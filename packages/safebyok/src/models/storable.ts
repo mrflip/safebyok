@@ -1,338 +1,335 @@
-/** The base of a Box and a Vault: one stored thing as this device holds it, the verbs that fetch, edit, send and delete it, and the pipeline that takes in what storage says of it. */
-
 import type * as Z from 'zod'
-import { Checker } from '../checks/validator'
-import { randomId } from '../crypto'
+import { Checker } from '../checks/validator.js'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf } from '../outcome'
 import type { Clock } from '../shapes/bank-opts'
 import { stableJsonify } from '../stable-jsonify'
 import { Trigger } from '../utils/trigger'
 
-// == [Record forms]: Revision, Times, Tombstone, Fetched, Dna, Received, isTombstone, isDraft
+// == [Record forms]: Revision, Times, Tombstone, Fetched, Draft, Received, isTombstone
 
-/** The two fields that version every stored thing: a token minted fresh for each write, and a count storage raises by one per write. */
 export type Revision = Readonly<{ revision_tok: string, revision_seq: number }>
 
-/** When the thing was first stored, and when the record in hand was written. On a tombstone, `written_at` is when it was deleted. */
+// When the thing was first stored, and when the record in hand was written; on a tombstone, when it was deleted.
 export type Times = Readonly<{ registered_at: number, written_at: number }>
 
-/** What a deletion leaves: the scope, the revision the deletion wrote, the times, and `deleted: true`. Nothing the user put in the thing. */
+// Scope, revision and times stay on a tombstone, for the record; nothing the user put in the thing does.
 export type Tombstone<ScopeT> = ScopeT & Revision & Times & Readonly<{ deleted: true }>
 
-/** A record as storage answers it, or as the device cache kept it: full, sparse, or a tombstone. A draft is a sparse record at `revision_seq` 0, which nothing stored has. */
+/** Outcome `val` of storage calls: the full record, its sparse form, or its tombstone. */
 export type Fetched<ScopeT, RecordT, SparseT> = RecordT | SparseT | Tombstone<ScopeT>
 
-/** What a host hands `listing.make`, or `fetch` with `ifAbsent: 'create'`, for a thing not stored yet: its scope, and any record field it wants to set. The listing completes it into a draft. */
-export type Dna<ScopeT, RecordT> = ScopeT & Partial<RecordT>
+// Slop: What `make` takes for a thing that is not stored yet: its scope and any props the host sets, no revision or times.
+// Properties for instatiating a storable: require the minimal props, accept the full record.
+export type Draft<ScopeT, RecordT> = ScopeT & Partial<RecordT>
 
-/** What `receive` hands back to the listing: the copy to write to the device cache, and news to tell the host once. */
+// Payload `receive` hands back to the listing: the copy to cache on the device, and news to tell.
 export type Received<ScopeT, SparseT> = Readonly<{
   cacheable: SparseT | Tombstone<ScopeT>
   badnews:   readonly VaultError[]
 }>
 
-/** True for a tombstone. */
 export const isTombstone = <ScopeT>(fetched: object): fetched is Tombstone<ScopeT> => (
   'deleted' in fetched && fetched.deleted === true
 )
 
-/** True for a draft: a record at `revision_seq` 0, made here from a dna and not stored yet. */
-export const isDraft = (fetched: Revision): boolean => fetched.revision_seq === 0
-// --
-
-// == [Options]: IfPresent, ifPresent, TimelyOpts, EditOpts, SendOpts
-
-/** What `send` does with a draft when storage already holds the thing: write over it, refuse, or take what is stored instead. Not acted on yet. */
-export const IfPresentVals = ['replace', 'fail', 'fetch'] as const
-export const ifPresent = Checker(({ oneof }) => oneof(IfPresentVals), 'bad_option')
+/** Policies when writing to an already-existing record: replace it, throw an error, return it instead */
+export const IfPresentValues = ['replace', 'fail', 'fetch'] as const
+/** Policy when writing to an already-existing record: replace it, throw an error, return it instead */
+export const ifPresent = Checker(({ oneof }) => oneof(IfPresentValues))
 export type  IfPresent = Z.infer<typeof ifPresent>
 
-/** How old a copy a verb may work from, in milliseconds: of the record in hand, and of the world around it. Left out, the listing's defaults hold. `maxWorldMillis` is not acted on yet. */
-export type TimelyOpts = { maxMillisSinceRefresh?: number | undefined, maxWorldMillis?: number | undefined }
-
-export type EditOpts = TimelyOpts
-
-export type SendOpts = TimelyOpts & { ifPresent?: IfPresent | undefined }
-// --
-
-// == [What a storable is given]: LockState, World, StorableListing, StorableOpts
-
+/** What a storable asks of its listing: World, StorableListing */
 export type LockState = 'unlocked' | 'locked'
 
-/** What every listing's surroundings supply: the one clock. The bank is a vault listing's world; the vault is a box listing's. */
+// The world a listing lives in: the vault for boxes, the bank for vaults. The one clock lives here.
 export type World = { clock: Clock }
 
-/** What a storable asks of the listing holding it: the clock, the lock, the world's timeliness, and storage calls made on its behalf. A `Listing` implements it. */
 export type StorableListing<ScopeT extends object, RecordT extends SparseT, SparseT extends ScopeT & Revision & Times> = {
+  world: World
   clock: Clock
   lockState(): LockState
   ensureTimelyWorld(opts: TimelyOpts): Promise<void>
   absentRefusal(scope: ScopeT): VaultError
   fetchRecordOf(thing: Storable<ScopeT, RecordT, SparseT, unknown, unknown>): Promise<void>
   putRecordOf(thing: Storable<ScopeT, RecordT, SparseT, unknown, unknown>, record: RecordT): Promise<void>
-  delRecordOf(thing: Storable<ScopeT, RecordT, SparseT, unknown, unknown>): Promise<void>
+  delRecordOf(thing: Storable<ScopeT, RecordT, SparseT, unknown, unknown>, tombstone: Tombstone<ScopeT>): Promise<void>
 }
 
 export type StorableOpts<ScopeT extends object, RecordT extends SparseT, SparseT extends ScopeT & Revision & Times> = {
-  listing:               StorableListing<ScopeT, RecordT, SparseT>
-  maxMillisSinceRefresh: number
+  listing:                StorableListing<ScopeT, RecordT, SparseT>
+  maxMillisSinceRefresh:  number
 }
-// --
+
+// == [Options]: TimelyOpts, SendOpts, EditOpts
+
+// How fresh the record in hand and the world must be before a verb goes on. `maxWorldMillis`: not yet.
+export type TimelyOpts = { maxMillisSinceRefresh?: number | undefined, maxWorldMillis?: number | undefined }
+
+// What `send` does when storage already holds the thing a draft is sent as. Not yet acted on.
+export type SendOpts = TimelyOpts & { ifPresent?: 'replace' | 'fail' | 'fetch' | undefined }
+
+export type EditOpts = TimelyOpts
 
 // == [Storable]
 
-/** One stored thing as this device holds it, and the verbs on it. A Box or a Vault is one; its listing makes it (`listing.make`), never `new`.
+/**
+ * Storable props come in several flavors. These are managed by the storable:
+ * - immutable props: the scope (eg `applabel`, `user_id`, `vaultlabel`), plus `registered_at`; Vault adds `vault_tok`
+ * - envelope props: revision props (`revision_tok`, `revision_seq`, `written_at`), managed by the storable
+ * Payload props are defined by the concrete class:
+ * - in Vault, `gate_epoch` and gate props; in Box, `sidecar`, and the whisper / box key props
  *
- * It keeps two copies. `central` is the latest record this device knows storage holds, frozen:
- * full, sparse, a draft at revision 0, or a tombstone. `overlay` is the fields edited here and
- * not yet sent, or null. `record` is central with the overlay laid over it, and is what the
- * snapshot shows and what `send` writes.
+ * The storable coordinates updates from other devices with local uncommitted changes by carrying
+ * - `central`, the latest view of the centrally stored record;
+ * - `overlay`, if data has been edited locally: a payload that will overwrite
+ *    the stored values when `send` is called. New data `receive`d passes through
+ *    `reconcile` to allow the overlay and central values to be merged
+ *    (or refused if there is a problem). Any call to `edit` activates the overlay:
+ *    even if there are no changes, and even if the offered patch is empty.
+ * The protected `record` accessor gives a unified view of the row as it would be stored.
+ * Public props are exposed as own props or accessors.
  *
- * Four verbs change it. `hydrate` makes the world and the record in hand timely, fetching when
- * they are not. `edit` lays a patch over the record in hand, sealing what needs the vaultKey.
- * `send` edits, then writes the record in hand under the next revision. `del` asks storage to
- * delete it. Each is a try pair, and each resolves `this`. Every answer storage gives, to these
- * or to a notice from the watch, comes back in through `receive`, which reconciles it against
- * central, adopts what is newer, and settles the consequences.
+ * (FIX ME implementation -- not clear if edit should also call reconcile; make *limited*
+ *  and *thoughtful* changes to the chain ordering based on vault's needs)
  *
- * The scope is the instance's only own fields, frozen. Everything that changes is read through
- * `snapshot`, which keeps its identity until something changes, as `useSyncExternalStore` wants.
+ * A storable is instantiated using async `build` in one of three circumstances:
  *
- * Refusals: 'vault_locked' from `edit`, `send` or `del` while the vault is locked; the listing's
- * absent refusal ('absent_box', 'absent_vault') from a verb on a thing gone; 'bad_option' from
- * `send` on a record too sparse to write.
+ * - explicitly by host, giving props for an assumedly never-before-stored thing;
+ * - listing's subscription reports a record it doesn't yet hold
+ * - during warmup, loaded from the local DeviceDB cache
+ * - when a listing operation contains records not yet held
+ *
+ * External updates to the `central` value come via `receive` (even when it's the result of an operation):
+ *
+ * - full:    an explicit fetch, yielding a full record
+ * - sparse:  an explicit listing operation, yielding a sparse record
+ * - full:    as metadata on certain refused calls, such as `stale_write` (which returns the stored record that won the race)
+ * - full:    return value of a write operation, giving the full actual record stored
+ * - full(§): subscribed notification of a record change ((§): notification-space-limited VaultDBs, eg Postgres, may omit payloads of large records)
+ * - full:    in the case of vault, the `world` slot of any VaultDB call
+ * - either:  in the case of vault, the `world` slot of any VaultDB subscription (depends on VaultDB capabilities)
+ *
+ * Timeliness: a storable is timely if
+ * - its `world` is timely,        AND
+ * - it is consistent,             AND
+ * - its `central` value is timely AND
+ * - there is a payload (i.e. there is an `overlay` or the `central` value is full)
+ *
+ * Read operations require the world to be timely, and unlocked at the moment the read is attempted.
+ * Write operations require the object and world to be timely, and to be unlocked at the moment the write is attempted.
+ * FIXME -- need to allow different timeliness windows for the object and the world
+ *
+ * FIXME -- PropsT is something an other agent hallucinated, rip that out
  */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends ScopeT & Revision & Times, PatchT, SnapshotT> {
-  readonly scope: ScopeT
-  protected readonly listing: StorableListing<ScopeT, RecordT, SparseT>
+  readonly scope:   ScopeT
+  readonly #world:  World
+  readonly listing: StorableListing<ScopeT, RecordT, SparseT>
 
-  #central:  Fetched<ScopeT, RecordT, SparseT>
-  #overlay:  Partial<RecordT> | null = null
-  #snapshot: SnapshotT | null = null
-  readonly #trigger:   Trigger<null, void>
+  // The revision and times of the record in hand, as plain props. `assign` sets them; the concrete class's
+  // constructor calls it once every field exists, then seals the instance.
+  declare revision_tok:  string
+  declare revision_seq:  number
+  declare registered_at: number
+  declare written_at:    number
+
+  // The most recent stored value this device knows: full, sparse, or a tombstone. A thing is born holding one,
+  // the listing's `make` having completed a draft into a record at revision_seq 0, the revision nothing stored has.
+  #central: Fetched<ScopeT, RecordT, SparseT>
+  // The local copy: the record as edited here and not yet sent (including a tombstone `del` is sending).
+  #edited: RecordT | Tombstone<ScopeT> | null = null
+  #snapshot: SnapshotT
+  readonly #trigger: Trigger<SnapshotT, void>
   readonly #listeners = new Set<() => void>()
 
-  // The concrete constructor freezes the instance as its last line: a private field cannot be added to a frozen object.
-  protected constructor(central: Fetched<ScopeT, RecordT, SparseT>, opts: StorableOpts<ScopeT, RecordT, SparseT>) {
-    this.listing = opts.listing
+  constructor(world: World, listing: StorableListing<ScopeT, RecordT, SparseT>, central: Fetched<ScopeT, RecordT, SparseT>, opts: StorableOpts<ScopeT, RecordT, SparseT>) {
+    this.#world = world
+    this.listing = listing
     this.scope = this.scopeOf(central)
-    tattoo(this, this.scope)
+    tattoo(this, this.scope, { writable: false }) // assign scope props immutably
     this.#central = Object.freeze(central)
     this.#trigger = new Trigger({
-      clock:                 opts.listing.clock,
+      clock:                 this.#world.clock,
       maxMillisSinceSuccess: opts.maxMillisSinceRefresh,
-      doSnapshot:            () => null,
+      doSnapshot:            () => this.#snapshot,
       doTryLaunch:           () => outcomeOf(() => this.listing.fetchRecordOf(this)),
     })
+    this.initialize()
+    this.#snapshot = this.makeSnapshot()
   }
 
-  // == [Copies]: central, overlay, record, sparse, isDraft, isGone, isHydrated, hasOverlay, toJSON
+  // We need a way to attach other lifetime props or do other housekeeping before the snapshot is made. Subclasses must call super.initialize()
+  protected initialize(): void { /* no-op */ }
 
-  /** The latest record this device knows storage holds, frozen: full, sparse, a draft, or a tombstone. */
+  // Set every prop that follows the record in hand. The concrete class sets its own after calling this.
+  protected assign(record: Fetched<ScopeT, RecordT, SparseT>): void {
+    this.revision_tok = record.revision_tok
+    this.revision_seq = record.revision_seq
+    this.registered_at = record.registered_at
+    this.written_at = record.written_at
+  }
+
+  // == [Identity and forms]: clock, record, central, edited, sparse, isGone, isHydrated, toJSON
+
+  // The record in hand: the local copy where one is begun, else the stored one.
+  // combines the envelope (core immutables and most-recent revision info)
+  // with the payload (from the overlay, or from the central value if no overlay and it's full)
+  // The design here is not clear yet: do we assemble on the fly
+  // using
+  // -
+  protected get record(): Fetched<ScopeT, RecordT, SparseT> { return this.#edited ?? this.#central }
+
   protected get central(): Fetched<ScopeT, RecordT, SparseT> { return this.#central }
 
-  /** The fields edited here and not yet sent, frozen, or null when nothing is. */
-  protected get overlay(): Partial<RecordT> | null { return this.#overlay }
+  protected get edited(): RecordT | Tombstone<ScopeT> | null { return this.#edited }
 
-  /** The record in hand: central with the overlay laid over it. A tombstone takes no overlay. */
-  protected get record(): Fetched<ScopeT, RecordT, SparseT> {
-    if (this.#overlay === null || isTombstone(this.#central)) { return this.#central }
-    return { ...this.#central, ...this.#overlay }
-  }
-
-  /** The record in hand without its heavy fields, or null once gone. */
   get sparse(): SparseT | null {
-    const { record } = this
-    return isTombstone(record) ? null : this.sparseOf(record)
+    if (isTombstone(this.#central)) { return null }
+    return this.sparseOf(this.#central)
   }
 
-  /** True while the thing was made here and never stored. */
-  get isDraft(): boolean { return isDraft(this.#central) }
-
-  /** True once storage holds a tombstone, or nothing, where this thing was: every verb on it refuses. */
   get isGone(): boolean { return isTombstone(this.#central) }
 
-  /** True when the record in hand is full, so there is a whole record to send or open. */
-  get isHydrated(): boolean {
-    const { record } = this
-    return ! isTombstone(record) && this.isFullRecord(record)
-  }
-
-  /** True while an edit made here is not yet sent. */
-  get hasOverlay(): boolean { return this.#overlay !== null }
+  get isHydrated(): boolean { return ! isTombstone(this.#central) && this.isFullRecord(this.#central) }
 
   toJSON(): SparseT | null { return this.sparse }
   // --
 
-  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, replaceSnapshot, sameSnapshot
+  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe
 
-  /** What a host renders: frozen plain data, the same object until something changes. Made on first read. */
-  get snapshot(): SnapshotT {
-    this.#snapshot ??= this.makeSnapshot()
-    return this.#snapshot
-  }
+  /** Direct public access to the snapshot */
+  get snapshot(): SnapshotT { return this.#snapshot }
+  /** Public access to the unbound "hand over yer snapshot" callback */
+  get       getSnapshot(): () => SnapshotT { return this.#getSnapshot }
+  /** Unbound callback to acquire the snapshot */
+  readonly #getSnapshot = (): SnapshotT => this.#snapshot
 
-  /** `() => snapshot`, one function for the instance's life: the second argument of `useSyncExternalStore`. */
-  get getSnapshot(): () => SnapshotT { return this.#getSnapshot }
-  readonly #getSnapshot = (): SnapshotT => this.snapshot
-
-  /** Enroll `listener` to be called after each change of the snapshot, returning the function that unenrolls it: the first argument of `useSyncExternalStore`. */
+  /** Public access to the unbound "make me a subscriber" callback */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+  /** Unbound callback to enroll the given listener for push notifications
+   * Invoke the returned unsubscribe function to unenroll the listener
+   */
   readonly #subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Make the snapshot again and, when it differs from the one held, replace it and call every listener. */
-  protected replaceSnapshot(): void {
-    const next = this.makeSnapshot()
-    if (this.#snapshot !== null && this.sameSnapshot(next, this.#snapshot)) { return }
-    this.#snapshot = next
-    for (const listener of this.#listeners) { listener() }
+  /** Replace the snapshot with a new one, and notify all listeners */
+  #replaceSnapshot(): void {
+    const nextSnapshot = this.makeSnapshot()
+    if (this.sameSnapshot(nextSnapshot, this.#snapshot)) { return }
+    this.#snapshot = nextSnapshot
+    this.#listeners.forEach((listener) => { listener() })
   }
-
-  /** True when two snapshots say the same thing, so no listener need hear of the second. Their JSON, by default. */
-  protected sameSnapshot(next: SnapshotT, held: SnapshotT): boolean {
-    return stableJsonify(next) === stableJsonify(held)
+  /** Compare two snapshots for equality: notifications are not sent if old and new are the same */
+  protected sameSnapshot(next: SnapshotT, current: SnapshotT): boolean {
+    return stableJsonify(next) === stableJsonify(current)
   }
   // --
 
-  // == [Guards]: isTimely, isLocked, demandNotGone, demandUnlocked, demandStorability, ensureTimelyStorability, fullRecord
+  // == [Guards]: isTimely, ensureTimelyStorability, demandStorability, demandUnlocked
 
-  /** True while the record in hand was fetched within the listing's `maxMillisSinceRefresh`. Says nothing of the world. */
   get isTimely(): boolean { return this.#trigger.isTimely }
 
-  /** True while the vault is locked, by the listing's word. */
-  get isLocked(): boolean { return this.listing.lockState() === 'locked' }
-
-  /** Throw the listing's absent refusal once this thing is gone. */
-  demandNotGone(): this {
-    if (this.isGone) { throw this.listing.absentRefusal(this.scope) }
-    return this
-  }
-
-  /** Throw 'vault_locked' while the vault is locked. */
-  demandUnlocked(): this {
-    if (this.isLocked) { throw new VaultError('vault_locked', 'The vault is locked, so nothing in it can be opened or stored: unlock it and call again.') }
-    return this
-  }
-
-  /** Throw unless a record can be written now: not gone, the vault unlocked, and the record in hand full. */
-  demandStorability(): this {
-    this.demandNotGone()
-    this.demandUnlocked()
-    this.fullRecord()
-    return this
-  }
-
-  /** Hydrate, then {@link demandStorability}: the one precondition of `send` and `del`. */
+  // The world and the record in hand are timely, and a record can be made over it.
   async ensureTimelyStorability(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
-    return this.demandStorability()
+    this.demandStorability()
+    return this
   }
 
-  /** The record in hand as a full record, or a throw: the absent refusal once gone, 'bad_option' while too sparse to write. */
-  protected fullRecord(): RecordT {
-    const { record } = this
-    if (isTombstone(record)) { throw this.listing.absentRefusal(this.scope) }
-    if (! this.isFullRecord(record)) { throw new VaultError('bad_option', 'This record is not whole, so there is nothing to make a record over: hydrate it, or edit in what it lacks, and call again.') }
-    return record
+  // The world is unlocked; the record in hand is whole and not gone, so a record can be made over it.
+  demandStorability(): this {
+    this.demandUnlocked()
+    if (this.isGone) { throw this.listing.absentRefusal(this.scope) }
+    if (! this.isHydrated) { throw new VaultError('bad_option', 'This record has not been hydrated, so there is nothing to make a record over: call hydrate() first.') }
+    return this
   }
-  // --
 
-  // == [Verbs]: hydrate, edit, send, del, each with its try form
+  isLocked(): boolean { return this.listing.lockState() === 'locked' }
+  demandUnlocked(): this {
+    if (this.listing.lockState() === 'locked') {
+      throw new VaultError('vault_locked', 'The vault is locked, so nothing in it can be opened or stored: unlock it and call again.')
+    }
+    return this
+  }
 
-  /** Make the world timely, then the record in hand, fetching each that is not; resolve `this`.
-   * The world goes first: its answer may lock this vault or take this thing away. Calls made
-   * while a fetch runs join it. A thing it finds gone resolves gone: the caller asks `isGone`.
-   */
+  // == [Storable ops]: hydrate, send, edit, del, each with its try form
+
+  // The world timely; then, if the record in hand is stale, fetch. Calls made during a fetch join it.
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
+    // FIXME -- can/should these be run in parallel? With zero, you will get two or more refreshes, as the refresh will also ask for timeliness
     await this.listing.ensureTimelyWorld(opts)
+    // FIXME -- change the interface to isTimelyWithin to fall back if given `undefined`
+    // const timely = opts.maxMillisSinceRefresh === undefined
+    //   ? this.#trigger.isTimely
+    //   : this.#trigger.isTimelyWithin(opts.maxMillisSinceRefresh)
+    // if (! timely) { await this.#trigger.launch() }
     await this.#trigger.ensureTimelyWithin(opts.maxMillisSinceRefresh)
     return this
   }
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Hydrate, then lay `patch` over the record in hand as the overlay; resolve `this`. Nothing is stored until `send`.
-   * The concrete class turns the patch into record fields through `overlayOf`, sealing what the
-   * vaultKey must seal. A later edit lays over the last. An empty patch still begins an overlay.
-   * Central is never touched: a newer record received meanwhile is adopted beneath the overlay,
-   * and the host decides between the two. Refuses 'vault_locked' while the vault is locked,
-   * whatever the patch holds.
-   */
-  async edit(patch: PatchT, opts: EditOpts = {}): Promise<this> {
-    await this.hydrate(opts)
-    this.demandNotGone()
-    this.demandUnlocked()
-    const laid = await this.overlayOf(patch, opts)
-    this.demandNotGone()
-    this.demandUnlocked()
-    const merged: Partial<RecordT> = { ...this.#overlay, ...laid }
-    this.#overlay = Object.freeze(merged)
-    this.replaceSnapshot()
-    return this
-  }
-
-  tryEdit(patch: PatchT, opts: EditOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.edit(patch, opts)) }
-
-  /** Edit, then write the record in hand under the next revision; resolve `this` once storage answers.
-   * The answer comes back through `receive`, so central is what storage now holds, and the
-   * overlay sent is dropped. A write storage refuses as 'stale_write' is delivered the same way
-   * before the refusal is thrown: central catches up, and the overlay stays for the host.
-   * Refuses as {@link demandStorability} does.
+  /** Edit, prepare and store the current record, returning the full record stored (if unlocked)
+   * Once ready, apply edits from props and put the edited record.
+   * Listing will update this record as the answer comes back.
+   * returns `this`
    */
   async send(patch: PatchT, opts: SendOpts = {}): Promise<this> {
-    await this.edit(patch, opts)
-    this.demandStorability()
-    const sent = this.#overlay
-    const record: RecordT = { ...this.fullRecord(), ...this.nextRevision(), written_at: this.listing.clock.now() }
+    await this.ensureTimelyStorability(opts) // unlocked, world is timely, this record is timely, all are consistent
+    await this.edit(patch, opts)             // apply and settle (eg seal) modifications
+    this.demandStorability()                 // unlocked, consistent with world
+    const { record } = this
     await this.listing.putRecordOf(this, record)
-    if (this.#overlay === sent) {
-      this.#overlay = null
-      this.replaceSnapshot()
-    }
     return this
   }
 
-  trySend(patch: PatchT, opts: SendOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.send(patch, opts)) }
+  trySend(patch: PatchT, opts: SendOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.send(props, opts)) }
 
-  /** Hydrate, then ask storage to delete the thing at the revision in hand; resolve `this`, gone.
-   * The answer comes back through `receive` as a tombstone: the listing lets the thing go and
-   * its snapshot shows no data. Refuses 'vault_locked' while the vault is locked.
+  /** Become timely; reconcile the patch with current values; adopt them, and settle consequences (eg seal and snapshot), returning `this`
+   * When done, our contract is restored:
+   * - overlay has the reconciled payload props, central is untouched
+   * - settle was able to handle the consequences (eg seal and snapshot)
    */
+  async edit(patch: PatchT, opts: EditOpts = {}): Promise<this> {
+    await this.ensureTimelyStorability(opts) // unlocked, world is timely, this record is timely, all are consistent
+    // my design here isn't clear yet
+    const props = this.reconcile(patch) // determine new payload to adopt
+    this.assign(this.#edited)
+    this.replaceSnapshot()
+    await this.settle()
+    return this
+  }
+
+  tryEdit(props: PropsT, opts: EditOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.edit(props, opts)) }
+
+  // Timely and storable; hold the tombstone as edited; ask the listing to delete. The answer evicts this.
   async del(opts: TimelyOpts = {}): Promise<this> {
-    await this.hydrate(opts)
-    this.demandNotGone()
-    this.demandUnlocked()
-    await this.listing.delRecordOf(this)
+    await this.ensureTimelyStorability(opts)
+    const { registered_at } = this.#central
+    const tombstone: Tombstone<ScopeT> = Object.freeze({ ...this.scope, ...this.nextRevision(), registered_at, written_at: this.clock.now(), deleted: true })
+    this.#edited = tombstone
+    await this.listing.delRecordOf(this, tombstone)
     return this
   }
 
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
-  // --
 
   // == [Receiving]: receive, reconcile, adopt, settle
 
-  /** Take in what storage said of this thing, `fetched`, or null for nothing stored: reconcile it against central, adopt it when it is newer, settle the consequences, and hand back what to cache and what to tell.
-   * The listing calls it with every answer and every notice. Nothing stored is a tombstone at the
-   * revision held: it confirms a draft, and takes a stored thing away. It throws what `reconcile`
-   * throws.
-   */
-  async receive(fetched: Fetched<ScopeT, RecordT, SparseT> | null): Promise<Received<ScopeT, SparseT>> {
-    const central = this.reconcile(fetched ?? this.#tombstoneForAbsence())
-    if (central !== this.#central) { this.adopt(central) }
+  // The listing hands in what storage said about this thing. Reconcile it to the record that stands;
+  // adopt that; settle the consequences; say what to cache and what to tell.
+  async receive(fetched: Fetched<ScopeT, RecordT, SparseT>): Promise<Received<ScopeT, SparseT>> {
+    const record = this.reconcile(fetched)
+    this.adopt(record)
     const badnews = await this.settle()
-    return { cacheable: isTombstone(central) ? central : this.sparseOf(central), badnews }
+    return { cacheable: isTombstone(record) ? record : this.sparseOf(record), badnews }
   }
 
-  /** The record that is central after hearing `fetched`: central itself where `fetched` is older or says less, else `fetched`. Refusals throw; the overlay plays no part.
-   * Older is a lower `revision_seq`: a read served before an own write and answered after it
-   * looks exactly so, and is ignored. A tombstone at the held revision is the thing gone, unless
-   * the held record is a draft, which absence confirms. Two records at one `revision_seq` under
-   * different tokens throw 'corrupt_record'. The concrete class adds its own judgments over this.
-   */
+  // Refusals throw; reasonable data is judged. What comes back is the record that stands, which is what
+  // can be cached: the held one where the answer is older or says less, else the answer.
   protected reconcile(fetched: Fetched<ScopeT, RecordT, SparseT>): Fetched<ScopeT, RecordT, SparseT> {
     const held = this.#central
     if (fetched.revision_seq < held.revision_seq) { return held }
@@ -340,72 +337,55 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if (fetched.revision_tok !== held.revision_tok) {
       throw new VaultError('corrupt_record', 'Storage holds a record at the same revision_seq as this device, under another revision_tok: two writes landed as one revision, so neither can be trusted until the record is read again.')
     }
-    if (isTombstone(fetched)) { return isDraft(held) ? held : fetched }
+    if (isTombstone(fetched)) {
+      if (held.revision_seq === 0) { return held }   // a draft confirmed absent stands, waiting for its first send
+      throw this.listing.absentRefusal(this.scope)   // absence, or a tombstone, at the very revision held
+    }
     if (isTombstone(held)) { return held }
     return this.isFullRecord(held) && ! this.isFullRecord(fetched) ? held : fetched
   }
 
-  /** Hold `central` as the central record, frozen, and replace the snapshot.
-   * A tombstone drops the overlay. A full record or a tombstone counts as a fetch that landed; a
-   * sparse one over a full one schedules a fetch at once, so a thing held whole stays whole.
-   */
-  protected adopt(central: Fetched<ScopeT, RecordT, SparseT>): void {
-    const wasHydrated = this.isHydrated
-    this.#central = Object.freeze(central)
-    if (isTombstone(central)) {
-      this.#overlay = null
-      this.#trigger.noteSuccessNow()
-    } else if (this.isFullRecord(central)) {
-      this.#trigger.noteSuccessNow()
-    } else if (wasHydrated) {
-      this.#trigger.scheduleLaunchNow()
-    }
+  // Hold the record as central, frozen; assign props; mark the fetch good if it brought the whole record; snapshot.
+  protected adopt(record: Fetched<ScopeT, RecordT, SparseT>): void {
+    this.#central = Object.freeze(record)
+    if (isTombstone(record)) { this.#edited = null }
+    this.assign(this.record)
+    if (isTombstone(record) || this.isFullRecord(record)) { this.#trigger.noteSuccessNow() }
     this.replaceSnapshot()
   }
 
-  /** Act on the record now central, beyond its fields and the snapshot, and resolve the bad news found in it. Nothing, by default.
-   * `receive` calls it after every answer, adopted or not, and the listing once at birth. A vault
-   * judges its lease and ways in here.
-   */
-  settle(): Promise<readonly VaultError[]> { return Promise.resolve([]) }
-  // --
+  // The consequences of a new record in hand, beyond the props and the snapshot. None by default.
+  // `receive` and `edit` call it after adopting; the listing's `make` calls it once on the record a thing is born with.
+  settle(): Promise<VaultError[]> { return Promise.resolve([]) }
 
-  // == [Revision]: nextRevision, tombstoneForAbsence
+  // == [Versioning]: nextRevision
 
-  /** The revision `send` writes under: a fresh token, and the central count plus one. */
   protected nextRevision(): Revision {
-    return { revision_tok: randomId(), revision_seq: this.#central.revision_seq + 1 }
+    return { revision_tok: mintRevisionTok(), revision_seq: this.#central.revision_seq + 1 }
   }
 
-  /** The tombstone an answer of nothing stored amounts to: at the revision and times held. */
-  #tombstoneForAbsence(): Tombstone<ScopeT> {
-    const { revision_tok, revision_seq, registered_at, written_at } = this.#central
-    return { ...this.scope, revision_tok, revision_seq, registered_at, written_at, deleted: true }
-  }
-  // --
+  // == [What the concrete class defines]: scopeOf, isFullRecord, sparseOf, overlayPropsAndSealBeforeSettling, makeSnapshot
 
-  // == [What the concrete class defines]: scopeOf, isFullRecord, sparseOf, overlayOf, makeSnapshot
-
-  /** The scope fields of `fetched`, and nothing else. */
   protected abstract scopeOf(fetched: Fetched<ScopeT, RecordT, SparseT>): ScopeT
-  /** True when `fetched` holds every field of the full record. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
-  /** `record` without its heavy fields. */
   protected abstract sparseOf(record: SparseT): SparseT
-  /** The record fields `patch` lays over the record in hand, sealed where the vaultKey must seal them. Called unlocked. */
-  protected abstract overlayOf(patch: PatchT, opts: EditOpts): Promise<Partial<RecordT>>
-  /** The snapshot of the record in hand and what changes beside it. */
+  // The step of `edit` only the concrete class can take: `drafted` is the record in hand under its next
+  // revision; lay the props over it and seal what needs sealing. What comes back is held as edited.
+  protected abstract overlayPropsAndSealBeforeSettling(drafted: RecordT, props: PropsT, opts: EditOpts): Promise<RecordT>
   protected abstract makeSnapshot(): SnapshotT
-  // --
 }
-// --
 
-// == [Helpers]: tattoo
+// == [Helpers]: tattoo, mintRevisionTok
 
-/** Attach each entry of `shown` to `obj` as an own enumerable field that cannot be assigned: the stamp a spread, `Object.keys` or JSON shows. */
-const tattoo = (obj: object, shown: object): void => {
+// Stands in until the helpers worker lands `tattoo`; then this goes and the import takes its place.
+const tattoo = <BT extends object>(obj: object, shown: BT, opts: { writable?: boolean } = {}): BT => {
   for (const [ckey, val] of Object.entries(shown)) {
-    Object.defineProperty(obj, ckey, { value: val, enumerable: true, writable: false, configurable: false })
+    Object.defineProperty(obj, ckey, { value: val, enumerable: true, writable: opts.writable ?? true, configurable: true })
   }
+  return shown
 }
-// --
+
+export const mintRevisionTok = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
