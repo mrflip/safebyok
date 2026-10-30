@@ -133,6 +133,11 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   spec's `ifPresent` entry is the table. A revision-0 put over a stored tombstone is `stale_write`.
   The brief's thread 8 text (its `'fail'` is this `'replace'`; its `'replace'`, an overwrite, does
   not exist) is superseded.
+* *The Coach (2026-10-30), the store's versioned replace* (verbatim in *Resolved*): storage
+  enforces that each revision is the prior's seq + 1 under the prior tok; the device sends the
+  prior tok only, never the prior seq; no row requires prior tok null **and** seq 0, either
+  without the other inconsistent ("I hate using null as a sentinel"). `'fetch'` "only makes sense
+  against an assumption it doesn't exist", hence not implemented. Thread 16.
 * *Orchestrator (2026-10-30), a planning lesson:* thread 9 (ten rulings, medium) compacted twice,
   once before its first justify and once after. Ten small items in one thread is one context's
   worth; threads 11-13 are one ruling each.

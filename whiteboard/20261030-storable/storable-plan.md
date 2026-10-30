@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** #385 back in draft, reworked to compare-and-swap only (the Coach's ruling); #387 reviewed, waiting to restack onto it; then 17, 15, 13, 16, then 6.
+* **Status:** #385 filing after the compare-and-swap rework; #387 restacks onto it; then 16 (the store's versioned replace), 17, 15, 13, then 6.
 
 ## Read first
 
@@ -462,21 +462,49 @@ the spec's `ifPresent` entry becomes the Coach's table (`'fetch'` not implemente
 under it open). The seal-stamp and skip-refresh rows are retired as moot. Then a short review of
 the rework, #387 restacked onto it with a lease, both filed.
 
-### 16. A faithful fake store
+### 16. The store's versioned replace
 
-*Orchestrator, from #385's review:* the fake store in `tests/test-helpers/models-world.ts` gives
-`put` and `del` a full compare-and-set: a given `expected` must match what is stored (revision
-seq and tok), and nothing stored with an `expected` given refuses too, as a real store would;
-`stale_write` carries what is stored. Fix the seeds of the tests that put or delete over a record
-they did not expect (the reviewer counted 9 across `listing.test.ts`, `box.test.ts`,
-`loosened.test.ts`, among them the save-refused loop cases), changing no assertion's subject. From #385's second review, the `Store` contract and the fake
-enforce the Coach's table (the spec's `ifPresent` entry) for every put and `del`, tok included;
-#385's rework already refuses a revision-0 put over a stored tombstone. A revision lower than
-expected stays `stale_write` (the Coach: "whatever refusal we do now"); note in the thread file
-that the device then judges what is stored older and stays stuck, a fundamentally inconsistent
-state CLAUDE.md answers with a reload, for the Coach.
-Label `faithful_fake`. Worker `sonnet`; review `low`. Depends on 13 (cut from its tip, last
-before 6). Size: small to medium.
+*Orchestrator, the Coach's ruling (2026-10-30):* "We need the store to enforce that the versions
+strictly increment by one each time, besides also naming the prior token. So we don't need to
+(and should not) send the expected prior seq; the vaultDB implementor may implement the +1 rule as
+a calculation or code it into the query. I hate using null as a sentinel, so this also gives us a
+little safety: 'no row' requires expected null and revision_seq 0 -- either without the other is
+an inconsistent refusal." On `'fetch'` and a live N - 1: "the ifPresent flag only makes sense
+against an assumption it doesn't exist, and that would be enforced at send and on server ... this
+is why we're not implementing it yet. Add your table, with question marks and shrug emojis where
+there's ambiguity." Label `versioned_replace` (was `faithful_fake`).
+1. **The contract.** `Store.put(record, priorTok)` and `Store.del(scope, priorTok)`: `priorTok` is
+   the `revision_tok` of the record the device holds, null when it holds none; no prior seq is
+   sent. A put lands only (a) over no row, with `priorTok` null and the record's `revision_seq` 0,
+   or (b) over the row whose `revision_tok` is `priorTok`, with the record's `revision_seq` that
+   row's seq + 1; storage computes or queries the + 1 itself and never renumbers or patches.
+   Otherwise: a row under another tok refuses `stale_write`, carrying it; no row with a
+   `priorTok` given refuses `stale_write` carrying nothing (today's path for an absent
+   `meta.box_stored`); `priorTok` null with a seq other than 0, a `priorTok` with seq 0, or a seq
+   other than the row's + 1, is **inconsistent**: survey `refusalKindVals` and use the existing
+   kind that fits a request the device should never make (YOLO; say which in the thread file and
+   the PR's open questions, for a Coach row). `del` follows the same tok rule; storage makes the
+   tombstone at the row's seq + 1 under a fresh tok; what `del` with `priorTok` null over no row
+   does today, keep and name in the thread file.
+2. **The device.** The listing sends `priorTok` (`expectedRevisionOf` becomes the tok alone, or a
+   successor so named), and checks the pairing (null with seq 0, a tok with seq > 0) before it
+   sends, refusing the same inconsistent kind; the storable already mints seq = central's + 1.
+3. **The fake store** in `tests/test-helpers/models-world.ts` enforces all of it for `put` and
+   `del`. Fix the seeds of tests that put or delete over a record they did not hold (about 9 across
+   `listing.test.ts`, `box.test.ts`, `loosened.test.ts`), changing no assertion's subject; list
+   each. Tests for every cell of the `'replace'` row below.
+4. **The spec** (`whiteboard/20261028-storable_base/storable-spec.md`, the `ifPresent` entry #385
+   wrote): restate it in these terms, with the table below (the Coach: "Add your table"). A
+   revision lower than expected is the Coach's "whatever refusal we do now"; note in the thread
+   file that the device then judges what is stored older and stays stuck, for the Coach.
+
+```
+| `ifPresent` | no row; prior tok null, N = 0 | row under the prior tok, a tombstone; N = its seq + 1 | row under the prior tok, alive or damaged; N = its seq + 1 | a row under another tok | no row; a prior tok given | prior tok null with N ≠ 0, a tok with N = 0, or N ≠ seq + 1 |
+|---|---|---|---|---|---|---|
+| `'replace'` (default; the only one implemented) | lands | lands | lands | `stale_write`, carrying it | `stale_write`, carrying nothing ❓ | refused, inconsistent (kind ❓) |
+| `'fetch'` (not implemented) | lands | lands | 🤷 the flag assumes no such row | answers it, `ok: true` ❓ (if newer? 🤷) | 🤷 | refused, inconsistent |
+```
+Worker `opus`; review `medium`. Depends on 12 (cut from its tip). Size: medium.
 
 ### 12. The sidecar, locked or not
 
@@ -505,7 +533,7 @@ Label `cacheable_private`. The storable's own `settle` hands its cacheable to th
 assert instead on what the fake cache saved (`mw`'s cache calls), on the snapshot, or on what was
 put; a test helper may read the fake cache's last save for a scope. Behaviour unchanged: the
 cache is saved when it is today (each delivery, each build; never on `hello`'s revive). Worker
-`sonnet`; review `medium`. Depends on 12 (cut from its tip). Size: medium (mechanical, wide).
+`sonnet`; review `medium`. Depends on 16 (cut from its tip). Size: medium (mechanical, wide).
 
 ### 15. A whisper and a sidecar on every update
 
@@ -548,7 +576,7 @@ so the loosened file and every thread file are in its tree. Reads 4a's and 4b's 
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 16 (a faithful fake store), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
