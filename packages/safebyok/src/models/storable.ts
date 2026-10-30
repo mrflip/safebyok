@@ -247,11 +247,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryEdit(patch: PatchT, opts: EditOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.edit(patch, opts)) }
 
-  /** `edit`, then hand this thing, ducking as its record, to `listing.put`, which resolves once storage's answer is delivered; a 'stale_write' refusal delivers what storage holds, then throws. The revision minted is spent, whatever the answer: the next `edit` mints another. */
+  /** `edit`, then hand the record it staged to `listing.put`, which resolves once storage's answer is delivered; a 'stale_write' refusal delivers what storage holds, then throws. The revision minted is spent, whatever the answer: the next `edit` mints another. */
   async send(patch: PatchT, opts: SendOpts = {}): Promise<this> {
     await this.edit(patch, opts)
     this.#minted = null
-    await this.listing.put(this)
+    // The staged record, not this thing ducking as it: a lock may come down between edit and put, and a locked thing's getters hide what it holds.
+    await this.listing.put(this.listing.recordOf(this.#staged))
     return this
   }
 
