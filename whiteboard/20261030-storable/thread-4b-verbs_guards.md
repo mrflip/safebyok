@@ -46,3 +46,11 @@ Branch `20261030-verbs_guards`, PR #375, stacked on #371 (restacked onto #374; t
   * **vault_tok on receive**: a box record under another `vault_tok` is adopted silently. CLAUDE.md calls this drift, which means a reload. I recommend refusing or reloading, and then thread 5's test can say the prop never changes.
   * **Exposed whisper across a lock**: today it reads LOCKED, then reads again once unlocked, against `expose`'s doc and G6. I recommend forgetting it on lock.
   * **Background refusals**: I recommend that the trigger's failed launch tells `onBadNews` (any kind but absent).
+
+## Restacked
+
+Restacked 2026-10-30 onto thread 7 (#377), in the line main → #368 → #374 → #370 → #371 → #373 → #376 → #377 → #375.
+
+* **`send` puts the record it staged** (commit 88da3d5b, right after the verbs commit). Thread 5 makes a locked box's `sidecar` getter answer the LOCKED bag, and `send` handed `listing.put` the box itself, ducking as its record. So a send whose vault locked between `edit` and `put` refused `bad_record` on `sidecar`. `send` now hands over `listing.recordOf(#staged)`. `listing.put` already took a record or a thing, so no signature changed. The test "completes a send whose vault locks between edit and put" passes unchanged. The orchestrator ruled answer A, for the Coach to confirm. The verbs commit 9089ca06 just before it fails that one test.
+* **Thread 2's test restated** (`tests/models/storable.test.ts`, reconcileStaged table): "edit: … a new tok each time" now reads "one tok until send or del spends it", and asserts the second edit keeps the first edit's tok. This follows (f), the revision minted once.
+* **Merged test files**: `storable.test.ts`, `box.test.ts` and `tests/loosened/loosened.test.ts` each have one import block. Every describe from each thread is kept. In `storable.test.ts`, thread 4b's `// --` closes the Hydrate section before the describes from threads 2 and 5, and its Edit, Send, Del, Locked and Try sections follow. The `box.ts` banner that threads 4b and 5 both renamed keeps thread 5's "[Required by Storable]".
