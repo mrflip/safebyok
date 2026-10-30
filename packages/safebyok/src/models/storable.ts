@@ -425,7 +425,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [What the concrete class defines]: isFullRecord, makeStaged, makeSnapshot
+  // == [Concrete Subclass Required Methods]: isFullRecord, makeStaged, makeSnapshot
 
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
   /** The step of `edit` only the concrete class can take: `base` is the record in hand, sparse or full, under its next revision; lay the patch over it and seal what needs sealing. The record it returns is held as the staged, full. */
