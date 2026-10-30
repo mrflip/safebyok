@@ -942,6 +942,51 @@ describe("storable.edit(patch): the record staged", () => {
     expect(box.revision_seq).to.eq(3)
   })
 })
+
+/** A box `anthropic_api_key` at revision 1, seeded and timely, whose next `makeStaged` first receives `rcvd`, as a delivery landing mid-edit would. Calls are cleared after. */
+const landingBoxOf = async (rcvd: Fetched<BoxRecord, BoxSparse>): Promise<Box> => {
+  const { mw } = held
+  const record = mw.fullBoxRecord()
+  mw.seedStore(record)
+  const landing: { box: Box | null } = { box: null }
+  const listing = fakeSealBoxListingOf(mw, {}, () => {
+    const { box } = landing
+    landing.box = null
+    box?.receive(rcvd)
+  })
+  const box = await listing.build(record)
+  landing.box = box
+  mw.clearCalls()
+  return box
+}
+
+describe("storable.edit(patch): central moving while makeStaged runs", () => {
+  const MovedCases = [
+    [() => fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2', sidecar: { note: 'theirs' } }), true,  'a newer record from another device'],
+    [() => tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }),                         false, 'a deletion from another device'],
+  ] as const
+  for (const [rcvdOf, present, blurb] of MovedCases) {
+    it(`refuses 'stale_write' when ${blurb} is received, staging nothing; central is the record received`, async () => {
+      const box = await landingBoxOf(rcvdOf())
+      await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
+      expect(box.hasStaged).to.be.false
+      expect(box.isPresent).to.eq(present)
+      expect(box.cacheable.central).to.deep.equal(rcvdOf())
+    })
+  }
+
+  it("refuses 'stale_write' from a send, which puts nothing", async () => {
+    const box = await landingBoxOf(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2' }))
+    await TH.expectRefusal(box.send({ sidecar: { note: 'mine' } }), 'stale_write')
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+  })
+
+  it("stages the edit when what is received only confirms central's revision", async () => {
+    const box = await landingBoxOf(sparseBoxRecord())
+    await expect(box.edit({ sidecar: { note: 'mine' } })).resolves.to.eq(box)
+    expect(box.cacheable.staged).to.deep.include({ revision_seq: 2, sidecar: { note: 'mine' } })
+  })
+})
 // --
 
 // == [Send]: edit, then put

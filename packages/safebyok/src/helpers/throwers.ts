@@ -14,5 +14,7 @@ export const behindError      = () => new VaultError('vault_behind', Phrases.Vau
 
 // == [Storable Throwers]
 
-export const notFullError    = () => new VaultError('bad_option', "The record in hand is not full, so it cannot be opened: hydrate it, and call again.")
+export const notFullError        = () => new VaultError('bad_option', "The record in hand is not full, so it cannot be opened: hydrate it, and call again.")
+
+export const movedUnderEditError = () => new VaultError('stale_write', "Storage delivered a newer record while this edit was being made, so the edit was laid over a record storage no longer holds, and nothing was staged. The record in hand is the one delivered: call again to edit it.")
 // --
