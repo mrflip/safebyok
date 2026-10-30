@@ -6,7 +6,7 @@ import { stableJsonify } from '../stable-jsonify'
 import { lockedError, movedUnderEditError, notFullError, vaultRemadeError } from '../helpers/throwers'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
-import type { Age, Am, Cacheable, EditOpts, Fetched, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Times, Tombstone, Vaulted, World } from './models-shapes'
+import type { Age, Am, Cacheable, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Times, Tombstone, Vaulted, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -55,8 +55,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, this>
   readonly #listeners = new Set<() => void>()
-  /** Whether the listing's watch should push full records for this thing. */
-  #watchable = false
+  /** Whether the listing's watch should push full records for this thing: true until set otherwise. */
+  #watchable = true
   // --
 
   // == [Constructor]: constructor, assignInitialProps, assign
@@ -78,7 +78,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       maxMillis:   opts.maxMillisSinceRefresh,
       eagerFrac:   opts.eagerFrac,
       doSnapshot:  () => this.snapshot,
-      doTryLaunch: () => this.tryFetch(),
+      doTryLaunch: () => this.tryFetch({ ifAbsent: 'nil' }),
     })
   }
 
@@ -219,14 +219,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, edit, send, del, each with its try form
 
-  /** Get the record storage holds, through the listing, which delivers it to `receive`. */
-  async fetch(opts: TimelyOpts = {}): Promise<this> {
+  /** Get the record storage holds, through the listing, which delivers it to `receive`. Where nothing is stored, or a tombstone, `opts.ifAbsent` says: the absent refusal by default, or an absent thing as it is under 'nil', which the trigger's refresh always passes. */
+  async fetch(opts: FetchOpts = {}): Promise<this> {
     await this.ensureReadyToFetch(opts)
     await this.listing.fetch(this.scope, opts)
     return this
   }
 
-  tryFetch(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
+  tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
 
   /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where neither central nor the record in hand is whole. Calls made during a fetch join it. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
