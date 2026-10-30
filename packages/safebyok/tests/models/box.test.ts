@@ -583,9 +583,10 @@ describe("box.send(patch, { ifPresent: 'replace' }): a box this device believes 
     expect(box.revision_tok).to.eq('rev-other')
   })
 
-  it("takes the timely options beside it", async () => {
+  it("takes the timely options beside it, handing them on without ifPresent", async () => {
     const box = await neverStoredBoxOf()
-    await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
+    await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
+    expect(held.mw.callsOf('ensureTimely')[0]?.opts).to.deep.equal({ maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })
   })
 
   it("refuses 'bad_option' an ifPresent that is not 'replace', before staging or putting anything", async () => {
