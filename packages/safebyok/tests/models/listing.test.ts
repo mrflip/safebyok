@@ -983,6 +983,18 @@ describe("listing.put(duck, ifPresent): handed to storage, which judges it", () 
     ])
   })
 
+  it("makes the fake store put a replacing record over any record stored at the seq after it, under the record's own tok", async () => {
+    for (const record of [fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }), tombstoneBoxRecord({ revision_seq: 4 }), tombstoneBoxRecord({ revision_seq: 4 }, 'd')]) {
+      held.mw.seedStore(record)
+      const box = await boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-replacing', revision_seq: 0 }), 'replace')
+      expect(box).to.include({ revision_tok: 'rev-replacing', revision_seq: 5 })
+      expect(held.mw.stored.get(record.boxlabel)).to.deep.include({ revision_tok: 'rev-replacing', revision_seq: 5 })
+    }
+    held.mw.stored.clear()
+    const box = await boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-replacing', revision_seq: 0 }), 'replace')
+    expect(box).to.include({ revision_tok: 'rev-replacing', revision_seq: 0 })
+  })
+
   it("makes the fake store put over a tombstone stored when none was expected", async () => {
     held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
     await expect(boxListingOf(held.mw).put(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))).resolves.to.be.instanceOf(Box)

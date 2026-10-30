@@ -144,7 +144,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
   /** Put `duck`, a record or a thing ducking as its record, over the revision its instance expects (none, for a thing never stored or not held), and deliver the answer. A 'stale_write' refusal delivers the record storage holds before it is thrown.
-   * `ifPresent`, optional, may only be `'replace'`: it goes to storage with the put, which judges it. Where the revision expected is none, storage puts over a record it holds; where one is expected, its compare-and-set holds as it does without.
+   * `ifPresent`, optional, may only be `'replace'`: it goes to storage with the put, which judges it. Where the revision expected is none, storage puts over a record it holds, at the revision after that record's; where one is expected, its compare-and-set holds as it does without.
    */
   async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ifPresent?: IfPresent): Promise<ThingT | null> {
     const record = this.recordOf(duck)

@@ -262,7 +262,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryEdit(patch: PatchT, opts: EditOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.edit(patch, opts)) }
 
   /** `edit`, then hand the record it staged to `listing.put`, which resolves once storage's answer is delivered; a 'stale_write' refusal delivers what storage holds, then throws. The revision minted is spent, whatever the answer: the next `edit` mints another.
-   * `opts.ifPresent`, optional and only `'replace'`, goes to storage with the put: for a thing this device believes never stored, where storage holds a record, storage puts over it instead of refusing 'stale_write'. For a thing with a revision expected it changes nothing.
+   * `opts.ifPresent`, optional and only `'replace'`, goes to storage with the put: for a thing this device believes never stored, where storage holds a record, storage puts over it, at the revision after the one it holds, instead of refusing 'stale_write'; the answer is delivered as any newer record is. For a thing with a revision expected it changes nothing.
    */
   async send(patch: PatchT, opts: SendOpts = {}): Promise<this> {
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)

@@ -330,7 +330,7 @@ export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOp
   return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
 })
 
-/** How `send` treats a thing storage already holds, as {@link ifPresent} checks it: `'replace'`. */
+/** How `send` treats a thing storage already holds, as {@link ifPresent} checks it: `'replace'` puts over it, at the `revision_seq` one past the one held, so that the record put is newer than the one it replaces on every device. */
 export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
@@ -387,7 +387,7 @@ export type ListingWorld = World & {
   takeWorld(world: unknown): void
 }
 
-/** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none. `put` is also given `ifPresent` when `send` was: `'replace'` makes storage put over a record it holds, but only where `expected` is null; with `expected` given, storage's compare-and-set holds whatever `ifPresent` says. Storage judges it, not the listing. `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most. */
+/** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none. `put` is also given `ifPresent` when `send` was: `'replace'` makes storage put over a record it holds, alive, damaged or a tombstone, but only where `expected` is null. Over a record held, storage puts the record given at the `revision_seq` one past the held one's, under the given `revision_tok`, and answers what it then holds, as any put answers; over nothing held, the record lands as given. With `expected` given, storage's compare-and-set holds whatever `ifPresent` says. Storage judges it, not the listing. `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most. */
 export type Store<ScopeT, RecordT, SparseT> = {
   get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
   put(record: RecordT, expected: Revision | null, ifPresent?: IfPresent): Promise<Answer<ScopeT, RecordT, SparseT>>
