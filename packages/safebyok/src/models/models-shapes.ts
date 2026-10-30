@@ -118,7 +118,7 @@ export const { answer, notice } = Checkers('bad_record', ({ obj, union, lit, unk
   return { answer, notice }
 }, [Checks])
 
-/** What every answer carries beside its outcome: the `scope` the call asked about, and the world the record lies in as storage holds it now. */
+/** The fields every answer carries beside its outcome: the `scope` the call asked about, and the world the record lies in as storage holds it now. */
 type AnswerBase<ScopeT> = Readonly<{ scope: ScopeT, world: unknown }>
 
 /** The outcome of a storage call about `scope`, as the concrete listing maps it: an {@link Outcome} whose `val` is the record stored (null for none), or whose `err` is the refusal, with the `scope` and the `world` it lies in as storage holds it now beside it.
