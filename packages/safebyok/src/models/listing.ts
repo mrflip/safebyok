@@ -176,11 +176,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** `thing.receive(record)`, then settle on the thing. The bad news `receive` returns, and a refusal it throws, are told to `onBadNews`, never thrown, so the instance is always handed back. */
   async #receiveInto(thing: ThingT, record: Fetched<RecordT, SparseT> | null): Promise<ThingT> {
+    let badnews: readonly VaultError[]
     try {
-      this.tellBadNews(thing.receive(record).badnews)
+      ({ badnews } = thing.receive(record))
     } catch (err) {
-      this.tellBadNews([refusalOf(err)])
+      badnews = [refusalOf(err)]
     }
+    this.tellBadNews(badnews)
     await this.settle(thing)
     return thing
   }
