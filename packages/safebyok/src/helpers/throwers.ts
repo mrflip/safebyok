@@ -14,5 +14,5 @@ export const behindError      = () => new VaultError('vault_behind', Phrases.Vau
 
 // == [Storable Throwers]
 
-export const notFullError    = () => new VaultError('bad_option', 'The record in hand is not full, so it cannot be opened: hydrate it, and call again.')
+export const notFullError    = () => new VaultError('bad_option', "The record in hand is not full, so it cannot be opened: hydrate it, and call again.")
 // --
