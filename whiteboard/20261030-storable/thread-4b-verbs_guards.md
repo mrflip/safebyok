@@ -1,56 +1,42 @@
 # Thread 4b: Verbs and guards (2026-10-30)
 
-Branch `20261030-verbs_guards`, PR #375, stacked on #371 (restacked onto #374; the restack's push is pending). Justify: green (core 3888 pass, 37 skipped as before, 2 todo).
+Branch `20261030-verbs_guards`, PR #375, stacked on #377. Justify: green (core 4073 pass, 37 skipped as before, 2 todo).
 
 * **Built**: the Coach's fixes (d) to (g).
-  * (d) `ensureReadyToSend` and `demandReadyToSend` are gone, from `Storable` and from Vault's override. `send` is `edit`, then `listing.put`. `edit` no longer calls `demandReadyToEdit()` after `makeStaged`. `demandReadyToDel` is `demandUnlocked()` alone. `demandFull` and `notFullError` stay, because the box's new guard and `#unseal` call them. Vault's two remaining overrides still type: `edit` demands present, and `del` refuses absent on `am` 'x'.
-  * (e) `registered_at` leaves the tattoo, which now holds the scope alone, and `assign` sets it like the revision props. `edit`'s base takes `registered_at: now` where the record in hand is a tombstone. `revisionPropsOf` carries it. A box still has nine own keys.
-  * (f) `#minted` holds `{ revision, anteTok }`. `nextRevision(ante)` returns the memoized revision while `ante.revision_tok` is `anteTok`. `send` and `del` clear it just before they hand the record to the listing.
-  * (g) Box gains a `// == [Guards]` section: `ensureReadyToUnsealWhisper(opts)` calls `hydrate`, then `demandReadyToUnsealWhisper()`, which is `demandUnlocked().demandPresent().demandFull()`. `unsealWhisper` calls the ensure. `ensureReadyToSeal` and `demandReadyToSeal` exist; nothing calls them yet.
-  * Tests:
-    * `storable.test.ts`: banners `[Edit]`, `[Send]`, `[Del]`, `[Locked]`, `[Try forms]`. 4a's banner is renamed `[Hydrate]`, and its `// --` now closes after the trailing `it.todo`.
-    * `box.test.ts`: `[Receive]` (4a's, renamed, plus the props a receive moves), `[The absent contract]`, `[Rebirth]`, `[Sending a sparse box]`, `[The whisper while locked]`.
-    * `tests/loosened/loosened.test.ts`, new.
-  * `fakeSealBoxListingOf(mw, overrides, duringMakeStaged)`, at the end of `models-world.ts`.
-  * The reconcileCentral ouchstone note now covers a thing already held and one not yet held.
-  * Comment fixes: `classifyRecordShape` and `sparse` said "payload". `box.ts`'s "[What a storable defines]" banner is now "[Concrete Subclass Required Methods]".
+  * (d) `ensureReadyToSend`/`demandReadyToSend` are gone, from `Storable` and Vault. `send` is `edit`, then `listing.put` of the record staged. `demandReadyToDel` is `demandUnlocked()` alone. `demandFull` and `notFullError` stay for the box's guard and `#unseal`.
+  * (e) `registered_at` leaves the tattoo, which holds the scope alone; `assign` sets it. `edit`'s base takes `registered_at: now` over a tombstone.
+  * (f) `#minted` holds `{ revision, anteTok }`; `nextRevision(ante)` returns it while `ante.revision_tok` is `anteTok`. `send` and `del` clear it just before handing the record to the listing.
+  * (g) Box's `// == [Guards]`: `ensureReadyToUnsealWhisper(opts)` hydrates, then `demandUnlocked().demandPresent().demandFull()`. `ensureReadyToSeal`/`demandReadyToSeal` exist, uncalled.
+  * Tests: `storable.test.ts` sections `[Edit]`, `[Send]`, `[Del]`, `[Locked]`, `[Try forms]`; `box.test.ts` `[Receive]`, `[The absent contract]`, `[Rebirth]`, `[Sending a sparse box]`, `[The whisper while locked]`; `tests/loosened/loosened.test.ts`; `fakeSealBoxListingOf(mw, overrides, duringMakeStaged)` in `models-world.ts`.
 
 * **Decisions taken**:
-  * **A fake seal for rebirth.** A rebirth over a tombstone needs a whisper, and the real seal refuses `unexpected_error`. `fakeSealBoxListingOf` makes boxes whose `makeStaged` turns a whisper into fake ciphered bags. Without a whisper they use the box's own `makeStaged`. Its hook lets a test lock the vault during `makeStaged`.
-  * **Del answers.** By default the fake `del` answers a tombstone at the next revision. That reads `gone` and drops the staged tombstone. A scripted answer of the same tombstone reads `same`: `receive` ends before `reconcileStaged`, so the staged tombstone stays held (`hasStaged` true). The test pins this; see *For the Coach*.
-  * `notFullError`'s message now fits its callers: "not full, so it cannot be opened: hydrate it". Its kind is still `bad_option`.
-  * `#unseal` keeps its `demandFull()`, behind the guard.
-  * Tests read central and staged through `box.cacheable`, because the getters are protected.
-  * **Lock between `edit` and `put`.** The test subscribes a listener that locks. It asks for `box.snapshot` first, so that `edit`'s settle calls the listener.
-
-* **Deviations**:
-  * The box-only cases went to `box.test.ts`: a sparse send refusing `bad_option`, and rebirth.
-  * Added beyond the brief: a test that a receive moves `vault_tok`. A loosened pin and an `it.todo`: a whisper exposed reads again after lock then unlock.
+  * **A fake seal for rebirth.** The real seal refuses `unexpected_error` over a tombstone; `fakeSealBoxListingOf` makes boxes whose `makeStaged` turns a whisper into fake ciphered bags. Its hook lets a test act during `makeStaged`.
+  * **Del answers.** The fake `del` answers a tombstone at the next revision (`gone`, staged dropped). The same tombstone reads `same`, and the staged tombstone stays: thread 9's.
+  * **Lock between `edit` and `put`**: a listener that locks, `box.snapshot` asked first so `edit`'s settle calls it.
 
 * **Discoveries**:
-  * The first stored revision is 0 (`NeverStoredSeq` is -1), so a draft's `send` puts `revision_seq` 0.
-  * `receive` calls `nextRevision(central)`, so it mints into `#minted` against the new central. The next `edit` uses that revision, which is harmless.
-  * **Before this thread, `vault_tok` was already assigned, not tattooed.** The brief's (e) and thread 5 say "scope and `vault_tok` never change". My handoff said the tattoo keeps only the scope, and today a newer record under another `vault_tok` moves it.
-  * **Once #372 lands:** if `#deliver` judges `ifAbsent` for `del`'s answer as well as `fetch`'s, every del test here gets `absent_box` under the default `'fail'`. `fetch` alone should pass it. Saves on settle add `save` calls that no test here counts.
-  * **Once #373 lands:** it creates `tests/loosened/loosened.test.ts` too, an add/add conflict. Keep one top and both sets of describes. The same-tombstone `del` row (gone over gone, 'same') is not a `record_conflict` row.
-  * `listing.ts`, `vault.ts` and `models-shapes.ts` still have "payload" and "What the…" banners, out of my remit.
-
-* **Bad news that reaches no one**:
-  * A launch the trigger's timer makes in the background ends where no one hears of it.
-  * `setTimeout(() => { void this.tryLaunch() })` runs `#launchAlone`, then `storable.tryFetch()`. `outcomeOf` catches every refusal: the world's `ensureTimely`, the store's answer, a `corrupt_record` from `cmpRevisions`, a rejected cache `save`.
-  * On a bad outcome the trigger schedules nothing, and the `void` drops the outcome. `onBadNews`, the listeners and the logger hear nothing. The thing goes quietly untimely, and the next verb's `hydrate` launches on demand, so that caller hears.
-  * Once thread 3 passes `'nil'`, absent no longer refuses, but the rest is still lost. `listing.hydrateAll` drops its `tryHydrate` outcomes the same way.
-
-* **For the Coach**:
-  * **Same-tombstone del**: a `del` answered with the tombstone already held leaves a staged tombstone that nothing clears until a newer receive. I recommend that a `same` answer to a `del` of a gone thing drops the staged tombstone (thread 2's table).
-  * **vault_tok on receive**: a box record under another `vault_tok` is adopted silently. CLAUDE.md calls this drift, which means a reload. I recommend refusing or reloading, and then thread 5's test can say the prop never changes.
-  * **Exposed whisper across a lock**: today it reads LOCKED, then reads again once unlocked, against `expose`'s doc and G6. I recommend forgetting it on lock.
-  * **Background refusals**: I recommend that the trigger's failed launch tells `onBadNews` (any kind but absent).
+  * The first stored revision is 0 (`NeverStoredSeq` is -1).
+  * `receive` mints into `#minted` against the new central; harmless.
+  * **Once #372 lands:** `fetch` alone should judge `ifAbsent`, or every del test gets `absent_box`.
+  * `listing.ts`, `vault.ts`, `models-shapes.ts` still have "payload" banners, and banners that open with a question word.
+  * A launch the trigger's timer makes in the background ends where no one hears of it (`void this.tryLaunch()` drops the outcome; `listing.hydrateAll` likewise). Ruled: tell `onBadNews`; thread 3's rework.
 
 ## Restacked
 
-Restacked 2026-10-30 onto thread 7 (#377), in the line main → #368 → #374 → #370 → #371 → #373 → #376 → #377 → #375.
+Onto #377, line main → #368 → #374 → #370 → #371 → #373 → #376 → #377 → #375. **`send` puts the record it staged**, `listing.recordOf(#staged)`, since a locked box's `sidecar` getter answers the LOCKED bag (YOLO, pending with the Coach); folded into the verbs commit 468dccdd. Thread 2's edit test now keeps one tok until send or del spends it. Test files merged with one import block each, every thread's describes kept; the box banner keeps thread 5's "[Required by Storable]".
 
-* **`send` puts the record it staged** (commit 88da3d5b, right after the verbs commit). Thread 5 makes a locked box's `sidecar` getter answer the LOCKED bag, and `send` handed `listing.put` the box itself, ducking as its record. So a send whose vault locked between `edit` and `put` refused `bad_record` on `sidecar`. `send` now hands over `listing.recordOf(#staged)`. `listing.put` already took a record or a thing, so no signature changed. The test "completes a send whose vault locks between edit and put" passes unchanged. The orchestrator ruled answer A, for the Coach to confirm. The verbs commit 9089ca06 just before it fails that one test.
-* **Thread 2's test restated** (`tests/models/storable.test.ts`, reconcileStaged table): "edit: … a new tok each time" now reads "one tok until send or del spends it", and asserts the second edit keeps the first edit's tok. This follows (f), the revision minted once.
-* **Merged test files**: `storable.test.ts`, `box.test.ts` and `tests/loosened/loosened.test.ts` each have one import block. Every describe from each thread is kept. In `storable.test.ts`, thread 4b's `// --` closes the Hydrate section before the describes from threads 2 and 5, and its Edit, Send, Del, Locked and Try sections follow. The `box.ts` banner that threads 4b and 5 both renamed keeps thread 5's "[Required by Storable]".
+## Rework (2026-10-30)
+
+After the #375 review and the Coach's rulings; commits beaf3756..c3bd8efc.
+
+* **`edit` refuses `stale_write`** (`movedUnderEditError`) when central's tok moves while `makeStaged` runs, staging nothing; `send` then puts nothing. A sparse confirm at the same revision lets it stage.
+* **`vault_tok` and `registered_at` over a tombstone.** `assign(record, current)` sets them only where `current`, the central held before `adopt`, is a tombstone (or null, at construction). I took the central held, not combined: a draft's send meeting `stale_write` then takes storage's `vault_tok`, and an edit during an in-flight `del` keeps the own `registered_at` (the staged record carries its own), the least logic, as ruled. `reconcileCentral` refuses `vault_remade` (`vaultRemadeError`) for a record under another `vault_tok` over a central not a tombstone, before comparing revisions.
+* **Timeliness.** `receive` notes success on a record not older where, once taken in, central or the record in hand is whole (`#holdsWhole`); an older record notes nothing. `hydrate` forces a fetch only where neither is whole.
+* **The exposed whisper** stays on the instance through lock and unlock; the pin moved from `tests/loosened` to box.test's `[The whisper while locked]`, and the docs of `#exposed`, `whisper` and `expose` say so.
+* **Spec**: *Record forms* names `whole`.
+* **The Infinity todo** is a test: the trigger is born due, so the first `hydrate` fetches once.
+
+* **Deviation**: the ruling says "combined is whole"; I check central *or* combined. A box draft holds a never-stored tombstone as central and a sparse staged; a `same` answer never adopts, so combined-only would fetch on every hydrate of a draft, breaking "send of a draft with Infinity fetches nothing" and the Infinity test. "I hold version 20, whole" reads as central whole.
+* **Could not test**: the Vault side (no Vault tests; the vault model is not updated, as the Coach said), and a draft vault's send meeting a vault stored under another `vault_tok`.
+* **Discoveries**: over a stored tombstone, a new life's record at a lower seq reads `older` and is ignored, and at the same seq refuses `record_conflict`. A `registered_at` mismatch over a living central is now kept, never moved.
+* **For the Coach**: notes/guarantees.md G6/G7 ("a Box holds its record, ciphertext, never a whisper") will need amending once the models replace the core Box, since `expose` keeps a whisper on the instance through a lock.
