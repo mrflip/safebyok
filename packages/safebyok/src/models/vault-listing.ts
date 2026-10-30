@@ -4,7 +4,7 @@ import { randomId } from '../crypto'
 import { type RefusalMeta, VaultError } from '../errors'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import { Listing } from './listing'
-import { type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Tell, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
@@ -37,6 +37,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [Defined by the vault listing]
 
+  protected vaultTokOfWorld(): null { return null }
+
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
   }
@@ -52,8 +54,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return { ...dna, fmt: VaultFormat, am: 'a', vault_tok: randomId() }
   }
 
-  protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>): Vault {
-    return new Vault(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
+  protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, tell: Tell): Vault {
+    return new Vault(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
   }
 
   absentRefusal(scope: VaultScope): VaultError {

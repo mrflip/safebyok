@@ -10,7 +10,7 @@ export type TriggerOpts<SnapT, ValT> = {
   eagerFrac?:             number | undefined
   doSnapshot:             () => SnapT
   doTryLaunch:            () => Promise<Outcome<ValT>>
-  // The launch notes its own success, by noteSuccessNow, and an ok outcome notes nothing more. Default false: an ok outcome is a success.
+  // The launch notes its own success, by noteSuccessNow, and an ok outcome notes no success more, though the next launch is scheduled after it all the same. Default false: an ok outcome is a success.
   notesOwnSuccess?:       boolean | undefined
   // Told the refusal of a launch the timer made, which no caller awaits.
   onTimerRefusal?:        ((err: VaultError) => void) | undefined
@@ -113,9 +113,9 @@ export class Trigger<SnapT, ValT> {
       this.#lastLaunchedAt = this.#clock.now()
       const outcome = await this.#doTryLaunch()
       this.#lastCompletedAt = this.#clock.now()
-      if (outcome.ok && ! this.#notesOwnSuccess) {
-        this.#lastSucceededAt = this.#lastCompletedAt
-        this.scheduleLaunchAt(this.#lastSucceededAt + (this.maxMillis * this.eagerFrac))
+      if (outcome.ok) {
+        if (! this.#notesOwnSuccess) { this.#lastSucceededAt = this.#lastCompletedAt }
+        this.scheduleLaunchAt(this.#lastCompletedAt + (this.maxMillis * this.eagerFrac))
       }
       return outcome
     } finally {

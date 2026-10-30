@@ -106,7 +106,7 @@ describe("storable.hydrate(opts): when it fetches", () => {
   it("fetches nothing under maxMillisSinceRefresh Infinity for a thing never fetched, its central full", async () => {
     const { mw } = held
     const listing = boxListingOf(mw)
-    const box = new Box(mw.world, listing, mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
+    const box = new Box(mw.world, listing, mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, mw.tell)
     expect(box.isTimely).to.be.false
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(mw.callsOf('get')).to.deep.equal([])
@@ -273,7 +273,7 @@ const Staged = (): BoxRecord => fullBoxRecord({ revision_seq: 3, revision_tok: '
 
 /** A box holding `central` and `staged`, as `hello` revives one from the device cache: not held by the listing, not yet timely. */
 const boxOf = (central: Rec, staged: Rec | null = null): SpiedBox => (
-  new SpiedBox(held.mw.world, boxListingOf(held.mw), central, staged, { maxMillisSinceRefresh: 10 * 60_000 })
+  new SpiedBox(held.mw.world, boxListingOf(held.mw), central, staged, { maxMillisSinceRefresh: 10 * 60_000 }, held.mw.tell)
 )
 
 /** The box's held records and the own props that follow the record in hand, for comparing before and after. */
@@ -587,7 +587,7 @@ describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with, and the draft stays staged", async () => {
     const listing = boxListingOf(held.mw)
     const built = await listing.build({ ...held.mw.boxscope('anthropic_api_key') })
-    const box = new SpiedBox(held.mw.world, listing, cacheableOf(built).central, cacheableOf(built).staged, { maxMillisSinceRefresh: 10 * 60_000 })
+    const box = new SpiedBox(held.mw.world, listing, cacheableOf(built).central, cacheableOf(built).staged, { maxMillisSinceRefresh: 10 * 60_000 }, held.mw.tell)
     expect(cacheableOf(box).central.revision_seq).to.eq(MSX.NeverStoredSeq)
     expectReceivedUnchanged(box, null, 'same')
     expect(cacheableOf(box).staged?.revision_seq).to.eq(0)
@@ -669,7 +669,7 @@ describe("Storable snapshot and subscription", () => {
 
     it("is made on the first call, so that a settle before it has none to replace and tells nobody", () => {
       const { mw } = held
-      const box = new Box(mw.world, boxListingOf(mw), mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
+      const box = new Box(mw.world, boxListingOf(mw), mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, mw.tell)
       const listener = vi.fn()
       box.subscribe(listener)
       box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
@@ -1247,7 +1247,6 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
     await box.hydrate({ maxMillisSinceRefresh: 1000 })
     expect(box.revision_seq).to.eq(2)
-    expect(box.isTimely).to.be.false
     await box.hydrate({ maxMillisSinceRefresh: 1000 })
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
@@ -1257,7 +1256,9 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     held.mw.setNow(T0 + 1000)
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
     await box.hydrate()
-    expect(box.isTimely).to.be.false
+    held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
+    await box.hydrate({ maxMillisSinceRefresh: Infinity })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
 
   it("notes success for a fetch answered with a newer full record, scheduling the next launch at eagerFrac", async () => {
@@ -1420,6 +1421,40 @@ describe("storable: the cacheable copy, kept from the host", () => {
     const box = await listing.build(fullBoxRecord({ boxlabel: 'saved_one' }))
     const saves = held.mw.callsOf('save')
     expect(saves.at(-1)?.cacheable).to.deep.equal(cacheableOf(box))
+  })
+})
+// --
+
+// == [The timer after a launch]: rescheduled after any launch that completes
+
+describe("storable: the timer after a launch that completes", () => {
+  it("launches again at the horizon after a fetch answered with an older record, which noted no success", async () => {
+    const { listing, box } = await timelyBoxOf(1000)
+    await listing.build(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+    held.mw.clearCalls()
+    held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
+    await held.mw.advance(800)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(box.isTimely).to.be.true
+    await held.mw.advance(800)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
+  })
+
+  it("launches again at the horizon after a fetch answered with a sparse record where nothing whole is held", async () => {
+    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(sparseBoxRecord())
+    held.mw.clearCalls()
+    held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
+    await box.hydrate()
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    await held.mw.advance(800)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
+  })
+
+  it("stops the timer after a refused launch", async () => {
+    const { box } = await timelyBoxOf(1000)
+    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
+    await held.mw.advance(800)
+    expect(vi.getTimerCount()).to.eq(0)
   })
 })
 // --

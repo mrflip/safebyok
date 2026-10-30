@@ -509,7 +509,7 @@ describe("The checks of the world and the listing", () => {
 
   describe("MSX.storableArgs", () => {
     const listing = boxListingOf(mw)
-    const args = { world: mw.world, listing, central: sparse, staged: null, opts: { maxMillisSinceRefresh: 1000 } }
+    const args = { world: mw.world, listing, central: sparse, staged: null, opts: { maxMillisSinceRefresh: 1000 }, tell: () => undefined }
     holdsCases(MSX.storableArgs, 'bad_option', [
       [args,                                           true,  'passes a world, a listing, a central, no staged and the options'],
       [{ ...args, staged: full },                      true,  'passes a staged beside the central'],
@@ -523,6 +523,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, world: {} },                         false, 'refuses a world with no clock'],
       [{ ...args, opts: {} },                          false, 'refuses options with no horizon'],
       [{ ...args, opts: { maxMillisSinceRefresh: -1 } }, false, 'refuses a negative horizon'],
+      [{ ...args, tell: undefined },                   false, 'refuses a missing tell'],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not take, being strict'],
     ])
 

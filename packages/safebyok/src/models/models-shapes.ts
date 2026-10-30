@@ -24,7 +24,7 @@ const Checks = Checkers('bad_record', ({ unk, custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, Cacheable, NeverStoredSeq, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable, cacheLoaded, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, Cacheable, NeverStoredSeq, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check or its seal, and reads as gone) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
@@ -34,12 +34,12 @@ export const tombstoneAmVals = ['d', 'x'] as const
 
 /** The checks of what the base knows of any record, each refusing 'bad_record': `am`, one of {@link amVals}; `revision`, `times`, `liveness` and `vaulted`, a part each; and `sparseBase`, the four together, the least a sparse form carries beside its scope.
  * `tombstone` is a sparse base that is damaged or gone; `cacheable` is one with `central` and
- * `staged` beside it, as the listing saves it to the device cache. Each takes its fields from
+ * `staged` beside it, as the listing saves it to the device cache; `cacheLoaded` is what the cache loads: an array, each element left to `cacheable`. Each takes its fields from
  * whatever carries them, a record, a storable or a snapshot, and strips the rest.
  *
  * @example sparseBase.parse(box)   // { revision_tok, revision_seq, registered_at, written_at, am, vault_tok }
  */
-export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable } = Checkers('bad_record', ({ obj, int, oneof, revision_tok, vault_tok, epochMillis }) => {
+export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable, cacheLoaded } = Checkers('bad_record', ({ obj, arr, unk, int, oneof, revision_tok, vault_tok, epochMillis }) => {
   const am = oneof(amVals)
   const revision = obj({
     revision_tok,
@@ -57,7 +57,8 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, ca
   const sparseBase = obj({ ...revision.shape, ...times.shape, ...liveness.shape, ...vaulted.shape })
   const tombstone  = sparseBase.extend({ am: oneof(tombstoneAmVals) })
   const cacheable  = sparseBase.extend({ central: sparseBase, staged: sparseBase.nullable() })
-  return { am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable }
+  const cacheLoaded = arr(unk)
+  return { am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable, cacheLoaded }
 }, [FX])
 
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
@@ -397,7 +398,8 @@ export type ListingOpts<ScopeT, RecordT, SparseT> = {
   store:                 Store<ScopeT, RecordT, SparseT>
   cache:                 Cache<RecordT, SparseT>
   maxMillisSinceRefresh: number
-  onBadNews?:            ((news: VaultError) => void) | undefined
+  /** Told bad news nobody asked about; its answer, a promise too, is heard out and never awaited. */
+  onBadNews?:            ((news: VaultError) => unknown) | undefined
 }
 
 /** The check of a listing's constructor arguments, as far as the base can tell: each of the world, store and cache answers to its verbs, and the horizon is {@link horizonMillis}. Its `parse` refuses 'bad_option'. Checks only. */
@@ -410,14 +412,18 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
 }), 'bad_option')
 // --
 
-// == [Making a storable]: storableArgs
+// == [Making a storable]: storableArgs, Tell
 
-/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, `central` passes {@link sparseBase}, `staged` does too or is null, and the options are {@link storableOpts}. The concrete class's validator judges the records further. Its `parse` refuses 'bad_option'. Checks only. */
-export const storableArgs = objCheck(({ custom }) => ({
+/** How a storable tells bad news nobody asked about, such as a refresh its timer launched that was refused, to the host's `onBadNews` through its listing. */
+export type Tell = (badnews: readonly VaultError[]) => void
+
+/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, `central` passes {@link sparseBase}, `staged` does too or is null, the options are {@link storableOpts}, and `tell` is a function. The concrete class's validator judges the records further. Its `parse` refuses 'bad_option'. Checks only. */
+export const storableArgs = objCheck(({ custom, fn }) => ({
   world,
   listing: custom<object>(isListing, Phrases.ListingExpected),
   central: sparseBase,
   staged:  sparseBase.nullable(),
   opts:    storableOpts,
+  tell:    fn(),
 }), 'bad_option')
 // --

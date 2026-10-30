@@ -671,7 +671,248 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 })
 
-// == [Helpers of the pipeline tests]: scopeOf, seededCache, edited
+// == [Bad news told]: a handler that throws, a refusal told once, a cache loaded malformed
+
+describe("listing: a host's onBadNews that fails", () => {
+  it("reports a handler that throws to the platform and goes on: hello resolves, the rest of the news is told", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const told: string[] = []
+      const listing = boxListingOf(held.mw, { onBadNews: (news) => { told.push(news.refusalkind); bust() } })
+      held.mw.willLoad(() => { throw new VaultError('unexpected_error', "The cache is gone.") })
+      held.mw.willGet(held.mw.refusalOf(held.mw.boxscope('anthropic_api_key'), new VaultError('storage_unavailable', "Down.")))
+      held.mw.seedStore(fullBoxRecord())
+      await expect(listing.hello()).resolves.to.eq(undefined)
+      expect(told).to.deep.equal(['unexpected_error'])
+      expect(reported).to.have.lengthOf(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it("reports a handler whose promise rejects to the platform, with no unhandled rejection", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000, onBadNews: rejectingHandler })
+      const box = await listing.build(fullBoxRecord())
+      held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "Down.")))
+      await held.mw.advance(800)
+      expect(reported).to.have.lengthOf(1)
+      expect(reported[0]).to.have.property('message', "Rejected.")
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it("reports a handler that throws as a timer's launch is refused, nothing unhandled", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000, onBadNews: bust })
+      const box = await listing.build(fullBoxRecord())
+      held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "Down.")))
+      await held.mw.advance(800)
+      expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+      expect(reported).to.have.lengthOf(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe("listing: a refusal met by a timer's launch and by a call that joins it", () => {
+  it("tells it to onBadNews once when hydrateAll joins the launch", async () => {
+    const down = new VaultError('storage_unavailable', "Down.")
+    const { listing, open } = await launchingOf(down)
+    const hydrating = listing.hydrateAll()
+    await vi.advanceTimersByTimeAsync(0)
+    open()
+    await hydrating
+    await vi.advanceTimersByTimeAsync(0)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(held.mw.badnews).to.deep.equal([down])
+  })
+
+  it("tells it once, and throws it to the caller, when box.hydrate joins the launch", async () => {
+    const down = new VaultError('storage_unavailable', "Down.")
+    const { box, open } = await launchingOf(down)
+    const hydrating = box.hydrate()
+    await vi.advanceTimersByTimeAsync(0)
+    open()
+    await expect(hydrating).rejects.toBe(down)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(held.mw.badnews).to.deep.equal([down])
+  })
+
+  it("tells the refusal of each separate launch, though they carry the same message", async () => {
+    const { listing, open } = await launchingOf(new VaultError('storage_unavailable', "Down."))
+    open()
+    await vi.advanceTimersByTimeAsync(0)
+    held.mw.willGet(held.mw.refusalOf(listing.things[0]!.scope, new VaultError('storage_unavailable', "Down.")))
+    await listing.hydrateAll()
+    expect(held.mw.badnews).to.have.lengthOf(2)
+  })
+})
+
+describe("listing.hello(): the cache loaded malformed", () => {
+  it("is a cache miss told to onBadNews when load resolves to something that is not an array: the watch starts and everything hydrates", async () => {
+    held.mw.seedStore(fullBoxRecord())
+    held.mw.willLoad(() => notAnArray)
+    const listing = boxListingOf(held.mw)
+    await listing.hello()
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['bad_record'])
+    expect(held.mw.watches).to.have.lengthOf(1)
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("is a cache miss told to onBadNews for a copy with no central, and the other copies are revived", async () => {
+    const copies = await seededCache()
+    const [copy] = copies
+    const { central: _central, ...headless } = copy!
+    held.mw.willLoad([headless as never, ...copies.slice(1)])
+    const listing = boxListingOf(held.mw)
+    await listing.hello()
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['bad_record'])
+    expect(listing.things).to.have.lengthOf(copies.length - 1)
+  })
+})
+
+describe("listing: a copy or a record of another vault_tok meets no instance held", () => {
+  const OtherVault = 'vault-tok-other'
+
+  it("refuses 'unexpected_error' for a fetch answered with a record of another vault_tok, making and saving nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.willGet(held.mw.answerOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault })))
+    await TH.expectRefusal(listing.fetch(scopeOf()), 'unexpected_error')
+    expect(listing.things).to.deep.equal([])
+    expect(held.mw.callsOf('save')).to.deep.equal([])
+  })
+
+  it("refuses it for a tombstone and a sparse record alike", async () => {
+    const listing = boxListingOf(held.mw)
+    for (const record of [tombstoneBoxRecord({ vault_tok: OtherVault, revision_seq: 2 }), sparseBoxRecord({ vault_tok: OtherVault })]) {
+      held.mw.willGet(held.mw.answerOf(scopeOf(), record))
+      await TH.expectRefusal(listing.fetch(scopeOf()), 'unexpected_error')
+    }
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("refuses it for build(record), and for a notice, which is told to onBadNews", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })), 'unexpected_error')
+    held.mw.seedStore(fullBoxRecord())
+    await listing.hello()
+    held.mw.clearCalls()
+    await held.mw.notify(fullBoxRecord({ boxlabel: 'other_box', vault_tok: OtherVault }))
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(listing.at(scopeOf('other_box'))).to.be.null
+  })
+
+  it("refuses it for a stale_write refusal's stored record, telling that one to onBadNews and throwing the stale_write", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.willPut(held.mw.staleWriteOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault, revision_seq: 5 })))
+    await TH.expectRefusal(listing.put(fullBoxRecord()), 'stale_write')
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("tells a cached copy of another vault_tok to onBadNews as a cache miss, reviving the others", async () => {
+    const copies = await seededCache()
+    const [first, ...rest] = copies
+    held.mw.willLoad([{ ...first!, vault_tok: OtherVault, central: { ...first!.central, vault_tok: OtherVault } }, ...rest])
+    const listing = boxListingOf(held.mw)
+    await listing.hello()
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(listing.at(scopeOf(first!.boxlabel))).to.be.null
+    expect(listing.things).to.have.lengthOf(rest.length)
+  })
+
+  it("leaves a record of the vault's own vault_tok, and a dna, as they were", async () => {
+    const listing = boxListingOf(held.mw)
+    await expect(listing.build(fullBoxRecord())).resolves.to.be.instanceOf(Box)
+    await expect(listing.build({ ...scopeOf('draft_box') })).resolves.to.be.instanceOf(Box)
+  })
+
+  it("compares a record held under another vault_tok by reconcileCentral, so an instance held keeps refusing as it did", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))
+    const err = await TH.expectRefusal(listing.fetch(box.scope), 'unexpected_error')
+    expect(err.message).to.contain('kept its own copy')
+  })
+})
+
+describe("listing: an answer names the scope of the record it carries", () => {
+  it("refuses 'bad_record' for a fetch answered with a record of another scope, making and saving nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.willGet(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
+    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'bad_record')
+    expect(listing.things).to.deep.equal([])
+    expect(held.mw.callsOf('save')).to.deep.equal([])
+  })
+
+  it("leaves the instance held under the scope asked as it was, and the instance of the record's scope too", async () => {
+    const listing = boxListingOf(held.mw)
+    const asked = await listing.build(fullBoxRecord({ boxlabel: 'asked_box' }))
+    const other = await listing.build(fullBoxRecord({ boxlabel: 'other_box' }))
+    const [askedBefore, otherBefore] = [cacheableOf(asked), cacheableOf(other)]
+    held.mw.willGet(held.mw.answerOf(asked.scope, fullBoxRecord({ boxlabel: 'other_box', revision_seq: 2, revision_tok: 'rev-a2' })))
+    await TH.expectRefusal(listing.fetch(asked.scope), 'bad_record')
+    expect(cacheableOf(asked)).to.deep.equal(askedBefore)
+    expect(cacheableOf(other)).to.deep.equal(otherBefore)
+  })
+
+  it("refuses it for a put and a del answered so, and for the record a stale_write carries, told to onBadNews with the stale_write thrown", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.willPut(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box' })), 'bad_record')
+    held.mw.willDel(held.mw.answerOf(scopeOf('asked_box'), tombstoneBoxRecord({ boxlabel: 'other_box', revision_seq: 2 })))
+    await TH.expectRefusal(listing.del(sparseBoxRecord({ boxlabel: 'asked_box' })), 'bad_record')
+    held.mw.willPut(held.mw.staleWriteOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 5 })))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box' })), 'stale_write')
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['bad_record'])
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("takes a record of the scope asked, however the answer's scope object was made", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.willGet(held.mw.answerOf({ ...scopeOf('asked_box') }, fullBoxRecord({ boxlabel: 'asked_box' })))
+    await expect(listing.fetch(scopeOf('asked_box'))).resolves.to.be.instanceOf(Box)
+  })
+})
+
+describe("storable: the tell it is handed when made", () => {
+  it("tells a refusal of the refresh its timer launches to the tell it was given, not to the listing's onBadNews", async () => {
+    const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
+    const told: unknown[] = []
+    const box = new Box(held.mw.world, listing, fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, (news) => { told.push(...news) })
+    box.receive(fullBoxRecord())
+    const down = new VaultError('storage_unavailable', "Down.")
+    held.mw.willGet(held.mw.refusalOf(box.scope, down))
+    await held.mw.advance(800)
+    expect(told).to.deep.equal([down])
+    expect(held.mw.badnews).to.deep.equal([])
+  })
+
+  it("is handed by the listing to each instance it makes: a revived copy, a record's, a draft's", async () => {
+    const copies = await seededCache()
+    const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
+    held.mw.willLoad(copies)
+    await listing.hello()
+    const built = await listing.build({ ...scopeOf('draft_two') })
+    for (const box of [listing.at(scopeOf('full_box')), built]) {
+      held.mw.willGet(held.mw.refusalOf(box!.scope, new VaultError('storage_unavailable', "Down.")))
+    }
+    held.mw.clearCalls()
+    await held.mw.advance(1000)
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.include('storage_unavailable')
+  })
+})
+// --
+
+// == [Helpers of the pipeline tests]: scopeOf, seededCache, bust, holdOf, launchingOf, edited
 
 const scopeOf = (boxlabel = 'anthropic_api_key') => held.mw.boxscope(boxlabel)
 
@@ -686,6 +927,29 @@ const seededCache = async () => {
   held.mw.seedStore(fullBoxRecord({ boxlabel: 'full_box' }))
   held.mw.seedStore(tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 }))
   return copies
+}
+
+/** What a handler that throws throws, and one that answers a promise that rejects rejects with. */
+const bust = (): never => { throw new Error("The handler is broken.") }
+const rejectingHandler = (): Promise<never> => Promise.reject(new Error("Rejected."))
+const notAnArray = { not: 'an array' } as never
+
+/** A promise the test resolves when it chooses, to hold a call. */
+const holdOf = () => {
+  const opener = { open: (): void => undefined }
+  const promise = new Promise<void>((resolve) => { opener.open = () => { resolve() } })
+  return { promise, open: () => { opener.open() } }
+}
+
+/** A listing whose box has its timer's launch under way, held until `open`, which has the store answer `err`. */
+const launchingOf = async (err: VaultError) => {
+  const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
+  const box = await listing.build(fullBoxRecord())
+  const gate = holdOf()
+  held.mw.willGet(async () => { await gate.promise; return held.mw.refusalOf(box.scope, err) })
+  await held.mw.advance(800)
+  expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+  return { listing, box, open: gate.open }
 }
 
 const edited = async () => {

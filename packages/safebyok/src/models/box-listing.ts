@@ -5,7 +5,7 @@ import type { Whisper } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box } from './box'
 import { Listing, hasRevision } from './listing'
-import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Tell, type Times, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 
 // == [Given to a box listing]: BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
 
@@ -53,6 +53,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Defined by the box listing]
 
+  protected vaultTokOfWorld(): string { return this.world.vault_tok }
+
   protected scopepathOf(scope: Boxscope): string {
     return ['box', scope.applabel, scope.user_id, scope.vaultlabel, scope.boxlabel].join('^')
   }
@@ -69,8 +71,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return { ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }
   }
 
-  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null): Box {
-    return new Box(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
+  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): Box {
+    return new Box(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
   }
 
   absentRefusal(scope: Boxscope): VaultError {
