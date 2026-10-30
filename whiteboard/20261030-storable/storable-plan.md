@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** 1, 4a filed (restacked onto #374 locally; push waits on the Coach); 2 filed (#373); 3 (#372) waits on the Coach; 4b (#375) in review; 5 and 7 building.
+* **Status:** paused 2026-10-30, every remaining thread waiting on the Coach (`human/20261030-sprint_storable_paused.md`). Filed: 1, 4a, 2, 5, 7. Waiting: 3, 4b. Not started: 8, 6.
 
 ## Read first
 
@@ -190,6 +190,13 @@ non-writable tattoo to the writable revision props without changing the count, w
 should not depend on beyond that.
 **Size:** large.
 
+*Review:* flagged (#375); waits unfiled on the Coach. Fixed `del`'s doc (staged at the next
+revision, over the tombstone's) and three style families. Significant, to the Coach: central can
+move while `edit` awaits `makeStaged`, and `send` then overwrites the newer record (a TOP row).
+Left: `registered_at` renewed by an edit during an in-flight `del` (a row); `notFullError`'s
+advice after a hydrate; missing doc blocks on the `ensureReadyTo...` guards; `it.todo` titles
+carrying questions (Cleanup); loosened-file titles citing file:line.
+
 ### 5. The snapshot and the props
 
 > **5. The snapshot and the props.** One fix first, the Coach's: the sidecar is not readable while the vault is locked. `LOCKED` becomes `Symbol.for('LOCKED')`, and `box.sidecar` answers the bag `{ [LOCKED]: true }` while locked, so the snapshot's `sidecar` carries it too; unlocked, the sidecar as today, null unless full. `box.whisper` keeps answering the symbol itself. Then, in `box.test.ts` and `storable.test.ts`: `getSnapshot` returns the same frozen object until a `settle` changes it, and a `settle` that changes nothing notifies nobody; `subscribe` returns an unsubscribe that works; the box snapshot carries the scope, the revision props, `registered_at`, `written_at`, `sidecar` (null unless full, the locked bag while locked), `full`, `present`, `exposed`; after `receive`, `edit` and `del` the own props `revision_tok`, `revision_seq`, `written_at` and `registered_at` follow the record in hand, and `scope` and `vault_tok` never change (the tattoo is non-writable); `toJSON` is the sparse form of central; `cacheable` is `{ ...sparse, central, staged }` with `staged` null when nothing is staged and no sidecar on the sparse or on any tombstone; a box's own enumerable keys are exactly the nine the base tattoos, and `scope` is a getter over one frozen object. Depends on 1. Size: small.
@@ -203,6 +210,13 @@ already moves it (`receive`); the rebirth case is 4b's.
 **Depends on:** 1.
 **Size:** small.
 
+*Review:* flagged, filed as built (#376; the orchestrator's call: both findings already rows and
+neither a defect of this change). Fixed word-rule test titles, doc blocks one fact per sentence,
+and an `it.todo` title. Significant, both rows: a snapshot made before the lock keeps the
+sidecar (nothing settles boxes on lock); `cacheable` shows the sidecar while locked. Left:
+`listing.put(box)` on a locked box refuses `bad_record`; `Sidecar`'s doc in `src/shapes/box.ts`
+(thread 6); a cloned snapshot turns the bag into `{}`.
+
 ### 7. The dna at `build`'s door
 
 > **7. The dna at `build`'s door.** Today a dna is checked only when it reaches the constructor, through `boxscope.parse` inside `makeThing`: a one-letter boxlabel refuses `bad_record` from deep in the stack. Per VOCABULARY.md *duckish* and CLAUDE.md *Validate at each module entrypoint*, `BoxListing.build` parses its dna on its first line with a `boxDna` checker in `models-shapes.ts` beside `boxRecord`: the scope required, the record's props optional, `whisper` optional, the factory's own props (`fmt`, `am`, `vault_tok`, the revision and times) allowed and stripped, refusing `bad_option`. This is the one piece of surface the sprint adds, and it is a validator, not a method. Tests in `box-listing.test.ts`. Depends on 1. Size: small.
@@ -214,6 +228,11 @@ already moves it (`receive`); the rebirth case is 4b's.
 **Levels:** worker `opus` (the Coach's suggestion); review `medium`.
 **Depends on:** 1.
 **Size:** small.
+
+*Review:* fixed (#377). Fixed `boxDna`'s doc opening and `draftOf`'s invariant as a comment.
+Left: a dna with `revision_seq: undefined` read as a record; `build(null)` throwing a bare
+`TypeError`; sealed parts without a sidecar given `{}`; `BoxDnaFilled` beside `BoxDna`; stripped
+keys listed by hand. The worker's four open matters confirmed (three rows, one my call).
 
 ### 8. `ifPresent`
 
