@@ -220,4 +220,8 @@ and 4b have filed and are restacked into a line. Thread 6 last, on the whole lin
 
 * The brief's own *For the Coach* list is unchanged; threads pin those behaviours in the loosened
   file rather than settle any of them.
-* Old *What a* / *What the* comments in `src/models/`: an open matter in the sprint doc.
+* Old *What a* / *What the* comments in `src/models/`: ruled, fix as you go (ground rule 2).
+* **Bad news is later work** (the Coach, 2026-10-30): "very poorly thought out -- a build()
+  doesn't allow it to be returned. #deliver should be handling a set of unhandleable errors, then
+  someone is handling things like corrupt error." No thread designs it; thread 3 lists in its
+  thread file every place bad news cannot reach anyone, as the inventory for that work.

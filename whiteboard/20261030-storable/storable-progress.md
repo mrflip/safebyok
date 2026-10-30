@@ -13,6 +13,13 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
 * *Orchestrator:* `trigger.ts` is `packages/safebyok/src/helpers/trigger.ts` (moved in 7483a7b3);
   the brief's `src/utils/trigger.ts` is stale.
 
+* *The Coach (2026-10-30), a direction for every thread:* the models' contract runs ahead of
+  today's VaultDB. Where it asks storage for more than VaultDB returns, workers supply the extra
+  fields in the fakes and tests; the adapters are a later match-up. The damaged-tombstone ruling
+  is kept on that ground.
+* *The Coach (2026-10-30):* bad-news handling is unspecified later work (plan, *For the Coach*).
+  Build nothing for it; note where bad news cannot reach anyone.
+
 ## Discoveries
 
 * *Thread 1:* the listing's snapshot is each present thing's `sparse`, the sparse form of
