@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** thread 1 filed (#370); threads 2 (#373), 3 (#372) and 4a (#371) in review.
+* **Status:** threads 1 (#370) and 4a (#371) filed; 2 (#373) and 3 (#372) in review; 4b building.
 
 ## Read first
 
@@ -141,6 +141,14 @@ trigger's launch line, not `hydrate`, so the two meet at restack only if both re
 nothing* rests on fix (c). Whether `trigger.ts` is used by the old code too: a change to it must
 keep the old code's tests green.
 **Size:** medium.
+
+*Review:* fixed (#371). Fixed double quotes in test strings, two test titles using the retired
+`payload`, and the corrected `MaxTimerMillis` docs (untimely once the launch is due, at
+`eagerFrac`). Left: `isTimely` true over a newly received sparse central (an open matter); an
+older full answer to a sparse central noting success (bounded); a purged sparse central refusing
+on `receive(null)` (beside thread 2's stuck-box matter); `isWholeRecord` duplicating
+`classifyRecordShape` (the Coach's spec); banners named for a thread, not a concern (4b renames
+them); an `it.todo` title carrying a question (shortened once ruled).
 
 ### 4b. Verbs and guards
 
