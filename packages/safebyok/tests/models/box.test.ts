@@ -581,7 +581,7 @@ describe("box.send(patch, { ifPresent: 'replace' }): a box this device believes 
     const box = await neverStoredBoxOf()
     await box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })
     const landed = held.mw.stored.get('anthropic_api_key')
-    if (landed === undefined) { throw new Error('nothing stored') }
+    if (landed === undefined) { throw new Error("nothing stored") }
     await held.mw.notify(landed)
     expect(otherBox).to.include({ revision_tok: box.revision_tok, revision_seq: 5 })
     expect(otherBox.sidecar).to.deep.equal({ note: 'new' })
@@ -600,7 +600,7 @@ describe("box.send(patch, { ifPresent: 'replace' }): a box this device believes 
     expect(box).to.include({ revision_seq: 1 })
     expect(box.revision_tok).to.not.eq(otherBox.revision_tok)
     const landed = held.mw.stored.get('anthropic_api_key')
-    if (landed === undefined) { throw new Error('nothing stored') }
+    if (landed === undefined) { throw new Error("nothing stored") }
     expect(landed).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 1 })
     await held.mw.notify(landed)
     expect(otherBox).to.include({ revision_tok: box.revision_tok, revision_seq: 1 })
