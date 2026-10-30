@@ -6,7 +6,7 @@ import { stableJsonify } from '../stable-jsonify'
 import { lockedError, notFullError } from '../helpers/throwers'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
-import type { Age, Am, Cacheable, EditOpts, Fetched, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Times, Tombstone, World } from './models-shapes'
+import type { Age, Am, Cacheable, EditOpts, Fetched, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Times, Tombstone, Vaulted, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -40,9 +40,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Tattooed with the scope, immutably. */
   declare readonly registered_at: number
-  declare readonly vault_tok:     string
 
-  /** The revision and time of the record in hand, as plain props: inscribed by `assignInitialProps`, set by `assign` at each adopt. */
+  /** The vault, revision and time of the record in hand, as plain props: inscribed by `assignInitialProps`, set by `assign` at each adopt. */
+  declare vault_tok:     string
   declare revision_tok:  string
   declare revision_seq:  number
   declare written_at:    number
@@ -84,8 +84,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Inscribe the own props, before the seal: the immutable ones here, and through `assign`, the ones that follow the record in hand. A concrete class with props of its own overrides it, calls super first, and inscribes them the same way: as own props, tattooed or adorned, never as #fields, which do not exist while the base constructor runs. */
   protected assignInitialProps(combined: Fetched<RecordT, SparseT>): void {
-    const { registered_at, vault_tok } = combined
-    tattoo(this, { ...this.scope, registered_at, vault_tok }, { writable: false, configurable: false })
+    const { registered_at } = combined
+    tattoo(this, { ...this.scope, registered_at }, { writable: false, configurable: false })
     this.assign(combined)
   }
 
@@ -440,7 +440,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 const OneRevisionTwoFates = 'Storage and this device hold one revision of a record, and only one of them holds it deleted: the record cannot be trusted until it is read again.'
 
 /** The own props that follow the record in hand. */
-const revisionPropsOf = ({ revision_tok, revision_seq, written_at }: Revision & Times): Revision & Pick<Times, 'written_at'> => ({ revision_tok, revision_seq, written_at })
+const revisionPropsOf = ({ vault_tok, revision_tok, revision_seq, written_at }: Revision & Times & Vaulted): Revision & Vaulted & Pick<Times, 'written_at'> => ({ vault_tok, revision_tok, revision_seq, written_at })
 
 /** A placeholder until the helpers worker lands `tattoo`; then this goes and the import takes its place. */
 const tattoo = <BT extends object>(obj: object, shown: BT, opts: { writable?: boolean, configurable?: boolean } = {}): BT => {
