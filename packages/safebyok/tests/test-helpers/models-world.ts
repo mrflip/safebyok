@@ -15,9 +15,11 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { BoxListing, type BoxCache, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Cacheable, type Fetched, type LockState, type Notice, type Revision, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq, boxSparse } from '../../src/models/models-shapes'
+import { type BoxRecord, type BoxSparse, type Cacheable, type Fetched, type LockState, type Notice, type Revision, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import * as MSX from '../../src/models/models-shapes'
 import * as Refusals from '../../src/refusals'
-import { type Boxscope, boxscope } from '../../src/shapes/scopes'
+import * as CX from '../../src/shapes/scopes'
+import type { Boxscope } from '../../src/shapes/scopes'
 import { fakeCiphered } from './builders'
 
 // == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord
@@ -54,7 +56,7 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
  *
  * @example sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
  */
-export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => boxSparse.parse({ ...fullBoxRecord(), ...overrides })
+export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => MSX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
 
 /** The tombstone of a box record: its sparse form, `am` 'x' for a deletion or 'd' for damage. `overrides` says otherwise.
  *
@@ -222,7 +224,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     load:         new Script<undefined>(),
     save:         new Script<Cacheable<BoxRecord, BoxSparse>>(),
   }
-  const scopeFor = (boxlabel: string): Boxscope => boxscope.parse({ ...WorldVault.scope, boxlabel })
+  const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
   const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ scope, ok: true, val, world })
   const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null): BoxAnswer => ({ scope, ok: false, err, world })
 
@@ -251,7 +253,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       const { scripted, answer } = scripts.put.take({ record, expected, ifPresent })
       if (scripted) { return (await answer) as BoxAnswer }
       stored.set(record.boxlabel, record)
-      return answerOf(boxscope.parse(record), record)
+      return answerOf(CX.boxscope.parse(record), record)
     },
     del: async (scope, expected) => {
       calls.push({ verb: 'del', scope, expected })
@@ -355,7 +357,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 }
 
 /** The sparse form of any record the store keeps. */
-const sparseOf = (record: Fetched<BoxRecord, BoxSparse>): BoxSparse => boxSparse.parse(record)
+const sparseOf = (record: Fetched<BoxRecord, BoxSparse>): BoxSparse => MSX.boxSparse.parse(record)
 
 /** A new {@link makeModelsWorld} before each test, disposed after it. Call it at the top of a test file; `held.mw` is the current test's world, as `mw` in the other examples.
  *
