@@ -51,12 +51,14 @@ export class Trigger<SnapT, ValT> {
 
   get isTimely(): boolean { return this.#clock.now() < this.#launchAt }
 
+  /** Whether the last success lies within `maxMillis` of now. `Infinity` is always timely, for a trigger that has never succeeded too: it means go ahead. */
   isTimelyWithin(maxMillis: number): boolean {
+    if (maxMillis === Infinity) { return true }
     if (this.#lastSucceededAt === null) { return false }
     return this.#clock.now() - this.#lastSucceededAt < maxMillis
   }
 
-  // A success that came some other way than a launch: an own write's answer, say.
+  // A success that came some other way than a launch: the answer to an own put, say.
   noteSuccessNow(): void {
     this.#lastSucceededAt = this.#clock.now()
     this.scheduleLaunchAt(this.#lastSucceededAt + (this.maxMillis * this.eagerFrac))
