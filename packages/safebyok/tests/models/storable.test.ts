@@ -70,6 +70,19 @@ describe("storable.hydrate(opts): when it fetches", () => {
     })
   }
 
+  it("fetches a sparse central with a full edit staged by the horizon given, as the record in hand is whole", async () => {
+    const { mw } = held
+    const sparse = mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
+    mw.seedStore(sparse)
+    const staged = mw.fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-s3', sidecar: { note: 'staged' } })
+    const box = new Box(mw.world, boxListingOf(mw), sparse, staged, { maxMillisSinceRefresh: 60_000 })
+    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
+    expect(mw.callsOf('get')).to.have.lengthOf(1)
+    expect(box.isTimely).to.be.true
+    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
+    expect(mw.callsOf('get')).to.have.lengthOf(1)
+  })
+
   it("never fetches a never-stored central for want of the whisperCiphered: a draft's central is a tombstone, whole", async () => {
     const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
     expect(box.isFull).to.be.false
@@ -321,10 +334,31 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       expectReceivedUnchanged(boxOf(Centrals.full(), Staged()), rcvdOf('ouch', OlderRev), 'skip')
     })
 
-    it("older | full | any marks the box timely, though it confirms nothing of central (pinned: the receive's doc says a full record that confirms central does)", () => {
-      const box = boxOf(Centrals.full())
+    for (const rcvdShape of ShapesAll) {
+      it(`older | ${rcvdShape} | full notes no success: an older record says nothing of the revision held`, () => {
+        const box = boxOf(Centrals.full())
+        box.receive(rcvdOf(rcvdShape, OlderRev))
+        expect(box.isTimely).to.be.false
+      })
+    }
+  })
+
+  describe("success noted on a record not older, where the record in hand is whole", () => {
+    it("same | sparse | sparse notes success where a full edit is staged: the record in hand is whole", () => {
+      const box = boxOf(Centrals.sparse(), Staged())
+      box.receive(rcvdOf('sparse', SameRev))
+      expect(box.isTimely).to.be.true
+    })
+
+    it("same | sparse | sparse notes no success with nothing staged: nothing whole is held", () => {
+      const box = boxOf(Centrals.sparse())
+      box.receive(rcvdOf('sparse', SameRev))
       expect(box.isTimely).to.be.false
-      box.receive(rcvdOf('full', OlderRev))
+    })
+
+    it("same | gone | gone notes success: a tombstone is whole", () => {
+      const box = boxOf(Centrals.gone())
+      box.receive(rcvdOf('gone', SameRev))
       expect(box.isTimely).to.be.true
     })
   })
