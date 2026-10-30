@@ -912,7 +912,7 @@ describe("storable: the tell it is handed when made", () => {
 })
 // --
 
-// == [Helpers of the pipeline tests]: scopeOf, seededCache, bust, holdOf, launchingOf, edited
+// == [Helpers of the pipeline tests]: scopeOf, seededCache, bust, rejectingHandler, notAnArray, holdOf, launchingOf, edited
 
 const scopeOf = (boxlabel = 'anthropic_api_key') => held.mw.boxscope(boxlabel)
 

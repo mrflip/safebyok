@@ -34,8 +34,9 @@ export const tombstoneAmVals = ['d', 'x'] as const
 
 /** The checks of what the base knows of any record, each refusing 'bad_record': `am`, one of {@link amVals}; `revision`, `times`, `liveness` and `vaulted`, a part each; and `sparseBase`, the four together, the least a sparse form carries beside its scope.
  * `tombstone` is a sparse base that is damaged or gone; `cacheable` is one with `central` and
- * `staged` beside it, as the listing saves it to the device cache; `cacheLoaded` is what the cache loads: an array, each element left to `cacheable`. Each takes its fields from
- * whatever carries them, a record, a storable or a snapshot, and strips the rest.
+ * `staged` beside it, as the listing saves it to the device cache. Each takes its fields from
+ * whatever carries them, a record, a storable or a snapshot, and strips the rest. `cacheLoaded`
+ * checks that the cache's load is an array, and leaves each copy in it to `cacheable`.
  *
  * @example sparseBase.parse(box)   // { revision_tok, revision_seq, registered_at, written_at, am, vault_tok }
  */
