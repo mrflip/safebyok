@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
-import { type BoxListingOpts, BoxListing } from '../../src/models/box-listing'
+import { type BoxDna, type BoxListingOpts, BoxListing } from '../../src/models/box-listing'
 import * as MSX from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
 import { boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -193,5 +193,57 @@ describe("BoxListing", () => {
       await TH.expectRefusal(listing.fetch(scope), 'bad_record')
       expect(listing.at(scope)).to.be.null
     })
+  })
+})
+
+describe("BoxListing: build holds a dna to boxDna at its door", () => {
+  it("refuses a one-letter boxlabel as 'bad_option', naming boxlabel, holding nothing and calling nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    const err = await TH.expectRefusal(listing.build({ ...dna(), boxlabel: 'B' }), 'bad_option')
+    expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
+    expect(listing.things).to.deep.equal([])
+    expect(held.mw.calls).to.deep.equal([])
+  })
+
+  it("refuses a field a dna does not take as 'bad_option'", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.build({ ...dna(), sidcar: {} } as unknown as BoxDna), 'bad_option')
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("refuses a bad whisper as 'bad_option' before the box is built", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.build({ ...dna(), whisper: null } as unknown as BoxDna), 'bad_option')
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("ignores the props the factory controls: the box is born alive, in the world's vault, at revision 0, under the clock's time", async () => {
+    held.mw.setNow(T0 + 5000)
+    const box = await boxListingOf(held.mw).build({ ...dna(), am: 'x', vault_tok: 'vault-tok-other', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
+    expect(box.am).to.eq('a')
+    expect(box.isPresent).to.be.true
+    expect(box.vault_tok).to.eq(held.mw.world.vault_tok)
+    expect(box.revision_seq).to.eq(0)
+    expect(box.revision_tok).to.not.eq('rev-given')
+    expect(box.registered_at).to.eq(T0 + 5000)
+  })
+
+  it("refuses a factory prop that fails its check, though it would be ignored", async () => {
+    await TH.expectRefusal(boxListingOf(held.mw).build({ ...dna(), fmt: 8 } as unknown as BoxDna), 'bad_option')
+  })
+
+  it("fills the draft's defaults for props given as undefined", async () => {
+    const box = await boxListingOf(held.mw).build({ ...dna(), sidecar: undefined, whisper_codec: undefined, whisper_schema_version: undefined })
+    expect(box.cacheable.staged).to.deep.include({ sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
+  })
+
+  it("tells a record by its revision_seq, and leaves it to its own check: a record with a one-letter boxlabel refuses as the record's check says, not as 'bad_option'", async () => {
+    const listing = boxListingOf(held.mw)
+    const err = await TH.expectRefusal(listing.build(fullBoxRecord({ boxlabel: 'B' })), 'bad_scope')
+    expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
+  })
+
+  it("takes a dna carrying a revision_seq for a record, held to the record's check", async () => {
+    await TH.expectRefusal(boxListingOf(held.mw).build({ ...dna(), revision_seq: 3 }), 'bad_record')
   })
 })
