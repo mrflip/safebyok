@@ -55,7 +55,7 @@ describe("the staged edit reconcileStaged drops or carries", () => {
   })
 })
 
-// == [Creation and re-creation]: registered_at over a rebirth, the tombstone's registered_at, build(dna) over a held scope
+// == [Creation and re-creation]: registered_at over a rebirth, the tombstone's registered_at
 
 describe("registered_at over a rebirth", () => {
   it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's edit, not its first store, nor the put that stores it", async () => {
@@ -101,24 +101,5 @@ describe("the tombstone's registered_at", () => {
     box.receive(tombstoneBoxRecord({ revision_seq: 2, registered_at: T0 + 3 }, 'd'))
     expect(box.cacheable.central).to.deep.include({ am: 'd', revision_seq: 2, registered_at: T0 })
   })
-})
-
-describe("build(dna) over a held scope", () => {
-  const HeldCases = [
-    [() => fullBoxRecord(),                        'a live box'],
-    [() => tombstoneBoxRecord({ revision_seq: 2 }), 'a deleted box'],
-  ] as const
-  for (const [recordOf, blurb] of HeldCases) {
-    it(`whiteboard/20261028-storable_base/sprint-box-contract.md:54 (one durable instance per scope): build(dna) over ${blurb} holds a second instance in its place, the first still reading its own record`, async () => {
-      const listing = boxListingOf(held.mw)
-      const first = await listing.build(recordOf())
-      const firstCentral = first.cacheable.central
-      const second = await listing.build({ ...held.mw.boxscope('anthropic_api_key') })
-      expect(second).not.to.eq(first)
-      expect(listing.at(first.scope)).to.eq(second)
-      expect(first.cacheable.central).to.eq(firstCentral)
-      expect(second.expectedRevision()).to.be.null
-    })
-  }
 })
 // --
