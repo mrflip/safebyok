@@ -103,7 +103,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
   }
   // --
 
-  // == [What a storable defines]: isFullRecord, makeStaged, makeSnapshot
+  // == [Defined by a box for its storable]: isFullRecord, makeStaged, makeSnapshot
 
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {
     return 'whisper_ciphered' in fetched
