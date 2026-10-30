@@ -50,6 +50,15 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   record under another `vault_tok`; the exposed whisper across a lock; a refused background
   refresh; a `del` answered `same`).
 
+* *Thread 5 (#376):* `LOCKED` is `Symbol.for('LOCKED')`; a locked box's `sidecar`, and its
+  snapshot's, is one frozen `{ [LOCKED]: true }` (`LockedSidecar`, exported from `box.ts`);
+  `Box.sameSnapshot` compares the bag by identity, since `stableJsonify` drops symbol keys: any
+  later symbol-keyed snapshot field needs the same. The nine own keys: the four scope parts,
+  `registered_at`, `vault_tok`, `revision_tok`, `revision_seq`, `written_at`.
+* *Thread 7 (#377):* `MSX.boxDna` (a `Checker`, `bad_option`) at `BoxListing.build`'s door;
+  `hasRevision` exported from `listing.ts` tells a record from a dna; `MSX.Dna` allows
+  `undefined` on each record prop; `BoxListing.draftOf` lays the factory's props over the dna's.
+
 ## Discoveries
 
 * *Thread 1:* the listing's snapshot is each present thing's `sparse`, the sparse form of
