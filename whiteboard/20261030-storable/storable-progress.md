@@ -106,6 +106,19 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   new; does not need a special validator, does not need a special name." Today `build(dna)`,
   `boxDna` and `hasRevision` do this with a dna validator; build nothing more on them.
 
+* *The Coach's rulings of 2026-10-30, fourth batch* (verbatim in *Resolved*): `ifPresent` comes
+  back as an optional flag taking only `'replace'` ("We might actually need it for vault, later"),
+  the spec noting the other flags wait on a need and a scenario table (thread 11); the sidecar is
+  visible locked or unlocked (thread 12); the whisper becomes an object, `.val`, for the models'
+  box only (thread 13). **Making a box seals it** ("you have to seal (via some
+  unspecified-as-yet-by-me step) as part of making a new box. So the box is never sparse"): the
+  step is the Coach's to specify; until then `#holdsWhole`'s union stays (a TODO, thread 10).
+  The whisper's get/set "should be cutting off access to the private variable when locked": the
+  Coach's to look at; thread 9's setter (null and `LOCKED` pass while locked) stays, documented.
+* *Orchestrator (2026-10-30), a planning lesson:* thread 9 (ten rulings, medium) compacted twice,
+  once before its first justify and once after. Ten small items in one thread is one context's
+  worth; threads 11-13 are one ruling each.
+
 ## Discoveries
 
 * *Thread 1:* the listing's snapshot is each present thing's `sparse`, the sparse form of
