@@ -72,15 +72,18 @@ describe("storable.hydrate(opts): when it fetches", () => {
 
   it("fetches a sparse central with a full edit staged by the horizon given, as the record in hand is whole", async () => {
     const { mw } = held
-    const sparse = mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
-    mw.seedStore(sparse)
+    const central = mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
     const staged = mw.fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-s3', sidecar: { note: 'staged' } })
-    const box = new Box(mw.world, boxListingOf(mw), sparse, staged, { maxMillisSinceRefresh: 60_000 })
-    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
+    const listing = boxListingOf(mw, { maxMillisSinceRefresh: 60_000 })
+    mw.seedStore(central)
+    mw.seedCache({ ...listing.sparseOf(central), central, staged })
+    await listing.hello()
+    const box = listing.at(mw.boxscope('anthropic_api_key'))
     expect(mw.callsOf('get')).to.have.lengthOf(1)
-    expect(box.isTimely).to.be.true
-    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
+    expect(box?.isTimely).to.be.true
+    await box?.hydrate({ maxMillisSinceRefresh: 60_000 })
     expect(mw.callsOf('get')).to.have.lengthOf(1)
+    expect(box?.cacheable).to.include({ central, staged })
   })
 
   it("never fetches a never-stored central for want of the whisperCiphered: a draft's central is a tombstone, whole", async () => {
