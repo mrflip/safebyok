@@ -187,6 +187,7 @@ describe("localVaultDB, as it is made", () => {
     [{},                                                 'a bag with no store'],
     [{ store: { get: () => null } },                     'a store missing four of its five calls'],
     [{ store: memoryStore(), logger: 'console' },        'a logger that is not a VaultLogger'],
+    [{ store: memoryStore(), prefix: 'acme:' },           'a field it does not take'],
   ] as const
 
   for (const [opts, blurb] of BadOpts) {

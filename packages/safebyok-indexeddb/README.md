@@ -161,7 +161,7 @@ And keep, as they are:
 The packaging is the template too: `package.json` (`safebyok` as its peer, ESM and CommonJS
 through `exports`), `tsdown.config.ts`, `vitest.config.ts`, `tsconfig.json`, and an
 `eslint.config.mjs` cut from the core's, which differs from it in nothing but its names. Its
-option checks are made with the core's `Validator` (`src/idb-opts.ts`), so it needs no Zod of its
+option checks are made with the core's `Checkers` (`src/idb-opts.ts`), so it needs no Zod of its
 own. Rename
 the package, its rules' names and its entry points, and add it to the `fixed` group in
 `.changeset/config.json`.

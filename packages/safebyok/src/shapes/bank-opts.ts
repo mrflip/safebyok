@@ -10,7 +10,7 @@ import type { VaultLogger } from '../logger'
 import { type StrengthChecker, DefaultStrengthChecker } from '../passphrase-strength'
 import type { VaultDB } from '../vault-db'
 import * as Phrases from '../phrases'
-import { Validator } from '../checks/validator'
+import { Checkers } from '../checks/validator'
 import * as VX from './vault'
 
 // == [Defaults]: LeaseHours, StaleMinutes, MaxLeaseHours, MaxWhisperBytes, MaxBoxes, Clock, wallClock
@@ -167,7 +167,7 @@ export type BankVaultOpts = {
  * Each option's value is checked by a parse of its own. `makeBankOpts` also checks
  * `strengthChecker`, handing the default back in its place when left out.
  */
-export const { makeBankOpts, bankVaultOpts } = Validator('bad_option', ({ obj, unk }) => {
+export const { makeBankOpts, bankVaultOpts } = Checkers('bad_option', ({ obj, unk }) => {
   const anyOpt = unk.optional()
   const makeBankOpts = obj({
     applabel:               anyOpt,
@@ -205,7 +205,7 @@ const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
 const HourMillis = 60 * MinuteMillis
 
 /** The checks of the numbers Bank.make takes, an adapter declares and a clock reads, each refusing 'bad_option'. Where the vault keeps a number in another form, its check reads it into that form. */
-export const { maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockReading } = Validator('bad_option', ({ union, lit, num, int }) => {
+export const { maxWhisperBytes, maxBoxes, declaredBytes, declaredBoxes, leaseHoursAsMillis, staleMinutesAsMillis, renewMinutesAsMillis, clockReading } = Checkers('bad_option', ({ union, lit, num, int }) => {
   // A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps.
   const declaredBytes = union([num.positive(), lit(Infinity)]).transform((bytes) => Math.min(bytes, UnlimitedBytes)).pipe(num.positive().lte(UnlimitedBytes))
   // A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps.

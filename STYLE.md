@@ -30,7 +30,7 @@ is a bug.
   holds it, and a file outside the core that reaches one or two imports them by name
   (safebyok-indexeddb's `idbOpts`, the demo's `label`). A shapes module (`src/shapes/`) is star-imported under one short name
   ending in `X`, the same in every file, as a module of types is under one ending in `T`; its
-  types are still imported by name. Or a `Validator` call takes the module as a source and its
+  types are still imported by name. Or a `Checkers` call takes the module as a source and its
   builder names what it uses, as a record names the field validators it is made of:
 
   ```ts
@@ -39,7 +39,7 @@ is a bug.
   import type { VaultScope } from './shapes/scopes'
 
   const { applabel, user_id } = CX.bankScope.parse(opts)
-  export const { boxCiphered } = Validator('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
+  export const { boxCiphered } = Checkers('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
     boxCiphered: obj({ box_key_wrapped, whisper_ciphered }),
   }), [FX])
   ```
@@ -69,17 +69,17 @@ is a bug.
   `vaultRecord`.
 * **The core's `src/shapes/` holds the validators a module exports**, one module to a concern,
   and no other module exports one. A validator a module keeps to itself stays beside its one user, made in a
-  `Validator` call at module level (lease.ts's `leaseSealProps`, vault.ts's `putBoxProps`,
+  `Checkers` call at module level (lease.ts's `leaseSealProps`, vault.ts's `putBoxProps`,
   checks/validator.ts's `Checks`): moving it to `src/shapes/` would export what no other module
   calls.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
-* **Zod's builders reach a validator under the `Validator` kit's short names** (*Validation*), and
+* **Zod's builders reach a validator under the `Checkers` kit's short names** (*Validation*), and
   its types come in under `Z`: `import type * as Z from 'zod'`. A module that builds outside a
-  `Validator` call (the kit's own primitives) imports the builders under the same short names.
+  `Checkers` call (the kit's own primitives) imports the builders under the same short names.
 * Tree-shaking is no reason to choose either. Where a star import is reached only through its
   members (`CX.bankScope`), it shakes as named imports do (esbuild 0.27, rolldown 1.2). One passed
-  as a value, as `[FX]` is to a `Validator` call, keeps the module's namespace object, and with it
+  as a value, as `[FX]` is to a `Checkers` call, keeps the module's namespace object, and with it
   every export the namespace names: about 0.2 kB in idbDeviceDB (`fields_exports` in
   `dist/shapes/fields.js`). That cost is accepted for what the source buys the builder.
 * **Picking named fields needs no library**: destructure them from the parsed output. No
@@ -380,8 +380,8 @@ handed, and checks it, in one parse: `const { applabel, user_id } = CX.bankScope
 means of, in one line, extracting and validating local data"). Never a hand-pick
 (`{ applabel: x.applabel, ... }`) where a schema exists, and never an if-then precondition, or a
 `safeParse` followed by a sentence of its own, where a parse says the same: the refusal a
-`Validator` makes names the failing field, which is what a developer who hits it needs. A
-module-local variation is welcome, made in a `Validator` call at module level, never in a call per
+`Checkers` makes names the failing field, which is what a developer who hits it needs. A
+module-local variation is welcome, made in a `Checkers` call at module level, never in a call per
 function call. Add a specific check beside the parse only for a rule Zod does not express
 naturally, or a comparison with what the callee holds.
 
@@ -402,8 +402,8 @@ naturally, or a comparison with what the callee holds.
   needing async I/O; properties Zod cannot see (whether a CryptoKey is usable). A rule relating
   several arguments does fit: check one object built from them, with `.refine` across its fields.
 
-**Validators are made inside a `Validator(kind, kit => { ... }, sources?)` call**
-(`checks/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
+**Validators are made inside a `Checkers(kind, kit => { ... }, sources?)` call**, or one of its
+one-validator forms, `Checker` and `objCheck` (`checks/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
 (`obj`, `arr`, `tuple`, `oneof`, `union`, `discrim`, `lit`, `lazy`, `custom`), its scalars
 ready made (`str`, `num`, `int`, `uint`, `bool`, `unk`), and the shared primitives (`label`,
 `user_id`, `epochMillis`, ...); and it wraps each schema it returns, so a failed `parse` throws a
@@ -414,11 +414,31 @@ failing field by its path, and a record's keys in that path are the input's own.
 whole, as a CryptoKey or bytes of one length are, takes `custom`.
 
 ```ts
-export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
+export const { vaultScope, boxscope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
   const vaultScope = obj({ applabel, user_id, vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
   return { vaultScope, boxscope }
 })
+```
+
+A validator made alone is made in a `Checker(kit => schema, kind?, sources?)` call, which
+returns that one validator; its `kind` comes after the builder, and is `'bad_record'` unless
+given. `objCheck(kit => fields, opts?, sources?)` is a `Checker` whose builder returns an
+object's fields, the object strict unless `opts` says `extras: 'strip'`; `opts` is the kind, or
+`{ refuseAs, extras }`. Strict is the default, as a stored record or a bag a person typed wants
+it; a shape taken out of whatever carries it says `'strip'`. A check of the object whole
+(`.refine()`, `.readonly()`, a sentence of its own) goes inside a `Checker`: chained onto the
+validator a call returns, it would refuse as Zod does. `Checkers` stays for validators made
+together, sharing locals or built one from another.
+
+```ts
+export const boxDamaged = objCheck(({ oneof, boxlabel, revision_tok }) => ({
+  boxlabel,
+  revision_tok: revision_tok.nullable(),
+  damage:       oneof(boxDamageVals),
+}), 'bad_record', [FX])
+export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { extras: 'strip' }, [FX])
+export const boxStamp = Checker(({ vault_tok }) => boxSparse.extend({ vault_tok }).strict(), 'bad_record', [FX])
 ```
 
 * **Writing one is strictly easier than Zod alone**: the body is plain Zod with shorter names, one
@@ -428,7 +448,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   bringing names into scope.
 * The primitives the kit hands out (`shapes/primitives.ts`) are plain Zod, and so is a variation
   made directly from a validator (`VX.vaultSparse.pick(...)`): its `parse` throws a `ZodError`, so
-  use it with `safeParse`, or make it in a module-level `Validator` call where it should refuse.
+  use it with `safeParse`, or make it in a module-level `Checkers` call where it should refuse.
 * **One input, one validator.** A function checks what it is handed with one validator, never a
   cascade of validators each taking a part of the input and refusing with its own kind. Checks
   after the parse are fine: one Zod does not express, or a comparison with what the callee holds
@@ -437,7 +457,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
   taking a scope's duck may parse it with one; a record's validator refuses with its own call's
   kind, a bad name in it included.
 * **A method deep in a call leaves the kind to whoever knows.** It asserts with a schema, whose
-  refusal carries its `Validator` call's kind, and any check written beside it throws with a
+  refusal carries its `Checkers` call's kind, and any check written beside it throws with a
   sentence from `Phrases`. A public call that knows more about what the caller was doing re-throws
   with the better kind: a name failing a check may be the host's typo (`bad_scope`), a damaged row
   read back, or our own bug. No `ZodError` escapes the public call.
@@ -452,7 +472,7 @@ export const { vaultScope, boxscope } = Validator('bad_scope', ({ obj, applabel,
 * **Every sentence a check says lives in `phrases.ts`**, star-imported as `Phrases`, so
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
-  made in a `Validator` call does (`src/checks/validator.ts`), and a check of options names the
+  made in a `Checkers` call does (`src/checks/validator.ts`), and a check of options names the
   call and says what to do in the parse's own story, `parse(opts, { where, advice })`, never in a
   catch that rethrows (`optionsCheck`, `readBankOpts`). Never `Z.config`, which is the host's
   Zod too. Zod's English names a refused value's type, never the value.
@@ -525,11 +545,11 @@ the scope.
   validator yet waits in `types/type-aliases.ts`, and leaves it when one is written.
 * **A shape and its type follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
   there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
-  and module-local and good idea to put it near where used); use Validator; namespace it, using
-  Validator or a star-import." The type is `Z.infer` of the shape, never a parallel written by
+  and module-local and good idea to put it near where used); use Checkers; namespace it, using
+  Checkers or a star-import." The type is `Z.infer` of the shape, never a parallel written by
   hand. The shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
-  local to one module, which keeps it beside its use. It is made in a `Validator` call. It is
-  namespaced as the object a `Validator` call returns (`Checks.story`), or through its
+  local to one module, which keeps it beside its use. It is made in a `Checkers` call. It is
+  namespaced as the object a `Checkers` call returns (`Checks.story`), or through its
   module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then
   `CX.vaultScope`). A good reason for an exception is said beside it. A type its own validator's
   type names (`Story`, which `Refusing` names and a `Refusing` makes) is an `interface` extending
@@ -868,7 +888,7 @@ packages that use Zod are on classic Zod, as one host bundle holds one flavour):
 * The library is the real cost: the same five validators bundle to 24-27 KB gzipped with classic
   and 6.7-6.9 KB with mini. The 25 unused validators cost 130-170 bytes.
 
-A `Validator` call keeps every schema it makes, used or not, and the Coach accepts that: the
+A `Checkers` call keeps every schema it makes, used or not, and the Coach accepts that: the
 advice above is moot for validators, and holds for everything else.
 
 ## Mechanically enforced, and deliberately not

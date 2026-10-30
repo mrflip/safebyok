@@ -308,25 +308,26 @@ under its own name, lowerCamelCase beside its type: the stored records (`vaultRe
 the options `Bank.make`, its calls and its stores take, the objects a host hands in (a store, a
 clock, a key deriver, a logger) and what their callbacks return, and the expectations a `VaultDB`
 is handed. The pieces the package builds those from are its own. Each is Zod, made in a
-`Validator` call: its `parse` throws a `VaultError` of its kind (`bad_record`, `bad_scope`,
+`Checkers` or `Checker` call: its `parse` throws a `VaultError` of its kind (`bad_record`, `bad_scope`,
 `bad_option`, `bad_whisper`), and its `safeParse` is Zod's own. `label`, `user_id` and
 `epochMillis` are plain Zod, the names they are all made of. Import each by name, as below, or
 the whole main entry (`import * as Safebyok from 'safebyok'`, then `Safebyok.vaultRecord.parse(row)`):
 there is no namespace of validators.
 
 ```ts
-import { Validator, vault_tok } from 'safebyok'
+import { Checker, vault_tok } from 'safebyok'
 
-const { sidebarOpts } = Validator('bad_option', ({ obj, bool, vaultlabel }) => ({
-  sidebarOpts: obj({ vaultlabel, collapsed: bool.optional() }).strict(),
-}))
+const sidebarOpts = Checker(({ obj, bool, vaultlabel }) => obj({ vaultlabel, collapsed: bool.optional() }).strict(), 'bad_option')
 sidebarOpts.parse({ vaultlabel: 'work', collapsed: true })
 vault_tok.safeParse(storedRow.vault_tok).success
 ```
 
 A refusal names each failing field and says what it must be, in Zod's English, and never repeats
 what it was handed: not a value, and not the name of a field it does not take, which it counts,
-listing the fields it does take. Your own validators made with `Validator` refuse the same way.
+listing the fields it does take. Your own validators made with `Checker`, `objCheck` or
+`Checkers` refuse the same way: `Checker` makes one, its kind `'bad_record'` unless given after
+the builder; `objCheck` makes one of an object from its fields, strict unless given
+`{ refuseAs, extras: 'strip' }`; `Checkers` makes several, returned by name.
 
 ## Your own storage adapter
 

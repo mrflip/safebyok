@@ -1,4 +1,4 @@
-import { Validator, idbOpts, type VaultDBOpts } from 'safebyok'
+import { Checkers, idbOpts, type VaultDBOpts } from 'safebyok'
 
 /** What `idbVaultDB` and `inspectIdbVaultDB` are made with; `inspectIdbVaultDB` ignores `logger`. */
 export type IdbVaultDBOpts = VaultDBOpts & {
@@ -9,7 +9,7 @@ export type IdbVaultDBOpts = VaultDBOpts & {
 }
 
 /** What the options hold, and nothing else: the core's IndexedDB options (`dbName`, defaulted), and the `logger` every VaultDB takes. Its `parse` refuses 'bad_option'. */
-const { idbVaultDBOpts } = Validator('bad_option', ({ unk }) => ({
+const { idbVaultDBOpts } = Checkers('bad_option', ({ unk }) => ({
   idbVaultDBOpts: idbOpts.extend({ logger: unk.optional() }).strict(),
 }))
 
