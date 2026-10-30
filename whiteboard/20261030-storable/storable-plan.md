@@ -361,6 +361,16 @@ context. Label `listing_ends`.
 Tests beside each. Worker `sonnet`; review `medium`. Depends on 9 (cut from its tip: both touch
 `listing.ts`). Size: medium (eight items; if it compacts twice, split what remains).
 
+*Review:* fixed (#383, medium; no compaction). The suspected item-1 bug was real: `isTimely` is
+`now < launchAt`, so scheduling the next launch after an older record made the box read timely;
+`Trigger` now reads untimely until a success is noted, the retry still scheduled. Also two doc
+blocks, a banner, three style fixes. The thread file's *Built* 1 and *Discoveries* still say the
+old behaviour; the PR comment supersedes them. Left: a held box answered absent or gone polls at
+every horizon and nothing disposes triggers (cleanup, the listing's lifecycle); `#told` dedupes by
+error identity (my call: accept); the answer's scope is never compared with the scope asked, and a
+cached copy's staged `vault_tok` is unchecked (both to thread 11); refused cached copies stay in
+the cache; `tellBadNews`'s one long doc line.
+
 ### 14. Build seals what it stages
 
 *Orchestrator, the Coach's ruling (2026-10-30), on thread 7's sealed-parts row:* "Ideally we'd
@@ -404,7 +414,12 @@ compare-and-set refuses `stale_write` as today; with `expected` given, the compa
 whatever `ifPresent` says. The fake store in `models-world.ts` honours it. Doc blocks say it is
 optional and takes only `'replace'`. In `whiteboard/20261028-storable_base/storable-spec.md`, a
 note where `ifPresent` is described: `'fail'` and `'fetch'` will not be implemented until a clear
-need and a scenario table arrive. Tests in `models-shapes.test.ts`, `listing.test.ts` or
+need and a scenario table arrive. Also, from #383's review, two listing guards: `fetch` (or `#deliver`) refuses `bad_record` when
+`answer.scope` differs from the scope asked; `hello`'s birth check (`#demandRecordOfVault`) covers
+a cached copy's staged `vault_tok` as it does its central. And, if the Coach flips the row, the
+storable's `settle` hands its cacheable to the listing's save, so `cacheable` becomes `#`-private
+and `ToCacheable`/`cacheableOf` go.
+Tests in `models-shapes.test.ts`, `listing.test.ts` or
 `box-listing.test.ts`, `box.test.ts`. Worker `sonnet`; review `low`. Depends on 14 (cut from its
 tip; 10 and 11 both touch `listing.ts`). Size: small.
 
