@@ -73,12 +73,11 @@ describe("box.receive(rcvd): vault_tok and registered_at, set over a tombstone",
     })
   }
 
-  it("tells 'vault_remade' to onBadNews from a fetch that meets a record under another vault_tok, the fetch resolving the box as it was", async () => {
+  it("refuses 'vault_remade' from a fetch that meets a record under another vault_tok", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
-    expect(await box.fetch()).to.eq(box)
-    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['vault_remade'])
+    await TH.expectRefusal(box.fetch(), 'vault_remade')
     expect(box.revision_seq).to.eq(1)
   })
 })
