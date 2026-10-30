@@ -79,6 +79,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       eagerFrac:   opts.eagerFrac,
       doSnapshot:  () => this.snapshot,
       doTryLaunch: () => this.tryFetch({ ifAbsent: 'nil' }),
+      // `receive` notes success by its verdict: a record not older, central or the record in hand whole.
+      notesOwnSuccess: true,
+      onTimerRefusal:  (err) => { listing.tellBadNews([err]) },
     })
   }
 
