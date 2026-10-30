@@ -29,17 +29,17 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   }
 
   const ConfirmingCases = [
-    [() => fullBoxRecord(),   true,  'a full record'],
-    [() => sparseBoxRecord(), false, 'a sparse record'],
+    [() => fullBoxRecord(),   'a full record'],
+    [() => sparseBoxRecord(), 'a sparse record'],
   ] as const
 
-  for (const [rcvdOf, timely, blurb] of ConfirmingCases) {
-    it(`${timely ? 'notes success on' : 'notes no success on'} ${blurb} that only confirms the full central held`, async () => {
+  for (const [rcvdOf, blurb] of ConfirmingCases) {
+    it(`notes success on ${blurb} that only confirms the full central held`, async () => {
       const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(fullBoxRecord())
       held.mw.setNow(T0 + 800)
       expect(box.isTimely).to.be.false
       box.receive(rcvdOf())
-      expect(box.isTimely).to.eq(timely)
+      expect(box.isTimely).to.be.true
       expect(box.revision_seq).to.eq(1)
     })
   }

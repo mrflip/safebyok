@@ -228,10 +228,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryFetch(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
 
-  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where central is not whole. Calls made during a fetch join it. */
+  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where neither central nor the record in hand is whole. Calls made during a fetch join it. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureReadyToFetch(opts)
-    await this.#trigger.ensureTimelyWithin(this.isWholeRecord(this.#central) ? opts.maxMillisSinceRefresh : 0)
+    await this.#trigger.ensureTimelyWithin(this.#holdsWhole ? opts.maxMillisSinceRefresh : 0)
     return this
   }
 
@@ -284,18 +284,21 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
    * `reconcileCentral` judges it; on 'older', 'same' or 'skip' the receive ends there; otherwise `reconcileStaged` judges
-   * the staged against the new central, both are adopted, and the thing settles. A whole record makes the record in hand
-   * timely, even one that only confirms central.
+   * the staged against the new central, both are adopted, and the thing settles. A record not older than central notes
+   * success where, once it is taken in, central or the record in hand is whole, so a sparse one that only confirms the
+   * revision held counts; an older one notes nothing.
    */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
     const answer = rcvd ?? this.tombstoneFor(this.#central)
     const rcvdShape = this.classifyRecordShape(answer)
     const { central, policy } = this.reconcileCentral(answer, rcvdShape)
-    if (this.isWholeRecord(answer)) { this.#trigger.noteSuccessNow() }
+    const older = cmpRevisions(this.#central, answer) === 'older'
     const act = MSX.receivedAct.safeParse(policy)
-    if (! act.success) { return { badnews: [] } }
-    this.adopt(central, this.reconcileStaged({ act: act.data, central: this.#central, staged: this.staged, rcvd: answer, nextRevision: this.nextRevision(central) }))
-    return this.settle()
+    if (act.success) {
+      this.adopt(central, this.reconcileStaged({ act: act.data, central: this.#central, staged: this.staged, rcvd: answer, nextRevision: this.nextRevision(central) }))
+    }
+    if (! older && this.#holdsWhole) { this.#trigger.noteSuccessNow() }
+    return act.success ? this.settle() : { badnews: [] }
   }
 
   /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand over the central held until now; the snapshot waits for `settle`. */
@@ -333,7 +336,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Reconcile]: reconcileCentral, reconcileStaged, classifyRecordShape, isWholeRecord
+  // == [Reconcile]: reconcileCentral, reconcileStaged, classifyRecordShape, isWholeRecord, holdsWhole
 
   /** The central that results from `rcvd` meeting the central held, and the policy that names the row taken. The staged is not consulted.
    *
@@ -447,6 +450,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   protected isWholeRecord(record: Fetched<RecordT, SparseT>): boolean {
     return MSX.isTombstone(record) || this.isFullRecord(record)
   }
+
+  /** Whether central or the record in hand is whole: the stored record is known whole, or a whole record is staged over a sparse central. A draft's central, nothing stored, is whole though its staged is sparse. */
+  get #holdsWhole(): boolean { return this.isWholeRecord(this.#central) || this.isWholeRecord(this.combined) }
   // --
 
   // == [Concrete Subclass Required Methods]: isFullRecord, makeStaged, makeSnapshot
