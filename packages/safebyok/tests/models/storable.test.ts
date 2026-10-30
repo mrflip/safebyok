@@ -66,14 +66,14 @@ describe("storable.hydrate(opts): when it fetches", () => {
     })
   }
 
-  it("never fetches a never-stored central for want of the payload: a draft's central is a tombstone, whole", async () => {
+  it("never fetches a never-stored central for want of the whisperCiphered: a draft's central is a tombstone, whole", async () => {
     const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
     expect(box.isFull).to.be.false
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.deep.equal([])
   })
 
-  it("never fetches a deleted central for want of the payload, while timely", async () => {
+  it("never fetches a deleted central for want of the whisperCiphered, while timely", async () => {
     const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
     const box = await listing.build(held.mw.tombstoneBoxRecord())
     held.mw.clearCalls()
