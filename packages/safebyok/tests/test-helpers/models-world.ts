@@ -52,7 +52,7 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
   ...overrides,
 })
 
-/** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise, and may not name those.
+/** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise; a sidecar or sealed part it names is stripped.
  *
  * @example sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
  */
