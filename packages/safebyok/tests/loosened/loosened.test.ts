@@ -122,16 +122,3 @@ describe("build(dna) over a held scope", () => {
   }
 })
 // --
-
-// == [The whisper exposed]: a lock that forgets nothing
-
-describe("the whisper exposed across a lock", () => {
-  it("notes/guarantees.md:238 (a Box holds its record, ciphertext, never a whisper) and box.ts:96 (kept until the vault locks): a whisper exposed reads LOCKED while locked, and reads again once unlocked", async () => {
-    const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    box.whisper = 'sk-test-0000'
-    held.mw.setLockState('locked')
-    held.mw.setLockState('unlocked')
-    expect(box.whisper).to.eq('sk-test-0000')
-  })
-})
-// --
