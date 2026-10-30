@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** resumed 2026-10-30; filed through #381 (thread 8). Thread 9 building; then 10, then 6.
+* **Status:** filed through #381 (thread 8); thread 9 (#382) in review; then 10, 11, 12, 13, then 6.
 
 ## Read first
 
@@ -340,8 +340,51 @@ context. Label `listing_ends`.
    protected.
 6. A refusal reaches `onBadNews` once when `hydrate` or `hydrateAll` joins a timer launch
    (bad-news item 8).
+7. *Orchestrator, the Coach's ruling (2026-10-30):* a TODO.md entry: making a box will seal it
+   (the Coach: "you have to seal (via some unspecified-as-yet-by-me step) as part of making a new
+   box. So the box is never sparse"); once it does, timeliness asks whether the record in hand is
+   whole, and `#holdsWhole`'s union with central goes. Nothing in code changes now.
 Tests beside each. Worker `sonnet`; review `medium`. Depends on 9 (cut from its tip: both touch
 `listing.ts`). Size: small to medium.
+
+### 11. `ifPresent: 'replace'`
+
+*Orchestrator, the Coach's note (2026-10-30), after thread 8 filed:* "Accept ifPresent as a flag.
+Document that it is optional and may only take the value 'replace'. We might actually need it for
+vault, later. In the spec, note that the other flags will not be implemented until a clear need
+and scenario table arrive". Label `if_present_replace`.
+`ifPresent?: 'replace'` on `sendOpts`, the one value; `send` hands it through `listing.put` to
+`store.put(record, expected, ifPresent)`; storage judges it: with `expected` null (a thing this
+device believes never stored) and a box stored, `'replace'` puts over it; absent, the
+compare-and-set refuses `stale_write` as today; with `expected` given, the compare-and-set holds
+whatever `ifPresent` says. The fake store in `models-world.ts` honours it. Doc blocks say it is
+optional and takes only `'replace'`. In `whiteboard/20261028-storable_base/storable-spec.md`, a
+note where `ifPresent` is described: `'fail'` and `'fetch'` will not be implemented until a clear
+need and a scenario table arrive. Tests in `models-shapes.test.ts`, `listing.test.ts` or
+`box-listing.test.ts`, `box.test.ts`. Worker `sonnet`; review `low`. Depends on 10 (cut from its
+tip: both touch `listing.ts`). Size: small.
+
+### 12. The sidecar, locked or not
+
+*Orchestrator, the Coach's ruling (2026-10-30):* "OK make sidecar visible when locked or
+unlocked". Label `sidecar_visible`. `box.sidecar`, and the snapshot's `sidecar`, give the sidecar
+whether the vault is locked or not; thread 5's `LockedSidecar` bag goes from the sidecar (keep
+`LOCKED` wherever else it is used, such as the whisper); `Box.sameSnapshot` compares the sidecar
+as the other fields are once no symbol-keyed bag needs identity. Thread 5's and 4b's tests that
+pin the LOCKED sidecar are restated. `send` keeps putting its staged record (the YOLO call of the
+restack). Worker `sonnet`; review `medium`. Depends on 11. Size: small.
+
+### 13. The whisper, an object
+
+*Orchestrator, the Coach's ruling (2026-10-30):* "for the new box only -- require that whisper,
+like sidecar, be an object. Given the baseline difficulty of accessing it, asking the developer
+to type an extra `.val` is not material. schedule a thread to do that." Label `whisper_object`.
+The models' `Box` (`src/models/box.ts`, never the old `src/box.ts`) takes and gives its whisper
+as a plain object (`box.whisper = { val: 'sk-…' }`), checked at the setter and at unseal as the
+sidecar is; the seal serializes the object. `null` and `LOCKED` keep their meaning (thread 9's
+setter). **Hands off:** cutting off access to the private value while locked (the Coach: "I will
+have to look at it later"); the setter is documented as it is. Worker `opus`; review `high` (the
+whisper is secret material: no side door, CLAUDE.md). Depends on 12. Size: small to medium.
 
 ### 6. What this model guarantees
 
@@ -351,12 +394,12 @@ Tests beside each. Worker `sonnet`; review `medium`. Depends on 9 (cut from its 
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 11, 12, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` twice), then 6. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
