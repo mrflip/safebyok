@@ -6,7 +6,7 @@ import { boxListingOf, cacheableOf, fakeSealBoxListingOf, fullBoxRecord, sparseB
 
 const held = useModelsWorld()
 
-// == [Receive]: success noted on a whole record, vault_tok and registered_at over a tombstone
+// == [Receive]: success noted on a whole record, registered_at over a tombstone, another vault_tok throws
 
 describe("box.receive(rcvd): a whole record makes the box timely", () => {
   const ReceivedCases = [
@@ -59,7 +59,6 @@ describe("box.receive(rcvd): registered_at, set over a tombstone; another vault_
     expect(box).to.include({ registered_at: T0 + 7, vault_tok: 'vault-tok-u1', revision_seq: 3 })
   })
 
-  // Thread 9 restates thread 4b's 'vault_remade' cases: the Coach's ruling throws 'unexpected_error', over a tombstone too.
   const HeldCases = [
     ['a box held alive',          () => fullBoxRecord()],
     ['a box held deleted',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'x')],
@@ -448,9 +447,9 @@ describe("Box own props", () => {
   })
 })
 
-// == [Thread 9]: forgetting the whisper while locked
+// == [Forgetting the whisper]: whisper = null or LOCKED while locked
 
-describe("box.whisper = null while the vault is locked (thread 9)", () => {
+describe("box.whisper = null while the vault is locked", () => {
   for (const [forget, blurb] of [[null, 'null'], [LOCKED, 'LOCKED']] as const) {
     it(`passes setting ${blurb}, forgetting the whisper exposed, which stays forgotten once unlocked`, async () => {
       const box = await boxListingOf(held.mw).build(fullBoxRecord())
