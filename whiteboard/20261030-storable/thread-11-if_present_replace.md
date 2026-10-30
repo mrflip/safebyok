@@ -1,6 +1,6 @@
 # Thread 11: ifPresent 'replace', and two listing guards (2026-10-30)
 
-Branch `20261030-if_present_replace`, PR to follow (base `main`), stacked on #384. Justify: green (safebyok 4295 passed).
+Branch `20261030-if_present_replace`, PR #385 (base `main`), stacked on #384. Justify: green (safebyok 4295 passed).
 
 * **Built**:
   * `ifPresent?: 'replace'` is back in `models-shapes.ts`: `ifPresentVals = ['replace']`, the `ifPresent` checker, the `IfPresent` type, `sendOpts = timelyOpts.extend({ ifPresent: ifPresent.optional() })`. `Store.put(record, expected, ifPresent?)`.
