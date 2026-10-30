@@ -189,21 +189,22 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       expect(box.sidecar).to.deep.equal({ note: 'staged' })
     })
 
-    for (const centralShape of ['full', 'sparse', 'ouch'] as const) {
+    for (const centralShape of ShapesAll) {
       it(`same | ouch | any (${centralShape}) takes 'skip', central and the staged as they were`, () => {
         expectReceivedUnchanged(boxOf(Centrals[centralShape](), Staged()), rcvdOf('ouch', SameRev), 'skip')
       })
     }
 
-    it("same | ouch | gone refuses 'record_conflict' today, by same | alive | gone, reading alive as not gone (pinned: see the todo below)", () => {
-      expectReceiveConflict(boxOf(Centrals.gone(), Staged()), rcvdOf('ouch', SameRev))
+    it("same | gone | ouch takes 'gone': central becomes the stored tombstone, the staged dropped", () => {
+      const box = boxOf(Centrals.ouch(), Staged())
+      const rcvd = rcvdOf('gone', SameRev)
+      box.receive(rcvd)
+      expect(policies).to.deep.equal(['gone'])
+      expect(box.cacheable.central).to.deep.equal(rcvd)
+      expect(box.cacheable.staged).to.be.null
+      expect(box.isPresent).to.be.false
+      expect(stateOf(box)).to.include({ revision_seq: 2, revision_tok: 'rev-c2', written_at: SameRev.written_at })
     })
-    it.todo("same | ouch | any (gone) takes 'skip', as the table's row says: is 'alive' am 'a' (amVals), so that damage over a deletion at one revision skips, or not gone, so that it refuses 'record_conflict' as today?")
-
-    it("same | gone | ouch refuses 'record_conflict' today, by same | gone | alive, reading alive as not gone (pinned: see the todo below)", () => {
-      expectReceiveConflict(boxOf(Centrals.ouch(), Staged()), rcvdOf('gone', SameRev))
-    })
-    it.todo("same | gone | ouch: no row matches it when alive is am 'a'; should a deletion at the revision held damaged take 'gone' (central becomes the deletion, the staged dropped), or refuse 'record_conflict' as today?")
 
     it("same | full | ouch matches no row, and refuses 'unexpected_error' as a bug in Storable today (pinned: see the todo below)", () => {
       const box = boxOf(Centrals.ouch(), Staged())
@@ -340,6 +341,16 @@ describe("storable.receive(null)", () => {
       expectReceiveConflict(boxOf(Centrals[centralShape](), Staged()), null)
     })
   }
+
+  it("for a thing held damaged takes 'gone', by same | gone | ouch: central becomes a deletion's tombstone at the revision held, the staged dropped", () => {
+    held.mw.setNow(T0 + 9000)
+    const box = boxOf(Centrals.ouch(), Staged())
+    box.receive(null)
+    expect(policies).to.deep.equal(['gone'])
+    expect(box.cacheable.central).to.deep.equal({ ...Centrals.ouch(), written_at: T0 + 9000, am: 'x' })
+    expect(box.cacheable.staged).to.be.null
+    expect(box.isPresent).to.be.false
+  })
 
   it("for a thing held gone reads as 'same', by same | gone | gone", () => {
     expectReceivedUnchanged(boxOf(Centrals.gone(), Staged()), null, 'same')
