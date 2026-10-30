@@ -73,7 +73,7 @@ describe("BoxListing", () => {
       const box = await listing.build(dna())
       expect(box.isPresent).to.be.true
       expect(box.am).to.eq('a')
-      expect(listing.snapshot).to.have.length(1)
+      expect(listing.snapshot).to.have.lengthOf(1)
       expect(listing.snapshot[0]).to.include({ boxlabel: 'anthropic_api_key' })
     })
 
@@ -137,12 +137,12 @@ describe("BoxListing", () => {
       expect(box.hasStaged).to.be.false
       expect(box.isFull).to.be.true
       expect(box.expectedRevision()).to.deep.equal({ revision_tok: 'rev-a1', revision_seq: 1 })
-      expect(listing.snapshot).to.have.length(1)
+      expect(listing.snapshot).to.have.lengthOf(1)
     })
 
     it("saves the box to the cache, as a fetch's answer does", async () => {
       await boxListingOf(held.mw).build(fullBoxRecord())
-      expect(held.mw.callsOf('save')).to.have.length(1)
+      expect(held.mw.callsOf('save')).to.have.lengthOf(1)
       expect(held.mw.cached.get('anthropic_api_key')?.central).to.deep.equal(fullBoxRecord())
     })
 
