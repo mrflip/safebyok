@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #382 (thread 9); thread 10 building; then 14, 11, 12, 13, then 6.
+* **Status:** filed through #384 (thread 14); thread 11 next; then 12, 13, then 6.
 
 ## Read first
 
@@ -401,6 +401,15 @@ Label `build_seals`. Runs next after thread 10, ahead of 11-13.
 logic stays hands off. Worker `opus`; review `high` (a seal stub sits next to secret material).
 Depends on 10 (cut from its tip). Size: medium.
 
+*Review:* fixed (#384, high; 1 compaction, ~12 minutes in, before the first justify). The whisper
+traced by hand: `draftOf` takes it from the dna, `stubSeal` drops it unread; it reaches no record,
+cache copy or snapshot. One fix: sealing over a live box still sparse after hydrating, with no
+sidecar given, staged `{}` over the stored sidecar (new with this thread; `makeStaged` now
+refuses `bad_option`, `NoSidecarToCarry`). Left: a whisperless dna builds a full box (a Coach
+row); a stub-sealed box can be sent, `build` seals before the held check, the seal's seam (the
+real seal's thread, cleanup); `models/Vault.lockState()` always locked (the lease); locked
+before malformed and a synchronous stub throw (my calls: keep).
+
 ### 11. `ifPresent: 'replace'`
 
 *Orchestrator, the Coach's note (2026-10-30), after thread 8 filed:* "Accept ifPresent as a flag.
@@ -420,7 +429,7 @@ a cached copy's staged `vault_tok` as it does its central. And, if the Coach fli
 storable's `settle` hands its cacheable to the listing's save, so `cacheable` becomes `#`-private
 and `ToCacheable`/`cacheableOf` go.
 Tests in `models-shapes.test.ts`, `listing.test.ts` or
-`box-listing.test.ts`, `box.test.ts`. Worker `sonnet`; review `low`. Depends on 14 (cut from its
+`box-listing.test.ts`, `box.test.ts`. Worker `sonnet`; review `medium` (raised from `low` for the two guards). Depends on 14 (cut from its
 tip; 10 and 11 both touch `listing.ts`). Size: small.
 
 ### 12. The sidecar, locked or not
