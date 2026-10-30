@@ -371,11 +371,14 @@ describe("Box sidecar, locked or not", () => {
     }
   })
 
-  it("follows a receive of a record with another sidecar into the snapshot while locked", async () => {
+  it("follows a receive of a record with another sidecar into the snapshot while locked, telling its listeners", async () => {
     const box = await boxOf()
     held.mw.setLockState('locked')
     const before = box.getSnapshot()
+    const listener = vi.fn()
+    box.subscribe(listener)
     box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', sidecar: { note: 'newer' } }))
+    expect(listener.mock.calls).to.have.lengthOf(1)
     expect(box.getSnapshot()).to.not.eq(before)
     expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'newer' })
     expect(box.sidecar).to.deep.equal({ note: 'newer' })
