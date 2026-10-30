@@ -59,6 +59,36 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   `hasRevision` exported from `listing.ts` tells a record from a dna; `MSX.Dna` allows
   `undefined` on each record prop; `BoxListing.draftOf` lays the factory's props over the dna's.
 
+* *The Coach's rulings of 2026-10-30, second batch* (verbatim in the sprint doc's *Resolved*):
+  - **Throwing** (on thread 3): "Throwing means 'We fundamentally cannot give you what you asked
+    for, and need to wreck everything in consequence'. If you can give them what they asked for,
+    no throw. If not, throw." Reporting to the customer (`onBadNews`) is good.
+  - **One pipeline** (on `hello`): "everything should go through a common scheme: hello, send,
+    anything -- buildOrReceive, so that there's no way for anything to be built more than once."
+    Survey for other places the rule is broken.
+  - **Timeliness:** "If I hold version 20 (whole) and see that we're still on version 20 (any), I
+    am fresh again. Same for holding version 20 sparse with a staged (making combined whole)". So
+    success is noted on a received record not older when the record in hand is whole; an older
+    record notes nothing; `hydrate` forces a fetch only when the record in hand is not whole.
+  - **`vault_tok` and `registered_at`:** `assign` sets them only when the current record is a
+    tombstone (true at birth and death); reconcile responds to a different `vault_tok` arriving.
+    "Do whatever has the least logic" on `registered_at` during an in-flight `del`.
+  - **`edit` and a moved central:** `edit` refuses `stale_write` when central's tok is not the one
+    it minted against (took the Rec).
+  - **Exposed whisper:** stays on the instance while locked and unlocked ("calling expose
+    indicates a different risk tolerance"); `expose` was on the design-not-implement list.
+  - **Background refresh refusals** go to `onBadNews` ("yes").
+  - **The cache:** "it's a cache, it's fine for it to get updated multiple times or not at all";
+    listeners before the save are accepted. Edits not cached: a TODO.
+  - **`ifPresent`:** removed (thread 8). **`same | full | ouch`:** fill. **`del` answered `same`:**
+    drops the staged tombstone. **`record_conflict`:** a condition, worth one retry.
+    **`cacheable`:** protected if only the listing needs it. **`bad_option`** for every dna fault.
+  - Left as they are: one listing horizon of Infinity fetching once; three `ensureTimely` calls
+    ("we will address it, but outside and/or later"); a damaged record counting as a refresh
+    (superseded by the timeliness rule); nobody settling boxes on lock (the vault's thread).
+* *Orchestrator (2026-10-30):* #370 and #371 force-pushed onto #374 with the Coach's permission;
+  the rest of the line restacks as main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3.
+
 ## Discoveries
 
 * *Thread 1:* the listing's snapshot is each present thing's `sparse`, the sparse form of
