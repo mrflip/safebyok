@@ -293,9 +293,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * `reconcileCentral` judges it; on 'older', 'same' or 'skip' the receive ends there, but for a deletion at the revision
    * held met by the staged tombstone of a `del`, which is spent: the staged is dropped, and the thing settles. Otherwise
    * `reconcileStaged` judges the staged against the new central, both are adopted, and the thing settles. A record not
-   * older than central notes
-   * success where, once it is taken in, central or the record in hand is whole, so a sparse one that only confirms the
-   * revision held counts; an older one notes nothing.
+   * older than central notes success where, once it is taken in, central or the record in hand is whole, so a sparse one
+   * that only confirms the revision held counts; an older one notes nothing.
    */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
     const answer = rcvd ?? this.tombstoneFor(this.#central)
@@ -303,7 +302,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const { central, policy } = this.reconcileCentral(answer, rcvdShape)
     const older = cmpRevisions(this.#central, answer) === 'older'
     const act = MSX.receivedAct.safeParse(policy)
-    // A deletion at the revision held answers a `del` sent over a thing already gone: the staged tombstone is spent.
+    // A deletion at the revision held, the answer to a `del` sent over a thing already gone or a fetch or notice met meanwhile, says storage holds it gone: the staged tombstone is spent.
     const delSpent = (policy === 'same') && (rcvdShape === 'gone') && (this.#staged?.am === 'x')
     if (act.success) {
       this.adopt(central, this.reconcileStaged({ act: act.data, central: this.#central, staged: this.staged, rcvd: answer, nextRevision: this.nextRevision(central) }))
