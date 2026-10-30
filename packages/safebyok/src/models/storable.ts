@@ -11,12 +11,12 @@ import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
 
-/** How `post` compares to `ante`: the later `revision_seq` is newer. The same seq under another `revision_tok` is two writes landed as one revision, refused 'corrupt_record'. */
+/** How `post` compares to `ante`: the later `revision_seq` is newer. The same seq under another `revision_tok` is two puts landed as one revision, refused 'record_conflict'. */
 export const cmpRevisions = (ante: Revision, post: Revision): Age => {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
   if (post.revision_tok !== ante.revision_tok) {
-    throw new VaultError('corrupt_record', 'Storage holds a record at the same revision_seq as this device, under another revision_tok: two writes landed as one revision, so neither can be trusted until the record is read again.')
+    throw new VaultError('record_conflict', 'Storage holds a record at the same revision_seq as this device, under another revision_tok: two puts landed as one revision, so neither can be trusted until the record is read again.')
   }
   return 'same'
 }
@@ -51,7 +51,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #central: Fetched<RecordT, SparseT>
   /** The record edited here and not yet sent, under the next revision, or a tombstone while `del` is sending; null while nothing is staged. */
   #staged: Fetched<RecordT, SparseT> | null
-  /** Made on first read, and again by each `settle` once one exists. */
+  /** Made when `snapshot` is first taken, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, this>
   readonly #listeners = new Set<() => void>()
@@ -114,7 +114,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return ! MSX.isTombstone(combined) && this.isFullRecord(combined) ? combined : null
   }
 
-  /** The copy the listing writes to the device cache. */
+  /** The copy the listing saves to the device cache. */
   get cacheable(): Cacheable<RecordT, SparseT> {
     return Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
   }
@@ -168,7 +168,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Replace the snapshot with a new one, and notify all listeners. Before the first read there is none to replace: the read makes it. */
+  /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first taken there is none to replace: taking it makes one. */
   #replaceSnapshot(): void {
     if (this.#snapshot === null) { return }
     const nextSnapshot = this.makeSnapshot()
@@ -334,8 +334,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * | older | gone   | any     | 'older'                  | central       |
    * | older | ouch   | any     | 'skip'                   | central       |
    * |       |        |         |                          |               |
-   * | same  | gone   | alive   | throw 'corrupt_record'   | -             |
-   * | same  | alive  | gone    | throw 'corrupt_record'   | -             |
+   * | same  | gone   | alive   | throw 'record_conflict'  | -             |
+   * | same  | alive  | gone    | throw 'record_conflict'  | -             |
    * | same  | sparse | any     | 'same'                   | central       |
    * | same  | gone   | gone    | 'same'                   | central       |
    * | same  | full   | full    | 'same'                   | central       |
@@ -358,8 +358,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if ((age === 'older') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
     if ((age === 'older'))                                       { return { central, policy: 'older' } }
     if ((age === 'same')) {
-      if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw new VaultError('corrupt_record', OneRevisionTwoFates) }
-      if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw new VaultError('corrupt_record', OneRevisionTwoFates) }
+      if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw new VaultError('record_conflict', OneRevisionTwoFates) }
+      if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw new VaultError('record_conflict', OneRevisionTwoFates) }
       if ((rcvdShape === 'ouch'))                                { return { central, policy: 'skip' } }
       if ((rcvdShape === 'gone') && (centralShape === 'gone'))   { return { central, policy: 'same' } }
       if ((rcvdShape === 'sparse'))                              { return { central, policy: 'same' } }
@@ -375,8 +375,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The staged that replaces the one held, given a new central (fill, adopt, gone, ouch) or a verb called here (edit, del); null for nothing staged.
    * An implementation reads `forms` and nothing else: never an own prop. A staged edit surpassed by
-   * a received update has no strategy both good and simple, so the simple one: a healthy record
-   * drops it, a damaged one carries it to the next revision (the Coach, 2026-10-30).
+   * a received update has no strategy both good and simple: any other drags the staged along until
+   * the customer sends it, to meet a stale_write at best, and a spurious `edit` could bump it into
+   * prominence. So the simple one: a healthy record (full, sparse, or a deletion's tombstone) drops
+   * it, whether or not it is the staged's own put landing; a damaged one carries it to the next
+   * revision (the Coach, 2026-10-30).
    *
    * | act             | staged after                                                                                   |
    * | --------------- | ---------------------------------------------------------------------------------------------- |
@@ -385,16 +388,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * | `fill`          | `staged`, as it was: a full record at the same revision surpasses nothing                      |
    * | `adopt`, `gone` | null: a healthy record newer than central, or a deletion from any device, drops the staged     |
    * | `ouch`          | `{ ...staged, ...nextRevision }`: the staged outlives the damage, under the revision after the ouchstone; null where nothing is staged |
-   *
-   * If the new received record's revision matches the staged's: successful write! Unstage it.
-   * We don't have any strategy that is both good and simple for an uncommitted staged edit
-   * surpassed by an received update. Anything we do has us dragging the staged record along
-   * until the customer tries to send, hopefully hitting a stale_write -- but a spurious edit
-   * call could bump the staged record into prominence.
-   *
-   * Instead, we have to go with simple: if the new record is
-   * healthy (full, sparse, or deletion tombstone), the staged record is dropped. If it is
-   * damaged, the staged record is moved to the next revision.
    *
    * @param forms.act          - The row to take.
    * @param forms.central      - The central held.
