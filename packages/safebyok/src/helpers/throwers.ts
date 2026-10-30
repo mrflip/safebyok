@@ -16,7 +16,7 @@ export const behindError      = () => new VaultError('vault_behind', Phrases.Vau
 
 export const notFullError        = () => new VaultError('bad_option', Phrases.RecordNotFull)
 
-/** `meta` names central as it now is, as a 'stale_write' carries what storage holds. */
+/** The 'stale_write' of an edit laid over a central that moved meanwhile, its `meta` carrying that central as a 'stale_write' from storage carries what storage holds. */
 export const movedUnderEditError = (meta: RefusalMeta) => new VaultError('stale_write', Phrases.MovedUnderEdit, { meta })
 
 export const alreadyHeldError    = () => new VaultError('bad_option', Phrases.AlreadyHeld)
