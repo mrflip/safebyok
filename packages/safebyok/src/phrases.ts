@@ -304,6 +304,9 @@ export const OtherVaultTokAtBirth = "Storage gave a record under another vault_t
 /** Why a record delivered under one scope that names another is not taken in. */
 export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
 
+/** Why an answer for one scope that was asked for another is not taken in. */
+export const AnswerOfOtherScope = "Storage answered for a scope other than the one asked, so nothing was made or changed of the answer: a bug in the storage adapter, which should answer each call about the scope it is given."
+
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --

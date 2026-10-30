@@ -7,7 +7,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq, ToCacheable } from './models-shapes'
+import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type IfPresent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq, ToCacheable } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -138,27 +138,30 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const asked = this.scopeOf(scope)
     await this.ensureTimelyWorld(timely)
     const answer = await this.#store.get(asked)
-    return this.#deliver(answer, ifAbsent)
+    return this.#deliver(answer, asked, ifAbsent)
   }
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
-  /** Put `duck`, a record or a thing ducking as its record, over the revision its instance expects (none, for a thing never stored or not held), and deliver the answer. A 'stale_write' refusal delivers the record storage holds before it is thrown. */
-  async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
+  /** Put `duck`, a record or a thing ducking as its record, over the revision its instance expects (none, for a thing never stored or not held), and deliver the answer. A 'stale_write' refusal delivers the record storage holds before it is thrown.
+   * `ifPresent`, optional, may only be `'replace'`: it goes to storage with the put, which judges it. Where the revision expected is none, storage puts over a record it holds; where one is expected, its compare-and-set holds as it does without.
+   */
+  async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ifPresent?: IfPresent): Promise<ThingT | null> {
     const record = this.recordOf(duck)
+    const replace = ifPresent === undefined ? undefined : MSX.ifPresent.parse(ifPresent)
     const expectedRevision = this.expectedRevisionOf(this.scopeOf(record))
-    const answer = await this.#store.put(record, expectedRevision)
-    return this.#deliver(answer)
+    const answer = await this.#store.put(record, expectedRevision, replace)
+    return this.#deliver(answer, this.scopeOf(record))
   }
 
-  tryPut(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.put(duck)) }
+  tryPut(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ifPresent?: IfPresent): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.put(duck, ifPresent)) }
 
   /** Delete the thing `duck` names, a sparse record or a thing, at the revision its instance expects, and deliver the answer, a tombstone. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     const scope = this.scopeOf(duck)
     const expectedRevision = this.expectedRevisionOf(scope)
     const answer = await this.#store.del(scope, expectedRevision)
-    return this.#deliver(answer)
+    return this.#deliver(answer, scope)
   }
 
   tryDel(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.del(duck)) }
@@ -171,12 +174,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Delivering an answer]: deliver, buildOrReceive, makeThingFor, hold, neverStoredOf
 
-  /** The pipeline every answer takes. Check it; take the world; hand the record, or none stored, to `#buildOrReceive` under the scope the answer names; a refusal answer is thrown, after the record a 'stale_write' carries is delivered.
+  /** The pipeline every answer takes. Check it, and that it is for `asked`, the scope the call was about, refusing 'bad_record' an answer for another; take the world; hand the record, or none stored, to `#buildOrReceive` under the scope the answer names; a refusal answer is thrown, after the record a 'stale_write' carries is delivered.
    * The answer's own refusals are thrown: its world's, its `err` (a 'stale_write' as it came), or the absent refusal. A refusal `receive` throws is thrown too, as the instance cannot become what storage holds; but where the answer is itself a refusal, that one is thrown, and the carried record's is told to `onBadNews`.
    * Only a fetch judges, by passing its `ifAbsent`: an answer of nothing stored, or of a tombstone, is then absent, once delivered, and throws {@link absentRefusal} under 'fail' and resolves null under 'nil'. A `put`, a `del` and a notice pass none, and have the instance back, a tombstone or not.
    */
-  async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
+  async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, asked: ScopeT, ifAbsent?: IfAbsent): Promise<ThingT | null> {
     MSX.answer.parse(answer)
+    if (this.scopepathOf(answer.scope) !== this.scopepathOf(asked)) { throw new VaultError('bad_record', Phrases.AnswerOfOtherScope) }
     this.world.takeWorld(answer.world)
     if (answer.ok) {
       const thing = await this.#buildOrReceive(answer.scope, { flavor: 'received', record: answer.val })
@@ -220,17 +224,20 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw new VaultError('bad_record', Phrases.RecordOfOtherScope) }
   }
 
-  /** Refuse 'unexpected_error' an `intake` of a record, or a copy's central, under another `vault_tok` than the vault this listing lies in, before any instance is made of it. */
+  /** Refuse 'unexpected_error' an `intake` of a record, or of a cached copy whose central or staged is, under another `vault_tok` than the vault this listing lies in, before any instance is made of it. */
   #demandRecordOfVault(intake: Intake<RecordT, SparseT>): void {
     const vault_tok = this.vaultTokOfWorld()
-    const record = intake.flavor === 'received' ? intake.record : this.#centralOf(intake)
-    if (vault_tok === null || record === null) { return }
-    if (this.sparseOf(record).vault_tok !== vault_tok) { throw new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth) }
+    if (vault_tok === null) { return }
+    for (const record of this.#recordsOf(intake)) {
+      if (this.sparseOf(record).vault_tok !== vault_tok) { throw new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth) }
+    }
   }
 
-  /** The central a cached copy holds; null for any other intake. */
-  #centralOf(intake: Intake<RecordT, SparseT>): Fetched<RecordT, SparseT> | null {
-    return intake.flavor === 'cached' ? intake.copy.central : null
+  /** The records `intake` would make an instance of: a record received, if any; a cached copy's central and its staged, if any; none for a draft. */
+  #recordsOf(intake: Intake<RecordT, SparseT>): readonly Fetched<RecordT, SparseT>[] {
+    if (intake.flavor === 'received') { return intake.record === null ? [] : [intake.record] }
+    if (intake.flavor === 'cached')   { return intake.copy.staged === null ? [intake.copy.central] : [intake.copy.central, intake.copy.staged] }
+    return []
   }
 
   /** How the instances made here tell bad news. */
@@ -263,7 +270,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const { ok, err } = await outcomeOf(async () => {
       MSX.notice.parse(notice)
       const { record, world } = notice
-      await this.#deliver({ scope: this.scopeOf(record), ok: true, val: record, world })
+      const scope = this.scopeOf(record)
+      await this.#deliver({ scope, ok: true, val: record, world }, scope)
     })
     if (! ok) { this.tellBadNews([err]) }
   }
