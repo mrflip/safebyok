@@ -14,6 +14,7 @@
 import { afterEach, beforeEach, vi } from 'vitest'
 import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
+import { type BoxProps, Box } from '../../src/models/box'
 import { BoxListing, type BoxCache, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Cacheable, type Fetched, type LockState, type Notice, type Revision, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
@@ -397,4 +398,36 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
     ...overrides,
   })
 )
+// --
+
+// == [Faked seal]: fakeSealBoxListingOf
+
+/** A {@link boxListingOf} whose boxes fake the seal, for a test that must seal over a record with no sealed parts (a draft, a tombstone) and is not about sealing: a whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, the sidecar given or carried, else `{}`. Without a whisper, `makeStaged` is the box's own. `duringMakeStaged`, where given, runs at the top of each `makeStaged`, for a test that acts while an edit is under way.
+ *
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: 'sk-test' }) is its rebirth
+ * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each edit
+ */
+export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringMakeStaged: () => void = () => undefined): BoxListing => {
+  class FakeSealBox extends Box {
+    protected override makeStaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
+      duringMakeStaged()
+      if (patch.whisper === undefined) { return super.makeStaged(base, patch) }
+      const sidecar = patch.sidecar ?? (this.isFullRecord(base) ? base.sidecar : {})
+      return Promise.resolve({ ...base, sidecar, box_key_wrapped: fakeCiphered(`boxkey-${base.revision_tok}`), whisper_ciphered: fakeCiphered(`whisper-${base.revision_tok}`) })
+    }
+  }
+  class FakeSealBoxListing extends BoxListing {
+    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null): Box {
+      return new FakeSealBox(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
+    }
+  }
+  return new FakeSealBoxListing({
+    world:                 mw.world,
+    store:                 mw.store,
+    cache:                 mw.cache,
+    maxMillisSinceRefresh: 10 * 60_000,
+    onBadNews:             mw.onBadNews,
+    ...overrides,
+  })
+}
 // --
