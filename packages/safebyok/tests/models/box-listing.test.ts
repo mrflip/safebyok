@@ -514,7 +514,7 @@ describe("BoxListing: an absent box", () => {
 })
 
 describe("BoxListing: its snapshot is what its boxes show", () => {
-  it("shows a box's sidecar as the box reads it: Bob's your uncle by any path", async () => {
+  it("shows a box's sidecar as `box.sidecar` gives it: Bob's your uncle by any path", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord({ boxlabel: 'robert', sidecar: { uncle: 'Bob' } }))
     const robert = listing.at(held.mw.boxscope('robert'))
@@ -540,7 +540,7 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     expect(listing.snapshot[0]).to.include({ present: true, full: false, sidecar: null })
   })
 
-  it("follows the box through an edit: the listing shows the sidecar the box now reads", async () => {
+  it("follows the box through an edit: the listing shows the sidecar `box.sidecar` now gives", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord({ sidecar: { uncle: 'Bob' } }))
     await box.edit({ sidecar: { uncle: 'Robert' } })
