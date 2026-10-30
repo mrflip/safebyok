@@ -815,7 +815,7 @@ describe("Storable own props", () => {
     })
   })
 
-  describe("the props that follow the record in hand: vault_tok, revision_tok, revision_seq, written_at", () => {
+  describe("the props that follow the record in hand: revision_tok, revision_seq, written_at, and vault_tok over a tombstone", () => {
     const writable = ['vault_tok', 'revision_tok', 'revision_seq', 'written_at'] as const
 
     it("start as the record the box was received with", async () => {
@@ -843,8 +843,8 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 1000 })
     })
 
-    it("follow the vault_tok of a record received under another vault_tok, and the scope does not", async () => {
-      const box = await builtBoxOf()
+    it("take the vault_tok of a record received over a tombstone under another vault_tok, and the scope does not", async () => {
+      const box = await builtBoxOf(tombstoneBoxRecord())
       const { scope } = box
       box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' }))
       expect(box.vault_tok).to.eq('vault-tok-u2')

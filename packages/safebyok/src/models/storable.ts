@@ -3,7 +3,7 @@ import { VaultError } from '../errors'
 import { adorn } from '../helpers'
 import { type Outcome, outcomeOf } from '../outcome'
 import { stableJsonify } from '../stable-jsonify'
-import { lockedError, movedUnderEditError, notFullError } from '../helpers/throwers'
+import { lockedError, movedUnderEditError, notFullError, vaultRemadeError } from '../helpers/throwers'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
 import type { Age, Am, Cacheable, EditOpts, Fetched, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Times, Tombstone, Vaulted, World } from './models-shapes'
@@ -38,7 +38,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare readonly world:   World
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
-  /** The vault, revision and times of the record in hand, as plain props: inscribed by `assignInitialProps`, set by `assign` at each adopt. */
+  /** The vault, revision and times of the record in hand, as plain props: inscribed by `assignInitialProps`, set by `assign` at each adopt, `vault_tok` and `registered_at` only over a tombstone. */
   declare vault_tok:     string
   declare revision_tok:  string
   declare revision_seq:  number
@@ -85,11 +85,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Inscribe the own props, before the seal: the scope, immutably, here, and through `assign`, the ones that follow the record in hand. A concrete class with props of its own overrides it, calls super first, and inscribes them the same way: as own props, tattooed or adorned, never as #fields, which do not exist while the base constructor runs. */
   protected assignInitialProps(combined: Fetched<RecordT, SparseT>): void {
     tattoo(this, this.scope, { writable: false, configurable: false })
-    this.assign(combined)
+    this.assign(combined, null)
   }
 
-  /** Set every prop that follows the record in hand. The concrete class sets its own after calling this. */
-  protected assign(record: Fetched<RecordT, SparseT>): void {
+  /** Set the props that follow `record`, the record in hand: its revision and `written_at` always; its `vault_tok` and
+   * `registered_at`, which name a life of the thing, only at birth (`current` null) or where `current`, the central held
+   * until now, is a tombstone, as it is before a first store and after a death. The concrete class sets its own after
+   * calling this.
+   */
+  protected assign(record: Fetched<RecordT, SparseT>, current: Fetched<RecordT, SparseT> | null): void {
+    if (current === null || MSX.isTombstone(current)) { tattoo(this, lifePropsOf(record), { configurable: false }) }
     tattoo(this, revisionPropsOf(record), { configurable: false })
   }
   // --
@@ -293,11 +298,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this.settle()
   }
 
-  /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand; the snapshot waits for `settle`. */
+  /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand over the central held until now; the snapshot waits for `settle`. */
   protected adopt(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null): void {
+    const current = this.#central
     this.#central = Object.freeze(central)
     this.#staged = staged === null ? null : Object.freeze(staged)
-    this.assign(this.combined)
+    this.assign(this.combined, current)
   }
 
   /** Act on the state as adopted, idempotently: the base replaces the snapshot and tells no news. A subclass calls super last, so that the snapshot sees it. */
@@ -341,6 +347,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * Of the shapes, only a deletion against a living record, either way round, refuses 'record_conflict'; `cmpRevisions`
    * refuses another tok at the same seq before any row is weighed.
    *
+   * NOTE, another `vault_tok` (the Coach, 2026-10-30). Before any row, a record under another `vault_tok` than a central
+   * held alive refuses 'vault_remade': it belongs to another life of the vault, whose revisions this one's do not order,
+   * and the remedy is to load the vault again. Over a central that is a tombstone, never stored or deleted or damaged, the
+   * rows weigh it as any other, and `assign` takes its `vault_tok` once it is adopted.
+   *
    * | age   | rcvd   | central | policy                   | central after |
    * | ----- | ------ | ------- | ------------------------ | ------------- |
    * | older | any    | any     | 'older'                  | central       |
@@ -369,6 +380,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
     const central = this.#central
+    if ((rcvd.vault_tok !== central.vault_tok) && ! MSX.isTombstone(central)) { throw vaultRemadeError() }
     const age = cmpRevisions(central, rcvd)
     const centralShape = this.classifyRecordShape(central)
     if ((age === 'older') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
@@ -447,12 +459,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 }
 // --
 
-// == [Helpers]: OneRevisionTwoFates, revisionPropsOf, tattoo
+// == [Helpers]: OneRevisionTwoFates, lifePropsOf, revisionPropsOf, tattoo
 
 const OneRevisionTwoFates = 'Storage and this device disagree about one revision of a record: one of them holds it alive and the other holds it deleted, or storage holds nothing for it. This device kept its own copy. Fetching the record again finds the same disagreement until what storage holds changes. Storage lost or rewrote the record, and the storage adapter is where to look.'
 
-/** The own props that follow the record in hand. */
-const revisionPropsOf = ({ vault_tok, revision_tok, revision_seq, registered_at, written_at }: Revision & Times & Vaulted): Revision & Vaulted & Times => ({ vault_tok, revision_tok, revision_seq, registered_at, written_at })
+/** The own props that name a life of the thing, set at birth and over a tombstone. */
+const lifePropsOf = ({ vault_tok, registered_at }: Vaulted & Times): Vaulted & Pick<Times, 'registered_at'> => ({ vault_tok, registered_at })
+
+/** The own props that follow every record in hand. */
+const revisionPropsOf = ({ revision_tok, revision_seq, written_at }: Revision & Times): Revision & Pick<Times, 'written_at'> => ({ revision_tok, revision_seq, written_at })
 
 /** A placeholder until the helpers worker lands `tattoo`; then this goes and the import takes its place. */
 const tattoo = <BT extends object>(obj: object, shown: BT, opts: { writable?: boolean, configurable?: boolean } = {}): BT => {
