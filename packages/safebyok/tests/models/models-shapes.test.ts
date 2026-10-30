@@ -114,7 +114,7 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
       [{ ...baseProps, revision_tok: undefined }, false, 'refuses a record with no revision_tok'],
       [{ ...baseProps, am: 'z' },              false, 'refuses an am that is not one'],
       [null,                                   false, 'refuses null'],
-      ['rev-a1',                               false, 'refuses text'],
+      ["rev-a1",                               false, 'refuses text'],
     ])
 
     it("takes the six props from a record and strips the rest, as its example shows", () => {
@@ -387,10 +387,10 @@ describe("MSX.boxRecord and MSX.boxSparse", () => {
 describe("The checks of options", () => {
   describe("MSX.ifPresent", () => {
     holdsCases(MSX.ifPresent, 'bad_option', [
-      ['replace', true,  'passes replace'],
-      ['fail',    true,  'passes fail'],
-      ['fetch',   true,  'passes fetch'],
-      ['skip',    false, 'refuses a policy it does not know'],
+      ["replace", true,  'passes replace'],
+      ["fail",    true,  'passes fail'],
+      ["fetch",   true,  'passes fetch'],
+      ["skip",    false, 'refuses a policy it does not know'],
       [true,      false, 'refuses a boolean'],
       [undefined, false, 'refuses undefined: a default is the option\'s, not the check\'s'],
     ])
@@ -405,7 +405,7 @@ describe("The checks of options", () => {
       [-1,        false, 'refuses a negative span'],
       [-Infinity, false, 'refuses minus Infinity'],
       [NaN,       false, 'refuses NaN'],
-      ['60000',   false, 'refuses text'],
+      ["60000",   false, 'refuses text'],
       [null,      false, 'refuses null'],
     ])
   })
@@ -456,9 +456,9 @@ describe("The checks of options", () => {
 describe("The checks of the world and the listing", () => {
   describe("MSX.lockState", () => {
     holdsCases(MSX.lockState, 'unexpected_error', [
-      ['unlocked', true,  'passes unlocked'],
-      ['locked',   true,  'passes locked'],
-      ['LOCKED',   false, 'refuses another spelling: a world that answers it is a bug'],
+      ["unlocked", true,  'passes unlocked'],
+      ["locked",   true,  'passes locked'],
+      ["LOCKED",   false, 'refuses another spelling: a world that answers it is a bug'],
       [true,       false, 'refuses a boolean'],
       [undefined,  false, 'refuses undefined'],
     ])
