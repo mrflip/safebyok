@@ -48,7 +48,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
 /** A box holding `record` (the full box record `anthropic_api_key` at revision 1, by default) as received, through a listing over the test world. */
 const boxOf = (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<Box> => boxListingOf(held.mw).build(record)
 
-/** The snapshot of a box holding `record`, as the host reads it. */
+/** The snapshot of a box holding `record`, as `getSnapshot` answers it. */
 const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<BoxSnapshot> => {
   const box = await boxOf(record)
   return box.getSnapshot()
@@ -156,7 +156,7 @@ describe("Box sidecar while the vault is locked", () => {
     expect(box.whisper).to.eq(LOCKED)
   })
 
-  it("is read as itself while unlocked, and as the locked bag while locked", async () => {
+  it("answers itself while unlocked, and the locked bag while locked", async () => {
     const box = await boxOf()
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
     held.mw.setLockState('locked')
