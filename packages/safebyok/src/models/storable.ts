@@ -477,8 +477,8 @@ const OneRevisionTwoFates = 'Storage and this device disagree about one revision
 /** The own props that name a life of the thing, set at birth and over a tombstone. */
 const lifePropsOf = ({ vault_tok, registered_at }: Vaulted & Times): Vaulted & Pick<Times, 'registered_at'> => ({ vault_tok, registered_at })
 
-/** The own props that follow every record in hand. */
-const revisionPropsOf = ({ revision_tok, revision_seq, written_at }: Revision & Times): Revision & Pick<Times, 'written_at'> => ({ revision_tok, revision_seq, written_at })
+/** The own props that follow the record in hand. */
+const revisionPropsOf = ({ vault_tok, revision_tok, revision_seq, written_at }: Revision & Times & Vaulted): Revision & Vaulted & Pick<Times, 'written_at'> => ({ vault_tok, revision_tok, revision_seq, written_at })
 
 /** A placeholder until the helpers worker lands `tattoo`; then this goes and the import takes its place. */
 const tattoo = <BT extends object>(obj: object, shown: BT, opts: { writable?: boolean, configurable?: boolean } = {}): BT => {

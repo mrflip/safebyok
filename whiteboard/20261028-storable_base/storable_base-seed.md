@@ -68,3 +68,36 @@ world then self, the live instance (`this`), the snapshot. `cachedRecord`, `fetc
 
 Still open: the lock-landed-mid-operation policy; `world` in VOCABULARY.md; a null `record` in an
 answer reads as absent, so a conditional "unchanged" answer needs its own shape when it comes.
+
+
+I rewrote `scenarios.md` against the sprint as finished (threads 1–8). The `code` column is now `plan`: it names the thread that produces each outcome, or `=` where today's code stands, or ✏️ where I corrected a plan defect. The seal is outside the plan, so rows that need it take the spec's outcome and are marked `seal`. It's still in the base checkout, not committed.
+
+**Plan defects, each judged as fixed in the rows:**
+- **P1, the trigger skips `'nil'`:** thread 3 has `hydrate` pass `ifAbsent: 'nil'`. But `hydrate` fetches through the trigger, which calls `tryFetch()` with no options. Left alone, hydrating a deleted box, or a draft with nothing stored, refuses `absent_box`.
+- **P2, `del` and notices would refuse:** `ifAbsent` is checked where every answer passes, so `put`, `del` and watch notices meet it too. A `del`'s own answer is a tombstone, so under the default `'fail'` every successful delete would throw `absent_box`, and every deletion notice would arrive as bad news. Only `fetch` should check it.
+- **P3, `ifPresent` almost never fires:** thread 8 checks it only when this device expects nothing stored. But `send` refreshes the box first. If another device already made it, that refresh adopts the stored box and drops the draft, and the `put` silently overwrites it. The fix I assumed: `send` notes that the box was never stored, refreshes, and applies `ifPresent` itself if the refresh found a record.
+- **P4, the `LOCKED` marker:**
+  - `Symbol.for('LOCKED')` can collide with any other library using that name.
+  - The locked sidecar `{ [LOCKED]: true }` has a symbol key, which disappears when serialized. So the snapshot comparison sees a locke                                                                   d sidecar as equal to an empty one, and listeners aren't told when the lock comes down.
+- **P5 and P6, small:** the plan's reading list still points to `src/utils/trigger.ts`, which moved to `src/helpers/`. And thread 4 removes `demandFull` "if nothing else calls them", but thread 4g's unseal guard calls it, so it stays, along with a message that still says "cannot be sent".
+
+**Gaps the plan leaves:**
+1. **Revision races:** a storage answer that lands mid-`edit` or between `edit` and `put` can stage a record at central's own revision number, or re-put storage's record and resolve with the patch lost. Three one-line checks would close these.
+2. **The lock:** nothing re-renders the boxes when the lock changes, and an exposed whisper survives it.
+3. **Lock checked after the fetch:** `edit`, `send` and `del` still fetch before refusing `vault_locked`.
+
+The rest are smaller:
+- a failed `del` keeps showing the box as deleted;
+- a `stale_write` that carries no record loops;
+- a dropped staged edit is invisible to the host;
+- `vault_tok` drift is never checked;
+- background refusals are lost;
+- an older record still marks the box fresh;
+- no code reports a damaged box;
+- whether a staged edit reaches the cache is left to chance;
+- `hello` and `goodbye` aren't safe to repeat.
+
+Several earlier findings are resolved by the plan and gone from this list: the sparse-record cases, retrying a `del`, aborting when the lock comes down mid-verb, and the new revision on every edit.
+
+Files are in this folder:
+- [scenarios.md](whiteboard/20261028-storable_base/scenarios.md)
