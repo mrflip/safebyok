@@ -246,7 +246,7 @@ export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, lit, appl
 export type BoxSparse = Z.infer<typeof boxSparse>
 export type BoxRecord = Z.infer<typeof boxRecord>
 
-/** The check of a box's dna, the duckish `listing.build` holds a dna to on its first line, refusing 'bad_option', naming the failing field. A record handed to `build` is held to `boxRecord` or `boxSparse` instead.
+/** The check of a box's dna, a duckish refusing 'bad_option' and naming the failing field. A record is checked by `boxRecord` or `boxSparse`, never by this.
  * The scope is required. The record's own props are optional: `sidecar`, `whisper_codec` and
  * `whisper_schema_version` take their defaults where missing or undefined, the sealed parts are
  * kept where given, and `whisper`, the whisper to seal in once built, may be given. The props the factory

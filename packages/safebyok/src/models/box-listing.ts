@@ -63,7 +63,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   recordOf(duck: unknown): BoxRecord { return boxRecord.parse(duck) }
 
-  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, its sidecar empty where none was given, under the format, alive, in this vault. No whisper until one is sealed in. `build` holds every dna to `boxDna` before it reaches here. */
+  // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here.
+  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault. No whisper until one is sealed in. */
   protected draftOf(dna: Omit<BoxDnaFilled, 'whisper'> & Revision & Times): BoxSparse | BoxRecord {
     return { ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }
   }
