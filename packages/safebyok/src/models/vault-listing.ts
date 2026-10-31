@@ -43,9 +43,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one. A dna takes the `proofClosure` its gate is built from: the vault is born of the dna's draft, without a gate, then `vault.buildGate(proofClosure)` gives it one; where that is refused, the vault stays held without a gate, and `buildGate` may be called again. */
+  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from: the vault is born of the dna's draft, without a gate, then `vault.buildGate(proofClosure)` gives it one; where that is refused, the vault stays held without a gate, and `buildGate` may be called again. */
   override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
-    if (hasRevision(input)) { return super.build(input) }
+    if (hasRevision(input)) {
+      if (proofClosure !== undefined) { throw closureWithRecord() }
+      return super.build(input)
+    }
     const checked = MSX.buildGateArgs.parse({ proofClosure })
     const vault = await super.build(input)
     return vault.buildGate(checked.proofClosure)
@@ -86,4 +89,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 }
+// --
+
+// == [Refusals]: closureWithRecord
+
+const closureWithRecord = (): VaultError => new VaultError('bad_option', 'A vault built of a record takes no proofClosure: its gate is the one the record carries.')
 // --
