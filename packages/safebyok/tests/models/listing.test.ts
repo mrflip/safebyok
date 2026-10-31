@@ -337,6 +337,18 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.callsOf('save')).to.have.lengthOf(2)
     })
 
+    it("saves, for a delivery judged same, the central and staged as they now are: an edit staged before it is in the copy", async () => {
+      held.mw.seedStore(fullBoxRecord())
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(fullBoxRecord())
+      await box.edit({ sidecar: { note: 'staged' } })
+      held.mw.clearCalls()
+      await listing.fetch(scopeOf())
+      const [saved] = held.mw.callsOf('save')
+      expect(saved?.cacheable.staged).to.deep.include({ sidecar: { note: 'staged' } })
+      expect(saved?.cacheable).to.deep.equal(keptOf(held.mw, box))
+    })
+
     it("makes the snapshot of a box held inside receive, before the save; a save refused is told to onBadNews, not thrown", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
@@ -1190,9 +1202,9 @@ describe("listing.put and listing.del: the prior tok they send", () => {
 })
 // --
 
-// == [The copy an instance hands in]: keepCopy at each settle, the cache saved at a delivery or a build
+// == [The copy an instance hands in]: [KeepCopy] at each settle, the cache saved at a delivery or a build
 
-describe("listing.keepCopy: the copy each instance's settle hands in, saved to the cache by a delivery or a build only", () => {
+describe("listing[KeepCopy]: the copy each instance's settle hands in, saved to the cache by a delivery or a build only", () => {
   it("is handed a copy at an edit, which saves nothing to the cache: the box is not reached for it", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
@@ -1219,6 +1231,15 @@ describe("listing.keepCopy: the copy each instance's settle hands in, saved to t
     const box = listing.at(scopeOf(copy.boxlabel))
     expect(keptOf(held.mw, box)).to.deep.equal(copy)
     expect(held.mw.callsOf('save')).to.deep.equal([])
+  })
+
+  it("is no string-keyed member of a listing: the method that keeps a copy is keyed by a symbol", () => {
+    const listing = boxListingOf(held.mw)
+    const names: string[] = []
+    for (let obj: object | null = listing; obj !== null && obj !== Object.prototype; obj = Object.getPrototypeOf(obj) as object | null) {
+      names.push(...Object.getOwnPropertyNames(obj))
+    }
+    expect(names).to.not.include('keepCopy')
   })
 
   it("holds no way to the copy on an instance a host holds: no `cacheable` and no symbol-keyed method", async () => {

@@ -136,7 +136,7 @@ export type ModelsWorld = {
   stored: Map<string, Fetched<BoxRecord, BoxSparse>>
   /** The copies the cache keeps, by boxlabel; `save` replaces the one of its box. */
   cached: Map<string, Cacheable<BoxRecord, BoxSparse>>
-  /** The copies the instances last handed their listing by `keepCopy`, by boxlabel: the listings {@link boxListingOf} and {@link fakeSealBoxListingOf} make log into it, each instance's `settle` replacing the one before. It follows the instance's state at each `settle`, which the cache's `save` does only at a delivery or a build. */
+  /** The copies the instances last handed their listing by `[MSX.KeepCopy]`, by boxlabel: the listings {@link boxListingOf} and {@link fakeSealBoxListingOf} make log into it, each instance's `settle` replacing the one before. It follows the instance's state at each `settle`, which the cache's `save` does only at a delivery or a build. */
   kept: Map<string, Cacheable<BoxRecord, BoxSparse>>
   /** Every watch started, oldest first. A live array. */
   watches: readonly ModelsWatch[]
@@ -421,12 +421,12 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
   })
 )
 
-/** The class of a {@link BoxListing} that logs each copy its instances hand it, by `keepCopy`, into `mw.kept`. */
+/** The class of a {@link BoxListing} that logs each copy its instances hand it, by `[MSX.KeepCopy]`, into `mw.kept`. */
 const keptBoxListingClassOf = (mw: ModelsWorld): typeof BoxListing => (
   class KeptBoxListing extends BoxListing {
-    override keepCopy(cacheable: Cacheable<BoxRecord, BoxSparse>): void {
+    override [MSX.KeepCopy](cacheable: Cacheable<BoxRecord, BoxSparse>): void {
       mw.kept.set(cacheable.boxlabel, cacheable)
-      super.keepCopy(cacheable)
+      super[MSX.KeepCopy](cacheable)
     }
   }
 )
@@ -466,7 +466,7 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
 
 // == [Peeking]: keptOf, lastSaveOf
 
-/** The copy `box` last handed its listing by `keepCopy`: its central and staged as of its last `settle`. Undefined for no box; throws where no copy was kept for its boxlabel, as for a box made by a listing neither {@link boxListingOf} nor {@link fakeSealBoxListingOf} made. */
+/** The copy `box` last handed its listing by `[MSX.KeepCopy]`: its central and staged as of its last `settle`. Undefined for no box; throws where no copy was kept for its boxlabel, as for a box made by a listing neither {@link boxListingOf} nor {@link fakeSealBoxListingOf} made. */
 export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse>
 export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined
 export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined {
