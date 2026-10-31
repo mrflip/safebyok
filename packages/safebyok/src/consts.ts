@@ -37,3 +37,13 @@ export const MaxSaltBytes = 65_536
 
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
 export const PassphraseKeyBytes = 32
+
+/** The longest duration we use for a timer, in hours -- the equivalent of 24.5 days (close to, but below, the hard limit of 2**31-1 milliseconds).
+ * A trigger arms no timer for a launch further off than this: the launch waits for a call that finds it due, and the trigger reads untimely once the launch is due, as with any other.
+ */
+export const MaxTimerHours = 588
+
+/** The longest duration we use for a timer, in milliseconds -- the equivalent of 24.5 days (close to, but below, the hard limit of 2**31-1 milliseconds).
+ * A trigger arms no timer for a launch further off than this: the launch waits for a call that finds it due, and the trigger reads untimely once the launch is due, as with any other.
+ */
+export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
