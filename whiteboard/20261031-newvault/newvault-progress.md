@@ -32,3 +32,9 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 * `vault.leaseDBFriend()` answers `{ logger, tryGetLease, tryPutLease, tryDelLease }` as arrows bound to the vault's scope; `VaultWorld` carries `keyDeriver`, `device_id`, `leaseMillis`, `deviceDB`, `scope`, `logger`. Thread 2 reads `leaseMillis` from the world.
 * `edit` demands a full record and `send` refuses a gateless vault: a failed proof closure leaves a held, gateless vault that `buildGate` may be called on again; `build(dna)` a second time refuses as already held.
 * `vault.gate` is a prototype getter, so a Vault passed where its record is expected fails `vaultRecord`; nothing does that today.
+
+## Rulings, 2026-10-31 (Open Matters, first sweep)
+
+* `autolock_at` stays; `gate_epoch` stays out this sprint ("add it at some point": next sprint, with gate-epoch voiding); the two G8 relabels stay; `FX.prfSalt` stays a separate checker; `Wayin.toJSON` keeps the header; the vault stamp binds no format.
+* The deviceDB bridge: "if there are things we will want from the old model, add them; if there are still gaps have the facade paper over them". Thread 2: look at the old lease record (`src/shapes/device.ts`) for fields the models will want and add them to `leaseRecord`; the bank's adapter papers over the rest.
+* Doc blocks: short now, more later; slop that narrates parameters is stripped or fixed, never written anew (ground rule 8).
