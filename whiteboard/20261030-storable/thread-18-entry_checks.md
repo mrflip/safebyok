@@ -1,6 +1,6 @@
 # Thread 18: Validators at every entrypoint (2026-10-31)
 
-Branch `20261031-entry_checks`, PR #TBD, stacked on #404. Justify: green (safebyok 4489 passed, 37 skipped; every package green). Changeset empty. No size budget moved; no `eslint-disable` or `ts-expect-error` added.
+Branch `20261031-entry_checks`, PR [#405](https://github.com/mrflip/safebyok/pull/405), stacked on [#404](https://github.com/mrflip/safebyok/pull/404). Justify: green (safebyok 4489 passed, 37 skipped; every package green). Changeset empty. No size budget moved; no `eslint-disable` or `ts-expect-error` added.
 
 The survey of every public method of Box, BoxListing, Storable and Listing, checked before, newly, and left unchecked with the reason, is in [thread-18-entry_checks-survey.md](thread-18-entry_checks-survey.md): read it before adding an entry to any of the four, or reviewing this thread's coverage.
 
