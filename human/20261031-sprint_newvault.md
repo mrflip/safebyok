@@ -1,4 +1,4 @@
-# 2026-10-31: Sprint newvault -- running; YOLO from 09:20 UTC
+# 2026-10-31: Sprint newvault -- running; YOLO from 09:20 UTC (superseded by the done note, `20261031-sprint_newvault_done.md`)
 
 The orchestrator's entry for sprint newvault (PR #409, branch `20261031-newvault`). The plan,
 progress document, design review and gap review are in `whiteboard/20261031-newvault/`; the

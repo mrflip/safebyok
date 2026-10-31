@@ -5,7 +5,7 @@
 * **At once**: 3 threads.
 * **Spec**: `whiteboard/20261030-newvault/newvault-spec.md` (the design, one day older than this sprint's folder; the two folders share the name on purpose). The storable spec is `whiteboard/20261028-storable_base/storable-spec.md`.
 * **Base**: every code thread stacks on the models PR, branch `20261031-newvault_models` (the Lease, Wayin, Proving, Gate, `Vault.lock()` and their shapes, filed from the Coach's planning checkout). Its PR number and tip are in the progress document once filed.
-* **Status**: wrapping up. One line: #408 (4ff14b4b) → #410 (7c57356c) → #412 (c740f161) → #413 (5a1dc63a) → #414 (a69bdef8) → #411 (7a0edfe9) → #415 (83cacba8, filing). All six threads built and reviewed; the sprint PR #409 closes the line on top.
+* **Status**: done 2026-10-31. One line, merge order: #408 (4ff14b4b) → #410 (7c57356c) → #412 (c740f161) → #413 (5a1dc63a) → #414 (a69bdef8) → #411 (7a0edfe9) → #415 (83cacba8) → #416 notes (34ee3d27) → #409 this sprint PR on top. Six threads built and reviewed; the Coach's open rows are on the sprint doc; the done note is `human/20261031-sprint_newvault_done.md`, the rulings `newvault-resolutions.md`.
 
 ## Read first
 
