@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { Lease } from '../../src/models/lease'
@@ -139,11 +139,49 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(deviceDB.tryPutLease).toHaveBeenCalledTimes(2)
   })
 
-  it("refuses 'bad_option' to take up a lease granted another Vault object", async () => {
-    const { vault } = await bornVault()
+  it("refuses 'bad_option' to take up a lease of another vault, and 'vault_locked' one no longer in force", async () => {
+    const { vault, advance } = await bornVault()
     const { vault: other } = await bornVault()
     TH.expectSyncRefusal(() => other.takeUpLease(vault.demandLease()), 'bad_option')
     expect(other.demandLease()).not.to.equal(vault.demandLease())
+    const born = vault.demandLease()
+    advance(LeaseMillis)
+    TH.expectSyncRefusal(() => vault.takeUpLease(born), 'vault_locked')
+  })
+
+  it("joins an unlock in flight: ensureUnlocked called at once, with a proof or without, asks the closure once and answers one lease", async () => {
+    const { vault, deviceDB } = await bornVault()
+    vault.lock()
+    const proofClosure = vi.fn(() => ({ passphrase: Passphrase }))
+    const [first, second, third] = await Promise.all([vault.ensureUnlocked(proofClosure), vault.ensureUnlocked(proofClosure), vault.ensureUnlocked()])
+    expect(proofClosure).toHaveBeenCalledOnce()
+    expect(second).to.equal(first)
+    expect(third).to.equal(first)
+    expect(vault.demandLease()).to.equal(first)
+    expect(deviceDB.tryPutLease).toHaveBeenCalledTimes(2)
+  })
+
+  it("lets a displaced lease go: past its own `autolock_at`, its autolock neither locks the vault nor erases the new lease's record", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const { vault, advance, deviceDB, opts: { world } } = await bornVault()
+      const born = vault.demandLease()
+      const halfway = LeaseMillis / 2
+      advance(halfway)
+      await vi.advanceTimersByTimeAsync(halfway)
+      const proving = await vault.gate.attemptProof(() => ({ passphrase: Passphrase }), world)
+      const lease = vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis }))
+      expect(born.isInForce).to.be.false
+      advance(halfway + 1)
+      await vi.advanceTimersByTimeAsync(halfway + 1)
+      expect(vault.isUnlocked).to.be.true
+      expect(vault.demandLease()).to.equal(lease)
+      expect(lease.isInForce).to.be.true
+      expect(deviceDB.tryDelLease).not.toHaveBeenCalled()
+      expect(deviceDB.keptNow()).not.to.be.null
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -190,11 +228,35 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     expect(deviceDB.keptNow()).to.be.null
   })
 
-  it("locks every vault at the listing's goodbye, erasing the kept lease", async () => {
-    const { listing, vault, deviceDB } = await bornVault()
+  it("takes up, at the next ensureUnlocked, a lease another session kept after this vault's first look", async () => {
+    const { vault, storedNow, anotherSession, deviceDB } = await bornVault()
+    const record = storedNow()
+    if (record === null) { throw new Error('nothing stored') }
+    vault.lock()
+    await TH.eventually(() => deviceDB.keptNow() === null)
+    const later = anotherSession()
+    const again = await later.build(record)
+    await later.hello()
+    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    const lease = await vault.ensureUnlocked(() => ({ passphrase: Passphrase }))
+    const taken = await again.ensureUnlocked()
+    expect(again.demandLease()).to.equal(taken)
+    expect(await roundTrip(lease, taken)).to.eq('sk-test')
+  })
+
+  it("lets every vault's lease go at the listing's goodbye: the vault reads locked, and the kept lease stays for the next session to take up", async () => {
+    const { listing, vault, storedNow, anotherSession, deviceDB } = await bornVault()
+    const record = storedNow()
+    if (record === null) { throw new Error('nothing stored') }
+    const born = vault.demandLease()
     listing.goodbye()
     expect(vault.isLocked).to.be.true
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    expect(born.isInForce).to.be.false
+    const later = anotherSession()
+    const again = await later.build(record)
+    await later.hello()
+    expect(again.isUnlocked).to.be.true
+    expect(deviceDB.tryDelLease).not.toHaveBeenCalled()
   })
 })
 

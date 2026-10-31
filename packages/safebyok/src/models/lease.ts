@@ -27,7 +27,7 @@ export class Lease implements LeaseStamp {
   /** The stamp of the vault this lease is of, parsed once: what every ctx under it binds. */
   readonly #vaultStamp: VaultStamp
 
-  /** Fires `vault.lock()` at `autolock_at`; disposed when the lease is forgotten. */
+  /** Fires `vault.lock()` at `autolock_at`; disposed when the lease is forgotten or let go. */
   readonly #autolock: Trigger<LeaseSparse, void>
 
   private constructor(vault: LeaseVault, dbfriend: LeaseDBFriend, record: LeaseRecord) {
@@ -87,15 +87,20 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Ending one]: forget, isForgotten, isInForce, autolockNow
+  // == [Ending one]: forget, letGo, isForgotten, isInForce, autolockNow
 
   /** Drop the keys and erase the record where the deviceDB keeps it. Nothing here has bytes to zero: the leaseKey is a non-extractable handle, and the wrap is ciphertext; dropping the record is all that can be done. */
   async forget(): Promise<void> {
     if (this.#record === null) { return }
-    this.#record = null
-    this.#autolock.dispose()
+    this.letGo()
     const del = await this.dbfriend.tryDelLease()
     if (! del.ok) { throw del.err }
+  }
+
+  /** Drop the keys and dispose the autolock, leaving the record the deviceDB keeps: a lease displaced or declined, or one its vault said goodbye to. */
+  letGo(): void {
+    this.#record = null
+    this.#autolock.dispose()
   }
 
   get isForgotten(): boolean { return this.#record === null }
@@ -165,8 +170,7 @@ export class Lease implements LeaseStamp {
     if (! opened.ok) {
       // Locking drops the vault's lease; this one is dropped here too, should the vault hold another. A refused erase is warned of: the refusal told is the damage.
       this.vault.lock()
-      this.#record = null
-      this.#autolock.dispose()
+      this.letGo()
       await eraseKept(this.dbfriend, 'Lease.vaultKey')
     }
     return valOf(opened)

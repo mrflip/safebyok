@@ -65,10 +65,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     await Promise.all(this.things.map((vault) => vault.takeUpKeptLease()))
   }
 
-  /** End the watch, and lock every vault. */
+  /** End the watch, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
   override goodbye(): void {
     super.goodbye()
-    for (const vault of this.things) { vault.lock() }
+    for (const vault of this.things) { vault.letLeaseGo() }
   }
 
   // == [Defined by the vault listing]

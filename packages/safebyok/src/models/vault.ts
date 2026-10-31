@@ -1,4 +1,4 @@
-import { verifyConsistent } from '../checks/validator'
+import { consistent, verifyConsistent } from '../checks/validator'
 import { VaultError } from '../errors'
 import { outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
@@ -56,8 +56,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The deviceDB work on the lease in flight, one chore after another. */
   #leaseChores: Promise<void> = Promise.resolve()
 
-  /** The one look for the lease this device keeps, at `hello` or the first `ensureUnlocked`. */
+  /** The look for the lease this device keeps in flight, which a look begun meanwhile joins; null once it settles. */
   #keptLookup: Promise<Lease | null> | null = null
+
+  /** The unlock by proof in flight, which an `ensureUnlocked` begun meanwhile joins; null once it settles. */
+  #unlocking: Promise<Lease> | null = null
 
   #gate: { props: GateProps, gate: Gate } | null = null
 
@@ -97,14 +100,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpKeptLease, unlock, lookUpKept, setLease
+  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpKeptLease, unlock, unlockAlone, unlockByProof, lookUpKept, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
   /** How long a lease granted this vault lasts: the world's `leaseMillis`, else {@link DefaultLeaseMillis}. */
   get leaseMillis(): number { return this.world.leaseMillis ?? DefaultLeaseMillis }
 
-  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the proof `proofClosure` answers; with neither, refuses 'vault_locked'. A lease held past its time locks the vault first. */
+  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else the proof `proofClosure` answers; with none of them, refuses 'vault_locked'. A lease held past its time locks the vault first. */
   async ensureUnlocked(proofClosure?: AttemptClosure): Promise<Lease> {
     await this.ensureTimely({})
     const held = this.#lease
@@ -119,23 +122,40 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#lease
   }
 
-  /** Hold `lease`, granted to this Vault object, as its lease: the vault reads unlocked. A lease of another refuses 'bad_option'. */
+  /** Hold `lease` as the vault's lease, letting go any it held: the vault reads unlocked. A lease of another vault, or granted another Vault object, refuses 'bad_option'; one not in force, 'vault_locked'. */
   takeUpLease(lease: Lease): Lease {
-    if (lease.vault !== this) { throw leaseOfOtherHolder() }
+    if (lease.vault !== this || ! consistent(MSX.vaultStamp.parse(lease), MSX.vaultStamp.parse(this))) { throw leaseOfOtherHolder() }
+    if (! lease.isInForce) { throw leaseNotInForce() }
     return this.#setLease(lease)
   }
 
-  /** Take up the lease this device keeps of the vault, where one is kept in force; looked for once, and a refused look is told as bad news. */
+  /** Take up the lease this device keeps of the vault, where the vault holds none and one is kept in force; a refused look is told as bad news. */
   takeUpKeptLease(): Promise<Lease | null> {
-    // A vault holding a lease in force keeps no other: a Lease made of its own record would arm a second autolock.
-    this.#keptLookup ??= this.#lease?.isInForce === true ? Promise.resolve(null) : this.#lookUpKept()
+    if (this.#lease !== null) { return Promise.resolve(null) }
+    this.#keptLookup ??= this.#lookUpKept()
     return this.#keptLookup
   }
 
   async #unlock(proofClosure?: AttemptClosure): Promise<Lease> {
+    const inFlight = this.#unlocking
+    if (inFlight !== null) { return inFlight }
     const kept = await this.takeUpKeptLease()
-    if (kept !== null && kept === this.#lease && kept.isInForce) { return kept }
-    if (proofClosure === undefined) { throw noProofToUnlock() }
+    if (kept !== null) { return kept }
+    if (proofClosure !== undefined) { this.#unlocking ??= this.#unlockAlone(proofClosure) }
+    if (this.#unlocking === null) { throw noProofToUnlock() }
+    return this.#unlocking
+  }
+
+  /** `#unlockByProof`, clearing `#unlocking` once it settles: never before it is set, as the await always yields first. */
+  async #unlockAlone(proofClosure: AttemptClosure): Promise<Lease> {
+    try {
+      return await this.#unlockByProof(proofClosure)
+    } finally {
+      this.#unlocking = null
+    }
+  }
+
+  async #unlockByProof(proofClosure: AttemptClosure): Promise<Lease> {
     if (! this.isFull) { await this.fetch() }
     const proving = await this.gate.attemptProof(proofClosure, this.world)
     // An erase a lock queued lands before this grant's put.
@@ -144,26 +164,38 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
 
   async #lookUpKept(): Promise<Lease | null> {
-    // An erase a lock queued lands before this look, so a lease just locked is not taken up again.
-    await this.#leaseChores
-    const kept = await Lease.tryGet(this, this.leaseDBFriend())
-    if (! kept.ok) {
-      this.listing.tellBadNews([kept.err])
-      return null
+    try {
+      // An erase a lock queued lands before this look, so a lease just locked is not taken up again. Awaited first, so `#keptLookup` is set before the finally clears it.
+      await this.#leaseChores
+      const kept = await Lease.tryGet(this, this.leaseDBFriend())
+      if (! kept.ok) {
+        this.listing.tellBadNews([kept.err])
+        return null
+      }
+      if (kept.val === null) { return null }
+      // Declined, it is let go: its autolock would otherwise lock the vault at its own `autolock_at`.
+      if (! kept.val.isInForce || this.#lease?.isInForce === true) {
+        kept.val.letGo()
+        return null
+      }
+      return this.#setLease(kept.val)
+    } finally {
+      this.#keptLookup = null
     }
-    if (kept.val === null || ! kept.val.isInForce || this.#lease?.isInForce === true) { return null }
-    return this.#setLease(kept.val)
   }
 
+  /** Hold `lease`, letting go the lease it displaces, whose autolock would otherwise erase this one's record at its own `autolock_at`. */
   #setLease(lease: Lease): Lease {
+    const displaced = this.#lease
     this.#lease = lease
     this.#isLocked = false
+    if (displaced !== null && displaced !== lease) { displaced.letGo() }
     this.settle()
     return lease
   }
   // --
 
-  // == [The lease]: leaseDBFriend, lock, dropLease, leaseChore
+  // == [The lease]: leaseDBFriend, lock, letLeaseGo, dropLease, leaseChore
 
   /** The deviceDB as this vault's lease reaches it: the world's lease verbs, bound to this vault's scope, so no verb takes one. */
   leaseDBFriend(): LeaseDBFriend {
@@ -176,21 +208,30 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Lock the vault, synchronously: the lease is dropped and the vault reads locked before this returns; the lease's forgetting (its record erased from the deviceDB) is queued as a chore. A box's whisper reads LOCKED from here on. */
+  /** Lock the vault, synchronously, and erase the lease this device keeps: the vault reads locked before this returns, and the erase is queued as a chore. */
   lock(): void {
     this.#isLocked = true
     this.#dropLease()
     this.settle()
   }
 
-  /** Let the lease go, its forgetting queued as a chore. */
+  /** Lock the vault in memory and let its lease go, leaving the lease this device keeps for the next load: the listing's goodbye. */
+  letLeaseGo(): void {
+    this.#isLocked = true
+    const lease = this.#lease
+    this.#lease = null
+    lease?.letGo()
+    this.settle()
+  }
+
+  /** Drop the lease, its forgetting queued as a chore. */
   #dropLease(): void {
     const lease = this.#lease
     this.#lease = null
     if (lease !== null) { this.#leaseChore(() => lease.forget()) }
   }
 
-  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlock` awaits the queue before granting and `#lookUpKept` before looking, so an erase lands before the next put or get. */
+  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlockByProof` awaits the queue before granting and `#lookUpKept` before looking, so a lock's erase lands before the next put or get. */
   #leaseChore(work: () => Promise<void>): void {
     const prior = this.#leaseChores
     this.#leaseChores = (async () => {
@@ -257,11 +298,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 }
 // --
 
-// == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder
+// == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce
 
 const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
 const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
 
 const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
+
+const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --

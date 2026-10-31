@@ -382,8 +382,8 @@ export const UnlockFirst = "The vault is locked, so nothing was read or written:
 /** Why a locked vault with no lease kept is not unlocked without a proof. */
 export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
 
-/** Why a vault takes up no lease granted to another Vault object. */
-export const LeaseOfOtherHolder = "This lease was granted to another Vault object, so this one did not take it up: a bug in the caller."
+/** Why a vault takes up no lease of another vault, or granted to another Vault object. */
+export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
