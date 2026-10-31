@@ -22,8 +22,9 @@ export type VaultProps = Readonly<Record<string, never>>
 // == [Vault]
 
 /** A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in.
- * Its `vault_tok` is the life of the vault in its scope, and follows the record in hand: a draft's
- * is minted here, and storage's replaces it once adopted. Its guards take no lock: its record holds no secret, and a change to its gate will carry its own
+ * Its `vault_tok` is the life of the vault in its scope: a draft's is minted here, and storage's
+ * replaces it once adopted over the draft's central, nothing stored; a record under another
+ * `vault_tok` over a vault held alive refuses 'vault_remade'. Its guards take no lock: its record holds no secret, and a change to its gate will carry its own
  * proof. A vault deleted or damaged is not edited back to life, as a box is: a new life is a new
  * `vault_tok`, so a new instance, built by the listing.
  */
@@ -59,13 +60,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Guards]: demandReadyToEdit, demandReadyToSend, demandReadyToDel
+  // == [Guards]: demandReadyToEdit, demandReadyToDel
 
   /** An edit needs the vault present, and no lock. */
   override demandReadyToEdit(): this { return this.demandPresent() }
-
-  /** A send needs what an edit does: every vault record is full. */
-  override demandReadyToSend(): this { return this.demandPresent() }
 
   /** A vault deleted has no life left to delete; a damaged one may be deleted, as `bank.delDamagedVault` did. Not yet: the passphrase's proof the old `vault.del` took. */
   override demandReadyToDel(): this {
