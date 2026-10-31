@@ -1,6 +1,6 @@
 # Thread 2: vault_unlock (2026-10-31)
 
-Branch `20261031-vault_unlock`, PR #PRNUM, stacked on #410. Justify: green (safebyok 4555 passed, 37 skipped; every package green).
+Branch `20261031-vault_unlock`, PR #412, stacked on #410. Justify: green (safebyok 4555 passed, 37 skipped; every package green).
 
 * **Built**:
   * `Proving.attempt(stamp, gate, proofClosure, world)` (proving.ts): the proving of the stored wayin the proof opens. The passphrase's if one is handed, else the passkey's (`PassphraseProving.ofWayin`, `PasskeyProving.ofWayin`), then `#demandOpens` unwraps and drops the vaultKey. Refusals: `unknown_key_deriver` (label), `wrong_passkey` (no passkey wayin, other credential, other salt, or a wrap that will not open), `wrong_passphrase`, and `bad_option` for a proof handing neither (`attemptCleartexts`). `Gate.attemptProof(proofClosure, world)` calls it with the gate's stamp and pickle.
