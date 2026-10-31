@@ -1,8 +1,8 @@
 # Thread 5: tests_models (2026-10-31)
 
-Branch `20261031-tests_models`, PR #411, stacked on #408 (`20261031-newvault_models`; rebased
-onto its 4ff14b4b mid-thread, at the orchestrator's word, recorded as
-`branch.20261031-tests_models.sprintbase`). Justify: green; core 4691 passed, 37 skipped.
+Branch `20261031-tests_models`, PR #411, stacked on #414 (`20261031-gate_ops`, a69bdef8), in
+the line main → #408 → #410 → #412 → #413 → #414 → #411 (restacked from beside #408; see
+*Restack*). Justify: green; core 4751 passed, 37 skipped.
 
 * **Built**: tests from outside for the models' cryptography, in `packages/safebyok/tests/models/`:
   * `lease.test.ts` (63): grant and its kept record; get/tryGet, a kept lease of another vault
@@ -19,45 +19,19 @@ onto its 4ff14b4b mid-thread, at the orchestrator's word, recorded as
   * `wayin.test.ts` (22), `gate.test.ts` (20): record checks, pickle, toJSON, props by kind.
 * **Shared fakes, for thread 6**: `packages/safebyok/tests/test-helpers/proving-world.ts`,
   imported directly (not through `TH`, as `src/models/` is not exported): `useFakeClock`,
-  `WorldStamp`, `duckVaultOf`/`asVault`, `fakeDBFriendOf` (a slot `kept`, a spy per verb,
+  `WorldStamp`, `duckVaultOf` (a lease's vault; a proving or gate takes `WorldStamp`), `fakeDBFriendOf` (a slot `kept`, a spy per verb,
   `logged`; script refusals with `mockResolvedValueOnce(bad(err))`), `WeekMillis`,
   `grantedLeaseOf`, `sealStampsOf`, `TestPassphrase`, `DeviceId`, `provingWorldOf`,
   `passkeyAnswerOf`, `proofClosureOf`, `isZeroed`, and the backdoor `_cheat_vaultKeyBytesOf`
   (opens a wayin from outside, from the secret, its header and the vault's stamp).
-* **Loosened pins** (13), in `tests/loosened/lease.test.ts` and `tests/loosened/proving.test.ts`,
-  each titled with its source and line. Split from `loosened.test.ts` by file, as the Coach
-  asked for `/loosened/<testfilename>`.
+* **Loosened pins**: 13 at the build; after the restack one stays, in `tests/loosened/lease.test.ts`
+  (titled with its source and line, one file per model as the Coach asked). The rest were
+  fixed by threads 1 to 3 and flipped into the models' tests, or dropped (*Restack*).
 
-## Loosened pins
+## Loosened pins, as built
 
-Lease:
-1. **Past autolock_at, before the timer fires**: not in force, still seals and opens
-   (guarantees.md:230). Recommend sealWith/unsealWith refuse `vault_locked` when not in force.
-2. **A lease longer than MaxTimerMillis (24.5 days) arms no timer and never autolocks**: it
-   still seals a day past its autolock_at, and nothing calls the launch (spec:67). The sharpest
-   finding: with pin 1 it means a 30-day lease never ends. Recommend #1, which fixes both.
-3. **Lease.get hands back a lease already past its autolock_at**; it seals until the timer turn
-   (guarantees.md:230). Recommend reading it as none, and forgetting it.
-4. **A damaged lease** calls `vault.lock()` and keeps its record, in force, locking again at
-   each call (guarantees.md:230, "dropped when it proves damaged"). With the real Vault the
-   lock queues forget, so this may be fine; recommend the lease drop its own record too.
-5. **A forget whose tryDelLease is refused** throws with the lease already forgotten; a second
-   forget erases nothing, so the record lies on (spec:66). Recommend accept; note it.
-6. **Empty stamps `{}` pass `ctxStamp`** (models-shapes.ts:644). Recommend requiring one field.
-
-Provings:
-7. **`PasskeyProving.make` takes a spent answer** (all-zero PRF bytes) (guarantees.md:201).
-8, 9. **`PasskeyProving.make` refused before its try** (a bad world, a short salt) leaves the
-   PRF bytes unzeroed (spec:52, "whatever happens"). Through makeProvingPair, `spendAnswer`
-   covers both; only a direct caller sees it. Recommend parsing the answer inside `make`'s try.
-10. **A short salt handed to `PasskeyProving.make` refuses `bad_record`**, not `bad_option`
-    (vault.ts:353): the header mint's check speaks for an argument.
-11. **`PassphraseProving.make` hands the keyDeriver an unchecked passphrase** (42) (CLAUDE.md:43).
-12. **`makeWayin` takes a proving of another vault**, wrapping that vault's vaultKey into this
-    vault's wayin (spec:53). Recommend refusing a source of another vault stamp.
-13. **A second `makeWayin(NOVEL)` on one proving** fabricates another vaultKey; leases made
-    after hold only the newer, so what an earlier lease sealed will not open (spec:53).
-    Recommend refusing a second NOVEL, or say it is undefined in `notes/wontfix.md`.
+The thirteen pins and their recommendations are in this file at 248735356. Every
+recommendation but #5 was taken up by threads 1 to 3; *Restack* says where each pin went.
 
 ## Decisions taken
 
@@ -76,10 +50,41 @@ Provings:
 ## Discoveries
 
 * **The Lease has no snapshot**; `Object.keys`, `JSON.stringify` and `toJSON` are what show.
-* **`Gate.build` makes no lease yet** (the code says "not yet"); the gate tests do not look for one.
+* **`Gate.build` makes no lease**: since thread 2 it answers `{ gate, proving }`, the proving granting the first lease (pinned through a real vault in `vault-unlock.test.ts`).
 * A seam that would help: none needed. Every test runs through exports; `_cheat_vaultKeyBytesOf`
   rebuilds the wayin key from the same exported crypto helpers a later unlock would use.
 
+## Restack (2026-10-31)
+
+Rebased from 4ff14b4b onto a69bdef8 (#414's tip) with no conflicts; the adaptations are one
+`tests:` commit on top. No `src/` change.
+
+* **Stamp signatures** (thread 1): `Gate.build`, `new Gate`, `makeProvingPair`,
+  `PassphraseProving.make`, `PasskeyProving.make` take `WorldStamp`; `makeLease(vault, friend,
+  opts)` takes a `duckVaultOf()`. `asVault` is gone from `proving-world.ts` (nothing needs a
+  `Vault` cast now; a `DuckVault` is a `LeaseVault`). Describe titles say `stamp`; the argument
+  cases are "a stamp with no vault_tok", "... no epoch millis", "no stamp at all"; `gate.stamp`
+  is pinned as the parsed `WorldStamp` where `gate.vault` was the vault handed.
+* **`Gate.build` answers `{ gate, proving }`** (thread 2): `builtGate` destructures the gate.
+* **The autolock** (thread 4): at `autolock_at` it locks the vault and lets go, erasing nothing
+  itself (lock() erases by scope); the warning test now scripts `vault.lock()` to throw.
+* **A tampered lease record** (threads 2, 4): its first seal or unseal locks the vault once,
+  refuses `damaged_lease` and lets go, erasing nothing itself; the next refuses `vault_locked`.
+* **Loosened pins, by build number**:
+  - Flipped into `tests/models/lease.test.ts`: 1 (refuses `vault_locked` past `autolock_at`
+    before the timer), 3 (`Lease.get` answers null and erases once). 4 (damaged) is absorbed by
+    the tampered cases above and dropped.
+  - Retitled as by design and moved to `lease.test.ts`'s autolock: 2, citing
+    `notes/wontfix.md:44`; it now refuses `vault_locked` too.
+  - Stays loosened: 5 (spec line now :73).
+  - Dropped: 6, empty stamps (thread 3 refuses them; pinned in `vault-unlock.test.ts`).
+  - Flipped into `tests/models/proving.test.ts`: 7 (spent answer refused), 8, 9, 10 (a refused
+    world or a short salt refuses `bad_option` and zeroes the PRF bytes, the salt as
+    freshPasskeyAnswer's second example shows), 11 (`PassphraseProving.make` refuses 42 before
+    the keyDeriver), 12 (a source of another vault refused `bad_option`), 13 (a second
+    `makeWayin` refused `unexpected_error`, and a later lease still opens what the first sealed).
+    `tests/loosened/proving.test.ts` is deleted, empty.
+
 ## For the Coach
 
-* Rule on pins 1-2 together: a long lease never autolocking is the one I would fix first.
+* Pin 5 stands: a forget whose erase is refused throws, and a second erases nothing.
