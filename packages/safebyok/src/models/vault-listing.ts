@@ -2,6 +2,7 @@
 
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
+import { alreadyHeldError } from '../helpers/throwers'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
@@ -43,12 +44,13 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing. */
+  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing, and a dna for a scope already held refuses 'bad_option' before the closure is asked anything. */
   override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
     if (hasRevision(input)) {
       if (proofClosure !== undefined) { throw closureWithRecord() }
       return super.build(input)
     }
+    if (this.at(input) !== null) { throw alreadyHeldError() }
     return this.holdDraft(await this.draftOf(this.stampDna(input), proofClosure))
   }
 

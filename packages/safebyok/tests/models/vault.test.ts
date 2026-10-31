@@ -97,6 +97,15 @@ describe("VaultListing.build of a dna: the gate is built before the vault is bor
     await vault.send({})
     expect(storedNow()?.gate).to.deep.equal(vault.gate.pickle())
   })
+
+  it("refuses 'bad_option' a dna for a scope already held, before the closure is asked anything", async () => {
+    const { listing } = makeVaultWorld()
+    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const closure = vi.fn(() => ({ passphrase: Passphrase }))
+    await TH.expectRefusal(listing.build(Dna, closure), 'bad_option')
+    expect(closure).not.toHaveBeenCalled()
+    expect(listing.at(Dna)).to.equal(vault)
+  })
 })
 
 describe("VaultListing.build of a record, and its constructor", () => {
