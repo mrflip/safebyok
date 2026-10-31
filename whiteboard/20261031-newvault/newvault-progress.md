@@ -43,3 +43,10 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 
 * The fakes thread 6 reuses are in `packages/safebyok/tests/test-helpers/proving-world.ts`, imported directly (not through `TH`): `useFakeClock`, `WorldStamp`, `duckVaultOf` / `asVault`; `fakeDBFriendOf` (keeps the record in `kept`, spies each verb, logs calls in `logged`); `WeekMillis`, `grantedLeaseOf`, `sealStampsOf`; `TestPassphrase`, `DeviceId`, `provingWorldOf`, `passkeyAnswerOf`, `proofClosureOf`; `isZeroed`; the backdoor `_cheat_vaultKeyBytesOf`.
 * Its pins found two things worth the Coach: a lease seals while out of force (no `isInForce` check in `sealWith`/`unsealWith`), and a lease longer than `MaxTimerMillis` (24.5 days) never autolocks because the Trigger sets no timer past the cap. Rows in Open Matters. The eight smaller pins are thread 2's and thread 3's (Cleanup, Your calls; thread 2's gloss).
+
+## Rulings, 2026-10-31 (second sweep)
+
+* Pester and autolock defined: autolock resets on every lease grant or renewal, default 14 days; the pester prompts for the passphrase every seven days (24.5 at most), reset whenever it is given; not this sprint.
+* The gate is never null (orchestrator's call on the Coach's "up to you"): rework of thread 1 after its review; threads 2 to 4 build on `vault.gate: Gate`.
+* Thread 1's guards: loosen or keep, but thread 6 tests that an edit over a sparse record keeps the gate.
+* The gap review's first five are the next sprint, in that order. The planning commits ride in #408.
