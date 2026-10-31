@@ -543,9 +543,11 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       })
     }
 
-    it("other | same | ouch | full takes 'skip': damage is weighed before life, as a damaged record's box_tok is no more to be trusted than the rest of it", () => {
-      expectReceivedUnchanged(boxOf(Centrals.full(), Staged()), rcvdOf('ouch', { ...SameRev, ...OtherLife }), 'skip')
-    })
+    for (const centralShape of ShapesAll) {
+      it(`other | same | ouch | ${centralShape} takes 'skip': damage is weighed before life, as a damaged record's box_tok is no more to be trusted than the rest of it`, () => {
+        expectReceivedUnchanged(boxOf(Centrals[centralShape](), Staged()), rcvdOf('ouch', { ...SameRev, ...OtherLife }), 'skip')
+      })
+    }
 
     for (const centralShape of ShapesAll) {
       it(`other | newer | full | ${centralShape} takes 'adopt', a birthday: central, box_tok and registered_at become the delivered record's`, () => {
