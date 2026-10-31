@@ -3,7 +3,7 @@ import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
 import * as TH from '../test-helpers'
-import { type BoxAnswer, boxListingOf, keptOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { type BoxAnswer, boxDnaOf, boxListingOf, keptOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -159,7 +159,7 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("sends no prior tok for a thing never stored, and its answer spends the draft", async () => {
       const listing = boxListingOf(held.mw)
-      const draft = await listing.build({ ...scopeOf() })
+      const draft = await listing.build(dnaOf())
       expect(listing.priorTokOf(draft.scope)).to.be.null
       held.mw.clearCalls()
       await listing.put(fullBoxRecord({ revision_seq: 0 }))
@@ -319,7 +319,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   describe("a settle that saves to the cache", () => {
     it("is made once per delivery, and once per build, with the cacheable of the instance", async () => {
       const listing = boxListingOf(held.mw)
-      const one = await listing.build({ ...scopeOf('one') })
+      const one = await listing.build(dnaOf('one'))
       const two = await listing.build(fullBoxRecord({ boxlabel: 'two' }))
       held.mw.seedStore(fullBoxRecord({ boxlabel: 'two', revision_tok: 'rev-a2', revision_seq: 2 }))
       await listing.fetch(scopeOf('two'))
@@ -341,7 +341,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       held.mw.seedStore(fullBoxRecord())
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
-      await box.edit({ sidecar: { note: 'staged' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
       held.mw.clearCalls()
       await listing.fetch(scopeOf())
       const saves = held.mw.callsOf('save')
@@ -405,7 +405,7 @@ describe("Listing's pipeline: what every answer takes", () => {
         heardAtSave = listing.snapshot.length
         throw new VaultError('unexpected_error', "The cache is full.")
       })
-      const box = await listing.build({ ...scopeOf() })
+      const box = await listing.build(dnaOf())
       expect(heardAtSave).to.eq(0)
       expect(listing.snapshot).to.deep.equal([box.getSnapshot()])
       expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
@@ -506,7 +506,7 @@ describe("Listing's pipeline: what every answer takes", () => {
         const listing = boxListingOf(held.mw)
         const box = await listing.build(record)
         held.mw.clearCalls()
-        await TH.expectRefusal(listing.build({ ...scopeOf() }), 'bad_option')
+        await TH.expectRefusal(listing.build(dnaOf()), 'bad_option')
         expect(listing.at(scopeOf())).to.eq(box)
         expect(box.revision_seq).to.eq(record.revision_seq)
         expect(held.mw.calls).to.deep.equal([])
@@ -608,7 +608,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("holds present things only, each as the thing's own snapshot", async () => {
       const listing = boxListingOf(held.mw)
       const full  = await listing.build(fullBoxRecord({ boxlabel: 'full_box' }))
-      const draft = await listing.build({ ...scopeOf('draft_box') })
+      const draft = await listing.build(dnaOf('draft_box'))
       await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 }))
       await listing.build(tombstoneBoxRecord({ boxlabel: 'damaged_box', revision_seq: 2 }, 'd'))
       expect(listing.things).to.have.lengthOf(4)
@@ -643,7 +643,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = await listing.build(fullBoxRecord())
       let told = 0
       listing.subscribe(() => { told += 1 })
-      await box.edit({ sidecar: { note: 'edited' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
       expect(told).to.eq(1)
       expect(listing.snapshot[0]).to.eq(box.getSnapshot())
       expect(listing.snapshot[0]?.sidecar).to.deep.equal({ note: 'edited' })
@@ -664,16 +664,16 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       let told = 0
       const unsubscribe = listing.subscribe(() => { told += 1 })
-      await listing.build({ ...scopeOf('one') })
+      await listing.build(dnaOf('one'))
       unsubscribe()
-      await listing.build({ ...scopeOf('two') })
+      await listing.build(dnaOf('two'))
       expect(told).to.eq(1)
     })
   })
 
   describe("box.isWatchable", () => {
     it("is true until set, and a plain get and set", async () => {
-      const box = await boxListingOf(held.mw).build({ ...scopeOf() })
+      const box = await boxListingOf(held.mw).build(dnaOf())
       expect(box.isWatchable).to.be.true
       box.isWatchable = false
       expect(box.isWatchable).to.be.false
@@ -684,7 +684,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("names a box to the watch's fullFor only while it is", async () => {
       const listing = boxListingOf(held.mw)
       await listing.hello()
-      const box = await listing.build({ ...scopeOf() })
+      const box = await listing.build(dnaOf())
       expect(held.mw.watchedScopes()).to.deep.equal([box.scope])
       box.isWatchable = false
       expect(held.mw.watchedScopes()).to.deep.equal([])
@@ -854,7 +854,7 @@ describe("listing: a copy or a record of another vault_tok meets no instance hel
   it("leaves a record of the vault's own vault_tok, and a dna, as they were", async () => {
     const listing = boxListingOf(held.mw)
     await expect(listing.build(fullBoxRecord())).resolves.to.be.instanceOf(Box)
-    await expect(listing.build({ ...scopeOf('draft_box') })).resolves.to.be.instanceOf(Box)
+    await expect(listing.build(dnaOf('draft_box'))).resolves.to.be.instanceOf(Box)
   })
 
   it("compares a record held under another vault_tok by reconcileCentral, so an instance held keeps refusing as it did", async () => {
@@ -923,7 +923,7 @@ describe("storable: the tell it is handed when made", () => {
     const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
     held.mw.willLoad(copies)
     await listing.hello()
-    const built = await listing.build({ ...scopeOf('draft_two') })
+    const built = await listing.build(dnaOf('draft_two'))
     for (const box of [listing.at(scopeOf('full_box')), built]) {
       held.mw.willGet(held.mw.refusalOf(box!.scope, new VaultError('storage_unavailable', "Down.")))
     }
@@ -934,16 +934,17 @@ describe("storable: the tell it is handed when made", () => {
 })
 // --
 
-// == [Helpers of the pipeline tests]: scopeOf, seededCache, bust, rejectingHandler, notAnArray, holdOf, launchingOf, edited
+// == [Helpers of the pipeline tests]: scopeOf, dnaOf, seededCache, bust, rejectingHandler, notAnArray, holdOf, launchingOf, edited
 
 const scopeOf = (boxlabel = 'anthropic_api_key') => held.mw.boxscope(boxlabel)
+const dnaOf = (boxlabel = 'anthropic_api_key') => boxDnaOf(scopeOf(boxlabel))
 
 /** A cache holding a full box, a deleted one and a draft, each as a listing saved it. */
 const seededCache = async () => {
   const maker = boxListingOf(held.mw)
   await maker.build(fullBoxRecord({ boxlabel: 'full_box' }))
   await maker.build(tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 }))
-  await maker.build({ ...scopeOf('draft_box') })
+  await maker.build(dnaOf('draft_box'))
   const copies = [...held.mw.cached.values()]
   held.mw.clearCalls()
   held.mw.seedStore(fullBoxRecord({ boxlabel: 'full_box' }))
@@ -978,7 +979,7 @@ const edited = async () => {
   const listing = boxListingOf(held.mw)
   held.mw.seedStore(fullBoxRecord())
   const box = await listing.build(fullBoxRecord())
-  await box.edit({ sidecar: { note: 'edited' } })
+  await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
   return { listing, box }
 }
 // --
@@ -1045,7 +1046,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
 const copyStagedUnder = async (vault_tok: string) => {
   const maker = boxListingOf(held.mw)
   const box = await maker.build(fullBoxRecord({ boxlabel: 'staged_box' }))
-  await box.edit({ sidecar: { note: 'edited' } })
+  await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
   const copy = keptOf(held.mw, box)
   held.mw.clearCalls()
   return { ...copy, staged: { ...copy.staged!, vault_tok } }
@@ -1176,7 +1177,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(aliveRow)
     const box = await listing.build(aliveRow)
-    await box.send({ sidecar: { note: 'sent' } })
+    await box.send({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })
     expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal(['rev-a1'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_seq: 2, revision_tok: box.revision_tok })
   })
@@ -1184,7 +1185,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
   it("meets 'stale_write' carrying nothing from a put and a del where the box held is stored no more, delivering nothing", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(aliveRow)
-    const putErr = await TH.expectRefusal(box.send({ sidecar: { note: 'sent' } }), 'stale_write')
+    const putErr = await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } }), 'stale_write')
     expect(putErr.meta).to.be.undefined
     const delErr = await TH.expectRefusal(box.del(), 'stale_write')
     expect(delErr.meta).to.be.undefined
@@ -1196,8 +1197,8 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
     const box = await listing.build(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))
-    await TH.expectRefusal(box.send({ sidecar: { note: 'once' } }), 'stale_write')
-    await TH.expectRefusal(box.send({ sidecar: { note: 'twice' } }), 'stale_write')
+    await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'once' } }), 'stale_write')
+    await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'twice' } }), 'stale_write')
     expect(keptOf(held.mw, box).central.revision_seq).to.eq(5)
     expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal(['rev-a5', 'rev-a5'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_tok: 'rev-a3' })
@@ -1212,7 +1213,7 @@ describe("listing[KeepCopy]: the copy each instance's settle hands in, saved to 
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     held.mw.clearCalls()
-    await box.edit({ sidecar: { note: 'staged' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
     expect(keptOf(held.mw, box).staged).to.deep.include({ sidecar: { note: 'staged' } })
     expect(held.mw.callsOf('save')).to.deep.equal([])
   })
@@ -1220,7 +1221,7 @@ describe("listing[KeepCopy]: the copy each instance's settle hands in, saved to 
   it("saves the copy handed in at the build, which a later edit then leaves behind in the cache", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
-    await box.edit({ sidecar: { note: 'staged' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
     const [saved] = held.mw.callsOf('save')
     expect(saved?.cacheable.staged).to.be.null
     expect(keptOf(held.mw, box).staged).to.not.be.null

@@ -2,7 +2,7 @@
 
 import { type RefusalMeta, VaultError } from '../errors'
 import { lockedError } from '../helpers/throwers'
-import type { Whisper } from '../shapes/box'
+import type { Sidecar, Whisper } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box } from './box'
 import { Listing, hasRevision } from './listing'
@@ -20,8 +20,8 @@ export type BoxStore = Store<Boxscope, BoxRecord, BoxSparse>
 /** The device cache of this vault's boxes. */
 export type BoxCache = Cache<BoxRecord, BoxSparse>
 
-/** The dna of a box, with the whisper `build` seals in: what a caller hands `build`, which holds it to {@link boxDna}. It carries no sealed parts, which only the seal makes. */
-export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered'> & { whisper?: Whisper | undefined }
+/** The dna of a box, with the whisper and the sidecar `build` seals, both required: what a caller hands `build`, which holds it to {@link boxDna}. It carries no sealed parts, which only the seal makes. */
+export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper: Whisper, sidecar: Sidecar }
 
 export type BoxListingOpts = ListingOpts<Boxscope, BoxRecord, BoxSparse> & { world: BoxWorld }
 // --
@@ -39,11 +39,12 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Building]: build
 
-  /** {@link Listing.build}, a dna sealed at birth: the box staged is full, its whisper sealed in where the dna carries one. Stores nothing.
+  /** {@link Listing.build}, a dna sealed at birth: the box staged is full, the dna's whisper sealed in with its sidecar. Stores nothing.
    * A record is told from a dna as `Listing.build` tells it, by its `revision_seq`, and keeps its
    * own check there. A dna is held to {@link boxDna} first, refusing 'bad_option', naming the
-   * failing field: the props the factory controls are stripped, the defaults filled in. The seal
-   * needs the vault unlocked: a dna built while it is locked refuses 'vault_locked', holding nothing.
+   * failing field, a missing whisper or sidecar among them: the props the factory controls are
+   * stripped, the defaults filled in. The seal needs the vault unlocked: a dna built while it is
+   * locked refuses 'vault_locked', holding nothing.
    */
   override async build(input: BoxDna | Fetched<BoxRecord, BoxSparse>): Promise<Box> {
     if (hasRevision(input)) { return super.build(input) }
@@ -67,9 +68,9 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return boxRecord.parse(duck) }
 
   // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here. The whisper rides in the dna this far, and no further.
-  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, sealed by {@link stubSeal} over the dna's whisper, or none. */
+  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, sealed by {@link stubSeal} over the dna's whisper. */
   protected draftOf({ whisper, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
-    return stubSeal({ ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }, whisper ?? null)
+    return stubSeal({ ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }, whisper)
   }
 
   protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): Box {

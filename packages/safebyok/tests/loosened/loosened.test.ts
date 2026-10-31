@@ -18,7 +18,7 @@ describe("the staged edit reconcileStaged drops or carries", () => {
   it("README.md:1109, 'never merges two writes -- a write that lost must be seen': a fetch meeting another device's newer box drops the edit staged here, resolves, and tells no bad news", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord(CentralRev))
-    await box.edit({ sidecar: { note: 'mine' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'mine' } })
     expect(box.hasStaged).to.be.true
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ ...OtherRev, sidecar: { note: 'theirs' } })))
     await listing.fetch(box.scope)
@@ -63,17 +63,17 @@ describe("registered_at over a rebirth", () => {
     const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
     await box.del()
     held.mw.setNow(T0 + 5000)
-    await box.edit({ whisper: 'sk-test-0000' })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
     held.mw.setNow(T0 + 9000)
-    await box.send({})
+    await box.send({ whisper: 'sk-test-0000', sidecar: {} })
     expect(keptOf(held.mw, box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000, written_at: T0 + 9000 })
   })
 
-  it("README.md:1282 (a record that will not decipher is written over with sidecar {} and its first-stored time now): a damaged box reborn is registered now, its sidecar {} unless given", async () => {
+  it("README.md:1282 (a record that will not decipher is written over with sidecar {} and its first-stored time now): a damaged box reborn is registered now, its sidecar the {} given", async () => {
     held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
     held.mw.setNow(T0 + 5000)
-    await box.send({ whisper: 'sk-test-0000' })
+    await box.send({ whisper: 'sk-test-0000', sidecar: {} })
     expect(keptOf(held.mw, box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000, sidecar: {} })
   })
 
@@ -81,7 +81,7 @@ describe("registered_at over a rebirth", () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
     held.mw.setNow(T0 + 5000)
     held.mw.willPut(({ record }) => held.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
-    await box.send({ whisper: 'sk-test-0000' })
+    await box.send({ whisper: 'sk-test-0000', sidecar: {} })
     expect(box.registered_at).to.eq(T0)
     expect(held.mw.badnews).to.deep.equal([])
   })

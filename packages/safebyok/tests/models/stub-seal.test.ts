@@ -25,11 +25,6 @@ describe("stubSeal(staged, whisper)", () => {
     expect(sealed.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
     expect(sealed.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
   })
-
-  it("seals a box made with no whisper as it would any other", async () => {
-    const staged = { ...sparseBoxRecord(), sidecar: {} }
-    expect(await stubSeal(staged, null)).to.deep.equal(await stubSeal(staged, 'sk-test-0000'))
-  })
 })
 
 describe("stubSeal(staged, whisper): no secret material", () => {

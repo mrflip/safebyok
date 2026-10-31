@@ -2,11 +2,11 @@ import { VaultError } from '../errors'
 import * as Phrases from '../phrases'
 import type { Sidecar, Whisper } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
-import { type BoxRecord, type BoxSparse, type EditOpts, isTombstone } from './models-shapes'
+import type { BoxRecord, BoxSparse, EditOpts } from './models-shapes'
 import { Storable } from './storable'
 import { stubSeal } from './stub-seal'
 
-// == [Record forms]: LOCKED, BoxSnapshot, BoxProps, BoxEditOpts
+// == [Record forms]: LOCKED, BoxSnapshot, BoxProps, namesBoth
 
 /** The sentinel `box.whisper` answers while the vault is locked. It is registered with `Symbol.for`, so `Symbol.for('LOCKED')` is this symbol. */
 export const LOCKED: unique symbol = Symbol.for('LOCKED')
@@ -22,11 +22,11 @@ export type BoxSnapshot = Boxscope & Readonly<{
   exposed:       boolean
 }>
 
-/** The patch a host hands `edit` and `send`: either half of a box, both, or neither. */
-export type BoxProps = { whisper?: Whisper | undefined, sidecar?: Sidecar | undefined }
+/** The patch a host hands `edit` and `send`: both halves of a box, the whisper and the sidecar, as every update names both. */
+export type BoxProps = { whisper: Whisper, sidecar: Sidecar }
 
-/** `reseal`: with no whisper given or exposed, open the stored one and seal it again under the new revision. */
-export type BoxEditOpts = EditOpts & { reseal?: boolean | undefined }
+/** True where `patch` names both a whisper and a sidecar, as a host's patch may not, whatever its type says. */
+const namesBoth = (patch: Partial<BoxProps>): boolean => (patch.whisper !== undefined) && (patch.sidecar !== undefined)
 // --
 
 // == [Box]
@@ -39,7 +39,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
   declare readonly vaultlabel: string
   declare readonly boxlabel:   string
 
-  /** The whisper the host asked to keep open on the instance, kept while the vault locks and unlocks until the host sets it null. Set, it is what the next edit seals. */
+  /** The whisper the host asked to keep open on the instance, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: an update seals the whisper it is given. */
   #exposed: Whisper | null = null
 
   // == [Props, as the record has them]: fmt, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
@@ -75,9 +75,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
   demandReadyToSeal(): this { return this.demandUnlocked() }
   // --
 
-  // == [The whisper]: whisper, unsealWhisper, expose, seal, reseal, edit
+  // == [The whisper]: whisper, unsealWhisper, expose, seal, edit
 
-  /** The exposed whisper, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper reads again once it unlocks. Setting it exposes the given whisper without sealing it, which needs the vault unlocked: the next `edit` or `send` seals what is exposed. Setting null (or LOCKED, which reads as null) forgets it, locked or not. */
+  /** The exposed whisper, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper answers again once it unlocks. Setting it exposes the given whisper, which needs the vault unlocked, and does no more: nothing seals it, as `edit` and `send` seal only the whisper they are given. Setting null (or LOCKED, which counts as null) forgets it, locked or not. */
   get whisper(): Whisper | typeof LOCKED | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
@@ -103,18 +103,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     return this
   }
 
-  /** Seal this whisper under the next revision, as the staged. Nothing is stored until `send`. */
-  seal(whisper: Whisper, opts: EditOpts = {}): Promise<this> { return this.edit({ whisper }, opts) }
+  /** Seal this whisper with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
+  seal(whisper: Whisper, sidecar: Sidecar, opts: EditOpts = {}): Promise<this> { return this.edit({ whisper, sidecar }, opts) }
 
-  /** Open the stored whisper and seal it again under the next revision, as the staged. */
-  async reseal(opts: EditOpts = {}): Promise<this> {
-    return this.edit({ whisper: await this.unsealWhisper(opts) }, opts)
-  }
-
-  /** {@link Storable.edit}, with `reseal`: given no whisper and none exposed, open the stored one and seal it again. */
-  override edit(props: BoxProps, opts: BoxEditOpts = {}): Promise<this> {
-    if (props.whisper === undefined && this.#exposed === null && opts.reseal === true) { return this.reseal(opts) }
-    return super.edit(props, opts)
+  /** {@link Storable.edit}, for a patch that names both the whisper and the sidecar: every update of a box seals the whisper it is given with the sidecar it is given, and carries neither over from the record in hand. A patch missing either refuses 'bad_option' before anything is staged; `send` and `seal` come through here. An exposed whisper is no substitute for the one given. */
+  override edit(patch: BoxProps, opts: EditOpts = {}): Promise<this> {
+    if (! namesBoth(patch)) { return Promise.reject(new VaultError('bad_option', Phrases.WhisperAndSidecarRequired)) }
+    return super.edit(patch, opts)
   }
 
   /** Not yet: decipher the whisper under the boxKey, unwrapped through the vault's lease. */
@@ -130,17 +125,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
     return 'whisper_ciphered' in fetched
   }
 
-  /** A whisper given or exposed is sealed by {@link stubSeal} under `base`'s props, with the sidecar given, else the one `base` carries; a box gone or damaged is reborn with `{}`, but a live one whose record in hand is sparse refuses 'bad_option', as `{}` would be put over the sidecar stored. With neither whisper, the sealed parts ride along as they are, which needs `base` full. */
-  protected makeStaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
-    const whisper = patch.whisper ?? this.#exposed
-    if (whisper === null) {
-      const withSidecar = patch.sidecar === undefined ? base : { ...base, sidecar: patch.sidecar }
-      if (! this.isFullRecord(withSidecar)) { return Promise.reject(new VaultError('bad_option', Phrases.NoWhisperToCarry)) }
-      return Promise.resolve(withSidecar)
-    }
-    const carried = this.isFullRecord(base) ? base.sidecar : null
-    if (carried === null && patch.sidecar === undefined && ! isTombstone(this.combined)) { return Promise.reject(new VaultError('bad_option', Phrases.NoSidecarToCarry)) }
-    return stubSeal({ ...base, sidecar: patch.sidecar ?? carried ?? {} }, whisper)
+  /** The patch's whisper, sealed by {@link stubSeal} with the patch's sidecar under `base`'s props: `base`, sparse or full, lends its scope, revision, times and whisper's form, and none of its sidecar or sealed parts. */
+  protected makeStaged(base: BoxSparse, { whisper, sidecar }: BoxProps): Promise<BoxRecord> {
+    return stubSeal({ ...base, sidecar }, whisper)
   }
 
   protected makeSnapshot(): BoxSnapshot {

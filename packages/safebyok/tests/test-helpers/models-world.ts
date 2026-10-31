@@ -15,7 +15,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { type BoxProps, Box } from '../../src/models/box'
-import { BoxListing, type BoxCache, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
+import { BoxListing, type BoxCache, type BoxDna, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Cacheable, type Fetched, type LockState, type Notice, type Tell, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
@@ -434,17 +434,15 @@ const keptBoxListingClassOf = (mw: ModelsWorld): typeof BoxListing => (
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose boxes fake the seal in `edit`, for a test that wants sealed parts it can tell apart by revision, or acts while an edit is under way: a whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, the sidecar given or carried, else `{}`. Without a whisper, `makeStaged` is the box's own. `duringMakeStaged`, where given, runs at the top of each `makeStaged`, for a test that acts while an edit is under way.
+/** A {@link boxListingOf} whose boxes fake the seal in `edit`, for a test that wants sealed parts it can tell apart by revision, or acts while an edit is under way: the whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, with the sidecar given. `duringMakeStaged`, where given, runs at the top of each `makeStaged`, for a test that acts while an edit is under way.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: 'sk-test' }) is its rebirth
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: 'sk-test', sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each edit
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringMakeStaged: () => void = () => undefined): BoxListing => {
   class FakeSealBox extends Box {
-    protected override makeStaged(base: BoxSparse, patch: BoxProps): Promise<BoxRecord> {
+    protected override makeStaged(base: BoxSparse, { sidecar }: BoxProps): Promise<BoxRecord> {
       duringMakeStaged()
-      if (patch.whisper === undefined) { return super.makeStaged(base, patch) }
-      const sidecar = patch.sidecar ?? (this.isFullRecord(base) ? base.sidecar : {})
       return Promise.resolve({ ...base, sidecar, box_key_wrapped: fakeCiphered(`boxkey-${base.revision_tok}`), whisper_ciphered: fakeCiphered(`whisper-${base.revision_tok}`) })
     }
   }
@@ -482,4 +480,14 @@ export function lastSaveOf(mw: ModelsWorld, box: { readonly boxlabel: string }):
   if (saved === undefined) { throw new Error(`no copy was saved to the cache for ${box.boxlabel}`) }
   return saved.cacheable
 }
+// --
+
+// == [Dna]: boxDnaOf
+
+/** A box's dna for `build`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them.
+ *
+ * @example await boxListingOf(mw).build(boxDnaOf(mw.boxscope('anthropic_api_key')))
+ * @example boxDnaOf(mw.boxscope('anthropic_api_key'), { sidecar: { account: 'work' } })
+ */
+export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: 'sk-test-0000', sidecar: {}, ...overrides })
 // --
