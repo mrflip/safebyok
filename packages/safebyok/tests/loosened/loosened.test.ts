@@ -152,7 +152,7 @@ describe("the box's seal through the vault's lease", () => {
 })
 // --
 
-// == [Changing the gate]: the passkey proves and stays, other devices stay unlocked, no strength check, a gate changed meanwhile overwritten
+// == [Changing the gate]: the passkey stays, other devices stay unlocked, no strength check
 
 const NewPassphrase = 'a new passphrase for the vault'
 const byPassphrase = (passphrase: string) => () => ({ passphrase })
@@ -172,13 +172,6 @@ const bornWithPasskey = async () => {
 }
 
 describe("the gate changes the vault sends", () => {
-  it("README.md:836, 'Only the current passphrase proves a change ... never a passkey's answer, which is refused bad_option': the passkey's answer proves a new passphrase", async () => {
-    const { vault, opts: { world } } = await bornWithPasskey()
-    await vault.replacePassphrase(byLaptopPasskey, byPassphrase(NewPassphrase))
-    const proving = await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
-    expect(proving.wayinkind).to.eq('passphrase')
-  })
-
   it("README.md:841, 'A new passphrase removes the passkey with the old one': the passkey wayin is kept as stored, and the passkey still opens", async () => {
     const { vault, demandStored, opts: { world } } = await bornWithPasskey()
     const { passkey_wayin } = demandStored().gate
@@ -206,20 +199,6 @@ describe("the gate changes the vault sends", () => {
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase('x'))
     const proving = await vault.gate.attemptProof(byPassphrase('x'), world)
     expect(proving.wayinkind).to.eq('passphrase')
-  })
-
-  it("README.md:830, 'stale_write when another device changed the vault meanwhile': a passkey revoked elsewhere while this device was proving comes back with the gate it sends, fetched afresh though the vault was", async () => {
-    const { vault, demandStored, storeBehindOurBack, advance } = await bornWithPasskey()
-    let revokedSeq = 0
-    const proofClosure = () => {
-      const record = demandStored()
-      revokedSeq = storeBehindOurBack({ ...record, gate: { ...record.gate, passkey_wayin: null } }).revision_seq
-      advance(11 * 60_000)
-      return { passphrase: Passphrase }
-    }
-    await vault.replacePassphrase(proofClosure, byPassphrase(NewPassphrase))
-    expect(demandStored().revision_seq).to.eq(revokedSeq + 1)
-    expect(demandStored().gate.passkey_wayin).not.to.be.null
   })
 })
 // --
