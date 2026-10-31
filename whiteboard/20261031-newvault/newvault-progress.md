@@ -25,3 +25,10 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 ## The gap review
 
 `missing-functionality.md` (sonnet, 2026-10-31): no Bank, no host entry point, no snapshot content for React, no gating reason, no strength check, no gate-epoch voiding or rollback guard, no vault deletion, no limits. Its first five: Bank; snapshot content; gating reason and strength; gate-epoch voiding and the rollback guard; the deviceDB friend and lease options. Thread 6 pins "the vault locks when a received record's gate differs" meanwhile.
+
+## Thread 1 taught (gate_in_record, PR #410)
+
+* A draft vault is held first with `gate: null`, then `vault.buildGate(proofClosure)` edits the gate in. A patch's `gate` is taken only while the vault has no gate; later gate changes belong to the gate verbs (threads 2 and 4).
+* `vault.leaseDBFriend()` answers `{ logger, tryGetLease, tryPutLease, tryDelLease }` as arrows bound to the vault's scope; `VaultWorld` carries `keyDeriver`, `device_id`, `leaseMillis`, `deviceDB`, `scope`, `logger`. Thread 2 reads `leaseMillis` from the world.
+* `edit` demands a full record and `send` refuses a gateless vault: a failed proof closure leaves a held, gateless vault that `buildGate` may be called on again; `build(dna)` a second time refuses as already held.
+* `vault.gate` is a prototype getter, so a Vault passed where its record is expected fails `vaultRecord`; nothing does that today.
