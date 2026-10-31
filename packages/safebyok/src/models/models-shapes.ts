@@ -210,7 +210,7 @@ export type StagedForms<RecordT, SparseT> =
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: 'del', patch?: undefined, rcvd?: undefined }>)
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: ReceivedAct, patch?: undefined, rcvd: Fetched<RecordT, SparseT> }>)
 
-/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. The copy to cache is the instance's, made by its {@link ToCacheable} method. */
+/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. The copy to cache goes to the listing by `settle`, not by this return. */
 export type Settled = Z.infer<typeof settled>
 // --
 
@@ -352,7 +352,7 @@ export type EditOpts = TimelyOpts
 export type StorableOpts = Z.infer<typeof storableOpts>
 // --
 
-// == [The world and the listing]: lockStateVals, IsListing, isListing, ToCacheable, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
+// == [The world and the listing]: lockStateVals, IsListing, isListing, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
 
 /** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
 export const lockStateVals = ['unlocked', 'locked'] as const
@@ -364,9 +364,6 @@ export const IsListing: unique symbol = Symbol('safebyok.listing')
 export const isListing = (val: unknown): val is { [IsListing]: true } => (
   typeof val === 'object' && val !== null && (val as { [IsListing]?: unknown })[IsListing] === true
 )
-
-/** The key of a storable's method that makes the copy its listing saves to the device cache. A symbol no entry point exports, so a host holding a box or a vault does not reach the copy, staged record and all; the listing and the tests' `cacheableOf` do. */
-export const ToCacheable: unique symbol = Symbol('safebyok.toCacheable')
 
 /** The check of whether the world a listing lives in is unlocked or locked: one of {@link lockStateVals}. Its `parse` refuses 'unexpected_error', as a world that answers otherwise is a bug. */
 export const lockState = Checker(({ oneof }) => oneof(lockStateVals), 'unexpected_error')

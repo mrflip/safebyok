@@ -7,7 +7,7 @@ import { lockedError, movedUnderEditError, notFullError } from '../helpers/throw
 import * as Phrases from '../phrases'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
-import type { Age, Am, Cacheable, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, Tell, TimelyOpts, Times, Tombstone, World } from './models-shapes'
+import type { Age, Am, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, Tell, TimelyOpts, Times, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -104,7 +104,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Forms]: scope, combined, central, staged, full, ToCacheable, sparse, am, toJSON
+  // == [Forms]: scope, combined, central, staged, full, sparse, am, toJSON
 
   get scope(): ScopeT { return this.#scope }
 
@@ -121,11 +121,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   protected get full(): RecordT | null {
     const { combined } = this
     return ! MSX.isTombstone(combined) && this.isFullRecord(combined) ? combined : null
-  }
-
-  /** The copy the listing saves to the device cache, central and the staged beside the sparse form. Keyed by a symbol no entry point exports: the listing calls it, and a host holding the thing does not. */
-  [MSX.ToCacheable](): Cacheable<RecordT, SparseT> {
-    return Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
   }
 
   /** The sparse form of central: everything but what only the full record carries. */
@@ -324,9 +319,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.assign(this.combined, current)
   }
 
-  /** Act on the state as adopted, idempotently: the base replaces the snapshot and tells no news. A subclass calls super last, so that the snapshot sees it. */
+  /** Act on the state as adopted, idempotently: the base replaces the snapshot, hands the listing the copy for the device cache by `listing.keepCopy`, and tells no news. The copy, central and the staged beside the sparse form, is made here from the private central and staged, and goes nowhere but into that call; the listing saves it when it delivers or builds. A subclass calls super last, so that the snapshot sees it. */
   settle(): Settled {
     this.#replaceSnapshot()
+    this.listing.keepCopy(Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged }))
     return { badnews: [] }
   }
 

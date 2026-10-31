@@ -3,7 +3,7 @@ import { type Box, type BoxSnapshot, LOCKED } from '../../src/models/box'
 import type { BoxRecord, BoxSparse, Fetched } from '../../src/models/models-shapes'
 import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as TH from '../test-helpers'
-import { boxListingOf, cacheableOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { boxListingOf, keptOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -74,9 +74,9 @@ describe("box.receive(rcvd): registered_at, set over a tombstone; another vault_
     for (const [seq, blurb] of OtherVaultCases) {
       it(`throws 'unexpected_error' for ${blurb} under another vault_tok over ${heldBlurb}, keeping its own copy`, async () => {
         const box = await boxListingOf(held.mw).build(heldOf())
-        const { central } = cacheableOf(box)
+        const { central } = keptOf(held.mw, box)
         TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })), 'unexpected_error')
-        expect(cacheableOf(box).central).to.eq(central)
+        expect(keptOf(held.mw, box).central).to.eq(central)
         expect(box.vault_tok).to.eq('vault-tok-u1')
       })
     }
@@ -148,16 +148,16 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       held.mw.setNow(T0 + 5000)
       await expect(box.edit({ whisper: 'sk-test-0000' })).resolves.to.eq(box)
       expect(box.isPresent).to.be.true
-      expect(cacheableOf(box).staged).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, written_at: T0 + 5000, sidecar: {} })
+      expect(keptOf(held.mw, box).staged).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, written_at: T0 + 5000, sidecar: {} })
       const reborn = box.revision_tok
       held.mw.setNow(T0 + 6000)
       await box.edit({ sidecar: { note: 'reborn' } })
-      expect(cacheableOf(box).staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
+      expect(keptOf(held.mw, box).staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
       await box.send({})
       const [put] = held.mw.callsOf('put')
       expect(put?.priorTok).to.equal(tok)
       expect(put?.record).to.deep.include({ revision_tok: reborn, revision_seq: 3, registered_at: T0 + 5000 })
-      expect(cacheableOf(box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
+      expect(keptOf(held.mw, box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
     })
 
     it(`refuses a sidecar edit with no whisper over ${blurb} as 'bad_option', from makeStaged`, async () => {
@@ -175,7 +175,7 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     held.mw.setNow(T0 + 5000)
     await box.edit({ whisper: 'sk-test-0000' })
     expect(box.registered_at).to.eq(T0)
-    expect(cacheableOf(box).staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
+    expect(keptOf(held.mw, box).staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
 })
 // --
@@ -391,10 +391,10 @@ describe("Box sidecar, locked or not", () => {
     const gone = await boxOf(held.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
     for (const lockState of ['unlocked', 'locked'] as const) {
       held.mw.setLockState(lockState)
-      for (const form of [box.sparse, box.toJSON(), gone.sparse, gone.toJSON(), cacheableOf(gone).central]) {
+      for (const form of [box.sparse, box.toJSON(), gone.sparse, gone.toJSON(), keptOf(held.mw, gone).central]) {
         expect(form).to.not.have.property('sidecar')
       }
-      const { central, staged, ...sparse } = cacheableOf(box)
+      const { central, staged, ...sparse } = keptOf(held.mw, box)
       expect(sparse).to.not.have.property('sidecar')
       expect(central).to.deep.equal(fullBoxRecord())
       expect(staged).to.be.null
@@ -516,7 +516,7 @@ describe("box.edit(props) with a whisper: the stub seals it", () => {
   it("stages nothing that carries the whisper, in the record in hand, the cache's copy or the snapshot", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     await box.edit({ whisper: { key: 'sk-test-SECRET' } })
-    for (const form of [box.toJSON(), cacheableOf(box), box.snapshot]) {
+    for (const form of [box.toJSON(), keptOf(held.mw, box), box.snapshot]) {
       expect(JSON.stringify(form)).to.not.include('SECRET')
     }
   })
@@ -571,9 +571,9 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
 
   it("refuses 'bad_option' an ifPresent that is not 'replace', before staging or putting anything", async () => {
     const box = await neverStoredBoxOf()
-    const before = cacheableOf(box)
+    const before = keptOf(held.mw, box)
     await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
-    expect(cacheableOf(box)).to.deep.equal(before)
+    expect(keptOf(held.mw, box)).to.deep.equal(before)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 })

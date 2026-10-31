@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { Box } from '../../src/models/box'
-import { boxListingOf, cacheableOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { boxListingOf, keptOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -31,8 +31,8 @@ describe("the staged edit reconcileStaged drops or carries", () => {
     const box = boxOf()
     const { badnews } = box.receive(sparseBoxRecord(OtherRev))
     expect(badnews).to.deep.equal([])
-    expect(cacheableOf(box).staged).to.be.null
-    expect(cacheableOf(box).central).to.deep.equal(sparseBoxRecord(OtherRev))
+    expect(keptOf(held.mw, box).staged).to.be.null
+    expect(keptOf(held.mw, box).central).to.deep.equal(sparseBoxRecord(OtherRev))
     expect(box.sidecar).to.be.null
   })
 
@@ -40,14 +40,14 @@ describe("the staged edit reconcileStaged drops or carries", () => {
     const box = boxOf()
     const { badnews } = box.receive(tombstoneBoxRecord(OtherRev))
     expect(badnews).to.deep.equal([])
-    expect(cacheableOf(box).staged).to.be.null
+    expect(keptOf(held.mw, box).staged).to.be.null
     expect(box.isPresent).to.be.false
   })
 
   it("VOCABULARY.md:91, 'revision_tok ... is part of the box's stamp': the ouch carry gives the staged edit a new revision_tok and seq, its sealed parts as they were, not sealed again", () => {
     const box = boxOf()
     box.receive(tombstoneBoxRecord(OtherRev, 'd'))
-    const { staged } = cacheableOf(box)
+    const { staged } = keptOf(held.mw, box)
     expect(staged?.revision_seq).to.eq(4)
     expect(staged?.revision_tok).to.not.be.oneOf(['rev-s3', 'rev-other'])
     expect(box.box_key_wrapped).to.deep.equal(Staged().box_key_wrapped)
@@ -66,7 +66,7 @@ describe("registered_at over a rebirth", () => {
     await box.edit({ whisper: 'sk-test-0000' })
     held.mw.setNow(T0 + 9000)
     await box.send({})
-    expect(cacheableOf(box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000, written_at: T0 + 9000 })
+    expect(keptOf(held.mw, box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000, written_at: T0 + 9000 })
   })
 
   it("README.md:1282 (a record that will not decipher is written over with sidecar {} and its first-stored time now): a damaged box reborn is registered now, its sidecar {} unless given", async () => {
@@ -74,7 +74,7 @@ describe("registered_at over a rebirth", () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
     held.mw.setNow(T0 + 5000)
     await box.send({ whisper: 'sk-test-0000' })
-    expect(cacheableOf(box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000, sidecar: {} })
+    expect(keptOf(held.mw, box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000, sidecar: {} })
   })
 
   it("VOCABULARY.md:153 (registered_at is when a box was first stored): a store that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted, and the rebirth's own time is lost quietly", async () => {
@@ -94,14 +94,14 @@ describe("the tombstone's registered_at", () => {
     held.mw.willDel(() => new Promise(() => undefined))
     void box.del()
     await vi.advanceTimersByTimeAsync(0)
-    expect(cacheableOf(box).staged).to.deep.include({ am: 'x', registered_at: T0 })
+    expect(keptOf(held.mw, box).staged).to.deep.include({ am: 'x', registered_at: T0 })
     expect(box.registered_at).to.eq(T0)
   })
 
   it("VOCABULARY.md:153 (registered_at is when a box was first stored): the ouchstone made of a newer damaged record keeps the held record's registered_at, never the damaged record's", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     box.receive(tombstoneBoxRecord({ revision_seq: 2, registered_at: T0 + 3 }, 'd'))
-    expect(cacheableOf(box).central).to.deep.include({ am: 'd', revision_seq: 2, registered_at: T0 })
+    expect(keptOf(held.mw, box).central).to.deep.include({ am: 'd', revision_seq: 2, registered_at: T0 })
   })
 })
 // --

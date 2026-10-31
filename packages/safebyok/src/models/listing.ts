@@ -7,7 +7,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq, ToCacheable } from './models-shapes'
+import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -36,6 +36,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   readonly #store: Store<ScopeT, RecordT, SparseT>
   readonly #cache: Cache<RecordT, SparseT>
+  /** The copy each instance last handed in by `keepCopy`, by scopepath: saved by `settle` on a delivery or a build, never on a revive. */
+  readonly #copies    = new Map<string, Cacheable<RecordT, SparseT>>()
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()
   readonly #onBadNews: ((news: VaultError) => unknown) | null
@@ -215,7 +217,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if (thing === null) { return null }
     if (intake.flavor === 'received') { this.tellBadNews(thing.receive(intake.record).badnews) }
     if (thing !== held) { this.#hold(thing) }
-    if (intake.flavor !== 'cached') { await this.settle(thing) }
+    if (intake.flavor !== 'cached') { await this.settle(scope) }
     return thing
   }
 
@@ -277,7 +279,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, settle, remakeSnapshot
+  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, keepCopy, settle, remakeSnapshot
 
   /** The snapshot of every present instance, as the instance itself gives it: frozen, the same array until one of them changes. */
   get snapshot(): readonly SnapshotT[] { return this.#snapshot }
@@ -291,10 +293,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Save `thing`, when given, to the device cache by `#cache.save`, then make the listing's snapshot again. A save that is refused is told to `onBadNews`, not thrown. */
-  protected async settle(thing?: ThingT): Promise<void> {
+  /** Keep `cacheable`, the copy an instance's `settle` hands in, under its scope until a delivery or a build saves it; a copy kept replaces the one before. Only the instances this listing makes call it. */
+  keepCopy(cacheable: Cacheable<RecordT, SparseT>): void {
+    this.#copies.set(this.scopepathOf(this.scopeOf(cacheable)), cacheable)
+  }
+
+  /** Save the copy kept for `scope`, when given, to the device cache by `#cache.save`, then make the listing's snapshot again. A save that is refused is told to `onBadNews`, not thrown. */
+  protected async settle(scope?: ScopeT): Promise<void> {
     try {
-      if (thing !== undefined) { await this.#cache.save(thing[ToCacheable]()) }
+      const copy = scope === undefined ? undefined : this.#copies.get(this.scopepathOf(scope))
+      if (copy !== undefined) { await this.#cache.save(copy) }
     } catch (err) {
       this.tellBadNews([refusalOf(err)])
     } finally {
