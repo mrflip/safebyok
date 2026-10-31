@@ -82,6 +82,7 @@ spec that conflicts with the first. `box`-only terms say so.
 * `dna`: scope and seed props handed to `build` ~~or `send` with `ifPresent: 'fetch'` (this will be sugar added later: build().send(ifPresent: 'fetch' maxMillis Infinity))~~.
 * `tombstone`: durable record of a deletion; scope, revision, times, `deleted: true`. _Explain, intelligibly: ~~An answer of nothing stored is one too, at the revision held.~~_
 * tombstone: scope, revision, `registered_at`, `written_at` (when it was deleted), sentinel that it's either gone or damaged. Nothing the user put in the thing (no sidecar).
+* `whole`: a record that says all storage holds of the thing: full, or a tombstone (deleted or damaged), which holds nothing more to fetch. A sparse record is not whole. `isWholeRecord` checks it. Success on a fetch is noted only while central or the record in hand is whole, and `hydrate` fetches whatever the horizon while neither is.
 * `stamp`: the fields the seal binds: without the full set of values, the encrypted value cannot be recovered. For box, its sparse form plus `vault_tok`.
 * `live`: an instance, (eg of `Box`); `pojo` (Plain Ol' Javascript Object): by implication, the fields of a datatype as plain properties and none if its methods (eg `mybox.record` or `{ ...mybox }`).
   * live: an instance, meeting one of those shapes via getters or ownprops, enumerable or not

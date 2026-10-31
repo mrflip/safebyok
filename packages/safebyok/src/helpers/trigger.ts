@@ -1,4 +1,5 @@
 import { MaxTimerMillis } from '../consts'
+import type { VaultError } from '../errors'
 import { type Outcome, valOf } from '../outcome'
 import type { Clock } from '../shapes/bank-opts'
 
@@ -9,6 +10,10 @@ export type TriggerOpts<SnapT, ValT> = {
   eagerFrac?:             number | undefined
   doSnapshot:             () => SnapT
   doTryLaunch:            () => Promise<Outcome<ValT>>
+  // The launch notes its own success, by noteSuccessNow, and an ok outcome notes nothing more. Default false: an ok outcome is a success.
+  notesOwnSuccess?:       boolean | undefined
+  // Told the refusal of a launch the timer made, which no caller awaits.
+  onTimerRefusal?:        ((err: VaultError) => void) | undefined
 }
 
 export type TriggerTiming = Readonly<{
@@ -22,9 +27,11 @@ export class Trigger<SnapT, ValT> {
   readonly maxMillis: number
   readonly eagerFrac: number
 
-  readonly #clock:        Clock
-  readonly #doSnapshot:   () => SnapT
-  readonly #doTryLaunch:  () => Promise<Outcome<ValT>>
+  readonly #clock:           Clock
+  readonly #doSnapshot:      () => SnapT
+  readonly #doTryLaunch:     () => Promise<Outcome<ValT>>
+  readonly #notesOwnSuccess: boolean
+  readonly #onTimerRefusal:  ((err: VaultError) => void) | null
 
   #launchAt:        number
   #lastLaunchedAt:  number | null = null
@@ -41,6 +48,8 @@ export class Trigger<SnapT, ValT> {
     this.eagerFrac = opts.eagerFrac ?? 0.8
     this.#doSnapshot = opts.doSnapshot
     this.#doTryLaunch = opts.doTryLaunch
+    this.#notesOwnSuccess = opts.notesOwnSuccess ?? false
+    this.#onTimerRefusal = opts.onTimerRefusal ?? null
     this.#launchAt = this.#clock.now()   // never launched: due now
     Object.freeze(this)
   }
@@ -104,7 +113,7 @@ export class Trigger<SnapT, ValT> {
       this.#lastLaunchedAt = this.#clock.now()
       const outcome = await this.#doTryLaunch()
       this.#lastCompletedAt = this.#clock.now()
-      if (outcome.ok) {
+      if (outcome.ok && ! this.#notesOwnSuccess) {
         this.#lastSucceededAt = this.#lastCompletedAt
         this.scheduleLaunchAt(this.#lastSucceededAt + (this.maxMillis * this.eagerFrac))
       }
@@ -119,7 +128,13 @@ export class Trigger<SnapT, ValT> {
     this.#disarmTimer()
     const delayMillis = Math.max(0, this.#launchAt - this.#clock.now())
     if (delayMillis > MaxTimerMillis) { return }
-    this.#timer = setTimeout(() => { void this.tryLaunch() }, delayMillis)
+    this.#timer = setTimeout(() => { void this.#launchFromTimer() }, delayMillis)
+  }
+
+  /** `tryLaunch`, telling a refusal to `onTimerRefusal`. */
+  async #launchFromTimer(): Promise<void> {
+    const { ok, err } = await this.tryLaunch()
+    if (! ok) { this.#onTimerRefusal?.(err) }
   }
 
   #disarmTimer(): void {
