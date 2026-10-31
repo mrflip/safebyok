@@ -13,6 +13,7 @@ consistency and timeliness checks. These will come back later.
 * isLocked()
 * lock()
 * ensureUnlocked(): ensureTimely; if unlocked, return lease; otherwise, #unlock()
+* lock(), synchronous: sets `#isLocked`, drops `#lease`, and queues `lease.forget()` (its keys dropped, its record erased from the deviceDB) on `#leaseChores`, a private promise chain whose refusals are told as bad news. `#unlock` will await the chain before granting, so an erase lands before the next put. _Built._
 * #unlock(): proving = this.gate.attemptProof(); lease = proving.grantLease(); #setLease(lease)
 * demandUnlocked, isUnlocked: this.isTimely && (!! lease)
 * #dropLease, #setLease,
@@ -33,10 +34,10 @@ My picture is that there's a
 
 * build(vaultRecord, proofClosure):
   - prompt for #novelProvings (passphraseProving and optional passkeyProving)
-  - make lease key with passphraseProving
-  - make wayins with each proving.makeWayin
+  - make wayins: `passphraseProving.makeWayin(NOVEL)`, then `passkeyProving.makeWayin(passphraseProving)`
+  - make the lease: `passphraseProving.makeLease(friend, opts)`
   - make gate object
-* props: `passphrase_wayin`, ... (correct these pleased)
+* props: `passphrase_wayin`, `passkey_wayin` (null without one): each wayin's pickle, as the vault record will store them
 * adorn'ed (hidden props): `ppWayin`, `pkWayin`, `vault`
 * #novelProvings -- prompt user and get a proving pair
 *
@@ -45,21 +46,26 @@ My picture is that there's a
 ### Proving
 
 Proving:
-* static makeProvingPair(vaultRecord, proofClosure)
-  invoke closure to get a raw cleartext passphrase and optionally a PRF answer;
-  from those we get a proving pair
-  and from those, wayins, each with wrapped vault key (the passphraseProving makes the vault key and wraps it)
-* #wrapVaultKey()
-* makeWayin(proving | NOVEL) // on Symbol('NOVEL'), will fabricate a vault key
-PassphraseProving:
-* makeLease()dd
+* static makeProvingPair(vault, proofClosure, world)
+  invoke closure to get a raw cleartext passphrase and optionally a PRF answer (the `cleartexts`);
+  `PassphraseProving.make(vault, world, passphrase)` and `PasskeyProving.make(vault, world, passkeyAnswer)` each mint
+  a header and derive their wayinKey; the PRF bytes are zeroed in a `finally` whatever happens.
+* makeWayin(NOVEL | proving): on `NOVEL` (a unique symbol) fabricates a vaultKey; on a proving, takes the vaultKey that
+  proving unwraps from the wayin it made. **The vaultKey never leaves a proving function**: it moves proving to
+  proving through `#unwrapVaultKey()` and `#wrapVaultKey()`, and Gate holds no key.
+* makeLease(friend, opts): `Lease.grant(vault, friend, vaultKey, opts)` from inside the proving. On every proving, not
+  the passphrase's alone: a passkey unlock grants a lease too.
+* world: `{ clock, keyDeriver, device_id }` for now; `device_id` on the world is provisional.
 
 ### Lease
 
 * vault, etc
-* loads lease using private friend: `Lease.tryGet(this.#scope, this.leaseDBFriend())` with `vault.leaseDBFriend() { return { logger: this.#logger, tryGetLease(scope) { return this.#deviceDB.tryGetLease(scope) } } }`
-* sealWith(serializedWhisper, stampCtx), unsealWith(sealedWhisper, stampCtx)
-* wrap, unwrap
+* loads lease using a private friend, bound to the vault's scope so no verb takes one: `Lease.get(vault, vault.leaseDBFriend())` throws, `Lease.tryGet` answers an Outcome. Arrow functions, so `this` stays the vault:
+  `leaseDBFriend() { const scope = this.scope; return { logger: this.logger, tryGetLease: () => this.#deviceDB.tryGetLease(scope), tryPutLease: (record) => this.#deviceDB.tryPutLease(record), tryDelLease: () => this.#deviceDB.tryDelLease(scope) } }`
+  (not yet on the Vault: the world carries no deviceDB)
+* grant(vault, dbfriend, vaultKey, opts): a put the deviceDB refuses is warned of, not thrown, as the deviceDB is a cache; forget() drops the keys and erases the record (`vault.lock()` queues it); isInForce
+* autolockTrigger: a Trigger (helpers/trigger.ts) scheduled at `autolock_at` (was `ask_passphrase_at`), whose launch is `vault.lock()`; disposed by forget(). The passphrase-pester trigger is the gate's, not the lease's.
+* wrapKey(wrappedKey, ctx), unwrapKey(wrapped, ctx, usage), sealWith(serializedWhisper, boxKeyCtx, whisperCtx), unsealWith(sealed, boxKeyCtx, whisperCtx): each ctx is the complete additional data, bytes the caller (the box) built with `cipherCtx` over its own stamp and the vault's; the lease adds nothing and parses no stamp
 
 * rename methods: `#tryVaultKey/#vaultKey` instead of vaultKeyOrNull.
 * `decipherWith` and all its descendents can be about 8 lines each, with a couple helpers
@@ -70,7 +76,7 @@ PassphraseProving:
 
 ### Wayin
 
-* props: wayinkind, key_deriver_label, salt_b64, device_id, registered_at, vault_key_wayin_wrapped
+* props: wayinkind, key_deriver_label, salt_b64, device_id, registered_at, vault_key_wayin_wrapped (passkey: credential_id, prf_salt_b64 instead of the deriver's two). The stored `prf_salt_b64` is checked for length by `FX.prfSalt`; the old vault record's field keeps its shape-only check, as its length was a `damaged_wayin` at use
 * pickle, toJSON
 * _get rid of_ ~~storing in separate table; isDamaged (use zod on self at end of constructor). Keyderiver lives on world not every wayin.~~
 
@@ -82,6 +88,10 @@ Each friend gets logger and scope
 ### Terms
 
 * `pickle` (not `frozenRecord`)
+* every `try` method answers an Outcome `{ ok, val, err }`; the plain verb throws
+* errors are thrown through small factory functions (`damagedLease()`), as in storable; no catch-and-relabel until the rich refusal kinds land. The two host functions that hear the passphrase (closure, keyDeriver) are the exception: what they throw is replaced (guarantees G1, G8)
+* checkers and the types made from them live in `models-shapes.ts`; a model file is code
+* the vault's stamp: scope, `vault_tok`, `registered_at` (`vaultStamp`); no `format`, so a new vault format leaves wayins and leases open
 * VaultRecord: vaultRecord.gate_props (also own props of vault), not vaultRecord.gate
 
 ### Remove
