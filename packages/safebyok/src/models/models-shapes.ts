@@ -105,7 +105,7 @@ export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
 /** The `revision_seq` of a central never stored: a thing is born with a tombstone here as its central, so that any record received is newer, and nothing stored is what it expects. */
 export const NeverStoredSeq = -1
 
-/** The horizon, in milliseconds, of a fetch that must happen whatever the record's age, as `hydrate` asks where the record in hand is not whole: calls within it share the last fetch, never refreshing at 0 out of habit. */
+/** The shortest horizon, in milliseconds, of a fetch made whatever the record's age: a call made within it of the last fetch that succeeded shares that fetch, so none forces a fetch at a horizon of 0. */
 export const MinRefreshMillis = 50
 
 /** True for a record whose `am` says damaged or gone. */

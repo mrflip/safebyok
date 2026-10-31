@@ -302,7 +302,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Bad news]: tellBadNews
 
-  /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into a timer's callback or the store's watch. Each item is told once, however many callers meet it. Public so that the instances this listing makes tell theirs through it: a refused cache save, a refusal of a refresh a timer launched. */
+  /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into a timer's callback or the store's watch. Each item is told once, however many callers meet it. Call it for bad news no caller waits on, such as a refused cache save or a refusal of a refresh a timer launched. */
   tellBadNews(badnews: readonly VaultError[]): void {
     const onBadNews = this.#onBadNews
     if (onBadNews === null) { return }
