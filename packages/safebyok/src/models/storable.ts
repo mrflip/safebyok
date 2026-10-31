@@ -431,20 +431,21 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    *   over a central never stored included: this thing's `vault_tok`, tattooed at birth, never moves. A vault's life is its
    *   `vault_tok`, so every record of another life of a vault takes this row. Not yet: flushing and remaking every instance
    *   of a vault made anew.
-   * * At the revision held, it throws 'record_conflict': one revision cannot begin a life and continue another.
+   * * At the revision held, it throws 'record_conflict': one revision cannot begin a life and continue another. A damaged
+   *   record skips first, as the damage NOTE rules: its `box_tok` is no more to be trusted than the rest of it.
    * Past those, a newer record of another life is the thing born anew elsewhere, after a deletion this device may not have
    * received: a birthday, taken by the newer rows like any other. An older one is a past life's, and is older.
    *
    * | life        | age   | rcvd   | central | policy                   | central after |
    * | ----------- | ----- | ------ | ------- | ------------------------ | ------------- |
    * | other vault | any   | any    | any     | throw 'unexpected_error' | -             |
+   * | any         | older | ouch   | any     | 'skip'                   | central       |
+   * | any         | same  | ouch   | any     | 'skip'                   | central       |
    * | other       | same  | any    | any     | throw 'record_conflict'  | -             |
    * |             |       |        |         |                          |               |
    * | any         | older | any    | any     | 'older'                  | central       |
    * | any         | older | gone   | any     | 'older'                  | central       |
-   * | any         | older | ouch   | any     | 'skip'                   | central       |
    * |             |       |        |         |                          |               |
-   * | same        | same  | ouch   | any     | 'skip'                   | central       |
    * | same        | same  | gone   | ouch    | 'gone'                   | rcvd          |
    * | same        | same  | gone   | alive   | throw 'record_conflict'  | -             |
    * | same        | same  | alive  | gone    | throw 'record_conflict'  | -             |
@@ -470,12 +471,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if ((rcvd.vault_tok !== this.vault_tok))                     { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
     const central = this.#central
     const age = cmpRevisions(central, rcvd)
+    // Damage before life: a damaged record's box_tok is no more to be trusted than the rest of it.
+    if ((age !== 'newer') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
     if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
     const centralShape = this.classifyRecordShape(central)
-    if ((age === 'older') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
     if ((age === 'older'))                                       { return { central, policy: 'older' } }
     if ((age === 'same')) {
-      if ((rcvdShape === 'ouch'))                                { return { central, policy: 'skip' } }
       if ((rcvdShape === 'gone') && (centralShape === 'ouch'))   { return { central: rcvd, policy: 'gone' } }
       if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
       if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }

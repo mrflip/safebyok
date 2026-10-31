@@ -317,6 +317,7 @@ const expectReceiveConflict = (box: SpiedBox, rcvd: Rec | null): void => {
 
 const ShapesAll: readonly RecordShape[] = ['full', 'sparse', 'gone', 'ouch']
 const ShapesAlive: readonly RecordShape[] = ['full', 'sparse']
+const ShapesUndamaged: readonly RecordShape[] = ['full', 'sparse', 'gone']
 
 describe("cmpRevisions(ante, post)", () => {
   const ante = { revision_seq: 2, revision_tok: 'rev-c2' }
@@ -529,7 +530,9 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       it(`other | older | ${rcvdShape} | full takes the older rows: a past life, its revisions ordered with this one's`, () => {
         expectReceivedUnchanged(boxOf(Centrals.full()), rcvdOf(rcvdShape, { ...OlderRev, ...OtherLife }), rcvdShape === 'ouch' ? 'skip' : 'older')
       })
+    }
 
+    for (const rcvdShape of ShapesUndamaged) {
       it(`other | same | ${rcvdShape} | full refuses 'record_conflict': one revision cannot begin a life and continue another`, () => {
         const box = boxOf(Centrals.full(), Staged())
         const before = stateOf(box)
@@ -539,6 +542,10 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
         expect(stateOf(box)).to.deep.equal(before)
       })
     }
+
+    it("other | same | ouch | full takes 'skip': damage is weighed before life, as a damaged record's box_tok is no more to be trusted than the rest of it", () => {
+      expectReceivedUnchanged(boxOf(Centrals.full(), Staged()), rcvdOf('ouch', { ...SameRev, ...OtherLife }), 'skip')
+    })
 
     for (const centralShape of ShapesAll) {
       it(`other | newer | full | ${centralShape} takes 'adopt', a birthday: central, box_tok and registered_at become the delivered record's`, () => {
