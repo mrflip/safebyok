@@ -9,19 +9,26 @@
  * only jumps the clock, firing none. Never move the clock any other way, and call `mw.dispose()`
  * in `afterEach`, as vitest's `restoreMocks` does not put real timers back: {@link useModelsWorld}
  * makes a new world before each test and disposes it after.
+ *
+ * The seal. The fake vault's `demandLease` refuses 'vault_locked' while it reads locked, and
+ * otherwise answers a fake lease, which keeps each whisper's bytes by the stamp it was sealed under
+ * and gives them back for that stamp alone: its sealed parts are the constants
+ * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
+ * builders make, opens to a 'damaged_box', as under the real lease.
  */
 
 import { afterEach, beforeEach, vi } from 'vitest'
 import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { type BoxPatch, Box } from '../../src/models/box'
-import { BoxListing, type BoxCache, type BoxDna, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
+import { BoxListing, type BoxCache, type BoxDna, type BoxLease, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import * as Refusals from '../../src/refusals'
 import * as CX from '../../src/shapes/scopes'
 import type { Boxscope } from '../../src/shapes/scopes'
+import { stableJsonify } from '../../src/stable-jsonify'
 import { fakeCiphered } from './builders'
 
 // == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord
@@ -96,7 +103,11 @@ export type BoxAnswer = Awaited<ReturnType<BoxStore['get']>>
 export type ModelsWatch = { onNotice: (notice: Notice<BoxRecord, BoxSparse>) => Promise<void>, fullFor: () => readonly Boxscope[], active: boolean }
 // --
 
-// == [The world]: ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
+// == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
+
+/** The sealed parts of every record the fake lease seals: constants that wrap no key and open under none. */
+export const FakeBoxKeyWrapped   = fakeCiphered('fake-box-key-wrapped')
+export const FakeWhisperCiphered = fakeCiphered('fake-whisper-ciphered')
 
 /** How {@link makeModelsWorld} starts the world. */
 export type ModelsWorldOpts = {
@@ -243,11 +254,30 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     return held.revision_tok === priorRevisionTok ? null : refusalOf(scope, Refusals.staleBox(held))
   }
 
+  // The fake lease: the bytes sealed, by the stamp they were sealed under.
+  const sealedBytes = new Map<string, Uint8Array>()
+  const lease: BoxLease = {
+    sealWith: (serializedWhisper, _boxKeyStamp, whisperStamp) => {
+      sealedBytes.set(String(stableJsonify(whisperStamp)), new Uint8Array(serializedWhisper))
+      serializedWhisper.fill(0)
+      return Promise.resolve({ box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered })
+    },
+    unsealWith: (_sealed, _boxKeyStamp, whisperStamp) => {
+      const bytes = sealedBytes.get(String(stableJsonify(whisperStamp)))
+      if (bytes === undefined) { return Promise.reject(new VaultError('damaged_box', Phrases.UnopenedWhisper)) }
+      return Promise.resolve(new Uint8Array(bytes))
+    },
+  }
+
   const world: BoxWorld = {
     clock:        { now: clockNow },
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
+    demandLease:  () => {
+      if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.UnlockFirst) }
+      return lease
+    },
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
     ensureTimely: async (timelyOpts) => {
       calls.push({ verb: 'ensureTimely', opts: timelyOpts })

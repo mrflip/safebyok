@@ -482,9 +482,9 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
   onBadNews:             fn().optional(),
 }), 'bad_option')
 
-/** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`. Its `parse` refuses 'bad_option'. Checks only. */
-export const boxListingOpts = objCheck(({ obj, applabel, user_id, vaultlabel, vault_tok }) => ({
-  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok }),
+/** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers `demandLease`. Its `parse` refuses 'bad_option'. Checks only. */
+export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
+  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, demandLease: fn() }),
 }), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
 // --
 

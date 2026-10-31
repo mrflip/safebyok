@@ -4,10 +4,9 @@ import { VaultError } from '../../src/errors'
 import type { BoxRecord, BoxSparse, CentralPolicy, Fetched, RecordShape, Reconciled } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import { cmpRevisions, Storable } from '../../src/models/storable'
-import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
-import { type BoxAnswer, TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, lastSaveOf, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { FakeBoxKeyWrapped, FakeWhisperCiphered, type BoxAnswer, TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, lastSaveOf, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 import { microtasks } from '../test-helpers/timing'
 
 const held = useModelsWorld()
@@ -623,12 +622,12 @@ describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () 
     const box = await listing.build(Centrals.full())
     await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'first' } })
     const first = box._cheat_staged
-    expect(first).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'first' }, revision_seq: 3, revision_tok: first?.revision_tok, written_at: T0 + 9000, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered })
+    expect(first).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'first' }, revision_seq: 3, revision_tok: first?.revision_tok, written_at: T0 + 9000, box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered })
     expect(first?.revision_tok).to.not.eq('rev-c2')
     held.mw.setNow(T0 + 9500)
     await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'second' } })
     const second = box._cheat_staged
-    expect(second).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'second' }, revision_seq: 3, revision_tok: second?.revision_tok, written_at: T0 + 9500, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered })
+    expect(second).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'second' }, revision_seq: 3, revision_tok: second?.revision_tok, written_at: T0 + 9500, box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered })
     expect(second?.revision_tok).to.eq(first?.revision_tok)
     expect(box._cheat_central).to.deep.equal(Centrals.full())
   })
