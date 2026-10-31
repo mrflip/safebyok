@@ -3,7 +3,8 @@ import { VaultError } from '../errors'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
-import { type BoxRecord, type BoxSparse, type EditOpts, type LockedBag, type WhisperHolder, LOCKED, boxPatch, whisperHolder } from './models-shapes'
+import { type BoxRecord, type BoxSparse, type EditOpts, type LockedBag, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import * as MSX from './models-shapes'
 import { Storable } from './storable'
 import { stubSeal } from './stub-seal'
 
@@ -125,7 +126,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
    * and `makeStaged` takes none of them. A scope field that names another box refuses, naming it.
    */
   protected isFullPatch(patch: unknown): asserts patch is BoxPatch {
-    verifyConsistent(boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
   /** The patch's whisper, sealed by {@link stubSeal} with the patch's sidecar under `base`'s props: `base`, sparse or full, lends its scope, revision, times and whisper's form, and none of its sidecar or sealed parts. */

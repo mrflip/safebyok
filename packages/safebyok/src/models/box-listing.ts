@@ -6,7 +6,8 @@ import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box } from './box'
 import { Listing, hasRevision } from './listing'
-import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Tell, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxListingOpts, boxSparse } from './models-shapes'
+import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Tell, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import * as MSX from './models-shapes'
 import { stubSeal } from './stub-seal'
 
 // == [Given to a box listing]: BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
@@ -34,7 +35,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check; each refuses 'bad_option'. */
   constructor(opts: BoxListingOpts) {
-    boxListingOpts.parse(opts)
+    MSX.boxListingOpts.parse(opts)
     super(opts)
     Object.freeze(this)
   }

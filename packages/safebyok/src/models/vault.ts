@@ -3,7 +3,8 @@ import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
-import { type LockState, type TimelyOpts, type VaultRecord, type VaultSparse, vaultPatch } from './models-shapes'
+import type { LockState, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import * as MSX from './models-shapes'
 import { Storable } from './storable'
 
 // == [Record forms]: VaultSnapshot, VaultProps, VaultPatch
@@ -86,7 +87,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   /** Returns for a full patch of this vault, and refuses any other 'bad_option', naming the field; `edit`, so `send`, calls it first of all, before any guard. Until the gate exists, every patch held to `vaultPatch` is full: `{}`, or the props of the vault's record, each checked and ignored. A scope field that names another vault refuses, naming it. */
   protected isFullPatch(patch: unknown): asserts patch is VaultPatch {
-    verifyConsistent(vaultPatch.parse(patch), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    verifyConsistent(MSX.vaultPatch.parse(patch), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
   /** The record in hand under its next revision is the whole staged record. Not yet: the gate a patch would change. */
