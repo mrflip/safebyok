@@ -5,7 +5,8 @@ import { VaultError } from '../errors'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
-import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, buildGateArgs, vaultListingOpts, vaultRecord, vaultSparse } from './models-shapes'
+import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
@@ -38,14 +39,14 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   constructor(opts: VaultListingOpts) {
     super(opts)
-    vaultListingOpts.parse(opts)
+    MSX.vaultListingOpts.parse(opts)
     Object.freeze(this)
   }
 
   /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one. A dna takes the `proofClosure` its gate is built from: the vault is born of the dna's draft, without a gate, then `vault.buildGate(proofClosure)` gives it one; where that is refused, the vault stays held without a gate, and `buildGate` may be called again. */
   override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
     if (hasRevision(input)) { return super.build(input) }
-    const checked = buildGateArgs.parse({ proofClosure })
+    const checked = MSX.buildGateArgs.parse({ proofClosure })
     const vault = await super.build(input)
     return vault.buildGate(checked.proofClosure)
   }
