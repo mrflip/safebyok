@@ -59,6 +59,7 @@ describe("the staged edit reconcileStaged drops or carries", () => {
 
 describe("registered_at over a rebirth", () => {
   it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's edit, not its first store, nor the put that stores it", async () => {
+    held.mw.seedStore(fullBoxRecord())
     const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
     await box.del()
     held.mw.setNow(T0 + 5000)
@@ -69,6 +70,7 @@ describe("registered_at over a rebirth", () => {
   })
 
   it("README.md:1282 (a record that will not decipher is written over with sidecar {} and its first-stored time now): a damaged box reborn is registered now, its sidecar {} unless given", async () => {
+    held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
     held.mw.setNow(T0 + 5000)
     await box.send({ whisper: 'sk-test-0000' })

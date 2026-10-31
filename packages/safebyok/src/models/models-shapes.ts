@@ -387,16 +387,20 @@ export type ListingWorld = World & {
   takeWorld(world: unknown): void
 }
 
-/** The vaultDB's verbs for one kind of thing, as a listing calls them: `expected` is the revision storage should hold, null for none.
- * Every `put` is the versioned replace (compare-and-swap). With `expected` given, it lands only over the record at that revision, its `revision_tok` and `revision_seq` both.
- * With `expected` null, it lands only where storage holds no record; a stored tombstone is a record. Otherwise storage refuses 'stale_write', carrying the record it holds.
+/** The vaultDB's verbs for one kind of thing, as a listing calls them. `priorTok` is the `revision_tok` of the record this device holds, null where it holds none; no prior `revision_seq` is sent.
+ * Every `put` is the versioned replace (compare-and-swap), judged by storage in this order:
+ * - `priorTok` null with a `revision_seq` other than 0, or a `priorTok` with a `revision_seq` below 1, refuses 'bad_record': no device of this package puts it.
+ * - Over no row, `priorTok` null lands; a `priorTok` given refuses 'stale_write', carrying nothing.
+ * - Over a row under another `revision_tok` than `priorTok` (any row, where `priorTok` is null; a tombstone is a row), it refuses 'stale_write', carrying that row.
+ * - Over the row under `priorTok`, it lands only at that row's `revision_seq` + 1, which storage computes or queries itself; any other `revision_seq` refuses 'bad_record'.
  * A put that lands keeps the record exactly as given, never renumbered or patched, and answers what storage then holds.
+ * `del` follows the same `priorTok` rule and answers the tombstone it lands, at the row's `revision_seq` + 1 under a fresh `revision_tok`; over no row, with `priorTok` null, it lands a tombstone at revision 0.
  * `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most.
  */
 export type Store<ScopeT, RecordT, SparseT> = {
   get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
-  put(record: RecordT, expected: Revision | null): Promise<Answer<ScopeT, RecordT, SparseT>>
-  del(scope: ScopeT, expected: Revision | null): Promise<Answer<ScopeT, RecordT, SparseT>>
+  put(record: RecordT, priorTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
+  del(scope: ScopeT, priorTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }
 
