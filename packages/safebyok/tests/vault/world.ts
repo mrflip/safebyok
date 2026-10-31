@@ -1,4 +1,4 @@
-import type { LeaseRecord, DeviceRecord } from '../../src/shapes/device'
+import type { KeptLeaseRow, LeaseRecord, DeviceRecord } from '../../src/shapes/device'
 import * as DX from '../../src/shapes/device'
 import { DeviceDB, memoryDeviceDB, type DeviceVerb } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
@@ -96,7 +96,7 @@ export const spoilableDeviceDB = () => {
   const rowsOf = (scopepath: string) => (Scopepath.isLease(scopepath) ? rows : records)
   class SpoilableDeviceDB extends DeviceDB {
     protected doGetLease(leaseScopepath: string) { return Promise.resolve(rows.get(leaseScopepath)) }
-    protected doPutLease(leaseScopepath: string, record: LeaseRecord) { rows.set(leaseScopepath, record); return Promise.resolve() }
+    protected doPutLease(leaseScopepath: string, record: KeptLeaseRow) { rows.set(leaseScopepath, record); return Promise.resolve() }
     protected doDelLease(leaseScopepath: string) { rows.delete(leaseScopepath); return Promise.resolve() }
     protected doGetDeviceRecord(deviceScopepath: string) { return Promise.resolve(records.get(deviceScopepath)) }
     protected doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) { records.set(deviceScopepath, raisedFrom(records.get(deviceScopepath))); return Promise.resolve() }

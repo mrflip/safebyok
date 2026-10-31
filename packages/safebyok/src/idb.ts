@@ -1,5 +1,5 @@
 import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
-import type { DeviceRecord, LeaseRecord } from './shapes/device'
+import type { DeviceRecord, KeptLeaseRow } from './shapes/device'
 import * as Scopepath from './scopepath'
 import { DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
@@ -78,7 +78,7 @@ class IdbDeviceDB extends DeviceDB {
     return raw
   }
 
-  protected async doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: LeaseRecord): Promise<void> {
+  protected async doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: KeptLeaseRow): Promise<void> {
     await set(leaseScopepath, record, this.#shelf())
     this.#ring()
   }
