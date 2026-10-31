@@ -29,8 +29,9 @@ export type VaultSnapshot = VaultScope & Readonly<{
 /** A host's patch for `edit` and `send`: any prop of the vault's record, each checked and all ignored, the gate included, so `{}` or `{ ...record }` will do and a patch only moves the revision. `vaultPatch` checks it. */
 export type VaultPatch = { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | undefined }
 
-/** The one patch whose gate the vault stages: made only by `Vault.#sendGate`, and never exported, so no host's patch carries a gate. `ante` is the record's gate the op proved against, the very object. */
+/** The one patch whose gate the vault stages: made only by `Vault.#sendGate`, and never exported, so no host's patch carries a gate. */
 class GateStaging {
+  /** The record's gate that `Vault.#sendGate`'s caller proved against, the very object: `makeStaged` refuses where the record in hand no longer holds it. */
   readonly ante: GateProps
   readonly gate: GateProps
   constructor(ante: GateProps, gate: GateProps) {
@@ -113,7 +114,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, sendGate, each with its try form
 
-  /** Replace the passphrase with the one `passphraseClosure` answers, once `proofClosure` proves the gate by the passphrase, and send. The passkey stays, and must be revoked separately if unwanted; the vaultKey does not change, so a lease held stays in force. */
+  /** Replace the passphrase with the one `passphraseClosure` answers, once `proofClosure` proves the gate by the passphrase, and send. The passkey stays, and must be revoked separately if unwanted; the vaultKey does not change, so a lease held stays in force. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
   async replacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<this> {
     MSX.passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
     await this.ensureReadyToEdit()
@@ -123,7 +124,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   tryReplacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase(proofClosure, passphraseClosure)) }
 
-  /** Add the passkey whose answer `passkeyClosure` hands in, once `proofClosure` proves the gate by the passphrase, and send. A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a lease held stays in force. */
+  /** Add the passkey whose answer `passkeyClosure` hands in, once `proofClosure` proves the gate by the passphrase, and send. A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a lease held stays in force. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
   async addPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<this> {
     MSX.passkeyAddArgs.parse({ proofClosure, passkeyClosure })
     await this.ensureReadyToEdit()
@@ -133,7 +134,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   tryAddPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey(proofClosure, passkeyClosure)) }
 
-  /** Revoke the passkey, once `proofClosure` proves the gate by the passphrase, and send. A vault without one refuses 'absent_wayin', asking nothing. Removal is not revocation of the vaultKey, which does not change: a lease held stays in force. */
+  /** Revoke the passkey, once `proofClosure` proves the gate by the passphrase, and send. A vault without one refuses 'absent_wayin', asking nothing. Removal is not revocation of the vaultKey, which does not change: a lease held stays in force. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
   async revokePasskey(proofClosure: AttemptClosure): Promise<this> {
     MSX.passkeyRevokeArgs.parse({ proofClosure })
     await this.ensureReadyToEdit()

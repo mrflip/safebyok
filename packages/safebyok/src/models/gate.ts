@@ -43,7 +43,7 @@ export class Gate {
     return Proving.attempt(this.stamp, this.pickle(), proofClosure, world)
   }
 
-  /** The proving of this gate's passphrase wayin that what `proofClosure` answers opens: a change to the gate is proved by the passphrase alone, so a passkey's answer that opens refuses 'bad_option', spent. */
+  /** Ask the proof through `attemptProof` and answer the proving where it is the passphrase's: a change to the gate is proved by the passphrase alone, so a passkey's answer that opens refuses 'bad_option', spent. */
   async #provePassphrase(proofClosure: AttemptClosure, world: ProvingWorld): Promise<PassphraseProving> {
     const proved = await this.attemptProof(proofClosure, world)
     if (! (proved instanceof PassphraseProving)) { throw changeNeedsPassphrase() }
