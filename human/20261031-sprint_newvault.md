@@ -11,7 +11,7 @@ sprint doc is https://claude.ai/artifact/9kdLTv64qR3Rei7Do3nj9C.
 * Thread 5 tests_models: filed, #411 at c9d12890, cut from main. Its tests change at the restack (`thread-1-restack-notes.md` on thread 1's branch, plus the describe titles the second review named).
 * Thread 2 vault_unlock: filed, #412 at c740f161, stacked on #410. Reworked after its first review and reviewed again; one significant finding left (after `goodbye`'s let-go, `lock()` cannot erase the kept lease), carried to thread 3 as its first directive and a TOP row.
 * Thread 3 box_seal: filed, #413 at 5a1dc63a, stacked on #412. Its open design question is yours: the seal binds every sparse field including the revision and times (as the old core did), and the storable's ouch carry and thread 25's normalized `registered_at` tolerance now rewrite those without a reseal; options and the recommendation (bind only what is fixed for the box's life, plus the sidecar) are the TOP row on Open Matters. The review's other significant finding, a harmless double erase in `lease.ts`, is thread 4's first directive.
-* Thread 4 gate_ops: building (opus), cut from 5a1dc63a, worktree `/workspace/byok-gate_ops`.
+* Thread 4 gate_ops: built, #414 at aa753a5c, stacked on #413; review (high) running. Its YOLO calls are rows: the passkey wayin is kept rather than resealed on a new passphrase (the vaultKey is unchanged), a passkey's answer proves a change, the ops leave lock state alone, `bad_option`/`absent_wayin` for the two refusals.
 * Thread 6 waits on 4 and 5.
 
 ## Judgment calls made in YOLO (each also on the sprint doc's Cleanup tab or in Resolved)
