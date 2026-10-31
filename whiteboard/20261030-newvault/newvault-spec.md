@@ -14,10 +14,10 @@ consistency and timeliness checks. These will come back later.
 * lock()
 * ensureUnlocked(): ensureTimely; if unlocked, return lease; otherwise, #unlock()
 * _Built (thread 2):_ `ensureUnlocked(proofClosure?)` answers the lease in force; one held past its time locks first. `#unlock()` joins an unlock by proof in flight (`#unlocking`), else takes up the kept lease where one is in force (looked for whenever no lease is held, after `#leaseChores`; `#keptLookup` joins a look in flight), else hydrates a sparse vault, `this.gate.attemptProof(proofClosure, world)`, awaits `#leaseChores`, and `#setLease(await proving.makeLease(this, this.leaseDBFriend(), { leaseMillis }))`. No closure, no unlock in flight and no kept lease refuses 'vault_locked'. `leaseMillis` is the world's, default 14 days. `demandLease()` refuses 'vault_locked'; `takeUpLease(lease)` refuses 'bad_option' a lease of another vault or Vault object, and 'vault_locked' one not in force. `#setLease` lets a displaced lease go (`lease.letGo()`: autolock disposed, keys dropped, kept record left); a declined kept lease is let go too. The listing's `hello` takes up each vault's kept lease; its `goodbye` lets every vault's lease go and leaves the kept lease for the next load, where `lock()` erases it.
-* lock(), synchronous: sets `#isLocked`, drops `#lease`, and queues `lease.forget()` (its keys dropped, its record erased from the deviceDB) on `#leaseChores`, a private promise chain whose refusals are told as bad news. `#unlock` will await the chain before granting, so an erase lands before the next put. _Built._
+* lock(), synchronous: sets `#isLocked`, drops `#lease`, and queues on `#leaseChores` (a private promise chain whose refusals are told as bad news) the held lease's `letGo()` and the vault's own erase, `leaseDBFriend().tryDelLease()`, whether or not it held a lease, so `goodbye` then `lock()` leaves no kept lease. `#unlock` awaits the chain before granting, so an erase lands before the next put. _Built (thread 2; the erase without a held lease, thread 3)._
 * #unlock(): proving = this.gate.attemptProof(); lease = proving.makeLease(); #setLease(lease). _Built (thread 2)._
 * demandUnlocked, isUnlocked: this.isTimely && (!! lease). _Built (thread 2)_ as `isUnlocked` and `demandLease()`; no timeliness check.
-* #dropLease, #setLease. _Built (thread 2)._
+* #setLease. _Built (thread 2)_; `#dropLease` folded into `lock()` (thread 3).
 * autolock         Trigger. _Built (thread 2)_, on the lease: reset at every grant.
 * passphrasePester Trigger
 

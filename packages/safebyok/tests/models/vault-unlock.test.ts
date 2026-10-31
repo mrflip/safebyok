@@ -274,6 +274,21 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     expect(again.isUnlocked).to.be.true
     expect(deviceDB.tryDelLease).not.toHaveBeenCalled()
   })
+
+  it("erases the kept lease at a lock() after goodbye, though the vault holds no lease: the next session asks for the proof", async () => {
+    const { listing, vault, storedNow, anotherSession, deviceDB } = await bornVault()
+    const record = storedNow()
+    if (record === null) { throw new Error('nothing stored') }
+    listing.goodbye()
+    vault.lock()
+    await TH.eventually(() => deviceDB.keptNow() === null)
+    expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
+    const later = anotherSession()
+    const again = await later.build(record)
+    await later.hello()
+    expect(again.isLocked).to.be.true
+    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+  })
 })
 
 describe("The real deviceDB as the vault's world's", () => {
