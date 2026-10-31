@@ -138,6 +138,20 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   prior tok only, never the prior seq; no row requires prior tok null **and** seq 0, either
   without the other inconsistent ("I hate using null as a sentinel"). `'fetch'` "only makes sense
   against an assumption it doesn't exist", hence not implemented. Thread 16.
+* *Thread 16 (#388), the versioned replace:* `Store.put(record, priorTok)` and
+  `Store.del(scope, priorTok)`; storage judges the pairing (prior tok null with seq 0, a tok with
+  seq >= 1), then no row, then a row under another tok (`stale_write` carrying it; a tombstone is a
+  row), then seq + 1 under the prior tok; the inconsistent cases refuse `bad_record` (the Coach:
+  "sound's good"). **Renamed:** `Storable.expectedRevision()` is `priorTok()`,
+  `Listing.expectedRevisionOf` is `priorTokOf`, the fake's `callsOf('put').expected` is
+  `.priorTok`. **The fake enforces the contract:** a test must seed (`seedStore`) any record it
+  puts or deletes over, and a put over a seeded record carries that record's tok at its seq + 1.
+  A `del` with null over no row lays a tombstone at revision 0. The device checks the pairing
+  only (the Coach: "leave it, storage owns the + 1 rule").
+* *The Coach (2026-10-31):* a device behind a rollback (storage older than central, or empty
+  under a live central) "is an impossible situation unless it's by deliberate user action i.e. a
+  backup": throw (thread 19). Every entrypoint validates its arguments, `edit` and `send`
+  duckish (thread 18).
 * *Orchestrator (2026-10-30), a planning lesson:* thread 9 (ten rulings, medium) compacted twice,
   once before its first justify and once after. Ten small items in one thread is one context's
   worth; threads 11-13 are one ruling each.

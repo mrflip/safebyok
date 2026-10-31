@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #387 (thread 12); thread 16 (the store's versioned replace) building on it, branch `20261031-versioned_replace`; then 17, 15, 13, then 6.
+* **Status:** filed through #388 (thread 16); thread 17 building on it; then 15, 13, 18, 19, then 6.
 
 ## Read first
 
@@ -505,6 +505,7 @@ there's ambiguity." Label `versioned_replace` (was `faithful_fake`).
 | `'fetch'` (not implemented) | lands | lands | 🤷 the flag assumes no such row | answers it, `ok: true` ❓ (if newer? 🤷) | 🤷 | refused, inconsistent |
 ```
 Worker `opus`; review `medium`. Depends on 12 (cut from its tip). Size: medium.
+*Review:* fixed (#388): `Phrases.PutUnfitForPrior` no longer blames the host, since storage also gives it to a held box put unedited at central's own revision; the `Store` doc block's bullets restyled. Left, minor: a purged row sticks the device (the twin of the lower-revision case; thread 19); "carrying nothing" is an absent `meta`, not `box_stored: null` (a Coach row); long doc-block sentences (documentarian); three stale test titles ("expects no revision…", now asserting `priorTok` null; thread 17 renames them); the pairing rule written twice, in the listing and the fake (kept, so the fake models storage on its own).
 
 ### 12. The sidecar, locked or not
 
@@ -563,6 +564,47 @@ setter). **Hands off:** cutting off access to the private value while locked (th
 have to look at it later"); the setter is documented as it is. Worker `opus`; review `high` (the
 whisper is secret material: no side door, CLAUDE.md). Depends on 15 (cut from its tip). Size: small to medium.
 
+### 18. Validators at every entrypoint
+
+*Orchestrator, the Coach (2026-10-31, in chat):* "would you have a thread put zod validators at
+each entrypoint -- edit, send, seal, etc if they aren't already? In the case of edit and send
+these should duckish-out (do you have that term in your vocab?) all the fields that are under our
+control." Label `entry_checks`.
+1. **Survey.** Every public method of the models' `Box`, `BoxListing`, `Storable` and `Listing`
+   (`build`, `edit`, `send`, `seal`, `del`, `fetch`, `hydrate`, `hello`, the whisper and sidecar
+   setters, and the rest): which already parse their arguments (`boxDna`, `MSX.sendOpts`,
+   `MSX.fetchOpts`, …) and which take them unchecked. List it in the thread file.
+2. **Checks.** Each unchecked entry validates its arguments through a check made in a `Checkers`
+   call in `models-shapes.ts` (CLAUDE.md: never plain Zod for a module's validator), refusing
+   `bad_option` and naming the field, as `boxDna` does. A private helper past a checked entry
+   trusts it.
+3. **Duckish for `edit` and `send`** (VOCABULARY.md, *duckish*): the caller gives the fields it
+   owns (whisper, sidecar, and what else thread 15 requires); it may give or omit the fields the
+   factory controls (scope, `vault_tok`, `revision_tok`, `revision_seq`, `am`, the times, the
+   sealed fields), which must pass validation when given and are stripped. A scope field given
+   that names another box refuses `bad_option`. Thread 15's whisper-and-sidecar rule becomes part
+   of these checks where it fits; say so in the thread file.
+4. Tests: one per entry for a bad argument, and for `edit` and `send` a round-trip of
+   `{ ...box.snapshot-or-record, whisper, sidecar }` with factory fields given and stripped.
+Worker `opus`; review `medium`. Depends on 13 (cut from its tip: 15 and 13 reshape the same
+entries). Size: medium.
+
+### 19. A rollback, thrown
+
+*Orchestrator, the Coach (2026-10-31), on #388's stuck-device row:* "There's nothing we can do
+except throw errors (and eventually, to give customers a way to hook into reconcile.) It's an
+impossible situation unless it's by deliberate user action i.e. a backup. I think this is a
+rollback_error -- lmk if I'm confused". Label `rollback_thrown`.
+When storage answers a put or a del with `stale_write` carrying a row older than central
+(`cmpRevisions`), or carrying nothing while central is held alive (the #388 review's purged row),
+the listing throws the rollback kind to the put/del caller, and a background launch tells
+`onBadNews`. Nothing is adopted and central is kept. The kind is the Coach row on its name
+(*rollback_error* does not exist; the row's Rec: a new bad-news kind `box_behind`, beside
+`vault_behind`); if that row is still open at the cut, use its Rec and say so. Survey the other
+paths where an older or absent answer meets a live central (a fetch's `get`, a notice) and what
+each does today; change none of them, list them in the thread file for the Coach. Worker `opus`;
+review `medium`. Depends on 18 (cut from its tip). Size: small to medium.
+
 ### 6. What this model guarantees
 
 > **6. What this model guarantees.** No code. Read `notes/guarantees.md` *The guarantees* and the README sections in *Read first*, then `tests/loosened/loosened.test.ts` and threads 2 through 5 and 8's thread files, and write `whiteboard/20261028-storable_base/guarantees-of-the-model.md`: a table, one row per guarantee or promise, columns `Guarantee | Old source | Model | Evidence`, where *Model* is `kept`, `changed`, `not yet` or `dropped` and *Evidence* names a test by file and title or a line of code. Every describe of the loosened file appears as `changed` or `dropped` with the Coach's decision left blank; every firm loosening appears as `changed` with the Coach's word as its evidence. Nothing about the seal beyond noting the rows that wait on it. Depends on 2, 3, 4, 5, 8. Size: small, `opus`.
@@ -571,12 +613,12 @@ whisper is secret material: no side door, CLAUDE.md). Depends on 15 (cut from it
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
