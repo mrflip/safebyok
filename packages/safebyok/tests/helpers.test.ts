@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adorn, decorate, nextMicrotask } from '../src/helpers'
+import { adorn, decorate, nextMicrotask, tattoo, tattooProp } from '../src/helpers'
 
 type Handle = { label: string, vault?: { vault_tok: string } }
 
@@ -90,5 +90,48 @@ describe("nextMicrotask", () => {
     setTimeout(() => { heard.push('task') }, 0)
     await nextMicrotask()
     expect(heard).to.deep.equal([])
+  })
+})
+
+describe("tattoo", () => {
+  it("attaches each entry as an enumerable own prop, found by keys, a spread and JSON, and hands the entries back", () => {
+    const handle = { label: 'anthropic' }
+    const shown = { vault_tok: 'v1', revision_seq: 3 }
+    expect(tattoo(handle, shown)).to.equal(shown)
+    expect(Object.keys(handle)).to.deep.equal(['label', 'vault_tok', 'revision_seq'])
+    expect({ ...handle }).to.deep.equal({ label: 'anthropic', vault_tok: 'v1', revision_seq: 3 })
+    expect(JSON.stringify(handle)).to.eq('{"label":"anthropic","vault_tok":"v1","revision_seq":3}')
+  })
+
+  it("leaves what it attached writable and configurable unless told otherwise", () => {
+    const handle = {}
+    tattoo(handle, { vault_tok: 'v1' })
+    expect(Object.getOwnPropertyDescriptor(handle, 'vault_tok')).to.include({ enumerable: true, writable: true, configurable: true })
+  })
+
+  it("fixes for good what it attaches with writable and configurable false, as its example shows", () => {
+    const handle = {}
+    tattoo(handle, { vault_tok: 'v1' }, { writable: false, configurable: false })
+    expect(Reflect.set(handle, 'vault_tok', 'v2')).to.be.false
+    expect(Reflect.deleteProperty(handle, 'vault_tok')).to.be.false
+    expect(handle).to.deep.equal({ vault_tok: 'v1' })
+  })
+
+  it("leaves a prop not configurable but writable assignable, never removable", () => {
+    const handle = {}
+    tattoo(handle, { revision_seq: 1 }, { configurable: false })
+    expect(Reflect.set(handle, 'revision_seq', 2)).to.be.true
+    expect(Reflect.deleteProperty(handle, 'revision_seq')).to.be.false
+    expect(handle).to.deep.equal({ revision_seq: 2 })
+  })
+})
+
+describe("tattooProp", () => {
+  it("attaches one value as an enumerable own prop and hands it back, as its example shows", () => {
+    const handle = { label: 'anthropic' }
+    expect(tattooProp(handle, 'vault_tok', 'v1', { writable: false })).to.eq('v1')
+    expect(Object.keys(handle)).to.deep.equal(['label', 'vault_tok'])
+    expect(Reflect.set(handle, 'vault_tok', 'v2')).to.be.false
+    expect(Object.getOwnPropertyDescriptor(handle, 'vault_tok')).to.include({ value: 'v1', enumerable: true, configurable: true })
   })
 })

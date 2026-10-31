@@ -15,8 +15,8 @@
     The important part, however, is: each operation just calls a function to establish its success (`ensureTimelyStorability` or whatever) and then a guard to check for drift (`demandStorability`).
 * The Listing model, not vault, intermediates between the storable and the VaultDB, handling
   generic errors; syndicating the updated world states that arrives with each response;
-  owns bad news and refusal handling; and owns caching records
-* The cache (backed by DeviceDB) is consulted once, to preload the listing, and never again. (The vault's use of DeviceDB to store the lease won't change)
+  owns bad news and refusal handling; and ~~owns caching records~~ loads the cache, which each storable saves itself to
+* The cache (backed by DeviceDB) is consulted once, to preload the listing, and never again. Each storable saves its own copy to it at every settle. (The vault's use of DeviceDB to store the lease won't change)
 * Listings own subscriptions and syndication. Vaults have a listing.
 * The storable public-facing interface uses some new verbs (send, edit, fetch) so they aren't too tightly married to their VaultDB counterparts
 * VaultDB subscription notifications will include a record:
@@ -65,7 +65,7 @@ spec that conflicts with the first. `box`-only terms say so.
 * `combined`, the record in hand: the staged where one is begun, else central; what the snapshot shows and what `send` writes.
   - ~~`record` as the accessor for this~~
 * `snapshot`: frozen plain data a host renders, the same object until something changes; never a whisper.
-* `cacheable`: getter, `{ ...sparse, central, staged }` as they are, frozen: what the listing writes to the device cache after a `receive`, and what `hello` revives an instance from.
+* `cacheable`: ~~getter,~~ `{ ...sparse, central, staged }` as they are, frozen: what ~~the listing writes to the device cache after a `receive`~~ the storable's `settle` saves to the device cache, never awaited, and what `hello` revives an instance from. Made inside `settle` alone; not readable on the instance.
   - ~~`combined` frozen. May be sparse, full, or tombstone.~~
   - ~~what `receive` hands the listing~~ (`receive` and `settle` hand back `{ badnews }` only)
   - ~~`cached`: the copy read from the deviceDB at warmup~~ (after warmup the cache is only written; the copy read is just the record a cold instance is born with)
@@ -102,22 +102,22 @@ spec that conflicts with the first. `box`-only terms say so.
 ### Verbs on a storable
 
 * `hydrate(opts)`: make the world and then the record in hand timely, fetching each that is not. Calls made during a fetch join it.
-* `edit(patch, opts)`: reconcile patch, staged, and central; adopt the values; settle the consequences (eg handling the lease and wayins). Does not modify Central. `staged` is now in place -- even if nothing changed, even if the patch is empty. ~~Stores nothing.~~ Does not update the VaultDB, and currently, does not cache. ~~Needs the vault unlocked, whatever the patch holds.~~ _that is Not true for a vault, and it's Not clear if it's true for sidecar._
+* `edit(patch, opts)`: reconcile patch, staged, and central; adopt the values; settle the consequences (eg handling the lease and wayins). Does not modify Central. `staged` is now in place -- even if nothing changed, even if the patch is empty. ~~Stores nothing.~~ Does not update the VaultDB~~, and currently, does not cache~~; its settle saves the copy to the device cache. ~~Needs the vault unlocked, whatever the patch holds.~~ _that is Not true for a vault, and it's Not clear if it's true for sidecar._
   - ~~`modify`~~
 * `send(patch, opts)`: `edit` to apply the patch, `put`s the reconciled settled
   record bearing the correct next revision. Returns the stored result
   (as `this`, by contract -- it does so by waiting until the answer
   is committed, `receive`d, adopted and settled).
 * `del(opts)`: immediately delete the thing using a timely revision. Optimistically applies the tombstone as staged, and once committed, returns the stored value (as `this`, by contract -- same process as for `send`)
-* `receive(fetched)`: update to match a new observation of the external value. Reconciles, adopts, settles; and then hands back its `cacheable` and any `badnews`.
+* `receive(fetched)`: update to match a new observation of the external value. Reconciles, adopts, settles; and then hands back ~~its `cacheable` and~~ any `badnews`.
 * `reconcile(rcvd)`: produce an update strategy using the record's own state, `central`, `staged`, and the `rcvd` props (from edit or recieve). Throws if defects are found (as determined by subclass and presumably someday by a customer hook).
 * `adopt(???)`: set own props, private vars, etc for a reconciled newly receive/edit'ed record (and maybe from constructor as well). Unclear about how to handle the edit/receive/constructor split; I was considering `assign`. Never modifies or reconsiders the props, or takes further action
   - ~~(there are no such fields: the snapshot reads the record)~~ yes there are: gate, gate_epoch
 * `settle()`: idempotently act on the updated state. Must call super().
-  - parent class makes a snapshot
+  - parent class makes a snapshot, and saves the copy (`cacheable`) to the device cache: the listing's, handed to the storable at construction as the world, listing and `tell` are. Not awaited: a save refused is bad news (`tell`), never thrown into the verb that settled. A thing never stored with nothing staged (between its birth and the record it was born to receive) saves nothing.
   - ~~now central beyond its fields, and return the bad news found in it~~.
   - A vault settles its lease and ways in here
-  - Called after every `receive`, `edit` and once by `build`
+  - Called after every `receive` that adopts, `edit`, `del`, and once by the constructor (a revive from the cache included, which saves back what it loaded)
 * `makeStaged(base, patch, opts)` (concrete): the one step of `edit` the concrete class writes: `base` is the record in hand, sparse or full, under its next revision; lay the patch over it and seal what needs sealing; hand back the whole record.
   - ~~`stagedOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.~~
   - ~~`stagedPropsAndSealBeforeSettling`~~
@@ -145,16 +145,16 @@ spec that conflicts with the first. `box`-only terms say so.
 ### StorableListing
 
 A `listing` tracks all known live instances of one Storable type, by scope.
-It owns the VaultDB subscriptions, the cache writes, the bad news, and every VaultDB call made for that storable type.
+It owns the VaultDB subscriptions, the cache's load (~~the cache writes~~: each storable saves itself), the bad news, and every VaultDB call made for that storable type.
 `Bank` uses a `VaultListing` of `Vault`s, `Vault` uses a `BoxListing` of `Box`es.
 
   - where does it put its tombstones? what does it do when a new record appears with that scope?
 * `hello`: warm from the cache, start the watch, hydrate everything. _probably_
   - ~~`goodbye`: end the watch.~~ probably, not yet
-* `build(record|sparse)`: constructs instance, settles its props. Sends nothing to VaultDB. Currently is not cached.
+* `build(record|sparse)`: constructs instance, settles its props. Sends nothing to VaultDB. ~~Currently is not cached.~~ The instance saves itself to the device cache as it settles.
   - ~~`make(dna | fetched)` is sync and typically a class method, we're not offering that~~
 * `at(scope)`: the instance held, or null; reads nothing. `fetch(scope, opts)`: the instance, hydrated, or what `ifAbsent` says for one not held or found gone.
-* `deliver`: the pipeline for a VaultDB response: update world, hand the record to `receive`, evict gone things, cache, tell bad news, settle self.
+* `deliver`: the pipeline for a VaultDB response: update world, hand the record to `receive`, evict gone things, ~~cache,~~ tell bad news, settle self.
 * `evict`: a vault taken away, with every box in it; the bank lets it go.
   - ~~`let_go`: the listing drops an instance gone.~~ I prefer the bluntness of evict/evicted.
 * `settle` -- handle consequences of new data (eg updating snapshot)
@@ -288,7 +288,7 @@ It honors this contract:
 3. Every defined value in the payload should be written to the store. Currently, every value in the payload must be defined. ~~no missing or undefined fields should be written into the store _this may tighten_~~
 4. The revision_seq is one greater than that of `central`
 5. The revision_tok is new and fabricated using the secure `randomBytes` helper
-6. staged is not sent to VaultDB until `send` is called. Currently its value is not cached.
+6. staged is not sent to VaultDB until `send` is called. ~~Currently its value is not cached.~~ It is in the copy each settle saves to the device cache.
 
 If a newer or fuller version is received, we may choose to update the staged, re-establishing it as ready to send. Storable may choose not to (or may not be able to), deferring that to be done by `send`.
 

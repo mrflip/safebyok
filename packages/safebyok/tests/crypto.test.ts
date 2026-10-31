@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeLeaseKey, makeBoxKey, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder, type CipherCtxRecord } from '../src/crypto'
+import { cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeLeaseKey, makeBoxKey, makeLifeTok, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder, type CipherCtxRecord } from '../src/crypto'
 import * as TH from './test-helpers'
+import { vault_tok } from '../src/shapes/fields'
 
 const utf8 = (text: string) => new TextEncoder().encode(text)
 
@@ -28,6 +29,12 @@ describe("random material", () => {
 
   it("randomId mints distinct ids", () => {
     expect(randomId()).to.not.eq(randomId())
+  })
+
+  it("makeLifeTok mints distinct life toks, each a token vault_tok accepts", () => {
+    const tok = makeLifeTok()
+    expect(vault_tok.parse(tok)).to.eq(tok)
+    expect(tok).to.not.eq(makeLifeTok())
   })
 })
 

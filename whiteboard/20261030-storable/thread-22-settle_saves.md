@@ -1,0 +1,30 @@
+# Thread 22: `settle` saves to the cache itself (2026-10-31)
+
+Branch `20261031-settle_saves`, PR #404, stacked on #403. Justify: green (safebyok 72 files, 4422 passed, 37 skipped; every package green, no size budget moved). Changeset empty.
+
+* **Built**, under `packages/safebyok/`:
+  * `src/models/storable.ts`: the constructor takes `cache` after `listing`: `(world, listing, cache, central, staged, opts, tell)`, checked by `storableArgs` (`cache: obj({ load: fn(), save: fn() })`). The storable holds `#cache` and `#tell`. `settle()` replaces the snapshot, then `#saveCopy()`: the frozen copy `{ ...sparseOf(central), central, staged }` goes to `cache.save`, through `outcomeOf`, not awaited; a refusal (a rejection, or a save that throws outright) goes to `#tell` once. The comment above `adopt` now gives the new reason: settle is what the snapshot and the device cache are made from.
+  * `src/models/listing.ts`: `[KeepCopy]`, `#copies` and the listing's `settle(scope)` are gone. Where it settled, it calls `#remakeSnapshot()` (after a delivery or build; once at the end of `hello`'s revives, as before). `makeThing(central, staged, cache, tell)`: the base hands each instance `#cache` as it hands `#tell`. `#buildOrReceive` is synchronous now (nothing left to await; lint's `require-await`).
+  * `src/models/models-shapes.ts`: `KeepCopy` removed; doc blocks of `Cache`, `Cacheable`, `cacheable`, `Settled` say the storable saves.
+  * `box-listing.ts`, `vault-listing.ts`, the test world's `TestableBoxListing` and `fakeSealBoxListingOf`: `makeThing` passes `cache`. `vault.ts`: `takeWorld`'s doc no longer says "nothing is cached" (a vault's receive now saves it, as any receive does).
+  * The spec (`whiteboard/20261028-storable_base/storable-spec.md`): the storable saves itself at every settle; the listing only loads. Retired text struck through, in the spec's own style.
+* **Decisions taken**:
+  * **A revive saves back what it just loaded.** Not skipped: the storable cannot tell a revive from any other birth without a flag passed for the purpose, and the Coach accepts saving at every settle. `hello` now logs `load, save x N, watch, ...`.
+  * **A thing never stored with nothing staged saves nothing.** A box born of a record is first constructed over a never-stored tombstone with nothing staged, then `receive`s the record; without this rule every such birth saved a junk copy (central at `NeverStoredSeq`) just before the real one. The rule is about content, not about the constructor: that state arises only in that moment (an edit always stages; a `del` stages a tombstone; any adopt from storage moves central off `NeverStoredSeq`). A draft (staged at revision 0) and a revive save as usual.
+  * **`settle` saves even when nothing cached changed**, e.g. `box.whisper = ...` and `expose` call settle for the snapshot's `exposed` flag and so save an unchanged copy. Accepted per "every settle"; see *For the Coach*.
+  * **Cache handed positionally, after `listing`**, grouping the environment (world, listing, cache) before the records; `tell` stays last.
+  * **`#saveCopy`** names the private helper for what it does (no coined verb).
+* **Deviations**: none from the handoff, beyond the never-stored skip above (declared).
+* **Tests restated to their new truth** (subjects kept):
+  * listing.test.ts *hello*: "saves nothing back for a copy revived" -> "saves each copy revived back as its box settles at birth, before the watch starts, and nothing for hydrate's fetches".
+  * listing.test.ts *a settle that saves to the cache*: "saves a delivery that changes nothing too" -> "saves nothing for a delivery that changes nothing" (one save, not two); "saves, for a delivery judged same, ..." -> "saves at an edit ..., and nothing at a delivery judged same after it"; "makes the snapshot of a box born of a record after the save, held from the moment it accepts the record" -> "saves a box born of a record as it receives the record, before the listing holds it" (`at(scope)` is null at the save); the first test renamed to "made by the instance at each settle that adopts".
+  * listing.test.ts, the KeepCopy describe at the end -> "storable.settle: each instance saves its own copy to the cache, and the listing keeps none": an edit saves; build then edit saves twice, the cache holding the edit's; a revive saves back its copy; a listing has no `keepCopy` and no symbol-keyed member but `IsListing`; a box still has no way to the copy.
+  * box-listing.test.ts: a fetch of nothing stored over a box held gone saves nothing (was one save).
+  * storable.test.ts *cacheable*: the edit's copy is read straight after the edit (the fetch that only triggered a save is gone); "is what the listing saves" -> "is what the box saves".
+  * models-shapes.test.ts *storableArgs*: a cache in the args; refuses a missing cache and one with no `save`.
+  * New, at storable.test.ts's end: no save for a box born of a record until it receives it; a rejected save at an edit told once, the edit resolving; a save that throws outright told the same, the constructor completing; an exposed whisper and an edit's whisper never in any saved copy.
+* **Discoveries**:
+  * Saves are now unordered in completion (fire-and-forget): two quick settles call `save` in order, but a host's cache may land them out of order. The fake cache keeps them in call order. A host cache that is async and reorders could keep an older copy; harmless (the cache is a cache, and `hello` hydrates), but worth a line in a host-facing doc when the cache adapter is written.
+  * The refusal of a save reaches `onBadNews` a few microtasks after the verb resolves; tests wait with `microtasks(10)` (`tests/test-helpers/timing.ts`, imported directly: it is not on the `TH` door).
+* **For the Coach**:
+  * **Dedupe unchanged saves?** `box.whisper = ...` and `expose` now save a copy identical to the last. A one-line skip (the same central and staged objects as the last save) would remove that; I left it out, as "every settle" was the ruling and the cost is one cache put.

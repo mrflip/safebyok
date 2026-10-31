@@ -1,4 +1,4 @@
-/** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, yielding to queued microtasks, and reading a stored row's field before the row is checked.
+/** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, or what each of them finds, yielding to queued microtasks, and reading a stored row's field before the row is checked.
  * Not the `safebyok/utils` entry point (`utils.ts`), which is for the app around a vault.
  */
 
@@ -25,6 +25,32 @@ export const decorate = <OT extends object>(obj: OT, hidden: Partial<OT>): OT =>
   return obj
 }
 
+/** The options of {@link tattoo} and {@link tattooProp}: whether what they attach may be assigned anew (`writable`) or removed and redefined (`configurable`); each true unless given false. */
+export type TattooOpts = { writable?: boolean, configurable?: boolean }
+
+/** `shown`, once each of its own entries is attached to `obj` as an enumerable own property, which `Object.keys`, a spread and `JSON.stringify` find, as {@link adorn} attaches a hidden one.
+ * Pass `{ writable: false, configurable: false }` for a prop that never changes. A property
+ * not configurable is still writable unless `writable` is false too: its value may change, it
+ * may not be removed or redefined. Call it in a model's constructor, before it seals itself.
+ *
+ * @example tattoo(this, { ...this.scope, vault_tok }, { writable: false, configurable: false })   // the scope and vault_tok, fixed for good
+ */
+export function tattoo<BT extends object>(obj: object, shown: BT, opts: TattooOpts = {}): BT {
+  for (const [ckey, val] of Object.entries(shown)) {
+    tattooProp(obj, ckey, val, opts)
+  }
+  return shown
+}
+
+/** `val`, once attached to `obj` as the enumerable own property `propname`: {@link tattoo} for one prop.
+ *
+ * @example tattooProp(this, 'vault_tok', vault_tok, { writable: false })   // => vault_tok; Object.keys(this) includes it
+ */
+export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: TattooOpts = {}): VT {
+  Object.defineProperty(obj, propname, { value: val, enumerable: true, writable: opts.writable ?? true, configurable: opts.configurable ?? true })
+  return val
+}
+
 /** Yield to the end of the current microtask queue: what was queued before the call runs before it resolves.
  * Await it to batch requests made in the same task.
  *
@@ -32,7 +58,7 @@ export const decorate = <OT extends object>(obj: OT, hidden: Partial<OT>): OT =>
  */
 export function nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }
 
-/** The field `fieldname` of `row`, a stored row as it stands, unchecked: undefined when the row is no object or has none.
+/** The field `fieldname` of `row`, a stored row as fetched, unchecked: undefined when the row is no object or has none.
  * For the few reads made before, or instead of, a row's check: its `format`, or the tokens a
  * key-value adapter compares inside its one atomic step.
  *

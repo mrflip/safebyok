@@ -1,7 +1,7 @@
 /** A stub of the box's seal, until the vault's seal lands: it fills a box record's sealed parts with placeholders. */
 
-import type { Sidecar, Whisper } from '../shapes/box'
-import { type BoxRecord, type BoxSparse, boxRecord } from './models-shapes'
+import type { Sidecar } from '../shapes/box'
+import { type BoxRecord, type BoxSparse, type WhisperHolder, boxRecord } from './models-shapes'
 
 // == [The stub seal]: StubBoxKeyWrapped, StubWhisperCiphered, stubSeal
 
@@ -13,15 +13,16 @@ export const StubWhisperCiphered = Object.freeze({ cipher_iv_b64: 'stub', cipher
 
 /** The full {@link BoxRecord} of `staged`, sealed over the whisper: `staged` as given, its sealed parts the constant placeholders. A stub, until the vault's seal lands.
  * The seal that replaces it makes a fresh boxKey, wraps it under the vaultKey through the vault's
- * lease, and ciphers the whisper under that boxKey, bound to the record's stamp. This stub does none
- * of that: it never looks at the whisper, and nothing it returns is derived from the whisper or any
- * key. A stub-sealed record opens to nothing; `staged`'s sealed parts, where it carries any, are
- * replaced. It refuses 'bad_record' a `staged` that does not make a full record.
+ * lease, and ciphers the whisper's whole {@link WhisperHolder}, `{ val }` serialized, under that
+ * boxKey, bound to the record's stamp. This stub does none of that: it never looks at the whisper,
+ * and nothing it returns is derived from the whisper or any key. A stub-sealed record opens to
+ * nothing; `staged`'s sealed parts, where it carries any, are replaced. It refuses 'bad_record' a
+ * `staged` that does not make a full record.
  *
  * @param staged  - Record to seal, under the revision it is staged at, with the sidecar the seal binds.
- * @param _whisper - Whisper to seal.
- * @example await stubSeal({ ...sparse, sidecar: {} }, 'sk-test')   // { ...sparse, sidecar: {}, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered }
+ * @param _whisper - Whisper to seal, as its `{ val }`.
+ * @example await stubSeal({ ...sparse, sidecar: {} }, { val: 'sk-test' })   // { ...sparse, sidecar: {}, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered }
  */
-export const stubSeal = (staged: BoxSparse & { sidecar: Sidecar }, _whisper: Whisper): Promise<BoxRecord> =>
+export const stubSeal = (staged: BoxSparse & { sidecar: Sidecar }, _whisper: WhisperHolder): Promise<BoxRecord> =>
   Promise.resolve(boxRecord.parse({ ...staged, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered }))
 // --

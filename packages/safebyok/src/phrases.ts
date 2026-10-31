@@ -272,25 +272,34 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, WhisperAndSidecarRequired, OneRevisionTwoToks, OneRevisionTwoFates, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const RecordNotFull = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why an edit laid over a central that moved while it was being made stages nothing. */
-export const MovedUnderEdit = "Storage delivered a newer record while this edit was being made, so the edit was laid over a record storage no longer holds, and nothing was staged. The record in hand is the one delivered, and this refusal carries it: call again to edit it."
+export const MovedUnderEdit = "Storage delivered a newer record while this edit was being made, so the edit was laid over a record storage no longer holds, and nothing was staged. The record in hand is now the one delivered: call again to edit it."
 
 /** Why `build` makes nothing of a dna for a scope the listing already holds. */
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
 
-/** Why an update of a box given no whisper or no sidecar stages nothing. */
-export const WhisperAndSidecarRequired = "Every update of a box names both its whisper and its sidecar, and this one lacked one or both, so nothing was staged: give both, as { whisper, sidecar }. To keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
+/** What to do about an update of a box whose patch fails its check, said after the failures. */
+export const BoxPatchAdvice = "Nothing was staged. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
+
+/** Why an update of a box or a vault whose patch names another's scope stages nothing. */
+export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was staged: update the one it names, which listing.at(scope) answers.`
+
+/** Why LOCKED, which a locked box answers for its whisper, is refused where a whisper is wanted. */
+export const LockedIsNoWhisper = "LOCKED is not a whisper: unseal or expose one first"
 
 /** Why a record storage holds under the revision_seq held, but another revision_tok, is not taken in. */
 export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
 
 /** Why a record storage holds deleted at the revision held alive, or the other way round, is not taken in. */
 export const OneRevisionTwoFates = "Storage and this device disagree about one revision of a record: one of them holds it alive and the other holds it deleted, or storage holds nothing for it. This device kept its own copy and did not take in what storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
+
+/** Why a record storage holds under the revision held, but of another life of the thing, is not taken in. */
+export const OneRevisionTwoLives = "Storage and this device disagree about one revision of a record: storage holds it as another life of the thing, as if the thing were deleted and made anew within one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
 
 /** Why a record under another vault_tok than the instance holds is not taken in. */
 export const OtherVaultTok = "Storage holds this record under another vault_tok than this device holds it under: the vault was deleted and made anew, or storage mixed the records of two vaults. This device kept its own copy and did not take in the one storage sent. Load the vault again from storage, and its boxes with it: safebyok does not yet remake what it holds of a vault made anew."
