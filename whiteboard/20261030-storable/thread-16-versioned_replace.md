@@ -1,6 +1,6 @@
 # Thread 16: the store's versioned replace (2026-10-31)
 
-Branch `20261031-versioned_replace`, PR #PR, stacked on #387. Justify: green (safebyok 4322 passed, 37 skipped; every package green, size budgets unmoved).
+Branch `20261031-versioned_replace`, PR #388, stacked on #387. Justify: green (safebyok 4322 passed, 37 skipped; every package green, size budgets unmoved).
 
 * **Built**:
   * **The contract** (`src/models/models-shapes.ts`, the `Store` type and its doc block): `put(record, priorTok)` and `del(scope, priorTok)`, `priorTok` the `revision_tok` of the record the device holds, null for none; no prior seq is sent. The doc block states the cases in the order storage judges them: (1) the pairing, judged from the request alone: `priorTok` null with a seq other than 0, or a `priorTok` with a seq below 1, refuses **`bad_record`**; (2) no row: `priorTok` null lands, a `priorTok` refuses `stale_write` carrying nothing; (3) a row under another tok (any row, for `priorTok` null; a tombstone is a row): `stale_write` carrying it; (4) the row under `priorTok`: lands only at its seq + 1, which storage computes or queries; any other seq refuses `bad_record`. `del`: same tok rule, the tombstone at the row's seq + 1 under a fresh tok.
