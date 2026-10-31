@@ -1,6 +1,6 @@
 # Thread 6: tests_vault_box (2026-10-31)
 
-Branch `20261031-tests_vault_box`, PR #TBD, stacked on #411 (`20261031-tests_models`, 7a0edfe9),
+Branch `20261031-tests_vault_box`, PR #415, stacked on #411 (`20261031-tests_models`, 7a0edfe9),
 in the line main → #408 → #410 → #412 → #413 → #414 → #411 → this one. Justify: green; core
 4769 passed, 37 skipped. Tests only: no change to `src/`, an empty changeset.
 
