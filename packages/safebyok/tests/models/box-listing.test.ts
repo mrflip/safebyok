@@ -62,7 +62,7 @@ describe("BoxListing", () => {
       expect(cacheableOf(box).central.written_at).to.eq(T0 + 5000)
     })
 
-    it("expects no revision of storage, being never stored", async () => {
+    it("sends no prior tok to storage, being never stored", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(dna())
       expect(box.priorTok()).to.be.null
