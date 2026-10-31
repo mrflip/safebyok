@@ -122,7 +122,7 @@ spec that conflicts with the first. `box`-only terms say so.
   - ~~`stagedOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.~~
   - ~~`stagedPropsAndSealBeforeSettling`~~
 * `seal` (box): cipher a whisper under a fresh boxKey wrapped under the vaultKey, cryptographically binding the stamp. `unsealWhisper` opens the stored whisper for one call. ~~`unseal` is not a thing~~
-* `reseal` (box): unseal the stored whisper and edit it back in, sealed again.
+* ~~`reseal` (box): unseal the stored whisper and edit it back in, sealed again.~~ Retired: every update of a box names its whisper and its sidecar (the Coach, 2026-10-30), so there is nothing to carry over or reseal.
 * `expose` (box): unseal and save the `#whisper` internally. This opens a whole ton of questions, and is a NOTYET todo. I have included it as an important forcing consideration for the design.
   - Use of this function presumes a looser threat model and warrants different guarantees.
   - `whisper` get/set access to `#whisper` while unlocked, returns a sentinel otherwise (?)
@@ -205,7 +205,7 @@ Some of these are design considerations / future feature requests but they influ
   the tombstone at the row's seq + 1 under a fresh tok; over no row, with the prior tok null, it
   makes one at revision 0. `'fetch'` will not be implemented until a clear need and a scenario
   table arrive.
-* `reseal` (box): with no whisper given or exposed, seal the stored one again.
+* ~~`reseal` (box): with no whisper given or exposed, seal the stored one again.~~ Retired: every update names a whisper and a sidecar.
 
 * `maxMillisSinceRefresh`, `maxWorldMillis`
 
@@ -248,18 +248,18 @@ But: they're not the concern of the op-- all they need to know is that their pre
 * `box.unsealWhisper(opts): Whisper` on the instance unseals the whisper temporarily and returns it, storing nothing in the box (the customer can do what they wish).
   - returns `LOCKED` symbol if locked. or throws. or something.
 * `box.expose(boxlabel, opts): void` unseals the whisper, stores in a private variable and offers it with a public getter on the box. (it's the customer's decision, and if we don't write it some will, but without the guard). On lock, a sentinel symbol is returned in place of the whisper prop
-  - `box.get/set whisper(val)`: accesses private variable #whisper if exposed. returns `LOCKED` symbol if locked. These do not seal -- that happens on `send`
-* `box.seal(whisper)`: uses lease to seal with current props, updating encryptedWhisper
-* `box.reseal(opts)` hydrates, `unseal`s the whisper, then `seal`s it
-* `box.edit({ whisper?, sidecar? }, opts)` Takes up most recent between `edited` and `central`
-  - replaces the sidecar (if given)
-  - seals the whisper (if given or exposed); otherwise, with opts.reseal, `reseal`s (hydrate, unseal, seal)
+  - `box.get/set whisper(val)`: accesses private variable #whisper if exposed. returns `LOCKED` symbol if locked. These only expose: nothing seals the exposed whisper, as an update seals only the whisper it is given.
+* `box.seal(whisper, sidecar)`: `edit({ whisper, sidecar })`; uses lease to seal with current props, updating encryptedWhisper
+* ~~`box.reseal(opts)` hydrates, `unseal`s the whisper, then `seal`s it~~ retired
+* `box.edit({ whisper, sidecar }, opts)` Takes up most recent between `edited` and `central`
+  - both are required, on `edit`, `send`, `seal` and a dna's `build`: one without both refuses `bad_option` before anything is staged (the Coach, 2026-10-30: "greatly simplifying"). Nothing is carried over from the record in hand, and the exposed whisper is no substitute.
+  - seals the whisper with the sidecar given
   - note: the sidecar will not be bound (not part of the cryptoCtx)
 
 ## Box lifecycle
 
-* Must reseal to update revision YES even if nothing changes, even if only sidecar changes
-* Must reseal to send a sidecar update MAYBE NOT YET
+* Every update reseals: it names a whisper and a sidecar, so a new revision is always sealed, even if nothing changes, even if only the sidecar changes.
+* A sidecar update is sent with its whisper, sealed again, by the same rule.
 * Must be unlocked to seal YES -- impossible even if we wanted
 * Seal on every edit YES, very desirable
   - seals at customer's indicated timeliness
