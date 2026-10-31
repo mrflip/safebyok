@@ -1,5 +1,16 @@
 # safebyok
 
+## 0.6.0
+
+### Minor Changes
+
+- [#362](https://github.com/mrflip/safebyok/pull/362) [`2f098b6`](https://github.com/mrflip/safebyok/commit/2f098b62f8bc60ef29ee29cd06fd9681f99f103b) Thanks [@mrflip](https://github.com/mrflip)! - **`Validator` is renamed `Checkers`, and `Checker` and `objCheck` make one validator each.** A host's `Validator('bad_option', build, sources)` now reads `Checkers('bad_option', build, sources)`, and behaves as before. `Checker(build, kind?, sources?)` makes a single validator: `build` returns its schema, and the kind, after the builder, is 'bad_record' unless given (`const sidebarOpts = Checker(({ obj, bool, vaultlabel }) => obj({ vaultlabel, collapsed: bool.optional() }).strict(), 'bad_option')`). `objCheck(build, opts?, sources?)` is a `Checker` whose builder returns an object's fields, the object strict by default: `opts` is the kind, or `{ refuseAs, extras }`, `extras: 'strip'` dropping a field it does not take where 'strict' refuses it; other `opts` refuse 'bad_option'. The type `ObjCheckOpts` is exported beside it. Each refuses as a `Checkers` call's validators do. The exported validators are the same objects under the same names, and refuse as before. **`mask` and `localVaultDB` refuse an option they do not take** as 'bad_option' (`mask(whisper, { heads: 2 })`, `localVaultDB({ store, prefix })`), where they dropped it unread; `localVaultDB` takes `store` and `logger`. **Stored format:** unchanged.
+
+- [#373](https://github.com/mrflip/safebyok/pull/373) [`ba3fac4`](https://github.com/mrflip/safebyok/commit/ba3fac444c6f681f8b56c01b91eaf3b85511e136) Thanks [@mrflip](https://github.com/mrflip)! - A new refusal kind, `record_conflict` (a condition), joins `refusalKindVals`: storage and this device disagree about one revision of a record. This device keeps its own copy; fetching the record again is worth one try, and if the disagreement persists the system is fundamentally not working: the app tells the user, and a developer looks at the storage adapter. No exported call refuses with it yet; a host that switches over every refusal kind exhaustively needs a case for it.
+
+- [#407](https://github.com/mrflip/safebyok/pull/407) [`87f97c4`](https://github.com/mrflip/safebyok/commit/87f97c43a745560c848bcae0f2078add5ddc874b) Thanks [@mrflip](https://github.com/mrflip)! - `RefusalMeta` gains two optional fields, `stored_revision` and `staged_revision`, for a 'stale_write' this device makes itself when a stored record moves while an edit is being made: the revision storage now holds, and the one the edit had staged. No refusal a host meets today fills them yet; they come with the models that replace the vault and box classes.
+  **Stored format:** the stored box shape gains a `box_tok`, a random tok naming one life of a box (made when it is first stored, or remade over a tombstone), in those same models alone. No host uses them yet, so a host sees no change: the box records it puts and gets are as before.
+
 ## 0.5.0
 
 ### Minor Changes

@@ -1,7 +1,7 @@
 {
   "name": "safebyok-graphql",
   "private": false,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "GraphQL storage for safebyok: the schema and resolvers that carry a server-side VaultDB's verbs, and the VaultDB over an urql Client that calls them from the browser.",
   "keywords": [
     "safebyok",
