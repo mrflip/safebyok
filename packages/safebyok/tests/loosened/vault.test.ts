@@ -37,6 +37,8 @@ describe("the ways in changing under a vault unlocked", () => {
     other.storeBehindOurBack(demandStored())
     const later = other.anotherSession()
     const again = await later.build(other.demandStored())
+    expect(other.deviceDB.keptNow()).not.to.be.null
+    expect(again.isLocked).to.be.true
     await later.hello()
     expect(again.gate.pkWayin).to.be.null
     expect(again.isUnlocked).to.be.true
