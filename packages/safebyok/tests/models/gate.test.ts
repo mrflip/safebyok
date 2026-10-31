@@ -6,7 +6,6 @@ import { _cheat_vaultKeyBytesOf, asVault, duckVaultOf, isZeroed, passkeyAnswerOf
 
 useFakeClock()
 
-
 /** The PRF bytes are copied before the build zeroes them, for the backdoor. */
 const builtGate = async ({ passkey = false } = {}) => {
   const vault = duckVaultOf()

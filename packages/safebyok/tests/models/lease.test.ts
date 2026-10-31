@@ -18,7 +18,6 @@ const whisperBytesOf = (text = '{"val":"sk-test-0000"}'): Uint8Array => new Text
 
 const textOf = (bytes: Uint8Array): string => new TextDecoder().decode(bytes)
 
-
 const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ vault: DuckVault, friend: FakeDBFriend, lease: Lease }> => {
   const vault = duckVaultOf()
   const friend = fakeDBFriendOf()

@@ -10,7 +10,6 @@ import { _cheat_vaultKeyBytesOf, asVault, DeviceId, duckVaultOf, fakeDBFriendOf,
 
 useFakeClock()
 
-
 const provingPairOf = async (proofClosure: ProofClosure = proofClosureOf(), world: ProvingWorld = provingWorldOf()) => (
   Proving.makeProvingPair(asVault(duckVaultOf()), proofClosure, world)
 )
