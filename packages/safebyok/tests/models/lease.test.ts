@@ -7,7 +7,7 @@ import { type LeaseGrantOpts, type LeaseRecord, LeaseFormat } from '../../src/mo
 import { bad } from '../../src/outcome'
 import { isLeaseKey } from '../../src/shapes/device'
 import * as TH from '../test-helpers'
-import { type DuckVault, type FakeDBFriend, duckVaultOf, fakeDBFriendOf, grantedLeaseOf, sealStampsOf, T0, useFakeClock, WeekMillis, WorldStamp, isZeroed } from '../test-helpers/proving-world'
+import { type DuckVault, type FakeDBFriend, duckVaultOf, fakeDBFriendOf, grantedLeaseOf, isZeroed, sealStampsOf, T0, useFakeClock, WeekMillis, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 

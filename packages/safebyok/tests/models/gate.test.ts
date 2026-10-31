@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Gate } from '../../src/models/gate'
 import type { GateProps } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, asVault, duckVaultOf, passkeyAnswerOf, proofClosureOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp, isZeroed } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, asVault, duckVaultOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 

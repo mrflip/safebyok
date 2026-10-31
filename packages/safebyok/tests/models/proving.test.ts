@@ -6,7 +6,7 @@ import { type ProofClosure, type ProvingWorld } from '../../src/models/models-sh
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, asVault, DeviceId, duckVaultOf, fakeDBFriendOf, passkeyAnswerOf, proofClosureOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WeekMillis, WorldStamp, isZeroed } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, asVault, DeviceId, duckVaultOf, fakeDBFriendOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WeekMillis, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
