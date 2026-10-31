@@ -1,11 +1,15 @@
 /** The box's seal through a real vault's lease, the one place a box meets real cryptography in `tests/models/`. */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
-import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
+import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
 import { Dna, LeaseMillis, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
+
+/** The models worlds a test made, disposed after it. */
+const modelsWorlds: ModelsWorld[] = []
+afterEach(() => { for (const mw of modelsWorlds.splice(0)) { mw.dispose() } })
 
 const Whisper = { val: { apiKey: 'sk-test-0000', orgId: null } }
 const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: { account: 'work' } }
@@ -15,6 +19,7 @@ const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
   const vault = await vaultWorld.listing.build(Dna, () => ({ passphrase: Passphrase }))
   const mw = makeModelsWorld({ fakeTimers: false })
+  modelsWorlds.push(mw)
   const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault) })
   return { ...vaultWorld, vault, boxesOf, boxes: boxesOf() }
 }
