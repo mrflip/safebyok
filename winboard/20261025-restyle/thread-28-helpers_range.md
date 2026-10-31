@@ -1,0 +1,16 @@
+# Thread 28: helpers_range (2026-10-28)
+
+Branch `20261028-helpers_range`, [PR #354](https://github.com/mrflip/safebyok/pull/354), cut from `origin/main` (1f22111b). A follow-up the Coach approved after the sprint closed. Justify: not run, and cannot pass until the re-lock (see *Release-age block*). **The PR is a draft and red until `thread-28-finish.sh` has run.**
+
+* **Built**: the convex-helpers 0.1.129 release-age exception ended today, a few hours short of its seventh day (PROCESS.md, *Dependencies*: once aged, delete the exclusion and the exact pin in one commit).
+  * `pnpm-workspace.yaml`: the `minimumReleaseAgeExclude` entry for `convex-helpers@0.1.129` and its comment block deleted.
+  * `packages/safebyok-convex/package.json` and `e2e/package.json`: devDependency `convex-helpers` `0.1.129` -> `^0.1.129` (the peer range was already `^0.1.129`).
+  * `notes/security.md`: the 2026-10-15 `minimumReleaseAge` entry now records the exception as ended, amended in place (via a `sonnet` subagent, as the file's header says; I did not read the file). The mentions of the peer range and of the policy in general stayed true and were left.
+  * `.changeset/20261028-helpers_range.md`: empty (devDependency pins only).
+  * Nothing else names the exception outside `whiteboard/`, `winboard/` and spent changesets (grep for `0.1.129` and `minimumReleaseAgeExclude`).
+* **Release-age block**: with `minimumReleaseAgeStrict: true`, pnpm refuses the lockfile entry once the exclusion is gone, for plain `pnpm install` and `--frozen-lockfile` alike:
+  `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION: convex-helpers@0.1.129 was published at 2026-10-21T23:13:40.417Z, within the minimumReleaseAge cutoff`. It passes at 2026-10-28T23:13:40Z. Until `pnpm-lock.yaml` is re-locked to the `^0.1.129` specifiers, `--frozen-lockfile` also fails on a specifier mismatch (`e2e`: lockfile `0.1.129`, manifest `^0.1.129`). Also: `pnpm <script>` (including `pnpm changeset`) refuses to run in this worktree for the same reason, so the changeset was written with `node scripts/changeset.ts --empty`.
+* **How the script finishes it**: `winboard/20261025-restyle/thread-28-finish.sh` (bash, `set -euo pipefail`). Refuses before 2026-10-28T23:14:00Z; then in `/workspace/byok-helpers_range` runs `pnpm install`, checks `pnpm-lock.yaml` resolves convex-helpers to 0.1.129, runs `pnpm install --frozen-lockfile`, commits `pnpm-lock.yaml` alone (`tools:` subject), runs `/workspace/byok/scripts/file-thread`, and if that exits 0, `gh pr ready 354`. Checked with `bash -n` and run now: it refuses and says when it can run.
+* **Decisions taken**: the commits are split deps / docs / changeset / plan; the lockfile commit is the script's, so the history shows the re-lock after the pins.
+* **Deviations**: the thread asked for `pnpm justify` green and the PR out of draft; both wait on the clock, by the Coach's instruction to bodge it into the script. The PR is therefore pushed as a draft. Lint was run on what this thread touched only.
+* **For the Coach**: run `thread-28-finish.sh` after 23:14 UTC. If `file-thread` stops (exit 3 conflict, exit 4 red), hand the worktree and the script's last lines to a fresh thread-worker per the usual rule; the script does not take the PR out of draft in that case.
