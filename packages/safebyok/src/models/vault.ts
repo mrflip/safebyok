@@ -12,7 +12,7 @@ import * as MSX from './models-shapes'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
 
-// == [Record forms]: DefaultLeaseMillis, VaultSnapshot, VaultPatch
+// == [Record forms]: DefaultLeaseMillis, VaultSnapshot, VaultPatch, GateStaging
 
 /** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
