@@ -1,4 +1,4 @@
-/** The shapes the models share, imported as `MSX`: the record forms a storable holds and reconciles, what storage answers, the bags reconciling passes, the world and listing a storable lives in, the options its verbs take, the arguments it is made with, the dna a box is built from, and the forms of the vault's stamp, its wayins, its gate, its record, a proving and the lease, and the vault's world.
+/** The shapes the models share, imported as `MSX`: each section banner names the forms it holds.
  * A type generic over a model's record cannot come from its validator, so it stays a type, with
  * the validator beside it: each check judges what the base can know of a record, its revision,
  * its times, its `am` and its `vault_tok`, and leaves the concrete class's validator the rest.
@@ -382,7 +382,6 @@ export type FetchOpts = Z.infer<typeof fetchOpts>
 /** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional: `'replace'`, the default and only policy, the versioned replace. */
 export type SendOpts = Z.infer<typeof sendOpts>
 
-/** `edit`'s options: its {@link TimelyOpts}. */
 export type EditOpts = TimelyOpts
 
 /** The options a storable is made with, after its world, listing and records: its refresh horizon, and the trigger's `eagerFrac`. */
@@ -665,7 +664,7 @@ export const leaseDeviceDB = objCheck(({ fn }) => ({
 
 export type LeaseDeviceDB = Z.infer<typeof leaseDeviceDB>
 
-/** The check of a vault listing's options, beyond what {@link listingOpts} checks: its world, the bank, carries what a gate and a lease need, a {@link provingWorld}, the logger, the lease's term and the deviceDB's lease verbs. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Its `parse` refuses 'bad_option'. Checks only. */
 export const vaultListingOpts = objCheck(({ obj }) => ({
   world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis, deviceDB: leaseDeviceDB }),
 }), { refuseAs: 'bad_option', extras: 'strip' })

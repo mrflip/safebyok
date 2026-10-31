@@ -36,7 +36,8 @@ export type VaultPatch = { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | und
  * Its `vault_tok` is the life of the vault in its scope, fixed at birth: a draft's is minted
  * here, a received record's is its own, and a record under another `vault_tok` throws
  * 'unexpected_error', a draft's central never stored included. Its record carries its gate, the
- * wayins, and nothing else stores them. Its guards take no lock: its record holds no secret. A vault deleted or damaged is not edited back to life, as a box is: a new life is a new
+ * wayins, and nothing else stores them. Its guards take no lock: its record holds no secret. A
+ * vault deleted or damaged is not edited back to life, as a box is: a new life is a new
  * `vault_tok`, so a new instance, built by the listing.
  */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultPatch, VaultSnapshot> implements BoxWorld {
@@ -55,7 +56,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The deviceDB work on the lease in flight, one chore after another. */
   #leaseChores: Promise<void> = Promise.resolve()
 
-  /** The gate `gate` made last, and the record's gate it was made from. */
   #gate: { props: GateProps, gate: Gate } | null = null
 
   // == [Props, as the record has them]: fmt
@@ -85,7 +85,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   // == [The gate]: gate, buildGate
 
-  /** The gate of the record in hand, made from its `gate`, and made again once that changes; null for a vault not yet gated, or whose record in hand is sparse or a tombstone. Made here, not at `settle`, as the base constructor settles before this class's fields exist. */
+  // Made on first read, not at settle: the base constructor settles before this class's fields exist.
+  /** The Gate of the record in hand: null for a vault not yet gated, or whose record in hand is sparse or a tombstone; the same Gate while the record's `gate` is the same object, so a record received remakes it. */
   get gate(): Gate | null {
     const props = this.full?.gate ?? null
     if (props === null) { return null }

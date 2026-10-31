@@ -11,7 +11,7 @@ import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, the bank's scope, and what a vault's gate and lease need: a {@link ProvingWorld}, the logger, the lease's term, and the deviceDB's lease verbs, which take the vault's scope. `vaultListingOpts` checks the fields past the ListingWorld's but the scope. */
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
@@ -19,10 +19,9 @@ export type VaultWorld = ListingWorld & ProvingWorld & {
   deviceDB:    LeaseDeviceDB
 }
 
-/** The vaultDB's vault verbs, as this listing calls them. Mapping the real VaultDB onto these is the later match-up. */
+/** The vaultDB's vault verbs, as this listing calls them. */
 export type VaultStore = Store<VaultScope, VaultRecord, VaultSparse>
 
-/** The device cache of this bank's vaults. */
 export type VaultCache = Cache<VaultRecord, VaultSparse>
 
 /** The dna of a vault: its scope. A gate it carries is ignored: a vault drafted is born without one, and `build` gives it its gate. */
