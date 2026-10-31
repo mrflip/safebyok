@@ -6,7 +6,7 @@ import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
 import { Gate } from './gate'
-import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse, vaultStamp } from './models-shapes'
+import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
@@ -70,7 +70,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<VaultRecord> {
     const checked = MSX.vaultBuildArgs.parse({ proofClosure })
     const draft: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
-    const gate = await Gate.build(vaultStamp.parse(draft), checked.proofClosure, this.world)
+    const gate = await Gate.build(MSX.vaultStamp.parse(draft), checked.proofClosure, this.world)
     return { ...draft, gate: gate.pickle() }
   }
 
