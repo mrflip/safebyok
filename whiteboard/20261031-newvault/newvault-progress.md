@@ -50,3 +50,4 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 * The gate is never null (orchestrator's call on the Coach's "up to you"): rework of thread 1 after its review; threads 2 to 4 build on `vault.gate: Gate`.
 * Thread 1's guards: loosen or keep, but thread 6 tests that an edit over a sparse record keeps the gate.
 * The gap review's first five are the next sprint, in that order. The planning commits ride in #408.
+* The lease refuses `vault_locked` when not in force (thread 2); a lease longer than the timer cap setting no timer is by design (wontfix), caught by that check.
