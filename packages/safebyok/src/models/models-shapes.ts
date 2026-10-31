@@ -474,8 +474,10 @@ export type Store<ScopeT, RecordT, SparseT> = {
 /** The deviceDB's cache of one kind of thing: loaded once, by the listing's `hello`; saved by each instance's settle, the listing handing it to each instance it makes.
  * `save` is best effort, never awaited by the settle that calls it: a refusal is told as bad news,
  * and nothing waits on it. An adapter keeps the order of its calls, so the last `save` of a thing
- * wins. A settle saves each time, so a host whose cache is slow may debounce `save` (`_.debounce`,
- * or a join primitive) before handing the cache over.
+ * wins. A settle saves each time, so a host whose cache is slow may debounce `save` for each thing,
+ * keyed by its scope (`_.debounce` per scope, or a join primitive), before handing the cache over:
+ * one `save` serves every thing of the kind, so a single debounce over every call keeps only the
+ * last thing's copy.
  */
 export type Cache<RecordT, SparseT> = {
   load(): Promise<readonly Cacheable<RecordT, SparseT>[]>
