@@ -1,13 +1,14 @@
 import { verifyConsistent } from '../checks/validator'
-import { makeLifeTok } from '../crypto'
+import { type CipherCtxRecord, makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
+import { stableJsonify } from '../stable-jsonify'
+import type { BoxLease, BoxWorld } from './box-listing'
 import { type BoxRecord, type BoxSparse, type EditOpts, type Fetched, type LockedBag, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
-import { stubSeal } from './stub-seal'
 
 // == [Record forms]: BoxSnapshot, BoxProps, BoxPatch
 
@@ -38,6 +39,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   declare readonly user_id:    string
   declare readonly vaultlabel: string
   declare readonly boxlabel:   string
+
+  declare readonly world: BoxWorld
 
   /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: an update seals the whisper it is given. */
   #exposed: WhisperHolder | null = null
@@ -115,10 +118,19 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   /** Seal this whisper, `{ val }`, with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
   seal(whisper: WhisperHolder, sidecar: Sidecar, opts: EditOpts = {}): Promise<this> { return this.edit({ whisper, sidecar }, opts) }
 
-  /** Not yet: decipher the whisper under the boxKey, unwrapped through the vault's lease, parse it, and hold it to {@link whisperHolder}: the seal ciphers the whole object, `{ val }`, as JSON. */
-  #unseal(): Promise<WhisperHolder> {
-    this.demandedFull()
-    return Promise.reject(new VaultError('unexpected_error', 'unseal is not written yet.'))
+  /** The whisper of the record in hand, opened through the vault's lease and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_box'. */
+  async #unseal(): Promise<WhisperHolder> {
+    const record = this.demandedFull()
+    const { sidecar, box_key_wrapped, whisper_ciphered } = record
+    const stamp = boxStampOf(MSX.boxSparse.parse(record), sidecar)
+    const bytes = await this.world.demandLease().unsealWith({ box_key_wrapped, whisper_ciphered }, stamp, stamp)
+    try {
+      const held = whisperHolder.safeParse(parseJsonOrNull(new TextDecoder().decode(bytes)))
+      if (! held.success) { throw undecodedWhisper() }
+      return held.data
+    } finally {
+      bytes.fill(0)
+    }
   }
   // --
 
@@ -139,12 +151,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** The staged record of `patch`: its whisper, sealed by {@link stubSeal} with its sidecar over `makeStagedBase`'s base, which lends its scope, revision, times, `box_tok` and whisper's form, and none of its sidecar or sealed parts. At a birthday, the box's birthday gift is a `box_tok` fresh from {@link makeLifeTok}. `patch` was held to `boxPatch` by `isFullPatch` before `edit` called this; of it, only the whisper and the sidecar are taken. */
+  /** The staged record of `patch`: its whisper and sidecar sealed through the vault's lease by {@link sealedRecordOf} over `makeStagedBase`'s base, which lends its scope, revision, times, `box_tok` and whisper's form, and none of its sidecar or sealed parts. At a birthday, the box's birthday gift is a `box_tok` fresh from {@link makeLifeTok}. `patch` was held to `boxPatch` by `isFullPatch` before `edit` called this; of it, only the whisper and the sidecar are taken. */
   protected makeStaged(patch: BoxPatch): Promise<BoxRecord> {
     const { whisper, sidecar } = patch
     const { base, isBirthday } = this.makeStagedBase()
     const box_tok = isBirthday ? makeLifeTok() : base.box_tok
-    return stubSeal({ ...base, box_tok, sidecar }, whisper)
+    return sealedRecordOf(this.world.demandLease(), { ...base, box_tok }, sidecar, whisper)
   }
 
   /** A box's life is its vault's and its own: `vault_tok-box_tok`. */
@@ -165,4 +177,32 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   }
   // --
 }
+// --
+
+// == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
+
+/** The full record of `staged` with `sidecar`, `whisper` sealed through `lease`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `staged`, only its sparse fields are taken. */
+export const sealedRecordOf = async (lease: BoxLease, staged: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
+  const sparse = MSX.boxSparse.parse(staged)
+  const stamp = boxStampOf(sparse, sidecar)
+  const { box_key_wrapped, whisper_ciphered } = await lease.sealWith(new TextEncoder().encode(stableJsonify(whisper)), stamp, stamp)
+  return MSX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
+}
+
+/** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */
+const boxStampOf = (sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord => ({ ...sparse, sidecar: stableJsonify(sidecar) ?? '' })
+
+/** `text` parsed as JSON, or null where it is none: a SyntaxError can quote what it failed on. */
+const parseJsonOrNull = (text: string): unknown => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+// --
+
+// == [Refusals]: undecodedWhisper
+
+const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --

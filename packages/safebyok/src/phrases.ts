@@ -50,7 +50,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, ListingExpected, VaultErrorExpected, LeftOutExpected
+// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, LeftOutExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -60,6 +60,9 @@ export const bytesExpected = (count?: number): string => (count === undefined ? 
 
 /** Anything but a leaseKey as `makeLeaseKey` makes one, where a lease record keeps its key. */
 export const LeaseKeyExpected = "Expected a non-extractable AES-GCM CryptoKey for wrapKey and unwrapKey"
+
+/** Anything but a stamp a lease binds a seal to. */
+export const CtxStampExpected = "Expected a flat object of strings and numbers, with at least one field"
 
 /** The listing a storable is made in. */
 export const ListingExpected = "Expected a Listing"
@@ -365,13 +368,16 @@ export const ProofClosureThrew = "The proof closure threw rather than handing ba
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases and vaults]: DamagedLease, UnopenedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
 
 /** Why a whisper that will not open under the vault's key is refused. */
 export const UnopenedWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
+
+/** Why a whisper that opened but is no whisper this package knows is refused. */
+export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
 
 /** Why a lease past its autolock_at, or forgotten, opens nothing. */
 export const LeaseNotInForce = "This lease is no longer in force -- its time ran out, or it was forgotten when the vault locked -- so nothing was read or written: unlock the vault again."

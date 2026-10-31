@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import { type BoxDna, type BoxListingOpts, BoxListing } from '../../src/models/box-listing'
 import * as MSX from '../../src/models/models-shapes'
-import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as TH from '../test-helpers'
-import { boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -569,17 +568,17 @@ describe("boxListing.build(dna): a revision_seq makes it a record", () => {
 })
 // --
 
-// == [Sealed at birth]: build, boxDna, the stub seal
+// == [Sealed at birth]: build, boxDna, the vault's lease
 
 describe("boxListing.build(dna): the box is sealed at birth", () => {
-  it("stages a full record at revision 0 over the central never stored, its sealed parts the stub's", async () => {
+  it("stages a full record at revision 0 over the central never stored, its sealed parts the fake lease's", async () => {
     const box = await boxListingOf(held.mw).build(dna())
     expect(box.isFull).to.be.true
     expect(box.hasStaged).to.be.true
     expect(box.revision_seq).to.eq(0)
     expect(box.priorRevisionTok()).to.be.null
-    expect(box.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
-    expect(box.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
+    expect(box.box_key_wrapped).to.deep.equal(FakeBoxKeyWrapped)
+    expect(box.whisper_ciphered).to.deep.equal(FakeWhisperCiphered)
     expect(box._cheat_central).to.include({ revision_seq: MSX.NeverStoredSeq, am: 'x' })
   })
 

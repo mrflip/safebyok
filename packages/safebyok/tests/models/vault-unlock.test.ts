@@ -95,6 +95,13 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(await vault.ensureUnlocked()).to.equal(lease)
   })
 
+  it("refuses 'bad_option' a stamp of no fields, at the seal and at the unseal: a seal bound to nothing of the box's binds nothing", async () => {
+    const { vault } = await bornVault()
+    const lease = vault.demandLease()
+    await TH.expectRefusal(lease.sealWith(new TextEncoder().encode('sk-test'), {}, WhisperStamp), 'bad_option')
+    await TH.expectRefusal(lease.unsealWith(await seal(lease), BoxKeyStamp, {}), 'bad_option')
+  })
+
   it("locks at `lock()`, erasing the kept lease; then refuses 'vault_locked' with no proof, the proof's own refusal with a wrong one, and unlocks with the right one", async () => {
     const { vault, deviceDB } = await bornVault()
     const born = vault.demandLease()
@@ -273,6 +280,21 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     await later.hello()
     expect(again.isUnlocked).to.be.true
     expect(deviceDB.tryDelLease).not.toHaveBeenCalled()
+  })
+
+  it("erases the kept lease at a lock() after goodbye, though the vault holds no lease: the next session asks for the proof", async () => {
+    const { listing, vault, storedNow, anotherSession, deviceDB } = await bornVault()
+    const record = storedNow()
+    if (record === null) { throw new Error('nothing stored') }
+    listing.goodbye()
+    vault.lock()
+    await TH.eventually(() => deviceDB.keptNow() === null)
+    expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
+    const later = anotherSession()
+    const again = await later.build(record)
+    await later.hello()
+    expect(again.isLocked).to.be.true
+    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
   })
 })
 

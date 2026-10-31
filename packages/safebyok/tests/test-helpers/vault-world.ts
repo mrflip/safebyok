@@ -2,7 +2,9 @@
 
 import { afterEach, vi } from 'vitest'
 import type { VaultScope } from '../../src/shapes/scopes'
+import type { BoxWorld } from '../../src/models/box-listing'
 import type { VaultRecord, VaultSparse } from '../../src/models/models-shapes'
+import type { Vault } from '../../src/models/vault'
 import { NOVEL, Proving } from '../../src/models/proving'
 import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
 import { quietLogger } from './logging'
@@ -113,3 +115,14 @@ export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: str
   await passphraseProving.makeWayin(NOVEL)
   return passphraseProving
 }
+
+/** `vault` as its boxes see it, but that it takes no world: the models world's fake store answers with none. */
+export const boxWorldOf = (vault: Vault): BoxWorld => ({
+  clock:        vault.clock,
+  scope:        vault.scope,
+  vault_tok:    vault.vault_tok,
+  lockState:    () => vault.lockState(),
+  ensureTimely: (opts) => vault.ensureTimely(opts),
+  takeWorld:    () => undefined,
+  demandLease:  () => vault.demandLease(),
+})

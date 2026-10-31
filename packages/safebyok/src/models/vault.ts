@@ -1,6 +1,6 @@
 import { consistent, verifyConsistent } from '../checks/validator'
 import { VaultError } from '../errors'
-import { outcomeOf } from '../outcome'
+import { outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
@@ -107,7 +107,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** How long a lease granted this vault lasts: the world's `leaseMillis`, else {@link DefaultLeaseMillis}. */
   get leaseMillis(): number { return this.world.leaseMillis ?? DefaultLeaseMillis }
 
-  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else the proof `proofClosure` answers; with none of them, refuses 'vault_locked'. A lease held past its time locks the vault first. */
+  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else the proof `proofClosure` answers; with none of them, refuses 'vault_locked'. A lease held past its time locks the vault first.
+   * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by calling again.
+   */
   async ensureUnlocked(proofClosure?: AttemptClosure): Promise<Lease> {
     await this.ensureTimely({})
     const held = this.#lease
@@ -200,7 +202,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [The lease]: leaseDBFriend, lock, letLeaseGo, dropLease, leaseChore
+  // == [The lease]: leaseDBFriend, lock, letLeaseGo, leaseChore
 
   /** The deviceDB as this vault's lease reaches it: the world's lease verbs, bound to this vault's scope, so no verb takes one. */
   leaseDBFriend(): LeaseDBFriend {
@@ -213,10 +215,16 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Lock the vault, synchronously, and erase the lease this device keeps: the vault reads locked before this returns, and the erase is queued as a chore. */
+  /** Lock the vault, synchronously, and erase the lease this device keeps, whether or not the vault holds one: the vault reads locked before this returns; letting the held lease go and the erase are queued as a chore. */
   lock(): void {
     this.#isLocked = true
-    this.#dropLease()
+    const lease = this.#lease
+    this.#lease = null
+    const { tryDelLease } = this.leaseDBFriend()
+    this.#leaseChore(async () => {
+      lease?.letGo()
+      valOf(await tryDelLease())
+    })
     this.settle()
   }
 
@@ -227,13 +235,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.#lease = null
     lease?.letGo()
     this.settle()
-  }
-
-  /** Drop the lease, its forgetting queued as a chore. */
-  #dropLease(): void {
-    const lease = this.#lease
-    this.#lease = null
-    if (lease !== null) { this.#leaseChore(() => lease.forget()) }
   }
 
   /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlockByProof` awaits the queue before granting and `#lookUpKept` before looking, so a lock's erase lands before the next put or get. */

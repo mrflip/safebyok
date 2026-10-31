@@ -4,8 +4,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import { BoxListing } from '../../src/models/box-listing'
+import * as TH from '../test-helpers'
 import { TestableBox, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
-import { Dna, Passphrase, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, LeaseMillis, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 const held = useModelsWorld()
 useVaultWorlds()
@@ -120,6 +122,32 @@ describe("a lease a caller holds across lock()", () => {
     expect(lease.isInForce).to.be.true
     const sealed = await lease.sealWith(new TextEncoder().encode('sk-test'), { boxlabel: 'b' }, { revision_seq: 1 })
     expect(sealed.box_key_wrapped).to.be.ok
+  })
+})
+// --
+
+// == [The seal]: the deadline past before the autolock fires, the carried edit's seal
+
+describe("the box's seal through the vault's lease", () => {
+  it("README.md:591, 'The deadline is the truth, and a timer enforces it': past autolock_at, before the autolock fires, the vault reads unlocked and a box passes its guard, but the lease refuses its seal 'vault_locked', and the vault still reads unlocked after", async () => {
+    const { listing, advance } = makeVaultWorld()
+    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const boxes = new BoxListing({ world: boxWorldOf(vault), store: held.mw.store, cache: held.mw.cache, maxMillisSinceRefresh: 10 * 60_000 })
+    const box = await boxes.build({ ...Dna, boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' }, sidecar: {} })
+    advance(LeaseMillis)
+    expect(vault.lockState()).to.eq('unlocked')
+    expect(box.demandReadyToSeal()).to.equal(box)
+    await TH.expectRefusal(box.seal({ val: 'sk-test-1111' }, {}), 'vault_locked')
+    expect(vault.lockState()).to.eq('unlocked')
+  })
+
+  it("VOCABULARY.md:92, 'revision_tok ... is part of the box's stamp': the ouch carry re-revisions the staged edit over sealed parts bound to its old revision, so the edit it carries no longer opens (the fake lease stands in, keeping each whisper by the stamp it was sealed under, as the real one binds it)", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-c2' }))
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'staged' } })
+    expect(await box.unsealWhisper()).to.deep.equal({ val: 'sk-test-0000' })
+    box.receive(tombstoneBoxRecord({ revision_seq: 3, revision_tok: 'rev-other', written_at: T0 + 3000 }, 'd'))
+    expect(box._cheat_staged?.revision_seq).to.eq(4)
+    await TH.expectRefusal(box.unsealWhisper(), 'damaged_box')
   })
 })
 // --

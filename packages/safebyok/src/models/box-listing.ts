@@ -5,16 +5,19 @@ import { VaultError } from '../errors'
 import { lockedError } from '../helpers/throwers'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
-import { type BoxSnapshot, Box } from './box'
+import { type BoxSnapshot, Box, sealedRecordOf } from './box'
+import type { Lease } from './lease'
 import { Listing, hasRevision } from './listing'
 import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-import { stubSeal } from './stub-seal'
 
-// == [Given to a box listing]: BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
+// == [Given to a box listing]: BoxLease, BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
 
-/** The vault, as far as its boxes need it: a {@link ListingWorld}, and the vault's scope and token. */
-export type BoxWorld = ListingWorld & { scope: VaultScope, vault_tok: string }
+/** The vault's lease, as far as its boxes need it: the seal and the unseal. */
+export type BoxLease = Pick<Lease, 'sealWith' | 'unsealWith'>
+
+/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope and token, and its lease, taken at each seal and unseal and never kept, which refuses 'vault_locked' while the vault is locked. */
+export type BoxWorld = ListingWorld & { scope: VaultScope, vault_tok: string, demandLease(): BoxLease }
 
 /** The vaultDB's box verbs, as this listing calls them. Mapping the real VaultDB onto these is the later match-up. */
 export type BoxStore = Store<Boxscope, BoxRecord, BoxSparse>
@@ -76,9 +79,9 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return boxRecord.parse(duck) }
 
   // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here. The whisper rides in the dna this far, and no further.
-  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, its birthday gift a `box_tok` fresh from {@link makeLifeTok}, sealed by {@link stubSeal} over the dna's whisper. */
-  protected draftOf({ whisper, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
-    return stubSeal({ ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, whisper)
+  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, its birthday gift a `box_tok` fresh from {@link makeLifeTok}, its whisper and sidecar sealed through the vault's lease by {@link sealedRecordOf}. */
+  protected draftOf({ whisper, sidecar, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
+    return sealedRecordOf(this.world.demandLease(), { ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
   }
 
   protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>): Box {

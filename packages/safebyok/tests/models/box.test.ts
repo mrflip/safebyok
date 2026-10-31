@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { BoxProps, BoxSnapshot } from '../../src/models/box'
+import type { BoxLease, BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
-import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
+import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
-import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { FakeBoxKeyWrapped, FakeWhisperCiphered, type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -142,14 +143,37 @@ describe("box.unsealWhisper(): refused from its guard", () => {
     // locked, refused first:
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      "locked",   "vault_locked",     'a deleted box while the vault is locked'],
     [() => fullBoxRecord(),                              "locked",   "vault_locked",     'a full box while the vault is locked'],
-    // present and full, past the guard to the seal not yet written:
-    [() => fullBoxRecord(),                              "unlocked", "unexpected_error", 'a full box, which reaches the unseal, not written yet'],
+    // present and full, past the guard to a lease that never sealed it:
+    [() => fullBoxRecord(),                              "unlocked", "damaged_box",      'a full box whose whisper will not open'],
   ] as const
   for (const [recordOf, lockState, refusalkind, blurb] of RefusedCases) {
     it(`refuses '${refusalkind}' for ${blurb}`, async () => {
       const box = await boxListingOf(held.mw).build(recordOf())
       held.mw.setLockState(lockState)
       await TH.expectRefusal(box.unsealWhisper(), refusalkind)
+    })
+  }
+})
+// --
+
+// == [What the lease opens]: a whisper that opens to no whisper
+
+describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
+  const OpenedCases = [
+    ['bytes that are no JSON',          'sk-test-SECRET {'],
+    ['JSON that is no { val } holder',  '{"value":"sk-test-SECRET"}'],
+  ] as const
+  for (const [blurb, text] of OpenedCases) {
+    it(`refuses 'damaged_box' for ${blurb}, quoting none of it, the opened bytes zeroed`, async () => {
+      const opened = new TextEncoder().encode(text)
+      const lease: BoxLease = { sealWith: () => Promise.reject(new Error('nothing is sealed here')), unsealWith: () => Promise.resolve(opened) }
+      const { world } = held.mw
+      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (opts) => world.ensureTimely(opts), demandLease: () => lease }
+      const box = await boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
+      const err = await TH.expectRefusal(box.unsealWhisper(), 'damaged_box')
+      expect(err.message).to.eq(Phrases.UndecodedWhisper)
+      expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')
+      expect(opened.every((byte) => byte === 0)).to.be.true
     })
   }
 })
@@ -472,16 +496,16 @@ describe("box.whisper = null while the vault is locked", () => {
 })
 // --
 
-// == [The stub seal in edit]: seal, edit, makeStaged
+// == [The seal in edit]: seal, edit, makeStaged
 
-describe("box.edit(props) with a whisper: the stub seals it", () => {
-  it("seals a whisper with its sidecar over a full box at the next revision, its sealed parts the stub's", async () => {
+describe("box.edit(props) with a whisper: the vault's lease seals it", () => {
+  it("seals a whisper with its sidecar over a full box at the next revision, its sealed parts the fake lease's", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
     await box.seal({ val: 'sk-test-0000' }, { account: 'work' })
     expect(box.revision_seq).to.eq(2)
     expect(box.sidecar).to.deep.equal({ account: 'work' })
-    expect(box.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
-    expect(box.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
+    expect(box.box_key_wrapped).to.deep.equal(FakeBoxKeyWrapped)
+    expect(box.whisper_ciphered).to.deep.equal(FakeWhisperCiphered)
   })
 
   it("seals the sidecar given in place of the one the box carries", async () => {
