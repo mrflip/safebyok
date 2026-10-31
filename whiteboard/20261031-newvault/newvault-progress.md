@@ -51,3 +51,9 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 * Thread 1's guards: loosen or keep, but thread 6 tests that an edit over a sparse record keeps the gate.
 * The gap review's first five are the next sprint, in that order. The planning commits ride in #408.
 * The lease refuses `vault_locked` when not in force (thread 2); a lease longer than the timer cap setting no timer is by design (wontfix), caught by that check.
+
+## Thread 1's review taught (PR #410, tip b985fb5d)
+
+* A vault held sparse reads `gate` as null until `edit` hydrates, so anything that judges the gate must hydrate first (`ensureReadyToEdit()`); the rework removes the case, but thread 2's `#unlock` should still take the gate from the record in hand after a hydrate.
+* The public patch must not carry the gate: `edit({ gate })` would store wayins no passphrase proved. Thread 4's gate verbs stage a new gate through a private path, never `vault.edit`.
+* `vault.gate` is rebuilt when the record's `gate` object changes identity (every receive after a send): a held `Gate` goes stale across a send. Thread 2 keys by content or rebuilds on settle if it holds one.
