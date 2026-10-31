@@ -12,7 +12,7 @@ export class Gate {
   declare readonly pkWayin:          Wayin | null
   declare readonly stamp:            VaultStamp
 
-  /** The gate of the vault `stamp` names (a record or a vault, stripped to its stamp), of `props`, its wayins' pickles. */
+  /** The gate of the vault `stamp` names, its wayins as `props` pickles them. */
   constructor(stamp: VaultStamp, props: unknown) {
     const checked = vaultStamp.parse(stamp)
     const { passphrase_wayin, passkey_wayin } = gateProps.parse(props)
@@ -23,7 +23,7 @@ export class Gate {
     Object.freeze(this)
   }
 
-  /** A novel gate for the vault `stamp` names, its wayins made from what `proofClosure` answers; built before the vault record is born, as every vault record carries its gate. */
+  /** A novel gate for the vault `stamp` names, its wayins made from what `proofClosure` answers. */
   static async build(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<Gate> {
     const wayins = await Gate.#novelWayins(stamp, proofClosure, world)
     return new Gate(stamp, { passphrase_wayin: wayins.passphrase.pickle(), passkey_wayin: wayins.passkey?.pickle() ?? null })

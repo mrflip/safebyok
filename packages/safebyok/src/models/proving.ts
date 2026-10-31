@@ -43,7 +43,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     Object.freeze(this)
   }
 
-  /** The provings of the vault `stamp` names (a record or a vault, stripped to its stamp), from what `proofClosure` answers: a passphrase proving, and a passkey proving where it answers a passkey too. */
+  /** The provings of the vault `stamp` names, from what `proofClosure` answers: a passphrase proving, and a passkey proving where it answers a passkey too. */
   static async makeProvingPair(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<ProvingPair> {
     const { stamp: checked } = provingPairArgs.parse({ stamp, proofClosure, world })
     const handed = await invokeProofClosure(proofClosure)
@@ -66,7 +66,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return this.#wrapVaultKey(vaultKey)
   }
 
-  /** Grant `vault` a lease under the vaultKey this proving's wayin holds. The vault is taken now, not at the proving's making, and refuses 'bad_option' where its stamp is not the one this proving is of. */
+  /** Grant `vault` a lease under the vaultKey this proving's wayin holds; refuses 'bad_option' a vault whose stamp is not the one this proving is of, before any key is touched. */
   async makeLease(vault: LeaseVault, dbfriend: LeaseDBFriend, opts: LeaseGrantOpts): Promise<Lease> {
     if (! consistent(vaultStamp.parse(vault), this.stamp)) { throw leaseOfOtherVault() }
     const vaultKey = await this.#unwrapVaultKey()
