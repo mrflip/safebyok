@@ -13,6 +13,7 @@ import { type VaultError, isVaultError } from '../errors'
 import { type Outcome } from '../outcome'
 import * as Phrases from '../phrases'
 import * as HX from '../shapes/host-code'
+import type { CipherCtxRecord } from '../crypto'
 import * as VX from '../shapes/vault'
 import { isLeaseKey } from '../shapes/device'
 import type { Clock } from '../shapes/bank-opts'
@@ -594,7 +595,7 @@ export const { provingPairArgs, provingMakeArgs } = Checkers('bad_option', ({ ob
 }))
 // --
 
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseDBFriend, leaseGrantOpts, unwrapUsageVals, leaseGetArgs, leaseGrantArgs, leaseWrapArgs, leaseUnwrapArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseVault, LeaseDBFriend, LeaseGrantOpts, UnwrapUsage
+// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseDBFriend, leaseGrantOpts, ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseVault, LeaseDBFriend, LeaseGrantOpts
 
 export const LeaseFormat = 7001
 
@@ -634,21 +635,24 @@ export const leaseGrantOpts = objCheck(({ int, lit, union }) => ({
 
 export type LeaseGrantOpts = Z.infer<typeof leaseGrantOpts>
 
-export const unwrapUsageVals = ['encrypt', 'decrypt', 'wrapKey', 'unwrapKey'] as const
-export type UnwrapUsage = typeof unwrapUsageVals[number]
+/** True for a stamp a caller hands the lease as additional data: a flat object of strings and finite numbers. */
+const isCtxStamp = (val: unknown): boolean => (
+  typeof val === 'object' && val !== null && ! Array.isArray(val)
+    && Object.values(val).every((field) => typeof field === 'string' || Number.isFinite(field))
+)
 
-/** The arguments of each lease verb. A ctx is the complete additional data, bytes the caller built with `cipherCtx` over its own stamp and the vault's: the lease adds nothing to it. */
-export const { leaseGetArgs, leaseGrantArgs, leaseWrapArgs, leaseUnwrapArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, oneof, fn, custom, bytes, ciphered }) => {
+/** The arguments of each lease verb. A stamp is the caller's own fields fixed for its record's life, flat; the lease binds each under the vault's stamp and its own purpose (`box_key_wrapped`, `whisper_ciphered`), so the purposes never leave it. */
+export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, fn, custom, bytes }) => {
   const vault     = obj({ ...vaultStamp.shape, clock: HX.clockShape, lock: fn<() => unknown>() })
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
-  const ctx       = bytes()
+  const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, 'Expected a flat object of strings and numbers')
   return {
+    ctxStamp,
+    serializedBytes: bytes(),
     leaseGetArgs:    obj({ vault, dbfriend: leaseDBFriend }),
     leaseGrantArgs:  obj({ vault, dbfriend: leaseDBFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
-    leaseWrapArgs:   obj({ wrappedKey: cryptoKey, ctx }),
-    leaseUnwrapArgs: obj({ wrapped: ciphered, ctx, usage: oneof(unwrapUsageVals) }),
-    leaseSealArgs:   obj({ serializedWhisper: bytes(), boxKeyCtx: ctx, whisperCtx: ctx }),
-    leaseUnsealArgs: obj({ sealed: sealedWhisper, boxKeyCtx: ctx, whisperCtx: ctx }),
+    leaseSealArgs:   obj({ boxKeyStamp: ctxStamp, whisperStamp: ctxStamp }),
+    leaseUnsealArgs: obj({ sealed: sealedWhisper, boxKeyStamp: ctxStamp, whisperStamp: ctxStamp }),
   }
 }, [FX])
 // --

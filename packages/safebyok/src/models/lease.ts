@@ -1,13 +1,11 @@
 import { consistent } from '../checks/validator'
 import { FarFuture, ForeverMillis } from '../consts'
-import { cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
+import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
 import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
 import { Trigger } from '../helpers/trigger'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
-import type { Ciphered } from '../shapes/fields'
-import * as FX from '../shapes/fields'
-import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type LeaseVault, type SealedWhisper, type UnwrapUsage, type VaultStamp, LeaseFormat, leaseGetArgs, leaseGrantArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, leaseUnwrapArgs, leaseWrapArgs, sealedWhisper, vaultStamp } from './models-shapes'
+import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type LeaseVault, type SealedWhisper, type VaultStamp, LeaseFormat, leaseGetArgs, leaseGrantArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, serializedBytes, vaultStamp } from './models-shapes'
 
 // == [Lease]
 
@@ -106,44 +104,38 @@ export class Lease implements LeaseStamp {
   toJSON(): LeaseSparse { return this.#leaseStamp }
   // --
 
-  // == [Keys under the vaultKey]: wrapKey, unwrapKey
+  // == [Whispers under the vaultKey]: sealWith, unsealWith, ctxOf
 
-  async wrapKey(wrappedKey: CryptoKey, ctx: Uint8Array): Promise<Ciphered> {
-    leaseWrapArgs.parse({ wrappedKey, ctx })
-    const vaultKey = await this.#vaultKey('wrapKey')
-    return FX.ciphered.parse(await wrapKeyUnder(vaultKey, wrappedKey, ctx))
-  }
-
-  async unwrapKey(wrapped: Ciphered, ctx: Uint8Array, usage: UnwrapUsage): Promise<CryptoKey> {
-    leaseUnwrapArgs.parse({ wrapped, ctx, usage })
-    const vaultKey = await this.#vaultKey('unwrapKey')
-    return valOf(await outcomeOf(() => unwrapKeyUnder(vaultKey, wrapped, ctx, { extractable: false, usage: [usage] }), unopenedKey))
-  }
-  // --
-
-  // == [Whispers under the vaultKey]: sealWith, unsealWith
-
-  async sealWith(serializedWhisper: Uint8Array, boxKeyCtx: Uint8Array, whisperCtx: Uint8Array): Promise<SealedWhisper> {
+  /** The bytes are judged first and zeroed whatever follows: a malformed stamp still spends them. */
+  async sealWith(serializedWhisper: Uint8Array, boxKeyStamp: CipherCtxRecord, whisperStamp: CipherCtxRecord): Promise<SealedWhisper> {
+    serializedBytes.parse(serializedWhisper)
     try {
-      leaseSealArgs.parse({ serializedWhisper, boxKeyCtx, whisperCtx })
+      leaseSealArgs.parse({ boxKeyStamp, whisperStamp })
       const vaultKey = await this.#vaultKey('wrapKey')
       const boxKey = await makeBoxKey()
-      const box_key_wrapped  = await wrapKeyUnder(vaultKey, boxKey, boxKeyCtx)
-      const whisper_ciphered = await cipherBytes(boxKey, serializedWhisper, whisperCtx)
+      const box_key_wrapped  = await wrapKeyUnder(vaultKey, boxKey, this.#ctxOf(boxKeyStamp, 'box_key_wrapped'))
+      const whisper_ciphered = await cipherBytes(boxKey, serializedWhisper, this.#ctxOf(whisperStamp, 'whisper_ciphered'))
       return sealedWhisper.parse({ box_key_wrapped, whisper_ciphered })
     } finally {
-      if (serializedWhisper instanceof Uint8Array) { serializedWhisper.fill(0) }
+      serializedWhisper.fill(0)
     }
   }
 
-  async unsealWith(sealed: SealedWhisper, boxKeyCtx: Uint8Array, whisperCtx: Uint8Array): Promise<Uint8Array> {
-    leaseUnsealArgs.parse({ sealed, boxKeyCtx, whisperCtx })
+  async unsealWith(sealed: SealedWhisper, boxKeyStamp: CipherCtxRecord, whisperStamp: CipherCtxRecord): Promise<Uint8Array> {
+    leaseUnsealArgs.parse({ sealed, boxKeyStamp, whisperStamp })
     const vaultKey = await this.#vaultKey('unwrapKey')
+    const boxKeyCtx  = this.#ctxOf(boxKeyStamp, 'box_key_wrapped')
+    const whisperCtx = this.#ctxOf(whisperStamp, 'whisper_ciphered')
     const opened = await outcomeOf(async () => {
       const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, boxKeyCtx, { extractable: false, usage: ['decrypt'] })
       return decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
     }, unopenedWhisper)
     return valOf(opened)
+  }
+
+  /** The caller's stamp under the vault's, bound to one of the lease's purposes. */
+  #ctxOf(stamp: CipherCtxRecord, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array {
+    return cipherCtx([this.#vaultStamp, stamp], purpose)
   }
   // --
 
@@ -169,13 +161,11 @@ export class Lease implements LeaseStamp {
 }
 // --
 
-// == [Refusals]: damagedLease, unopenedWhisper, unopenedKey, leaseForgotten
+// == [Refusals]: damagedLease, unopenedWhisper, leaseForgotten
 
 const damagedLease = (): VaultError => new VaultError('damaged_lease', "This device's lease would not open, so the vault was locked: unlock it again to carry on.")
 
 const unopenedWhisper = (): VaultError => new VaultError('damaged_box', "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed.")
-
-const unopenedKey = (): VaultError => new VaultError('damaged_box', "That wrapped key would not open under this vault's key: it was altered in storage, or wrapped under another vault. Nothing was changed.")
 
 const leaseForgotten = (): VaultError => new VaultError('vault_locked', 'This lease was forgotten when the vault locked: unlock the vault again.')
 // --

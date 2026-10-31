@@ -65,7 +65,7 @@ Proving:
   (not yet on the Vault: the world carries no deviceDB)
 * grant(vault, dbfriend, vaultKey, opts): a put the deviceDB refuses is warned of, not thrown, as the deviceDB is a cache; forget() drops the keys and erases the record (`vault.lock()` queues it); isInForce
 * autolockTrigger: a Trigger (helpers/trigger.ts) scheduled at `autolock_at` (was `ask_passphrase_at`), whose launch is `vault.lock()`; disposed by forget(). The passphrase-pester trigger is the gate's, not the lease's.
-* wrapKey(wrappedKey, ctx), unwrapKey(wrapped, ctx, usage), sealWith(serializedWhisper, boxKeyCtx, whisperCtx), unsealWith(sealed, boxKeyCtx, whisperCtx): each ctx is the complete additional data, bytes the caller (the box) built with `cipherCtx` over its own stamp and the vault's; the lease adds nothing and parses no stamp
+* sealWith(serializedWhisper, boxKeyStamp, whisperStamp), unsealWith(sealed, boxKeyStamp, whisperStamp): the box hands in its two stamps, flat bags of its own fields; the lease binds each under the vault's stamp and its own purpose (`box_key_wrapped`, `whisper_ciphered`). No wrapKey/unwrapKey: a key handle never leaves the lease, and the purposes never leave it either (the Coach, 2026-10-31)
 
 * rename methods: `#tryVaultKey/#vaultKey` instead of vaultKeyOrNull.
 * `decipherWith` and all its descendents can be about 8 lines each, with a couple helpers
