@@ -26,6 +26,11 @@ worker's worktree. Here the script may do both, to what it judges finished, in t
 hand: no push, no branch deleted, no tag made, moved or deleted, no `--force`, and the main
 checkout (`/workspace/byok`) is never touched.
 
+**We keep branches; deleting one is never a habit**, local or remote: a branch stays as the
+record of its work. This skill settles where each local branch finally stands, tagged and pointed
+at its merged head. It never changes a remote branch, and its report never recommends deleting
+one. The one deletion it makes is `attic`'s, when the Coach asks for it, behind an `attic/` tag.
+
 ## 1. Survey
 
 ```sh
@@ -91,5 +96,5 @@ order, each line one branch or worktree:
   what it is, what you found, and what you recommend. These are the questions for the Coach.
 
 Close with one line each for: the count closed already, worktree entries pruned, strays left
-for `attic`, and the script's `remote` count (finished branches still on origin, which GitHub's
-"Automatically delete head branches" setting would clear: the Coach's call). Then end.
+for `attic`, and the script's `remote` count (finished branches still on origin, which stay).
+Then end.
