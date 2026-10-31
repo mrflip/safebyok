@@ -136,8 +136,6 @@ export type ModelsWorld = {
   stored: Map<string, Fetched<BoxRecord, BoxSparse>>
   /** The copies the cache keeps, by boxlabel; `save` replaces the one of its box. */
   cached: Map<string, Cacheable<BoxRecord, BoxSparse>>
-  /** The copies the instances last handed their listing by `[MSX.KeepCopy]`, by boxlabel: the listings {@link boxListingOf} and {@link fakeSealBoxListingOf} make log into it, each instance's `settle` replacing the one before. It follows the instance's state at each `settle`, which the cache's `save` does only at a delivery or a build. */
-  kept: Map<string, Cacheable<BoxRecord, BoxSparse>>
   /** Every watch started, oldest first. A live array. */
   watches: readonly ModelsWatch[]
 
@@ -229,7 +227,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const watches: ModelsWatch[] = []
   const stored = new Map<string, Fetched<BoxRecord, BoxSparse>>()
   const cached = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
-  const kept   = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
   const scripts = {
     get:          new Script<{ scope: Boxscope }>(),
     put:          new Script<{ record: BoxRecord, priorTok: string | null }>(),
@@ -340,7 +337,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, store, cache, calls, badnews, stored, cached, kept, watches,
+    world, store, cache, calls, badnews, stored, cached, watches,
     onBadNews:  (news) => { badnews.push(news) },
     tell:       (told) => { badnews.push(...told) },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
@@ -406,12 +403,45 @@ export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: Model
   }
 }
 
-/** A {@link BoxListing} over the world's vault, store and cache, its bad news logged in `badnews`. `overrides` replaces any of its options; the horizon is ten minutes.
+// == [Testable]: TestableBox, TestableBoxListing, boxListingOf
+
+/** A {@link Box} that shows a test the records it holds, which the storable keeps protected: `_cheat_central` and `_cheat_staged` are its `central` and `staged`, as of now. Hosts get no such door; a test that wants the state itself, not its snapshot, makes its boxes by {@link boxListingOf} or by `new TestableBox`. */
+export class TestableBox extends Box {
+  get _cheat_central(): Fetched<BoxRecord, BoxSparse> { return this.central } // eslint-disable-line unicorn/prefer-private-class-fields
+
+  get _cheat_staged(): Fetched<BoxRecord, BoxSparse> | null { return this.staged } // eslint-disable-line unicorn/prefer-private-class-fields
+}
+
+/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
+export class TestableBoxListing extends BoxListing {
+  protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): TestableBox {
+    return new TestableBox(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+  }
+
+  override async build(input: Parameters<BoxListing['build']>[0]): Promise<TestableBox> { return testableOf(await super.build(input)) }
+
+  override async fetch(...args: Parameters<BoxListing['fetch']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.fetch(...args)) }
+
+  override async put(...args: Parameters<BoxListing['put']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.put(...args)) }
+
+  override async del(...args: Parameters<BoxListing['del']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.del(...args)) }
+
+  override at(...args: Parameters<BoxListing['at']>): TestableBox | null { return nullOrTestableOf(super.at(...args)) }
+}
+
+const testableOf = (box: Box): TestableBox => {
+  if (!(box instanceof TestableBox)) { throw new TypeError('a TestableBoxListing makes only TestableBoxes') }
+  return box
+}
+
+const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null ? null : testableOf(box))
+
+/** A {@link BoxListing} over the world's vault, store and cache, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes.
  *
  * @example const listing = boxListingOf(mw, { maxMillisSinceRefresh: 1000 })
  */
-export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}): BoxListing => (
-  new (keptBoxListingClassOf(mw))({
+export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}): TestableBoxListing => (
+  new TestableBoxListing({
     world:                 mw.world,
     store:                 mw.store,
     cache:                 mw.cache,
@@ -419,16 +449,6 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
     onBadNews:             mw.onBadNews,
     ...overrides,
   })
-)
-
-/** The class of a {@link BoxListing} that logs each copy its instances hand it, by `[MSX.KeepCopy]`, into `mw.kept`. */
-const keptBoxListingClassOf = (mw: ModelsWorld): typeof BoxListing => (
-  class KeptBoxListing extends BoxListing {
-    override [MSX.KeepCopy](cacheable: Cacheable<BoxRecord, BoxSparse>): void {
-      mw.kept.set(cacheable.boxlabel, cacheable)
-      super[MSX.KeepCopy](cacheable)
-    }
-  }
 )
 // --
 
@@ -439,15 +459,15 @@ const keptBoxListingClassOf = (mw: ModelsWorld): typeof BoxListing => (
  * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: 'sk-test', sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each edit
  */
-export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringMakeStaged: () => void = () => undefined): BoxListing => {
-  class FakeSealBox extends Box {
+export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringMakeStaged: () => void = () => undefined): TestableBoxListing => {
+  class FakeSealBox extends TestableBox {
     protected override makeStaged(base: BoxSparse, { sidecar }: BoxProps): Promise<BoxRecord> {
       duringMakeStaged()
       return Promise.resolve({ ...base, sidecar, box_key_wrapped: fakeCiphered(`boxkey-${base.revision_tok}`), whisper_ciphered: fakeCiphered(`whisper-${base.revision_tok}`) })
     }
   }
-  class FakeSealBoxListing extends keptBoxListingClassOf(mw) {
-    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): Box {
+  class FakeSealBoxListing extends TestableBoxListing {
+    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): TestableBox {
       return new FakeSealBox(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
     }
   }
@@ -462,17 +482,7 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
 }
 // --
 
-// == [Peeking]: keptOf, lastSaveOf
-
-/** The copy `box` last handed its listing by `[MSX.KeepCopy]`: its central and staged as of its last `settle`. Undefined for no box; throws where no copy was kept for its boxlabel, as for a box made by a listing neither {@link boxListingOf} nor {@link fakeSealBoxListingOf} made. */
-export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse>
-export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined
-export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined {
-  if (box === null || box === undefined) { return undefined }
-  const kept = mw.kept.get(box.boxlabel)
-  if (kept === undefined) { throw new Error(`no copy was kept for ${box.boxlabel}`) }
-  return kept
-}
+// == [Peeking]: lastSaveOf
 
 /** The copy the listing last saved to the fake device cache for `box`'s scope, as `mw` logged the save; the cache is saved on each delivery and each build, not on an edit, a `send` in flight or `hello`'s revive. Throws where no copy was saved for the scope. */
 export function lastSaveOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse> {

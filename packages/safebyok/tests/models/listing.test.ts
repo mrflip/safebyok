@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
-import { BoxListing } from '../../src/models/box-listing'
 import * as TH from '../test-helpers'
-import { type BoxAnswer, boxDnaOf, boxListingOf, keptOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { type BoxAnswer, TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -11,11 +10,11 @@ describe("listing.fetch(scope): nothing stored for a thing held alive", () => {
   it("refuses 'record_conflict' by the same-revision row same | gone | alive, the box as it was and nothing saved to the cache", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
-    const before = keptOf(held.mw, box)
+    const before = { central: box._cheat_central, staged: box._cheat_staged }
     held.mw.clearCalls()
     held.mw.willGet(held.mw.answerOf(box.scope, null))
     await TH.expectRefusal(listing.fetch(box.scope), 'record_conflict')
-    expect(keptOf(held.mw, box)).to.deep.equal(before)
+    expect({ central: box._cheat_central, staged: box._cheat_staged }).to.deep.equal(before)
     expect(listing.at(box.scope)).to.eq(box)
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'get', 'takeWorld'])
   })
@@ -31,7 +30,8 @@ describe("Listing's pipeline: what every answer takes", () => {
       for (const copy of copies) {
         const box = listing.at(scopeOf(copy.boxlabel))
         expect(box).to.be.instanceOf(Box)
-        expect(keptOf(held.mw, box), copy.boxlabel).to.deep.equal(copy)
+        expect(box?._cheat_central, copy.boxlabel).to.deep.equal(copy.central)
+        expect(box?._cheat_staged, copy.boxlabel).to.deep.equal(copy.staged)
       }
     })
 
@@ -124,7 +124,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("puts a box over the revision its instance expects, and its answer spends the staged", async () => {
       const { listing, box } = await edited()
       expect(box.hasStaged).to.be.true
-      const { staged } = keptOf(held.mw, box)
+      const staged = box._cheat_staged
       held.mw.clearCalls()
       const answered = await listing.put(box)
       const [call] = held.mw.callsOf('put')
@@ -132,7 +132,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(call?.record).to.deep.equal(staged)
       expect(answered).to.eq(box)
       expect(box.hasStaged).to.be.false
-      expect(keptOf(held.mw, box).central).to.deep.equal(staged)
+      expect(box._cheat_central).to.deep.equal(staged)
       expect(box.sidecar).to.deep.equal({ note: 'edited' })
     })
 
@@ -182,7 +182,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       await listing.put(box)
       const saves = held.mw.callsOf('save')
       expect(saves).to.have.lengthOf(1)
-      expect(saves[0]?.cacheable).to.deep.equal(keptOf(held.mw, box))
+      expect(saves[0]?.cacheable).to.deep.include({ central: box._cheat_central, staged: box._cheat_staged })
     })
 
     it("has tryPut resolve the outcome of a refusal, rejecting never", async () => {
@@ -325,8 +325,8 @@ describe("Listing's pipeline: what every answer takes", () => {
       await listing.fetch(scopeOf('two'))
       const saves = held.mw.callsOf('save')
       expect(saves.map(({ cacheable }) => [cacheable.boxlabel, cacheable.central.revision_seq])).to.deep.equal([['one', -1], ['two', 1], ['two', 2]])
-      expect(saves[0]?.cacheable).to.deep.equal(keptOf(held.mw, one))
-      expect(saves[2]?.cacheable).to.deep.equal(keptOf(held.mw, two))
+      expect(saves[0]?.cacheable).to.deep.include({ central: one._cheat_central, staged: one._cheat_staged })
+      expect(saves[2]?.cacheable).to.deep.include({ central: two._cheat_central, staged: two._cheat_staged })
     })
 
     it("saves a delivery that changes nothing too: the answer is delivered, so the copy is current", async () => {
@@ -349,7 +349,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const [saved] = saves
       expect(saved?.cacheable.central).to.deep.equal(fullBoxRecord())
       expect(saved?.cacheable.staged).to.deep.include({ sidecar: { note: 'staged' } })
-      expect(saved?.cacheable).to.deep.equal(keptOf(held.mw, box))
+      expect(saved?.cacheable).to.deep.include({ central: box._cheat_central, staged: box._cheat_staged })
     })
 
     it("makes the snapshot of a box held inside receive, before the save; a save refused is told to onBadNews, not thrown", async () => {
@@ -515,7 +515,7 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("makes each scope's instance once, however it arrives: hello's copy, a build, a fetch, a put, a del, a notice", async () => {
       const copies = await seededCache()
-      const made = vi.spyOn(BoxListing.prototype as unknown as { makeThing: () => Box }, 'makeThing')
+      const made = vi.spyOn(TestableBoxListing.prototype as unknown as { makeThing: () => TestableBox }, 'makeThing')
       try {
         const listing = boxListingOf(held.mw)
         await listing.hello()
@@ -879,11 +879,11 @@ describe("listing: an answer names the scope of the record it carries", () => {
     const listing = boxListingOf(held.mw)
     const asked = await listing.build(fullBoxRecord({ boxlabel: 'asked_box' }))
     const other = await listing.build(fullBoxRecord({ boxlabel: 'other_box' }))
-    const [askedBefore, otherBefore] = [keptOf(held.mw, asked), keptOf(held.mw, other)]
+    const [askedBefore, otherBefore] = [{ central: asked._cheat_central, staged: asked._cheat_staged }, { central: other._cheat_central, staged: other._cheat_staged }]
     held.mw.willGet(held.mw.answerOf(asked.scope, fullBoxRecord({ boxlabel: 'other_box', revision_seq: 2, revision_tok: 'rev-a2' })))
     await TH.expectRefusal(listing.fetch(asked.scope), 'bad_record')
-    expect(keptOf(held.mw, asked)).to.deep.equal(askedBefore)
-    expect(keptOf(held.mw, other)).to.deep.equal(otherBefore)
+    expect({ central: asked._cheat_central, staged: asked._cheat_staged }).to.deep.equal(askedBefore)
+    expect({ central: other._cheat_central, staged: other._cheat_staged }).to.deep.equal(otherBefore)
   })
 
   it("refuses it for a put and a del answered so, and for the record a stale_write carries, told to onBadNews with the stale_write thrown", async () => {
@@ -909,7 +909,7 @@ describe("storable: the tell it is handed when made", () => {
   it("tells a refusal of the refresh its timer launches to the tell it was given, not to the listing's onBadNews", async () => {
     const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
     const told: unknown[] = []
-    const box = new Box(held.mw.world, listing, fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, (news) => { told.push(...news) })
+    const box = new TestableBox(held.mw.world, listing, fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, (news) => { told.push(...news) })
     box.receive(fullBoxRecord())
     const down = new VaultError('storage_unavailable', "Down.")
     held.mw.willGet(held.mw.refusalOf(box.scope, down))
@@ -1034,10 +1034,10 @@ describe("listing: an answer is for the scope the call asked about", () => {
   it("leaves an instance held under the scope asked as it was", async () => {
     const listing = boxListingOf(held.mw)
     const asked = await listing.build(fullBoxRecord({ boxlabel: 'asked_box' }))
-    const before = keptOf(held.mw, asked)
+    const before = { central: asked._cheat_central, staged: asked._cheat_staged }
     held.mw.willGet(held.mw.answerOf(scopeOf('other_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 2, revision_tok: 'rev-a2' })))
     await TH.expectRefusal(listing.fetch(asked.scope), 'bad_record')
-    expect(keptOf(held.mw, asked)).to.deep.equal(before)
+    expect({ central: asked._cheat_central, staged: asked._cheat_staged }).to.deep.equal(before)
     expect(listing.things).to.deep.equal([asked])
   })
 })
@@ -1047,7 +1047,7 @@ const copyStagedUnder = async (vault_tok: string) => {
   const maker = boxListingOf(held.mw)
   const box = await maker.build(fullBoxRecord({ boxlabel: 'staged_box' }))
   await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
-  const copy = keptOf(held.mw, box)
+  const copy = { ...box.sparse, central: box._cheat_central, staged: box._cheat_staged }
   held.mw.clearCalls()
   return { ...copy, staged: { ...copy.staged!, vault_tok } }
 }
@@ -1189,7 +1189,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     expect(putErr.meta).to.be.undefined
     const delErr = await TH.expectRefusal(box.del(), 'stale_write')
     expect(delErr.meta).to.be.undefined
-    expect(keptOf(held.mw, box).central.revision_tok).to.eq('rev-a1')
+    expect(box._cheat_central.revision_tok).to.eq('rev-a1')
     expect(held.mw.stored.size).to.eq(0)
   })
 
@@ -1199,7 +1199,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     const box = await listing.build(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))
     await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'once' } }), 'stale_write')
     await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'twice' } }), 'stale_write')
-    expect(keptOf(held.mw, box).central.revision_seq).to.eq(5)
+    expect(box._cheat_central.revision_seq).to.eq(5)
     expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal(['rev-a5', 'rev-a5'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_tok: 'rev-a3' })
   })
@@ -1214,7 +1214,7 @@ describe("listing[KeepCopy]: the copy each instance's settle hands in, saved to 
     const box = await listing.build(fullBoxRecord())
     held.mw.clearCalls()
     await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
-    expect(keptOf(held.mw, box).staged).to.deep.include({ sidecar: { note: 'staged' } })
+    expect(box._cheat_staged).to.deep.include({ sidecar: { note: 'staged' } })
     expect(held.mw.callsOf('save')).to.deep.equal([])
   })
 
@@ -1224,7 +1224,7 @@ describe("listing[KeepCopy]: the copy each instance's settle hands in, saved to 
     await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
     const [saved] = held.mw.callsOf('save')
     expect(saved?.cacheable.staged).to.be.null
-    expect(keptOf(held.mw, box).staged).to.not.be.null
+    expect(box._cheat_staged).to.not.be.null
   })
 
   it("is handed the copy of a revived instance too, and saves it nowhere: hello's revive saves nothing", async () => {
@@ -1233,7 +1233,8 @@ describe("listing[KeepCopy]: the copy each instance's settle hands in, saved to 
     const listing = boxListingOf(held.mw)
     await listing.hello()
     const box = listing.at(scopeOf(copy.boxlabel))
-    expect(keptOf(held.mw, box)).to.deep.equal(copy)
+    expect(box?._cheat_central).to.deep.equal(copy.central)
+    expect(box?._cheat_staged).to.deep.equal(copy.staged)
     expect(held.mw.callsOf('save')).to.deep.equal([])
   })
 
