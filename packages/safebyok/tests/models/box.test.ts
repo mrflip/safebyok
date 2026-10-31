@@ -96,6 +96,14 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     expect(box._cheat_central).to.eq(central)
   })
 
+  it("throws 'unexpected_error' for a damaged record under another vault_tok at or before the revision held, the vault_tok weighed before damage", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    const central = box._cheat_central
+    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' }, 'd')), 'unexpected_error')
+    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 0, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' }, 'd')), 'unexpected_error')
+    expect(box._cheat_central).to.eq(central)
+  })
+
   it("throws 'unexpected_error' over a draft's central never stored, and for a tombstone or a damaged record under another vault_tok", async () => {
     const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
