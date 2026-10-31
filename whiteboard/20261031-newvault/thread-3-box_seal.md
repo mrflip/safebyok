@@ -1,6 +1,6 @@
 # Thread 3: box_seal (2026-10-31)
 
-Branch `20261031-box_seal`, PR #TBD, stacked on #412 (`20261031-vault_unlock`). Justify: green (safebyok 4561 passed, 37 skipped; every package green). `pnpm size:budget`: the same eight "raise" rows as the base; no `--write`.
+Branch `20261031-box_seal`, PR #413, stacked on #412 (`20261031-vault_unlock`). Justify: green (safebyok 4561 passed, 37 skipped; every package green). `pnpm size:budget`: the same eight "raise" rows as the base; no `--write`.
 
 * **Built**:
   - **Directive 1** (`e446fb49`, on its own): `vault.lock()` queues, as one chore on `#leaseChores`, the held lease's `letGo()` (where one is held) and the vault's own `leaseDBFriend().tryDelLease()`, whether or not it holds a lease; `#dropLease` folded in. Test: goodbye, then `lock()`, leaves no kept lease and the next session asks for the proof (`vault-unlock.test.ts`). Spec `lock()` and `#setLease` lines updated.
@@ -29,4 +29,4 @@ Branch `20261031-box_seal`, PR #TBD, stacked on #412 (`20261031-vault_unlock`). 
   - Thread 5 (`20261031-tests_models`) pins that `ctxStamp` passes `{}`; directive 3 makes it refuse. Retitle that pin to the refusal, or drop it, when it restacks onto this branch.
   - `stub-seal.ts` is gone: a later branch importing `StubBoxKeyWrapped`/`StubWhisperCiphered` takes `FakeBoxKeyWrapped`/`FakeWhisperCiphered` from `tests/test-helpers/models-world.ts`.
   - Thread 6's round trip can build on `boxWorldOf` and `box-seal.test.ts`.
-* **For the Coach**: the ouch carry (above) wants a ruling: seal again at the carry, or drop the edit with bad news, or leave it pinned until the consistency lanes return.
+* **For the Coach**: the ouch carry (above) wants a ruling: seal again at the carry, drop the edit with bad news (my recommendation, for now), or leave it pinned until the consistency lanes return. And whether the stamp should bind the revision and times (VOCABULARY says yes, which I followed) or only the fields fixed for the box's life.
