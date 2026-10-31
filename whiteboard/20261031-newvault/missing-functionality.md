@@ -56,3 +56,41 @@
 5. **The DeviceDB leaseDBFriend plus lease length options** (`leaseHours`, renewal, keep-failure tolerance), so a reload does not re-ask.
 
 Close behind: vault deletion with passphrase proof, and box limits/capacity.
+
+## The Coach's rulings (2026-10-31, highlighted on the sprint doc's Roadmap Gaps tab)
+
+*Orchestrator: carried here word for word; "implement" means the next sprint unless a thread of this one is named.*
+
+| Item | Ruling |
+|---|---|
+| Lease lifetime | "This is autolock now": the autolock is reset on every lease grant or renewal, default 14 days (thread 2 for the default) |
+| Keep-on-device failure | "yeah skip" (already in: `Lease.grant` warns on a refused put) |
+| Gate epoch voiding | "implement" |
+| Take-up at birth | "implement" (thread 2) |
+| Rollback and drift guard | "proceed. I'm not against all consistency checks -- its the old code's mania for them I'm against." |
+| Passphrase strength | "implement" |
+| Gating reason | no mark |
+| Passkey flow | no mark |
+| Passphrase pester | no mark (defined on Open Matters: a seven-day prompt, reset when the passphrase is given; not this sprint) |
+| Damaged or unknown wayins | no mark |
+| Key-deriver loading | no mark |
+| Whisper access | "implement" |
+| Limits | "hold" |
+| Names | "implement" |
+| Damaged boxes | "hold" |
+| Whisper-field helper | "hold" |
+| Bank itself | "implement but very simply" |
+| Letting go | no mark |
+| Watch lifecycle | "implement" |
+| Local refresh defaults | no mark |
+| Two-device races | no mark |
+| Bad news | "implement" |
+| Snapshot content | "implement" |
+| Bank options | "implement" |
+| Two forms | no mark |
+| Index exports | "implement exporting as safebyok/v6" |
+| Refusal kinds | no mark |
+| DeviceDB | "implement using the current DeviceDB" (thread 2: the world's deviceDB is the current `DeviceDB` class) |
+| Device record | "implement" |
+| Cache load of vaults | "implement" |
+| Local VaultDB | no mark |
