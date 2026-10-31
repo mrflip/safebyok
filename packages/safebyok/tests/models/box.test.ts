@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { type BoxProps, type BoxSnapshot, LOCKED } from '../../src/models/box'
-import type { BoxRecord, BoxSparse, Fetched } from '../../src/models/models-shapes'
+import type { BoxProps, BoxSnapshot } from '../../src/models/box'
+import { type BoxRecord, type BoxSparse, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
 import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as TH from '../test-helpers'

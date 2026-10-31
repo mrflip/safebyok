@@ -6,10 +6,7 @@ import { type BoxRecord, type BoxSparse, type EditOpts, type LockedBag, type Whi
 import { Storable } from './storable'
 import { stubSeal } from './stub-seal'
 
-// == [Record forms]: LOCKED, BoxSnapshot, BoxProps, namesBoth
-
-/** The frozen bag `box.whisper` answers while the vault is locked, made in models-shapes beside its brand: tell it apart with `Storable.isLockedFUBag(val)`. */
-export { LOCKED } from './models-shapes'
+// == [Record forms]: BoxSnapshot, BoxProps, namesBoth
 
 export type BoxSnapshot = Boxscope & Readonly<{
   revision_tok:  string
