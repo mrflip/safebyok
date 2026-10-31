@@ -1,7 +1,13 @@
-# Sprint storable, paused (2026-10-31)
+# Sprint storable, paused (2026-10-31, second pause)
 
-Paused on one call of the Coach's; every remaining thread is stacked on it.
+Main has merged the line through #407 (threads up to and including 25's first rework).
 
-* **Filed:** threads through 23. Open line: main → #402 → #403 → #404 → #405 → #406, then #407 (unfiled) and #369 (the sprint plan PR, draft, on top). Main has merged through #390.
-* **Waiting:** thread 25 (`life_tok`, PR #407), unfiled in `/workspace/byok-life_tok` at 01369ba5 (pushed). Its second and last review flagged a significant finding: a damaged central (an ouchstone) keeps the old life's `box_tok`, so the intact copy of its revision throws `record_conflict` (`OneRevisionTwoLives`) where the damage NOTE's rows say 'fill' or 'gone'. The review comment on #407 has the trace and the two options; the sprint doc's Open Matters has it as a TOP row. Recommendation: damage before life on the central too, a one-line move with two table tests.
-* **Then:** on the Coach's word, a fresh worker makes the fix, thread 25 files, and thread 24 (`receive_table`) is cut from its tip; then 19, 20, 6, and the wrapup.
+Thread 25's second rework, on the Coach's ruling (a) (damage before life on the central too), is
+green at 07a6996d on `20261031-life_tok`: 790414bc `models:`, 63bc1f55 `docs:`, 07a6996d `plan:`.
+#407 merged five minutes before it began, so the three commits sit past main in no PR. The
+worker's `gh pr create` was refused by the permission classifier (External System Writes); the
+orchestrator has not tried it. The PR body is ready at
+/tmp/claude-1000/-workspace-byok/b8e332a0-1c7d-407b-b51e-0642eab0189f/scratchpad/life_tok/pr-body.md.
+
+Waiting: 24 (cut from `20261031-life_tok` once its PR exists), then 19, 20, 6. Worktree
+/workspace/byok-life_tok is clean and pushed. The sprint PR is #369.

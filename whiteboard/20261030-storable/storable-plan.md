@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** resumed 2026-10-31 on the Coach's ruling (a) for #407 (damage before life on the central too). Main has merged through #390; filed through #406 (thread 23); 25 in its last rework, no third review; then 24, 19, 20, then 6.
+* **Status:** paused 2026-10-31: main has merged through #407 (thread 25). Thread 25's second rework (ruling a) is green at 07a6996d on 20261031-life_tok, in no PR: the worker's gh pr create was refused, so the Coach opens it. Then 24, 19, 20, then 6.
 
 ## Read first
 
