@@ -25,13 +25,11 @@ const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ vault: DuckVault, 
   return { vault, friend, lease }
 }
 
-const keptOf = (friend: FakeDBFriend): LeaseRecord => friend.kept as LeaseRecord
-
 describe("Lease.grant(vault, dbfriend, vaultKey, opts)", () => {
   it("keeps a lease record of the vault through tryPutLease: fmt 7001, the vault's stamp, autolock_at leaseMillis from now, a leaseKey handle and the wrapped vaultKey", async () => {
     const { friend } = await grantedWorld()
     expect(friend.tryPutLease).toHaveBeenCalledTimes(1)
-    const record = keptOf(friend)
+    const record = friend.kept as LeaseRecord
     expect(record).to.deep.include({ ...WorldStamp, fmt: LeaseFormat, autolock_at: T0 + WeekMillis })
     expect(Object.keys(record)).to.have.members([...StampFieldnames, 'lease_key', 'vault_key_lease_wrapped'])
     expect(Object.keys(record.vault_key_lease_wrapped)).to.have.members(['cipher_iv_b64', 'ciphertext_b64'])
@@ -39,7 +37,7 @@ describe("Lease.grant(vault, dbfriend, vaultKey, opts)", () => {
 
   it("makes its leaseKey non-extractable, usable only to wrap and unwrap (G4)", async () => {
     const { friend } = await grantedWorld()
-    const { lease_key } = keptOf(friend)
+    const { lease_key } = friend.kept as LeaseRecord
     expect(isLeaseKey(lease_key)).to.be.true
     expect(lease_key.extractable).to.be.false
   })
@@ -148,7 +146,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
   it("warns of a lease of another vault quoting none of its record: neither its ciphertext nor its stamp", async () => {
     const friend = fakeDBFriendOf()
     await grantedLeaseOf(duckVaultOf({ vault_tok: 'vault-tok-SIBLING' }), friend)
-    const { vault_key_lease_wrapped } = keptOf(friend)
+    const { vault_key_lease_wrapped } = friend.kept as LeaseRecord
     await Lease.get(duckVaultOf(), friend)
     const logged = TH.loggedText(friend.logged)
     expect(logged).to.not.include(vault_key_lease_wrapped.ciphertext_b64)
@@ -166,7 +164,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
   for (const [tamper, blurb] of MalformedCases) {
     it(`reads a kept record ${blurb} as none, with a warning`, async () => {
       const { friend } = await grantedWorld()
-      friend.kept = tamper(keptOf(friend), await makeVaultKey())
+      friend.kept = tamper(friend.kept as LeaseRecord, await makeVaultKey())
       expect(await Lease.get(duckVaultOf(), friend)).to.be.null
       expect(friend.logged.map(({ level }) => level)).to.deep.equal(['warn'])
     })
@@ -368,7 +366,7 @@ describe("a tampered lease record", () => {
       const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
       const otherFriend = fakeDBFriendOf()
       await grantedLeaseOf(duckVaultOf(), otherFriend)
-      friend.kept = tamper(keptOf(friend), keptOf(otherFriend))
+      friend.kept = tamper(friend.kept as LeaseRecord, otherFriend.kept as LeaseRecord)
       const vault = duckVaultOf()
       const got = await Lease.get(vault, friend)
       expect(got).to.be.instanceOf(Lease)
@@ -382,11 +380,11 @@ describe("a tampered lease record", () => {
 
   it("refuses 'damaged_lease' quoting none of the record", async () => {
     const { friend } = await grantedWorld()
-    friend.kept = { ...keptOf(friend), autolock_at: T0 + (2 * WeekMillis) }
+    friend.kept = { ...(friend.kept as LeaseRecord), autolock_at: T0 + (2 * WeekMillis) }
     const got = await Lease.get(duckVaultOf(), friend)
     const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
     const err = await TH.expectRefusal(got!.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'damaged_lease')
-    expect(TH.thrownText(err)).to.not.include(keptOf(friend).vault_key_lease_wrapped.ciphertext_b64)
+    expect(TH.thrownText(err)).to.not.include((friend.kept as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
   })
 })
 
@@ -400,7 +398,7 @@ describe("what a lease shows", () => {
     const { friend, lease } = await grantedWorld()
     expect(TH.jsonOf(lease)).to.deep.equal({ ...WorldStamp, fmt: LeaseFormat, autolock_at: T0 + WeekMillis })
     expect(lease.toJSON()).to.deep.equal(TH.jsonOf(lease))
-    expect(JSON.stringify(lease)).to.not.include(keptOf(friend).vault_key_lease_wrapped.ciphertext_b64)
+    expect(JSON.stringify(lease)).to.not.include((friend.kept as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
   })
 
   it("is frozen: its stamp cannot be changed", async () => {
