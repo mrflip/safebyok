@@ -29,7 +29,7 @@ const Checks = Checkers('bad_option', ({ custom }) => ({
 }))
 // --
 
-// == [Proving]: makeProvingPair, attempt, makeWayin, makeLease, demandOpens, wrapVaultKey, unwrapVaultKey, toJSON
+// == [Proving]: makeProvingPair, attempt, makeWayin, makeLease, checkOpens, wrapVaultKey, unwrapVaultKey, toJSON
 
 export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   readonly wayinkind: HeaderT['wayinkind']
@@ -73,7 +73,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
       const proving: Proving = passphrase === undefined
         ? await PasskeyProving.ofWayin(checked, wayins.passkey_wayin, passkeyAnswer)
         : await PassphraseProving.ofWayin(checked, world, wayins.passphrase_wayin, passphrase)
-      await proving.#demandOpens()
+      await proving.#checkOpens()
       return proving
     } finally {
       spendAnswer(handed)
@@ -97,7 +97,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
 
   /** Unwrap the stored wayin's vaultKey and drop it: the ctx is built before the catch, so a refusal means only that the key did not open the wrap (guarantees.md, G3). */
-  async #demandOpens(): Promise<void> {
+  async #checkOpens(): Promise<void> {
     const wrongProof = this.wayinkind === 'passphrase' ? wrongPassphrase : wrongPasskey
     const { vault_key_wayin_wrapped } = this.#demandWayin()
     const ctx = this.#wayinCtx()
