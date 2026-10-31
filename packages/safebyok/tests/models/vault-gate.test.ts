@@ -1,50 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Lease } from '../../src/models/lease'
-import type { ProofClosure } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
-import { Dna, LeaseMillis, Passphrase, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
-const NewPassphrase = 'a new passphrase for the vault'
-
-const BoxKeyStamp  = Object.freeze({ boxlabel: 'anthropic_api_key' })
-const WhisperStamp = Object.freeze({ revision_seq: 1 })
-
-/** What `opener` unseals of a whisper `sealer` seals: the two hold one vaultKey only if it comes back. */
-const roundTrip = async (sealer: Lease, opener: Lease): Promise<string> => {
-  const sealed = await sealer.sealWith(new TextEncoder().encode('sk-test'), BoxKeyStamp, WhisperStamp)
-  return new TextDecoder().decode(await opener.unsealWith(sealed, BoxKeyStamp, WhisperStamp))
-}
-
-/** A vault born of `Dna` under `Passphrase` and sent, in a fresh world: unlocked, its lease kept on the device. */
-const bornVault = async (proofClosure: ProofClosure = () => ({ passphrase: Passphrase })) => {
-  const world = makeVaultWorld()
-  const vault = await world.listing.build(Dna, proofClosure)
-  await vault.send({})
-  const storedGate = () => {
-    const record = world.storedNow()
-    if (record === null) { throw new Error('nothing stored') }
-    return record.gate
-  }
-  return { ...world, vault, storedGate }
-}
-
-const bornWithPasskey = async () => {
-  const passkeyAnswer = await TH.passkeyOf('laptop')
-  return bornVault(() => ({ passphrase: Passphrase, passkeyAnswer }))
-}
-
-const byPassphrase = (passphrase: string) => () => ({ passphrase })
-const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await TH.passkeyOf(tag) })
-
 describe("Vault.replacePassphrase", () => {
   it("replaces the passphrase wayin and keeps the passkey wayin as stored: the new passphrase opens, the old refuses 'wrong_passphrase', the passkey still opens, and the lease held stays in force", async () => {
-    const { vault, storedGate, opts: { world } } = await bornWithPasskey()
+    const { vault, demandStored, opts: { world } } = await makeBornVaultWithPasskey()
     const held = vault.demandLease()
-    const ante = storedGate()
+    const ante = demandStored().gate
     expect(await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))).to.equal(vault)
-    const post = storedGate()
+    const post = demandStored().gate
     expect(post.passphrase_wayin).not.to.deep.equal(ante.passphrase_wayin)
     expect(post.passkey_wayin).to.deep.equal(ante.passkey_wayin)
     expect(vault.gate.pickle()).to.deep.equal(post)
@@ -60,7 +26,7 @@ describe("Vault.replacePassphrase", () => {
   })
 
   it("refuses a wrong current proof with the attempt's own refusal, asking for no new passphrase and storing nothing", async () => {
-    const { vault, storedNow } = await bornVault()
+    const { vault, storedNow } = await makeBornVault()
     const ante = storedNow()
     const passphraseClosure = vi.fn(byPassphrase(NewPassphrase))
     await TH.expectRefusal(vault.replacePassphrase(byPassphrase('not the passphrase'), passphraseClosure), 'wrong_passphrase')
@@ -69,7 +35,7 @@ describe("Vault.replacePassphrase", () => {
   })
 
   it("refuses 'bad_option' a proof by passkey, which unlocks but does not change the gate: it asks for no new passphrase, stores nothing, and spends the answer's PRF bytes", async () => {
-    const { vault, storedNow } = await bornWithPasskey()
+    const { vault, storedNow } = await makeBornVaultWithPasskey()
     const ante = storedNow()
     const passkeyAnswer = await TH.passkeyOf('laptop')
     const passphraseClosure = vi.fn(byPassphrase(NewPassphrase))
@@ -80,7 +46,7 @@ describe("Vault.replacePassphrase", () => {
   })
 
   it("refuses 'stale_write' where the gate changes elsewhere while it proves, storing nothing, its meta naming the revision stored and the one it had staged: a passkey revoked meanwhile stays revoked", async () => {
-    const { vault, storedNow, storedGate, storeBehindOurBack, advance } = await bornWithPasskey()
+    const { vault, storedNow, demandStored, storeBehindOurBack, advance } = await makeBornVaultWithPasskey()
     let revokedSeq = 0
     const proofClosure = () => {
       const record = storedNow()
@@ -93,12 +59,12 @@ describe("Vault.replacePassphrase", () => {
     expect(err.meta?.stored_revision?.revision_seq).to.eq(revokedSeq)
     expect(err.meta?.staged_revision?.revision_seq).to.eq(revokedSeq + 1)
     expect(storedNow()?.revision_seq).to.eq(revokedSeq)
-    expect(storedGate().passkey_wayin).to.be.null
+    expect(demandStored().gate.passkey_wayin).to.be.null
     expect(vault.gate.pkWayin).to.be.null
   })
 
   it("refuses 'bad_option' a passphrase closure that is no function, before asking for the proof", async () => {
-    const { vault } = await bornVault()
+    const { vault } = await makeBornVault()
     const proofClosure = vi.fn(byPassphrase(Passphrase))
     await TH.expectRefusal(vault.replacePassphrase(proofClosure, 'not a closure' as never), 'bad_option')
     expect(proofClosure).not.toHaveBeenCalled()
@@ -107,10 +73,10 @@ describe("Vault.replacePassphrase", () => {
 
 describe("Vault.addPasskey", () => {
   it("adds a passkey wayin, sealed from the proving that opened, which the passkey then opens; the passphrase wayin stays as stored", async () => {
-    const { vault, storedGate, opts: { world } } = await bornVault()
-    const ante = storedGate()
+    const { vault, demandStored, opts: { world } } = await makeBornVault()
+    const ante = demandStored().gate
     await vault.addPasskey(byPassphrase(Passphrase), byPasskey('laptop'))
-    const post = storedGate()
+    const post = demandStored().gate
     expect(post.passphrase_wayin).to.deep.equal(ante.passphrase_wayin)
     const { credential_id } = await TH.passkeyOf('laptop')
     expect(post.passkey_wayin?.credential_id).to.eq(credential_id)
@@ -121,7 +87,7 @@ describe("Vault.addPasskey", () => {
   })
 
   it("refuses 'bad_option' on a vault that has a passkey, asking nothing", async () => {
-    const { vault } = await bornWithPasskey()
+    const { vault } = await makeBornVaultWithPasskey()
     const proofClosure = vi.fn(byPassphrase(Passphrase))
     const passkeyClosure = vi.fn(byPasskey('phone'))
     await TH.expectRefusal(vault.addPasskey(proofClosure, passkeyClosure), 'bad_option')
@@ -130,7 +96,7 @@ describe("Vault.addPasskey", () => {
   })
 
   it("refuses a wrong current proof with the attempt's own refusal, asking for no passkey and storing nothing", async () => {
-    const { vault, storedNow } = await bornVault()
+    const { vault, storedNow } = await makeBornVault()
     const ante = storedNow()
     const passkeyClosure = vi.fn(byPasskey('laptop'))
     await TH.expectRefusal(vault.addPasskey(byPassphrase('not the passphrase'), passkeyClosure), 'wrong_passphrase')
@@ -139,7 +105,7 @@ describe("Vault.addPasskey", () => {
   })
 
   it("zeroes the PRF bytes of an answer it refuses: a closure answering more than the passkey's answer refuses 'bad_option', and stores nothing", async () => {
-    const { vault, storedNow } = await bornVault()
+    const { vault, storedNow } = await makeBornVault()
     const ante = storedNow()
     const passkeyAnswer = await TH.passkeyOf('laptop')
     await TH.expectRefusal(vault.addPasskey(byPassphrase(Passphrase), () => ({ passkeyAnswer, extra: true }) as never), 'bad_option')
@@ -150,17 +116,17 @@ describe("Vault.addPasskey", () => {
 
 describe("Vault.revokePasskey", () => {
   it("revokes the passkey: the gate holds none, the passkey refuses 'wrong_passkey', and the passphrase still opens", async () => {
-    const { vault, storedGate, opts: { world } } = await bornWithPasskey()
-    const ante = storedGate()
+    const { vault, demandStored, opts: { world } } = await makeBornVaultWithPasskey()
+    const ante = demandStored().gate
     await vault.revokePasskey(byPassphrase(Passphrase))
-    expect(storedGate()).to.deep.equal({ passphrase_wayin: ante.passphrase_wayin, passkey_wayin: null })
+    expect(demandStored().gate).to.deep.equal({ passphrase_wayin: ante.passphrase_wayin, passkey_wayin: null })
     await TH.expectRefusal(vault.gate.attemptProof(byPasskey('laptop'), world), 'wrong_passkey')
     const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
     expect(proving.wayinkind).to.eq('passphrase')
   })
 
   it("refuses a wrong current proof with the attempt's own refusal, storing nothing: the passkey still opens", async () => {
-    const { vault, storedNow, opts: { world } } = await bornWithPasskey()
+    const { vault, storedNow, opts: { world } } = await makeBornVaultWithPasskey()
     const ante = storedNow()
     await TH.expectRefusal(vault.revokePasskey(byPasskey('phone')), 'wrong_passkey')
     expect(storedNow()).to.equal(ante)
@@ -169,7 +135,7 @@ describe("Vault.revokePasskey", () => {
   })
 
   it("refuses 'bad_option' a proof by the passkey it would revoke, storing nothing: the passkey still opens", async () => {
-    const { vault, storedNow, opts: { world } } = await bornWithPasskey()
+    const { vault, storedNow, opts: { world } } = await makeBornVaultWithPasskey()
     const ante = storedNow()
     await TH.expectRefusal(vault.revokePasskey(byPasskey('laptop')), 'bad_option')
     expect(storedNow()).to.equal(ante)
@@ -178,7 +144,7 @@ describe("Vault.revokePasskey", () => {
   })
 
   it("refuses 'absent_wayin' on a vault without a passkey, asking nothing; the try form answers it as an Outcome", async () => {
-    const { vault } = await bornVault()
+    const { vault } = await makeBornVault()
     const proofClosure = vi.fn(byPassphrase(Passphrase))
     await TH.expectRefusal(vault.revokePasskey(proofClosure), 'absent_wayin')
     await TH.expectBad(vault.tryRevokePasskey(proofClosure), 'absent_wayin')
@@ -188,7 +154,7 @@ describe("Vault.revokePasskey", () => {
 
 describe("The gate operations' try forms", () => {
   it("answer the vault as a good Outcome, and a refusal as a bad one", async () => {
-    const { vault } = await bornVault()
+    const { vault } = await makeBornVault()
     const [oldPassphrase, newPassphrase, laptopPasskey] = [byPassphrase(Passphrase), byPassphrase(NewPassphrase), byPasskey('laptop')]
     expect(await TH.expectGood(vault.tryAddPasskey(oldPassphrase, laptopPasskey))).to.equal(vault)
     expect(await TH.expectGood(vault.tryReplacePassphrase(oldPassphrase, newPassphrase))).to.equal(vault)

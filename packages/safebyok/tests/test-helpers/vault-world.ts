@@ -3,12 +3,13 @@
 import { afterEach, vi } from 'vitest'
 import type { VaultScope } from '../../src/shapes/scopes'
 import type { BoxWorld } from '../../src/models/box-listing'
-import type { VaultRecord, VaultSparse } from '../../src/models/models-shapes'
+import type { Lease } from '../../src/models/lease'
+import type { ProofClosure, VaultRecord, VaultSparse } from '../../src/models/models-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, Proving } from '../../src/models/proving'
 import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
 import { quietLogger } from './logging'
-import { testDeriver } from './builders'
+import { passkeyOf, testDeriver } from './builders'
 
 /** The clock's first reading: 31 October 2026. */
 export const T0 = Date.UTC(2026, 9, 31)
@@ -17,6 +18,15 @@ export const T0 = Date.UTC(2026, 9, 31)
 export const Dna = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
 
 export const Passphrase = 'correct horse battery staple'
+
+/** The passphrase a gate change sets in place of {@link Passphrase}. */
+export const NewPassphrase = 'a new passphrase for the vault'
+
+/** The proof closure of a user who types `passphrase`. */
+export const byPassphrase = (passphrase: string) => () => ({ passphrase })
+
+/** The proof closure of a user who touches the passkey `tag` names, its answer as `passkeyOf` makes it. */
+export const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await passkeyOf(tag) })
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
@@ -88,8 +98,12 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
     return stored
   }
+  const demandStored = (): VaultRecord => {
+    if (stored === null) { throw new Error('nothing stored') }
+    return stored
+  }
   return {
-    listing, opts, deviceDB, storeBehindOurBack,
+    listing, opts, deviceDB, storeBehindOurBack, demandStored,
     storedNow:      () => stored,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
     anotherSession: makeListing,
@@ -101,12 +115,33 @@ export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
 /** The record of a vault built of `Dna`, gated under `passphrase` and sent, as a vaultDB holds it. */
 export const storedVaultRecord = async (passphrase: string = Passphrase): Promise<VaultRecord> => {
-  const { listing, storedNow } = makeVaultWorld()
-  const vault = await listing.build(Dna, () => ({ passphrase }))
+  const { listing, demandStored } = makeVaultWorld()
+  const vault = await listing.build(Dna, byPassphrase(passphrase))
   await vault.send({})
-  const record = storedNow()
-  if (record === null) { throw new Error('nothing stored') }
-  return record
+  return demandStored()
+}
+
+/** A vault born of `Dna` by `proofClosure` (under {@link Passphrase} unless told otherwise) and sent, in a fresh world: unlocked, its lease kept on the device. */
+export const makeBornVault = async (proofClosure: ProofClosure = byPassphrase(Passphrase)) => {
+  const world = makeVaultWorld()
+  const vault = await world.listing.build(Dna, proofClosure)
+  await vault.send({})
+  return { ...world, vault }
+}
+
+/** A vault born as {@link makeBornVault} makes it, with the passkey of the `laptop` beside the passphrase. */
+export const makeBornVaultWithPasskey = async () => {
+  const passkeyAnswer = await passkeyOf('laptop')
+  return makeBornVault(() => ({ passphrase: Passphrase, passkeyAnswer }))
+}
+
+const RoundTripBoxKeyStamp  = Object.freeze({ boxlabel: 'anthropic_api_key' })
+const RoundTripWhisperStamp = Object.freeze({ revision_seq: 1 })
+
+/** What `opener` unseals of a whisper `sealer` seals: the two hold one vaultKey only if it comes back. */
+export const roundTrip = async (sealer: Lease, opener: Lease): Promise<string> => {
+  const sealed = await sealer.sealWith(new TextEncoder().encode('sk-test'), RoundTripBoxKeyStamp, RoundTripWhisperStamp)
+  return new TextDecoder().decode(await opener.unsealWith(sealed, RoundTripBoxKeyStamp, RoundTripWhisperStamp))
 }
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
