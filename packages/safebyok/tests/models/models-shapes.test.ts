@@ -672,7 +672,7 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
 })
 
 describe("MSX.whisperHolder", () => {
-  holdsCases(MSX.whisperHolder, 'bad_whisper', [
+  holdsCases(MSX.whisperHolder, 'bad_option', [
     // a whisper as its val, any JSON a whisper can carry:
     [{ val: 'sk-ant-fake' },                                true,  'passes a string, as its first example shows'],
     [{ val: { apiKey: 'sk-ant-fake', orgId: null } },       true,  'passes a plain object, null inside it, as its second example shows'],
@@ -707,8 +707,8 @@ describe("MSX.whisperHolder", () => {
   })
 
   it("names the failing field: val for a val no whisper may be, none for a whisper not given as { val }", () => {
-    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse({ val: null }), 'bad_whisper').meta?.fieldnames).to.deep.equal(['val'])
-    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse('sk-ant-fake'), 'bad_whisper').meta?.fieldnames).to.deep.equal([])
+    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse({ val: null }), 'bad_option').meta?.fieldnames).to.deep.equal(['val'])
+    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse('sk-ant-fake'), 'bad_option').meta?.fieldnames).to.deep.equal([])
   })
 
   it("quotes nothing of what it was handed, a val's secret or a field's name, in its message, meta, cause or stack", () => {
@@ -721,9 +721,70 @@ describe("MSX.whisperHolder", () => {
       { SECRET_FIELD: 'SECRET-VAL' },
     ]
     for (const marked of Marked) {
-      const err = TH.expectSyncRefusal(() => MSX.whisperHolder.parse(marked), 'bad_whisper')
+      const err = TH.expectSyncRefusal(() => MSX.whisperHolder.parse(marked), 'bad_option')
       expect(TH.thrownText(err)).to.not.include('SECRET')
       expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     }
+  })
+})
+
+describe("MSX.whisperHolder and LOCKED", () => {
+  it("refuses LOCKED as 'bad_option' with a sentence that names it, and a copy of it as no { val }", () => {
+    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse(MSX.LOCKED), 'bad_option').message).to.include('LOCKED is not a whisper: unseal or expose one first')
+    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse({ ...MSX.LOCKED }), 'bad_option').message).to.not.include('LOCKED')
+  })
+})
+
+describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its patch", () => {
+  const whisper = { val: 'sk-ant-fake' }
+  const { sidecar: _sidecar, ...sealedless } = full
+
+  describe("boxDna", () => {
+    holdsCases(MSX.boxDna, 'bad_option', [
+      [{ ...scope, whisper, sidecar: {} },                                   true,  'passes the scope, whisper and sidecar, as its first example shows'],
+      [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls, as its second example shows'],
+      [{ ...scope, whisper },                                                false, 'refuses a dna with no sidecar, as its third example shows'],
+      [{ ...scope, whisper, sidecar: {}, revision_seq: 3 },                  false, 'refuses a revision_seq, as its fourth example shows'],
+      [{ ...scope, whisper, sidecar: {}, whisper_ciphered: full.whisper_ciphered }, false, 'refuses a sealed part, as its fifth example shows'],
+      [{ ...scope, whisper, sidecar: {}, am: 'q' },                          false, 'refuses a factory prop that fails its check'],
+      [{ whisper, sidecar: {} },                                             false, 'refuses a dna with no scope'],
+    ])
+
+    it("strips the props the factory controls and fills the whisper's codec", () => {
+      const given = { ...scope, whisper, sidecar: {}, fmt: MSX.BoxFormat, am: 'x', vault_tok: 'tok-u1', revision_tok: 'rev-given', registered_at: T0, written_at: T0 }
+      expect(MSX.boxDna.parse(given)).to.deep.equal({ ...scope, whisper, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
+    })
+  })
+
+  describe("boxPatch", () => {
+    holdsCases(MSX.boxPatch, 'bad_option', [
+      [{ whisper, sidecar: {} },                                             true,  'passes the whisper and the sidecar alone'],
+      [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with its whisper and a sidecar, as its sixth example shows'],
+      [{ ...sparse, whisper, sidecar: {} },                                  true,  'passes a sparse record given back so'],
+      [{ ...sealedless, revision_seq: 99, am: 'x', whisper, sidecar: {} },   true,  'passes the factory props, revision_seq among them, whatever they say'],
+      [{ whisper },                                                          false, 'refuses a patch with no sidecar'],
+      [{ sidecar: {} },                                                      false, 'refuses a patch with no whisper'],
+      [{ whisper: MSX.LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper, as its seventh example shows'],
+      [{ whisper: 'sk-ant-fake', sidecar: {} },                              false, 'refuses a bare whisper'],
+      [{ whisper, sidecar: 'note' },                                         false, 'refuses a sidecar that fails its check'],
+      [{ ...full, revision_seq: 'one', whisper, sidecar: {} },               false, 'refuses a factory prop that fails its check'],
+      [{ ...full, boxlabel: 'B', whisper, sidecar: {} },                     false, 'refuses a scope field that fails its check'],
+      [{ whisper, sidecar: {}, sidecarr: {} },                               false, 'refuses a field no box record has'],
+      [undefined,                                                            false, 'refuses undefined'],
+    ])
+
+    it("hands back the whisper, the sidecar, and the scope's fields as given, stripping the rest", () => {
+      expect(MSX.boxPatch.parse({ ...full, whisper, sidecar: { note: 'new' } })).to.deep.equal({ ...scope, whisper, sidecar: { note: 'new' } })
+      expect(MSX.boxPatch.parse({ whisper, sidecar: {} })).to.deep.equal({ whisper, sidecar: {}, applabel: undefined, user_id: undefined, vaultlabel: undefined, boxlabel: undefined })
+    })
+
+    it("names the failing field, quoting nothing of a whisper or a field's name", () => {
+      expect(TH.expectSyncRefusal(() => MSX.boxPatch.parse({ whisper: { val: null }, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper.val'])
+      for (const marked of [{ whisper: { val: { SECRET: undefined } }, sidecar: {} }, { whisper: { val: 'SECRET-VAL' }, sidecar: {}, SECRET_FIELD: 1 }]) {
+        const err = TH.expectSyncRefusal(() => MSX.boxPatch.parse(marked), 'bad_option')
+        expect(TH.thrownText(err)).to.not.include('SECRET')
+        expect(JSON.stringify(err.meta)).to.not.include('SECRET')
+      }
+    })
   })
 })

@@ -97,9 +97,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Listing verbs]: at, things, watchableThings, build, hydrateAll
 
-  /** The instance held under `scope`, or null. Calls nothing. */
+  /** The instance held under `scope`, or null. Calls nothing. A scope that fails {@link scopeOf} refuses as it does. */
   at(scope: ScopeT): ThingT | null {
-    return this.#things.get(this.scopepathOf(scope)) ?? null
+    return this.#things.get(this.scopepathOf(this.scopeOf(scope))) ?? null
   }
 
   get things(): readonly ThingT[] { return [...this.#things.values()] }
@@ -121,9 +121,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.#buildOrReceive(this.scopeOf(draft), { flavor: 'drafted', draft })
   }
 
-  /** Hydrate every instance held. A hydrate that is refused is told as bad news, and the others go on. */
+  /** Hydrate every instance held. A hydrate that is refused is told as bad news, and the others go on; `opts` that fail {@link MSX.timelyOpts} refuse 'bad_option' first, hydrating none. */
   async hydrateAll(opts: TimelyOpts = {}): Promise<void> {
-    const outcomes = await Promise.all(this.things.map((thing) => thing.tryHydrate(opts)))
+    const timely = MSX.timelyOpts.parse(opts)
+    const outcomes = await Promise.all(this.things.map((thing) => thing.tryHydrate(timely)))
     for (const { ok, err } of outcomes) { if (! ok) { this.tellBadNews([err]) } }
   }
   // --
@@ -288,7 +289,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(listener)
+    this.#listeners.add(MSX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
   }
 
@@ -358,8 +359,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
 // == [Helpers]: hasRevision, fitsPriorTok
 
-/** True for a record handed to `build`, which carries a `revision_seq`; false for a dna. A dna carrying one is taken for a record. */
-export const hasRevision = (input: object): input is Revision & Times => 'revision_seq' in input
+/** True for a record handed to `build`, which carries a `revision_seq`; false for a dna, and for anything not an object, which the dna's check refuses. A dna carrying one is taken for a record. */
+export const hasRevision = (input: unknown): input is Revision & Times => (typeof input === 'object') && (input !== null) && ('revision_seq' in input)
 
 /** True where a record at `revision_seq` may be put over `priorTok`: revision 0 over none, a later revision over a tok. */
 const fitsPriorTok = (revision_seq: number, priorTok: string | null): boolean => (priorTok === null ? revision_seq === 0 : revision_seq > 0)

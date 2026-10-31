@@ -6,7 +6,7 @@ import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box } from './box'
 import { Listing, hasRevision } from './listing'
-import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Tell, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Tell, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxListingOpts, boxSparse } from './models-shapes'
 import { stubSeal } from './stub-seal'
 
 // == [Given to a box listing]: BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
@@ -32,25 +32,31 @@ export type BoxListingOpts = ListingOpts<Boxscope, BoxRecord, BoxSparse> & { wor
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box> {
   declare readonly world: BoxWorld
 
+  /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check; each refuses 'bad_option'. */
   constructor(opts: BoxListingOpts) {
+    boxListingOpts.parse(opts)
     super(opts)
     Object.freeze(this)
   }
 
-  // == [Building]: build
+  // == [Building]: build, demandUnlocked
 
   /** {@link Listing.build}, a dna sealed at birth: the box staged is full, the dna's whisper sealed in with its sidecar. Stores nothing.
    * A record is told from a dna as `Listing.build` tells it, by its `revision_seq`, and keeps its
-   * own check there. A dna is held to {@link boxDna} first, refusing 'bad_option', naming the
-   * failing field, a missing whisper or sidecar, or a whisper that is not `{ val }`, among them:
-   * the props the factory controls are stripped, the defaults filled in. The seal needs the vault
-   * unlocked: a dna built while it is locked refuses 'vault_locked', holding nothing.
+   * own check there. A dna is held to {@link boxDna} first of all, refusing 'bad_option', naming
+   * the failing field, a missing whisper or sidecar, or a whisper that is not `{ val }`, among
+   * them: the props the factory controls are stripped, the defaults filled in. Then the seal needs
+   * the vault unlocked: a sound dna built while it is locked refuses 'vault_locked', holding nothing.
    */
   override async build(input: BoxDna | Fetched<BoxRecord, BoxSparse>): Promise<Box> {
     if (hasRevision(input)) { return super.build(input) }
-    if (this.lockState() === 'locked') { throw lockedError() }
-    return super.build(boxDna.parse(input))
+    const dna = boxDna.parse(input)
+    this.#demandUnlocked()
+    return super.build(dna)
   }
+
+  /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
+  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw lockedError() } }
   // --
 
   // == [Defined by the box listing]
@@ -78,7 +84,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   absentRefusal(scope: Boxscope): VaultError {
-    return new VaultError('absent_box', `No box is stored under the label ${scope.boxlabel}.`)
+    return new VaultError('absent_box', `No box is stored under the label ${this.scopeOf(scope).boxlabel}.`)
   }
 
   /** The record `meta.box_stored` carries: the full record where it is one, else its sparse form, else null. */

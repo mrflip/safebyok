@@ -6,7 +6,7 @@
  * in Storable, never a host's. Every other `parse` refuses as its doc says, quoting none of its input.
  */
 
-import { deepFreeze } from 'es-toolkit'
+import { deepFreeze, omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../checks/validator'
 import { type VaultError, isVaultError } from '../errors'
@@ -215,25 +215,32 @@ export type StagedForms<RecordT, SparseT> =
 export type Settled = Z.infer<typeof settled>
 // --
 
-// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, BoxRecord, BoxSparse, BoxDnaFilled
+// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const BoxFormat = 5001
 
-/** The check of the object a box takes and gives its whisper in, `{ val }`, the whisper itself its `val`: what `edit`, `send`, `seal` and `build` take as `whisper`, and what `box.whisper` and `unsealWhisper` give. Its `parse` refuses 'bad_whisper', naming the failing field and quoting none of it.
+/** The check of the object a box takes and gives its whisper in, `{ val }`, the whisper itself its `val`: what `edit`, `send`, `seal` and `build` take as `whisper`, and what `box.whisper` and `unsealWhisper` give. Its `parse` refuses 'bad_option', naming the failing field and quoting none of it.
  * The `val` is a whisper as the old box keeps one, checked by the same check: any JSON value a
- * whisper can carry, never a bare null. The object takes no other field. A parse hands back a
+ * whisper can carry, never a bare null. The object takes no other field. {@link LOCKED}, which a
+ * locked box answers for its whisper, refuses with a sentence that names it. A parse hands back a
  * copy frozen through, `val` and all, never the caller's own object, so the host's later changes
  * to theirs reach no box, and a box's to its own reach no host: set `box.whisper` anew to change
  * it.
  *
+ * Its kind is 'bad_option', not the old box's 'bad_whisper': a whisper reaches a box inside a
+ * dna or a patch, each checked whole by one check of one kind, so the setter, which takes the
+ * whisper alone, refuses as they do.
+ *
  * @example whisperHolder.parse({ val: 'sk-ant-...' })                 // a frozen { val: 'sk-ant-...' }, a copy
  * @example whisperHolder.parse({ val: { apiKey: 'sk-ant-...', orgId: null } })
- * @example whisperHolder.parse('sk-ant-...')                          // throws 'bad_whisper': a whisper is given as { val }
- * @example whisperHolder.parse({ val: null })                         // throws 'bad_whisper', naming val: emptying a box is del's job
- * @example whisperHolder.parse({ val: 'sk-ant-...', note: 'work' })   // throws 'bad_whisper': it takes no other field
+ * @example whisperHolder.parse('sk-ant-...')                          // throws 'bad_option': a whisper is given as { val }
+ * @example whisperHolder.parse({ val: null })                         // throws 'bad_option', naming val: emptying a box is del's job
+ * @example whisperHolder.parse({ val: 'sk-ant-...', note: 'work' })   // throws 'bad_option': it takes no other field
+ * @example whisperHolder.parse(LOCKED)                                // throws 'bad_option': LOCKED is not a whisper
  */
-export const whisperHolder = Checker(({ obj }) => obj({ val: whisper }).strict().overwrite((holder) => deepFreeze(holder)).readonly(), 'bad_whisper')
+export const whisperHolder = Checker(({ obj, custom }) => custom((val) => val !== LOCKED, Phrases.LockedIsNoWhisper)
+  .pipe(obj({ val: whisper }).strict().overwrite((holder) => deepFreeze(holder)).readonly()), 'bad_option')
 
 /** The object a box takes and gives its whisper in: `{ val }`, frozen, the whisper its `val`. */
 export type WhisperHolder = Z.output<typeof whisperHolder>
@@ -269,38 +276,50 @@ export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, lit, appl
 export type BoxSparse = Z.infer<typeof boxSparse>
 export type BoxRecord = Z.infer<typeof boxRecord>
 
-/** The check of a box's dna, a duckish refusing 'bad_option' and naming the failing field. A record is checked by `boxRecord` or `boxSparse`, never by this.
- * The scope is required, and so are `whisper`, the {@link WhisperHolder} `build` seals in, and
- * `sidecar`, as every update of a box names both. A whisper that fails {@link whisperHolder}
- * refuses 'bad_option' here, as every field of a dna does, naming `whisper` or `whisper.val`.
- * `whisper_codec` and `whisper_schema_version` take their defaults where missing or undefined.
- * The sealed parts never come from a dna: `build` seals every box it makes, so a dna carrying one
- * refuses, as a field it does not take. The props the factory controls, `fmt`, `am`, `vault_tok`,
- * `revision_tok` and the times, may be given, must pass their checks, and are stripped. A field it
- * does not take refuses, as a bag a person typed would, and `revision_seq` among them: input
- * carrying one is a record, which `build` holds to the record check.
+/** The checks of what a caller hands to make or update a box, each a duckish refusing 'bad_option' and naming the failing field: `boxDna`, what `build` takes; `boxPatch`, what `edit`, `send` and `seal` take. A record is checked by `boxRecord` or `boxSparse`, never by these.
+ * Both require `whisper`, the {@link WhisperHolder} sealed in, and `sidecar`, as every update of a
+ * box names both. A whisper that fails {@link whisperHolder} refuses 'bad_option' here, as every
+ * field does, naming `whisper` or `whisper.val`. The props the factory controls may be given, must
+ * pass their checks, and are stripped. A field neither takes refuses, as a bag a person typed would.
+ *
+ * `boxDna` requires the scope too, and fills `whisper_codec` and `whisper_schema_version` with
+ * their defaults where missing or undefined; the factory's props are `fmt`, `am`, `vault_tok`,
+ * `revision_tok` and the times. The sealed parts never come from a dna: `build` seals every box it
+ * makes, so a dna carrying one refuses, as a field it does not take, and `revision_seq` among them:
+ * input carrying one is a record, which `build` holds to the record check.
+ *
+ * `boxPatch` takes the round trip of a box's record, `{ ...record, whisper, sidecar }`: every prop
+ * of the record but the sidecar is the factory's, the scope, `revision_seq`, the whisper's codec and
+ * the sealed parts among them. It hands back the whisper and the sidecar, and the scope's fields as
+ * given, each undefined where left out, for the box to hold to its own scope.
  *
  * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' }, sidecar: {} })                                 // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: { val: 'sk-ant-...' } }
  * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' }, sidecar: {}, am: 'x', vault_tok: 'tok-u1' })   // the scope, whisper, sidecar and defaults: am and vault_tok are the factory's
  * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' } })                                              // throws 'bad_option', naming sidecar
- * @example boxDna.parse({ ...scope, sidecar: {} })                                                                 // throws 'bad_option', naming whisper
- * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...', sidecar: {} })                                          // throws 'bad_option', naming whisper: a whisper is given as { val }
- * @example boxDna.parse({ ...scope, boxlabel: 'B' })                                                               // throws 'bad_option', naming boxlabel
  * @example boxDna.parse({ ...scope, revision_seq: 3 })                                                             // throws 'bad_option': a dna carries no revision_seq
  * @example boxDna.parse({ ...scope, whisper_ciphered: ciphered })                                                  // throws 'bad_option': the sealed parts are the seal's to make
+ * @example boxPatch.parse({ ...record, whisper: { val: 'sk-ant-...' }, sidecar: {} })                              // { whisper: { val: 'sk-ant-...' }, sidecar: {}, ...scope }
+ * @example boxPatch.parse({ whisper: LOCKED, sidecar: {} })                                                        // throws 'bad_option', naming whisper: LOCKED is not a whisper
  */
-export const boxDna = Checker(({ obj, lit, applabel, user_id, vaultlabel, boxlabel }) => obj({
-  applabel, user_id, vaultlabel, boxlabel,
-  sidecar,
-  whisper_codec:          lit('json_v1').default('json_v1'),
-  whisper_schema_version: lit(1).default(1),
-  whisper:                whisperHolder,
-  fmt:                    lit(BoxFormat).optional(),
-  ...sparseBase.omit({ revision_seq: true }).partial().shape,
-}).strict().transform(({ fmt: _fmt, am: _am, vault_tok: _vault_tok, revision_tok: _revision_tok, registered_at: _registered_at, written_at: _written_at, ...dna }) => dna), 'bad_option')
+export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, applabel, user_id, vaultlabel, boxlabel }) => {
+  const halves  = { whisper: whisperHolder, sidecar }
+  const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
+  const boxDna  = factory.extend({
+    applabel, user_id, vaultlabel, boxlabel,
+    ...halves,
+    whisper_codec:          lit('json_v1').default('json_v1'),
+    whisper_schema_version: lit(1).default(1),
+  }).strict().transform((dna) => omit(dna, factory.keyof().options))
+  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend(halves).strict()
+    .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
+  return { boxDna, boxPatch }
+})
 
 /** A box's dna as {@link boxDna} hands it back: the scope, the whisper and the sidecar, and the record's own props with their defaults filled. */
 export type BoxDnaFilled = Z.output<typeof boxDna>
+
+/** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, and the scope's fields as given. */
+export type BoxPatchGiven = Z.output<typeof boxPatch>
 // --
 
 // == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, VaultRecord, VaultSparse
@@ -322,7 +341,7 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
+// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
 
 /** The policies when sending a record to a place that already holds one: the one value, `replace`, the versioned replace (compare-and-swap) every put is, and the default. `fetch` is not implemented. */
 export const ifPresentVals = ['replace'] as const
@@ -335,9 +354,10 @@ export const ifAbsentVals = ['fail', 'nil'] as const
  * is a span of milliseconds, 0 or more, or `Infinity` for never. `timelyOpts` says how fresh the
  * record in hand (`maxMillisSinceRefresh`) and the world (`maxWorldMillis`) must be before a verb
  * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` adds `ifPresent`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
- * strips the rest.
+ * strips the rest. `watchable` is the flag `isWatchable` is set to, a boolean; `listener` is what
+ * `subscribe` enrolls, a function.
  */
-export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts } = Checkers('bad_option', ({ obj, num, union, lit, oneof }) => {
+export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, bool, fn }) => {
   const ifPresent     = oneof(ifPresentVals)
   const ifAbsent      = oneof(ifAbsentVals)
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
@@ -350,7 +370,9 @@ export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOp
     /** The fraction of the horizon after which the trigger schedules the next refresh. */
     eagerFrac:             num.positive().max(1).optional(),
   })
-  return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts }
+  const watchable     = bool
+  const listener      = fn<() => void>()
+  return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener }
 })
 
 /** How `send` meets what storage holds, as {@link ifPresent} checks it: `'replace'`, the default and only policy, is the versioned replace (compare-and-swap). Nothing hands it to storage. `'fetch'` is not implemented. */
@@ -375,7 +397,7 @@ export type EditOpts = TimelyOpts
 export type StorableOpts = Z.infer<typeof storableOpts>
 // --
 
-// == [The world and the listing]: lockStateVals, LOCKED, LockedBag, IsListing, isListing, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
+// == [The world and the listing]: lockStateVals, LOCKED, LockedBag, IsListing, isListing, lockState, world, listingOpts, boxListingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
 
 /** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
 export const lockStateVals = ['unlocked', 'locked'] as const
@@ -461,6 +483,11 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
   maxMillisSinceRefresh: horizonMillis,
   onBadNews:             fn().optional(),
 }), 'bad_option')
+
+/** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`. Its `parse` refuses 'bad_option'. Checks only. */
+export const boxListingOpts = objCheck(({ obj, applabel, user_id, vaultlabel, vault_tok }) => ({
+  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok }),
+}), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
 // --
 
 // == [Making a storable]: storableArgs, Tell

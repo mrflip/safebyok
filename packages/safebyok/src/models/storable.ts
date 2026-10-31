@@ -160,7 +160,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   get isWatchable(): boolean { return this.#watchable }
 
-  set isWatchable(watchable: boolean) { this.#watchable = watchable }
+  set isWatchable(watchable: boolean) { this.#watchable = MSX.watchable.parse(watchable) }
   // --
 
   // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe
@@ -181,7 +181,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * Invoke the returned unsubscribe function to unenroll the listener
    */
   readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(listener)
+    this.#listeners.add(MSX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
   }
 
@@ -233,11 +233,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Storable ops]: fetch, hydrate, edit, send, del, each with its try form
 
   /** Get the record storage holds, through the listing, which delivers it to `receive`. Where nothing is stored, or a tombstone,
-   * `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent.
+   * `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent. `opts` are checked
+   * first, before the world is made timely.
    */
   async fetch(opts: FetchOpts = {}): Promise<this> {
-    await this.ensureReadyToFetch(opts)
-    await this.listing.fetch(this.scope, opts)
+    const fetchOpts = MSX.fetchOpts.parse(opts)
+    await this.ensureReadyToFetch(fetchOpts)
+    await this.listing.fetch(this.scope, fetchOpts)
     return this
   }
 
@@ -245,22 +247,24 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where it is not whole. Calls made during a fetch join it. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
-    await this.ensureReadyToFetch(opts)
-    await this.#trigger.ensureTimelyWithin(this.#holdsWhole ? opts.maxMillisSinceRefresh : 0)
+    const timely = MSX.timelyOpts.parse(opts)
+    await this.ensureReadyToFetch(timely)
+    await this.#trigger.ensureTimelyWithin(this.#holdsWhole ? timely.maxMillisSinceRefresh : 0)
     return this
   }
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Lay `patch` over the record in hand under the next revision, alive, through the concrete class's `makeStaged`; reconcile the result in as the staged; settle. Central is untouched; nothing is stored. On a thing gone or damaged, this is its rebirth: the record made is alive over its tombstone's sparse props, registered now. Once past its guards it completes, whether or not the vault locks meanwhile; but a central that moves while `makeStaged` runs refuses 'stale_write', staging nothing, as the record made was laid over one storage no longer holds; the refusal carries that central as a 'stale_write' from storage carries what it holds (`meta.box_stored` for a box). */
+  /** Lay `patch` over the record in hand under the next revision, alive, through the concrete class's `makeStaged`; reconcile the result in as the staged; settle. Central is untouched; nothing is stored. On a thing gone or damaged, this is its rebirth: the record made is alive over its tombstone's sparse props, registered now. Once past its guards it completes, whether or not the vault locks meanwhile; but a central that moves while `makeStaged` runs refuses 'stale_write', staging nothing, as the record made was laid over one storage no longer holds; the refusal carries that central as a 'stale_write' from storage carries what it holds (`meta.box_stored` for a box). `opts` are checked first, before any guard; `patch` is the concrete class's to check, which its override does before calling here. */
   async edit(patch: PatchT, opts: EditOpts = {}): Promise<this> {
-    await this.ensureReadyToEdit(opts)
+    const timely = MSX.timelyOpts.parse(opts)
+    await this.ensureReadyToEdit(timely)
     const ante = this.#central
     const nextRevision = this.nextRevision(ante)
     const now = this.world.clock.now()
     const { combined } = this
     const registered_at = MSX.isTombstone(combined) ? now : combined.registered_at
-    const made = await this.makeStaged({ ...combined, ...nextRevision, registered_at, written_at: now, am: 'a' }, patch, opts)
+    const made = await this.makeStaged({ ...combined, ...nextRevision, registered_at, written_at: now, am: 'a' }, patch, timely)
     if (this.#central.revision_tok !== ante.revision_tok) { throw movedUnderEditError(this.listing.staleMetaOf(this.#central)) }
     this.adopt(this.#central, this.reconcileStaged({ act: 'edit', central: this.#central, staged: this.staged, patch: made, nextRevision }))
     this.settle()
@@ -285,7 +289,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Stage a tombstone under the next revision; hand this thing to `listing.del`. Its answer, the stored tombstone, makes the thing gone. A thing gone or damaged is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
-    await this.ensureReadyToDel(opts)
+    await this.ensureReadyToDel(MSX.timelyOpts.parse(opts))
     const nextRevision = this.nextRevision(this.#central)
     this.adopt(this.#central, this.reconcileStaged({ act: 'del', central: this.#central, staged: this.staged, nextRevision }))
     this.settle()

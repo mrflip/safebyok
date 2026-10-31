@@ -1,12 +1,13 @@
+import { verifyConsistent } from '../checks/validator'
 import { VaultError } from '../errors'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
-import { type BoxRecord, type BoxSparse, type EditOpts, type LockedBag, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import { type BoxRecord, type BoxSparse, type EditOpts, type LockedBag, type WhisperHolder, LOCKED, boxPatch, whisperHolder } from './models-shapes'
 import { Storable } from './storable'
 import { stubSeal } from './stub-seal'
 
-// == [Record forms]: BoxSnapshot, BoxProps, namesBoth
+// == [Record forms]: BoxSnapshot, BoxProps, BoxPatch
 
 export type BoxSnapshot = Boxscope & Readonly<{
   revision_tok:  string
@@ -19,17 +20,17 @@ export type BoxSnapshot = Boxscope & Readonly<{
   exposed:       boolean
 }>
 
-/** The patch a host hands `edit` and `send`: both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar, as every update names both. */
+/** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
 export type BoxProps = { whisper: WhisperHolder, sidecar: Sidecar }
 
-/** True where `patch` names both a whisper and a sidecar, neither undefined nor null, as a host's patch may not, whatever its type says. */
-const namesBoth = (patch: Partial<BoxProps>): boolean => ((patch.whisper ?? null) !== null) && ((patch.sidecar ?? null) !== null)
+/** What a host hands `edit` and `send`: both {@link BoxProps}, required, and any other prop of the box's record, which the box controls and ignores, so `{ ...record, whisper, sidecar }` will do. `boxPatch` checks it. */
+export type BoxPatch = BoxProps & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
 // --
 
 // == [Box]
 
 /** A box as this device holds it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
-export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxSnapshot> {
+export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxSnapshot> {
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
   declare readonly user_id:    string
@@ -74,7 +75,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
 
   // == [The whisper]: whisper, unsealWhisper, expose, seal, edit
 
-  /** The exposed whisper, as its frozen {@link WhisperHolder} `{ val }`, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper answers again once it unlocks. Setting it exposes the given whisper, `{ val }`, which needs the vault unlocked, and does no more: nothing seals it, as `edit` and `send` seal only the whisper they are given. The box keeps a frozen copy, so to change the whisper, set it anew; one that is not `{ val }` with `val` a whisper refuses 'bad_whisper', naming the field. Setting null (or LOCKED, which counts as null, and is told from a whisper by `Storable.isLockedFUBag`) forgets it, locked or not. */
+  /** The exposed whisper, as its frozen {@link WhisperHolder} `{ val }`, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper answers again once it unlocks. Setting it exposes the given whisper, `{ val }`, which needs the vault unlocked, and does no more: nothing seals it, as `edit` and `send` seal only the whisper they are given. The box keeps a frozen copy, so to change the whisper, set it anew; one that is not `{ val }` with `val` a whisper refuses 'bad_option', naming the field, before the lock is looked at. Setting null (or LOCKED, which counts as null, and is told from a whisper by `Storable.isLockedFUBag`) forgets it, locked or not. */
   get whisper(): WhisperHolder | LockedBag | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
@@ -104,11 +105,17 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxProps, BoxS
   /** Seal this whisper, `{ val }`, with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
   seal(whisper: WhisperHolder, sidecar: Sidecar, opts: EditOpts = {}): Promise<this> { return this.edit({ whisper, sidecar }, opts) }
 
-  /** {@link Storable.edit}, for a patch that names both the whisper, as `{ val }`, and the sidecar: every update of a box seals the whisper it is given with the sidecar it is given, and carries neither over from the record in hand. A patch missing either refuses 'bad_option', and one whose whisper is not `{ val }` with `val` a whisper refuses 'bad_whisper', naming the field, each before anything is staged; `send` and `seal` come through here. An exposed whisper is no substitute for the one given. */
-  override async edit(patch: BoxProps, opts: EditOpts = {}): Promise<this> {
-    if (! namesBoth(patch)) { throw new VaultError('bad_option', Phrases.WhisperAndSidecarRequired) }
-    const { whisper, sidecar } = patch
-    await super.edit({ whisper: whisperHolder.parse(whisper), sidecar }, opts)
+  /** {@link Storable.edit}, for a patch that names both the whisper, as `{ val }`, and the sidecar: every update of a box seals the whisper it is given with the sidecar it is given, and carries neither over from the record in hand. An exposed whisper is no substitute for the one given. `send` and `seal` come through here.
+   * The patch is held to `boxPatch` before anything else, its opts and every guard after it: a
+   * patch missing either half, or whose whisper is not `{ val }` with `val` a whisper, or whose
+   * sidecar fails its check, refuses 'bad_option', naming the field. The other props of the box's
+   * record may ride along, and are checked and ignored; a scope field that names another box
+   * refuses 'bad_option', naming it.
+   */
+  override async edit(patch: BoxPatch, opts: EditOpts = {}): Promise<this> {
+    const given = boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice })
+    const { whisper, sidecar } = verifyConsistent(given, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherBox })
+    await super.edit({ whisper, sidecar }, opts)
     return this
   }
 

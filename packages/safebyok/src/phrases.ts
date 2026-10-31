@@ -272,7 +272,7 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, WhisperAndSidecarRequired, OneRevisionTwoToks, OneRevisionTwoFates, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherBox, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const RecordNotFull = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -283,8 +283,14 @@ export const MovedUnderEdit = "Storage delivered a newer record while this edit 
 /** Why `build` makes nothing of a dna for a scope the listing already holds. */
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
 
-/** Why an update of a box given no whisper or no sidecar stages nothing. */
-export const WhisperAndSidecarRequired = "Every update of a box names both its whisper and its sidecar, and this one lacked one or both, so nothing was staged: give both, as { whisper: { val }, sidecar }. To keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
+/** What to do about an update of a box whose patch fails its check, said after the failures. */
+export const BoxPatchAdvice = "Nothing was staged. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
+
+/** Why an update of a box whose patch names another box's scope stages nothing. */
+export const patchOfOtherBox = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than the box's own, so nothing was staged: update the box it names, which listing.at(scope) answers.`
+
+/** Why LOCKED, which a locked box answers for its whisper, is refused where a whisper is wanted. */
+export const LockedIsNoWhisper = "LOCKED is not a whisper: unseal or expose one first"
 
 /** Why a record storage holds under the revision_seq held, but another revision_tok, is not taken in. */
 export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."

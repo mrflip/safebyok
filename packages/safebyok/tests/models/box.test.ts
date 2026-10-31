@@ -676,7 +676,7 @@ describe("LOCKED and Storable.isLockedFUBag: a frozen bag of the package's own (
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     box.whisper = { val: 'LOCKED' }
     expect(box.whisper).to.deep.equal({ val: 'LOCKED' })
-    TH.expectSyncRefusal(() => { box.whisper = { ...LOCKED } }, 'bad_whisper')
+    TH.expectSyncRefusal(() => { box.whisper = { ...LOCKED } }, 'bad_option')
     expect(box.whisper).to.deep.equal({ val: 'LOCKED' })
   })
 })
@@ -694,39 +694,39 @@ describe("box.whisper and box.edit: the whisper given as { val }", () => {
   ] as const
 
   for (const [whisper, blurb] of BadWhisperCases) {
-    it(`refuses setting ${blurb} as 'bad_whisper', keeping the whisper exposed and quoting nothing`, async () => {
+    it(`refuses setting ${blurb} as 'bad_option', keeping the whisper exposed and quoting nothing`, async () => {
       const box = await boxListingOf(held.mw).build(fullBoxRecord())
       box.whisper = { val: 'sk-test-0000' }
-      const err = TH.expectSyncRefusal(() => { box.whisper = whisper as never }, 'bad_whisper')
+      const err = TH.expectSyncRefusal(() => { box.whisper = whisper as never }, 'bad_option')
       expect(TH.thrownText(err)).to.not.include('SECRET')
       expect(JSON.stringify(err.meta)).to.not.include('SECRET')
       expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
     })
 
-    it(`refuses an edit of ${blurb} as 'bad_whisper', staging nothing, calling nothing and quoting nothing`, async () => {
+    it(`refuses an edit of ${blurb} as 'bad_option', staging nothing, calling nothing and quoting nothing`, async () => {
       const box = await boxListingOf(held.mw).build(fullBoxRecord())
       held.mw.clearCalls()
-      const err = await TH.expectRefusal(box.edit({ whisper: whisper as never, sidecar: {} }), 'bad_whisper')
+      const err = await TH.expectRefusal(box.edit({ whisper: whisper as never, sidecar: {} }), 'bad_option')
       expect(TH.thrownText(err)).to.not.include('SECRET')
       expect(JSON.stringify(err.meta)).to.not.include('SECRET')
       expect(box.hasStaged).to.be.false
       expect(held.mw.calls).to.deep.equal([])
     })
 
-    it(`refuses a send of ${blurb} as 'bad_whisper', putting nothing`, async () => {
+    it(`refuses a send of ${blurb} as 'bad_option', putting nothing`, async () => {
       const box = await boxListingOf(held.mw).build(fullBoxRecord())
       held.mw.clearCalls()
-      await TH.expectRefusal(box.send({ whisper: whisper as never, sidecar: {} }), 'bad_whisper')
+      await TH.expectRefusal(box.send({ whisper: whisper as never, sidecar: {} }), 'bad_option')
       expect(box.hasStaged).to.be.false
       expect(held.mw.calls).to.deep.equal([])
     })
   }
 
-  it("refuses 'bad_whisper' before its guards: a bare whisper refuses so while the vault is locked, set or edited", async () => {
+  it("refuses 'bad_option' before its guards: a bare whisper refuses so while the vault is locked, set or edited", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     held.mw.setLockState('locked')
-    TH.expectSyncRefusal(() => { box.whisper = 'sk-test-0000' as never }, 'bad_whisper')
-    await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000' as never, sidecar: {} }), 'bad_whisper')
+    TH.expectSyncRefusal(() => { box.whisper = 'sk-test-0000' as never }, 'bad_option')
+    await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000' as never, sidecar: {} }), 'bad_option')
   })
 
   it("keeps a frozen copy of the whisper set: the host's later change to its own reaches no box, and the box's cannot be changed in place, val and all", async () => {
@@ -747,6 +747,111 @@ describe("box.whisper and box.edit: the whisper given as { val }", () => {
     for (const form of [box.toJSON(), box, box.getSnapshot(), { central: box._cheat_central, staged: box._cheat_staged }]) {
       expect(JSON.stringify(form)).to.not.include('SECRET')
     }
+  })
+})
+// --
+
+// == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and send take a duckish
+
+describe("Box and Storable entries: arguments checked first of all, before any guard (the Coach, 2026-10-31)", () => {
+  const whisper = { val: 'sk-test-0000' }
+  const BadArgCases = [
+    [(box: TestableBox) => box.edit(undefined as never),                                          'edit(undefined)'],
+    [(box: TestableBox) => box.edit({ whisper, sidecar: 'a note' as never }),                     'edit with a sidecar that fails its check'],
+    [(box: TestableBox) => box.edit({ whisper, sidecar: {} }, { maxWorldMillis: -1 }),            'edit with opts out of range'],
+    [(box: TestableBox) => box.send({ whisper, sidecar: [] as never }),                           'send with a sidecar that fails its check'],
+    [(box: TestableBox) => box.send({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'send with opts out of range'],
+    [(box: TestableBox) => box.seal(whisper, 7 as never),                                         'seal with a sidecar that fails its check'],
+    [(box: TestableBox) => box.seal(whisper, {}, { maxWorldMillis: 'soon' as never }),            'seal with opts out of range'],
+    [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not take'],
+    [(box: TestableBox) => box.hydrate({ maxMillisSinceRefresh: -1 }),                            'hydrate with opts out of range'],
+    [(box: TestableBox) => box.del({ maxWorldMillis: -1 }),                                       'del with opts out of range'],
+    [(box: TestableBox) => box.unsealWhisper({ maxWorldMillis: -1 }),                             'unsealWhisper with opts out of range'],
+    [(box: TestableBox) => box.expose({ maxWorldMillis: -1 }),                                    'expose with opts out of range'],
+  ] as const
+
+  for (const [call, blurb] of BadArgCases) {
+    it(`refuses ${blurb} as 'bad_option' while the vault is locked, calling nothing and staging nothing`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      held.mw.setLockState('locked')
+      held.mw.clearCalls()
+      await TH.expectRefusal(call(box), 'bad_option')
+      expect(held.mw.calls).to.deep.equal([])
+      expect(box.hasStaged).to.be.false
+    })
+  }
+
+  it("refuses setting isWatchable to anything but a boolean as 'bad_option', keeping the flag", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    const before = box.isWatchable
+    TH.expectSyncRefusal(() => { box.isWatchable = 'yes' as never }, 'bad_option')
+    expect(box.isWatchable).to.eq(before)
+  })
+
+  it("refuses subscribing anything but a function as 'bad_option'", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    TH.expectSyncRefusal(() => box.subscribe('call me' as never), 'bad_option')
+  })
+
+  it("refuses LOCKED handed to edit, send or seal as 'bad_option', naming whisper and saying LOCKED is no whisper", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.setLockState('locked')
+    held.mw.clearCalls()
+    expect(box.whisper).to.eq(LOCKED)
+    for (const call of [() => box.edit({ whisper: box.whisper as never, sidecar: {} }), () => box.send({ whisper: LOCKED as never, sidecar: {} }), () => box.seal(LOCKED as never, {})]) {
+      const err = await TH.expectRefusal(call(), 'bad_option')
+      expect(err.message).to.include('LOCKED is not a whisper: unseal or expose one first')
+      expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
+    }
+    expect(held.mw.calls).to.deep.equal([])
+  })
+
+  it("refuses an edit whose scope fields name another box as 'bad_option', naming them, staging nothing", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.clearCalls()
+    const err = await TH.expectRefusal(box.edit({ ...fullBoxRecord({ boxlabel: 'openai_api_key' }), whisper, sidecar: {} }), 'bad_option')
+    expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
+    expect(box.hasStaged).to.be.false
+    expect(held.mw.calls).to.deep.equal([])
+  })
+
+  it("refuses an edit whose factory field fails its check as 'bad_option', naming it, though the field would be ignored", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    const err = await TH.expectRefusal(box.edit({ ...fullBoxRecord(), am: 'q' as never, whisper, sidecar: {} }), 'bad_option')
+    expect(err.meta?.fieldnames).to.deep.equal(['am'])
+    expect(box.hasStaged).to.be.false
+  })
+
+  it("refuses an edit carrying a field no box record has as 'bad_option', as a bag a person typed", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    await TH.expectRefusal(box.edit({ whisper, sidecar: {}, sidecarr: {} } as never), 'bad_option')
+  })
+
+  /** A record handed back as a patch, every field the box controls given and none of it heeded. */
+  const roundTripOf = (record: BoxRecord) => ({
+    ...record, revision_tok: 'rev-ignored', revision_seq: 99, am: 'x', written_at: T0 + 99, registered_at: T0 + 99,
+    whisper: { val: 'sk-test-1111' }, sidecar: { note: 'round trip' },
+  } as const)
+
+  it("takes { ...record, whisper, sidecar } to edit, the fields the box controls checked and stripped", async () => {
+    const record = fullBoxRecord()
+    const box = await boxListingOf(held.mw).build(record)
+    held.mw.setNow(T0 + 5000)
+    await expect(box.edit(roundTripOf(record))).resolves.to.eq(box)
+    expect(box._cheat_staged).to.deep.include({ am: 'a', revision_seq: 2, registered_at: T0, written_at: T0 + 5000, sidecar: { note: 'round trip' } })
+    expect(box._cheat_staged?.revision_tok).to.not.be.oneOf(['rev-ignored', 'rev-a1'])
+  })
+
+  it("takes { ...record, whisper, sidecar } to send, putting the next revision over the one held", async () => {
+    const record = fullBoxRecord()
+    held.mw.seedStore(record)
+    const box = await boxListingOf(held.mw).build(record)
+    held.mw.clearCalls()
+    await expect(box.send(roundTripOf(record), { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity })).resolves.to.eq(box)
+    const [put] = held.mw.callsOf('put')
+    expect(put?.priorTok).to.eq('rev-a1')
+    expect(put?.record).to.deep.include({ am: 'a', revision_seq: 2, registered_at: T0, sidecar: { note: 'round trip' } })
+    expect(box._cheat_central).to.deep.include({ revision_seq: 2, sidecar: { note: 'round trip' } })
   })
 })
 // --
