@@ -136,6 +136,8 @@ export type ModelsWorld = {
   stored: Map<string, Fetched<BoxRecord, BoxSparse>>
   /** The copies the cache keeps, by boxlabel; `save` replaces the one of its box. */
   cached: Map<string, Cacheable<BoxRecord, BoxSparse>>
+  /** The copies the instances last handed their listing by `keepCopy`, by boxlabel: the listings {@link boxListingOf} and {@link fakeSealBoxListingOf} make log into it, each instance's `settle` replacing the one before. It follows the instance's state at each `settle`, which the cache's `save` does only at a delivery or a build. */
+  kept: Map<string, Cacheable<BoxRecord, BoxSparse>>
   /** Every watch started, oldest first. A live array. */
   watches: readonly ModelsWatch[]
 
@@ -227,6 +229,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const watches: ModelsWatch[] = []
   const stored = new Map<string, Fetched<BoxRecord, BoxSparse>>()
   const cached = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
+  const kept   = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
   const scripts = {
     get:          new Script<{ scope: Boxscope }>(),
     put:          new Script<{ record: BoxRecord, priorTok: string | null }>(),
@@ -337,7 +340,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, store, cache, calls, badnews, stored, cached, watches,
+    world, store, cache, calls, badnews, stored, cached, kept, watches,
     onBadNews:  (news) => { badnews.push(news) },
     tell:       (told) => { badnews.push(...told) },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
@@ -408,7 +411,7 @@ export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: Model
  * @example const listing = boxListingOf(mw, { maxMillisSinceRefresh: 1000 })
  */
 export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}): BoxListing => (
-  new BoxListing({
+  new (keptBoxListingClassOf(mw))({
     world:                 mw.world,
     store:                 mw.store,
     cache:                 mw.cache,
@@ -416,6 +419,16 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
     onBadNews:             mw.onBadNews,
     ...overrides,
   })
+)
+
+/** The class of a {@link BoxListing} that logs each copy its instances hand it, by `keepCopy`, into `mw.kept`. */
+const keptBoxListingClassOf = (mw: ModelsWorld): typeof BoxListing => (
+  class KeptBoxListing extends BoxListing {
+    override keepCopy(cacheable: Cacheable<BoxRecord, BoxSparse>): void {
+      mw.kept.set(cacheable.boxlabel, cacheable)
+      super.keepCopy(cacheable)
+    }
+  }
 )
 // --
 
@@ -435,7 +448,7 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
       return Promise.resolve({ ...base, sidecar, box_key_wrapped: fakeCiphered(`boxkey-${base.revision_tok}`), whisper_ciphered: fakeCiphered(`whisper-${base.revision_tok}`) })
     }
   }
-  class FakeSealBoxListing extends BoxListing {
+  class FakeSealBoxListing extends keptBoxListingClassOf(mw) {
     protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): Box {
       return new FakeSealBox(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
     }
@@ -451,12 +464,22 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
 }
 // --
 
-// == [Peeking]: cacheableOf
+// == [Peeking]: keptOf, lastSaveOf
 
-/** The copy `box`'s listing saves to the device cache, by the storable's {@link MSX.ToCacheable} method, which a host holding a box does not reach; undefined for no box. */
-export function cacheableOf(box: Box): Cacheable<BoxRecord, BoxSparse>
-export function cacheableOf(box: Box | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined
-export function cacheableOf(box: Box | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined {
-  return box?.[MSX.ToCacheable]()
+/** The copy `box` last handed its listing by `keepCopy`: its central and staged as they were at its last `settle`, as a test of the box's state reads them. Undefined for no box; throws where the box's scope was never kept, as a box made by a listing {@link boxListingOf} did not make. */
+export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse>
+export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined
+export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined {
+  if (box === null || box === undefined) { return undefined }
+  const kept = mw.kept.get(box.boxlabel)
+  if (kept === undefined) { throw new Error(`no copy was kept for ${box.boxlabel}`) }
+  return kept
+}
+
+/** The copy the listing last saved to the fake device cache for `box`'s scope, as `mw` logged the save; the cache is saved on each delivery and each build, not on an edit, a `send` in flight or `hello`'s revive. Throws where no copy was saved for the scope. */
+export function lastSaveOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse> {
+  const saved = mw.callsOf('save').findLast((call) => call.cacheable.boxlabel === box.boxlabel)
+  if (saved === undefined) { throw new Error(`no copy was saved to the cache for ${box.boxlabel}`) }
+  return saved.cacheable
 }
 // --
