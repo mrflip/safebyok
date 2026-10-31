@@ -49,8 +49,7 @@ describe("Vault.replacePassphrase", () => {
     const { vault, storedNow, demandStored, storeBehindOurBack, advance } = await makeBornVaultWithPasskey()
     let revokedSeq = 0
     const proofClosure = () => {
-      const record = storedNow()
-      if (record === null) { throw new Error('nothing stored') }
+      const record = demandStored()
       revokedSeq = storeBehindOurBack({ ...record, gate: { ...record.gate, passkey_wayin: null } }).revision_seq
       advance(11 * 60_000)
       return { passphrase: Passphrase }
