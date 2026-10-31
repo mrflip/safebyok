@@ -5,7 +5,8 @@ import { VaultError } from '../errors'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
-import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { Gate } from './gate'
+import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse, vaultStamp } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
@@ -24,7 +25,7 @@ export type VaultStore = Store<VaultScope, VaultRecord, VaultSparse>
 
 export type VaultCache = Cache<VaultRecord, VaultSparse>
 
-/** The dna of a vault: its scope. A gate it carries is ignored: a vault drafted is born without one, and `build` gives it its gate. */
+/** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `build` makes from its `proofClosure`. */
 export type VaultDna = Dna<VaultScope, VaultRecord>
 
 export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse> & { world: VaultWorld }
@@ -42,15 +43,13 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from: the vault is born of the dna's draft, without a gate, then `vault.buildGate(proofClosure)` gives it one; where that is refused, the vault stays held without a gate, and `buildGate` may be called again. */
+  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing. */
   override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
     if (hasRevision(input)) {
       if (proofClosure !== undefined) { throw closureWithRecord() }
       return super.build(input)
     }
-    const checked = MSX.buildGateArgs.parse({ proofClosure })
-    const vault = await super.build(input)
-    return vault.buildGate(checked.proofClosure)
+    return this.holdDraft(await this.draftOf(this.stampDna(input), proofClosure))
   }
 
   // == [Defined by the vault listing]
@@ -67,9 +66,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
-  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and no gate yet. */
-  protected draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times): Promise<VaultRecord> {
-    return Promise.resolve({ ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok(), gate: null })
+  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and the gate {@link Gate.build} makes of that draft's stamp from what `proofClosure` answers; without one, refuses 'bad_option'. */
+  protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<VaultRecord> {
+    const checked = MSX.vaultBuildArgs.parse({ proofClosure })
+    const draft: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
+    const gate = await Gate.build(vaultStamp.parse(draft), checked.proofClosure, this.world)
+    return { ...draft, gate: gate.pickle() }
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, cache: Cache<VaultRecord, VaultSparse>): Vault {

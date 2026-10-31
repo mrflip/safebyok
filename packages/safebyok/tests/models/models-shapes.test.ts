@@ -793,20 +793,23 @@ describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault recor
   const { boxlabel: _boxlabel, ...vaultscope } = scope
   const sparseVault = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps }
 
+  const gate = { passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
+
   holdsCases(MSX.vaultRecord, 'bad_record', [
-    [{ ...sparseVault, gate: null }, true,  'passes a record whose gate is null, a vault drafted and not yet gated'],
+    [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
+    [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
     [sparseVault,                    false, 'refuses a record without its gate'],
     [{ ...sparseVault, gate: {} },   false, 'refuses a gate without its wayins'],
   ])
 
   it("strips the gate from the sparse form", () => {
-    expect(MSX.vaultSparse.parse({ ...sparseVault, gate: null })).to.deep.equal(sparseVault)
+    expect(MSX.vaultSparse.parse({ ...sparseVault, gate })).to.deep.equal(sparseVault)
   })
 })
 
 describe("MSX.vaultPatch: the duckish of a vault's patch, which Vault.isFullPatch holds it to", () => {
   const { boxlabel: _boxlabel, ...vaultscope } = scope
-  const record = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps, gate: null }
+  const record = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps, gate: { passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null } }
 
   holdsCases(MSX.vaultPatch, 'bad_option', [
     [{},                                       true,  'passes an empty patch, as its first example shows'],

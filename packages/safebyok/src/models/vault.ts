@@ -1,18 +1,18 @@
 import { verifyConsistent } from '../checks/validator'
+import { notFullError } from '../helpers/throwers'
 import { outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
-import { VaultError } from '../errors'
 import type { BoxWorld } from './box-listing'
 import { Gate } from './gate'
 import type { Lease } from './lease'
-import type { Fetched, GateProps, LeaseDBFriend, LockState, ProofClosure, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { Fetched, GateProps, LeaseDBFriend, LockState, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
 
-// == [Record forms]: VaultSnapshot, VaultProps, VaultPatch
+// == [Record forms]: VaultSnapshot, VaultPatch
 
 export type VaultSnapshot = VaultScope & Readonly<{
   vault_tok:     string
@@ -23,10 +23,7 @@ export type VaultSnapshot = VaultScope & Readonly<{
   present:       boolean
 }>
 
-/** The one prop a vault takes from a patch: its first gate, which `buildGate` hands `edit`. A vault with a gate ignores a patch's, as it does every other prop of its record, so a patch only moves the revision, and a draft's `send` stores it. */
-export type VaultProps = Readonly<{ gate?: GateProps | null | undefined }>
-
-/** A host's patch for `edit` and `send`: the {@link VaultProps}, and any prop of the vault's record, which the vault controls and ignores, so `{ ...record }` will do. `vaultPatch` checks it. */
+/** A host's patch for `edit` and `send`: any prop of the vault's record, each checked and all ignored, the gate included, so `{}` or `{ ...record }` will do and a patch only moves the revision. `vaultPatch` checks it. */
 export type VaultPatch = { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | undefined }
 // --
 
@@ -83,27 +80,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [The gate]: gate, buildGate
+  // == [The gate]: gate
 
   // Made on first read, not at settle: the base constructor settles before this class's fields exist.
-  /** The Gate of the record in hand: null for a vault not yet gated, or whose record in hand is sparse or a tombstone; the same Gate while the record's `gate` is the same object, so a record received remakes it. */
-  get gate(): Gate | null {
-    const props = this.full?.gate ?? null
-    if (props === null) { return null }
-    if (this.#gate?.props !== props) { this.#gate = { props, gate: new Gate(this, props) } }
+  /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. A vault held sparse, or a tombstone, has none in hand and refuses 'bad_option': hydrate first. */
+  get gate(): Gate {
+    const full = this.#demandedFull()
+    if (this.#gate?.props !== full.gate) { this.#gate = { props: full.gate, gate: new Gate(full, full.gate) } }
     return this.#gate.gate
-  }
-
-  /** Build this vault's gate from what `proofClosure` answers, and stage it by `edit`; `send` stores it. A vault born of a dna has none until this lands. Hydrates first, as an edit does, and refuses 'bad_option' a vault that has a gate before the closure is asked anything; a gate that lands meanwhile, from a call overlapping this one, refuses the same once this one's edit finds it there. */
-  async buildGate(proofClosure: ProofClosure): Promise<this> {
-    MSX.buildGateArgs.parse({ proofClosure })
-    await this.ensureReadyToEdit()
-    if (this.gate !== null) { throw gateAlreadyBuilt() }
-    const gate = await Gate.build(this, proofClosure, this.world)
-    const props = gate.pickle()
-    await this.edit({ gate: props })
-    if (this.full?.gate !== props) { throw gateAlreadyBuilt() }
-    return this
   }
   // --
 
@@ -140,16 +124,17 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Guards]: demandReadyToEdit, demandReadyToSend, demandReadyToDel
+  // == [Guards]: ensureReadyToEdit, demandReadyToEdit, demandReadyToDel
 
-  /** An edit needs the vault present and full, as what it stages keeps the gate of the record in hand; no lock. */
-  override demandReadyToEdit(): this { return this.demandPresent().demandFull() }
-
-  /** A send needs what an edit does, and a gate: a vault is never stored without one. */
-  override demandReadyToSend(): this {
-    if (this.demandReadyToEdit().gate === null) { throw notGatedYet() }
-    return this
+  /** What an edit stages keeps the gate of the record in hand, so a vault held sparse fetches its full record first, whatever its age. */
+  override async ensureReadyToEdit(opts: TimelyOpts = {}): Promise<this> {
+    await super.ensureReadyToEdit(opts)
+    if (! this.isFull) { await this.fetch(opts) }
+    return this.demandReadyToEdit()
   }
+
+  /** An edit needs the vault present; no lock, as its record holds no secret. */
+  override demandReadyToEdit(): this { return this.demandPresent() }
 
   /** A vault deleted has no life left to delete; a damaged one may be deleted, as `bank.delDamagedVault` did. Not yet: the passphrase's proof the old `vault.del` took. */
   override demandReadyToDel(): this {
@@ -160,20 +145,28 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, lifeTokPathOf, makeSnapshot
 
-  /** A full vault record is one alive that carries its `gate`, null or not; a sparse one or a tombstone is not. */
+  /** A full vault record is one alive that carries its `gate`; a sparse one or a tombstone is not. */
   protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord {
     return fetched.am === 'a' && 'gate' in fetched
   }
 
-  /** Returns for a full patch of this vault, and refuses any other 'bad_option', naming the field; `edit`, so `send`, calls it first of all, before any guard. Every patch held to `vaultPatch` is full: `{}`, or the props of the vault's record, each checked, and all but a first gate ignored. A scope field that names another vault refuses, naming it. */
+  /** Returns for a full patch of this vault, and refuses any other 'bad_option', naming the field; `edit`, so `send`, calls it first of all, before any guard. Every patch held to `vaultPatch` is full: `{}`, or the props of the vault's record, each checked, and all ignored. A scope field that names another vault refuses, naming it. */
   protected isFullPatch(patch: unknown): asserts patch is VaultPatch {
     verifyConsistent(MSX.vaultPatch.parse(patch), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** `makeStagedBase`'s base, the record in hand under its next revision, its `vault_tok` kept, with the gate of the record in hand, or the patch's where it has none. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. */
-  protected makeStaged(patch: VaultPatch): Promise<VaultRecord> {
+  /** `makeStagedBase`'s base, the record in hand under its next revision, its `vault_tok` and its gate kept: a patch's props are all ignored. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. */
+  protected makeStaged(): Promise<VaultRecord> {
     const { base } = this.makeStagedBase()
-    return Promise.resolve({ ...base, gate: this.full?.gate ?? patch.gate ?? null })
+    // not yet: the gate verbs stage a new gate through a private path of their own, never through a patch
+    return Promise.resolve({ ...base, gate: this.#demandedFull().gate })
+  }
+
+  /** The full record in hand; a sparse one or a tombstone refuses 'bad_option'. */
+  #demandedFull(): VaultRecord {
+    const { full } = this
+    if (full === null) { throw notFullError() }
+    return full
   }
 
   /** A vault's life is its `vault_tok`. */
@@ -192,11 +185,4 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 }
-// --
-
-// == [Refusals]: gateAlreadyBuilt, notGatedYet
-
-const gateAlreadyBuilt = (): VaultError => new VaultError('bad_option', 'This vault has its gate already.')
-
-const notGatedYet = (): VaultError => new VaultError('bad_option', 'This vault has no gate yet, so it cannot be stored: buildGate gives it one.')
 // --

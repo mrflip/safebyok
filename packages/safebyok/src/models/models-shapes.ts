@@ -556,14 +556,14 @@ export type GateProps = Z.infer<typeof gateProps>
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const VaultFormat = 6001
 
-/** The checks of a vault's forms, each refusing 'bad_record', from a record or from a vault ducking as one: `vaultSparse`, a plain copy of the scope and the base's fields, the rest stripped; `vaultRecord`, those fields and the `gate`, strict, as a stored record is. The gate is its wayins, as {@link gateProps} checks them, and null only for a vault drafted here and not yet gated. The scope alone is `vaultScope` in shapes/scopes. */
+/** The checks of a vault's forms, each refusing 'bad_record', from a record or from a vault ducking as one: `vaultSparse`, a plain copy of the scope and the base's fields, the rest stripped; `vaultRecord`, those fields and the `gate`, its wayins as {@link gateProps} checks them, strict, as a stored record is. A vault record is never without its gate: it is built before the record is born. The scope alone is `vaultScope` in shapes/scopes. */
 export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, applabel, user_id, vaultlabel }) => {
   const vaultSparse = obj({ applabel, user_id, vaultlabel, fmt: lit(VaultFormat), ...sparseBase.shape })
-  const vaultRecord = vaultSparse.extend({ gate: gateProps.nullable() }).strict()
+  const vaultRecord = vaultSparse.extend({ gate: gateProps }).strict()
   return { vaultRecord, vaultSparse }
 }, [FX])
 
-/** The check of a vault's patch, refusing 'bad_option', naming the field: `{}`, or any prop of the vault's record, each checked, so `{ ...record }` will do; a field no vault record has refuses. The vault ignores every prop but `gate`, and takes that only where it has no gate yet. Its output is the props given, for the vault to hold its scope fields to its own.
+/** The check of a vault's patch, refusing 'bad_option', naming the field: `{}`, or any prop of the vault's record, each checked, so `{ ...record }` will do; a field no vault record has refuses. The vault ignores every prop, its `gate` included: a patch only moves the revision. Its output is the props given, for the vault to hold its scope fields to its own.
  * @example vaultPatch.parse({})                          // {}
  * @example vaultPatch.parse({ ...record })               // the record's props, as given
  */
@@ -573,7 +573,7 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [What a proving is handed]: cleartexts, provingWorld, provingPairArgs, provingMakeArgs, buildGateArgs, Cleartexts, ProofClosure, ProvingWorld
+// == [What a proving is handed]: cleartexts, provingWorld, provingPairArgs, provingMakeArgs, vaultBuildArgs, Cleartexts, ProofClosure, ProvingWorld
 
 export const { cleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id }) => ({
   cleartexts:   obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
@@ -584,10 +584,11 @@ export type Cleartexts   = Z.input<typeof cleartexts>
 export type ProofClosure = () => Cleartexts | Promise<Cleartexts>
 export type ProvingWorld = Z.infer<typeof provingWorld>
 
-export const { provingPairArgs, provingMakeArgs, buildGateArgs } = Checkers('bad_option', ({ obj, fn }) => ({
-  provingPairArgs: obj({ vault: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
-  provingMakeArgs: obj({ vault: vaultStamp, world: provingWorld }),
-  buildGateArgs:   obj({ proofClosure: fn<ProofClosure>() }),
+/** The arguments of the proving makers and of `VaultListing.build` of a dna: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
+export const { provingPairArgs, provingMakeArgs, vaultBuildArgs } = Checkers('bad_option', ({ obj, fn }) => ({
+  provingPairArgs: obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
+  provingMakeArgs: obj({ stamp: vaultStamp, world: provingWorld }),
+  vaultBuildArgs:  obj({ proofClosure: fn<ProofClosure>() }),
 }))
 // --
 
