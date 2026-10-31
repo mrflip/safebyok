@@ -1202,7 +1202,7 @@ describe("listing.keepCopy: the copy each instance's settle hands in, saved to t
     expect(held.mw.callsOf('save')).to.deep.equal([])
   })
 
-  it("saves the copy handed in at the delivery, which a later edit then leaves behind in the cache", async () => {
+  it("saves the copy handed in at the build, which a later edit then leaves behind in the cache", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     await box.edit({ sidecar: { note: 'staged' } })
@@ -1224,8 +1224,11 @@ describe("listing.keepCopy: the copy each instance's settle hands in, saved to t
   it("holds no way to the copy on an instance a host holds: no `cacheable` and no symbol-keyed method", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     expect(box).to.not.have.property('cacheable')
-    expect(Object.getOwnPropertySymbols(box)).to.deep.equal([])
-    expect(Object.getOwnPropertySymbols(Object.getPrototypeOf(box))).to.deep.equal([])
+    const symbols: symbol[] = []
+    for (let obj: object | null = box; obj !== null && obj !== Object.prototype; obj = Object.getPrototypeOf(obj) as object | null) {
+      symbols.push(...Object.getOwnPropertySymbols(obj))
+    }
+    expect(symbols).to.deep.equal([])
   })
 })
 // --
