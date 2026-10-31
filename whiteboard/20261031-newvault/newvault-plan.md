@@ -1,6 +1,6 @@
 # Sprint newvault: flesh out the vault models
 
-* **Date**: 2026-10-31. **Mode**: normal. **Issued by**: the Coach, in chat (the prompt is quoted verbatim under each thread).
+* **Date**: 2026-10-31. **Mode**: normal until 09:20 UTC, then YOLO (the Coach in chat: "you're in YOLO mode -- you have permission to do force pushes and most other things"); each judgment call is a row in Open Matters or on Cleanup, and a line in the sprint's `human/` entry. **Issued by**: the Coach, in chat (the prompt is quoted verbatim under each thread).
 * **Levels, default**: review `medium`; worker and reviewer at their agents' own model and effort; style pass at `style-reviewer`'s pin. Per-thread overrides are in each gloss.
 * **At once**: 3 threads.
 * **Spec**: `whiteboard/20261030-newvault/newvault-spec.md` (the design, one day older than this sprint's folder; the two folders share the name on purpose). The storable spec is `whiteboard/20261028-storable_base/storable-spec.md`.
