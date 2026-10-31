@@ -87,6 +87,15 @@ describe("Vault.edit and Vault.send: the gate of the record in hand rides every 
     expect(storedNow()?.revision_seq).to.eq(record.revision_seq + 1)
   })
 
+  it("sends a vault held sparse, with no edit before, by fetching its full record first, so the record it stores carries the gate: no vault is sent without one", async () => {
+    const record = await storedVaultRecord()
+    const { listing, storedNow } = makeVaultWorld(record)
+    const vault = await listing.build(listing.sparseOf(record))
+    await vault.send({})
+    expect(storedNow()?.gate).to.deep.equal(record.gate)
+    expect(storedNow()?.revision_seq).to.eq(record.revision_seq + 1)
+  })
+
   it("keeps the gate of the record another device stored, where its newer sparse record arrived as a box's world since the last fetch", async () => {
     const record = await storedVaultRecord()
     const { listing, storedNow, storeBehindOurBack } = makeVaultWorld(record)
