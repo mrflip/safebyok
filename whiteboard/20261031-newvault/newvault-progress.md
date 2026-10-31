@@ -38,3 +38,8 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 * `autolock_at` stays; `gate_epoch` stays out this sprint ("add it at some point": next sprint, with gate-epoch voiding); the two G8 relabels stay; `FX.prfSalt` stays a separate checker; `Wayin.toJSON` keeps the header; the vault stamp binds no format.
 * The deviceDB bridge: "if there are things we will want from the old model, add them; if there are still gaps have the facade paper over them". Thread 2: look at the old lease record (`src/shapes/device.ts`) for fields the models will want and add them to `leaseRecord`; the bank's adapter papers over the rest.
 * Doc blocks: short now, more later; slop that narrates parameters is stripped or fixed, never written anew (ground rule 8).
+
+## Thread 5 taught (tests_models, PR #411)
+
+* The fakes thread 6 reuses are in `packages/safebyok/tests/test-helpers/proving-world.ts`, imported directly (not through `TH`): `useFakeClock`, `WorldStamp`, `duckVaultOf` / `asVault`; `fakeDBFriendOf` (keeps the record in `kept`, spies each verb, logs calls in `logged`); `WeekMillis`, `grantedLeaseOf`, `sealStampsOf`; `TestPassphrase`, `DeviceId`, `provingWorldOf`, `passkeyAnswerOf`, `proofClosureOf`; `isZeroed`; the backdoor `_cheat_vaultKeyBytesOf`.
+* Its pins found two things worth the Coach: a lease seals while out of force (no `isInForce` check in `sealWith`/`unsealWith`), and a lease longer than `MaxTimerMillis` (24.5 days) never autolocks because the Trigger sets no timer past the cap. Rows in Open Matters. The eight smaller pins are thread 2's and thread 3's (Cleanup, Your calls; thread 2's gloss).
