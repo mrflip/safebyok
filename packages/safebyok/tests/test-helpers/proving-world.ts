@@ -158,7 +158,10 @@ export const _cheat_vaultKeyBytesOf = async (vault: VaultStamp, wayin: Wayin, se
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(vaultStamp.parse(vault), header)
   const wayinKeyOf = async (): Promise<CryptoKey> => {
-    if ('prfBytes' in secret) { return deriveWrappingKey(secret.prfBytes, ctx) }
+    if ('prfBytes' in secret) {
+      if (header.wayinkind !== 'passkey') { throw new Error('PRF bytes open a passkey wayin alone.') }
+      return deriveWrappingKey(secret.prfBytes, ctx)
+    }
     if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase opens a passphrase wayin alone.') }
     return importWrappingKeyBytes(await keyDeriver.deriveKeyBytes(VX.passphraseCleartext.parse(secret.passphrase), fromB64(header.salt_b64)))
   }
