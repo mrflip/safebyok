@@ -4,7 +4,7 @@
 
 ## The models PR (the base)
 
-Filed from the Coach's planning checkout, branch `20261031-newvault_models`: PR number and tip SHA to follow. It holds `models/lease.ts`, `wayin.ts`, `proving.ts`, `gate.ts`, `Vault.lock()`, and their shapes at the end of `models-shapes.ts` (banners *The vault's stamp*, *The wayin's forms*, *The gate's forms*, *What a proving is handed*, *The lease's forms*). Green: typecheck, eslint, 4519 tests.
+Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/safebyok/pull/408), branch `20261031-newvault_models`, tip `6aa1e692`. It also carries the two unmerged planning commits `bb19200d` and `4e0ca295`, as `20261031-base_planning` has no PR of its own. It holds `models/lease.ts`, `wayin.ts`, `proving.ts`, `gate.ts`, `Vault.lock()`, and their shapes at the end of `models-shapes.ts` (banners *The vault's stamp*, *The wayin's forms*, *The gate's forms*, *What a proving is handed*, *The lease's forms*). Green: typecheck, eslint, 4519 tests.
 
 ## What the first round settled (2026-10-31)
 

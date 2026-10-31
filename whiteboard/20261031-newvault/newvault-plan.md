@@ -5,7 +5,7 @@
 * **At once**: 3 threads.
 * **Spec**: `whiteboard/20261030-newvault/newvault-spec.md` (the design, one day older than this sprint's folder; the two folders share the name on purpose). The storable spec is `whiteboard/20261028-storable_base/storable-spec.md`.
 * **Base**: every code thread stacks on the models PR, branch `20261031-newvault_models` (the Lease, Wayin, Proving, Gate, `Vault.lock()` and their shapes, filed from the Coach's planning checkout). Its PR number and tip are in the progress document once filed.
-* **Status**: planning; the models PR is being filed; the sonnet gap review runs as a subagent; threads 1 and 5 start when the models PR is up.
+* **Status**: running. Models PR #408 filed at `6aa1e692`; threads 1 and 5 building; the gap review running.
 
 ## Read first
 
