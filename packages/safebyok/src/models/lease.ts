@@ -41,8 +41,8 @@ export class Lease implements LeaseStamp {
       maxMillis:      ForeverMillis,
       eagerFrac:      1,
       doSnapshot:     () => this.toJSON(),
-      doTryLaunch:    () => outcomeOf(() => this.#autolockNow()),
-      onTimerRefusal: (err) => { dbfriend.logger.warn('The autolock fired, but forgetting the lease was refused.', { call: 'Lease.autolock', refusalkind: err.refusalkind }) },
+      doTryLaunch:    () => outcomeOf(() => { this.#autolockNow() }),
+      onTimerRefusal: (err) => { dbfriend.logger.warn('The autolock fired, but locking the vault was refused.', { call: 'Lease.autolock', refusalkind: err.refusalkind }) },
     })
     Object.freeze(this)
     this.#autolock.scheduleLaunchAt(this.autolock_at)
@@ -107,10 +107,10 @@ export class Lease implements LeaseStamp {
 
   get isInForce(): boolean { return this.#record !== null && this.#autolock.isTimely }
 
-  /** The autolock's launch: lock the vault, which forgets the lease it holds; forget here too, for a lease the vault never took up. */
-  async #autolockNow(): Promise<void> {
+  /** The autolock's launch: lock the vault, which erases the kept lease by scope; let go here too, for a lease the vault never took up. */
+  #autolockNow(): void {
     this.vault.lock()
-    await this.forget()
+    this.letGo()
   }
   // --
 
@@ -168,10 +168,9 @@ export class Lease implements LeaseStamp {
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
     const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), damagedLease)
     if (! opened.ok) {
-      // Locking drops the vault's lease; this one is dropped here too, should the vault hold another. A refused erase is warned of: the refusal told is the damage.
+      // Locking drops the vault's lease and erases the kept one by scope; this one is let go too, should the vault hold another.
       this.vault.lock()
       this.letGo()
-      await eraseKept(this.dbfriend, 'Lease.vaultKey')
     }
     return valOf(opened)
   }
