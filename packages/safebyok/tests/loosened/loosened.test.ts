@@ -151,3 +151,75 @@ describe("the box's seal through the vault's lease", () => {
   })
 })
 // --
+
+// == [Changing the gate]: the passkey proves and stays, other devices stay unlocked, no strength check, a gate changed meanwhile overwritten
+
+const NewPassphrase = 'a new passphrase for the vault'
+const byPassphrase = (passphrase: string) => () => ({ passphrase })
+const byLaptopPasskey = async () => ({ passkeyAnswer: await TH.passkeyOf('laptop') })
+/** A vault born with a passphrase and the laptop's passkey, and sent. */
+const bornWithPasskey = async () => {
+  const world = makeVaultWorld()
+  const passkeyAnswer = await TH.passkeyOf('laptop')
+  const vault = await world.listing.build(Dna, () => ({ passphrase: Passphrase, passkeyAnswer }))
+  await vault.send({})
+  const demandStored = () => {
+    const record = world.storedNow()
+    if (record === null) { throw new Error('nothing stored') }
+    return record
+  }
+  return { ...world, vault, demandStored }
+}
+
+describe("the gate changes the vault sends", () => {
+  it("README.md:836, 'Only the current passphrase proves a change ... never a passkey's answer, which is refused bad_option': the passkey's answer proves a new passphrase", async () => {
+    const { vault, opts: { world } } = await bornWithPasskey()
+    await vault.replacePassphrase(byLaptopPasskey, byPassphrase(NewPassphrase))
+    const proving = await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
+    expect(proving.wayinkind).to.eq('passphrase')
+  })
+
+  it("README.md:841, 'A new passphrase removes the passkey with the old one': the passkey wayin is kept as stored, and the passkey still opens", async () => {
+    const { vault, demandStored, opts: { world } } = await bornWithPasskey()
+    const { passkey_wayin } = demandStored().gate
+    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    expect(demandStored().gate.passkey_wayin).to.deep.equal(passkey_wayin)
+    const proving = await vault.gate.attemptProof(byLaptopPasskey, world)
+    expect(proving.wayinkind).to.eq('passkey')
+  })
+
+  it("README.md:844, 'Every change locks the other devices': another device, unlocked before the change, fetches the new gate and stays unlocked, its lease in force", async () => {
+    const { vault, demandStored } = await bornWithPasskey()
+    const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
+    const theirs = await other.listing.build(demandStored())
+    await theirs.ensureUnlocked(byPassphrase(Passphrase))
+    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    other.storeBehindOurBack(demandStored())
+    await theirs.fetch()
+    expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
+    expect(theirs.isUnlocked).to.be.true
+    expect(theirs.demandLease().isInForce).to.be.true
+  })
+
+  it("README.md:853, 'each change_passphrase sets -- is put to the vault's strengthChecker first': a one-letter new passphrase is set, as the world carries no checker", async () => {
+    const { vault, opts: { world } } = await bornWithPasskey()
+    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase('x'))
+    const proving = await vault.gate.attemptProof(byPassphrase('x'), world)
+    expect(proving.wayinkind).to.eq('passphrase')
+  })
+
+  it("README.md:830, 'stale_write when another device changed the vault meanwhile': a passkey revoked elsewhere while this device was proving comes back with the gate it sends, fetched afresh though the vault was", async () => {
+    const { vault, demandStored, storeBehindOurBack, advance } = await bornWithPasskey()
+    let revokedSeq = 0
+    const proofClosure = () => {
+      const record = demandStored()
+      revokedSeq = storeBehindOurBack({ ...record, gate: { ...record.gate, passkey_wayin: null } }).revision_seq
+      advance(11 * 60_000)
+      return { passphrase: Passphrase }
+    }
+    await vault.replacePassphrase(proofClosure, byPassphrase(NewPassphrase))
+    expect(demandStored().revision_seq).to.eq(revokedSeq + 1)
+    expect(demandStored().gate.passkey_wayin).not.to.be.null
+  })
+})
+// --

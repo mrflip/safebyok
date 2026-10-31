@@ -7,7 +7,7 @@ import { outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import * as VX from '../shapes/vault'
 import { Lease } from './lease'
-import { type AttemptClosure, type GateProps, type LeaseDBFriend, type LeaseGrantOpts, type LeaseVault, type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, type WayinKind, attemptCleartexts, cleartexts, passkeyWayinHeader, passkeyWayinRecord, passphraseMakeArgs, passphraseWayinHeader, passphraseWayinRecord, provingAttemptArgs, provingMakeArgs, provingPairArgs, vaultStamp } from './models-shapes'
+import { type AttemptClosure, type GateProps, type LeaseDBFriend, type LeaseGrantOpts, type LeaseVault, type PasskeyClosure, type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseClosure, type PassphraseWayinHeader, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, type WayinKind, attemptCleartexts, cleartexts, passkeyClosureArgs, passkeyCleartexts, passkeyWayinHeader, passkeyWayinRecord, passphraseClosureArgs, passphraseCleartexts, passphraseMakeArgs, passphraseWayinHeader, passphraseWayinRecord, provingAttemptArgs, provingMakeArgs, provingPairArgs, vaultStamp } from './models-shapes'
 import { Wayin, wayinCtxOf } from './wayin'
 
 // == [NOVEL and the checks]: NOVEL, Novel, ProvingPair, RewrapUsage, Checks
@@ -125,9 +125,21 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 }
 // --
 
-// == [PassphraseProving]: make, ofWayin
+// == [PassphraseProving]: make, makeFromClosure, ofWayin
 
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
+  /** A new passphrase proving of the vault `stamp` names, for the passphrase `passphraseClosure` answers. */
+  static async makeFromClosure(stamp: VaultStamp, passphraseClosure: PassphraseClosure, world: ProvingWorld): Promise<PassphraseProving> {
+    passphraseClosureArgs.parse({ stamp, passphraseClosure, world })
+    const handed = await invokeProofClosure(passphraseClosure)
+    try {
+      const { passphrase } = passphraseCleartexts.parse(handed)
+      return await this.make(stamp, world, passphrase)
+    } finally {
+      spendAnswer(handed)
+    }
+  }
+
   static async make(stamp: VaultStamp, world: ProvingWorld, passphrase: VX.PassphraseCleartext): Promise<PassphraseProving> {
     const { stamp: checked, passphrase: typed } = passphraseMakeArgs.parse({ stamp, world, passphrase })
     const header = mintPassphraseHeader(world)
@@ -147,9 +159,21 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 }
 // --
 
-// == [PasskeyProving]: make, ofWayin
+// == [PasskeyProving]: make, makeFromClosure, ofWayin
 
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
+  /** A new passkey proving of the vault `stamp` names, for the passkey whose answer `passkeyClosure` hands in; the answer is spent, made or refused (G2). */
+  static async makeFromClosure(stamp: VaultStamp, passkeyClosure: PasskeyClosure, world: ProvingWorld): Promise<PasskeyProving> {
+    passkeyClosureArgs.parse({ stamp, passkeyClosure, world })
+    const handed = await invokeProofClosure(passkeyClosure)
+    try {
+      const { passkeyAnswer } = passkeyCleartexts.parse(handed)
+      return await this.make(stamp, world, passkeyAnswer)
+    } finally {
+      spendAnswer(handed)
+    }
+  }
+
   /** The answer is checked inside the try, so its bytes are zeroed whether it passes or not (G2). */
   static async make(stamp: VaultStamp, world: ProvingWorld, passkeyAnswer: unknown): Promise<PasskeyProving> {
     try {
@@ -208,7 +232,7 @@ const passkeyWayinRecordOf = (wayin: Wayin): PasskeyWayinRecord => passkeyWayinR
 // == [Host calls]: invokeProofClosure, deriveKeyBytes, spendAnswer, spendPrfBytes
 
 // The two host functions that hear the passphrase (guarantees.md, G1 and G8): what they throw may quote it, so it is replaced, not kept as a cause.
-const invokeProofClosure = async (proofClosure: ProofClosure | AttemptClosure): Promise<unknown> => {
+const invokeProofClosure = async (proofClosure: ProofClosure | AttemptClosure | PassphraseClosure | PasskeyClosure): Promise<unknown> => {
   try {
     return await proofClosure()
   } catch {

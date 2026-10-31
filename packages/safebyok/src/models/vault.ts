@@ -1,13 +1,13 @@
 import { consistent, verifyConsistent } from '../checks/validator'
 import { VaultError } from '../errors'
-import { outcomeOf, valOf } from '../outcome'
+import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
 import { Gate } from './gate'
 import { Lease } from './lease'
-import type { AttemptClosure, Fetched, GateProps, LeaseDBFriend, LockState, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { AttemptClosure, Fetched, GateProps, LeaseDBFriend, LockState, PasskeyClosure, PassphraseClosure, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
@@ -28,6 +28,15 @@ export type VaultSnapshot = VaultScope & Readonly<{
 
 /** A host's patch for `edit` and `send`: any prop of the vault's record, each checked and all ignored, the gate included, so `{}` or `{ ...record }` will do and a patch only moves the revision. `vaultPatch` checks it. */
 export type VaultPatch = { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | undefined }
+
+/** The one patch whose gate the vault stages: made only by `Vault.#sendGate`, and never exported, so no host's patch carries a gate. */
+class GateStaging {
+  readonly gate: GateProps
+  constructor(gate: GateProps) {
+    this.gate = gate
+    Object.freeze(this)
+  }
+}
 // --
 
 // == [Vault]
@@ -97,6 +106,38 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     const full = this.demandedFull()
     if (this.#gate?.props !== full.gate) { this.#gate = { props: full.gate, gate: new Gate(full, full.gate) } }
     return this.#gate.gate
+  }
+  // --
+
+  // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, sendGate, each with its try form
+
+  /** Replace the passphrase with the one `passphraseClosure` answers, once `proofClosure` proves the gate, and send; the passkey stays. The vaultKey does not change, so a lease held stays in force. */
+  async replacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<this> {
+    await this.ensureReadyToEdit()
+    return this.#sendGate(await this.gate.withPassphraseReplaced(proofClosure, passphraseClosure, this.world))
+  }
+
+  tryReplacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase(proofClosure, passphraseClosure)) }
+
+  /** Add the passkey whose answer `passkeyClosure` hands in, once `proofClosure` proves the gate, and send. A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a lease held stays in force. */
+  async addPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<this> {
+    await this.ensureReadyToEdit()
+    return this.#sendGate(await this.gate.withPasskeyAdded(proofClosure, passkeyClosure, this.world))
+  }
+
+  tryAddPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey(proofClosure, passkeyClosure)) }
+
+  /** Revoke the passkey, once `proofClosure` proves the gate, and send. A vault without one refuses 'absent_wayin', asking nothing. Removal is not revocation of the vaultKey, which does not change: a lease held stays in force. */
+  async revokePasskey(proofClosure: AttemptClosure): Promise<this> {
+    await this.ensureReadyToEdit()
+    return this.#sendGate(await this.gate.withPasskeyRevoked(proofClosure, this.world))
+  }
+
+  tryRevokePasskey(proofClosure: AttemptClosure): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey(proofClosure)) }
+
+  /** Stage `gate` over the record in hand and send it: the vault's one path to a new gate. */
+  #sendGate(gate: GateProps): Promise<this> {
+    return this.send(new GateStaging(gate))
   }
   // --
 
@@ -274,16 +315,17 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return fetched.am === 'a' && 'gate' in fetched
   }
 
-  /** Returns for a full patch of this vault, and refuses any other 'bad_option', naming the field; `edit`, so `send`, calls it first of all, before any guard. Every patch held to `vaultPatch` is full: `{}`, or the props of the vault's record, each checked, and all ignored. A scope field that names another vault refuses, naming it. */
+  /** Returns for a full patch of this vault, and refuses any other 'bad_option', naming the field; `edit`, so `send`, calls it first of all, before any guard. Every patch held to `vaultPatch` is full: `{}`, or the props of the vault's record, each checked, and all ignored. A scope field that names another vault refuses, naming it. The gate's own staging, from `#sendGate`, is full too. */
   protected isFullPatch(patch: unknown): asserts patch is VaultPatch {
+    if (patch instanceof GateStaging) { return }
     verifyConsistent(MSX.vaultPatch.parse(patch), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** `makeStagedBase`'s base, the record in hand under its next revision, its `vault_tok` and its gate kept: a patch's props are all ignored. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. */
-  protected makeStaged(): Promise<VaultRecord> {
+  /** `makeStagedBase`'s base, the record in hand under its next revision, its `vault_tok` kept, and its gate, but where `#sendGate` stages a new one: a host's patch's props are all ignored. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. */
+  protected makeStaged(patch: VaultPatch): Promise<VaultRecord> {
     const { base } = this.makeStagedBase()
-    // not yet: the gate verbs stage a new gate through a private path of their own, never through a patch
-    return Promise.resolve({ ...base, gate: this.demandedFull().gate })
+    const gate = patch instanceof GateStaging ? patch.gate : this.demandedFull().gate
+    return Promise.resolve({ ...base, gate })
   }
 
   /** A vault's life is its `vault_tok`. */

@@ -573,29 +573,40 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [What a proving is handed]: cleartexts, attemptCleartexts, provingWorld, provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, vaultBuildArgs, Cleartexts, AttemptCleartexts, ProofClosure, AttemptClosure, ProvingWorld
+// == [What a proving is handed]: cleartexts, attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld, provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, passphraseClosureArgs, passkeyClosureArgs, vaultBuildArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs, Cleartexts, AttemptCleartexts, PassphraseCleartexts, PasskeyCleartexts, ProofClosure, AttemptClosure, PassphraseClosure, PasskeyClosure, ProvingWorld
 
-/** What a proof closure hands in: `cleartexts` at a vault's birth, a passphrase and perhaps a new passkey's answer; `attemptCleartexts` at an unlock, a passphrase or a passkey's answer. */
-export const { cleartexts, attemptCleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id }) => ({
-  cleartexts:        obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
-  attemptCleartexts: obj({ passphrase: passphraseCleartext.optional(), passkeyAnswer: passkeyAnswer.nullable().optional() }).strict()
+/** What a proof closure hands in: `cleartexts` at a vault's birth, a passphrase and perhaps a new passkey's answer; `attemptCleartexts` at an unlock, a passphrase or a passkey's answer; `passphraseCleartexts` and `passkeyCleartexts` for a gate's new wayin, a new passphrase or a new passkey's answer. */
+export const { cleartexts, attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id }) => ({
+  cleartexts:           obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
+  attemptCleartexts:    obj({ passphrase: passphraseCleartext.optional(), passkeyAnswer: passkeyAnswer.nullable().optional() }).strict()
     .refine(({ passphrase, passkeyAnswer: answer = null }) => passphrase !== undefined || answer !== null, Phrases.ProofMissing),
-  provingWorld:      obj({ clock: clockShape, keyDeriver: keyDeriverShape, device_id }),
+  passphraseCleartexts: obj({ passphrase: passphraseCleartext }).strict(),
+  passkeyCleartexts:    obj({ passkeyAnswer: freshPasskeyAnswer }).strict(),
+  provingWorld:         obj({ clock: clockShape, keyDeriver: keyDeriverShape, device_id }),
 }), [FX, HX, VX])
 
-export type Cleartexts        = Z.input<typeof cleartexts>
-export type AttemptCleartexts = Z.input<typeof attemptCleartexts>
-export type ProofClosure      = () => Cleartexts | Promise<Cleartexts>
-export type AttemptClosure    = () => AttemptCleartexts | Promise<AttemptCleartexts>
-export type ProvingWorld      = Z.infer<typeof provingWorld>
+export type Cleartexts           = Z.input<typeof cleartexts>
+export type AttemptCleartexts    = Z.input<typeof attemptCleartexts>
+export type PassphraseCleartexts = Z.input<typeof passphraseCleartexts>
+export type PasskeyCleartexts    = Z.input<typeof passkeyCleartexts>
+export type ProofClosure         = () => Cleartexts | Promise<Cleartexts>
+export type AttemptClosure       = () => AttemptCleartexts | Promise<AttemptCleartexts>
+export type PassphraseClosure    = () => PassphraseCleartexts | Promise<PassphraseCleartexts>
+export type PasskeyClosure       = () => PasskeyCleartexts | Promise<PasskeyCleartexts>
+export type ProvingWorld         = Z.infer<typeof provingWorld>
 
-/** The arguments of the proving makers and of `VaultListing.build` of a dna: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
-export const { provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, vaultBuildArgs } = Checkers('bad_option', ({ obj, fn, passphraseCleartext }) => ({
-  provingPairArgs:    obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
-  provingMakeArgs:    obj({ stamp: vaultStamp, world: provingWorld }),
-  passphraseMakeArgs: obj({ stamp: vaultStamp, world: provingWorld, passphrase: passphraseCleartext }),
-  provingAttemptArgs: obj({ stamp: vaultStamp, gate: gateProps, proofClosure: fn<AttemptClosure>(), world: provingWorld }),
-  vaultBuildArgs:     obj({ proofClosure: fn<ProofClosure>() }),
+/** The arguments of the proving makers, of `VaultListing.build` of a dna, and of the gate's operations: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
+export const { provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, passphraseClosureArgs, passkeyClosureArgs, vaultBuildArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs } = Checkers('bad_option', ({ obj, fn, passphraseCleartext }) => ({
+  provingPairArgs:       obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
+  provingMakeArgs:       obj({ stamp: vaultStamp, world: provingWorld }),
+  passphraseMakeArgs:    obj({ stamp: vaultStamp, world: provingWorld, passphrase: passphraseCleartext }),
+  provingAttemptArgs:    obj({ stamp: vaultStamp, gate: gateProps, proofClosure: fn<AttemptClosure>(), world: provingWorld }),
+  passphraseClosureArgs: obj({ stamp: vaultStamp, passphraseClosure: fn<PassphraseClosure>(), world: provingWorld }),
+  passkeyClosureArgs:    obj({ stamp: vaultStamp, passkeyClosure: fn<PasskeyClosure>(), world: provingWorld }),
+  vaultBuildArgs:        obj({ proofClosure: fn<ProofClosure>() }),
+  passphraseReplaceArgs: obj({ proofClosure: fn<AttemptClosure>(), passphraseClosure: fn<PassphraseClosure>() }),
+  passkeyAddArgs:        obj({ proofClosure: fn<AttemptClosure>(), passkeyClosure: fn<PasskeyClosure>() }),
+  passkeyRevokeArgs:     obj({ proofClosure: fn<AttemptClosure>() }),
 }), [VX])
 // --
 
