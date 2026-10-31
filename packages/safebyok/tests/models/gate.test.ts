@@ -7,7 +7,7 @@ import { _cheat_vaultKeyBytesOf, asVault, duckVaultOf, passkeyAnswerOf, proofClo
 useFakeClock()
 
 
-/** A gate built for a fresh duck vault, with a passkey when `passkey` says so; the passkey answer's PRF bytes are copied first, for the backdoor. */
+/** The PRF bytes are copied before the build zeroes them, for the backdoor. */
 const builtGate = async ({ passkey = false } = {}) => {
   const vault = duckVaultOf()
   const answer = passkey ? passkeyAnswerOf() : undefined

@@ -11,19 +11,17 @@ import { _cheat_vaultKeyBytesOf, asVault, DeviceId, duckVaultOf, fakeDBFriendOf,
 useFakeClock()
 
 
-/** A proving pair of a fresh duck vault, from the world and closure given, the defaults otherwise. */
 const provingPairOf = async (proofClosure: ProofClosure = proofClosureOf(), world: ProvingWorld = provingWorldOf()) => (
   Proving.makeProvingPair(asVault(duckVaultOf()), proofClosure, world)
 )
 
-/** A key deriver handing back what `handBack` makes, a spy. */
+/** A key deriver scripted to hand back anything at all, to try what a proving makes of it. */
 const deriverHanding = (handBack: () => unknown): KeyDeriver => ({
   key_deriver_label: 'test_scripted_v0',
   salt_bytes:        16,
   deriveKeyBytes:    () => Promise.resolve(handBack() as Uint8Array),
 })
 
-/** A passphrase proving of a fresh duck vault, through `keyDeriver`. */
 const passphraseProvingWith = (keyDeriver: KeyDeriver): Promise<PassphraseProving> => (
   PassphraseProving.make(asVault(duckVaultOf()), provingWorldOf({ keyDeriver }), TestPassphrase)
 )

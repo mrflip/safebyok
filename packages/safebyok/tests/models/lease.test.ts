@@ -16,11 +16,9 @@ const StampFieldnames = ['fmt', 'applabel', 'user_id', 'vaultlabel', 'vault_tok'
 /** A whisper's serialized bytes, fresh each call: a test checks they are zeroed. */
 const whisperBytesOf = (text = '{"val":"sk-test-0000"}'): Uint8Array => new TextEncoder().encode(text)
 
-/** The text of unsealed whisper bytes. */
 const textOf = (bytes: Uint8Array): string => new TextDecoder().decode(bytes)
 
 
-/** A granted lease, its vault and its friend, each fresh. */
 const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ vault: DuckVault, friend: FakeDBFriend, lease: Lease }> => {
   const vault = duckVaultOf()
   const friend = fakeDBFriendOf()
@@ -28,7 +26,6 @@ const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ vault: DuckVault, 
   return { vault, friend, lease }
 }
 
-/** The record `friend` keeps, typed. */
 const keptOf = (friend: FakeDBFriend): LeaseRecord => friend.kept as LeaseRecord
 
 describe("Lease.grant(vault, dbfriend, vaultKey, opts)", () => {

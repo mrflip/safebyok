@@ -41,7 +41,7 @@ export const WorldStamp: VaultStamp = Object.freeze({ applabel: 'acme', user_id:
 /** A plain stand-in for a vault, as a lease, a proving and a gate are handed one: its stamp, a clock on `Date.now()`, and `lock`, a spy. */
 export type DuckVault = VaultStamp & { clock: { now: () => number }, lock: Mock<() => void> }
 
-/** A {@link DuckVault} of {@link WorldStamp}; `overrides` says otherwise of its stamp.
+/** A {@link DuckVault} of {@link WorldStamp}, with a fresh `lock` spy.
  *
  * @example const vault = duckVaultOf({ vault_tok: 'vault-tok-other' })
  */
@@ -100,7 +100,7 @@ export const fakeDBFriendOf = (): FakeDBFriend => {
 /** A week, the lease {@link grantedLeaseOf} grants unless told otherwise. */
 export const WeekMillis = 7 * 24 * 60 * MinuteMillis
 
-/** A lease of `vault`, granted under a fresh vaultKey through `friend`, for a {@link WeekMillis week} unless `opts` says otherwise. */
+/** A lease under a fresh vaultKey: no two share a key. A {@link WeekMillis week} long unless `opts` says otherwise. */
 export const grantedLeaseOf = async (vault: DuckVault, friend: FakeDBFriend, opts?: LeaseGrantOpts): Promise<Lease> => (
   Lease.grant(vault, friend, await makeVaultKey(), opts ?? { leaseMillis: WeekMillis })
 )
@@ -120,7 +120,7 @@ export const TestPassphrase = VX.passphraseCleartext.parse('correct horse batter
 /** The `device_id` a {@link provingWorldOf} world carries. */
 export const DeviceId = 'device-laptop'
 
-/** A proving's world: a clock on `Date.now()`, the one-SHA-256 `testDeriver`, and {@link DeviceId}; `overrides` says otherwise. */
+/** A proving's world: a clock on `Date.now()`, the one-SHA-256 `testDeriver`, and {@link DeviceId}. */
 export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWorld => ({
   clock:      { now: () => Date.now() },
   keyDeriver: testDeriver,
@@ -128,7 +128,7 @@ export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWo
   ...overrides,
 })
 
-/** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. `overrides` says otherwise. */
+/** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
 export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.PasskeyAnswer => ({
   credential_id: 'cred-test-1',
   prf_salt_b64:  toB64(randomBytes(PasskeySaltBytes)),
@@ -136,7 +136,7 @@ export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.P
   ...overrides,
 })
 
-/** A proof closure handing back `passphrase`, and `passkeyAnswer` where given. */
+/** A synchronous proof closure; a test of an async one, or one that throws, writes its own. */
 export const proofClosureOf = (passphrase: string = TestPassphrase, passkeyAnswer?: VX.PasskeyAnswer): ProofClosure => () => (
   passkeyAnswer === undefined ? { passphrase } : { passphrase, passkeyAnswer }
 )
