@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #389 (thread 17); thread 15 building on it, branch `20261031-whisper_required`; then 13, 18, 19, 20, then 6.
+* **Status:** restacked onto main ce0e96e0 (#374 and #370 now inside #368); filed through #390 (thread 15); thread 21 (TestableBox) building on it; then 13, 18, 19, 20, then 6.
 
 ## Read first
 
@@ -553,6 +553,21 @@ where they edit with a sidecar alone or a whisper alone. Worker `opus`; review `
 on 17 (cut from its tip; 12 and 15 both touch `box.ts`). Size: medium.
 
 
+### 21. `TestableBox`, in place of `keptOf`
+
+*Orchestrator, the Coach (2026-10-31), on #389's test-reading row:* "Does a TestableStorable /
+TestableBox that offers `get _cheat_central()` and `get _cheat_staged()` solve the issue? I wish I
+had better guidance to stop agents from picking names like KeptOf -- once I point to it do you see
+that it's terrible?" Label `testable_box`.
+In `tests/test-helpers/models-world.ts`, a `TestableBox extends Box` exposes the storable's
+protected `central` and `staged` getters as `get _cheat_central()` and `get _cheat_staged()`;
+`boxListingOf` and `fakeSealBoxListingOf` make it (the listing's `makeThing`). Every
+`keptOf(held.mw, box).central` / `.staged` becomes `box._cheat_central` / `box._cheat_staged`;
+`keptOf`, `mw.kept` and `KeptBoxListing` go. Tests about the cache compare the save
+(`callsOf('save')`, `lastSaveOf`) with the cheat getters. No source change under `src/`. Name a
+new helper for what it returns; no coined verbs. Worker `sonnet`; review `low`. Depends on 15 (cut
+from its tip). Size: small (mechanical, wide).
+
 ### 13. The whisper, an object
 
 *Orchestrator, the Coach's ruling (2026-10-30):* "for the new box only -- require that whisper,
@@ -563,7 +578,7 @@ as a plain object (`box.whisper = { val: 'sk-…' }`), checked at the setter and
 sidecar is; the seal serializes the object. `null` and `LOCKED` keep their meaning (thread 9's
 setter). **Hands off:** cutting off access to the private value while locked (the Coach: "I will
 have to look at it later"); the setter is documented as it is. Worker `opus`; review `high` (the
-whisper is secret material: no side door, CLAUDE.md). Depends on 15 (cut from its tip). Size: small to medium.
+whisper is secret material: no side door, CLAUDE.md). Depends on 21 (cut from its tip; 15 below it). Size: small to medium.
 
 ### 18. Validators at every entrypoint
 
@@ -653,12 +668,12 @@ Worker `sonnet`; review `medium`. Depends on 19 (cut from its tip). Size: small.
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 21 (TestableBox) before 13, then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
