@@ -466,7 +466,7 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
 
 // == [Peeking]: keptOf, lastSaveOf
 
-/** The copy `box` last handed its listing by `keepCopy`: its central and staged as they were at its last `settle`, as a test of the box's state reads them. Undefined for no box; throws where the box's scope was never kept, as a box made by a listing {@link boxListingOf} did not make. */
+/** The copy `box` last handed its listing by `keepCopy`: its central and staged as of its last `settle`. Undefined for no box; throws where no copy was kept for its boxlabel, as for a box made by a listing neither {@link boxListingOf} nor {@link fakeSealBoxListingOf} made. */
 export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse>
 export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined
 export function keptOf(mw: ModelsWorld, box: { readonly boxlabel: string } | null | undefined): Cacheable<BoxRecord, BoxSparse> | undefined {
