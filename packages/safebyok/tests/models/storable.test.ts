@@ -549,6 +549,25 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       })
     }
 
+    it("other | same | full | ouch takes 'fill': the ouchstone keeps the life held when the damage arrived, so the healthy copy of its revision fills it, box_tok and registered_at included", () => {
+      const box = boxOf(Centrals.ouch())
+      const rcvd = rcvdOf('full', { ...SameRev, ...OtherLife })
+      box.receive(rcvd)
+      expect(policies).to.deep.equal(['fill'])
+      expect(box._cheat_central).to.deep.equal(rcvd)
+      expect(box).to.include({ box_tok: 'box-tok-b', registered_at: T0 + 50, revision_seq: 2 })
+    })
+
+    it("other | same | gone | ouch takes 'gone': the deletion is the one healthy word on that revision, whatever life the ouchstone kept", () => {
+      const box = boxOf(Centrals.ouch())
+      const rcvd = rcvdOf('gone', { ...SameRev, ...OtherLife })
+      box.receive(rcvd)
+      expect(policies).to.deep.equal(['gone'])
+      expect(box._cheat_central).to.deep.equal(rcvd)
+      expect(box.isPresent).to.be.false
+      expect(box).to.include({ box_tok: 'box-tok-b', revision_seq: 2 })
+    })
+
     for (const centralShape of ShapesAll) {
       it(`other | newer | full | ${centralShape} takes 'adopt', a birthday: central, box_tok and registered_at become the delivered record's`, () => {
         const box = boxOf(Centrals[centralShape]())

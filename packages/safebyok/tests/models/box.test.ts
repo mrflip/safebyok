@@ -67,6 +67,18 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', revision_seq: 4 })
   })
 
+  it("fills from the healthy copy of a revision of another life first received damaged: the ouchstone keeps the life held, and the healthy copy takes no 'record_conflict'", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    const remade = { revision_seq: 3, revision_tok: 'rev-b3', box_tok: 'box-tok-b', registered_at: T0 + 7 }
+    box.receive(tombstoneBoxRecord(remade, 'd'))
+    expect(box._cheat_central).to.include({ am: 'd', revision_seq: 3, box_tok: 'box-tok-a' })
+    const rcvd = fullBoxRecord(remade)
+    box.receive(rcvd)
+    expect(box._cheat_central).to.deep.equal(rcvd)
+    expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', revision_seq: 3 })
+    expect(box.isPresent).to.be.true
+  })
+
   const HeldCases = [
     ['a box held alive',          () => fullBoxRecord()],
     ['a box held deleted',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'x')],
