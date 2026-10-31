@@ -631,7 +631,7 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
-/** What a lease needs of its vault: the stamp, the clock, and `lock()`, called when the lease proves damaged or its autolock fires. */
+/** What a lease needs of its vault: the stamp, the clock, and `lock()`, called when the lease proves damaged or its autolock fires. The lease erases nothing itself then: `lock()` erases the lease the device keeps, by scope, whether or not the vault holds one. */
 export type LeaseVault = VaultStamp & { clock: Clock, lock(): unknown }
 
 /** The deviceDB as a lease reaches it, bound to the vault's scope by the vault that makes the friend, so no verb takes a scope. */
