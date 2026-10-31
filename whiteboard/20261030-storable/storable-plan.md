@@ -668,6 +668,15 @@ intend." Label `coach_sweep`.
   record -- refuses 'absent_box', 'needs_fetch' or 'vault_locked'"; `needs_fetch` is no refusal
   kind today: say what `demandFull` refuses, and raise it) and `demandReadyToSeal` ("throws
   unless unlocked ('vault_locked')"). `namesBoth` → abstract `isFullPatch` went to thread 18.
+* **Rulings since (the Coach, 2026-10-31, in Resolved):** the `Cache.save` contract says saves are
+  best effort and an adapter keeps call order, the last call winning ("Document the best-effort
+  promise; they can call _.debounce or a join primitive"); where the code forces a fetch with a
+  horizon of 0 (`hydrate`, a record in hand not whole), it uses `minRefreshMillis` = 50 ("we cannot
+  refresh(0) as a matter of habit"); the props that follow the record (`revision_tok`,
+  `revision_seq`, `written_at`, `registered_at`) become plain assignments to `declare`d fields set
+  before the seal, `tattoo` kept only for the immutable scope and `vault_tok` (the Coach asked why
+  tattoo, and why `configurable: false` doesn't fail on the second `defineProperty`: a
+  non-configurable property stays writable, so its value may change).
 Worker `opus`; review `medium`. Depends on 18 (cut from its tip). Size: medium.
 
 ### 19. A rollback, thrown
