@@ -690,6 +690,19 @@ describe("Storable snapshot and subscription", () => {
       expect(listener.mock.calls).to.have.lengthOf(0)
       expect(box.getSnapshot()).to.include({ revision_seq: 2 })
     })
+
+    it("is made by becomeNotifiable, which answers the box, so that the next change notifies; the snapshot it made is the one getSnapshot answers", () => {
+      const { mw } = held
+      const box = new TestableBox(mw.world, boxListingOf(mw), mw.cache, mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
+      const listener = vi.fn()
+      box.subscribe(listener)
+      expect(box.becomeNotifiable()).to.eq(box)
+      const made = box.getSnapshot()
+      expect(box.becomeNotifiable().getSnapshot()).to.eq(made)
+      box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      expect(listener.mock.calls).to.have.lengthOf(1)
+      expect(box.getSnapshot()).to.include({ revision_seq: 2 })
+    })
   })
 
   describe("settle", () => {

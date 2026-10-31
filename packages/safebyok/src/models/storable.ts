@@ -174,7 +174,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   set isWatchable(watchable: boolean) { this.#watchable = MSX.watchable.parse(watchable) }
   // --
 
-  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe
+  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, becomeNotifiable
 
   /** Direct public access to the snapshot */
   get snapshot(): SnapshotT {
@@ -194,6 +194,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   readonly #subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(MSX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
+  }
+
+  /** Make the snapshot now, if not yet made, so that each change from here on notifies the subscribers: until then there is none to replace. */
+  becomeNotifiable(): this {
+    this.#snapshot ??= this.makeSnapshot()
+    return this
   }
 
   /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */

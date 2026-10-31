@@ -252,7 +252,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Hold `thing`, born here, under its scope, and make the listing's snapshot again on each change of the thing's. */
   #hold(thing: ThingT): void {
     this.#things.set(this.scopepathOf(thing.scope), thing)
-    thing.getSnapshot()   // a thing notifies only once it has a snapshot
+    thing.becomeNotifiable()
     thing.subscribe(() => { this.#remakeSnapshot() })
   }
 
