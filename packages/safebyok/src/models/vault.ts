@@ -1,5 +1,5 @@
 import { consistent, verifyConsistent } from '../checks/validator'
-import { VaultError } from '../errors'
+import { type RefusalMeta, VaultError } from '../errors'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
@@ -329,12 +329,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     verifyConsistent(MSX.vaultPatch.parse(patch), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** `makeStagedBase`'s base, the record in hand under its next revision, its `vault_tok` kept, and its gate, but where `#sendGate` stages a new one: a host's patch's props are all ignored. A staged gate proved against another gate than the record's refuses 'stale_write'. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. */
+  /** `makeStagedBase`'s base, the record in hand under its next revision, its `vault_tok` kept, and its gate, but where `#sendGate` stages a new one: a host's patch's props are all ignored. A staged gate proved against another gate than the record's refuses 'stale_write', its `meta` carrying the revisions as `edit`'s own refusal does. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. */
   protected makeStaged(patch: VaultPatch): Promise<VaultRecord> {
     const { base } = this.makeStagedBase()
     const held = this.demandedFull().gate
     if (! (patch instanceof GateStaging)) { return Promise.resolve({ ...base, gate: held }) }
-    if (patch.ante !== held) { throw gateMovedUnderChange() }
+    if (patch.ante !== held) { throw gateMovedUnderChange({ stored_revision: MSX.revision.parse(this.central), staged_revision: MSX.revision.parse(base) }) }
     return Promise.resolve({ ...base, gate: patch.gate })
   }
 
@@ -366,5 +366,6 @@ const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrase
 
 const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 
-const gateMovedUnderChange = (): VaultError => new VaultError('stale_write', Phrases.GateMovedUnderChange)
+/** The 'stale_write' of a gate change proved against a record that moved meanwhile, its `meta` the revisions `movedUnderEditError` carries. */
+const gateMovedUnderChange = (meta: RefusalMeta): VaultError => new VaultError('stale_write', Phrases.GateMovedUnderChange, { meta })
 // --
