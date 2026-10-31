@@ -1,6 +1,7 @@
 /** Behaviours an old guarantee forbids that the Coach has not ruled on, each pinned as the model does it today.
- * One file for the sprint: each thread appends describes of its own at the end, and edits none another
- * wrote. Each `it` names the guarantee's source and line in its title.
+ * This file keeps the storable sprint's pins and the sections the newvault sprint's threads 2 to 4 appended;
+ * a new pin goes in the loosened file of its model, one per model (`vault.test.ts`, `box.test.ts`,
+ * `lease.test.ts`), named for what it pins. Each `it` names the guarantee's source and line in its title.
  */
 
 import { describe, expect, it, vi } from 'vitest'
