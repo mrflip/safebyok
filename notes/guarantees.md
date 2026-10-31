@@ -16,8 +16,9 @@ Last verified against the code 2026-10-27, on `main` after #302, with
 
 ## Where the guarantees are kept
 
-Six files hold every line of code that touches a secret. A change to one of them is a change to
-these guarantees until shown otherwise.
+Ten files hold every line of code that touches a secret: the old core's six, and the four of the
+`models/` that build the same constructions. A change to one of them is a change to these
+guarantees until shown otherwise.
 
 | File | What it keeps |
 |---|---|
@@ -27,6 +28,10 @@ these guarantees until shown otherwise.
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
 | `packages/safebyok/src/types/types.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
+| `packages/safebyok/src/models/proving.ts` | the wayinKey, and the vaultKey unwrapped per call and moved from proving to proving inside `makeWayin(source)`, handed only to `Lease.grant`; the PRF bytes, spent in a `finally` |
+| `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `letGo` and `forget` |
+| `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; `Gate.build` hands the passphrase proving back to the listing, which drops it after the birth lease |
+| `packages/safebyok/src/models/box.ts` | holds no key: hands the lease the bytes and stamps and gets bytes back; zeroes the opened bytes in a `finally` |
 
 Beside them, three host functions hear the passphrase and are guarded where they are called:
 `keyDeriver.deriveKeyBytes` (`proving.ts`, `deriverThrewRefusal`), `strengthChecker`
