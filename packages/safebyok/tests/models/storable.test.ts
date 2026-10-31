@@ -808,11 +808,14 @@ describe("Storable forms", () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
       await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
-      const { _cheat_central: central, _cheat_staged: staged, sparse } = box
+      held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
+      await box.tryFetch()
+      const { staged, central, ...sparse } = lastSaveOf(held.mw, box)
       expect(central).to.deep.equal(fullBoxRecord())
       expect(staged).to.include({ revision_seq: 2, written_at: T0 + 500, am: 'a' })
       expect(staged).to.have.property('sidecar').that.deep.equals({ note: 'staged' })
       expect(sparse).to.deep.equal(held.mw.sparseBoxRecord())
+      expect(Object.isFrozen(lastSaveOf(held.mw, box))).to.be.true
     })
 
     it("has no sidecar on the sparse form nor on a tombstone, central or staged", async () => {
