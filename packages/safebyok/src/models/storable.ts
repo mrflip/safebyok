@@ -466,11 +466,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * record's sparse form, so the props held are the damaged record's own.
    */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
-    const isSameLife = this.#sameLife(rcvd)
-    if ((! isSameLife) && (rcvd.vault_tok !== this.vault_tok))   { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
+    // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
+    if ((rcvd.vault_tok !== this.vault_tok))                     { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
     const central = this.#central
     const age = cmpRevisions(central, rcvd)
-    if ((! isSameLife) && (age === 'same'))                      { throw new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
+    if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
     const centralShape = this.classifyRecordShape(central)
     if ((age === 'older') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
     if ((age === 'older'))                                       { return { central, policy: 'older' } }

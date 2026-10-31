@@ -89,6 +89,13 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     }
   }
 
+  it("throws 'unexpected_error' for a record under another vault_tok whose life tok path, joined, is the box's own", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    const central = box._cheat_central
+    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })), 'unexpected_error')
+    expect(box._cheat_central).to.eq(central)
+  })
+
   it("throws 'unexpected_error' over a draft's central never stored, and for a tombstone or a damaged record under another vault_tok", async () => {
     const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
