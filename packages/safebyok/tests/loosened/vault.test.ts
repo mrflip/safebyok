@@ -42,14 +42,16 @@ describe("the ways in changing under a vault unlocked", () => {
 
 describe("an older copy of the vault record", () => {
   it("README.md:1204, 'Storage handing back an older copy could otherwise bring back a way in that was removed': the next session on this device holds a vault record restored from before a passphrase change, and the passphrase replaced opens it again", async () => {
-    const { vault, opts, demandStored, anotherSession } = await makeBornVault()
+    const { vault, opts, demandStored, anotherSession, deviceDB } = await makeBornVault()
     const ante = demandStored()
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     vault.lock()
+    await TH.eventually(() => deviceDB.keptNow() === null)
     await opts.store.put(ante, null)
     const later = anotherSession()
     const restored = await later.build(demandStored())
     await later.hello()
+    expect(restored.isLocked).to.be.true
     expect(restored.revision_seq).to.eq(ante.revision_seq)
     expect(restored.gate.pickle()).to.deep.equal(ante.gate)
     await restored.ensureUnlocked(byPassphrase(Passphrase))
