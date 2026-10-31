@@ -1,6 +1,6 @@
 # Thread 15: A whisper and a sidecar on every update (2026-10-31)
 
-Branch `20261031-whisper_required`, PR #TBD, stacked on #389. Justify: green (safebyok 4347 passed, 37 skipped; every package green, size budgets unmoved).
+Branch `20261031-whisper_required`, PR #390, stacked on #389. Justify: green (safebyok 4347 passed, 37 skipped; every package green, size budgets unmoved).
 
 * **Built** (all under `packages/safebyok`):
   * **`BoxProps` is `{ whisper: Whisper, sidecar: Sidecar }`, both required** (`src/models/box.ts`). `Box.edit` checks the patch first, through the module-private `namesBoth(patch)` (in *Record forms*), and refuses `bad_option` with `Phrases.WhisperAndSidecarRequired` before any guard or hydrate runs, so nothing is staged and nothing is called. `send` and `seal` come through `edit`, so the check is in one place.
@@ -29,3 +29,4 @@ Branch `20261031-whisper_required`, PR #TBD, stacked on #389. Justify: green (sa
   * **`makeStaged`'s `opts` parameter kept** in `Storable`'s abstract signature, though no implementer reads it now: the vault's gate may need it, and it is the base's surface, not this thread's.
 * **Approaches set aside**: a `boxPatch` Checker in `models-shapes.ts` (thread 18's job, and a second shape beside `BoxProps` it would have to reconcile); checking in `makeStaged` (runs after hydrate and guards, so a malformed send would fetch first).
 * **Discoveries**: no vault-model test edits; `VaultProps` is untouched. The handoff's "around lines 125, 208, 253-262" in the spec were exact.
+* **For the Coach** (also the PR's open questions): `bad_option` precedes `vault_locked` for a malformed patch (recommend keep); `makeStaged`'s unused `opts` kept (recommend keep for the vault's gate).
