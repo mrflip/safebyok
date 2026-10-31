@@ -273,12 +273,12 @@ export type BoxRecord = Z.infer<typeof boxRecord>
  * The scope is required, and so are `whisper`, the {@link WhisperHolder} `build` seals in, and
  * `sidecar`, as every update of a box names both. A whisper that fails {@link whisperHolder}
  * refuses 'bad_option' here, as every field of a dna does, naming `whisper` or `whisper.val`.
- * `whisper_codec` and `whisper_schema_version` take their defaults where missing or undefined. The sealed parts never come from a dna: `build` seals
- * every box it makes, so a dna carrying one refuses, as a field it does not take. The props the
- * factory controls, `fmt`, `am`, `vault_tok`, `revision_tok` and the times, may be given, must
- * pass their checks, and are stripped. A field it does not take refuses, as a bag a person typed
- * would, and `revision_seq` among them: input carrying one is a record, which `build` holds to the
- * record check.
+ * `whisper_codec` and `whisper_schema_version` take their defaults where missing or undefined.
+ * The sealed parts never come from a dna: `build` seals every box it makes, so a dna carrying one
+ * refuses, as a field it does not take. The props the factory controls, `fmt`, `am`, `vault_tok`,
+ * `revision_tok` and the times, may be given, must pass their checks, and are stripped. A field it
+ * does not take refuses, as a bag a person typed would, and `revision_seq` among them: input
+ * carrying one is a record, which `build` holds to the record check.
  *
  * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' }, sidecar: {} })                                 // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: { val: 'sk-ant-...' } }
  * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' }, sidecar: {}, am: 'x', vault_tok: 'tok-u1' })   // the scope, whisper, sidecar and defaults: am and vault_tok are the factory's

@@ -14,10 +14,10 @@ export const StubWhisperCiphered = Object.freeze({ cipher_iv_b64: 'stub', cipher
 /** The full {@link BoxRecord} of `staged`, sealed over the whisper: `staged` as given, its sealed parts the constant placeholders. A stub, until the vault's seal lands.
  * The seal that replaces it makes a fresh boxKey, wraps it under the vaultKey through the vault's
  * lease, and ciphers the whisper's whole {@link WhisperHolder}, `{ val }` serialized, under that
- * boxKey, bound to the record's stamp. This stub does none
- * of that: it never looks at the whisper, and nothing it returns is derived from the whisper or any
- * key. A stub-sealed record opens to nothing; `staged`'s sealed parts, where it carries any, are
- * replaced. It refuses 'bad_record' a `staged` that does not make a full record.
+ * boxKey, bound to the record's stamp. This stub does none of that: it never looks at the whisper,
+ * and nothing it returns is derived from the whisper or any key. A stub-sealed record opens to
+ * nothing; `staged`'s sealed parts, where it carries any, are replaced. It refuses 'bad_record' a
+ * `staged` that does not make a full record.
  *
  * @param staged  - Record to seal, under the revision it is staged at, with the sidecar the seal binds.
  * @param _whisper - Whisper to seal, as its `{ val }`.
