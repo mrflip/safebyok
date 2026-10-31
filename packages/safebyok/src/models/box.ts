@@ -25,8 +25,8 @@ export type BoxSnapshot = Boxscope & Readonly<{
 /** The patch a host hands `edit` and `send`: both halves of a box, the whisper and the sidecar, as every update names both. */
 export type BoxProps = { whisper: Whisper, sidecar: Sidecar }
 
-/** True where `patch` names both a whisper and a sidecar, as a host's patch may not, whatever its type says. */
-const namesBoth = (patch: Partial<BoxProps>): boolean => (patch.whisper !== undefined) && (patch.sidecar !== undefined)
+/** True where `patch` names both a whisper and a sidecar, neither undefined nor null, as a host's patch may not, whatever its type says. */
+const namesBoth = (patch: Partial<BoxProps>): boolean => ((patch.whisper ?? null) !== null) && ((patch.sidecar ?? null) !== null)
 // --
 
 // == [Box]
