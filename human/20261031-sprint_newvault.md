@@ -9,7 +9,7 @@ sprint doc is https://claude.ai/artifact/9kdLTv64qR3Rei7Do3nj9C.
 * Models PR #408 at 4ff14b4b (the base).
 * Thread 1 gate_in_record: filed, #410 at 7c57356c, stacked on #408. Reviewed twice (high), both fixed, nothing significant left.
 * Thread 5 tests_models: filed, #411 at c9d12890, cut from main. Its tests change at the restack (`thread-1-restack-notes.md` on thread 1's branch, plus the describe titles the second review named).
-* Thread 2 vault_unlock: building (opus), cut from 7c57356c, worktree `/workspace/byok-vault_unlock`.
+* Thread 2 vault_unlock: built and reviewed (high, fixed, four significant left), #412 at 61cb93dc, stacked on #410; a rework is running on the branch in `/workspace/byok-vault_unlock`, then a second review.
 * Threads 3, 4, 6 wait on 2, 3, and 4+5.
 
 ## Judgment calls made in YOLO (each also on the sprint doc's Cleanup tab or in Resolved)
@@ -19,6 +19,7 @@ sprint doc is https://claude.ai/artifact/9kdLTv64qR3Rei7Do3nj9C.
 * **Overlapping `build(dna, …)` calls** on one scope both run their closures: left, a per-scope in-flight guard being the kind of check this sprint keeps out.
 * **`Vault.#demandedFull()`** is hoisted into `Storable` by thread 2 (name its call).
 * **Refusal sentences** move into `phrases.ts` in thread 2, per your ruling; the factories stay.
+* **Thread 2's rework** (the review's four significant findings, all two-way): the current `DeviceDB` widened on the put side too (`KeptLeaseRow`), so the real class types as the world's deviceDB; the kept-lease look runs whenever no lease is held rather than once per vault object, so another tab's lease is taken up; `ensureUnlocked` joins an unlock in flight and a displaced lease is let go without an erase; `goodbye` lets go rather than locks, leaving the kept lease for the next load (erasing is `lock()`'s and later the Bank's sign-out); `takeUpLease` refuses another vault's lease and one not in force. The worker's other calls stand: no closure handed and no kept lease refuses `vault_locked`; one proof per attempt, no fall-through; one wayin per proving.
 
 ## What you may want to look at
 
