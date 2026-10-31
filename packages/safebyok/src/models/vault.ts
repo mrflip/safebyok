@@ -149,9 +149,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#unlocking
   }
 
-  /** `#unlockByProof`, clearing `#unlocking` once it settles: never before it is set, as the await always yields first. */
+  /** The unlock by proof as the one in flight: `#unlocking`, cleared once it settles. */
   async #unlockAlone(proofClosure: AttemptClosure): Promise<Lease> {
     try {
+      // The await always yields first, so the finally never runs before `#unlock` has set `#unlocking`.
       return await this.#unlockByProof(proofClosure)
     } finally {
       this.#unlocking = null
@@ -187,11 +188,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Hold `lease`, letting go the lease it displaces, whose autolock would otherwise erase this one's record at its own `autolock_at`. */
+  /** Hold `lease` as the vault's, the vault reading unlocked, and let go the lease it displaces. */
   #setLease(lease: Lease): Lease {
     const displaced = this.#lease
     this.#lease = lease
     this.#isLocked = false
+    // Let go, the displaced lease's autolock neither locks the vault nor erases this lease's record at the old `autolock_at`.
     if (displaced !== null && displaced !== lease) { displaced.letGo() }
     this.settle()
     return lease
@@ -218,7 +220,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
-  /** Lock the vault in memory and let its lease go, leaving the lease this device keeps for the next load: the listing's goodbye. */
+  /** Let the vault's lease go, the vault reading locked and the lease this device keeps left for the next load: the listing's goodbye, where `lock()` erases. */
   letLeaseGo(): void {
     this.#isLocked = true
     const lease = this.#lease
