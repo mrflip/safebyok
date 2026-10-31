@@ -4,8 +4,8 @@ import { VaultError } from '../errors'
 import type { Whisper } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box } from './box'
-import { Listing } from './listing'
-import { type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, BoxFormat, boxRecord, boxSparse } from './models-shapes'
+import { Listing, hasRevision } from './listing'
+import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 
 // == [What a box listing is given]: BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
 
@@ -18,7 +18,7 @@ export type BoxStore = Store<Boxscope, BoxRecord, BoxSparse>
 /** The device cache of this vault's boxes. */
 export type BoxCache = Cache<BoxRecord, BoxSparse>
 
-/** The dna of a box, with the whisper to seal into it once built. */
+/** The dna of a box, with the whisper to seal into it once built: what a caller hands `build`, which holds it to {@link boxDna}. */
 export type BoxDna = Dna<Boxscope, BoxRecord> & { whisper?: Whisper | undefined }
 
 export type BoxListingOpts = ListingOpts<Boxscope, BoxRecord, BoxSparse> & { world: BoxWorld }
@@ -37,12 +37,16 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Building]: build
 
-  /** {@link Listing.build}, and for a dna with a whisper, seal it in once built: the constructor takes no whisper. Stores nothing. */
+  /** {@link Listing.build}, and for a dna with a whisper, seal it in once built: the constructor takes no whisper. Stores nothing.
+   * A record is told from a dna as `Listing.build` tells it, by its `revision_seq`, and keeps its
+   * own check there. A dna is held to {@link boxDna} first, refusing 'bad_option', naming the
+   * failing field: the props the factory controls are stripped, the defaults filled in.
+   */
   override async build(input: BoxDna | Fetched<BoxRecord, BoxSparse>): Promise<Box> {
-    if (! ('whisper' in input) || input.whisper === undefined) { return super.build(input) }
-    const { whisper, ...dna } = input
+    if (hasRevision(input)) { return super.build(input) }
+    const { whisper, ...dna } = boxDna.parse(input)
     const box = await super.build(dna)
-    await box.seal(whisper)
+    if (whisper !== undefined) { await box.seal(whisper) }
     return box
   }
   // --
@@ -59,9 +63,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   recordOf(duck: unknown): BoxRecord { return boxRecord.parse(duck) }
 
-  /** The box a dna stages at birth: the dna over the sparse defaults, with an empty sidecar for the seal to bind. No whisper until one is sealed in. */
-  protected draftOf(dna: Dna<Boxscope, BoxRecord> & Revision & Times): BoxSparse | BoxRecord {
-    return { fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, whisper_codec: 'json_v1', whisper_schema_version: 1, sidecar: {}, ...dna }
+  // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here.
+  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault. No whisper until one is sealed in. */
+  protected draftOf(dna: Omit<BoxDnaFilled, 'whisper'> & Revision & Times): BoxSparse | BoxRecord {
+    return { ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }
   }
 
   protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null): Box {
