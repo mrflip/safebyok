@@ -57,3 +57,8 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 * A vault held sparse reads `gate` as null until `edit` hydrates, so anything that judges the gate must hydrate first (`ensureReadyToEdit()`); the rework removes the case, but thread 2's `#unlock` should still take the gate from the record in hand after a hydrate.
 * The public patch must not carry the gate: `edit({ gate })` would store wayins no passphrase proved. Thread 4's gate verbs stage a new gate through a private path, never `vault.edit`.
 * `vault.gate` is rebuilt when the record's `gate` object changes identity (every receive after a send): a held `Gate` goes stale across a send. Thread 2 keys by content or rebuilds on settle if it holds one.
+
+## Rulings, 2026-10-31 (third sweep; YOLO from 09:20 UTC)
+
+* Refusal factories bring their sentences from `phrases.ts` and may take objects they sanitize and attach; thread 2 moves the existing sentences. Catch-and-rethrow is allowed where it earns its lines.
+* Closer Look: the lease is made at birth (thread 2, through the proving `Gate.build` hands back); the Trigger is the keeper of the end time and things check now against it, Infinity included; the private-method-on-another-instance idiom stays; the vault's stamp is parsed once per lease; `spendAnswer` gets a try/catch and a comment. The rest LGTM.
