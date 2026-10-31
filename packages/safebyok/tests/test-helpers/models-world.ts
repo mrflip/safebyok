@@ -430,7 +430,7 @@ export class TestableBoxListing extends BoxListing {
 }
 
 const testableOf = (box: Box): TestableBox => {
-  if (!(box instanceof TestableBox)) { throw new TypeError('a TestableBoxListing makes only TestableBoxes') }
+  if (! (box instanceof TestableBox)) { throw new TypeError('a TestableBoxListing makes only TestableBoxes') }
   return box
 }
 
