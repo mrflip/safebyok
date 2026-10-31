@@ -358,7 +358,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#staged = staged === null ? null : Object.freeze(staged)
   }
 
-  /** Act on the state as adopted, idempotently: the base replaces the snapshot, saves this thing's copy to the device cache through `#cacheOnDevice` without awaiting it, and tells no news. A subclass calls super last, so that the snapshot sees it. */
+  /** Bring the snapshot and the device cache up to the state just adopted: replace the snapshot, notifying the subscribers where it changed, and save this thing's copy by `#cacheOnDevice`, not awaited. Calling it again changes nothing. The base answers no bad news. A subclass that overrides it calls super last, so that the snapshot sees what the subclass set. */
   settle(): Settled {
     this.#replaceSnapshot()
     this.#cacheOnDevice()

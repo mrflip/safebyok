@@ -62,7 +62,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     return this.demandReadyToUnsealWhisper()
   }
 
-  /** Opening the whisper needs the vault unlocked and the record in hand present and full: a box gone or damaged has no whisper to open, and refuses 'absent_box'. */
+  /** Throws unless unlocked with a full, healthy record: refuses 'vault_locked', 'absent_box' for a box gone or damaged, or 'bad_option' for a sparse record not yet filled, which `ensureReadyToUnsealWhisper` fetches first. */
   demandReadyToUnsealWhisper(): this { return this.demandUnlocked().demandPresent().demandFull() }
 
   async ensureReadyToSeal(opts: EditOpts = {}): Promise<this> {
@@ -70,13 +70,18 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     return this.demandReadyToSeal()
   }
 
-  /** A seal needs the vault unlocked, and no more: a box gone or damaged is sealed back to life. */
+  /** Throws unless unlocked ('vault_locked'). */
   demandReadyToSeal(): this { return this.demandUnlocked() }
   // --
 
   // == [The whisper]: whisper, unsealWhisper, expose, seal
 
-  /** The exposed whisper, as its frozen {@link WhisperHolder} `{ val }`, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper answers again once it unlocks. Setting it exposes the given whisper, `{ val }`, which needs the vault unlocked, and does no more: nothing seals it, as `edit` and `send` seal only the whisper they are given. The box keeps a frozen copy, so to change the whisper, set it anew; one that is not `{ val }` with `val` a whisper refuses 'bad_option', naming the field, before the lock is looked at. Setting null (or LOCKED, which counts as null, and is told from a whisper by `Storable.isLockedFUBag`) forgets it, locked or not. */
+  /** The exposed whisper, `{ val }`, while the vault is unlocked, or null where none is exposed; {@link LOCKED} while the vault is locked. Locking forgets nothing: the whisper answers again once the vault unlocks.
+   * Setting it exposes the whisper given, and no more: nothing seals it, as an update seals only the
+   * whisper it is given. It needs the vault unlocked; a whisper that is not `{ val }` refuses
+   * 'bad_option', naming the field, before the lock is looked at. The box keeps a frozen copy.
+   * Setting null, or LOCKED (told from a whisper by `Storable.isLockedFUBag`), forgets it, locked or not.
+   */
   get whisper(): WhisperHolder | LockedBag | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
@@ -96,7 +101,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     return this.#unseal()
   }
 
-  /** Open the stored whisper and keep it on the instance, readable and settable as `box.whisper`, kept while the vault locks and unlocks: a host that calls this accepts the whisper living on the instance until it sets `box.whisper` null. */
+  /** Open the stored whisper and keep it on the instance, offered by `box.whisper`, which answers LOCKED in its place while the vault is locked. Keeping it is the host's decision, which a host would otherwise make for itself, without the guard; it lives on the instance until the host sets `box.whisper` null. */
   async expose(opts: EditOpts = {}): Promise<this> {
     this.#exposed = await this.unsealWhisper(opts)
     this.settle()

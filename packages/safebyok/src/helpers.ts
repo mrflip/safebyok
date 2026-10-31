@@ -58,7 +58,7 @@ export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: Tat
  */
 export function nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }
 
-/** The field `fieldname` of `row`, a stored row as it stands, unchecked: undefined when the row is no object or has none.
+/** The field `fieldname` of `row`, a stored row as fetched, unchecked: undefined when the row is no object or has none.
  * For the few reads made before, or instead of, a row's check: its `format`, or the tokens a
  * key-value adapter compares inside its one atomic step.
  *
