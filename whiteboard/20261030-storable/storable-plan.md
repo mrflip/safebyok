@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** #385 filing after the compare-and-swap rework; #387 restacks onto it; then 16 (the store's versioned replace), 17, 15, 13, then 6.
+* **Status:** filed through #387 (thread 12); thread 16 (the store's versioned replace) building on it, branch `20261031-versioned_replace`; then 17, 15, 13, then 6.
 
 ## Read first
 
