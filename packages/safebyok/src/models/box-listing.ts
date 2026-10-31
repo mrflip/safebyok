@@ -73,8 +73,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return stubSeal({ ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }, whisper)
   }
 
-  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): Box {
-    return new Box(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>, tell: Tell): Box {
+    return new Box(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
   }
 
   absentRefusal(scope: Boxscope): VaultError {

@@ -16,7 +16,7 @@ import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { type BoxProps, Box } from '../../src/models/box'
 import { BoxListing, type BoxCache, type BoxDna, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Cacheable, type Fetched, type LockState, type Notice, type Tell, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type Tell, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import * as Refusals from '../../src/refusals'
@@ -414,8 +414,8 @@ export class TestableBox extends Box {
 
 /** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
-  protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): TestableBox {
-    return new TestableBox(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+  protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>, tell: Tell): TestableBox {
+    return new TestableBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
   }
 
   override async build(input: Parameters<BoxListing['build']>[0]): Promise<TestableBox> { return testableOf(await super.build(input)) }
@@ -467,8 +467,8 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
     }
   }
   class FakeSealBoxListing extends TestableBoxListing {
-    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, tell: Tell): TestableBox {
-      return new FakeSealBox(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>, tell: Tell): TestableBox {
+      return new FakeSealBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
     }
   }
   return new FakeSealBoxListing({
@@ -484,7 +484,7 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
 
 // == [Peeking]: lastSaveOf
 
-/** The copy the listing last saved to the fake device cache for `box`'s scope, as `mw` logged the save; the cache is saved on each delivery and each build, not on an edit, a `send` in flight or `hello`'s revive. Throws where no copy was saved for the scope. */
+/** The copy last saved to the fake device cache for `box`'s scope, as `mw` logged the save: a box saves its own at every settle, so this is the state it last settled into. Throws where no copy was saved for the scope. */
 export function lastSaveOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse> {
   const saved = mw.callsOf('save').findLast((call) => call.cacheable.boxlabel === box.boxlabel)
   if (saved === undefined) { throw new Error(`no copy was saved to the cache for ${box.boxlabel}`) }

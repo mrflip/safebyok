@@ -54,7 +54,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     await this.hydrate({ maxMillisSinceRefresh: opts.maxWorldMillis })
   }
 
-  /** The vault record a box's answer carries, received as any record of this vault is. What `receive` hands back goes nowhere, and nothing is cached: the box listing takes its world synchronously, where the vault listing delivers asynchronously. */
+  /** The vault record a box's answer carries, received as any record of this vault is. What `receive` hands back goes nowhere: the box listing takes its world synchronously, where the vault listing delivers asynchronously. The vault saves itself to the device cache as it settles, as at any receive. */
   takeWorld(world: unknown): void {
     this.receive(this.listing.sparseOf(world))
   }

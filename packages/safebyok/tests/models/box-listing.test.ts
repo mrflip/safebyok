@@ -279,14 +279,14 @@ describe("BoxListing: an absent box", () => {
       expect(listing.at(scope())).to.be.null
     })
 
-    it("refuses 'absent_box' for a box held gone, which has received the answer and settled", async () => {
+    it("refuses 'absent_box' for a box held gone, which receives the answer as the same and saves nothing", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(gone())
       held.mw.clearCalls()
       await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
       expect(listing.at(scope())).to.eq(box)
       expect(box.isPresent).to.be.false
-      expect(held.mw.callsOf('save')).to.have.lengthOf(1)
+      expect(held.mw.callsOf('save')).to.deep.equal([])
     })
 
     it("resolves null for a box held gone under 'nil', the box still at `at(scope)` as its tombstone", async () => {

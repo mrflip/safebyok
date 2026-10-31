@@ -35,7 +35,7 @@ export const tombstoneAmVals = ['d', 'x'] as const
 
 /** The checks of what the base knows of any record, each refusing 'bad_record': `am`, one of {@link amVals}; `revision`, `times`, `liveness` and `vaulted`, a part each; and `sparseBase`, the four together, the least a sparse form carries beside its scope.
  * `tombstone` is a sparse base that is damaged or gone; `cacheable` is one with `central` and
- * `staged` beside it, as the listing saves it to the device cache. Each takes its fields from
+ * `staged` beside it, as a storable saves it to the device cache. Each takes its fields from
  * whatever carries them, a record, a storable or a snapshot, and strips the rest. `cacheLoaded`
  * checks that the cache's load is an array, and leaves each copy in it to `cacheable`.
  *
@@ -95,7 +95,7 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 /** The DNA of a storable, what a caller hands `listing.build`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
-/** The copy the listing saves to the device cache: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link cacheable} checks what the base knows of one. */
+/** The copy a storable saves to the device cache at each settle, and a listing revives it from: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link cacheable} checks what the base knows of one. */
 export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
   central: Fetched<RecordT, SparseT>
   staged:  Fetched<RecordT, SparseT> | null
@@ -211,7 +211,7 @@ export type StagedForms<RecordT, SparseT> =
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: 'del', patch?: undefined, rcvd?: undefined }>)
   | (FormsBase<RecordT, SparseT> & Readonly<{ act: ReceivedAct, patch?: undefined, rcvd: Fetched<RecordT, SparseT> }>)
 
-/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. The copy to cache goes to the listing by `settle`, not by this return. */
+/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. The copy for the device cache is saved by `settle` itself, not handed back in this return. */
 export type Settled = Z.infer<typeof settled>
 // --
 
@@ -375,7 +375,7 @@ export type EditOpts = TimelyOpts
 export type StorableOpts = Z.infer<typeof storableOpts>
 // --
 
-// == [The world and the listing]: lockStateVals, LOCKED, LockedBag, IsListing, KeepCopy, isListing, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
+// == [The world and the listing]: lockStateVals, LOCKED, LockedBag, IsListing, isListing, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
 
 /** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
 export const lockStateVals = ['unlocked', 'locked'] as const
@@ -395,9 +395,6 @@ export type LockedBag = Readonly<{ [LockedBrand]: true }>
 
 /** The tag a Listing answers true to, so a storable can tell one without importing it. */
 export const IsListing: unique symbol = Symbol('safebyok.listing')
-
-/** The key of the Listing method that keeps the copy an instance hands in for the next cache save. A symbol the package does not export, so the method is off the surface a host types against: the instances the listing makes import it and call it. Reflection on a listing still finds a symbol-keyed member, so it keeps out a mistaken call, not a determined one. */
-export const KeepCopy: unique symbol = Symbol('safebyok.keepCopy')
 
 /** True for a Listing: an object that answers true to {@link IsListing}. */
 export const isListing = (val: unknown): val is { [IsListing]: true } => (
@@ -440,7 +437,7 @@ export type Store<ScopeT, RecordT, SparseT> = {
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }
 
-/** The deviceDB's cache of one kind of thing, as a listing calls it: loaded once at `hello`, saved after each delivery. */
+/** The deviceDB's cache of one kind of thing: loaded once, by the listing's `hello`; saved by each instance's settle, the listing handing it to each instance it makes. */
 export type Cache<RecordT, SparseT> = {
   load(): Promise<readonly Cacheable<RecordT, SparseT>[]>
   save(cacheable: Cacheable<RecordT, SparseT>): Promise<void>
@@ -471,10 +468,11 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
 /** How a storable tells bad news nobody asked about, such as a refresh its timer launched that was refused, to the host's `onBadNews` through its listing. */
 export type Tell = (badnews: readonly VaultError[]) => void
 
-/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, `central` passes {@link sparseBase}, `staged` does too or is null, the options are {@link storableOpts}, and `tell` is a function. The concrete class's validator judges the records further. Its `parse` refuses 'bad_option'. Checks only. */
-export const storableArgs = objCheck(({ custom, fn }) => ({
+/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, the cache answers to `load` and `save`, `central` passes {@link sparseBase}, `staged` does too or is null, the options are {@link storableOpts}, and `tell` is a function. The concrete class's validator judges the records further. Its `parse` refuses 'bad_option'. Checks only. */
+export const storableArgs = objCheck(({ custom, obj, fn }) => ({
   world,
   listing: custom<object>(isListing, Phrases.ListingExpected),
+  cache:   obj({ load: fn(), save: fn() }),
   central: sparseBase,
   staged:  sparseBase.nullable(),
   opts:    storableOpts,

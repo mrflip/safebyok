@@ -7,7 +7,7 @@ import { lockedError, movedUnderEditError, notFullError } from '../helpers/throw
 import * as Phrases from '../phrases'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
-import type { Age, Am, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, Tell, TimelyOpts, Times, Tombstone, World } from './models-shapes'
+import type { Age, Am, Cache, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, Tell, TimelyOpts, Times, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -30,7 +30,7 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
   Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown, unknown>>
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, PatchT, SnapshotT> {
-  // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, staged, minted, snapshot, trigger, listeners, watchable
+  // == [Declarations]: scope, world, listing, cache, tell, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, staged, minted, snapshot, trigger, listeners, watchable
 
   /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
@@ -38,6 +38,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
   declare readonly world:   World
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
+
+  /** The device cache of this kind of thing, the listing's, which each `settle` saves this thing's copy to. */
+  readonly #cache: Cache<RecordT, SparseT>
+  /** How this thing tells bad news nobody asked about to the host: a refused cache save, a refresh its timer launched that was refused. */
+  readonly #tell: Tell
 
   /** The vault this thing lies in, inscribed once by `assignInitialProps` and never moved: a record under another `vault_tok` is refused, not taken. */
   declare readonly vault_tok: string
@@ -69,11 +74,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Constructor]: constructor, assignInitialProps, assign
 
-  /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. `tell` is how it tells bad news nobody asked about to the host. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
-  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, opts: StorableOpts, tell: Tell) {
-    MSX.storableArgs.parse({ world, listing, central, staged, opts, tell })
+  /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. `cache` is the listing's device cache, which each settle saves this thing's copy to; `tell` is how it tells bad news nobody asked about to the host. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
+  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, cache: Cache<RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, opts: StorableOpts, tell: Tell) {
+    MSX.storableArgs.parse({ world, listing, cache, central, staged, opts, tell })
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
+    this.#cache = cache
+    this.#tell  = tell
     this.#scope = Object.freeze(listing.scopeOf(central))
     this.#central = Object.freeze(central)
     this.#staged  = staged === null ? null : Object.freeze(staged)
@@ -89,7 +96,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       doTryLaunch: () => this.tryFetch({ ifAbsent: 'nil' }),
       // `receive` notes success by its verdict: a record not older, central or the record in hand whole. The next launch is scheduled after any launch that completes.
       notesOwnSuccess: true,
-      onTimerRefusal:  (err) => { tell([err]) },
+      onTimerRefusal:  (err) => { this.#tell([err]) },
     })
   }
 
@@ -290,7 +297,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
-  // == [Receiving]: receive, adopt, settle, tombstoneFor, nextRevision, priorTok
+  // == [Receiving]: receive, adopt, settle, saveCopy, tombstoneFor, nextRevision, priorTok
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
@@ -317,7 +324,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return (delSpent || act.success) ? this.settle() : { badnews: [] }
   }
 
-  // Every adopt is followed by a settle: the listing saves the copy last handed in by settle, not the state at the time of the save.
+  // Every adopt is followed by a settle, which the snapshot and the device cache are made from: an adopt left unsettled would leave both behind.
   /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand over the central held until now; the snapshot waits for `settle`. */
   protected adopt(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null): void {
     const current = this.#central
@@ -326,11 +333,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.assign(this.combined, current)
   }
 
-  /** Act on the state as adopted, idempotently: the base replaces the snapshot, hands the listing the copy for the device cache by `listing[MSX.KeepCopy]`, and tells no news. The copy, central and the staged beside the sparse form, is made here from the private central and staged, and goes nowhere but into that call; the listing saves it when it delivers or builds. A subclass calls super last, so that the snapshot sees it. */
+  /** Act on the state as adopted, idempotently: the base replaces the snapshot, saves this thing's copy to the device cache, and tells no news. A subclass calls super last, so that the snapshot sees it. */
   settle(): Settled {
     this.#replaceSnapshot()
-    this.listing[MSX.KeepCopy](Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged }))
+    this.#saveCopy()
     return { badnews: [] }
+  }
+
+  /** Save the copy, central and the staged beside the sparse form, to the device cache by `cache.save`, not awaited: a save refused is told by `tell`, never thrown into the verb that settled. The copy holds the records as stored and staged, sealed, and nothing the instance alone keeps, such as an exposed whisper. A thing never stored with nothing staged, as one is between its birth and the record it was born to receive, has nothing to keep, and saves nothing. */
+  #saveCopy(): void {
+    if (this.#central.revision_seq === MSX.NeverStoredSeq && this.#staged === null) { return }
+    const copy = Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
+    void outcomeOf(() => this.#cache.save(copy)).then(({ ok, err }) => { if (! ok) { this.#tell([err]) } })
   }
 
   /** A tombstone made here, from the sparse props held, under `revision`, written now: `am` 'x' for a deletion, 'd' for damage. */

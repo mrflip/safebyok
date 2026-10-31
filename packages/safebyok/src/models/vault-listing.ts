@@ -54,8 +54,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return Promise.resolve({ ...dna, fmt: VaultFormat, am: 'a', vault_tok: randomId() })
   }
 
-  protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, tell: Tell): Vault {
-    return new Vault(this.world, this, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+  protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, cache: Cache<VaultRecord, VaultSparse>, tell: Tell): Vault {
+    return new Vault(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
   }
 
   absentRefusal(scope: VaultScope): VaultError {
