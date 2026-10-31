@@ -91,13 +91,13 @@ export const fakeDBFriendOf = (): FakeDBFriend => {
 }
 // --
 
-// == [Leases]: WeekMillis, grantedLeaseOf, sealStampsOf
+// == [Leases]: WeekMillis, makeGrantedLease, sealStampsOf
 
-/** A week, the lease {@link grantedLeaseOf} grants unless told otherwise. */
+/** A week, the lease {@link makeGrantedLease} grants unless told otherwise. */
 export const WeekMillis = 7 * 24 * 60 * MinuteMillis
 
 /** A lease under a fresh vaultKey: no two share a key. A {@link WeekMillis week} long unless `opts` says otherwise. */
-export const grantedLeaseOf = async (vault: DuckVault, friend: FakeDBFriend, opts?: LeaseGrantOpts): Promise<Lease> => (
+export const makeGrantedLease = async (vault: DuckVault, friend: FakeDBFriend, opts?: LeaseGrantOpts): Promise<Lease> => (
   Lease.grant(vault, friend, await makeVaultKey(), opts ?? { leaseMillis: WeekMillis })
 )
 

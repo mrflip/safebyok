@@ -7,7 +7,7 @@ import { type LeaseGrantOpts, type LeaseRecord, LeaseFormat } from '../../src/mo
 import { bad } from '../../src/outcome'
 import { isLeaseKey } from '../../src/shapes/device'
 import * as TH from '../test-helpers'
-import { type DuckVault, type FakeDBFriend, duckVaultOf, fakeDBFriendOf, grantedLeaseOf, isZeroed, sealStampsOf, T0, useFakeClock, WeekMillis, WorldStamp } from '../test-helpers/proving-world'
+import { type DuckVault, type FakeDBFriend, duckVaultOf, fakeDBFriendOf, makeGrantedLease, isZeroed, sealStampsOf, T0, useFakeClock, WeekMillis, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -21,7 +21,7 @@ const textOf = (bytes: Uint8Array): string => new TextDecoder().decode(bytes)
 const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ vault: DuckVault, friend: FakeDBFriend, lease: Lease }> => {
   const vault = duckVaultOf()
   const friend = fakeDBFriendOf()
-  const lease = await grantedLeaseOf(vault, friend, opts)
+  const lease = await makeGrantedLease(vault, friend, opts)
   return { vault, friend, lease }
 }
 
@@ -60,7 +60,7 @@ describe("Lease.grant(vault, dbfriend, vaultKey, opts)", () => {
     const vault = duckVaultOf()
     const friend = fakeDBFriendOf()
     friend.tryPutLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the disk is full')))
-    const lease = await grantedLeaseOf(vault, friend)
+    const lease = await makeGrantedLease(vault, friend)
     expect(friend.logged.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'Lease.grant', refusalkind: 'unexpected_error' }]])
     const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
     await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
@@ -134,7 +134,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
   for (const [stamp, blurb] of NotThisVaultCases) {
     it(`reads a kept lease of ${blurb} as none, with a warning, and leaves it where it lies`, async () => {
       const friend = fakeDBFriendOf()
-      await grantedLeaseOf(duckVaultOf(stamp), friend)
+      await makeGrantedLease(duckVaultOf(stamp), friend)
       const { kept } = friend
       expect(await Lease.get(duckVaultOf(), friend)).to.be.null
       expect(friend.logged.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'Lease.get' }]])
@@ -145,7 +145,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
 
   it("warns of a lease of another vault quoting none of its record: neither its ciphertext nor its stamp", async () => {
     const friend = fakeDBFriendOf()
-    await grantedLeaseOf(duckVaultOf({ vault_tok: 'vault-tok-SIBLING' }), friend)
+    await makeGrantedLease(duckVaultOf({ vault_tok: 'vault-tok-SIBLING' }), friend)
     const { vault_key_lease_wrapped } = friend.kept as LeaseRecord
     await Lease.get(duckVaultOf(), friend)
     const logged = TH.loggedText(friend.logged)
@@ -172,7 +172,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
 
   it("answers null for a kept lease whose autolock_at has passed, erasing its record once and locking nothing", async () => {
     const friend = fakeDBFriendOf()
-    await grantedLeaseOf(duckVaultOf(), friend)
+    await makeGrantedLease(duckVaultOf(), friend)
     vi.setSystemTime(T0 + (2 * WeekMillis))
     const vault = duckVaultOf()
     expect(await Lease.get(vault, friend)).to.be.null
@@ -360,7 +360,7 @@ describe("lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp) and unsea
 
   it("refuses to open what another vault sealed under the same box stamps, as 'damaged_box'", async () => {
     const { lease } = await grantedWorld()
-    const other = await grantedLeaseOf(duckVaultOf({ vault_tok: 'vault-tok-other' }), fakeDBFriendOf())
+    const other = await makeGrantedLease(duckVaultOf({ vault_tok: 'vault-tok-other' }), fakeDBFriendOf())
     const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
     const sealed = await other.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
     await TH.expectRefusal(lease.unsealWith(sealed, boxKeyStamp, whisperStamp), 'damaged_box')
@@ -395,7 +395,7 @@ describe("a tampered lease record", () => {
       const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
       const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
       const otherFriend = fakeDBFriendOf()
-      await grantedLeaseOf(duckVaultOf(), otherFriend)
+      await makeGrantedLease(duckVaultOf(), otherFriend)
       friend.kept = tamper(friend.kept as LeaseRecord, otherFriend.kept as LeaseRecord)
       const vault = duckVaultOf()
       const got = await Lease.get(vault, friend)
