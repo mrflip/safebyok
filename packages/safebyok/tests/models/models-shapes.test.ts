@@ -789,15 +789,31 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
   })
 })
 
+describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault record, and nowhere in the sparse form", () => {
+  const { boxlabel: _boxlabel, ...vaultscope } = scope
+  const sparseVault = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps }
+
+  holdsCases(MSX.vaultRecord, 'bad_record', [
+    [{ ...sparseVault, gate: null }, true,  'passes a record whose gate is null, a vault drafted and not yet gated'],
+    [sparseVault,                    false, 'refuses a record without its gate'],
+    [{ ...sparseVault, gate: {} },   false, 'refuses a gate without its wayins'],
+  ])
+
+  it("strips the gate from the sparse form", () => {
+    expect(MSX.vaultSparse.parse({ ...sparseVault, gate: null })).to.deep.equal(sparseVault)
+  })
+})
+
 describe("MSX.vaultPatch: the duckish of a vault's patch, which Vault.isFullPatch holds it to", () => {
   const { boxlabel: _boxlabel, ...vaultscope } = scope
-  const record = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps }
+  const record = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps, gate: null }
 
   holdsCases(MSX.vaultPatch, 'bad_option', [
     [{},                                       true,  'passes an empty patch, as its first example shows'],
     [record,                                   true,  'passes the vault record given back, as its second example shows'],
     [{ revision_seq: 99, am: 'x' },            true,  'passes the factory props, whatever they say'],
-    [{ gate: {} },                             false, 'refuses a field no vault record has, as its third example shows'],
+    [{ gate: {} },                             false, 'refuses a gate without its wayins'],
+    [{ shelf: 1 },                             false, 'refuses a field no vault record has'],
     [{ ...record, revision_seq: 'one' },       false, 'refuses a factory prop that fails its check'],
     [{ ...record, vaultlabel: 'V' },           false, 'refuses a scope field that fails its check'],
     [undefined,                                false, 'refuses undefined'],
