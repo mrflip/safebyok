@@ -187,16 +187,24 @@ Some of these are design considerations / future feature requests but they influ
   - `maxBoxMillis`: specialized for the box (not acted on yet).
 * `ifAbsent`: `'fail' | 'nil'`, policy when attempting to read an absent or tombstoned record -- default `'fail'`.
 * `ifPresent`: how `send` meets what storage holds. A put carries the record at revision N, minted
-  on the device over the revision N − 1 it holds (`expected`; none when N is 0). A revision is its
-  tok and seq: "at N − 1" means the very record the device holds.
+  on the device over the record it holds, and names that record by its `revision_tok` alone, the
+  prior tok: null where the device holds none. No prior seq is sent: storage enforces that N is
+  the prior row's seq + 1, by a calculation or in its query, and never renumbers or patches. No
+  row requires the prior tok null **and** N = 0; either without the other is inconsistent. A
+  revision lower than expected (storage holding an older row than the device's, under another tok)
+  meets the refusal of today, `stale_write` carrying it.
 
-  | `ifPresent` | over no row (N = 0) or the record at N − 1 | over N or later | over a lower revision |
-  |---|---|---|---|
-  | `'replace'` (default; the only one implemented) | lands | `stale_write`, carrying what is stored | `stale_write`, as today |
-  | `'fetch'` (not implemented) | lands over no row or a tombstone at N − 1; over a live N − 1: open | answers what is stored, `ok: true` | `stale_write`, as today |
+  | `ifPresent` | no row; prior tok null, N = 0 | row under the prior tok, a tombstone; N = its seq + 1 | row under the prior tok, alive or damaged; N = its seq + 1 | a row under another tok | no row; a prior tok given | prior tok null with N ≠ 0, a tok with N = 0, or N ≠ seq + 1 |
+  |---|---|---|---|---|---|---|
+  | `'replace'` (default; the only one implemented) | lands | lands | lands | `stale_write`, carrying it | `stale_write`, carrying nothing ❓ | refused, inconsistent (`bad_record`) |
+  | `'fetch'` (not implemented) | lands | lands | 🤷 the flag assumes no such row | answers it, `ok: true` ❓ (if newer? 🤷) | 🤷 | refused, inconsistent |
 
-  `'replace'` is the versioned replace (compare-and-swap): storage never renumbers or patches a
-  record. `'fetch'` will not be implemented until a clear need and a scenario table arrive.
+  `'replace'` is the versioned replace (compare-and-swap). The pairing (prior tok null with N = 0,
+  a tok with N > 0) is judged from the request alone, ahead of any `stale_write`, and by the device
+  before it sends; N against seq + 1 is judged only over the row under the prior tok. `del` follows the same tok rule, and storage makes
+  the tombstone at the row's seq + 1 under a fresh tok; over no row, with the prior tok null, it
+  makes one at revision 0. `'fetch'` will not be implemented until a clear need and a scenario
+  table arrive.
 * `reseal` (box): with no whisper given or exposed, seal the stored one again.
 
 * `maxMillisSinceRefresh`, `maxWorldMillis`
