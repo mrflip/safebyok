@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { makeLeaseKey } from '../../src/crypto'
+import { memoryDeviceDB } from '../../src/device-db'
 import type { Lease } from '../../src/models/lease'
 import type { ProofClosure } from '../../src/models/models-shapes'
 import { NOVEL, Proving } from '../../src/models/proving'
+import type { VaultWorld } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { Dna, LeaseMillis, Passphrase, T0, makeVaultWorld, makeProving, useVaultWorlds } from '../test-helpers/vault-world'
 
@@ -193,5 +195,23 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     listing.goodbye()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => deviceDB.keptNow() === null)
+  })
+})
+
+describe("The real deviceDB as the vault's world's", () => {
+  it("keeps the lease an unlock grants in memoryDeviceDB, and the next session's vault takes it up", async () => {
+    const deviceDB: VaultWorld['deviceDB'] = memoryDeviceDB()
+    const { listing, storedNow, anotherSession } = makeVaultWorld(null, { deviceDB })
+    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    await vault.send({})
+    const record = storedNow()
+    if (record === null) { throw new Error('nothing stored') }
+    vault.lock()
+    const lease = await vault.ensureUnlocked(() => ({ passphrase: Passphrase }))
+    const later = anotherSession()
+    const again = await later.build(record)
+    const taken = await again.ensureUnlocked()
+    expect(again.demandLease()).to.equal(taken)
+    expect(await roundTrip(lease, taken)).to.eq('sk-test')
   })
 })

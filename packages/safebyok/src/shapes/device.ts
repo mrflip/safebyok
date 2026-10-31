@@ -49,9 +49,12 @@ export type LeaseRecord = Z.infer<typeof leaseRecord>
 /** The `fmt` a lease the vault models grant carries (`models/lease.ts`), whose record `Lease.get` checks. */
 export const ModelsLeaseFormat = 7001
 
-/** A lease row as `getLease` answers it: a {@link LeaseRecord}, or a row carrying `fmt` {@link ModelsLeaseFormat}, which only the models' `Lease.get` checks further. Its `parse` refuses 'bad_record'. */
-export const keptLeaseRow = Checker(({ obj, lit, custom, vault_key_lease_wrapped }) => leaseRecord.or(obj({
+/** A lease row as `putLease` takes it and `getLease` answers it: a {@link LeaseRecord}, or a row of its vault's scope carrying `fmt` {@link ModelsLeaseFormat}, which only the models' `Lease.get` checks further. Its `parse` refuses 'bad_record'. */
+export const keptLeaseRow = Checker(({ obj, lit, custom, applabel, user_id, vaultlabel, vault_key_lease_wrapped }) => leaseRecord.or(obj({
   fmt:       lit(ModelsLeaseFormat),
+  applabel,
+  user_id,
+  vaultlabel,
   lease_key: custom<CryptoKey>(isLeaseKey, Phrases.LeaseKeyExpected),
   vault_key_lease_wrapped,
 }).loose()), 'bad_record', [FX])
