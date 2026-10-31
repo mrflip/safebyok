@@ -535,68 +535,75 @@ describe("The checks of the world and the listing", () => {
 })
 
 describe("MSX.boxDna", () => {
-  const filled = { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 }
+  const dna = { ...scope, whisper: 'sk-ant-fake', sidecar: {} }
+  const filled = { ...dna, whisper_codec: 'json_v1', whisper_schema_version: 1 }
   const { box_key_wrapped, whisper_ciphered } = full
   // A dna carries no revision_seq, so the factory's props stop at the rest.
   const { revision_seq: _revision_seq, ...factoryProps } = baseProps
 
   holdsCases(MSX.boxDna, 'bad_option', [
-    // the scope, and what a caller may give beside it:
-    [scope,                                                 true,  'passes the scope alone'],
-    [{ ...scope, whisper: 'sk-ant-fake' },                  true,  'passes a whisper that is a string'],
-    [{ ...scope, whisper: { key: 'sk-ant-fake', orgId: null } }, true, 'passes a whisper that is an object, null inside it'],
-    [{ ...scope, sidecar: { account: 'work' } },            true,  'passes a sidecar'],
-    [{ ...scope, whisper: undefined, sidecar: undefined },  true,  'passes optional props given as undefined'],
-    [{ ...scope, ...factoryProps, fmt: MSX.BoxFormat },     true,  'passes the props the factory controls, each passing its check'],
+    // the scope, the whisper and the sidecar, and what a caller may give beside them:
+    [dna,                                                   true,  'passes the scope, a whisper and a sidecar'],
+    [{ ...dna, whisper: { key: 'sk-ant-fake', orgId: null } }, true, 'passes a whisper that is an object, null inside it'],
+    [{ ...dna, sidecar: { account: 'work' } },              true,  'passes a sidecar with a field'],
+    [{ ...dna, whisper_codec: undefined },                  true,  'passes optional props given as undefined'],
+    [{ ...dna, ...factoryProps, fmt: MSX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
+    // the whisper and the sidecar, both required:
+    [scope,                                                 false, 'refuses the scope alone'],
+    [{ ...scope, whisper: 'sk-ant-fake' },                  false, 'refuses a whisper with no sidecar, as its third example shows'],
+    [{ ...scope, sidecar: {} },                             false, 'refuses a sidecar with no whisper, as its fourth example shows'],
+    [{ ...dna, whisper: undefined },                        false, 'refuses a whisper given as undefined'],
+    [{ ...dna, sidecar: undefined },                        false, 'refuses a sidecar given as undefined'],
     // the scope refused:
-    [{ ...scope, boxlabel: undefined },                     false, 'refuses a dna with no boxlabel'],
-    [{ ...scope, boxlabel: 'B' },                           false, 'refuses a boxlabel that is no label, as its third example shows'],
+    [{ ...dna, boxlabel: undefined },                       false, 'refuses a dna with no boxlabel'],
+    [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label, as its fifth example shows'],
     [{ boxlabel: 'anthropic_api_key' },                     false, 'refuses a boxlabel without its vault'],
     // the record's own props refused:
-    [{ ...scope, sidecar: 'work account' },                 false, 'refuses a sidecar that is no object'],
-    [{ ...scope, whisper_codec: 'json_v2' },                false, 'refuses a codec it does not know'],
-    [{ ...scope, whisper_schema_version: 2 },               false, 'refuses a schema version it does not know'],
-    [{ ...scope, box_key_wrapped },                         false, 'refuses a box_key_wrapped, which only the seal makes'],
-    [{ ...scope, whisper_ciphered },                        false, 'refuses a whisper_ciphered, which only the seal makes, as its fifth example shows'],
-    [{ ...scope, whisper: null },                           false, 'refuses a whisper that is null'],
-    [{ ...scope, whisper: new Date(T0) },                   false, 'refuses a whisper JSON would mangle'],
+    [{ ...dna, sidecar: 'work account' },                   false, 'refuses a sidecar that is no object'],
+    [{ ...dna, whisper_codec: 'json_v2' },                  false, 'refuses a codec it does not know'],
+    [{ ...dna, whisper_schema_version: 2 },                 false, 'refuses a schema version it does not know'],
+    [{ ...dna, box_key_wrapped },                           false, 'refuses a box_key_wrapped, which only the seal makes'],
+    [{ ...dna, whisper_ciphered },                          false, 'refuses a whisper_ciphered, which only the seal makes, as its seventh example shows'],
+    [{ ...dna, whisper: null },                             false, 'refuses a whisper that is null'],
+    [{ ...dna, whisper: new Date(T0) },                     false, 'refuses a whisper JSON would mangle'],
     // the factory's props, given, must pass their checks:
-    [{ ...scope, fmt: 8 },                                  false, 'refuses another format'],
-    [{ ...scope, am: 'z' },                                 false, 'refuses an am it does not know'],
-    [{ ...scope, vault_tok: 7 },                            false, 'refuses a vault_tok that is no string'],
-    [{ ...scope, revision_seq: 1 },                         false, 'refuses a revision_seq, which a dna never carries, as its fourth example shows'],
-    [{ ...scope, registered_at: 5 },                        false, 'refuses a registered_at that is no epoch'],
+    [{ ...dna, fmt: 8 },                                    false, 'refuses another format'],
+    [{ ...dna, am: 'z' },                                   false, 'refuses an am it does not know'],
+    [{ ...dna, vault_tok: 7 },                              false, 'refuses a vault_tok that is no string'],
+    [{ ...dna, revision_seq: 1 },                           false, 'refuses a revision_seq, which a dna never carries, as its sixth example shows'],
+    [{ ...dna, registered_at: 5 },                          false, 'refuses a registered_at that is no epoch'],
     // a bag a person typed:
-    [{ ...scope, sidcar: {} },                              false, 'refuses a field it does not take, being strict'],
+    [{ ...dna, sidcar: {} },                                false, 'refuses a field it does not take, being strict'],
     [null,                                                  false, 'refuses null'],
   ])
 
-  it("hands back the scope with the defaults filled: an empty sidecar, the codec and the schema version", () => {
-    expect(MSX.boxDna.parse(scope)).to.deep.equal(filled)
-  })
-
-  it("hands back the whisper given, as its first example shows", () => {
-    expect(MSX.boxDna.parse({ ...scope, whisper: 'sk-ant-fake' })).to.deep.equal({ ...filled, whisper: 'sk-ant-fake' })
+  it("hands back the whisper and the sidecar given, with the codec and the schema version filled, as its first example shows", () => {
+    expect(MSX.boxDna.parse(dna)).to.deep.equal(filled)
   })
 
   it("strips the props the factory controls, as its second example shows", () => {
-    const parsed = MSX.boxDna.parse({ ...scope, ...factoryProps, fmt: MSX.BoxFormat })
+    const parsed = MSX.boxDna.parse({ ...dna, ...factoryProps, fmt: MSX.BoxFormat })
     expect(parsed).to.deep.equal(filled)
     expect(parsed).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'registered_at', 'written_at')
   })
 
   it("fills a default for a prop given as undefined", () => {
-    expect(MSX.boxDna.parse({ ...scope, sidecar: undefined, whisper_codec: undefined, whisper_schema_version: undefined })).to.deep.equal(filled)
+    expect(MSX.boxDna.parse({ ...dna, whisper_codec: undefined, whisper_schema_version: undefined })).to.deep.equal(filled)
   })
 
   it("keeps the sidecar given", () => {
     const sidecar = { account: 'work' }
-    expect(MSX.boxDna.parse({ ...scope, sidecar })).to.deep.equal({ ...filled, sidecar })
+    expect(MSX.boxDna.parse({ ...dna, sidecar })).to.deep.equal({ ...filled, sidecar })
   })
 
   it("names the failing field", () => {
-    const err = TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, boxlabel: 'B' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...dna, boxlabel: 'B' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
+  })
+
+  it("names the missing sidecar, and the missing whisper, as its third and fourth examples show", () => {
+    expect(TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, whisper: 'sk-ant-fake' }), 'bad_option').meta?.fieldnames).to.deep.equal(['sidecar'])
+    expect(TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper'])
   })
 
   it("refuses without quoting its input", () => {

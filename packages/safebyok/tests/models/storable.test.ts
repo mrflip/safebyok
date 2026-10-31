@@ -5,9 +5,10 @@ import { Box } from '../../src/models/box'
 import type { BoxRecord, BoxSparse, CentralPolicy, Fetched, RecordShape, Reconciled } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import { cmpRevisions, Storable } from '../../src/models/storable'
+import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
-import { type BoxAnswer, boxListingOf, keptOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { type BoxAnswer, boxDnaOf, boxListingOf, keptOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -88,7 +89,7 @@ describe("storable.hydrate(opts): when it fetches", () => {
   })
 
   it("never fetches a draft for want of the whisperCiphered: a draft is staged full", async () => {
-    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+    const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
     expect(box.isFull).to.be.true
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.deep.equal([])
@@ -183,7 +184,7 @@ describe("storable.hydrate(opts): after a failed fetch", () => {
   })
 
   it("rejects a hydrate whose fetch fails with its refusal, scheduling no launch, and launches again on the next", async () => {
-    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+    const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
     held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
     await expect(box.hydrate()).rejects.toThrow(/could not be reached/)
     expect(vi.getTimerCount()).to.eq(0)
@@ -221,7 +222,7 @@ describe("storable.hydrate(opts): a horizon past MaxTimerMillis", () => {
 
 describe("storable.hydrate(opts): a thing made with a horizon of Infinity", () => {
   it("fetches once on the first hydrate given no horizon, as the trigger is born due, and nothing after", async () => {
-    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: Infinity }).build({ ...held.mw.boxscope('anthropic_api_key') })
+    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: Infinity }).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
     held.mw.clearCalls()
     await box.hydrate()
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
@@ -559,14 +560,14 @@ describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () 
   it("edit: the patch over central and the staged, under the revision after central's, one tok until send or del spends it", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(Centrals.full())
-    await box.edit({ sidecar: { note: 'first' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'first' } })
     const first = keptOf(held.mw, box).staged
-    expect(first).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'first' }, revision_seq: 3, revision_tok: first?.revision_tok, written_at: T0 + 9000 })
+    expect(first).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'first' }, revision_seq: 3, revision_tok: first?.revision_tok, written_at: T0 + 9000, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered })
     expect(first?.revision_tok).to.not.eq('rev-c2')
     held.mw.setNow(T0 + 9500)
-    await box.edit({ sidecar: { note: 'second' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'second' } })
     const second = keptOf(held.mw, box).staged
-    expect(second).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'second' }, revision_seq: 3, revision_tok: second?.revision_tok, written_at: T0 + 9500 })
+    expect(second).to.deep.equal({ ...fullBoxRecord(CentralRev), sidecar: { note: 'second' }, revision_seq: 3, revision_tok: second?.revision_tok, written_at: T0 + 9500, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered })
     expect(second?.revision_tok).to.eq(first?.revision_tok)
     expect(keptOf(held.mw, box).central).to.deep.equal(Centrals.full())
   })
@@ -586,7 +587,7 @@ describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () 
 describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with, and the draft stays staged", async () => {
     const listing = boxListingOf(held.mw)
-    const built = await listing.build({ ...held.mw.boxscope('anthropic_api_key') })
+    const built = await listing.build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
     const box = new SpiedBox(held.mw.world, listing, keptOf(held.mw, built).central, keptOf(held.mw, built).staged, { maxMillisSinceRefresh: 10 * 60_000 }, held.mw.tell)
     expect(keptOf(held.mw, box).central.revision_seq).to.eq(MSX.NeverStoredSeq)
     expectReceivedUnchanged(box, null, 'same')
@@ -648,7 +649,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot).to.eq(box.getSnapshot)
       const { getSnapshot } = box
       const first = getSnapshot()
-      await box.edit({ sidecar: { note: 'changed' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'changed' } })
       expect(getSnapshot()).to.not.eq(first)
       expect(getSnapshot()).to.eq(box.snapshot)
     })
@@ -725,7 +726,7 @@ describe("Storable snapshot and subscription", () => {
       box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      await box.edit({ sidecar: { note: 'edited' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
       const afterEdit = listener.mock.calls.length
       expect(afterEdit).to.be.greaterThan(0)
       await box.del()
@@ -781,7 +782,7 @@ describe("Storable forms", () => {
 
     it("is the sparse form of central whatever is staged", async () => {
       const box = await builtBoxOf()
-      await box.edit({ sidecar: { note: 'staged only' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged only' } })
       expect(box.hasStaged).to.be.true
       expect(box.toJSON()).to.deep.equal(held.mw.sparseBoxRecord())
       expect(JSON.stringify(box)).to.not.contain('staged only')
@@ -806,7 +807,7 @@ describe("Storable forms", () => {
     it("carries the staged record, whole, once an edit has staged one; the sparse form stays central's", async () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
-      await box.edit({ sidecar: { note: 'staged' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
       const { staged, central, ...sparse } = keptOf(held.mw, box)
       expect(central).to.deep.equal(fullBoxRecord())
       expect(staged).to.include({ revision_seq: 2, written_at: T0 + 500, am: 'a' })
@@ -924,7 +925,7 @@ describe("Storable own props", () => {
     it("follow the staged record after an edit, which is one revision on, written now; central is untouched", async () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
-      await box.edit({ sidecar: { note: 'edited' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
       expect(box.revision_seq).to.eq(2)
       expect(box.revision_tok).to.not.eq('rev-a1')
       expect(box.written_at).to.eq(T0 + 500)
@@ -957,7 +958,7 @@ describe("storable.edit(patch): the record staged", () => {
     const { box } = await timelyBoxOf()
     const { central } = keptOf(held.mw, box)
     held.mw.setNow(T0 + 500)
-    await expect(box.edit({ sidecar: { note: 'edited' } })).resolves.to.eq(box)
+    await expect(box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })).resolves.to.eq(box)
     expect(box.hasStaged).to.be.true
     expect(keptOf(held.mw, box).staged).to.deep.include({ revision_seq: 2, written_at: T0 + 500, registered_at: T0, am: 'a', sidecar: { note: 'edited' } })
     expect(keptOf(held.mw, box).staged?.revision_tok).not.to.eq(central.revision_tok)
@@ -970,7 +971,7 @@ describe("storable.edit(patch): the record staged", () => {
     const { box } = await timelyBoxOf()
     const toks: string[] = []
     for (const note of ['one', 'two', 'three']) {
-      await box.edit({ sidecar: { note } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note } })
       toks.push(box.revision_tok)
     }
     expect(new Set(toks).size).to.eq(1)
@@ -987,9 +988,9 @@ describe("storable.edit(patch): the record staged", () => {
     it(`stages a fresh revision_tok after a send, whatever its outcome: ${blurb}`, async () => {
       const { box } = await timelyBoxOf()
       scriptPut(box)
-      await box.trySend({ sidecar: { note: 'sent' } })
+      await box.trySend({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })
       const [put] = held.mw.callsOf('put')
-      await box.edit({ sidecar: { note: 'after' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'after' } })
       expect(box.revision_tok).not.to.eq(put?.record.revision_tok)
       expect(box.revision_seq).to.eq(keptOf(held.mw, box).central.revision_seq + 1)
     })
@@ -997,10 +998,10 @@ describe("storable.edit(patch): the record staged", () => {
 
   it("stages a fresh revision_tok once central changes", async () => {
     const { box } = await timelyBoxOf()
-    await box.edit({ sidecar: { note: 'before' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'before' } })
     const before = box.revision_tok
     box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2' }))
-    await box.edit({ sidecar: { note: 'after' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'after' } })
     expect(box.revision_tok).not.to.be.oneOf([before, 'rev-b2'])
     expect(box.revision_seq).to.eq(3)
   })
@@ -1031,7 +1032,7 @@ describe("storable.edit(patch): central moving while makeStaged runs", () => {
   for (const [rcvdOf, present, blurb] of MovedCases) {
     it(`refuses 'stale_write' when ${blurb} is received, staging nothing; central is the record received`, async () => {
       const box = await landingBoxOf(rcvdOf())
-      await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
+      await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'mine' } }), 'stale_write')
       expect(box.hasStaged).to.be.false
       expect(box.isPresent).to.eq(present)
       expect(keptOf(held.mw, box).central).to.deep.equal(rcvdOf())
@@ -1040,13 +1041,13 @@ describe("storable.edit(patch): central moving while makeStaged runs", () => {
 
   it("refuses 'stale_write' from a send, which puts nothing", async () => {
     const box = await landingBoxOf(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2' }))
-    await TH.expectRefusal(box.send({ sidecar: { note: 'mine' } }), 'stale_write')
+    await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'mine' } }), 'stale_write')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("stages the edit when what is received only confirms central's revision", async () => {
     const box = await landingBoxOf(sparseBoxRecord())
-    await expect(box.edit({ sidecar: { note: 'mine' } })).resolves.to.eq(box)
+    await expect(box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'mine' } })).resolves.to.eq(box)
     expect(keptOf(held.mw, box).staged).to.deep.include({ revision_seq: 2, sidecar: { note: 'mine' } })
   })
 })
@@ -1064,7 +1065,7 @@ describe("storable.send(patch): edit, then put", () => {
     })
     let resolved = false
     const sending = (async () => {
-      const sent = await box.send({ sidecar: { note: 'sent' } })
+      const sent = await box.send({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })
       resolved = true
       return sent
     })()
@@ -1081,9 +1082,9 @@ describe("storable.send(patch): edit, then put", () => {
   })
 
   it("puts a draft under maxMillisSinceRefresh Infinity without fetching, at revision 0, expecting no record stored", async () => {
-    const box = await fakeSealBoxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+    const box = await fakeSealBoxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
     held.mw.clearCalls()
-    await box.send({ whisper: 'sk-test-0000' }, { maxMillisSinceRefresh: Infinity })
+    await box.send({ whisper: 'sk-test-0000', sidecar: {} }, { maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.deep.equal([])
     const [put] = held.mw.callsOf('put')
     expect(put?.priorTok).to.be.null
@@ -1156,8 +1157,8 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
 
 describe("storable verbs while the vault is locked", () => {
   const EntryCases = [
-    [(box: Box) => box.edit({ sidecar: { note: 'locked' } }), 'edit'],
-    [(box: Box) => box.send({ sidecar: { note: 'locked' } }), 'send'],
+    [(box: Box) => box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'locked' } }), 'edit'],
+    [(box: Box) => box.send({ whisper: 'sk-test-0000', sidecar: { note: 'locked' } }), 'send'],
     [(box: Box) => box.del(),                                  'del'],
   ] as const
   for (const [verb, verbname] of EntryCases) {
@@ -1175,7 +1176,7 @@ describe("storable verbs while the vault is locked", () => {
     const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLockState('locked') } })
     const box = await listing.build(held.mw.fullBoxRecord())
     lock.during = true
-    await expect(box.edit({ sidecar: { note: 'made while locking' } })).resolves.to.eq(box)
+    await expect(box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'made while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
     expect(keptOf(held.mw, box).staged).to.deep.include({ sidecar: { note: 'made while locking' } })
   })
@@ -1184,7 +1185,7 @@ describe("storable verbs while the vault is locked", () => {
     const { box } = await timelyBoxOf()
     expect(box.snapshot.present).to.be.true
     box.subscribe(() => { held.mw.setLockState('locked') })
-    await expect(box.send({ sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
+    await expect(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
     expect(held.mw.callsOf('put')).to.have.lengthOf(1)
     expect(box.hasStaged).to.be.false
@@ -1210,8 +1211,8 @@ describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
     [(box: Box) => box.tryFetch(),                          'tryFetch of a stored record'],
     [(box: Box) => box.tryHydrate(),                        'tryHydrate of a timely record'],
-    [(box: Box) => box.tryEdit({ sidecar: { note: 'x' } }), 'tryEdit of a full record'],
-    [(box: Box) => box.trySend({ sidecar: { note: 'x' } }), 'trySend that storage takes'],
+    [(box: Box) => box.tryEdit({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), 'tryEdit of a full record'],
+    [(box: Box) => box.trySend({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), 'trySend that storage takes'],
     [(box: Box) => box.tryDel(),                            'tryDel that storage takes'],
   ] as const
   for (const [tryVerb, blurb] of GoodCases) {
@@ -1225,8 +1226,8 @@ describe("storable try forms: an outcome, never a rejection", () => {
     [(box: Box) => box.tryFetch(),                          (box: Box) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },    "storage_unavailable", 'tryFetch that storage refuses'],
     [(box: Box) => box.tryFetch(),                          () => { held.mw.willGet(() => { throw new Error("socket closed") }) },           "unexpected_error",    'tryFetch whose store throws a plain Error'],
     [(box: Box) => box.tryHydrate(),                        () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },           "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
-    [(box: Box) => box.tryEdit({ sidecar: { note: 'x' } }), () => { held.mw.setLockState('locked') },                                        "vault_locked",        'tryEdit while locked'],
-    [(box: Box) => box.trySend({ sidecar: { note: 'x' } }), (box: Box) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'trySend that storage refuses as stale'],
+    [(box: Box) => box.tryEdit({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), () => { held.mw.setLockState('locked') },                                        "vault_locked",        'tryEdit while locked'],
+    [(box: Box) => box.trySend({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), (box: Box) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'trySend that storage refuses as stale'],
     [(box: Box) => box.tryDel(),                            () => { held.mw.setLockState('locked') },                                        "vault_locked",        'tryDel while locked'],
   ] as const
   for (const [tryVerb, arrange, refusalkind, blurb] of BadCases) {
@@ -1338,7 +1339,7 @@ describe("storable.receive(rcvd): a 'same' answer and the staged tombstone of a 
 
   it("keeps a staged rebirth over a box held gone when the deletion held arrives again", async () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
-    await box.edit({ whisper: 'sk-test-0000' })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
     box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     expect(box.isPresent).to.be.true
     expect(keptOf(held.mw, box).staged).to.deep.include({ am: 'a', revision_seq: 3 })
@@ -1367,7 +1368,7 @@ describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile c
   for (const [rcvdOf, blurb] of MovedCases) {
     it(`carries ${blurb} received as meta.box_stored, the central now held`, async () => {
       const box = await landingBoxOf(rcvdOf())
-      const err = await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
+      const err = await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'mine' } }), 'stale_write')
       expect(err.meta?.box_stored).to.deep.equal(rcvdOf())
       expect(err.meta?.box_stored).to.eq(keptOf(held.mw, box).central)
       expect(err.message).to.eq(Phrases.MovedUnderEdit)
@@ -1376,7 +1377,7 @@ describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile c
 
   it("carries a central where `storedInStaleRefusal` finds it, as storage's own 'stale_write' would carry it", async () => {
     const box = await landingBoxOf(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2' }))
-    const err = await TH.expectRefusal(box.edit({ sidecar: { note: 'mine' } }), 'stale_write')
+    const err = await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'mine' } }), 'stale_write')
     const { listing } = box as unknown as { listing: { storedInStaleRefusal: (err: VaultError) => unknown } }
     expect(listing.storedInStaleRefusal(err)).to.deep.equal(keptOf(held.mw, box).central)
   })
@@ -1398,7 +1399,7 @@ describe("storable refusal sentences, from phrases.ts", () => {
   it("refuses a locked edit and a record not full with the sentences phrases.ts holds", async () => {
     const { box } = await timelyBoxOf()
     held.mw.setLockState('locked')
-    const locked = await TH.expectRefusal(box.edit({ sidecar: {} }), 'vault_locked')
+    const locked = await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000', sidecar: {} }), 'vault_locked')
     expect(locked.message).to.eq(Phrases.VaultLocked)
     held.mw.setLockState('unlocked')
     const sparse = await boxListingOf(held.mw).build(sparseBoxRecord({ boxlabel: 'sparse_one' }))
@@ -1469,7 +1470,7 @@ describe("storable: the timer after a launch that completes", () => {
 
 describe("storable.hydrate(opts): timeliness asks of the record in hand alone", () => {
   it("fetches a box built from a dna once, never having fetched it, then nothing within the horizon, as the box is whole", async () => {
-    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+    const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
     await box.hydrate({ maxMillisSinceRefresh: 60_000 })
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     await held.mw.advance(30_000)
@@ -1496,7 +1497,7 @@ describe("storable.receive(null): a staged edit carried past damage, then nothin
   it("is dropped with nothing refused or told: central becomes the deletion at the ouchstone's revision", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord(CentralRev))
-    await box.edit({ sidecar: { note: 'staged' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
     box.receive(rcvdOf('ouch', NewerRev))
     expect(box.hasStaged).to.be.true
     expect(box.revision_seq).to.eq(NewerRev.revision_seq + 1)

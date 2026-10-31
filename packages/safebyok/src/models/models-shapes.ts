@@ -251,32 +251,34 @@ export type BoxSparse = Z.infer<typeof boxSparse>
 export type BoxRecord = Z.infer<typeof boxRecord>
 
 /** The check of a box's dna, a duckish refusing 'bad_option' and naming the failing field. A record is checked by `boxRecord` or `boxSparse`, never by this.
- * The scope is required. The record's own props are optional: `sidecar`, `whisper_codec` and
- * `whisper_schema_version` take their defaults where missing or undefined, and `whisper`, the
- * whisper `build` seals in, may be given. The sealed parts never come from a dna: `build` seals
+ * The scope is required, and so are `whisper`, the whisper `build` seals in, and `sidecar`, as
+ * every update of a box names both. `whisper_codec` and `whisper_schema_version` take their
+ * defaults where missing or undefined. The sealed parts never come from a dna: `build` seals
  * every box it makes, so a dna carrying one refuses, as a field it does not take. The props the
  * factory controls, `fmt`, `am`, `vault_tok`, `revision_tok` and the times, may be given, must
  * pass their checks, and are stripped. A field it does not take refuses, as a bag a person typed
  * would, and `revision_seq` among them: input carrying one is a record, which `build` holds to the
  * record check.
  *
- * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...' })         // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: 'sk-ant-...' }
- * @example boxDna.parse({ ...scope, am: 'x', vault_tok: 'tok-u1' })   // the scope and the defaults: am and vault_tok are the factory's
- * @example boxDna.parse({ ...scope, boxlabel: 'B' })                  // throws 'bad_option', naming boxlabel
- * @example boxDna.parse({ ...scope, revision_seq: 3 })                // throws 'bad_option': a dna carries no revision_seq
- * @example boxDna.parse({ ...scope, whisper_ciphered: ciphered })     // throws 'bad_option': the sealed parts are the seal's to make
+ * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...', sidecar: {} })                                 // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: 'sk-ant-...' }
+ * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...', sidecar: {}, am: 'x', vault_tok: 'tok-u1' })   // the scope, whisper, sidecar and defaults: am and vault_tok are the factory's
+ * @example boxDna.parse({ ...scope, whisper: 'sk-ant-...' })                                              // throws 'bad_option', naming sidecar
+ * @example boxDna.parse({ ...scope, sidecar: {} })                                                        // throws 'bad_option', naming whisper
+ * @example boxDna.parse({ ...scope, boxlabel: 'B' })                                                      // throws 'bad_option', naming boxlabel
+ * @example boxDna.parse({ ...scope, revision_seq: 3 })                                                    // throws 'bad_option': a dna carries no revision_seq
+ * @example boxDna.parse({ ...scope, whisper_ciphered: ciphered })                                         // throws 'bad_option': the sealed parts are the seal's to make
  */
 export const boxDna = Checker(({ obj, lit, applabel, user_id, vaultlabel, boxlabel }) => obj({
   applabel, user_id, vaultlabel, boxlabel,
-  sidecar:                sidecar.default({}),
+  sidecar,
   whisper_codec:          lit('json_v1').default('json_v1'),
   whisper_schema_version: lit(1).default(1),
-  whisper:                whisper.optional(),
+  whisper,
   fmt:                    lit(BoxFormat).optional(),
   ...sparseBase.omit({ revision_seq: true }).partial().shape,
 }).strict().transform(({ fmt: _fmt, am: _am, vault_tok: _vault_tok, revision_tok: _revision_tok, registered_at: _registered_at, written_at: _written_at, ...dna }) => dna), 'bad_option')
 
-/** A box's dna as {@link boxDna} hands it back: the scope, the record's own props with their defaults filled, and the whisper where one was given. */
+/** A box's dna as {@link boxDna} hands it back: the scope, the whisper and the sidecar, and the record's own props with their defaults filled. */
 export type BoxDnaFilled = Z.output<typeof boxDna>
 // --
 

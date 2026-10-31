@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { type Box, type BoxSnapshot, LOCKED } from '../../src/models/box'
+import { type Box, type BoxProps, type BoxSnapshot, LOCKED } from '../../src/models/box'
 import type { BoxRecord, BoxSparse, Fetched } from '../../src/models/models-shapes'
 import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as TH from '../test-helpers'
-import { boxListingOf, keptOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { boxDnaOf, boxListingOf, keptOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
@@ -22,7 +22,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
 
   for (const [rcvdOf, timely, blurb] of ReceivedCases) {
     it(`${timely ? 'notes success on' : 'notes no success on'} ${blurb}, newer than a draft never fetched`, async () => {
-      const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build({ ...held.mw.boxscope('anthropic_api_key') })
+      const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
       expect(box.isTimely).to.be.false
       box.receive(rcvdOf())
       expect(box.isTimely).to.eq(timely)
@@ -83,7 +83,7 @@ describe("box.receive(rcvd): registered_at, set over a tombstone; another vault_
   }
 
   it("throws 'unexpected_error' over a draft's central never stored, and for a tombstone or a damaged record under another vault_tok", async () => {
-    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('drafted') })
+    const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
     TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })), 'unexpected_error')
     TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')), 'unexpected_error')
@@ -146,23 +146,23 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       held.mw.seedStore(tombstone)
       const box = await fakeSealBoxListingOf(held.mw).build(tombstone)
       held.mw.setNow(T0 + 5000)
-      await expect(box.edit({ whisper: 'sk-test-0000' })).resolves.to.eq(box)
+      await expect(box.edit({ whisper: 'sk-test-0000', sidecar: {} })).resolves.to.eq(box)
       expect(box.isPresent).to.be.true
       expect(keptOf(held.mw, box).staged).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, written_at: T0 + 5000, sidecar: {} })
       const reborn = box.revision_tok
       held.mw.setNow(T0 + 6000)
-      await box.edit({ sidecar: { note: 'reborn' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'reborn' } })
       expect(keptOf(held.mw, box).staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
-      await box.send({})
+      await box.send({ whisper: 'sk-test-0000', sidecar: { note: 'reborn' } })
       const [put] = held.mw.callsOf('put')
       expect(put?.priorTok).to.equal(tok)
       expect(put?.record).to.deep.include({ revision_tok: reborn, revision_seq: 3, registered_at: T0 + 5000 })
       expect(keptOf(held.mw, box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
     })
 
-    it(`refuses a sidecar edit with no whisper over ${blurb} as 'bad_option', from makeStaged`, async () => {
+    it(`refuses a sidecar edit with no whisper over ${blurb} as 'bad_option', before anything is staged`, async () => {
       const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am))
-      await TH.expectRefusal(box.edit({ sidecar: { note: 'no whisper' } }), 'bad_option')
+      await TH.expectRefusal(box.edit({ sidecar: { note: 'no whisper' } } as unknown as BoxProps), 'bad_option')
       expect(box.hasStaged).to.be.false
     })
   }
@@ -173,24 +173,9 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     void box.del()
     await vi.advanceTimersByTimeAsync(0)
     held.mw.setNow(T0 + 5000)
-    await box.edit({ whisper: 'sk-test-0000' })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
     expect(box.registered_at).to.eq(T0)
     expect(keptOf(held.mw, box).staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
-  })
-})
-// --
-
-// == [Sending a sparse box]: no whisper to carry forward
-
-describe("box.send(patch): a sparse box with no whisper", () => {
-  it("refuses 'bad_option' from makeStaged when storage too holds it sparse, putting nothing", async () => {
-    const sparse = sparseBoxRecord()
-    held.mw.seedStore(sparse)
-    const box = await boxListingOf(held.mw).build(sparse)
-    held.mw.clearCalls()
-    await TH.expectRefusal(box.send({ sidecar: { note: 'sent' } }), 'bad_option')
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 })
 // --
@@ -283,7 +268,7 @@ describe("Box snapshot", () => {
 
     it("born from a dna: present, full, the sidecar empty, at revision 0 registered and written now", async () => {
       held.mw.setNow(T0 + 7000)
-      const box = await boxListingOf(held.mw).build(held.mw.boxscope('openai_api_key'))
+      const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('openai_api_key')))
       expect(box.getSnapshot()).to.deep.equal({
         ...held.mw.boxscope('openai_api_key'),
         revision_tok:  box.revision_tok,
@@ -300,7 +285,7 @@ describe("Box snapshot", () => {
     it("edited: the record in hand is the staged, so the sidecar and the revision are the edit's", async () => {
       const box = await boxOf()
       held.mw.setNow(T0 + 500)
-      await box.edit({ sidecar: { note: 'edited' } })
+      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
       expect(box.getSnapshot()).to.deep.include({ sidecar: { note: 'edited' }, revision_seq: 2, written_at: T0 + 500, full: true, present: true })
     })
 
@@ -416,7 +401,7 @@ describe("Box own props", () => {
     held.mw.seedStore(received)
     box.receive(received)
     expect(Object.keys(box)).to.have.members(keys)
-    await box.edit({ sidecar: { note: 'edited' } })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
     await box.del()
     expect(Object.keys(box)).to.have.members(keys)
@@ -466,9 +451,9 @@ describe("box.whisper = null while the vault is locked", () => {
 // == [The stub seal in edit]: seal, edit, makeStaged
 
 describe("box.edit(props) with a whisper: the stub seals it", () => {
-  it("seals a whisper over a full box at the next revision, keeping its sidecar, its sealed parts the stub's", async () => {
+  it("seals a whisper with its sidecar over a full box at the next revision, its sealed parts the stub's", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
-    await box.seal('sk-test-0000')
+    await box.seal('sk-test-0000', { account: 'work' })
     expect(box.revision_seq).to.eq(2)
     expect(box.sidecar).to.deep.equal({ account: 'work' })
     expect(box.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
@@ -481,20 +466,13 @@ describe("box.edit(props) with a whisper: the stub seals it", () => {
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
-  it("seals a deleted box back to life with an empty sidecar, where none is given", async () => {
+  it("seals a deleted box back to life with the sidecar given", async () => {
     const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
-    await box.edit({ whisper: 'sk-test-0000' })
+    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
     expect(box.isPresent).to.be.true
     expect(box.isFull).to.be.true
     expect(box.sidecar).to.deep.equal({})
     expect(box.revision_seq).to.eq(3)
-  })
-
-  it("refuses 'bad_option' a live box still sparse once hydrated, given no sidecar, staging nothing", async () => {
-    held.mw.seedStore(sparseBoxRecord())
-    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
-    await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000' }), 'bad_option')
-    expect(box.hasStaged).to.be.false
   })
 
   it("seals the sidecar given over a live box still sparse once hydrated", async () => {
@@ -505,17 +483,9 @@ describe("box.edit(props) with a whisper: the stub seals it", () => {
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
-  it("seals the whisper exposed, where the edit gives none", async () => {
-    const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
-    box.whisper = 'sk-test-0000'
-    await box.edit({})
-    expect(box.isFull).to.be.true
-    expect(box.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
-  })
-
   it("stages nothing that carries the whisper, in the record in hand, the cache's copy or the snapshot", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    await box.edit({ whisper: { key: 'sk-test-SECRET' } })
+    await box.edit({ whisper: { key: 'sk-test-SECRET' }, sidecar: {} })
     for (const form of [box.toJSON(), keptOf(held.mw, box), box.snapshot]) {
       expect(JSON.stringify(form)).to.not.include('SECRET')
     }
@@ -529,7 +499,7 @@ const asBuilt = { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity } as
 /** A box built from a dna, its scope held by storage already under another revision. */
 const neverStoredBoxOf = async () => {
   held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
-  const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+  const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
   held.mw.clearCalls()
   return box
 }
@@ -538,7 +508,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
   for (const opts of [{}, { ifPresent: 'replace' }] as const) {
     it(`refuses 'stale_write' for a box this device believes never stored over a box stored, handing storage the revision none, with opts ${JSON.stringify(opts)}`, async () => {
       const box = await neverStoredBoxOf()
-      await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       const [put] = held.mw.callsOf('put')
       expect(put?.priorTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
@@ -547,33 +517,109 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
 
     it(`refuses it over a tombstone stored, with opts ${JSON.stringify(opts)}`, async () => {
       held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
-      const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
+      const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
       held.mw.clearCalls()
-      await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       expect(held.mw.callsOf('put')[0]?.priorTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
     })
   }
 
   it("puts with nothing stored at the revision minted, with ifPresent 'replace'", async () => {
-    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
-    await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
+    const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
+    await expect(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
     expect(box.isPresent).to.be.true
     expect(box.revision_seq).to.eq(0)
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 0 })
   })
 
   it("takes the timely options beside ifPresent, handing the timely ones on", async () => {
-    const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
-    await expect(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
+    const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
+    await expect(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
     expect(held.mw.callsOf('ensureTimely')[0]?.opts).to.deep.equal({ maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })
   })
 
   it("refuses 'bad_option' an ifPresent that is not 'replace', before staging or putting anything", async () => {
     const box = await neverStoredBoxOf()
     const before = keptOf(held.mw, box)
-    await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
+    await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
     expect(keptOf(held.mw, box)).to.deep.equal(before)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 })
+
+// == [A whisper and a sidecar on every update]: edit, send, seal, the whisper setter
+
+describe("box.edit(patch), send and seal: a whisper and a sidecar on every update", () => {
+  const PatchCases = [
+    [{ whisper: 'sk-test-0000' },                     'a whisper with no sidecar'],
+    [{ sidecar: { note: 'x' } },                      'a sidecar with no whisper'],
+    [{},                                              'neither'],
+    [{ whisper: undefined, sidecar: { note: 'x' } },  'a whisper given as undefined'],
+    [{ whisper: 'sk-test-0000', sidecar: undefined }, 'a sidecar given as undefined'],
+  ] as const
+
+  for (const [patch, blurb] of PatchCases) {
+    it(`refuses an edit of ${blurb} as 'bad_option', staging nothing and calling nothing`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      held.mw.clearCalls()
+      const err = await TH.expectRefusal(box.edit(patch as unknown as BoxProps), 'bad_option')
+      expect(err.message).to.include('whisper and its sidecar')
+      expect(box.hasStaged).to.be.false
+      expect(box.revision_seq).to.eq(1)
+      expect(held.mw.calls).to.deep.equal([])
+    })
+
+    it(`refuses a send of ${blurb} as 'bad_option', putting nothing`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      held.mw.clearCalls()
+      await TH.expectRefusal(box.send(patch as unknown as BoxProps), 'bad_option')
+      expect(box.hasStaged).to.be.false
+      expect(held.mw.calls).to.deep.equal([])
+    })
+  }
+
+  it("refuses 'bad_option' a seal given no sidecar", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    await TH.expectRefusal(box.seal('sk-test-0000', undefined as never), 'bad_option')
+    expect(box.hasStaged).to.be.false
+  })
+
+  it("refuses 'bad_option' before its guards: a patch lacking a whisper refuses so while the vault is locked, too", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.setLockState('locked')
+    await TH.expectRefusal(box.edit({ sidecar: {} } as unknown as BoxProps), 'bad_option')
+  })
+
+  it("leaves a staged edit as it was when a later edit refuses", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
+    const before = keptOf(held.mw, box).staged
+    await TH.expectRefusal(box.edit({ sidecar: { note: 'later' } } as unknown as BoxProps), 'bad_option')
+    expect(keptOf(held.mw, box).staged).to.deep.equal(before)
+  })
+
+  it("takes no whisper from the one exposed: an edit giving none refuses 'bad_option', though one is exposed", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.whisper = 'sk-test-0000'
+    await TH.expectRefusal(box.edit({ sidecar: { note: 'x' } } as unknown as BoxProps), 'bad_option')
+    expect(box.hasStaged).to.be.false
+  })
+
+  it("seals nothing when the whisper is set: the setter only exposes it", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.clearCalls()
+    box.whisper = 'sk-test-0000'
+    expect(box.whisper).to.eq('sk-test-0000')
+    expect(box.hasStaged).to.be.false
+    expect(box.revision_seq).to.eq(1)
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+  })
+
+  it("seals the sidecar given over a full box, carrying none over from the record in hand", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
+    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
+    expect(box.sidecar).to.deep.equal({})
+  })
+})
+// --

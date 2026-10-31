@@ -19,9 +19,9 @@ export const StubWhisperCiphered = Object.freeze({ cipher_iv_b64: 'stub', cipher
  * replaced. It refuses 'bad_record' a `staged` that does not make a full record.
  *
  * @param staged  - Record to seal, under the revision it is staged at, with the sidecar the seal binds.
- * @param _whisper - Whisper to seal; null for a box made with none.
+ * @param _whisper - Whisper to seal.
  * @example await stubSeal({ ...sparse, sidecar: {} }, 'sk-test')   // { ...sparse, sidecar: {}, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered }
  */
-export const stubSeal = (staged: BoxSparse & { sidecar: Sidecar }, _whisper: Whisper | null): Promise<BoxRecord> =>
+export const stubSeal = (staged: BoxSparse & { sidecar: Sidecar }, _whisper: Whisper): Promise<BoxRecord> =>
   Promise.resolve(boxRecord.parse({ ...staged, box_key_wrapped: StubBoxKeyWrapped, whisper_ciphered: StubWhisperCiphered }))
 // --
