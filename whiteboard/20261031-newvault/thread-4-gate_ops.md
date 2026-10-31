@@ -1,6 +1,6 @@
 # Thread 4: gate_ops (2026-10-31)
 
-Branch `20261031-gate_ops`, PR #TBD, stacked on #413 (`20261031-box_seal`). Justify: green (safebyok 4578 passed, 37 skipped; every package green). `pnpm size:budget`: the same eight "raise" rows as the base (the new phrases are shaken out of every bundle); no `--write`.
+Branch `20261031-gate_ops`, PR #414, stacked on #413 (`20261031-box_seal`). Justify: green (safebyok 4578 passed, 37 skipped; every package green). `pnpm size:budget`: the same eight "raise" rows as the base (the new phrases are shaken out of every bundle); no `--write`.
 
 * **Built**:
   - **Directive 1** (`23f30334`, on its own): the autolock and the damaged-lease path each erased the kept lease twice (`lock()` erases by scope, then `Lease.eraseKept`). Both now `vault.lock()` then `letGo()`; `Lease.#autolockNow` is the autolock's launch. Tests in `vault-unlock.test.ts`: `tryDelLease` called once on each path.
