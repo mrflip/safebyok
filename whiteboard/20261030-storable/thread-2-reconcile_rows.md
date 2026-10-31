@@ -1,0 +1,95 @@
+# Thread 2: reconcile_rows (2026-10-30)
+
+Branch `20261030-reconcile_rows`, PR #373, stacked on #370 (its base is `20261030-models_world`).
+Justify: green; safebyok 3889 passed, 37 skipped, 1 todo.
+
+* **Built**
+  * `record_conflict`, a condition, in `src/errors.ts` (the doc block, `refusalKindVals`,
+    `RefusalFamilyForKind`), `tests/errors.test.ts` FamilyCases, and the README Conditions table.
+    `cmpRevisions` and the two one-revision-two-fates throws in `reconcileCentral` use it now.
+    `corrupt_record` is left for adapter answers in shapes the protocol does not allow. The old
+    `src/vault.ts` and `src/box.ts` have no revision compare, so they are untouched. Changeset
+    `.changeset/20261030-reconcile_rows.md`, minor.
+  * `tests/models/storable.test.ts`: `cmpRevisions` tested directly, then `receive` tested through
+    `SpiedBox`, a file-local `Box` subclass that logs each policy `reconcileCentral` returns.
+    Every row of both tables is covered, each test titled with its row (`age | rcvd | central`).
+    The cases run over each central shape (full, sparse, gone, ouch) at revision 2 'rev-c2',
+    with and without a staged edit at 3 'rev-s3'. Edit and del are driven through a box from
+    `listing.build`. Also covered: `receive(null)`, both for a thing never stored and for a held
+    one.
+  * `tests/models/listing.test.ts` (new): **pulled in from thread 3**. `listing.fetch` of
+    nothing stored for a box held alive refuses `record_conflict`. Thread 3 appends its own
+    describes there.
+  * `tests/loosened/loosened.test.ts` (new): the describe "the staged edit reconcileStaged drops
+    or carries".
+  * Comments only, fixed in `storable.ts` as I went: "two puts landed"; the snapshot comments
+    name the `snapshot` getter rather than "the first read"; "saves to the device cache". I also
+    folded the duplicated reasoning in `reconcileStaged`'s doc into one paragraph. Its
+    "successful write! Unstage it" line is gone: adopt drops the staged whatever its tok.
+
+* **Decisions taken**
+  * The tests watch the policy through a subclass rather than inferring it from state, because
+    'older', 'same' and 'skip' leave the same state behind. A storable seals itself, so the log
+    is a module-level array cleared before each test.
+  * Where the code differs from the table read one way, I pinned today's behaviour with a passing
+    test and added an `it.todo` written to the table. When the Coach rules, the pinned test
+    breaks, which is the signal to update it.
+  * The changeset says no exported call refuses with the new kind yet. That is true: only the
+    unexported models do.
+  * **Ruling, "alive" (the Coach, 2026-10-30)**: "Don't redefine the constants. If a different
+    policy makes more sense, implement that and put a big honking note down." `amVals`,
+    `liveness` and every constant stay. The rows changed instead, in `reconcileCentral`'s table
+    and code. At one revision a damaged record delivered skips over any central, a deletion
+    included (`same | ouch | any`). A deletion delivered over a copy held damaged takes 'gone'
+    (`same | gone | ouch`, a new row): central becomes the deletion and the staged is dropped.
+    That row covers `receive(null)`, and a listing's fetch of nothing stored, for a box held
+    damaged. Alive in the table now reads as `amVals` has it, am 'a'. A NOTE paragraph above the
+    table says what the rows do and cites the ruling. It sits above the table, away from the
+    ouchstone sentence thread 4b rewrites. The two pinned tests and their `it.todo`s became
+    passing tests: same | ouch | any now loops over all four centrals, plus same | gone | ouch,
+    and `receive(null)` for a box held damaged.
+  * **Ruling, a box stuck on `record_conflict` (the Coach, 2026-10-30)**: "a reset button to go
+    back to tombstone -1? Not against it, but we don't want something to cause infinite refresh.
+    The real way out is to tell the customer." No automatic way out was built. Both refusal
+    messages (`cmpRevisions`, `OneRevisionTwoFates`), the README Conditions row, the `errors.ts`
+    kind comment, the errors test blurb and the changeset now say three things. Storage and this
+    device disagree about one revision of a record. This device kept its own copy. Fetching
+    again finds the same disagreement, so the app tells the user and a developer looks at the
+    storage adapter. Nothing promises that fetching again mends it. The README row no longer
+    names `revision_seq` ("a different record under the same revision number"), which settles
+    the reviewer's note on that.
+
+* **Rows unreachable or differing from the table** (for thread 6)
+  1. **"alive" was read two ways**: settled by the Coach's ruling (see *Decisions taken*).
+     same | ouch | gone now skips, and same | gone | ouch takes 'gone'.
+  2. **same | full | ouch matches no row.** A healthy record delivered at the revision held
+     damaged falls through and refuses `unexpected_error` ("a bug in Storable"). It is reachable
+     with one healthy fetch after an ouch. Pinned, with `it.todo`.
+  3. **older | gone | any** repeats older | any | any, with the same result.
+  4. **The edit row over a sparse central** cannot be reached until the seal is written:
+     `makeStaged` refuses 'bad_option' without a whisper and 'unexpected_error' with one. The
+     edit row is tested over a full central.
+  5. **Every other row matches the code**, including fill keeping the staged as it was, adopt
+     and gone dropping it under either tok, and the ouch carry (`{...staged, ...nextRevision}`,
+     the staged's own `written_at` kept).
+
+* **Discoveries**
+  * Any older full or gone record marks the thing timely (`noteSuccessNow` runs before the
+    policy is consulted), though it confirms nothing. `receive`'s doc says "even one that only
+    confirms central". A test pins this as today's behaviour.
+  * `build(damaged)` for a thing not held makes its ouchstone from the damaged record's own
+    sparse props, because the never-stored central `#makeThingFor` builds comes from them. The
+    table's note "nothing of the delivered one is kept" holds only for a thing already held.
+
+* **For the Coach**
+  * **same | full | ouch**: I recommend 'fill' (central becomes the healthy record, the staged
+    left as it was), as same | full | sparse does.
+  * **older and timely**: should only full or gone records that are not older mark the thing
+    timely? I recommend yes.
+  * The ouch carry gives the staged a new `revision_tok` while keeping the sealed parts the old
+    tok was stamped into. That waits on the seal, and is pinned in the loosened file.
+
+Set aside: asserting the policy from state alone, which cannot tell 'older', 'same' and 'skip'
+apart; a `SpiedListing` whose `makeThing` builds `SpiedBox`, which cannot easily hold a box with
+an arbitrary staged edit. Boxes built directly are not held by a listing, so the del test uses
+`listing.build`.

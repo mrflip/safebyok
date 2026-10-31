@@ -2,6 +2,7 @@ import type { BankBag, BankScope, VaultBag, VaultScope } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
+import { goneError, otherStoresError, behindError } from './helpers/throwers'
 import { type Outcome, good, outcomeOf, refusalOf, valOf } from './outcome'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
@@ -666,10 +667,3 @@ const draftOf = (scope: VaultScope, now: number): VaultDraft => {
   const { applabel, user_id, vaultlabel } = scope
   return { format: VaultFormat, applabel, user_id, vaultlabel, vault_tok: randomId(), registered_at: now, vault_epoch: 0, gate_epoch: 0, gate: null }
 }
-
-const goneError = () => new VaultError('vault_gone', Phrases.VaultGoneWhileOpening)
-
-const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStoresThanHeld)
-
-const behindError = () => new VaultError('vault_behind', Phrases.VaultBehindWhileOpening)
-// --
