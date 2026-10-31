@@ -1,6 +1,6 @@
 # Thread 17: `cacheable` private (2026-10-31)
 
-Branch `20261031-cacheable_private`, PR #TBD, stacked on #388. Justify: see the PR's **Tests:** line.
+Branch `20261031-cacheable_private`, PR #389, stacked on #388. Justify: green (safebyok 4326 passed, 37 skipped; every package green, size budgets unmoved).
 
 * **Built**:
   * **`ToCacheable` and the `cacheableOf` helper are gone.** The storable's `settle()` now makes the copy for the device cache (central and staged beside the sparse form) from its private `#central` and `#staged`, and pushes it into `listing.keepCopy(cacheable)`, a new public method of `Listing` (`src/models/listing.ts`, banner *Snapshot and subscription*). The listing holds the latest copy per scopepath in `#copies`. `#buildOrReceive` then calls `this.settle(scope)`, which saves the copy kept for that scope (`#cache.save`) and remakes the snapshot, as `settle(thing)` did. The listing's `settle` argument changed from a thing to a scope.
