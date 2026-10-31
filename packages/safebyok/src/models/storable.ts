@@ -264,11 +264,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
 
-  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, fetched whatever its age where it is not whole. Calls made during a fetch join it. */
+  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, or by {@link MSX.MinRefreshMillis} where it is not whole, so fetched again whatever its age once that short horizon passes. Calls made during a fetch join it. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const timely = MSX.timelyOpts.parse(opts)
     await this.ensureReadyToFetch(timely)
-    await this.#trigger.ensureTimelyWithin(this.#isWhole ? timely.maxMillisSinceRefresh : 0)
+    await this.#trigger.ensureTimelyWithin(this.#isWhole ? timely.maxMillisSinceRefresh : MSX.MinRefreshMillis)
     return this
   }
 

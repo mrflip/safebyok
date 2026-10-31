@@ -57,11 +57,12 @@ describe("storable.hydrate(opts): when it fetches", () => {
     [{},                                  'before the launch scheduled'],
   ] as const
   for (const [opts, blurb] of SparseCases) {
-    it(`fetches a sparse central however timely: ${blurb}`, async () => {
+    it(`fetches a sparse central however timely, once MinRefreshMillis has passed since the last fetch: ${blurb}`, async () => {
       const { listing, box } = await timelyBoxOf(60_000)
       await listing.build(held.mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       held.mw.seedStore(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       held.mw.clearCalls()
+      held.mw.setNow(T0 + MSX.MinRefreshMillis)
       expect(box.isFull).to.be.false
       expect(box.isTimely).to.be.true
       await box.hydrate(opts)
@@ -71,6 +72,17 @@ describe("storable.hydrate(opts): when it fetches", () => {
       expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     })
   }
+
+  it("shares the last fetch with a hydrate of a sparse central within MinRefreshMillis of it, never refreshing at 0", async () => {
+    const { listing, box } = await timelyBoxOf(60_000)
+    await listing.build(held.mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    held.mw.seedStore(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    held.mw.clearCalls()
+    held.mw.setNow(T0 + MSX.MinRefreshMillis - 1)
+    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(0)
+    expect(box.isFull).to.be.false
+  })
 
   it("fetches a sparse central with a full edit staged by the horizon given, as the record in hand is whole", async () => {
     const { mw } = held

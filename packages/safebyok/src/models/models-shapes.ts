@@ -25,7 +25,7 @@ const Checks = Checkers('bad_record', ({ unk, custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, Cacheable, NeverStoredSeq, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, Cacheable, NeverStoredSeq, MinRefreshMillis, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check or its seal, and reads as gone) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
@@ -104,6 +104,9 @@ export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
 
 /** The `revision_seq` of a central never stored: a thing is born with a tombstone here as its central, so that any record received is newer, and nothing stored is what it expects. */
 export const NeverStoredSeq = -1
+
+/** The horizon, in milliseconds, of a fetch that must happen whatever the record's age, as `hydrate` asks where the record in hand is not whole: calls within it share the last fetch, never refreshing at 0 out of habit. */
+export const MinRefreshMillis = 50
 
 /** True for a record whose `am` says damaged or gone. */
 export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
@@ -468,7 +471,12 @@ export type Store<ScopeT, RecordT, SparseT> = {
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }
 
-/** The deviceDB's cache of one kind of thing: loaded once, by the listing's `hello`; saved by each instance's settle, the listing handing it to each instance it makes. */
+/** The deviceDB's cache of one kind of thing: loaded once, by the listing's `hello`; saved by each instance's settle, the listing handing it to each instance it makes.
+ * `save` is best effort, never awaited by the settle that calls it: a refusal is told as bad news,
+ * and nothing waits on it. An adapter keeps the order of its calls, so the last `save` of a thing
+ * wins. A settle saves each time, so a host whose cache is slow may debounce `save` (`_.debounce`,
+ * or a join primitive) before handing the cache over.
+ */
 export type Cache<RecordT, SparseT> = {
   load(): Promise<readonly Cacheable<RecordT, SparseT>[]>
   save(cacheable: Cacheable<RecordT, SparseT>): Promise<void>
