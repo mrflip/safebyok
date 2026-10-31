@@ -855,3 +855,21 @@ describe("Box and Storable entries: arguments checked first of all, before any g
   })
 })
 // --
+
+describe("Storable.edit holds its patch to the concrete class's isFullPatch first of all (the Coach, 2026-10-31)", () => {
+  it("refuses a patch that is not full, named for its field, before it looks at the opts or the lock", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.setLockState('locked')
+    held.mw.clearCalls()
+    const err = await TH.expectRefusal(box.edit({ whisper: { val: 'sk-test-0000' } } as never, { maxWorldMillis: -1 }), 'bad_option')
+    expect(err.meta?.fieldnames).to.deep.equal(['sidecar'])
+    expect(held.mw.calls).to.deep.equal([])
+  })
+
+  it("lays only the whisper and the sidecar of a full patch over the record, whatever else it carries", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    await box.edit({ ...fullBoxRecord(), sidecar: { note: 'new' }, whisper: { val: 'sk-test-0001' }, box_key_wrapped: undefined })
+    expect(box._cheat_staged).to.include({ revision_seq: 2, am: 'a' })
+    expect(box.sidecar).to.deep.equal({ note: 'new' })
+  })
+})

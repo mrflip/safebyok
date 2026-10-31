@@ -272,7 +272,7 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherBox, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const RecordNotFull = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -286,8 +286,8 @@ export const AlreadyHeld = "This listing already holds an instance under the dna
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
 export const BoxPatchAdvice = "Nothing was staged. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
 
-/** Why an update of a box whose patch names another box's scope stages nothing. */
-export const patchOfOtherBox = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than the box's own, so nothing was staged: update the box it names, which listing.at(scope) answers.`
+/** Why an update of a box or a vault whose patch names another's scope stages nothing. */
+export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was staged: update the one it names, which listing.at(scope) answers.`
 
 /** Why LOCKED, which a locked box answers for its whisper, is refused where a whisper is wanted. */
 export const LockedIsNoWhisper = "LOCKED is not a whisper: unseal or expose one first"

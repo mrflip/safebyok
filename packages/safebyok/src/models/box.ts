@@ -73,7 +73,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   demandReadyToSeal(): this { return this.demandUnlocked() }
   // --
 
-  // == [The whisper]: whisper, unsealWhisper, expose, seal, edit
+  // == [The whisper]: whisper, unsealWhisper, expose, seal
 
   /** The exposed whisper, as its frozen {@link WhisperHolder} `{ val }`, or LOCKED while the vault is; the vault locking forgets nothing, and the whisper answers again once it unlocks. Setting it exposes the given whisper, `{ val }`, which needs the vault unlocked, and does no more: nothing seals it, as `edit` and `send` seal only the whisper they are given. The box keeps a frozen copy, so to change the whisper, set it anew; one that is not `{ val }` with `val` a whisper refuses 'bad_option', naming the field, before the lock is looked at. Setting null (or LOCKED, which counts as null, and is told from a whisper by `Storable.isLockedFUBag`) forgets it, locked or not. */
   get whisper(): WhisperHolder | LockedBag | null {
@@ -105,20 +105,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   /** Seal this whisper, `{ val }`, with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
   seal(whisper: WhisperHolder, sidecar: Sidecar, opts: EditOpts = {}): Promise<this> { return this.edit({ whisper, sidecar }, opts) }
 
-  /** {@link Storable.edit}, for a patch that names both the whisper, as `{ val }`, and the sidecar: every update of a box seals the whisper it is given with the sidecar it is given, and carries neither over from the record in hand. An exposed whisper is no substitute for the one given. `send` and `seal` come through here.
-   * The patch is held to `boxPatch` before anything else, its opts and every guard after it: a
-   * patch missing either half, or whose whisper is not `{ val }` with `val` a whisper, or whose
-   * sidecar fails its check, refuses 'bad_option', naming the field. The other props of the box's
-   * record may ride along, and are checked and ignored; a scope field that names another box
-   * refuses 'bad_option', naming it.
-   */
-  override async edit(patch: BoxPatch, opts: EditOpts = {}): Promise<this> {
-    const given = boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice })
-    const { whisper, sidecar } = verifyConsistent(given, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherBox })
-    await super.edit({ whisper, sidecar }, opts)
-    return this
-  }
-
   /** Not yet: decipher the whisper under the boxKey, unwrapped through the vault's lease, parse it, and hold it to {@link whisperHolder}: the seal ciphers the whole object, `{ val }`, as JSON. */
   #unseal(): Promise<WhisperHolder> {
     this.demandFull()
@@ -126,10 +112,20 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   }
   // --
 
-  // == [Required by Storable]: isFullRecord, makeStaged, makeSnapshot
+  // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
 
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {
     return 'whisper_ciphered' in fetched
+  }
+
+  /** Returns for a full patch of this box, and refuses any other 'bad_option', naming the field; `edit`, so `send` and `seal`, calls it first of all, before any guard. Every update of a box seals the whisper it is given, as `{ val }`, with the sidecar it is given, and carries neither over from the record in hand; an exposed whisper is no substitute for the one given.
+   * The patch is held to `boxPatch`: a patch missing either half, or whose whisper is not `{ val }`
+   * with `val` a whisper, or whose sidecar fails its check, is not full. The other props of the
+   * box's record may ride along, so `{ ...record, whisper, sidecar }` will do; each is checked,
+   * and `makeStaged` takes none of them. A scope field that names another box refuses, naming it.
+   */
+  protected isFullPatch(patch: unknown): asserts patch is BoxPatch {
+    verifyConsistent(boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
   /** The patch's whisper, sealed by {@link stubSeal} with the patch's sidecar under `base`'s props: `base`, sparse or full, lends its scope, revision, times and whisper's form, and none of its sidecar or sealed parts. */

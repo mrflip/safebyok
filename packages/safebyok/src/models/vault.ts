@@ -1,10 +1,12 @@
+import { verifyConsistent } from '../checks/validator'
+import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
-import type { LockState, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import { type LockState, type TimelyOpts, type VaultRecord, type VaultSparse, vaultPatch } from './models-shapes'
 import { Storable } from './storable'
 
-// == [Record forms]: VaultSnapshot, VaultProps
+// == [Record forms]: VaultSnapshot, VaultProps, VaultPatch
 
 export type VaultSnapshot = VaultScope & Readonly<{
   vault_tok:     string
@@ -17,6 +19,9 @@ export type VaultSnapshot = VaultScope & Readonly<{
 
 /** The patch a host hands `edit` and `send`: nothing yet, so either one only moves the revision, and a draft's `send` stores it. Not yet: a change to the gate, the vault's one payload. */
 export type VaultProps = Readonly<Record<string, never>>
+
+/** What a host hands `edit` and `send`: the {@link VaultProps}, and any prop of the vault's record, which the vault controls and ignores, so `{ ...record }` will do. `vaultPatch` checks it. */
+export type VaultPatch = VaultProps & { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | undefined }
 // --
 
 // == [Vault]
@@ -28,7 +33,7 @@ export type VaultProps = Readonly<Record<string, never>>
  * proof. A vault deleted or damaged is not edited back to life, as a box is: a new life is a new
  * `vault_tok`, so a new instance, built by the listing.
  */
-export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultProps, VaultSnapshot> implements BoxWorld {
+export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultPatch, VaultSnapshot> implements BoxWorld {
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
   declare readonly user_id:    string
@@ -72,11 +77,16 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Required by Storable]: isFullRecord, makeStaged, makeSnapshot
+  // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
 
   /** Every vault record is full until the gate exists. */
   protected isFullRecord(_fetched: VaultSparse): _fetched is VaultRecord {
     return true
+  }
+
+  /** Returns for a full patch of this vault, and refuses any other 'bad_option', naming the field; `edit`, so `send`, calls it first of all, before any guard. Until the gate exists, every patch held to `vaultPatch` is full: `{}`, or the props of the vault's record, each checked and ignored. A scope field that names another vault refuses, naming it. */
+  protected isFullPatch(patch: unknown): asserts patch is VaultPatch {
+    verifyConsistent(vaultPatch.parse(patch), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
   /** The record in hand under its next revision is the whole staged record. Not yet: the gate a patch would change. */

@@ -322,7 +322,7 @@ export type BoxDnaFilled = Z.output<typeof boxDna>
 export type BoxPatchGiven = Z.output<typeof boxPatch>
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, VaultRecord, VaultSparse
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const VaultFormat = 6001
@@ -336,6 +336,14 @@ export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, 
   const vaultRecord = vaultSparse.strict()
   return { vaultRecord, vaultSparse }
 }, [FX])
+
+/** The check of a vault's patch, refusing 'bad_option', naming the field: nothing yet, so `{}`, and any prop of the vault's record, which the vault controls and ignores, so `{ ...record }` will do; each is checked, and one no vault record has refuses. Its output is the props given, for the vault to hold its scope fields to its own.
+ * Not yet: the gate, the one payload a vault's patch will carry.
+ * @example vaultPatch.parse({})                          // {}
+ * @example vaultPatch.parse({ ...record })               // the record's props, as given
+ * @example vaultPatch.parse({ gate: {} })                // throws 'bad_option', naming gate
+ */
+export const vaultPatch = Checker(() => vaultRecord.partial().strict(), 'bad_option')
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>

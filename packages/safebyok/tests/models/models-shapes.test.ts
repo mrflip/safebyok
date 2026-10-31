@@ -788,3 +788,23 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
     })
   })
 })
+
+describe("MSX.vaultPatch: the duckish of a vault's patch, which Vault.isFullPatch holds it to", () => {
+  const { boxlabel: _boxlabel, ...vaultscope } = scope
+  const record = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps }
+
+  holdsCases(MSX.vaultPatch, 'bad_option', [
+    [{},                                       true,  'passes an empty patch, as its first example shows'],
+    [record,                                   true,  'passes the vault record given back, as its second example shows'],
+    [{ revision_seq: 99, am: 'x' },            true,  'passes the factory props, whatever they say'],
+    [{ gate: {} },                             false, 'refuses a field no vault record has, as its third example shows'],
+    [{ ...record, revision_seq: 'one' },       false, 'refuses a factory prop that fails its check'],
+    [{ ...record, vaultlabel: 'V' },           false, 'refuses a scope field that fails its check'],
+    [undefined,                                false, 'refuses undefined'],
+  ])
+
+  it("hands back the props as given, for the vault to hold its scope fields to its own, and names the failing field", () => {
+    expect(MSX.vaultPatch.parse(record)).to.deep.equal(record)
+    expect(TH.expectSyncRefusal(() => MSX.vaultPatch.parse({ revision_seq: 'one' }), 'bad_option').meta?.fieldnames).to.deep.equal(['revision_seq'])
+  })
+})

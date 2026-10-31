@@ -255,8 +255,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Lay `patch` over the record in hand under the next revision, alive, through the concrete class's `makeStaged`; reconcile the result in as the staged; settle. Central is untouched; nothing is stored. On a thing gone or damaged, this is its rebirth: the record made is alive over its tombstone's sparse props, registered now. Once past its guards it completes, whether or not the vault locks meanwhile; but a central that moves while `makeStaged` runs refuses 'stale_write', staging nothing, as the record made was laid over one storage no longer holds; the refusal carries that central as a 'stale_write' from storage carries what it holds (`meta.box_stored` for a box). `opts` are checked first, before any guard; `patch` is the concrete class's to check, which its override does before calling here. */
+  /** Lay `patch` over the record in hand under the next revision, alive, through the concrete class's `makeStaged`; reconcile the result in as the staged; settle. Central is untouched; nothing is stored. On a thing gone or damaged, this is its rebirth: the record made is alive over its tombstone's sparse props, registered now. Once past its guards it completes, whether or not the vault locks meanwhile; but a central that moves while `makeStaged` runs refuses 'stale_write', staging nothing, as the record made was laid over one storage no longer holds; the refusal carries that central as a 'stale_write' from storage carries what it holds (`meta.box_stored` for a box). `patch`, through the concrete class's `isFullPatch`, then `opts`, are checked first of all, before any guard, each refusing 'bad_option' and naming the field. */
   async edit(patch: PatchT, opts: EditOpts = {}): Promise<this> {
+    this.isFullPatch(patch)
     const timely = MSX.timelyOpts.parse(opts)
     await this.ensureReadyToEdit(timely)
     const ante = this.#central
@@ -495,9 +496,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get #holdsWhole(): boolean { return this.isWholeRecord(this.combined) }
   // --
 
-  // == [Concrete Subclass Required Methods]: isFullRecord, makeStaged, makeSnapshot
+  // == [Concrete Subclass Required Methods]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
 
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
+  /** The check `edit` (so `send`) makes of its patch first of all, before any guard: it returns for a full patch, one `makeStaged` can lay over the record in hand, and refuses any other 'bad_option', naming the field, through the concrete class's Checker. It returns nothing: `makeStaged` is handed the patch as given, and takes from it only what it lays over the record, so a field the check allows and ignores goes no further. */
+  protected abstract isFullPatch(patch: unknown): asserts patch is PatchT
   /** The step of `edit` only the concrete class can take: `base` is the record in hand, sparse or full, under its next revision; lay the patch over it and seal what needs sealing. The record it returns is held as the staged, full. */
   protected abstract makeStaged(base: SparseT, patch: PatchT, opts: EditOpts): Promise<RecordT>
   protected abstract makeSnapshot(): SnapshotT
