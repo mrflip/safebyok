@@ -1,12 +1,12 @@
 # Thread 2: vault_unlock (2026-10-31)
 
-Branch `20261031-vault_unlock`, PR #412, stacked on #410. Justify: green (safebyok 4555 passed, 37 skipped; every package green).
+Branch `20261031-vault_unlock`, PR #412, stacked on #410. Justify: green (safebyok 4559 passed, 37 skipped; every package green), after the rework below.
 
 * **Built**:
   * `Proving.attempt(stamp, gate, proofClosure, world)` (proving.ts): the proving of the stored wayin the proof opens. The passphrase's if one is handed, else the passkey's (`PassphraseProving.ofWayin`, `PasskeyProving.ofWayin`), then `#demandOpens` unwraps and drops the vaultKey. Refusals: `unknown_key_deriver` (label), `wrong_passkey` (no passkey wayin, other credential, other salt, or a wrap that will not open), `wrong_passphrase`, and `bad_option` for a proof handing neither (`attemptCleartexts`). `Gate.attemptProof(proofClosure, world)` calls it with the gate's stamp and pickle.
   * `makeWayin` refuses a second wayin of any proving (`unexpected_error`) and a source proving of another vault (`bad_option`). A proving of a stored wayin is born holding it.
   * `Gate.build` answers `{ gate, proving }`. `VaultListing.build(dna)` holds the vault, then `vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis }))`, so a vault is born unlocked.
-  * Vault (vault.ts, *Unlocking*): `isUnlocked`; `leaseMillis` (the world's, else `DefaultLeaseMillis`, 14 days); `ensureUnlocked(proofClosure?)`; `demandLease()` (`vault_locked`); `takeUpLease(lease)` (`bad_option` for another Vault object's); `takeUpKeptLease()`; `#unlock`, `#lookUpKept`, `#setLease`, `#dropLease`. The listing's `hello` takes up each vault's kept lease; its `goodbye` locks every vault.
+  * Vault (vault.ts, *Unlocking*): `isUnlocked`; `leaseMillis` (the world's, else `DefaultLeaseMillis`, 14 days); `ensureUnlocked(proofClosure?)`; `demandLease()` (`vault_locked`); `takeUpLease(lease)`; `takeUpKeptLease()`; `letLeaseGo()`; `#unlock`, `#unlockAlone`, `#unlockByProof`, `#lookUpKept`, `#setLease`, `#dropLease`. The listing's `hello` takes up each vault's kept lease; its `goodbye` lets every vault's lease go (see *Rework*).
   * Lease (lease.ts): `#vaultStamp` parsed once in the constructor (ruling 9). `#vaultKey` refuses `vault_locked` past `autolock_at` or once forgotten (ruling 2). A lease that will not open locks its vault, drops its record, erases it, and refuses `damaged_lease`. `Lease.get` answers null for a kept lease past `autolock_at` and erases it (ruling 3).
   * `PasskeyProving.make` parses inside its try/finally (`passkeyAnswer` refuses all-zero, spent bytes); `PassphraseProving.make` parses `passphraseMakeArgs` at entry; `spendAnswer`/`spendPrfBytes` swallow a throw, commented (ruling 4).
   * `Storable.demandedFull()`, used by `vault.gate` and `box.#unseal` (ruling 11). Every refusal sentence of the models comes from phrases.ts (ruling 10).
@@ -20,7 +20,7 @@ Branch `20261031-vault_unlock`, PR #412, stacked on #410. Justify: green (safeby
   * One wayin per proving: `makeWayin` refuses any second call, a superset of ruling 5's other-vault refusal.
   * `demandedFull` over `checkedFull`, as `demand*` is the house verb for "or refuse".
   * `takeUpLease` is public: the listing grants at birth and hands the lease over.
-  * The kept-lease lookup runs once per Vault object (`#keptLookup`), and not at all while the vault holds a lease in force. A Lease made of the vault's own kept record would arm a second autolock: an orphan that would lock the vault at the old `autolock_at` after a later re-grant.
+  * ~~The kept-lease lookup runs once per Vault object.~~ Replaced in the rework: see *Rework*.
   * The damaged-lease path is inlined in `#vaultKey`, not a `#dropDamaged` method, per the spec's "get rid of dropDamaged and just call this.vault.lock()". It still drops its own record too, for a lease the vault does not hold.
   * The changeset is `minor`: `DeviceDB.getLease`'s answer type and three new exports.
 
@@ -31,7 +31,9 @@ Branch `20261031-vault_unlock`, PR #412, stacked on #410. Justify: green (safeby
 * **Discoveries**:
   * `lock()` queues the lease's forget as a chore, so a Lease a caller took before `lock()` still seals until the chore lands. The vault itself reads locked at once. Pinned in loosened.test.ts against README.md:616. Thread 3's boxes should take `vault.demandLease()` per call and not keep it.
   * The Trigger's timer is real `setTimeout`. Each birth arms a one-hour timer, so test worlds must `goodbye` their listings (`useVaultWorlds`).
-  * `#setLease` does not dispose a prior lease it replaces; `ensureUnlocked` locks one past its time first, and `takeUpLease` is only called at birth.
+  * ~~`#setLease` does not dispose a prior lease it replaces.~~ It lets it go now (*Rework*).
+
+* **Rework** (after the review on PR #412): `DeviceDB`'s put side widened to `KeptLeaseRow`; `Lease.letGo()`; the kept lease looked for whenever none is held; `ensureUnlocked` joins an unlock by proof in flight; a displaced lease let go; `goodbye` lets go rather than locks; `takeUpLease` refuses another vault's lease and one not in force. The why and the approaches set aside are in [thread-2-vault_unlock-rework.md](thread-2-vault_unlock-rework.md): read it before touching `vault.ts`'s *Unlocking*.
 
 * **For the restack of thread 5 (PR #411, `20261031-tests_models`)**: these of its tests change meaning here.
   * gate.test.ts: `Gate.build` now answers `{ gate, proving }`.
@@ -42,6 +44,8 @@ Branch `20261031-vault_unlock`, PR #412, stacked on #410. Justify: green (safeby
   * I created no tests/models/{gate,lease,proving}.test.ts, to leave thread 5's files unconflicted.
 
 * **For the Coach**:
-  * The `DeviceDB.getLease` type change is public (minor): a host reading its answer as a `LeaseRecord` must narrow it.
+  * The `DeviceDB` lease types are public (minor): a host reading `getLease`'s answer as a `LeaseRecord` must narrow it; `putLease` takes any `KeptLeaseRow` and resolves it typed as handed.
+  * `takeUpLease` keeps the holder check beside the directed stamp check (the holder check implies the stamp for every Lease the models make): confirm, or drop one.
+  * idb.ts's `doPutLease` is still typed `LeaseRecord` (outside this thread's files; compiles by method bivariance): widen it in a later thread.
   * `ensureUnlocked()` without a closure refuses rather than prompting through the world: confirm, or name the world's prompt.
   * The spec edits sit on the 20261030-newvault spec as this branch has it; the base_planning branch has since rewritten its status markers (162c9c52), so the two will need merging by hand.
