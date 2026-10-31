@@ -144,6 +144,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
 
   async #lookUpKept(): Promise<Lease | null> {
+    // An erase a lock queued lands before this look, so a lease just locked is not taken up again.
+    await this.#leaseChores
     const kept = await Lease.tryGet(this, this.leaseDBFriend())
     if (! kept.ok) {
       this.listing.tellBadNews([kept.err])
@@ -188,7 +190,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     if (lease !== null) { this.#leaseChore(() => lease.forget()) }
   }
 
-  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlock` awaits the queue before granting, so an erase lands before the next put. */
+  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlock` awaits the queue before granting and `#lookUpKept` before looking, so an erase lands before the next put or get. */
   #leaseChore(work: () => Promise<void>): void {
     const prior = this.#leaseChores
     this.#leaseChores = (async () => {
