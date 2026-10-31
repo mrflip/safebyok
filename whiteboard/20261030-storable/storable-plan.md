@@ -606,7 +606,16 @@ as an edit to the rolled back data -- the customer can do so, we cannot". So: a 
 `box_behind` in `refusalKindVals`, beside `vault_behind`, with its family in
 `RefusalFamilyForKind` and an entry in the package README's *Errors* section; its message names
 the likely cause and says the customer, not the device, chooses among those three. The kind list
-is exported: the changeset says a host may now meet `box_behind`. Survey the other
+is exported: the changeset says a host may now meet `box_behind`.
+*Ruled too (the Coach, 2026-10-31), on #388's "carrying nothing":* "I think there's a missing
+record refusal. If you want to be friendly, report the conflicting staged/stored/expected
+revisions in meta". So the `Store` contract changes one cell: a put or del naming a `priorTok`
+over no row refuses the kind's absent refusal (the listing's `absentRefusal`: `absent_box` for a
+box), not `stale_write` carrying nothing; its `meta` carries the revision put, the revision
+stored (none) and the `priorTok` expected. The fake follows; the spec table's
+"`stale_write`, carrying nothing ❓" cell names it. A device holding central alive turns that
+refusal into `box_behind` (above); one holding a tombstone or nothing keeps today's behaviour,
+named in the thread file. The `StaleBoxMessage` mismatch on *Cleanup* goes with it. Survey the other
 paths where an older or absent answer meets a live central (a fetch's `get`, a notice) and what
 each does today; change none of them, list them in the thread file for the Coach. Worker `opus`;
 review `medium`. Depends on 18 (cut from its tip). Size: small to medium.
