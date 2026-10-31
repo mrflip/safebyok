@@ -117,7 +117,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   async build(input: Dna<ScopeT, RecordT> | Fetched<RecordT, SparseT>): Promise<ThingT> {
     if (hasRevision(input)) { return this.#buildOrReceive(this.scopeOf(input), { flavor: 'received', record: input }) }
-    const draft = await this.draftOf(this.stampDna(input))
+    return this.holdDraft(await this.draftOf(this.stampDna(input)))
+  }
+
+  /** Hold the instance of `draft`, the full record `draftOf` made of a dna, as `build` of a dna does: a concrete listing whose draft needs more than the dna calls it itself. */
+  protected holdDraft(draft: RecordT): ThingT {
     return this.#buildOrReceive(this.scopeOf(draft), { flavor: 'drafted', draft })
   }
 

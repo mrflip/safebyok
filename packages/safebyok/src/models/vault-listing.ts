@@ -2,23 +2,31 @@
 
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
+import { alreadyHeldError } from '../helpers/throwers'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
-import { Listing } from './listing'
-import { type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import type { VaultLogger } from '../logger'
+import { Listing, hasRevision } from './listing'
+import { Gate } from './gate'
+import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and the bank's scope. */
-export type VaultWorld = ListingWorld & { scope: BankScope }
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
+export type VaultWorld = ListingWorld & ProvingWorld & {
+  scope:       BankScope
+  logger:      VaultLogger
+  leaseMillis: LeaseGrantOpts['leaseMillis']
+  deviceDB:    LeaseDeviceDB
+}
 
-/** The vaultDB's vault verbs, as this listing calls them. Mapping the real VaultDB onto these is the later match-up. */
+/** The vaultDB's vault verbs, as this listing calls them. */
 export type VaultStore = Store<VaultScope, VaultRecord, VaultSparse>
 
-/** The device cache of this bank's vaults. */
 export type VaultCache = Cache<VaultRecord, VaultSparse>
 
-/** The dna of a vault: its scope. */
+/** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `build` makes from its `proofClosure`. */
 export type VaultDna = Dna<VaultScope, VaultRecord>
 
 export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse> & { world: VaultWorld }
@@ -32,7 +40,18 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   constructor(opts: VaultListingOpts) {
     super(opts)
+    MSX.vaultListingOpts.parse(opts)
     Object.freeze(this)
+  }
+
+  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing, and a dna for a scope already held refuses 'bad_option' before the closure is asked anything. */
+  override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
+    if (hasRevision(input)) {
+      if (proofClosure !== undefined) { throw closureWithRecord() }
+      return super.build(input)
+    }
+    if (this.at(input) !== null) { throw alreadyHeldError() }
+    return this.holdDraft(await this.draftOf(this.stampDna(input), proofClosure))
   }
 
   // == [Defined by the vault listing]
@@ -49,9 +68,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
-  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none. */
-  protected draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times): Promise<VaultRecord> {
-    return Promise.resolve({ ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() })
+  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and the gate {@link Gate.build} makes of that draft's stamp from what `proofClosure` answers; without one, refuses 'bad_option'. */
+  protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<VaultRecord> {
+    const checked = MSX.vaultBuildArgs.parse({ proofClosure })
+    const draft: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
+    const gate = await Gate.build(MSX.vaultStamp.parse(draft), checked.proofClosure, this.world)
+    return { ...draft, gate: gate.pickle() }
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, cache: Cache<VaultRecord, VaultSparse>): Vault {
@@ -70,4 +92,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 }
+// --
+
+// == [Refusals]: closureWithRecord
+
+const closureWithRecord = (): VaultError => new VaultError('bad_option', 'A vault built of a record takes no proofClosure: its gate is the one the record carries.')
 // --

@@ -1,4 +1,4 @@
-/** The shapes the models share, imported as `MSX`: the record forms a storable holds and reconciles, what storage answers, the bags reconciling passes, the world and listing a storable lives in, the options its verbs take, the arguments it is made with, the dna a box is built from, and the forms of the vault's stamp, its wayins, its gate, a proving and the lease.
+/** The shapes the models share, imported as `MSX`: each section banner names the forms it holds.
  * A type generic over a model's record cannot come from its validator, so it stays a type, with
  * the validator beside it: each check judges what the base can know of a record, its revision,
  * its times, its `am` and its `vault_tok`, and leaves the concrete class's validator the rest.
@@ -17,6 +17,7 @@ import type { CipherCtxRecord } from '../crypto'
 import * as VX from '../shapes/vault'
 import { isLeaseKey } from '../shapes/device'
 import type { Clock } from '../shapes/bank-opts'
+import type { VaultScope } from '../shapes/scopes'
 import { sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
 
@@ -332,33 +333,6 @@ export type BoxDnaFilled = Z.output<typeof boxDna>
 export type BoxPatchGiven = Z.output<typeof boxPatch>
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse
-
-/** The vault format these forms describe, as each record carries it in `fmt`. */
-export const VaultFormat = 6001
-
-/** The checks of a vault's forms, each refusing 'bad_record', from a record or from a vault ducking as one: `vaultSparse`, a plain copy of the scope and the base's fields, the rest stripped; `vaultRecord`, the same fields, strict, as a stored record is. The scope alone is `vaultScope` in shapes/scopes.
- * Not yet: the gate and its `gate_epoch`, the payload that will make the full record more than
- * the sparse one. Until then every vault record is full.
- */
-export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, applabel, user_id, vaultlabel }) => {
-  const vaultSparse = obj({ applabel, user_id, vaultlabel, fmt: lit(VaultFormat), ...sparseBase.shape })
-  const vaultRecord = vaultSparse.strict()
-  return { vaultRecord, vaultSparse }
-}, [FX])
-
-/** The check of a vault's patch, refusing 'bad_option', naming the field: nothing yet, so `{}`, and any prop of the vault's record, which the vault controls and ignores, so `{ ...record }` will do; each is checked, and one no vault record has refuses. Its output is the props given, for the vault to hold its scope fields to its own.
- * Not yet: the gate, the one payload a vault's patch will carry.
- * @example vaultPatch.parse({})                          // {}
- * @example vaultPatch.parse({ ...record })               // the record's props, as given
- * @example vaultPatch.parse({ gate: {} })                // throws 'bad_option', naming gate
- */
-export const vaultPatch = Checker(() => vaultRecord.partial().strict(), 'bad_option')
-
-export type VaultSparse = Z.infer<typeof vaultSparse>
-export type VaultRecord = Z.infer<typeof vaultRecord>
-// --
-
 // == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
 
 /** The policies when sending a record to a place that already holds one: the one value, `replace`, the versioned replace (compare-and-swap) every put is, and the default. `fetch` is not implemented. */
@@ -408,7 +382,6 @@ export type FetchOpts = Z.infer<typeof fetchOpts>
 /** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional: `'replace'`, the default and only policy, the versioned replace. */
 export type SendOpts = Z.infer<typeof sendOpts>
 
-/** `edit`'s options: its {@link TimelyOpts}. */
 export type EditOpts = TimelyOpts
 
 /** The options a storable is made with, after its world, listing and records: its refresh horizon, and the trigger's `eagerFrac`. */
@@ -578,7 +551,29 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [What a proving is handed]: cleartexts, provingWorld, provingPairArgs, provingMakeArgs, Cleartexts, ProofClosure, ProvingWorld
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse
+
+/** The vault format these forms describe, as each record carries it in `fmt`. */
+export const VaultFormat = 6001
+
+/** The checks of a vault's forms, each refusing 'bad_record', from a record or from a vault ducking as one: `vaultSparse`, a plain copy of the scope and the base's fields, the rest stripped; `vaultRecord`, those fields and the `gate`, its wayins as {@link gateProps} checks them, strict, as a stored record is. A vault record is never without its gate. The scope alone is `vaultScope` in shapes/scopes. */
+export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, applabel, user_id, vaultlabel }) => {
+  const vaultSparse = obj({ applabel, user_id, vaultlabel, fmt: lit(VaultFormat), ...sparseBase.shape })
+  const vaultRecord = vaultSparse.extend({ gate: gateProps }).strict()
+  return { vaultRecord, vaultSparse }
+}, [FX])
+
+/** The check of a vault's patch, refusing 'bad_option', naming the field: `{}`, or any prop of the vault's record, each checked, so `{ ...record }` will do; a field no vault record has refuses. The vault ignores every prop, its `gate` included: a patch only moves the revision. Its output is the props given, for the vault to hold its scope fields to its own.
+ * @example vaultPatch.parse({})                          // {}
+ * @example vaultPatch.parse({ ...record })               // the record's props, as given
+ */
+export const vaultPatch = Checker(() => vaultRecord.partial().strict(), 'bad_option')
+
+export type VaultSparse = Z.infer<typeof vaultSparse>
+export type VaultRecord = Z.infer<typeof vaultRecord>
+// --
+
+// == [What a proving is handed]: cleartexts, provingWorld, provingPairArgs, provingMakeArgs, vaultBuildArgs, Cleartexts, ProofClosure, ProvingWorld
 
 export const { cleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id }) => ({
   cleartexts:   obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
@@ -589,9 +584,11 @@ export type Cleartexts   = Z.input<typeof cleartexts>
 export type ProofClosure = () => Cleartexts | Promise<Cleartexts>
 export type ProvingWorld = Z.infer<typeof provingWorld>
 
-export const { provingPairArgs, provingMakeArgs } = Checkers('bad_option', ({ obj, fn }) => ({
-  provingPairArgs: obj({ vault: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
-  provingMakeArgs: obj({ vault: vaultStamp, world: provingWorld }),
+/** The arguments of the proving makers and of `VaultListing.build` of a dna: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
+export const { provingPairArgs, provingMakeArgs, vaultBuildArgs } = Checkers('bad_option', ({ obj, fn }) => ({
+  provingPairArgs: obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
+  provingMakeArgs: obj({ stamp: vaultStamp, world: provingWorld }),
+  vaultBuildArgs:  obj({ proofClosure: fn<ProofClosure>() }),
 }))
 // --
 
@@ -655,4 +652,21 @@ export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSea
     leaseUnsealArgs: obj({ sealed: sealedWhisper, boxKeyStamp: ctxStamp, whisperStamp: ctxStamp }),
   }
 }, [FX])
+// --
+
+// == [The vault's world]: leaseDeviceDB, vaultListingOpts, LeaseDeviceDB
+
+/** The deviceDB's lease verbs, as the vault's world carries them: each by the vault's scope, which `vault.leaseDBFriend()` binds, so no verb of the dbfriend takes one. */
+export const leaseDeviceDB = objCheck(({ fn }) => ({
+  tryGetLease: fn<(scope: VaultScope) => Promise<Outcome<LeaseRecord | null>>>(),
+  tryPutLease: fn<(record: LeaseRecord) => Promise<Outcome<LeaseRecord>>>(),
+  tryDelLease: fn<(scope: VaultScope) => Promise<Outcome<void>>>(),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+export type LeaseDeviceDB = Z.infer<typeof leaseDeviceDB>
+
+/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Its `parse` refuses 'bad_option'. Checks only. */
+export const vaultListingOpts = objCheck(({ obj }) => ({
+  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis, deviceDB: leaseDeviceDB }),
+}), { refuseAs: 'bad_option', extras: 'strip' })
 // --

@@ -1,7 +1,6 @@
 import { decorate, tattoo } from '../helpers'
-import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type WayinHeader, gateProps, vaultStamp } from './models-shapes'
+import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, gateProps, vaultStamp } from './models-shapes'
 import { NOVEL, Proving } from './proving'
-import type { Vault } from './vault'
 import { Wayin } from './wayin'
 
 // == [Gate]: build, novelWayins, pickle, toJSON
@@ -11,25 +10,27 @@ export class Gate {
   declare readonly passkey_wayin:    PasskeyWayinRecord | null
   declare readonly ppWayin:          Wayin
   declare readonly pkWayin:          Wayin | null
-  declare readonly vault:            Vault
+  declare readonly stamp:            VaultStamp
 
-  constructor(vault: Vault, props: unknown) {
-    vaultStamp.parse(vault)
+  /** The gate of the vault `stamp` names, its wayins as `props` pickles them. */
+  constructor(stamp: VaultStamp, props: unknown) {
+    const checked = vaultStamp.parse(stamp)
     const { passphrase_wayin, passkey_wayin } = gateProps.parse(props)
     const ppWayin = new Wayin(passphrase_wayin)
     const pkWayin = passkey_wayin === null ? null : new Wayin(passkey_wayin)
     tattoo(this, { passphrase_wayin: ppWayin.pickle(), passkey_wayin: pkWayin?.pickle() ?? null }, { writable: false })
-    decorate<Gate>(this, { ppWayin, pkWayin, vault })
+    decorate<Gate>(this, { ppWayin, pkWayin, stamp: checked })
     Object.freeze(this)
   }
 
-  static async build(vault: Vault, proofClosure: ProofClosure, world: ProvingWorld): Promise<Gate> {
-    const wayins = await Gate.#novelWayins(vault, proofClosure, world)
-    return new Gate(vault, { passphrase_wayin: wayins.passphrase.pickle(), passkey_wayin: wayins.passkey?.pickle() ?? null })
+  /** A novel gate for the vault `stamp` names, its wayins made from what `proofClosure` answers. */
+  static async build(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<Gate> {
+    const wayins = await Gate.#novelWayins(stamp, proofClosure, world)
+    return new Gate(stamp, { passphrase_wayin: wayins.passphrase.pickle(), passkey_wayin: wayins.passkey?.pickle() ?? null })
   }
 
-  static async #novelWayins(vault: Vault, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ passphrase: Wayin, passkey: Wayin | null }> {
-    const { passphraseProving, passkeyProving } = await Proving.makeProvingPair(vault, proofClosure, world)
+  static async #novelWayins(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ passphrase: Wayin, passkey: Wayin | null }> {
+    const { passphraseProving, passkeyProving } = await Proving.makeProvingPair(stamp, proofClosure, world)
     const passphrase = await passphraseProving.makeWayin(NOVEL)
     const passkey = passkeyProving === null ? null : await passkeyProving.makeWayin(passphraseProving)
     // not yet: passphraseProving.makeLease()

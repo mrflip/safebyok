@@ -1,0 +1,39 @@
+# Thread 1: gate_in_record (2026-10-31)
+
+Branch `20261031-gate_in_record`, PR #410, stacked on #408 (`20261031-newvault_models`). Base moved mid-thread: rebased onto 4ff14b4b before any commit of mine, recorded as `branch.20261031-gate_in_record.sprintbase`. Justify: green (safebyok 4529 passed, 37 skipped; every package green).
+
+* **Built**:
+  - `models-shapes.ts`: `vaultRecord` = `vaultSparse` + `gate: gateProps.nullable()` (nested, not flattened); the vault's forms moved below the gate's (TDZ). `vaultPatch` is `vaultRecord.partial().strict()`. `buildGateArgs` (`{ proofClosure }`). New section *The vault's world*: `leaseDeviceDB` (the three lease verbs by scope) and `vaultListingOpts` (checks the world's ProvingWorld, logger, leaseMillis, deviceDB).
+  - `vault-listing.ts`: `VaultWorld` = ListingWorld & ProvingWorld & `{ scope, logger, leaseMillis, deviceDB }`. `build(dna, proofClosure)`: drafts with `gate: null`, holds the vault, then `vault.buildGate(proofClosure)`. A record goes through the base's `build` untouched.
+  - `vault.ts`: `get gate()` (lazy, cached by the identity of `full.gate`), `buildGate(proofClosure)` (Gate.build, then `edit({ gate: gate.pickle() })`), `leaseDBFriend()` (arrow functions over `world.deviceDB` and `this.scope`), `demandReadyToEdit` now demands a full record, new `demandReadyToSend` refuses a gateless vault; `isFullRecord` asks `'gate' in fetched`; `makeStaged` carries the gate. Refusals `gateAlreadyBuilt`, `notGatedYet` (both `bad_option`).
+  - Tests: `tests/models/vault.test.ts` (new, 5), `models-shapes.test.ts` (vaultRecord/vaultSparse gate; vaultPatch cases).
+  - Spec *Terms*: ground rules 1 and 2; the gate's birth, `vault.gate` and the vault's world marked built. The `gate_props` note left as it was.
+* **Decisions taken**:
+  - **Nested `gate`, nullable.** The vault must exist before `Gate.build(vault, ...)`, and `draftOf` must answer a full record, so a drafted vault holds `gate: null` until `buildGate`. `send` refuses it then.
+  - **The vault edits its gate in after birth** (`vault.buildGate`), not Gate-before-vault: Gate.build needs a Vault, and a failed closure leaves a held, gateless vault that `buildGate` can retry (a second `build(dna)` would refuse it as already held).
+  - **The patch's gate is taken only where the vault has none.** A host's stale `{ ...record }` patch can never revert a gate; later gate changes are the gate verbs' (thread 2/3).
+  - **`#gate` built lazily in the getter**, not in `settle`: the Storable constructor settles before the subclass's private fields exist.
+  - `leaseMillis` pulled forward into `VaultWorld` (thread 2 needs it for `Lease.grant`); declare it struck from thread 2.
+* **Deviations**: two guards added (`edit` demands full, `send` demands a gate). Without the first, an edit over a sparse record stages `gate: null` and the next send wipes the gate; without the second, a gateless vault reaches storage. Rule 6 bars consistency checks coming back; these are shape guards, but the Coach may rule otherwise.
+* **Discoveries**:
+  - Confirmed by `rg` over `models/`: storage is written only by `listing.put`/`del` and storable's `cache.save` of vault and box records; `lease.ts` writes only the lease. A wayin or gate reaches storage only inside the vault record (and its device-cache copy). Proving, Gate and Wayin write nothing.
+  - `vault.gate` is a prototype getter, so ducking a Vault as its record fails `vaultRecord` (no own `gate`); ducking it as sparse is fine. Nothing does the former today.
+  - `vaultListingOpts` does not check `world.scope` (the listing's base owns it).
+* **Set aside**: a host-patchable gate (revert hazard); a private slot or symbol key for the gate's first write (hacky beside `edit`); building the gate before the vault (Gate.build takes a Vault); a flattened gate (the Coach's later `gate_props` note will reshape it anyway).
+* **For the Coach**: the two guards above; `gate: null` as a stored-record value that is never stored (send refuses it).
+
+## Rework (2026-10-31): the gate is never null
+
+Directive: the reviewer found `edit({ gate })` on a draft stored unproved wayins, and the Coach ruled the gate is built before the record is born. Everything above describing `gate: null`, `buildGate`, the two guards and a patch's gate being taken is superseded here.
+
+* **Built**:
+  - `models-shapes.ts`: `vaultRecord.gate: GateProps` required; `vaultSparse` without one; `vaultPatch` unchanged in shape, its gate ignored like every prop. `buildGateArgs` is now `vaultBuildArgs`; `provingPairArgs`/`provingMakeArgs` take `stamp: vaultStamp` (was `vault`).
+  - `listing.ts`: `protected holdDraft(draft)` holds a draft the way `build` of a dna does; the base `build` uses it. (`#buildOrReceive` is private, and the vault's draft needs the closure.)
+  - `vault-listing.ts`: `build(dna, proofClosure)` is `holdDraft(await draftOf(stampDna(dna), proofClosure))`; `draftOf` drafts the sparse record, `Gate.build(vaultStamp.parse(draft), proofClosure, world)`, answers `{ ...draft, gate: gate.pickle() }`. A refused closure holds nothing; `build(record)` with a closure still refuses (`closureWithRecord`).
+  - `gate.ts`, `proving.ts`: `Gate.build(stamp, …)`, `new Gate(stamp, props)`, `makeProvingPair(stamp, …)`, `PassphraseProving.make(stamp, …)`, `PasskeyProving.make(stamp, …)`; adorned `stamp` (parsed) replaces `vault`; `#wayinCtx` uses it. `Proving.makeLease(vault, dbfriend, opts)` takes the `LeaseVault` now and refuses `'bad_option'` (`leaseOfOtherVault`) where `vaultStamp.parse(vault)` is not `consistent` with the proving's stamp, before any key is unwrapped.
+  - `vault.ts`: `buildGate`, `VaultProps`, `demandReadyToSend`, `gateAlreadyBuilt`, `notGatedYet` gone. `get gate(): Gate` never null: a sparse record or tombstone in hand throws `notFullError()` ('bad_option', RecordNotFull). `makeStaged()` takes no patch and carries `this.#demandedFull().gate`, with a `// not yet:` line where thread 4's gate verbs will stage a new gate through a private path. `ensureReadyToEdit` fetches the full record when `!isFull` (hydrate alone will not within `MinRefreshMillis` of the last success); `demandReadyToEdit` only demands presence.
+  - Tests: `vault.test.ts` rewritten (12): gate at birth and `gate.stamp`; no closure / throwing closure hold nothing; `build(record)` holds the gate as given and refuses a closure; sparse `vault.gate` refuses until `hydrate`; an edit over a sparse record keeps the gate; a newer sparse record taken via `takeWorld` keeps *their* gate; a patch's gate ignored by `edit` and `send`; `makeLease` grants the matching vault and refuses another stamp without touching `tryPutLease`; `leaseDBFriend`. `models-shapes.test.ts`: required gate.
+  - Spec: the *Vault* section's `_Built_` and `vault.gate` bullets only. The *Gate* section still says `build(vaultRecord, …)` / adorned `vault`: left for the orchestrator, as the directive confined me to those two bullets.
+* **Decisions taken**: `holdDraft` in the base rather than re-stamping through `super.build({ ...dna, vault_tok, gate })` (which would re-mint `vault_tok`/`registered_at` and desync the gate's stamp), a per-build stashed closure, or generics for the draft's extra args. `vault.gate` throws RecordNotFull rather than answering null, so the type stays `Gate`. `ensureReadyToEdit`'s fetch replaces the old "edit demands full" guard: the sparse case is handled, not refused.
+* **Open**: whether `ensureReadyToEdit` fetching when not full is a consistency check rule 6 bars (I read it as the edit's own need: it cannot stage a gate it does not hold); whether `vault.gate` throwing on a sparse record is the right surface for thread 2's `tryUnlock` (it can `hydrate()` first).
+* **Thread 5 restack**: every call that bound a vault now binds a stamp, or takes the vault at the lease; the call sites on `20261031-tests_models` are listed in [thread-1-restack-notes.md](thread-1-restack-notes.md).

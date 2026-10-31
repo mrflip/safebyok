@@ -26,6 +26,9 @@ consistency and timeliness checks. These will come back later.
   - draft sparse vault record
   - gate = Gate.build()
   - make vault object
+* _Built:_ `vaultListing.build(dna, proofClosure)` drafts the sparse record, builds the gate from the draft's stamp, `Gate.build(vaultStamp.parse(draft), proofClosure, world)`, and holds the vault with `{ ...draft, gate: gate.pickle() }`. Where the closure or the gate is refused, nothing is held, and `build` may be called again. `Gate` and `Proving` bind the `VaultStamp`, not the vault; `proving.makeLease(vault, dbfriend, opts)` takes the vault at the grant and refuses 'bad_option' one of another stamp.
+* `vault.gate`: the `Gate` of the record in hand, made from its `gate` on first read and again when that changes; never null: a vault held sparse, or a tombstone, has none in hand and refuses 'bad_option' (hydrate first). The gate is stored with the vault record and nowhere else: no wayin table, no write of a wayin or gate in `models/` but the vault listing's put of the vault record (and the device cache's copy of it).
+* the vault's world (`VaultWorld`): a `ListingWorld`, a `ProvingWorld` (`clock`, `keyDeriver`, `device_id`), `scope`, `logger`, `leaseMillis`, and `deviceDB`, the three lease verbs by scope; `vaultListingOpts` checks them. `vault.leaseDBFriend()` binds the verbs to the vault's scope. _Built._
 * Bank.buildVault() vaultListing.build, vault.send
 
 ### Gate
@@ -93,6 +96,8 @@ Each friend gets logger and scope
 * checkers and the types made from them live in `models-shapes.ts`; a model file is code
 * the vault's stamp: scope, `vault_tok`, `registered_at` (`vaultStamp`); no `format`, so a new vault format leaves wayins and leases open
 * VaultRecord: vaultRecord.gate_props (also own props of vault), not vaultRecord.gate
+* Only `Proving` and `Lease` touch cryptography. They alone import a key maker, `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes` or `decipherBytes`. An unwrapped key, a handle included, never leaves a local variable: no field, no return, no argument across a class boundary. The two exceptions are by design: the vaultKey moves proving to proving inside `Proving` (`makeWayin(source)`), and `Proving.makeLease` hands it to `Lease.grant` as an argument. `Gate`, `Vault`, `Box` and the listings hold no key, ever. (The Coach, 2026-10-31; guarantees G3, G5, G9.)
+* A ctx is built once, by its owner, in one small function. No helper that takes a purpose and a method name and walks a chain; never pass a function or method name around to be invoked on another instance.
 
 ### Remove
 
