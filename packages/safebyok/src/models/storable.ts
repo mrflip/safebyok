@@ -216,13 +216,20 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: demandUnlocked, demandPresent, demandFull, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToSend, demandReadyToSend, ensureReadyToDel, demandReadyToDel
+  // == [Guards]: demandUnlocked, demandPresent, demandFull, demandedFull, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToSend, demandReadyToSend, ensureReadyToDel, demandReadyToDel
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
   demandPresent():  this { if (! this.isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
 
   demandFull():     this { if (! this.isFull)    { throw notFullError() }                              return this }
+
+  /** The full record in hand; a sparse one or a tombstone refuses 'bad_option'. */
+  protected demandedFull(): RecordT {
+    const { full } = this
+    if (full === null) { throw notFullError() }
+    return full
+  }
 
   /** A fetch needs only the world timely: it takes no lock, and may find the thing gone. */
   async ensureReadyToFetch(opts: TimelyOpts = {}): Promise<this> {

@@ -13,11 +13,12 @@ consistency and timeliness checks. These will come back later.
 * isLocked()
 * lock()
 * ensureUnlocked(): ensureTimely; if unlocked, return lease; otherwise, #unlock()
+* _Built (thread 2):_ `ensureUnlocked(proofClosure?)` answers the lease in force; one held past its time locks first. `#unlock()` joins an unlock by proof in flight (`#unlocking`), else takes up the kept lease where one is in force (looked for whenever no lease is held, after `#leaseChores`; `#keptLookup` joins a look in flight), else hydrates a sparse vault, `this.gate.attemptProof(proofClosure, world)`, awaits `#leaseChores`, and `#setLease(await proving.makeLease(this, this.leaseDBFriend(), { leaseMillis }))`. No closure, no unlock in flight and no kept lease refuses 'vault_locked'. `leaseMillis` is the world's, default 14 days. `demandLease()` refuses 'vault_locked'; `takeUpLease(lease)` refuses 'bad_option' a lease of another vault or Vault object, and 'vault_locked' one not in force. `#setLease` lets a displaced lease go (`lease.letGo()`: autolock disposed, keys dropped, kept record left); a declined kept lease is let go too. The listing's `hello` takes up each vault's kept lease; its `goodbye` lets every vault's lease go and leaves the kept lease for the next load, where `lock()` erases it.
 * lock(), synchronous: sets `#isLocked`, drops `#lease`, and queues `lease.forget()` (its keys dropped, its record erased from the deviceDB) on `#leaseChores`, a private promise chain whose refusals are told as bad news. `#unlock` will await the chain before granting, so an erase lands before the next put. _Built._
-* #unlock(): proving = this.gate.attemptProof(); lease = proving.grantLease(); #setLease(lease)
-* demandUnlocked, isUnlocked: this.isTimely && (!! lease)
-* #dropLease, #setLease,
-* autolock         Trigger
+* #unlock(): proving = this.gate.attemptProof(); lease = proving.makeLease(); #setLease(lease). _Built (thread 2)._
+* demandUnlocked, isUnlocked: this.isTimely && (!! lease). _Built (thread 2)_ as `isUnlocked` and `demandLease()`; no timeliness check.
+* #dropLease, #setLease. _Built (thread 2)._
+* autolock         Trigger. _Built (thread 2)_, on the lease: reset at every grant.
 * passphrasePester Trigger
 
 * revokePasskey(), replacePassphrase, addPasskey, ???
@@ -35,13 +36,13 @@ consistency and timeliness checks. These will come back later.
 
 My picture is that there's a
 
-* build(vaultRecord, proofClosure):
+* build(stamp, proofClosure, world):
   - prompt for #novelProvings (passphraseProving and optional passkeyProving)
   - make wayins: `passphraseProving.makeWayin(NOVEL)`, then `passkeyProving.makeWayin(passphraseProving)`
-  - make the lease: `passphraseProving.makeLease(friend, opts)`
-  - make gate object
+  - make gate object, and answer `{ gate, proving }`: the passphrase proving beside the gate. The gate holds no proving; `VaultListing.build` grants the first lease, `proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis })`, once it holds the vault. _Built (thread 2)._
+* attemptProof(proofClosure, world): `Proving.attempt(this.stamp, this.pickle(), proofClosure, world)`. _Built (thread 2)._
 * props: `passphrase_wayin`, `passkey_wayin` (null without one): each wayin's pickle, as the vault record will store them
-* adorn'ed (hidden props): `ppWayin`, `pkWayin`, `vault`
+* adorn'ed (hidden props): `ppWayin`, `pkWayin`, `stamp` (the vault's stamp, parsed)
 * #novelProvings -- prompt user and get a proving pair
 *
 * revokePasskey(), replacePassphrase(), addPasskey()
@@ -59,6 +60,7 @@ Proving:
 * makeLease(friend, opts): `Lease.grant(vault, friend, vaultKey, opts)` from inside the proving. On every proving, not
   the passphrase's alone: a passkey unlock grants a lease too.
 * world: `{ clock, keyDeriver, device_id }` for now; `device_id` on the world is provisional.
+* static attempt(stamp, gate, proofClosure, world): the proving of the stored wayin the proof opens, the passphrase's where one is handed, else the passkey's; a label of another deriver refuses 'unknown_key_deriver', another credential or salt 'wrong_passkey', a wrap that will not open 'wrong_passphrase' or 'wrong_passkey'. One wayin per proving: a second `makeWayin`, or a source of another vault, refuses. _Built (thread 2)._
 
 ### Lease
 
@@ -68,6 +70,7 @@ Proving:
   (not yet on the Vault: the world carries no deviceDB)
 * grant(vault, dbfriend, vaultKey, opts): a put the deviceDB refuses is warned of, not thrown, as the deviceDB is a cache; forget() drops the keys and erases the record (`vault.lock()` queues it); isInForce
 * autolockTrigger: a Trigger (helpers/trigger.ts) scheduled at `autolock_at` (was `ask_passphrase_at`), whose launch is `vault.lock()`; disposed by forget(). The passphrase-pester trigger is the gate's, not the lease's.
+* _Built (thread 2):_ a lease past `autolock_at`, or forgotten, refuses 'vault_locked' from `#vaultKey`; `Lease.get` answers null for a kept lease past `autolock_at` and erases its record; a lease that will not open is dropped, locks its vault, erases its record, and refuses 'damaged_lease'.
 * sealWith(serializedWhisper, boxKeyStamp, whisperStamp), unsealWith(sealed, boxKeyStamp, whisperStamp): the box hands in its two stamps, flat bags of its own fields; the lease binds each under the vault's stamp and its own purpose (`box_key_wrapped`, `whisper_ciphered`). No wrapKey/unwrapKey: a key handle never leaves the lease, and the purposes never leave it either (the Coach, 2026-10-31)
 
 * rename methods: `#tryVaultKey/#vaultKey` instead of vaultKeyOrNull.

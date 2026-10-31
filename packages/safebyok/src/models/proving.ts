@@ -3,9 +3,11 @@ import { PassphraseKeyBytes } from '../consts'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
 import { VaultError } from '../errors'
 import { adorn } from '../helpers'
-import type * as VX from '../shapes/vault'
+import { outcomeOf, valOf } from '../outcome'
+import * as Phrases from '../phrases'
+import * as VX from '../shapes/vault'
 import { Lease } from './lease'
-import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseVault, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, type WayinKind, cleartexts, passkeyWayinHeader, passphraseWayinHeader, provingMakeArgs, provingPairArgs, vaultStamp } from './models-shapes'
+import { type AttemptClosure, type GateProps, type LeaseDBFriend, type LeaseGrantOpts, type LeaseVault, type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, type WayinKind, attemptCleartexts, cleartexts, passkeyWayinHeader, passkeyWayinRecord, passphraseMakeArgs, passphraseWayinHeader, passphraseWayinRecord, provingAttemptArgs, provingMakeArgs, provingPairArgs, vaultStamp } from './models-shapes'
 import { Wayin, wayinCtxOf } from './wayin'
 
 // == [NOVEL and the checks]: NOVEL, Novel, ProvingPair, RewrapUsage, Checks
@@ -18,13 +20,16 @@ export type ProvingPair = { passphraseProving: PassphraseProving, passkeyProving
 /** What the vaultKey is unwrapped as, inside a proving: extractable only so it can be wrapped again, and dropped when the method ends. */
 const RewrapUsage = Object.freeze({ extractable: true, usage: ['wrapKey'] as const })
 
+/** What the vaultKey is unwrapped as to prove a stored wayin opens: non-extractable, and dropped at once. */
+const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as const })
+
 /** Stays here: it names the class. */
 const Checks = Checkers('bad_option', ({ custom }) => ({
   wayinSource: custom<Novel | Proving>((val) => val === NOVEL || val instanceof Proving, 'Expected NOVEL or a proving'),
 }))
 // --
 
-// == [Proving]: makeProvingPair, makeWayin, makeLease, wrapVaultKey, unwrapVaultKey, toJSON
+// == [Proving]: makeProvingPair, attempt, makeWayin, makeLease, checkOpens, wrapVaultKey, unwrapVaultKey, toJSON
 
 export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   readonly wayinkind: HeaderT['wayinkind']
@@ -35,10 +40,12 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   readonly #wayinKey: CryptoKey
   #wayin: Wayin | null = null
 
-  protected constructor(stamp: VaultStamp, header: HeaderT, wayinKey: CryptoKey) {
+  /** A proving of a stored wayin is born holding it; a proving minted for a new wayin holds none until `makeWayin`. */
+  protected constructor(stamp: VaultStamp, header: HeaderT, wayinKey: CryptoKey, stored: Wayin | null = null) {
     this.wayinkind = header.wayinkind
     this.header = Object.freeze(header)
     this.#wayinKey = wayinKey
+    this.#wayin = stored
     adorn(this, 'stamp', stamp)
     Object.freeze(this)
   }
@@ -57,11 +64,27 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     }
   }
 
-  // not yet: attemptProof, unwrapping the vaultKey from a stored wayin
-  // not yet: resealing a wayin
+  /** The proving of the stored wayin of `gate` that what `proofClosure` answers opens: the passphrase's where it hands one, else the passkey's. A wayin that will not open refuses 'wrong_passphrase' or 'wrong_passkey'. */
+  static async attempt(stamp: VaultStamp, gate: GateProps, proofClosure: AttemptClosure, world: ProvingWorld): Promise<Proving> {
+    const { stamp: checked, gate: wayins } = provingAttemptArgs.parse({ stamp, gate, proofClosure, world })
+    const handed = await invokeProofClosure(proofClosure)
+    try {
+      const { passphrase, passkeyAnswer } = attemptCleartexts.parse(handed)
+      const proving: Proving = passphrase === undefined
+        ? await PasskeyProving.ofWayin(checked, wayins.passkey_wayin, passkeyAnswer)
+        : await PassphraseProving.ofWayin(checked, world, wayins.passphrase_wayin, passphrase)
+      await proving.#checkOpens()
+      return proving
+    } finally {
+      spendAnswer(handed)
+    }
+  }
 
+  /** The wayin this proving holds, made under a vaultKey new (`NOVEL`) or held by the `source` proving of the same vault. A proving holds one wayin: one that holds one already refuses. */
   async makeWayin(source: Novel | Proving): Promise<Wayin> {
+    if (this.#wayin !== null) { throw wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
+    if (checked !== NOVEL && ! consistent(checked.stamp, this.stamp)) { throw provingOfOtherVault() }
     const vaultKey = checked === NOVEL ? await makeVaultKey() : await checked.#unwrapVaultKey()
     return this.#wrapVaultKey(vaultKey)
   }
@@ -73,6 +96,14 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return Lease.grant(vault, dbfriend, vaultKey, opts)
   }
 
+  /** Unwrap the stored wayin's vaultKey and drop it: the ctx is built before the catch, so a refusal means only that the key did not open the wrap (guarantees.md, G3). */
+  async #checkOpens(): Promise<void> {
+    const wrongProof = this.wayinkind === 'passphrase' ? wrongPassphrase : wrongPasskey
+    const { vault_key_wayin_wrapped } = this.#demandWayin()
+    const ctx = this.#wayinCtx()
+    valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, vault_key_wayin_wrapped, ctx, CheckUsage), wrongProof))
+  }
+
   async #wrapVaultKey(vaultKey: CryptoKey): Promise<Wayin> {
     const vault_key_wayin_wrapped = await wrapKeyUnder(this.#wayinKey, vaultKey, this.#wayinCtx())
     this.#wayin = new Wayin({ ...this.header, vault_key_wayin_wrapped })
@@ -80,8 +111,12 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
 
   #unwrapVaultKey(): Promise<CryptoKey> {
+    return unwrapKeyUnder(this.#wayinKey, this.#demandWayin().vault_key_wayin_wrapped, this.#wayinCtx(), RewrapUsage)
+  }
+
+  #demandWayin(): Wayin {
     if (this.#wayin === null) { throw wayinNotMadeYet() }
-    return unwrapKeyUnder(this.#wayinKey, this.#wayin.vault_key_wayin_wrapped, this.#wayinCtx(), RewrapUsage)
+    return this.#wayin
   }
 
   #wayinCtx(): Uint8Array { return wayinCtxOf(this.stamp, this.header) }
@@ -90,35 +125,64 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 }
 // --
 
-// == [PassphraseProving]: make
+// == [PassphraseProving]: make, ofWayin
 
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   static async make(stamp: VaultStamp, world: ProvingWorld, passphrase: VX.PassphraseCleartext): Promise<PassphraseProving> {
-    const { stamp: checked } = provingMakeArgs.parse({ stamp, world })
+    const { stamp: checked, passphrase: typed } = passphraseMakeArgs.parse({ stamp, world, passphrase })
     const header = mintPassphraseHeader(world)
-    const passphraseKey = await passphraseKeyOf(world.keyDeriver, passphrase, fromB64(header.salt_b64))
+    const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
     return new PassphraseProving(checked, header, passphraseKey)
+  }
+
+  /** The proving of the stored passphrase wayin, its key derived over the wayin's own salt; one made under another key deriver refuses 'unknown_key_deriver'. Opening it is the caller's. */
+  static async ofWayin(stamp: VaultStamp, world: ProvingWorld, stored: PassphraseWayinRecord, passphrase: VX.PassphraseCleartext): Promise<PassphraseProving> {
+    const { stamp: checked, passphrase: typed } = passphraseMakeArgs.parse({ stamp, world, passphrase })
+    const wayin = new Wayin(stored)
+    const { vault_key_wayin_wrapped: _wrapped, ...header } = passphraseWayinRecordOf(wayin)
+    if (header.key_deriver_label !== world.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
+    const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
+    return new PassphraseProving(checked, header, passphraseKey, wayin)
   }
 }
 // --
 
-// == [PasskeyProving]: make
+// == [PasskeyProving]: make, ofWayin
 
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
-  static async make(stamp: VaultStamp, world: ProvingWorld, passkeyAnswer: VX.PasskeyAnswer): Promise<PasskeyProving> {
-    const { stamp: checked } = provingMakeArgs.parse({ stamp, world })
-    const header = mintPasskeyHeader(world, passkeyAnswer)
+  /** The answer is checked inside the try, so its bytes are zeroed whether it passes or not (G2). */
+  static async make(stamp: VaultStamp, world: ProvingWorld, passkeyAnswer: unknown): Promise<PasskeyProving> {
     try {
-      const passkeyKey = await deriveWrappingKey(passkeyAnswer.prfBytes, wayinCtxOf(checked, header))
+      const { stamp: checked } = provingMakeArgs.parse({ stamp, world })
+      const answer = VX.freshPasskeyAnswer.parse(passkeyAnswer)
+      const header = mintPasskeyHeader(world, answer)
+      const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checked, header))
       return new PasskeyProving(checked, header, passkeyKey)
     } finally {
-      passkeyAnswer.prfBytes.fill(0)
+      spendPrfBytes(passkeyAnswer)
+    }
+  }
+
+  /** The proving of the stored passkey wayin; an answer for another credential or salt, or a vault with no passkey wayin, refuses 'wrong_passkey'. Opening it is the caller's. */
+  static async ofWayin(stamp: VaultStamp, stored: PasskeyWayinRecord | null, passkeyAnswer: unknown): Promise<PasskeyProving> {
+    try {
+      if (stored === null) { throw noPasskeyWayin() }
+      const checked = vaultStamp.parse(stamp)
+      const answer = VX.passkeyAnswer.parse(passkeyAnswer)
+      const wayin = new Wayin(stored)
+      const { vault_key_wayin_wrapped: _wrapped, ...header } = passkeyWayinRecordOf(wayin)
+      if (answer.credential_id !== header.credential_id) { throw otherPasskey() }
+      if (answer.prf_salt_b64 !== header.prf_salt_b64) { throw otherPrfSalt() }
+      const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checked, header))
+      return new PasskeyProving(checked, header, passkeyKey, wayin)
+    } finally {
+      spendPrfBytes(passkeyAnswer)
     }
   }
 }
 // --
 
-// == [Headers]: mintPassphraseHeader, mintPasskeyHeader
+// == [Headers]: mintPassphraseHeader, mintPasskeyHeader, passphraseWayinRecordOf, passkeyWayinRecordOf
 
 const mintPassphraseHeader = ({ clock, keyDeriver, device_id }: ProvingWorld): PassphraseWayinHeader => passphraseWayinHeader.parse({
   wayinkind:         'passphrase',
@@ -135,12 +199,16 @@ const mintPasskeyHeader = ({ clock, device_id }: ProvingWorld, { credential_id, 
   device_id,
   registered_at: clock.now(),
 })
+
+const passphraseWayinRecordOf = (wayin: Wayin): PassphraseWayinRecord => passphraseWayinRecord.parse(wayin.pickle())
+
+const passkeyWayinRecordOf = (wayin: Wayin): PasskeyWayinRecord => passkeyWayinRecord.parse(wayin.pickle())
 // --
 
-// == [Host calls]: invokeProofClosure, deriveKeyBytes, spendAnswer
+// == [Host calls]: invokeProofClosure, deriveKeyBytes, spendAnswer, spendPrfBytes
 
 // The two host functions that hear the passphrase (guarantees.md, G1 and G8): what they throw may quote it, so it is replaced, not kept as a cause.
-const invokeProofClosure = async (proofClosure: ProofClosure): Promise<unknown> => {
+const invokeProofClosure = async (proofClosure: ProofClosure | AttemptClosure): Promise<unknown> => {
   try {
     return await proofClosure()
   } catch {
@@ -158,8 +226,19 @@ const deriveKeyBytes = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase
 
 /** Zero a passkey answer's PRF bytes wherever the closure's answer carries them, checked or not: an answer is single-use (G2). */
 const spendAnswer = (handed: unknown): void => {
-  const prfBytes: unknown = (handed as { passkeyAnswer?: { prfBytes?: unknown } | null } | null)?.passkeyAnswer?.prfBytes
-  if (prfBytes instanceof Uint8Array) { prfBytes.fill(0) }
+  // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the refusal or the proving it follows.
+  try {
+    spendPrfBytes((handed as { passkeyAnswer?: unknown } | null)?.passkeyAnswer)
+  } catch { /* nothing left to spend */ }
+}
+
+/** Zero a passkey answer's PRF bytes, checked or not. */
+const spendPrfBytes = (answer: unknown): void => {
+  // As in spendAnswer: the host's object may throw as it is reached into.
+  try {
+    const prfBytes: unknown = (answer as { prfBytes?: unknown } | null)?.prfBytes
+    if (prfBytes instanceof Uint8Array) { prfBytes.fill(0) }
+  } catch { /* nothing left to spend */ }
 }
 // --
 
@@ -182,15 +261,31 @@ const passphraseKeyOf = async (keyDeriver: ProvingWorld['keyDeriver'], passphras
 }
 // --
 
-// == [Refusals]: notKeyBytes, wayinNotMadeYet, leaseOfOtherVault, proofClosureThrew, keyDeriverThrew
+// == [Refusals]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, provingOfOtherVault, leaseOfOtherVault, proofClosureThrew, keyDeriverThrew, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
-const notKeyBytes = (): VaultError => new VaultError('bad_option', `The keyDeriver handed back something other than ${String(PassphraseKeyBytes)} fresh key bytes.`)
+const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
 
-const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', 'A proving was asked for the vaultKey before it made a wayin: a bug in the caller.')
+const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', Phrases.WayinNotMadeYet)
 
-const leaseOfOtherVault = (): VaultError => new VaultError('bad_option', 'This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds.')
+const wayinMadeAlready = (): VaultError => new VaultError('unexpected_error', Phrases.WayinMadeAlready)
 
-const proofClosureThrew = (): VaultError => new VaultError('unexpected_error', 'The proof closure threw rather than handing back a passphrase. What it threw is left out, as it heard the passphrase.')
+const provingOfOtherVault = (): VaultError => new VaultError('bad_option', Phrases.ProvingOfOtherVault)
 
-const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', 'The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase.')
+const leaseOfOtherVault = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherVault)
+
+const proofClosureThrew = (): VaultError => new VaultError('unexpected_error', Phrases.ProofClosureThrew)
+
+const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverThrew)
+
+const wrongPassphrase = (): VaultError => new VaultError('wrong_passphrase', Phrases.WrongPassphrase)
+
+const wrongPasskey = (): VaultError => new VaultError('wrong_passkey', Phrases.WrongPasskey)
+
+const noPasskeyWayin = (): VaultError => new VaultError('wrong_passkey', Phrases.NoPasskeyWayin)
+
+const otherPasskey = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPasskey)
+
+const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPrfSalt)
+
+const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_deriver', Phrases.UnknownKeyDeriver)
 // --

@@ -117,7 +117,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 
   /** Not yet: decipher the whisper under the boxKey, unwrapped through the vault's lease, parse it, and hold it to {@link whisperHolder}: the seal ciphers the whole object, `{ val }`, as JSON. */
   #unseal(): Promise<WhisperHolder> {
-    this.demandFull()
+    this.demandedFull()
     return Promise.reject(new VaultError('unexpected_error', 'unseal is not written yet.'))
   }
   // --

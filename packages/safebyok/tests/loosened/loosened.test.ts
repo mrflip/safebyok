@@ -5,8 +5,10 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { TestableBox, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { Dna, Passphrase, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 const held = useModelsWorld()
+useVaultWorlds()
 
 describe("the staged edit reconcileStaged drops or carries", () => {
   const CentralRev = { revision_seq: 2, revision_tok: 'rev-c2' }
@@ -102,6 +104,22 @@ describe("the tombstone's registered_at", () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     box.receive(tombstoneBoxRecord({ revision_seq: 2, registered_at: T0 + 3 }, 'd'))
     expect(box._cheat_central).to.deep.include({ am: 'd', revision_seq: 2, registered_at: T0 })
+  })
+})
+// --
+
+// == [Locking]: a lease handed out before lock()
+
+describe("a lease a caller holds across lock()", () => {
+  it("README.md:616, 'The key is dropped at once, and every call that needs it throws kind vault_locked': the vault reads locked at once, but a Lease taken from it before lock() seals until the forget lock() queued lands", async () => {
+    const { listing } = makeVaultWorld()
+    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const lease = vault.demandLease()
+    vault.lock()
+    expect(vault.isLocked).to.be.true
+    expect(lease.isInForce).to.be.true
+    const sealed = await lease.sealWith(new TextEncoder().encode('sk-test'), { boxlabel: 'b' }, { revision_seq: 1 })
+    expect(sealed.box_key_wrapped).to.be.ok
   })
 })
 // --

@@ -37,3 +37,11 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
   time); nothing queues the box calls. A store's expectation (`vault_tok`, `gate_epoch`, a box's
   `revision_tok`) prevents a lost update, not a reordering: a host that needs an order awaits each
   call before making the next.
+* 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused erase of a kept lease is not
+  retried.** `Lease.get` meeting a lease past its `autolock_at`, and a lease that proves damaged,
+  erase the deviceDB's record once (`tryDelLease`); a refusal is warned of and left. The record
+  is unusable either way, and the next grant writes over it.
+* 2026-10-31 (the Coach, newvault sprint, thread 2): **no autolock timer past the Trigger's cap.**
+  A lease whose `autolock_at` lies more than `MaxTimerMillis` (about 24.5 days) away arms no
+  timer, by design: it locks no vault on its own, but reads not in force, and refuses
+  `vault_locked`, once the clock passes its `autolock_at`.

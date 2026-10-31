@@ -319,3 +319,75 @@ export const AnswerOfOtherScope = "Storage answered for a scope other than the o
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
+
+// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+
+/** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
+export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
+
+/** Why a passphrase whose key does not open the vault's passphrase wayin is refused. */
+export const WrongPassphrase = "That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged."
+
+/** Why a passkey's answer whose key does not open the vault's passkey wayin is refused. */
+export const WrongPasskey = "That passkey answered, but its answer didn't unlock the vault: its stored way in may be damaged. Unlock with the passphrase; if that works, add the passkey again, which replaces it."
+
+/** Why a passkey's answer is refused by a vault that has no passkey wayin. */
+export const NoPasskeyWayin = "This vault has no passkey: it may have been removed on another device. Unlock with the passphrase."
+
+/** Why a passkey's answer for another credential than the vault's passkey wayin names is refused. */
+export const OtherPasskey = "That passkey is not this vault's: it may have been replaced or removed on another device, or belong to another vault. Ask the credential the vault's passkey wayin names."
+
+/** Why a passkey's answer over another PRF salt than the vault's passkey wayin keeps is refused. */
+export const OtherPrfSalt = "The passkey answered for a different salt than this vault keeps for it: ask it again with the prf_salt_b64 the vault's passkey wayin names."
+
+/** Why a passphrase wayin made under another key deriver than the world's is not tried. */
+export const UnknownKeyDeriver = "This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made."
+
+/** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
+export const notKeyBytes = (count: number): string => `The keyDeriver handed back something other than ${String(count)} fresh key bytes.`
+
+/** Why a proving asked for the vaultKey before it holds a wayin refuses: a bug. */
+export const WayinNotMadeYet = "A proving was asked for the vaultKey before it made or opened a wayin: a bug in the caller."
+
+/** Why a proving that holds a wayin already makes no other. */
+export const WayinMadeAlready = "This proving holds a wayin already, and a proving holds one: make a new proving for another wayin. A bug in the caller."
+
+/** Why a wayin is not made under the vaultKey of a proving of another vault. */
+export const ProvingOfOtherVault = "The source proving is of another vault: a wayin is made only under the vaultKey of the vault it lets into."
+
+/** Why a lease is not granted to a vault other than the one a proving is of. */
+export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds."
+
+/** Why a proof closure's throw is replaced: it heard the passphrase. */
+export const ProofClosureThrew = "The proof closure threw rather than handing back a passphrase. What it threw is left out, as it heard the passphrase."
+
+/** Why a keyDeriver's throw is replaced: it heard the passphrase. */
+export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
+// --
+
+// == [Models: leases and vaults]: DamagedLease, UnopenedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
+
+/** Why a lease that will not open locks its vault. */
+export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
+
+/** Why a whisper that will not open under the vault's key is refused. */
+export const UnopenedWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
+
+/** Why a lease past its autolock_at, or forgotten, opens nothing. */
+export const LeaseNotInForce = "This lease is no longer in force -- its time ran out, or it was forgotten when the vault locked -- so nothing was read or written: unlock the vault again."
+
+/** Why a call that needs the vault unlocked is refused while it is locked. */
+export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
+
+/** Why a locked vault with no lease kept is not unlocked without a proof. */
+export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
+
+/** Why a vault takes up no lease of another vault, or granted to another Vault object. */
+export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."
+
+/** Why a vault absent from storage is refused, by its vaultlabel. */
+export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
+
+/** Why a vault built of a record takes no proof closure. */
+export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."
+// --

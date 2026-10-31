@@ -1,5 +1,5 @@
 import type * as Z from 'zod'
-import { DeviceRecordFormat, type DeviceRecord, type LeaseRecord } from './shapes/device'
+import { DeviceRecordFormat, type DeviceRecord, type KeptLeaseRow } from './shapes/device'
 import * as DX from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import * as CX from './shapes/scopes'
@@ -9,7 +9,7 @@ import { type Outcome, outcomeOf } from './outcome'
 import { isStorageBlocked } from './refusals'
 
 /** Storage on this device for what it keeps of each vault: its lease, which survives a page reload, and its device record. Extend it, and implement its `do*` methods against your store.
- * Nothing here ever goes to the backend. A {@link LeaseRecord} holds a non-extractable leaseKey, a
+ * Nothing here ever goes to the backend. A {@link KeptLeaseRow} holds a non-extractable leaseKey, a
  * CryptoKey with no JSON form, so a store keeps records by structured clone or in memory, never as
  * JSON. `memoryDeviceDB` and `idbDeviceDB` (from `safebyok/idb`) are the two supplied; the README's
  * *Your own storage adapter* shows a third, and `describeDeviceDB` (from `safebyok/testing`) checks
@@ -46,29 +46,29 @@ export abstract class DeviceDB {
    *
    * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
    */
-  async getLease(scope: VaultScope): Promise<LeaseRecord | null> {
+  async getLease(scope: VaultScope): Promise<KeptLeaseRow | null> {
     const leaseScopepath = Scopepath.lease(scope)
     const raw = await storeAnswer('getLease', () => this.doGetLease(leaseScopepath))
-    return await this.#parseOrDel('getLease', DX.leaseRecord, leaseScopepath, raw)
+    return await this.#parseOrDel('getLease', DX.keptLeaseRow, leaseScopepath, raw)
   }
 
   /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
    *
    * @example await deviceDB.tryGetLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
    */
-  tryGetLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>> {
+  tryGetLease(scope: VaultScope): Promise<Outcome<KeptLeaseRow | null>> {
     return outcomeOf(() => this.getLease(scope))
   }
 
   /** Store `record` as the lease of its vault, in place of any before, resolving the record as stored. */
-  async putLease(record: LeaseRecord): Promise<LeaseRecord> {
+  async putLease<RowT extends KeptLeaseRow>(record: RowT): Promise<RowT> {
     const leaseScopepath = Scopepath.lease(record)
     await storeAnswer('putLease', () => this.doPutLease(leaseScopepath, record))
     return record
   }
 
   /** The lease as stored, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.putLease}. */
-  tryPutLease(record: LeaseRecord): Promise<Outcome<LeaseRecord>> {
+  tryPutLease<RowT extends KeptLeaseRow>(record: RowT): Promise<Outcome<RowT>> {
     return outcomeOf(() => this.putLease(record))
   }
 
@@ -166,7 +166,7 @@ export abstract class DeviceDB {
   /** Read the row under `leaseScopepath` exactly as stored, undefined or null for none. */
   protected abstract doGetLease(leaseScopepath: Scopepath.LeaseScopepath): Promise<unknown>
   /** Store `record` under `leaseScopepath`, in place of any row there. */
-  protected abstract doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: LeaseRecord): Promise<void>
+  protected abstract doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: KeptLeaseRow): Promise<void>
   /** Delete the row under `leaseScopepath`, if any. */
   protected abstract doDelLease(leaseScopepath: Scopepath.LeaseScopepath): Promise<void>
   /** Read the row under `deviceScopepath` exactly as stored, undefined or null for none. */
@@ -211,7 +211,7 @@ class MemoryDeviceDB extends DeviceDB {
     return Promise.resolve(this.#rows.get(leaseScopepath))
   }
 
-  protected doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: LeaseRecord): Promise<void> {
+  protected doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: KeptLeaseRow): Promise<void> {
     this.#rows.set(leaseScopepath, record)
     return Promise.resolve()
   }

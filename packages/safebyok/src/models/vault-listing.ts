@@ -3,10 +3,12 @@
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import { alreadyHeldError } from '../helpers/throwers'
+import * as Phrases from '../phrases'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
 import { Gate } from './gate'
+import type { PassphraseProving } from './proving'
 import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
@@ -17,7 +19,7 @@ import { type VaultSnapshot, Vault } from './vault'
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
-  leaseMillis: LeaseGrantOpts['leaseMillis']
+  leaseMillis?: LeaseGrantOpts['leaseMillis']
   deviceDB:    LeaseDeviceDB
 }
 
@@ -44,14 +46,29 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing, and a dna for a scope already held refuses 'bad_option' before the closure is asked anything. */
+  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing, and a dna for a scope already held refuses 'bad_option' before the closure is asked anything. A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
   override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
     if (hasRevision(input)) {
       if (proofClosure !== undefined) { throw closureWithRecord() }
       return super.build(input)
     }
     if (this.at(input) !== null) { throw alreadyHeldError() }
-    return this.holdDraft(await this.draftOf(this.stampDna(input), proofClosure))
+    const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
+    const vault = this.holdDraft(draft)
+    vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
+    return vault
+  }
+
+  /** Take up each vault's kept lease, as {@link Vault.takeUpKeptLease} does, once the base's `hello` has revived and hydrated them. */
+  override async hello(): Promise<void> {
+    await super.hello()
+    await Promise.all(this.things.map((vault) => vault.takeUpKeptLease()))
+  }
+
+  /** End the watch, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
+  override goodbye(): void {
+    super.goodbye()
+    for (const vault of this.things) { vault.letLeaseGo() }
   }
 
   // == [Defined by the vault listing]
@@ -70,10 +87,15 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and the gate {@link Gate.build} makes of that draft's stamp from what `proofClosure` answers; without one, refuses 'bad_option'. */
   protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<VaultRecord> {
+    const { draft } = await this.#draftWithProving(dna, proofClosure)
+    return draft
+  }
+
+  async #draftWithProving(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
     const checked = MSX.vaultBuildArgs.parse({ proofClosure })
-    const draft: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
-    const gate = await Gate.build(MSX.vaultStamp.parse(draft), checked.proofClosure, this.world)
-    return { ...draft, gate: gate.pickle() }
+    const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
+    const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.proofClosure, this.world)
+    return { draft: { ...sparse, gate: gate.pickle() }, proving }
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, cache: Cache<VaultRecord, VaultSparse>): Vault {
@@ -81,7 +103,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   absentRefusal(scope: VaultScope): VaultError {
-    return new VaultError('absent_vault', `No vault is stored under the label ${scope.vaultlabel}.`)
+    return new VaultError('absent_vault', Phrases.vaultAbsent(scope.vaultlabel))
   }
 
   /** The record `meta.vault_stored` carries, where it is a record of these forms; else null. */
@@ -96,5 +118,5 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
 // == [Refusals]: closureWithRecord
 
-const closureWithRecord = (): VaultError => new VaultError('bad_option', 'A vault built of a record takes no proofClosure: its gate is the one the record carries.')
+const closureWithRecord = (): VaultError => new VaultError('bad_option', Phrases.ClosureWithRecord)
 // --
