@@ -200,7 +200,7 @@ export const MovedUnderEdit = "Storage delivered a newer record while this edit 
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
 
 /** Why an update of a box given no whisper or no sidecar stages nothing. */
-export const WhisperAndSidecarRequired = "Every update of a box names both its whisper and its sidecar, and this one lacked one or both, so nothing was staged: give both, as { whisper, sidecar }. To keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar the sidecar."
+export const WhisperAndSidecarRequired = "Every update of a box names both its whisper and its sidecar, and this one lacked one or both, so nothing was staged: give both, as { whisper, sidecar }. To keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
 
 /** Why a record storage holds under the revision_seq held, but another revision_tok, is not taken in. */
 export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
