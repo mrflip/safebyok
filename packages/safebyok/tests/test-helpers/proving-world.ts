@@ -52,13 +52,13 @@ export const duckVaultOf = (overrides: Partial<VaultStamp> = {}): DuckVault => (
   lock:  vi.fn<() => void>(),
 })
 
-/** `duck` typed as the model `Vault` a proving and a gate take: they read its stamp and hand it to a lease, which reads its clock and calls `lock()`. */
+/** `duck` typed as the model `Vault`: a lease, a proving and a gate read nothing of a vault past its stamp, its clock and `lock()`. */
 export const asVault = (duck: DuckVault): Vault => duck as unknown as Vault
 // --
 
 // == [The deviceDB friend]: FakeDBFriend, fakeDBFriendOf
 
-/** A fake of the deviceDB as a lease reaches it: a slot that keeps one lease record, a spy on each verb, and a spying logger. */
+/** A fake of the deviceDB as a lease reaches it: its {@link LeaseDBFriend} verbs, each a spy. */
 export type FakeDBFriend = LeaseDBFriend & {
   tryGetLease: Mock<LeaseDBFriend['tryGetLease']>
   tryPutLease: Mock<LeaseDBFriend['tryPutLease']>
@@ -69,7 +69,7 @@ export type FakeDBFriend = LeaseDBFriend & {
   logged:      LoggedCall[]
 }
 
-/** A {@link FakeDBFriend} keeping nothing: `tryGetLease` answers what it keeps, `tryPutLease` keeps the record and answers it, `tryDelLease` empties the slot. Script a refusal with the spy's `mockResolvedValueOnce(bad(err))`.
+/** A {@link FakeDBFriend} keeping nothing, its verbs answering good. Script a refusal with the spy's `mockResolvedValueOnce(bad(err))`.
  *
  * @example
  *   const friend = fakeDBFriendOf()
