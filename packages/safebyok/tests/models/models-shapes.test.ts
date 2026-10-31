@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
 import * as MSX from '../../src/models/models-shapes'
+import type { VaultPatch } from '../../src/models/vault'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import * as TH from '../test-helpers'
 
@@ -806,5 +807,9 @@ describe("MSX.vaultPatch: the duckish of a vault's patch, which Vault.isFullPatc
   it("hands back the props as given, for the vault to hold its scope fields to its own, and names the failing field", () => {
     expect(MSX.vaultPatch.parse(record)).to.deep.equal(record)
     expect(TH.expectSyncRefusal(() => MSX.vaultPatch.parse({ revision_seq: 'one' }), 'bad_option').meta?.fieldnames).to.deep.equal(['revision_seq'])
+  })
+
+  it("types the vault record given back as a VaultPatch, as `{ ...record }` will do", () => {
+    expectTypeOf<MSX.VaultRecord>().toExtend<VaultPatch>()
   })
 })
