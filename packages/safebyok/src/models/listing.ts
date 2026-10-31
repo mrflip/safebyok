@@ -24,8 +24,8 @@ type Received<RecordT, SparseT> = Readonly<{ flavor: 'received', record: Fetched
  * `hello` warms it from the device cache, starts the watch and hydrates everything; after that
  * the cache is only saved to. Every answer storage gives, to `fetch`, `put`, `del` or the watch,
  * goes through `#deliver`, and every instance is made and held through `#buildOrReceive`, so no
- * scope is built twice. The listing then settles, saving the instance to the cache and making the
- * snapshot again. A call is refused when it cannot give what it asked for: a refusal from storage,
+ * scope is built twice. The listing then settles, saving to the cache the copy the instance last
+ * handed in by `keepCopy`, and making the snapshot again. A call is refused when it cannot give what it asked for: a refusal from storage,
  * or a record its instance's `receive` refuses. Bad news nobody asked about, a refused save to
  * the cache or a refusal met on a notice, is told to `onBadNews`.
  */
@@ -202,8 +202,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The instance under `scope` once `intake` meets it: the instance held, or, where none is, one born of `intake` and held.
    * A record received goes to the instance's `receive`, a new instance's included, which is held only once it has taken
    * the record; a refusal `receive` throws is thrown, nothing held or saved. A cached copy leaves an instance held as it
-   * is, being older. A draft for a scope held refuses 'bad_option'. The listing then settles on the instance, saving it,
-   * except for a revived copy, which is saved nowhere. Null for nothing stored and nothing held.
+   * is, being older. A draft for a scope held refuses 'bad_option'. The listing then settles, saving the copy the instance
+   * last handed in, except for a revived copy, which is saved nowhere. Null for nothing stored and nothing held.
    */
   #buildOrReceive(scope: ScopeT, intake: Exclude<Intake<RecordT, SparseT>, Received<RecordT, SparseT>> | (Received<RecordT, SparseT> & { record: Fetched<RecordT, SparseT> })): Promise<ThingT>
   #buildOrReceive(scope: ScopeT, intake: Intake<RecordT, SparseT>): Promise<ThingT | null>
