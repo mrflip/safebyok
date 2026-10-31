@@ -99,6 +99,24 @@ describe("Vault.addPasskey", () => {
     expect(proofClosure).not.toHaveBeenCalled()
     expect(passkeyClosure).not.toHaveBeenCalled()
   })
+
+  it("refuses a wrong current proof with the attempt's own refusal, asking for no passkey and storing nothing", async () => {
+    const { vault, storedNow } = await bornVault()
+    const ante = storedNow()
+    const passkeyClosure = vi.fn(byPasskey('laptop'))
+    await TH.expectRefusal(vault.addPasskey(byPassphrase('not the passphrase'), passkeyClosure), 'wrong_passphrase')
+    expect(passkeyClosure).not.toHaveBeenCalled()
+    expect(storedNow()).to.equal(ante)
+  })
+
+  it("zeroes the PRF bytes of an answer it refuses: a closure answering more than the passkey's answer refuses 'bad_option', and stores nothing", async () => {
+    const { vault, storedNow } = await bornVault()
+    const ante = storedNow()
+    const passkeyAnswer = await TH.passkeyOf('laptop')
+    await TH.expectRefusal(vault.addPasskey(byPassphrase(Passphrase), () => ({ passkeyAnswer, extra: true }) as never), 'bad_option')
+    expect(passkeyAnswer.prfBytes.every((byte) => byte === 0)).to.be.true
+    expect(storedNow()).to.equal(ante)
+  })
 })
 
 describe("Vault.revokePasskey", () => {
@@ -110,6 +128,15 @@ describe("Vault.revokePasskey", () => {
     await TH.expectRefusal(vault.gate.attemptProof(byPasskey('laptop'), world), 'wrong_passkey')
     const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
     expect(proving.wayinkind).to.eq('passphrase')
+  })
+
+  it("refuses a wrong current proof with the attempt's own refusal, storing nothing: the passkey still opens", async () => {
+    const { vault, storedNow, opts: { world } } = await bornWithPasskey()
+    const ante = storedNow()
+    await TH.expectRefusal(vault.revokePasskey(byPasskey('phone')), 'wrong_passkey')
+    expect(storedNow()).to.equal(ante)
+    const proving = await vault.gate.attemptProof(byPasskey('laptop'), world)
+    expect(proving.wayinkind).to.eq('passkey')
   })
 
   it("refuses 'absent_wayin' on a vault without a passkey, asking nothing; the try form answers it as an Outcome", async () => {
