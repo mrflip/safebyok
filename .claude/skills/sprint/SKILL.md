@@ -31,8 +31,8 @@ sprint directory on in full, since workers read it from theirs.
   and the style pass's model (`style-reviewer`'s pin) -- each unless the Coach named another, how
   many threads may run at once (3 unless the Coach named another), who issued it, and a status
   line you keep current.
-* *Read first*: the notes and files every worker needs beyond CLAUDE.md, by section where a
-  section will do.
+* *Read first*: the notes and files every worker needs beyond CLAUDE.md, by section, never a
+  document whole. A rule every thread needs goes in *Ground rules*, for the handoffs to quote.
 * *Ground rules*: only what is particular to this sprint.
 * The threads, numbered, each with the Coach's text **verbatim** and then your gloss: what it
   likely touches; its **levels**, where they differ from the defaults; **what it depends on**;
@@ -43,8 +43,10 @@ sprint directory on in full, since workers read it from theirs.
   the thread is mostly naming or vocabulary. Revise a later thread's levels as the earlier ones
   teach, and say so in its gloss. Read the whole request before writing any of this, because
   later threads bend earlier ones: a capability built in thread 3 and reused in thread 5 is
-  designed once, for both. A worker's context only grows, so a thread that would build two
-  features, or plainly run long, is two threads.
+  designed once, for both. A worker's context only grows, and is compacted at about 170k tokens,
+  so size a thread to reach its first `pnpm justify` in one context: a thread that would build
+  two features, carries more than about four items that touch different code, or plainly runs
+  long, is two threads or more.
 * *For the Coach*: anything already visible that needs a human.
 
 **Dependencies decide the base.** A thread depends on another when it builds on its code, or when
@@ -108,7 +110,10 @@ one `thread-worker` with `run_in_background: true`, the thread's worker model an
 they differ from the agent's, and a `description` naming the thread (`Thread 3: vault_record`),
 never with `isolation`. The prompt is the whole handoff,
 re-sent on every one of the worker's turns: it carries what this thread needs from the plan and
-the progress document, and points to the rest by file and section.
+the progress document, and points to the rest by file and section. Quote rather than send the
+worker to read: a section it reads stays in its context for the rest of the build. So *Read:*
+names only what the handoff does not already carry, never a section a *From the sprint* line
+quotes, and a STYLE.md section only for a kind of thing the thread writes.
 
 ```
 Thread <N> of sprint <sprint_name>. Sprint directory: <sprint root>/whiteboard/<YYYYMMDD-sprint_name>/.
@@ -120,7 +125,7 @@ Mode: <normal | YOLO>. Scratch files: <scratchpad>/<label>/.
 From the sprint: <the ground rules that bear on this thread; the decisions and discoveries of
 earlier threads it builds on or beside; its size-budget step, if any>.
 Look-ahead: <what later threads need from this one, if anything>.
-Read: <the plan's *Read first*, and what else this thread needs, by section>.
+Read: <what this handoff does not already carry, by section>.
 ```
 
 Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each

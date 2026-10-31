@@ -84,9 +84,9 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 * Private, never published: the root (`scripts/`, tested in `tests/scripts/`), `demos/`, and
   `e2e/` (adapter-by-framework checks).
 * `whiteboard/` and `winboard/` -- thread and session folders, `YYYYMMDD-<label>/`, open and
-  done. Your own thread's folder is yours to read and search. Every other is a historic artifact:
-  exclude them from searches (`--exclude-dir={whiteboard,winboard}`) and open one only when your
-  task names it. Precedence: your instructions and plan, then your whiteboard, then the code.
+  done. Your own thread's folder is yours to read and search, by name: `rg` skips the rest. Every
+  other is a historic artifact: open one only when your task names it. Precedence: your
+  instructions and plan, then your whiteboard, then the code.
 * `human/` -- from agents to Coaches. Progress notes, caveats and open questions go here or in the
   thread's whiteboard, never in doc blocks or comments. Write to it, never read it
   (`human/README.md`).
@@ -99,9 +99,18 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 
 ## Reading
 
-A file past about 800 lines is searched, never read through. Search .md files by headings.
-A code file's section banners are its table of contents:
-`grep -n '// == '` (`// == [Name]: key names` opens a section, `// --` closes it).
+What you open stays in your context, paid again on every turn. Read a file whole when you are
+about to edit through it; one you only consult, by its table of contents, then `sed -n` the
+section you need. A code file's section banners are its table of contents:
+`rg -n '// == ' <file>` (`// == [Name]: key names` opens a section, `// --` closes it); a .md
+file's are its headings, `rg -n '^#' <file>`. A file past about 800 lines is searched, never
+read through.
+
+Search files with `rg`, not `grep`, and always name a path, `.` for the whole tree: with none,
+it waits on the shell's input. It skips what `.gitignore` and the `.ignore` files name
+(dependencies, builds, changelogs, `.changeset/`, `human/`, `notes/security.md`, `whiteboard/`,
+`winboard/`), so it needs no `--exclude-dir`, and still searches a path you name. Trace a name
+through the whole tree with `rg -l` first, then open the hits that matter.
 
 ## Notable files
 

@@ -2,6 +2,9 @@
 name: thread-worker
 description: Builds one thread of a sprint in the worktree the /sprint orchestrator cut for it, as a PR, and reports; or picks up one already built, to file it or to rework a review finding. Spawned by /sprint, or by hand with the same handoff.
 autoCompactWindow: 200000
+# Held in reserve: denying the Artifact tool would save about 10k tokens on every turn of
+# every worker, and a worker publishes nothing (.claude/skills/sprint/DESIGN.md).
+# disallowedTools: Artifact
 ---
 
 You are a full agent on this repository, working one **thread**: one line of work, one branch,
@@ -26,10 +29,14 @@ bare `git` or `pnpm` there would act on a checkout other agents share. Read the 
 the sprint's worktree for context if you like; never write to either.
 
 **The handoff is written to be enough.** Start from it. The sprint's `<sprint>-plan.md` and
-`<sprint>-progress.md` are there to look things up in, not to read: a `grep -n` for your thread's
+`<sprint>-progress.md` are there to look things up in, not to read: an `rg -n` for your thread's
 number, or for a name, when the handoff leaves you unsure how your work fits. Say in your report
 what you went looking for, so the orchestrator can put it in the next handoff. Where they
 disagree, the progress document is newer.
+
+**Read for the change you are making** (CLAUDE.md, *Reading*): what you read stays until you are
+compacted, so search the directories your thread works in before the whole tree, and read
+whole only the files you are about to edit through.
 
 ## Singing out
 
@@ -44,7 +51,8 @@ conflict, writing the thread file, and the report you are about to make (`ready`
 `cd <root> && scripts/ohai repairing lint errors && pnpm lint`, so it costs no turn.
 
 **When your conversation opens with a summary of an earlier one**, you were compacted: sing
-`compacted`, then re-read your thread file and `git log` before going on. What the summary says
+`compacted`, then re-read your thread file and `git log` before going on, and open again only
+what your next edit needs, by section. What the summary says
 of the code is a sketch, and can be wrong with confidence: trust the files, the test output and
 the diff.
 
@@ -57,8 +65,8 @@ the diff.
 2. **Draft.** At your first milestone, start your thread file (*Syndication*) with what you know
    so far, push the branch with the credential helper PROCESS.md names, and open its PR as a
    draft, per PROCESS.md, *Pull requests*. Push each milestone after it, with the thread file
-   brought up to date: the Coach follows the thread there. Your context is compacted once it
-   nears 200k tokens, so the thread file is your own memory as well as the Coach's. Once
+   brought up to date: the Coach follows the thread there. Your context is compacted at about
+   170k tokens, so the thread file is your own memory as well as the Coach's. Once
    pushed, a commit is not rewritten except by a catch-up rebase.
 3. **Ready.** With everything committed and justify green, finish the thread file, commit it
    (`plan:`), push, bring the PR's title and body up to date -- a **Tests:** line, *Open

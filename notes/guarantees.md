@@ -191,7 +191,7 @@ holds it; the one comparison of two passphrases is `current === next` in `change
 both typed by the same user. Three host functions hear it: the dialog that collects it, the
 `strengthChecker` and the `keyDeriver`. *Caveat:* a JavaScript string cannot be zeroed, so copies
 live until collected, and the React dialog holds what was typed in component state until it
-closes. Kept by: `gating.ts` (chains), `proving.ts`. Checked by: `grep` for a field or record
+closes. Kept by: `gating.ts` (chains), `proving.ts`. Checked by: `rg` for a field or record
 holding one finds none.
 
 **G2. The strong key's bytes are locals, zeroed; its handle is non-extractable.** The deriver's
@@ -299,7 +299,7 @@ route reaches is no key and yields none. Neither class has a getter, field, spre
 that yields a key, and no module exports a route to one: `leaseRecordOf`, which did, is gone
 ([#305](https://github.com/mrflip/safebyok/pull/305)). The entry points export `Lease` and
 `Proving` as types and classes alone, and none of the registries. Checked by:
-`tests/lease.test.ts` (*hands out no record*), `grep` for the crypto imports.
+`tests/lease.test.ts` (*hands out no record*), `rg` for the crypto imports.
 
 **G10. Foundations the construction rests on.**
 

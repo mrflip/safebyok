@@ -180,7 +180,7 @@ to trust.
 `box.put()` and `vault.putBox(box)` both say "put the box", and both are good. A verb leaves its
 object to the receiver only when the receiver *is* the object: `gating.settle()` settles the
 gating, and one that settles the user's prompt is `settlePrompt()`. Being private, or the only
-method of its kind, earns no shortcut: neither shows at the call site or in a grep, and a second
+method of its kind, earns no shortcut: neither shows at the call site or in an `rg`, and a second
 method ends it. Never `putSelf`: the receiver already says it.
 
 **The verbs, at a glance.** Each promises this much and no more; the paragraphs below say more.
@@ -761,10 +761,10 @@ rows with it.
   backticks, never a type-only import made for the link, which `no-unused-vars` refuses. A
   private member is always plain code, in backticks: never a `{@link}`.
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
-  section (its name, then the names a reader would grep for), `// --` closes it, both at the
-  section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
-  of contents. A banner groups declarations; it does not excuse a file that should be split, and
-  it moves with the code it names.
+  section (its name, then the names a reader would `rg` for), `// --` closes it, both at the
+  section's indentation; sections are flat, never nested. `rg -n '// == ' <file>` is the file's
+  table of contents. A banner groups declarations; it does not excuse a file that should be
+  split, and it moves with the code it names.
 
 A doc block before and after, its examples left out. Before, 41 lines opening:
 
@@ -819,7 +819,7 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
 
 * **Test helpers are reached through one module, `tests/test-helpers.ts`, star-imported as `TH`**:
   `import * as TH from './test-helpers'`, then `TH.scopeOf('u1')`. It exports everything, and
-  may re-export, by name, a folder of parts beside it (`tests/test-helpers/`: grep the door for the
+  may re-export, by name, a folder of parts beside it (`tests/test-helpers/`: `rg` the door for the
   part that holds a helper, then read that part). A new helper goes in its part and in the door. The
   core's is also published as `safebyok/testing`, so another package's tests reach the same
   helpers; a package with helpers of its own keeps them in its own `tests/test-helpers.ts`, which

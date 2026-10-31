@@ -51,7 +51,7 @@ work only there.
 * **Dropped facts are listed.** Every fact you drop that STYLE.md does not plainly cut goes in the
   `human/` entry, so a Coach can put back what matters.
 
-A long file has a table of contents in `grep -n '// == '`. Do not read `whiteboard/`,
+A long file has a table of contents in `rg -n '// == ' <file>`. Do not read `whiteboard/`,
 `winboard/` or `human/`. STYLE.md's two before-and-afters (`hello`, `#storedBase`) are the
 worked examples.
 

@@ -53,6 +53,25 @@ sprinting or not, which is why those are one sentence of when to use it.
   median worker turn held 200k tokens, and 45% of what workers read came after their first
   justify. A compaction costs about one turn's read plus a summary of a few thousand tokens, and
   leaves 30--55k.
+* **A thread reaches its first justify in one context** (§1: about four items). Thread 9 of
+  sprint storable (2026-10-30) carried ten of the Coach's rulings and compacted twice: its first
+  context went to orientation alone (35k to 167k in five minutes, before any edit), and its
+  second compaction fell just after its first justify, mid-repair. Its items ran roughly 25k
+  tokens each to survey and build, against some 130k of room above a worker's start. Cost is not
+  the reason: a worker pays about a tenth of its context in cache reads each turn, and moving the
+  compaction anywhere from 100k to 170k changes its bill by under a tenth. The summary is: a
+  worker compacted mid-survey reads again what it lost (21k tokens in thread 9), and one
+  compacted mid-repair runs justify again.
+* **Handoffs quote; *Read:* points only at the rest.** Thread 9's *Read:* (the plan's *Read
+  first*: the brief and the progress document, then five STYLE.md sections) put 33k tokens in its
+  context before its first edit, mostly rules its *From the sprint* lines already quoted, carried
+  on every turn after. Thread 8, handed one item and two of the plan's sections, finished at 56k.
+* **A saving held in reserve: workers could do without the Artifact tool** (`disallowedTools:`,
+  commented out in `thread-worker.md`). Its schema alone is 36k characters, about 10k tokens on
+  every turn of every worker, and a worker publishes nothing; the Coach chose on 2026-10-30 to keep
+  it for now. If adopted, a denylist, not an allowlist: an allowlist also strips what an agent loads
+  on demand (ToolSearch and the tools behind it, Skill, the MCP servers), and no spawn can give a
+  tool back: the Agent tool takes no tool list, and a message adds none.
 * **The reviewer re-checks only what `/code-review` did not verify.** Reviewers ran a median of
   32 turns, up to 97, most of them `grep` and `sed` re-checking findings that `/code-review`'s
   verify pass had already confirmed.
