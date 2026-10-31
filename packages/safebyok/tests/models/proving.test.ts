@@ -10,7 +10,7 @@ import { _cheat_vaultKeyBytesOf, asVault, DeviceId, duckVaultOf, fakeDBFriendOf,
 
 useFakeClock()
 
-const provingPairOf = async (proofClosure: ProofClosure = proofClosureOf(), world: ProvingWorld = provingWorldOf()) => (
+const makeProvingPair = async (proofClosure: ProofClosure = proofClosureOf(), world: ProvingWorld = provingWorldOf()) => (
   Proving.makeProvingPair(asVault(duckVaultOf()), proofClosure, world)
 )
 
@@ -51,37 +51,37 @@ describe("Proving.makeProvingPair(vault, proofClosure, world): the arguments", (
   }
 
   it("refuses a proofClosure that is no function as 'bad_option'", async () => {
-    await TH.expectRefusal(provingPairOf({ passphrase: TestPassphrase } as never), 'bad_option')
+    await TH.expectRefusal(makeProvingPair({ passphrase: TestPassphrase } as never), 'bad_option')
   })
 })
 
 describe("Proving.makeProvingPair: what the closure hands back", () => {
   it("makes a passphrase proving alone when the closure hands back a passphrase alone", async () => {
-    const { passphraseProving, passkeyProving } = await provingPairOf()
+    const { passphraseProving, passkeyProving } = await makeProvingPair()
     expect(passphraseProving).to.be.instanceOf(PassphraseProving)
     expect(passkeyProving).to.be.null
   })
 
   it("makes a passphrase proving alone when the closure hands back passkeyAnswer null", async () => {
-    const { passkeyProving } = await provingPairOf(() => ({ passphrase: TestPassphrase, passkeyAnswer: null }))
+    const { passkeyProving } = await makeProvingPair(() => ({ passphrase: TestPassphrase, passkeyAnswer: null }))
     expect(passkeyProving).to.be.null
   })
 
   it("makes a passkey proving beside it when the closure hands back a passkey answer, and zeroes that answer's PRF bytes (G2)", async () => {
     const answer = passkeyAnswerOf()
-    const { passphraseProving, passkeyProving } = await provingPairOf(proofClosureOf(TestPassphrase, answer))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, answer))
     expect(passphraseProving).to.be.instanceOf(PassphraseProving)
     expect(passkeyProving).to.be.instanceOf(PasskeyProving)
     expect(isZeroed(answer.prfBytes)).to.be.true
   })
 
   it("awaits a closure that answers a promise", async () => {
-    const { passphraseProving } = await provingPairOf(() => Promise.resolve({ passphrase: TestPassphrase }))
+    const { passphraseProving } = await makeProvingPair(() => Promise.resolve({ passphrase: TestPassphrase }))
     expect(passphraseProving).to.be.instanceOf(PassphraseProving)
   })
 
   it("replaces what a throwing closure threw with 'unexpected_error', quoting none of it and keeping no cause", async () => {
-    const err = await TH.expectRefusal(provingPairOf(() => { throw new Error(`no good: ${TestPassphrase}`) }), 'unexpected_error')
+    const err = await TH.expectRefusal(makeProvingPair(() => { throw new Error(`no good: ${TestPassphrase}`) }), 'unexpected_error')
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
@@ -100,7 +100,7 @@ describe("Proving.makeProvingPair: what the closure hands back", () => {
   for (const [answerOf, blurb] of AnswerCases) {
     it(`refuses ${blurb} as 'bad_option', zeroing any PRF bytes it carries`, async () => {
       const handed = answerOf()
-      const err = await TH.expectRefusal(provingPairOf(() => handed as never), 'bad_option')
+      const err = await TH.expectRefusal(makeProvingPair(() => handed as never), 'bad_option')
       expect(isZeroed(prfBytesOf(handed))).to.be.true
       expect(TH.thrownText(err)).to.not.include(TestPassphrase)
     })
@@ -109,7 +109,7 @@ describe("Proving.makeProvingPair: what the closure hands back", () => {
   it("zeroes the PRF bytes even when the passphrase's keyDeriver throws after the answer passed its check (G2)", async () => {
     const answer = passkeyAnswerOf()
     const world = provingWorldOf({ keyDeriver: deriverHanding(() => { throw new Error('out of memory') }) })
-    await TH.expectRefusal(provingPairOf(proofClosureOf(TestPassphrase, answer), world), 'unexpected_error')
+    await TH.expectRefusal(makeProvingPair(proofClosureOf(TestPassphrase, answer), world), 'unexpected_error')
     expect(isZeroed(answer.prfBytes)).to.be.true
   })
 })
@@ -188,8 +188,8 @@ describe("a proving's header", () => {
   })
 
   it("draws a fresh salt for each passphrase proving", async () => {
-    const { passphraseProving: one } = await provingPairOf()
-    const { passphraseProving: two } = await provingPairOf()
+    const { passphraseProving: one } = await makeProvingPair()
+    const { passphraseProving: two } = await makeProvingPair()
     expect(one.header.salt_b64).to.not.eq(two.header.salt_b64)
   })
 })
@@ -250,28 +250,28 @@ describe("proving.makeWayin(source)", () => {
 
   for (const [source, blurb] of SourceCases) {
     it(`refuses ${blurb} as 'bad_option'`, async () => {
-      const { passphraseProving } = await provingPairOf()
+      const { passphraseProving } = await makeProvingPair()
       await TH.expectRefusal(passphraseProving.makeWayin(source as never), 'bad_option')
     })
   }
 
   it("refuses, as 'unexpected_error', a proving that has made no wayin yet as its source", async () => {
     const answer = passkeyAnswerOf()
-    const { passphraseProving, passkeyProving } = await provingPairOf(proofClosureOf(TestPassphrase, answer))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, answer))
     await TH.expectRefusal(passkeyProving!.makeWayin(passphraseProving), 'unexpected_error')
   })
 })
 
 describe("proving.makeLease(dbfriend, opts)", () => {
   it("refuses, as 'unexpected_error', before the proving has made a wayin, and keeps nothing", async () => {
-    const { passphraseProving } = await provingPairOf()
+    const { passphraseProving } = await makeProvingPair()
     const friend = fakeDBFriendOf()
     await TH.expectRefusal(passphraseProving.makeLease(friend, { leaseMillis: WeekMillis }), 'unexpected_error')
     expect(friend.tryPutLease).not.toHaveBeenCalled()
   })
 
   it("grants and keeps a lease of the proving's vault, in force for leaseMillis", async () => {
-    const { passphraseProving } = await provingPairOf()
+    const { passphraseProving } = await makeProvingPair()
     await passphraseProving.makeWayin(NOVEL)
     const friend = fakeDBFriendOf()
     const lease = await passphraseProving.makeLease(friend, { leaseMillis: WeekMillis })
@@ -281,7 +281,7 @@ describe("proving.makeLease(dbfriend, opts)", () => {
   })
 
   it("grants leases over one vaultKey from both provings once both made wayins: what one seals, the other opens", async () => {
-    const { passphraseProving, passkeyProving } = await provingPairOf(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
     await passphraseProving.makeWayin(NOVEL)
     await passkeyProving!.makeWayin(passphraseProving)
     const viaPassphrase = await passphraseProving.makeLease(fakeDBFriendOf(), { leaseMillis: WeekMillis })
@@ -292,7 +292,7 @@ describe("proving.makeLease(dbfriend, opts)", () => {
   })
 
   it("refuses opts its check refuses as 'bad_option'", async () => {
-    const { passphraseProving } = await provingPairOf()
+    const { passphraseProving } = await makeProvingPair()
     await passphraseProving.makeWayin(NOVEL)
     await TH.expectRefusal(passphraseProving.makeLease(fakeDBFriendOf(), { leaseMillis: 0 }), 'bad_option')
   })
@@ -300,20 +300,20 @@ describe("proving.makeLease(dbfriend, opts)", () => {
 
 describe("what a proving shows", () => {
   it("Object.keys shows its wayinkind and header alone: no key, no wayin, no vault", async () => {
-    const { passphraseProving, passkeyProving } = await provingPairOf(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
     await passphraseProving.makeWayin(NOVEL)
     expect(Object.keys(passphraseProving)).to.deep.equal(['wayinkind', 'header'])
     expect(Object.keys(passkeyProving!)).to.deep.equal(['wayinkind', 'header'])
   })
 
   it("JSON.stringify gives its wayinkind alone", async () => {
-    const { passphraseProving, passkeyProving } = await provingPairOf(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
     expect(JSON.stringify(passphraseProving)).to.eq('{"wayinkind":"passphrase"}')
     expect(JSON.stringify(passkeyProving)).to.eq('{"wayinkind":"passkey"}')
   })
 
   it("is frozen", async () => {
-    const { passphraseProving } = await provingPairOf()
+    const { passphraseProving } = await makeProvingPair()
     expect(Object.isFrozen(passphraseProving)).to.be.true
     expect(() => { (passphraseProving as { wayinkind: string }).wayinkind = 'passkey' }).to.throw(TypeError)
   })
