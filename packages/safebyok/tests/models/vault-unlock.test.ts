@@ -4,7 +4,7 @@ import type { Lease } from '../../src/models/lease'
 import type { ProofClosure } from '../../src/models/models-shapes'
 import { NOVEL, Proving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
-import { Dna, LeaseMillis, Passphrase, T0, makeVaultWorld, provingOf, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, LeaseMillis, Passphrase, T0, makeVaultWorld, makeProving, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -76,7 +76,7 @@ describe("Proving.makeWayin: one wayin per proving, of its own vault", () => {
     const mine = await vault.gate.attemptProof(() => ({ passphrase: Passphrase }), world)
     await TH.expectRefusal(mine.makeWayin(NOVEL), 'unexpected_error')
     const { passphraseProving } = await Proving.makeProvingPair(vault.gate.stamp, () => ({ passphrase: 'a new passphrase' }), world)
-    await TH.expectRefusal(passphraseProving.makeWayin(await provingOf({ vault_tok: 'vault-tok-other', registered_at: T0 })), 'bad_option')
+    await TH.expectRefusal(passphraseProving.makeWayin(await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })), 'bad_option')
     const wayin = await passphraseProving.makeWayin(mine)
     expect(wayin.wayinkind).to.eq('passphrase')
   })

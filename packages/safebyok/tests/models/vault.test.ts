@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeVaultWorld, provingOf, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -115,7 +115,7 @@ describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the gr
   it("grants the vault whose stamp the proving is of a lease, through the vault's dbfriend", async () => {
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
-    const proving = await provingOf(vault)
+    const proving = await makeProving(vault)
     deviceDB.tryPutLease.mockClear()
     const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 })
     expect(lease.isInForce).to.be.true
@@ -127,7 +127,7 @@ describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the gr
   it("refuses 'bad_option' a vault of another stamp, before any key is touched", async () => {
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
-    const proving = await provingOf({ vault_tok: 'vault-tok-other', registered_at: T0 })
+    const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryPutLease.mockClear()
     await TH.expectRefusal(proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 }), 'bad_option')
     expect(deviceDB.tryPutLease).not.toHaveBeenCalled()

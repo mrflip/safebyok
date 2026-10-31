@@ -75,12 +75,12 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     cache: { load: () => Promise.resolve([]), save: () => Promise.resolve() },
     maxMillisSinceRefresh: 10 * 60_000,
   }
-  const listingOf = (): VaultListing => {
+  const makeListing = (): VaultListing => {
     const made = new VaultListing(opts)
     madeListings.push(made)
     return made
   }
-  const listing = listingOf()
+  const listing = makeListing()
   /** Another device's put of `record`, landing in the vaultDB behind this one's back, at the next revision. */
   const storeBehindOurBack = (record: VaultRecord): VaultRecord => {
     stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
@@ -90,7 +90,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     listing, opts, deviceDB, storeBehindOurBack,
     storedNow:      () => stored,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
-    anotherSession: listingOf,
+    anotherSession: makeListing,
     /** Move the clock on by `millis`; no timer fires. */
     advance:        (millis: number) => { now += millis },
   }
@@ -108,7 +108,7 @@ export const storedVaultRecord = async (passphrase: string = Passphrase): Promis
 }
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
-export const provingOf = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
+export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
   const { passphraseProving } = await Proving.makeProvingPair({ ...Dna, vault_tok, registered_at }, () => ({ passphrase: Passphrase }), makeVaultWorld().opts.world)
   await passphraseProving.makeWayin(NOVEL)
   return passphraseProving
