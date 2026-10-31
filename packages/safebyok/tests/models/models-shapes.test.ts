@@ -699,6 +699,7 @@ describe("MSX.whisperHolder", () => {
     expect(parsed).to.not.eq(given)
     expect(parsed.val).to.not.eq(given.val)
     expect(Object.isFrozen(parsed)).to.be.true
+    expect(Object.isFrozen(parsed.val)).to.be.true
     given.val.apiKey = 'sk-ant-changed'
     expect(parsed).to.deep.equal({ val: { apiKey: 'sk-ant-fake' } })
   })

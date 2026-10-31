@@ -729,7 +729,7 @@ describe("box.whisper and box.edit: the whisper given as { val }", () => {
     await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000' as never, sidecar: {} }), 'bad_whisper')
   })
 
-  it("keeps a frozen copy of the whisper set: the host's later change to its own reaches no box, and the box's cannot be changed in place", async () => {
+  it("keeps a frozen copy of the whisper set: the host's later change to its own reaches no box, and the box's cannot be changed in place, val and all", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     const given = { val: { apiKey: 'sk-test-0000' } }
     box.whisper = given
@@ -737,6 +737,8 @@ describe("box.whisper and box.edit: the whisper given as { val }", () => {
     expect(box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000' } })
     expect(Object.isFrozen(box.whisper)).to.be.true
     expect(() => { (box.whisper as { val: unknown }).val = 'sk-test-1111' }).to.throw(TypeError)
+    expect(() => { ((box.whisper as { val: { apiKey: string } }).val).apiKey = 'sk-test-1111' }).to.throw(TypeError)
+    expect(box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000' } })
   })
 
   it("shows the whisper exposed in no snapshot or JSON of the box", async () => {

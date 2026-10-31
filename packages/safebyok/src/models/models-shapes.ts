@@ -6,6 +6,7 @@
  * in Storable, never a host's. Every other `parse` refuses as its doc says, quoting none of its input.
  */
 
+import { deepFreeze } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../checks/validator'
 import { type VaultError, isVaultError } from '../errors'
@@ -222,8 +223,9 @@ export const BoxFormat = 5001
 /** The check of the object a box takes and gives its whisper in, `{ val }`, the whisper itself its `val`: what `edit`, `send`, `seal` and `build` take as `whisper`, and what `box.whisper` and `unsealWhisper` give. Its `parse` refuses 'bad_whisper', naming the failing field and quoting none of it.
  * The `val` is a whisper as the old box keeps one, checked by the same check: any JSON value a
  * whisper can carry, never a bare null. The object takes no other field. A parse hands back a
- * frozen copy, never the caller's own object, so the host's later changes to theirs reach no box,
- * and a box's to its own reach no host: set `box.whisper` anew to change it.
+ * copy frozen through, `val` and all, never the caller's own object, so the host's later changes
+ * to theirs reach no box, and a box's to its own reach no host: set `box.whisper` anew to change
+ * it.
  *
  * @example whisperHolder.parse({ val: 'sk-ant-...' })                 // a frozen { val: 'sk-ant-...' }, a copy
  * @example whisperHolder.parse({ val: { apiKey: 'sk-ant-...', orgId: null } })
@@ -231,7 +233,7 @@ export const BoxFormat = 5001
  * @example whisperHolder.parse({ val: null })                         // throws 'bad_whisper', naming val: emptying a box is del's job
  * @example whisperHolder.parse({ val: 'sk-ant-...', note: 'work' })   // throws 'bad_whisper': it takes no other field
  */
-export const whisperHolder = Checker(({ obj }) => obj({ val: whisper }).strict().readonly(), 'bad_whisper')
+export const whisperHolder = Checker(({ obj }) => obj({ val: whisper }).strict().overwrite((holder) => deepFreeze(holder)).readonly(), 'bad_whisper')
 
 /** The object a box takes and gives its whisper in: `{ val }`, frozen, the whisper its `val`. */
 export type WhisperHolder = Z.output<typeof whisperHolder>
