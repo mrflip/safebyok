@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** restacked onto main ce0e96e0 (#374 and #370 now inside #368); filed through #390 (thread 15); thread 21 (TestableBox) building on it; then 13, 22, 18, 19, 20, then 6.
+* **Status:** main has merged through #390; filed through #405 (thread 18); thread 23 (the Coach's fingerpaints) building on it; then 24, 19, 20, then 6.
 
 ## Read first
 
@@ -668,6 +668,13 @@ intend." Label `coach_sweep`.
   record -- refuses 'absent_box', 'needs_fetch' or 'vault_locked'"; `needs_fetch` is no refusal
   kind today: say what `demandFull` refuses, and raise it) and `demandReadyToSeal` ("throws
   unless unlocked ('vault_locked')"). `namesBoth` → abstract `isFullPatch` went to thread 18.
+* **More Closer Look marks (re-read at the cut):** "Bad-news plumbing ... no, just call
+  listing.tellBadNews or some other method" (the `Tell` type and `#tell` handed through
+  `makeThing` go with the constructor's `tell`); the cache revive's `cacheLoaded` / `cacheable`
+  checks renamed `buildableRecords` / `buildableRecord` ("you've uncached them and then making
+  them ready to build with"); `priorRevisionTok` also in the `Store` contract's parameter names
+  and the listing's `fitsPriorTok` neighbours; `LOCKED` "change to FUBag as discussed" (it is a
+  frozen bag since #403: name it so if the name still says symbol).
 * **Rulings since (the Coach, 2026-10-31, in Resolved):** the `Cache.save` contract says saves are
   best effort and an adapter keeps call order, the last call winning ("Document the best-effort
   promise; they can call _.debounce or a join primitive"); where the code forces a fetch with a
@@ -678,6 +685,23 @@ intend." Label `coach_sweep`.
   tattoo, and why `configurable: false` doesn't fail on the second `defineProperty`: a
   non-configurable property stays writable, so its value may change).
 Worker `opus`; review `medium`. Depends on 18 (cut from its tip). Size: medium.
+
+### 24. The receive table and the trigger's verdict
+
+*Orchestrator, the Coach (2026-10-31), Closer Look marks:* on `receive`'s `delSpent`: "fix table.
+is delSpent a camel when others are labels? try recreate instead"; on the trigger's
+`notesOwnSuccess`: "yes please. Why is an ok tryFetch not yet a success?"; on `reconcileStaged`'s
+'edit' row: "no if it's called patch it should be a patch. how did that happen? why is makeStaged
+a thing when this is reconcile's job?" Label `receive_table`.
+1. The `delSpent` decision moves into the reconcile tables as a labelled policy row (the Coach
+   suggests the label `'recreate'`; take it unless it misnames the case, and say why), so the
+   tables tell the whole story and `receive` adds no branch of its own.
+2. The trigger's `notesOwnSuccess` mode, `#notedInLaunch` and `#unconfirmed` go: the launch
+   (`tryFetch`) resolves to `receive`'s verdict (the record in hand whole and not behind), and the
+   trigger counts a launch a success by that outcome, not by a side call to `noteSuccessNow`.
+3. `reconcileStaged`'s `forms.patch` is renamed for what it is, the staged record `makeStaged` made
+   and sealed; the 'edit' row becomes that record under `nextRevision`.
+Worker `opus`; review `medium`. Depends on 23 (cut from its tip). Size: medium.
 
 ### 19. A rollback, thrown
 
@@ -714,7 +738,7 @@ and a test shows another vault's change is never pushed. A record under another 
 arrives anyway is still refused at once ("it can only be the residue of failing to delete"). Survey the other
 paths where an older or absent answer meets a live central (a fetch's `get`, a notice) and what
 each does today; change none of them, list them in the thread file for the Coach. Worker `opus`;
-review `medium`. Depends on 23 (cut from its tip). Size: small to medium.
+review `medium`. Depends on 24 (cut from its tip). Size: small to medium.
 
 ### 20. A draft carried onto a tombstone
 
@@ -748,12 +772,12 @@ Worker `sonnet`; review `medium`. Depends on 19 (cut from its tip). Size: small.
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 21 (TestableBox) before 13, then 22 (settle saves to the cache), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31), 23 (the Coach's fingerpaints) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 21 (TestableBox) before 13, then 22 (settle saves to the cache), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31), 23 (the Coach's fingerpaints), 24 (the receive table and the trigger's verdict) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
