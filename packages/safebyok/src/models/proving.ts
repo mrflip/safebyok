@@ -137,11 +137,12 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 
   /** The proving of the stored passphrase wayin, its key derived over the wayin's own salt; one made under another key deriver refuses 'unknown_key_deriver'. Opening it is the caller's. */
   static async ofWayin(stamp: VaultStamp, world: ProvingWorld, stored: PassphraseWayinRecord, passphrase: VX.PassphraseCleartext): Promise<PassphraseProving> {
+    const { stamp: checked, passphrase: typed } = passphraseMakeArgs.parse({ stamp, world, passphrase })
     const wayin = new Wayin(stored)
     const { vault_key_wayin_wrapped: _wrapped, ...header } = passphraseWayinRecordOf(wayin)
     if (header.key_deriver_label !== world.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
-    const passphraseKey = await passphraseKeyOf(world.keyDeriver, passphrase, fromB64(header.salt_b64))
-    return new PassphraseProving(stamp, header, passphraseKey, wayin)
+    const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
+    return new PassphraseProving(checked, header, passphraseKey, wayin)
   }
 }
 // --
@@ -166,13 +167,14 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   static async ofWayin(stamp: VaultStamp, stored: PasskeyWayinRecord | null, passkeyAnswer: unknown): Promise<PasskeyProving> {
     try {
       if (stored === null) { throw noPasskeyWayin() }
+      const checked = vaultStamp.parse(stamp)
       const answer = VX.passkeyAnswer.parse(passkeyAnswer)
       const wayin = new Wayin(stored)
       const { vault_key_wayin_wrapped: _wrapped, ...header } = passkeyWayinRecordOf(wayin)
       if (answer.credential_id !== header.credential_id) { throw otherPasskey() }
       if (answer.prf_salt_b64 !== header.prf_salt_b64) { throw otherPrfSalt() }
-      const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(stamp, header))
-      return new PasskeyProving(stamp, header, passkeyKey, wayin)
+      const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checked, header))
+      return new PasskeyProving(checked, header, passkeyKey, wayin)
     } finally {
       spendPrfBytes(passkeyAnswer)
     }
