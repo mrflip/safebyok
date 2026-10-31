@@ -333,14 +333,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.assign(this.combined, current)
   }
 
-  /** Act on the state as adopted, idempotently: the base replaces the snapshot, saves this thing's copy to the device cache, and tells no news. A subclass calls super last, so that the snapshot sees it. */
+  /** Act on the state as adopted, idempotently: the base replaces the snapshot, saves this thing's copy to the device cache through `#saveCopy` without awaiting it, and tells no news. A subclass calls super last, so that the snapshot sees it. */
   settle(): Settled {
     this.#replaceSnapshot()
     this.#saveCopy()
     return { badnews: [] }
   }
 
-  /** Save the copy, central and the staged beside the sparse form, to the device cache by `cache.save`, not awaited: a save refused is told by `tell`, never thrown into the verb that settled. The copy holds the records as stored and staged, sealed, and nothing the instance alone keeps, such as an exposed whisper. A thing never stored with nothing staged, as one is between its birth and the record it was born to receive, has nothing to keep, and saves nothing. */
+  /** Save the copy, central and the staged beside the sparse form, to the device cache by `cache.save`, not awaited: a save refused is told by `tell`, never thrown into the verb that settled. The copy holds the records as stored and staged, sealed, and nothing the instance alone keeps, such as an exposed whisper. A thing never stored with nothing staged has nothing to keep, and saves nothing. One is in that state between its birth and the record it was born to receive. */
   #saveCopy(): void {
     if (this.#central.revision_seq === MSX.NeverStoredSeq && this.#staged === null) { return }
     const copy = Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
