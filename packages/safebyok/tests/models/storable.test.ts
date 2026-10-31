@@ -1600,12 +1600,13 @@ describe("Storable send guards: ensureReadyToSend, demandReadyToSend", () => {
 
   it("send establishes its own guard first, before the edit's, and checks the patch before either", async () => {
     const box = await builtBoxOf()
+    held.mw.seedStore(fullBoxRecord())
     const sendGuard = vi.spyOn(Storable.prototype, 'ensureReadyToSend')
     const editGuard = vi.spyOn(Storable.prototype, 'ensureReadyToEdit')
     await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' } } as never), 'bad_option')
     expect(sendGuard).not.toHaveBeenCalled()
     expect(editGuard).not.toHaveBeenCalled()
-    await box.trySend({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)
     expect(sendGuard).toHaveBeenCalledOnce()
     expect(sendGuard.mock.invocationCallOrder[0]).to.be.below(editGuard.mock.invocationCallOrder[0] ?? 0)
   })
