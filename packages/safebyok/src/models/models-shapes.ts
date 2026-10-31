@@ -15,7 +15,7 @@ import * as Phrases from '../phrases'
 import * as HX from '../shapes/host-code'
 import type { CipherCtxRecord } from '../crypto'
 import * as VX from '../shapes/vault'
-import { isLeaseKey } from '../shapes/device'
+import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import { sidecar, whisper } from '../shapes/box'
@@ -573,28 +573,35 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [What a proving is handed]: cleartexts, provingWorld, provingPairArgs, provingMakeArgs, vaultBuildArgs, Cleartexts, ProofClosure, ProvingWorld
+// == [What a proving is handed]: cleartexts, attemptCleartexts, provingWorld, provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, vaultBuildArgs, Cleartexts, AttemptCleartexts, ProofClosure, AttemptClosure, ProvingWorld
 
-export const { cleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id }) => ({
-  cleartexts:   obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
-  provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, device_id }),
+/** What a proof closure hands in: `cleartexts` at a vault's birth, a passphrase and perhaps a new passkey's answer; `attemptCleartexts` at an unlock, a passphrase or a passkey's answer. */
+export const { cleartexts, attemptCleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id }) => ({
+  cleartexts:        obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
+  attemptCleartexts: obj({ passphrase: passphraseCleartext.optional(), passkeyAnswer: passkeyAnswer.nullable().optional() }).strict()
+    .refine(({ passphrase, passkeyAnswer: answer = null }) => passphrase !== undefined || answer !== null, Phrases.ProofMissing),
+  provingWorld:      obj({ clock: clockShape, keyDeriver: keyDeriverShape, device_id }),
 }), [FX, HX, VX])
 
-export type Cleartexts   = Z.input<typeof cleartexts>
-export type ProofClosure = () => Cleartexts | Promise<Cleartexts>
-export type ProvingWorld = Z.infer<typeof provingWorld>
+export type Cleartexts        = Z.input<typeof cleartexts>
+export type AttemptCleartexts = Z.input<typeof attemptCleartexts>
+export type ProofClosure      = () => Cleartexts | Promise<Cleartexts>
+export type AttemptClosure    = () => AttemptCleartexts | Promise<AttemptCleartexts>
+export type ProvingWorld      = Z.infer<typeof provingWorld>
 
 /** The arguments of the proving makers and of `VaultListing.build` of a dna: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
-export const { provingPairArgs, provingMakeArgs, vaultBuildArgs } = Checkers('bad_option', ({ obj, fn }) => ({
-  provingPairArgs: obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
-  provingMakeArgs: obj({ stamp: vaultStamp, world: provingWorld }),
-  vaultBuildArgs:  obj({ proofClosure: fn<ProofClosure>() }),
-}))
+export const { provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, vaultBuildArgs } = Checkers('bad_option', ({ obj, fn, passphraseCleartext }) => ({
+  provingPairArgs:    obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
+  provingMakeArgs:    obj({ stamp: vaultStamp, world: provingWorld }),
+  passphraseMakeArgs: obj({ stamp: vaultStamp, world: provingWorld, passphrase: passphraseCleartext }),
+  provingAttemptArgs: obj({ stamp: vaultStamp, gate: gateProps, proofClosure: fn<AttemptClosure>(), world: provingWorld }),
+  vaultBuildArgs:     obj({ proofClosure: fn<ProofClosure>() }),
+}), [VX])
 // --
 
 // == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseDBFriend, leaseGrantOpts, ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseVault, LeaseDBFriend, LeaseGrantOpts
 
-export const LeaseFormat = 7001
+export const LeaseFormat = ModelsLeaseFormat
 
 export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, custom, epochMillis, vault_key_lease_wrapped }) => {
   const leaseStamp  = obj({ fmt: lit(LeaseFormat), ...vaultStamp.shape, autolock_at: epochMillis })
@@ -619,8 +626,8 @@ export type LeaseVault = VaultStamp & { clock: Clock, lock(): unknown }
 /** The deviceDB as a lease reaches it, bound to the vault's scope by the vault that makes the friend, so no verb takes a scope. */
 export const leaseDBFriend = objCheck(({ fn }) => ({
   logger:      HX.loggerShape,
-  tryGetLease: fn<() => Promise<Outcome<LeaseRecord | null>>>(),
-  tryPutLease: fn<(record: LeaseRecord) => Promise<Outcome<LeaseRecord>>>(),
+  tryGetLease: fn<() => Promise<Outcome<unknown>>>(),
+  tryPutLease: fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   tryDelLease: fn<() => Promise<Outcome<void>>>(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 
@@ -658,8 +665,8 @@ export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSea
 
 /** The deviceDB's lease verbs, as the vault's world carries them: each by the vault's scope, which `vault.leaseDBFriend()` binds, so no verb of the dbfriend takes one. */
 export const leaseDeviceDB = objCheck(({ fn }) => ({
-  tryGetLease: fn<(scope: VaultScope) => Promise<Outcome<LeaseRecord | null>>>(),
-  tryPutLease: fn<(record: LeaseRecord) => Promise<Outcome<LeaseRecord>>>(),
+  tryGetLease: fn<(scope: VaultScope) => Promise<Outcome<unknown>>>(),
+  tryPutLease: fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   tryDelLease: fn<(scope: VaultScope) => Promise<Outcome<void>>>(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 
@@ -667,6 +674,6 @@ export type LeaseDeviceDB = Z.infer<typeof leaseDeviceDB>
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Its `parse` refuses 'bad_option'. Checks only. */
 export const vaultListingOpts = objCheck(({ obj }) => ({
-  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis, deviceDB: leaseDeviceDB }),
+  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), deviceDB: leaseDeviceDB }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --

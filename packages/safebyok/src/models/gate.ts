@@ -1,9 +1,9 @@
 import { decorate, tattoo } from '../helpers'
-import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, gateProps, vaultStamp } from './models-shapes'
-import { NOVEL, Proving } from './proving'
+import { type AttemptClosure, type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, gateProps, vaultStamp } from './models-shapes'
+import { NOVEL, type PassphraseProving, Proving } from './proving'
 import { Wayin } from './wayin'
 
-// == [Gate]: build, novelWayins, pickle, toJSON
+// == [Gate]: build, novelWayins, attemptProof, pickle, toJSON
 
 export class Gate {
   declare readonly passphrase_wayin: PassphraseWayinRecord
@@ -23,21 +23,25 @@ export class Gate {
     Object.freeze(this)
   }
 
-  /** A novel gate for the vault `stamp` names, its wayins made from what `proofClosure` answers. */
-  static async build(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<Gate> {
-    const wayins = await Gate.#novelWayins(stamp, proofClosure, world)
-    return new Gate(stamp, { passphrase_wayin: wayins.passphrase.pickle(), passkey_wayin: wayins.passkey?.pickle() ?? null })
+  /** A novel gate for the vault `stamp` names, its wayins made from what `proofClosure` answers, beside the passphrase proving, which grants the vault its first lease. */
+  static async build(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ gate: Gate, proving: PassphraseProving }> {
+    const { proving, passphrase, passkey } = await Gate.#novelWayins(stamp, proofClosure, world)
+    return { gate: new Gate(stamp, { passphrase_wayin: passphrase.pickle(), passkey_wayin: passkey?.pickle() ?? null }), proving }
   }
 
-  static async #novelWayins(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ passphrase: Wayin, passkey: Wayin | null }> {
+  static async #novelWayins(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ proving: PassphraseProving, passphrase: Wayin, passkey: Wayin | null }> {
     const { passphraseProving, passkeyProving } = await Proving.makeProvingPair(stamp, proofClosure, world)
     const passphrase = await passphraseProving.makeWayin(NOVEL)
     const passkey = passkeyProving === null ? null : await passkeyProving.makeWayin(passphraseProving)
-    // not yet: passphraseProving.makeLease()
-    return { passphrase, passkey }
+    return { proving: passphraseProving, passphrase, passkey }
   }
 
-  // not yet: attemptProof, revokePasskey, replacePassphrase, addPasskey, gate_epoch
+  /** The proving of this gate's wayin that what `proofClosure` answers opens, as {@link Proving.attempt} makes it. */
+  attemptProof(proofClosure: AttemptClosure, world: ProvingWorld): Promise<Proving> {
+    return Proving.attempt(this.stamp, this.pickle(), proofClosure, world)
+  }
+
+  // not yet: revokePasskey, replacePassphrase, addPasskey, gate_epoch
 
   pickle(): GateProps {
     const { passphrase_wayin, passkey_wayin } = this

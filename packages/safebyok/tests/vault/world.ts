@@ -1,4 +1,5 @@
 import type { LeaseRecord, DeviceRecord } from '../../src/shapes/device'
+import * as DX from '../../src/shapes/device'
 import { DeviceDB, memoryDeviceDB, type DeviceVerb } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
@@ -49,7 +50,10 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
     await TH.unlock(vault, passphrase)
     return vault
   }
-  const getLease = () => TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
+  const getLease = async (): Promise<LeaseRecord | null> => {
+    const kept = await TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
+    return kept === null ? null : DX.leaseRecord.parse(kept)
+  }
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<TH.BornVaultOpts>) => {
     const vault = await open(overrides)

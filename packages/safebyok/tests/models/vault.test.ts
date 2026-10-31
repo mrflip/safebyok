@@ -1,74 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { VaultScope } from '../../src/shapes/scopes'
-import type { VaultRecord, VaultSparse } from '../../src/models/models-shapes'
-import { NOVEL, Proving } from '../../src/models/proving'
-import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
+import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
+import { Dna, Passphrase, T0, makeVaultWorld, provingOf, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
-const T0 = Date.UTC(2026, 9, 31)
-const Dna = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
-const Passphrase = 'correct horse battery staple'
-const ok = <ValT>(val: ValT) => Promise.resolve({ ok: true as const, val, err: null })
-const nothing = (): void => undefined
-
-/** A vault listing over a vaultDB of one row, `stored0` to begin with, a cache that keeps nothing, and a world whose deviceDB logs each lease verb. */
-const makeVaultWorld = (stored0: VaultRecord | null = null) => {
-  let stored = stored0
-  const deviceDB = { tryGetLease: vi.fn(() => ok(null)), tryPutLease: vi.fn((record: unknown) => ok(record)), tryDelLease: vi.fn(() => ok(undefined)) }
-  const world: VaultWorld = {
-    clock:        { now: () => T0 },
-    lockState:    () => 'unlocked',
-    ensureTimely: () => Promise.resolve(),
-    takeWorld:    nothing,
-    scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
-    logger:       TH.quietLogger,
-    keyDeriver:   TH.testDeriver,
-    device_id:    'device-1',
-    leaseMillis:  60 * 60_000,
-    deviceDB:     deviceDB as unknown as VaultWorld['deviceDB'],
-  }
-  const answerOf = (scope: VaultScope, val: VaultRecord | VaultSparse | null) => ({ scope, ok: true as const, val, world: null })
-  const opts: VaultListingOpts = {
-    world,
-    store: {
-      get:   (scope) => Promise.resolve(answerOf(scope, stored)),
-      put:   (record) => { stored = record; return Promise.resolve(answerOf(record, record)) },
-      del:   () => Promise.reject(new Error('not in these tests')),
-      watch: () => nothing,
-    },
-    cache: { load: () => Promise.resolve([]), save: () => Promise.resolve() },
-    maxMillisSinceRefresh: 10 * 60_000,
-  }
-  const listing = new VaultListing(opts)
-  /** Another device's put of `record`, landing in the vaultDB behind this one's back, at the next revision. */
-  const storeBehindOurBack = (record: VaultRecord): VaultRecord => {
-    stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: T0 }
-    return stored
-  }
-  return { listing, opts, deviceDB, storedNow: () => stored, storeBehindOurBack }
-}
-
-/** The record of a vault built of `Dna`, gated under `passphrase` and sent, as a vaultDB holds it. */
-const storedVaultRecord = async (passphrase: string = Passphrase) => {
-  const { listing, storedNow } = makeVaultWorld()
-  const vault = await listing.build(Dna, () => ({ passphrase }))
-  await vault.send({})
-  const record = storedNow()
-  if (record === null) { throw new Error('nothing stored') }
-  return record
-}
+useVaultWorlds()
 
 /** The gate of a vault of `Dna` proved under another passphrase entirely: one this test's vault never proved. */
 const unprovedGateOf = async () => {
   const { gate } = await storedVaultRecord('another passphrase entirely')
   return gate
-}
-
-/** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
-const provingOf = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
-  const { passphraseProving } = await Proving.makeProvingPair({ ...Dna, vault_tok, registered_at }, () => ({ passphrase: Passphrase }), makeVaultWorld().opts.world)
-  await passphraseProving.makeWayin(NOVEL)
-  return passphraseProving
 }
 
 describe("VaultListing.build of a dna: the gate is built before the vault is born, and stored in the vault record alone", () => {
@@ -176,6 +116,7 @@ describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the gr
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
     const proving = await provingOf(vault)
+    deviceDB.tryPutLease.mockClear()
     const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 })
     expect(lease.isInForce).to.be.true
     expect(lease.vault).to.equal(vault)
@@ -187,6 +128,7 @@ describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the gr
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
     const proving = await provingOf({ vault_tok: 'vault-tok-other', registered_at: T0 })
+    deviceDB.tryPutLease.mockClear()
     await TH.expectRefusal(proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 }), 'bad_option')
     expect(deviceDB.tryPutLease).not.toHaveBeenCalled()
   })

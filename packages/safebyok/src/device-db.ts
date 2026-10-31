@@ -1,5 +1,5 @@
 import type * as Z from 'zod'
-import { DeviceRecordFormat, type DeviceRecord, type LeaseRecord } from './shapes/device'
+import { DeviceRecordFormat, type DeviceRecord, type KeptLeaseRow, type LeaseRecord } from './shapes/device'
 import * as DX from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import * as CX from './shapes/scopes'
@@ -46,17 +46,17 @@ export abstract class DeviceDB {
    *
    * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
    */
-  async getLease(scope: VaultScope): Promise<LeaseRecord | null> {
+  async getLease(scope: VaultScope): Promise<KeptLeaseRow | null> {
     const leaseScopepath = Scopepath.lease(scope)
     const raw = await storeAnswer('getLease', () => this.doGetLease(leaseScopepath))
-    return await this.#parseOrDel('getLease', DX.leaseRecord, leaseScopepath, raw)
+    return await this.#parseOrDel('getLease', DX.keptLeaseRow, leaseScopepath, raw)
   }
 
   /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
    *
    * @example await deviceDB.tryGetLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
    */
-  tryGetLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>> {
+  tryGetLease(scope: VaultScope): Promise<Outcome<KeptLeaseRow | null>> {
     return outcomeOf(() => this.getLease(scope))
   }
 
