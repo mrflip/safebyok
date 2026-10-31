@@ -33,13 +33,13 @@ const prfBytesOf = (handed: unknown): Uint8Array => (
 
 describe("Proving.makeProvingPair(vault, proofClosure, world): the arguments", () => {
   const ArgsCases = [
-    [{ world: TH.omitting(provingWorldOf(), 'keyDeriver') },        'a world with no keyDeriver'],
-    [{ world: TH.omitting(provingWorldOf(), 'clock') },             'a world with no clock'],
-    [{ world: TH.omitting(provingWorldOf(), 'device_id') },         'a world with no device_id'],
-    [{ world: provingWorldOf({ device_id: '' }) },                  'a world with an empty device_id'],
-    [{ vault: { ...duckVaultOf(), vault_tok: undefined } },          'a vault with no vault_tok'],
-    [{ vault: { ...duckVaultOf(), registered_at: 'yesterday' } },    'a vault registered at a time that is no epoch millis'],
-    [{ vault: null },                                                'no vault at all'],
+    [{ world: TH.omitting(provingWorldOf(), 'keyDeriver') },      'a world with no keyDeriver'],
+    [{ world: TH.omitting(provingWorldOf(), 'clock') },           'a world with no clock'],
+    [{ world: TH.omitting(provingWorldOf(), 'device_id') },       'a world with no device_id'],
+    [{ world: provingWorldOf({ device_id: '' }) },                'a world with an empty device_id'],
+    [{ vault: { ...duckVaultOf(), vault_tok: undefined } },       'a vault with no vault_tok'],
+    [{ vault: { ...duckVaultOf(), registered_at: 'yesterday' } }, 'a vault registered at a time that is no epoch millis'],
+    [{ vault: null },                                             'no vault at all'],
   ] as const
 
   for (const [args, blurb] of ArgsCases) {
@@ -243,9 +243,9 @@ describe("proving.makeWayin(source)", () => {
   })
 
   const SourceCases = [
-    ['NOVEL',            'the string NOVEL'],
-    [Symbol('NOVEL'),    'another symbol named NOVEL'],
-    [null,               'null'],
+    ['NOVEL',                     'the string NOVEL'],
+    [Symbol('NOVEL'),             'another symbol named NOVEL'],
+    [null,                        'null'],
     [{ wayinkind: 'passphrase' }, 'a plain object shaped like a proving'],
   ] as const
 

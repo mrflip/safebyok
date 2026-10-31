@@ -70,16 +70,16 @@ describe("Lease.grant(vault, dbfriend, vaultKey, opts)", () => {
   })
 
   const GrantRefusalCases = [
-    [() => ({ vaultKey: makeLeaseKey() }),                                             'refuses a vaultKey that is not extractable'],
-    [() => ({ vaultKey: 'a vault key' }),                                       'refuses a vaultKey that is no CryptoKey'],
-    [() => ({ opts: { leaseMillis: 0 } }),                                      'refuses leaseMillis 0'],
-    [() => ({ opts: { leaseMillis: -1000 } }),                                  'refuses a negative leaseMillis'],
-    [() => ({ opts: { leaseMillis: 1.5 } }),                                    'refuses a leaseMillis that is not whole'],
-    [() => ({ opts: {} }),                                                      'refuses opts with no leaseMillis'],
-    [() => ({ vault: { ...duckVaultOf(), lock: undefined } }),                  'refuses a vault with no lock()'],
-    [() => ({ vault: { ...duckVaultOf(), vault_tok: undefined } }),             'refuses a vault with no vault_tok'],
-    [() => ({ dbfriend: { ...fakeDBFriendOf(), tryDelLease: undefined } }),     'refuses a dbfriend with no tryDelLease'],
-    [() => ({ dbfriend: { ...fakeDBFriendOf(), logger: undefined } }),          'refuses a dbfriend with no logger'],
+    [() => ({ vaultKey: makeLeaseKey() }),                                  'refuses a vaultKey that is not extractable'],
+    [() => ({ vaultKey: 'a vault key' }),                                   'refuses a vaultKey that is no CryptoKey'],
+    [() => ({ opts: { leaseMillis: 0 } }),                                  'refuses leaseMillis 0'],
+    [() => ({ opts: { leaseMillis: -1000 } }),                              'refuses a negative leaseMillis'],
+    [() => ({ opts: { leaseMillis: 1.5 } }),                                'refuses a leaseMillis that is not whole'],
+    [() => ({ opts: {} }),                                                  'refuses opts with no leaseMillis'],
+    [() => ({ vault: { ...duckVaultOf(), lock: undefined } }),              'refuses a vault with no lock()'],
+    [() => ({ vault: { ...duckVaultOf(), vault_tok: undefined } }),         'refuses a vault with no vault_tok'],
+    [() => ({ dbfriend: { ...fakeDBFriendOf(), tryDelLease: undefined } }), 'refuses a dbfriend with no tryDelLease'],
+    [() => ({ dbfriend: { ...fakeDBFriendOf(), logger: undefined } }),      'refuses a dbfriend with no logger'],
   ] as const
 
   for (const [argsOf, blurb] of GrantRefusalCases) {
@@ -158,10 +158,10 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
 
   const MalformedCases = [
     [(record: LeaseRecord, extractableVaultKey: CryptoKey) => ({ ...record, lease_key: extractableVaultKey }), 'whose leaseKey is extractable (G4)'],
-    [(record: LeaseRecord) => ({ ...record, fmt: 7000 }),                             'of another fmt'],
-    [(record: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: undefined }),    'with no wrapped vaultKey'],
-    [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                        'with a field no lease has'],
-    [() => 'a lease',                                                                       'that is no record at all'],
+    [(record: LeaseRecord) => ({ ...record, fmt: 7000 }),                          'of another fmt'],
+    [(record: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: undefined }), 'with no wrapped vaultKey'],
+    [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                     'with a field no lease has'],
+    [() => 'a lease',                                                              'that is no record at all'],
   ] as const
 
   for (const [tamper, blurb] of MalformedCases) {
@@ -283,7 +283,7 @@ describe("lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp) and unsea
     [[['boxlabel', 'b1']],               'an array'],
     [{ boxlabel: 'b1', revision: null }, 'a stamp with a null field'],
     [{ boxlabel: { nested: 'b1' } },     'a stamp that is not flat'],
-    [{ revision_seq: NaN },       'a stamp with a number that is not finite'],
+    [{ revision_seq: NaN },              'a stamp with a number that is not finite'],
   ] as const
 
   for (const [stamp, blurb] of BadStampCases) {
@@ -306,8 +306,8 @@ describe("lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp) and unsea
   })
 
   const WrongStampCases = [
-    [{ boxKeyStamp: sealStampsOf('b2').boxKeyStamp },                           "another box's boxKey stamp"],
-    [{ whisperStamp: sealStampsOf('b1', { revision_seq: 2 }).whisperStamp },     "another revision's whisper stamp"],
+    [{ boxKeyStamp: sealStampsOf('b2').boxKeyStamp },                        "another box's boxKey stamp"],
+    [{ whisperStamp: sealStampsOf('b1', { revision_seq: 2 }).whisperStamp }, "another revision's whisper stamp"],
     [{ boxKeyStamp: sealStampsOf('b1').whisperStamp, whisperStamp: sealStampsOf('b1').boxKeyStamp }, 'the two stamps swapped'],
   ] as const
 
@@ -357,7 +357,7 @@ describe("lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp) and unsea
 
 describe("a tampered lease record", () => {
   const TamperCases = [
-    [(record: LeaseRecord) => ({ ...record, autolock_at: record.autolock_at + WeekMillis }),  'its autolock_at pushed a week later'],
+    [(record: LeaseRecord) => ({ ...record, autolock_at: record.autolock_at + WeekMillis }),   'its autolock_at pushed a week later'],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }), "another lease's leaseKey"],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: other.vault_key_lease_wrapped }), "another lease's wrapped vaultKey"],
   ] as const
