@@ -26,6 +26,7 @@ import * as Phrases from './phrases'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
+import { lockedError } from './helpers/throwers'
 import { type DeviceDB, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { KeptLease, Lease } from './lease'
@@ -1874,11 +1875,9 @@ export class Vault implements VaultStamp {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, goneError, remadeError, behindError, gateMovedError, gatingLandedError
+// == [Refusals]: damagedBeyondNaming, goneError, remadeError, behindError, gateMovedError, gatingLandedError
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', Phrases.BoxDamagedBeyondNaming)
-
-const lockedError = () => new VaultError('vault_locked', Phrases.VaultLocked)
 
 const goneError = () => new VaultError('vault_gone', Phrases.VaultObjectGone)
 
