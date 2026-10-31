@@ -22,6 +22,7 @@ consistency and timeliness checks. These will come back later.
 * passphrasePester Trigger
 
 * revokePasskey(), replacePassphrase, addPasskey, ???
+  - _Built (thread 4):_ `replacePassphrase(proofClosure, passphraseClosure)`, `addPasskey(proofClosure, passkeyClosure)` and `revokePasskey(proofClosure)`, each with its `try*` form: `ensureReadyToEdit()`, the gate's next props, then `#sendGate(ante, props)`, which sends a module-private `GateStaging` that `isFullPatch` passes and `makeStaged` takes the gate of; a host's patch still carries none. Proof is asked even of an unlocked vault, and the lock state is left as it was. The vaultKey does not change, so the lease held, and the one kept, stay in force across a gate change. `ante` is the record's gate the op proved against, read after `ensureReadyToEdit()`: where the record's gate is another object by `makeStaged` (a newer record received in the send), it refuses 'stale_write' and stores nothing. The passkey stays across a new passphrase, to be revoked separately (pinned in `tests/loosened/`).
 
 * vaultListing.build()
   - draft sparse vault record
@@ -46,6 +47,7 @@ My picture is that there's a
 * #novelProvings -- prompt user and get a proving pair
 *
 * revokePasskey(), replacePassphrase(), addPasskey()
+  - _Built (thread 4)_ as `withPassphraseReplaced(proofClosure, passphraseClosure, world)`, `withPasskeyAdded(proofClosure, passkeyClosure, world)` and `withPasskeyRevoked(proofClosure, world)`, each answering the next `GateProps`: `#provePassphrase` (`attemptProof`, a proof by passkey refusing 'bad_option', as the passphrase alone proves a change), then the new proving (`PassphraseProving.makeFromClosure`, `PasskeyProving.makeFromClosure`), whose wayin `proving.makeWayin(proved)` seals from the passphrase's proving. A new passphrase keeps the passkey wayin as stored: its ctx binds only the vault stamp and its own header, and the vaultKey is unchanged. A second passkey refuses 'bad_option', revoking none 'absent_wayin', both before asking. Not yet: the strengthChecker, `gate_epoch`.
 
 ### Proving
 

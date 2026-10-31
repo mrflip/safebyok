@@ -397,3 +397,18 @@ export const vaultAbsent = (vaultlabel: string): string => `No vault is stored u
 /** Why a vault built of a record takes no proof closure. */
 export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."
 // --
+
+// == [Models: gates]: GateChangeNeedsPassphrase, GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
+
+/** Why a passkey's answer does not prove a change to the gate. */
+export const GateChangeNeedsPassphrase = "Only the passphrase proves a change to the vault's passphrase or passkey, and this proof handed in a passkey's answer, so nothing more was asked and nothing changed. The passkey still unlocks the vault: prove the change with the passphrase."
+
+/** Why a gate change proved against a record that has since moved is not sent. */
+export const GateMovedUnderChange = "The vault's record was changed elsewhere while this change was being proved, and its passphrase or passkey may have changed with it, so nothing was changed. The vault in hand now holds the newer record: call again to make the change over it."
+
+/** Why a passkey is not added to a gate that holds one. */
+export const PasskeyHeldAlready = "This vault has a passkey already, and holds one at a time, so nothing was asked or changed: revoke it first (vault.revokePasskey), then add the new one."
+
+/** Why revoking a passkey changes nothing where the gate holds none. */
+export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
+// --

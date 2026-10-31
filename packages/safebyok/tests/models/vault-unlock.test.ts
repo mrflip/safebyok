@@ -184,6 +184,22 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.demandLease()).to.equal(fresh)
   })
 
+  it("locks at its lease's `autolock_at`, when the autolock fires, erasing the kept lease once", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const { vault, advance, deviceDB } = await bornVault()
+      const born = vault.demandLease()
+      advance(LeaseMillis)
+      await vi.advanceTimersByTimeAsync(LeaseMillis)
+      expect(vault.isLocked).to.be.true
+      expect(born.isForgotten).to.be.true
+      await TH.eventually(() => deviceDB.keptNow() === null)
+      expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("lets a displaced lease go: past its own `autolock_at`, its autolock neither locks the vault nor erases the new lease's record", async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
@@ -248,7 +264,8 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     await TH.expectRefusal(seal(lease), 'damaged_lease')
     expect(again.isLocked).to.be.true
     expect(lease.isInForce).to.be.false
-    expect(deviceDB.keptNow()).to.be.null
+    await TH.eventually(() => deviceDB.keptNow() === null)
+    expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
   })
 
   it("takes up, at the next ensureUnlocked, a lease another session kept after this vault's first look", async () => {
