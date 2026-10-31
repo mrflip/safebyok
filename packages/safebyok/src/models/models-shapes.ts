@@ -352,13 +352,16 @@ export type EditOpts = TimelyOpts
 export type StorableOpts = Z.infer<typeof storableOpts>
 // --
 
-// == [The world and the listing]: lockStateVals, IsListing, isListing, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
+// == [The world and the listing]: lockStateVals, IsListing, KeepCopy, isListing, lockState, world, listingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
 
 /** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
 export const lockStateVals = ['unlocked', 'locked'] as const
 
 /** The tag a Listing answers true to, so a storable can tell one without importing it. */
 export const IsListing: unique symbol = Symbol('safebyok.listing')
+
+/** The key of the Listing method that keeps the copy an instance hands in for the next cache save. A symbol, so that no host holding a listing can call it: only the instances the listing makes, which import it, do. */
+export const KeepCopy: unique symbol = Symbol('safebyok.keepCopy')
 
 /** True for a Listing: an object that answers true to {@link IsListing}. */
 export const isListing = (val: unknown): val is { [IsListing]: true } => (

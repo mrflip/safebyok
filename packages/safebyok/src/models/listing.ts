@@ -7,7 +7,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
+import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, KeepCopy, NeverStoredSeq } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -25,7 +25,7 @@ type Received<RecordT, SparseT> = Readonly<{ flavor: 'received', record: Fetched
  * the cache is only saved to. Every answer storage gives, to `fetch`, `put`, `del` or the watch,
  * goes through `#deliver`, and every instance is made and held through `#buildOrReceive`, so no
  * scope is built twice. The listing then settles, saving to the cache the copy the instance last
- * handed in by `keepCopy`, and making the snapshot again. A call is refused when it cannot give what it asked for: a refusal from storage,
+ * handed in by `[KeepCopy]`, and making the snapshot again. A call is refused when it cannot give what it asked for: a refusal from storage,
  * or a record its instance's `receive` refuses. Bad news nobody asked about, a refused save to
  * the cache or a refusal met on a notice, is told to `onBadNews`.
  */
@@ -36,7 +36,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   readonly #store: Store<ScopeT, RecordT, SparseT>
   readonly #cache: Cache<RecordT, SparseT>
-  /** The copy each instance last handed in by `keepCopy`, by scopepath: saved by `settle` on a delivery or a build, never on a revive. */
+  /** The copy each instance last handed in by `[KeepCopy]`, by scopepath: saved by `settle` on a delivery or a build, never on a revive. */
   readonly #copies    = new Map<string, Cacheable<RecordT, SparseT>>()
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()
@@ -279,7 +279,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, keepCopy, settle, remakeSnapshot
+  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, [KeepCopy], settle, remakeSnapshot
 
   /** The snapshot of every present instance, as the instance itself gives it: frozen, the same array until one of them changes. */
   get snapshot(): readonly SnapshotT[] { return this.#snapshot }
@@ -293,8 +293,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Keep `cacheable`, the copy an instance's `settle` hands in, under its scope until a delivery or a build saves it; a copy kept replaces the one before. Only the instances this listing makes call it. */
-  keepCopy(cacheable: Cacheable<RecordT, SparseT>): void {
+  /** Keep `cacheable`, the copy an instance's `settle` hands in, under its scope until a delivery or a build saves it; a copy kept replaces the one before. Keyed by the module-private {@link KeepCopy}, so only the instances this listing makes can call it. */
+  [KeepCopy](cacheable: Cacheable<RecordT, SparseT>): void {
     this.#copies.set(this.scopepathOf(this.scopeOf(cacheable)), cacheable)
   }
 

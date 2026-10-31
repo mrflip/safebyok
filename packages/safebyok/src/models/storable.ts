@@ -313,16 +313,17 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand over the central held until now; the snapshot waits for `settle`. */
   protected adopt(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null): void {
+    // Every adopt is followed by a settle: the listing saves the copy last handed in by settle, not the state at the time of the save.
     const current = this.#central
     this.#central = Object.freeze(central)
     this.#staged = staged === null ? null : Object.freeze(staged)
     this.assign(this.combined, current)
   }
 
-  /** Act on the state as adopted, idempotently: the base replaces the snapshot, hands the listing the copy for the device cache by `listing.keepCopy`, and tells no news. The copy, central and the staged beside the sparse form, is made here from the private central and staged, and goes nowhere but into that call; the listing saves it when it delivers or builds. A subclass calls super last, so that the snapshot sees it. */
+  /** Act on the state as adopted, idempotently: the base replaces the snapshot, hands the listing the copy for the device cache by `listing[MSX.KeepCopy]`, and tells no news. The copy, central and the staged beside the sparse form, is made here from the private central and staged, and goes nowhere but into that call; the listing saves it when it delivers or builds. A subclass calls super last, so that the snapshot sees it. */
   settle(): Settled {
     this.#replaceSnapshot()
-    this.listing.keepCopy(Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged }))
+    this.listing[MSX.KeepCopy](Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged }))
     return { badnews: [] }
   }
 
