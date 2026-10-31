@@ -113,6 +113,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   /** Replace the passphrase with the one `passphraseClosure` answers, once `proofClosure` proves the gate, and send; the passkey stays. The vaultKey does not change, so a lease held stays in force. */
   async replacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<this> {
+    MSX.passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
     await this.ensureReadyToEdit()
     return this.#sendGate(await this.gate.withPassphraseReplaced(proofClosure, passphraseClosure, this.world))
   }
@@ -121,6 +122,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   /** Add the passkey whose answer `passkeyClosure` hands in, once `proofClosure` proves the gate, and send. A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a lease held stays in force. */
   async addPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<this> {
+    MSX.passkeyAddArgs.parse({ proofClosure, passkeyClosure })
     await this.ensureReadyToEdit()
     return this.#sendGate(await this.gate.withPasskeyAdded(proofClosure, passkeyClosure, this.world))
   }
@@ -129,6 +131,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   /** Revoke the passkey, once `proofClosure` proves the gate, and send. A vault without one refuses 'absent_wayin', asking nothing. Removal is not revocation of the vaultKey, which does not change: a lease held stays in force. */
   async revokePasskey(proofClosure: AttemptClosure): Promise<this> {
+    MSX.passkeyRevokeArgs.parse({ proofClosure })
     await this.ensureReadyToEdit()
     return this.#sendGate(await this.gate.withPasskeyRevoked(proofClosure, this.world))
   }
