@@ -293,7 +293,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Keep `cacheable`, the copy an instance's `settle` hands in, under its scope until a delivery or a build saves it; a copy kept replaces the one before. Keyed by the module-private {@link KeepCopy}, so only the instances this listing makes can call it. */
+  /** Keep `cacheable`, the copy an instance's `settle` hands in, under its scope until a delivery or a build saves it; a copy kept replaces the one before. Keyed by {@link KeepCopy}, which the package does not export, so it is off a host's typed surface; the instances this listing makes call it. */
   [KeepCopy](cacheable: Cacheable<RecordT, SparseT>): void {
     this.#copies.set(this.scopepathOf(this.scopeOf(cacheable)), cacheable)
   }
