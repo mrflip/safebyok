@@ -141,6 +141,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     if (inFlight !== null) { return inFlight }
     const kept = await this.takeUpKeptLease()
     if (kept !== null) { return kept }
+    // A lease taken up meanwhile, through `takeUpLease`, is the answer: the look declined the kept one for it.
+    const held = this.#lease
+    if (held?.isInForce) { return held }
     if (proofClosure !== undefined) { this.#unlocking ??= this.#unlockAlone(proofClosure) }
     if (this.#unlocking === null) { throw noProofToUnlock() }
     return this.#unlocking

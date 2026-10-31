@@ -161,6 +161,22 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(deviceDB.tryPutLease).toHaveBeenCalledTimes(2)
   })
 
+  it("answers, when its look for a kept lease finds none, a lease taken up meanwhile, rather than refusing a vault that reads unlocked", async () => {
+    const { vault, deviceDB, opts: { world } } = await bornVault()
+    const proving = await vault.gate.attemptProof(() => ({ passphrase: Passphrase }), world)
+    const fresh = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis })
+    vault.lock()
+    await TH.eventually(() => deviceDB.keptNow() === null)
+    const look = { answer: null as (() => void) | null }
+    deviceDB.tryGetLease.mockImplementationOnce(() => new Promise((resolve) => { look.answer = () => { resolve({ ok: true, val: null, err: null }) } }))
+    const pending = vault.ensureUnlocked()
+    await TH.eventually(() => look.answer !== null)
+    expect(vault.takeUpLease(fresh)).to.equal(fresh)
+    look.answer?.()
+    expect(await pending).to.equal(fresh)
+    expect(vault.demandLease()).to.equal(fresh)
+  })
+
   it("lets a displaced lease go: past its own `autolock_at`, its autolock neither locks the vault nor erases the new lease's record", async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
