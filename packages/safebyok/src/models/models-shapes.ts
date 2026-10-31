@@ -360,7 +360,7 @@ export const lockStateVals = ['unlocked', 'locked'] as const
 /** The tag a Listing answers true to, so a storable can tell one without importing it. */
 export const IsListing: unique symbol = Symbol('safebyok.listing')
 
-/** The key of the Listing method that keeps the copy an instance hands in for the next cache save. A symbol, so that no host holding a listing can call it: only the instances the listing makes, which import it, do. */
+/** The key of the Listing method that keeps the copy an instance hands in for the next cache save. A symbol the package does not export, so the method is off the surface a host types against: the instances the listing makes import it and call it. Reflection on a listing still finds a symbol-keyed member, so it keeps out a mistaken call, not a determined one. */
 export const KeepCopy: unique symbol = Symbol('safebyok.keepCopy')
 
 /** True for a Listing: an object that answers true to {@link IsListing}. */
