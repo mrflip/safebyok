@@ -14,7 +14,7 @@
 import { afterEach, beforeEach, vi } from 'vitest'
 import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
-import { type BoxProps, Box } from '../../src/models/box'
+import { type BoxPatch, Box } from '../../src/models/box'
 import { BoxListing, type BoxCache, type BoxDna, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
@@ -32,7 +32,7 @@ export const T0 = 1_700_000_000_000
 /** The vault's scope and `vault_tok` that {@link makeModelsWorld} gives its world, and the builders below give their records. */
 const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
 
-/** A full box record that passes `boxRecord`, in {@link WorldVault}: revision 1 of the box `anthropic_api_key`, alive, registered and written at {@link T0}, its sealed parts the fake ciphered bags that open under no key. `overrides` says otherwise.
+/** A full box record that passes `boxRecord`, in {@link WorldVault}: revision 1 of the box `anthropic_api_key`, of the life `box-tok-a`, alive, registered and written at {@link T0}, its sealed parts the fake ciphered bags that open under no key. `overrides` says otherwise.
  *
  * @example fullBoxRecord({ boxlabel: 'openai_api_key', revision_seq: 3, sidecar: { note: 'work' } })
  */
@@ -41,6 +41,7 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
   boxlabel:               'anthropic_api_key',
   fmt:                    BoxFormat,
   vault_tok:              WorldVault.vault_tok,
+  box_tok:                'box-tok-a',
   am:                     'a',
   revision_tok:           'rev-a1',
   revision_seq:           1,
@@ -451,16 +452,17 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose boxes fake the seal in `edit`, for a test that wants sealed parts it can tell apart by revision, or acts while an edit is under way: the whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, with the sidecar given. `duringMakeStaged`, where given, runs at the top of each `makeStaged`, for a test that acts while an edit is under way.
+/** A {@link boxListingOf} whose boxes fake the seal in `edit`, for a test that wants sealed parts it can tell apart by revision, or acts while an edit is under way: the whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, with the sidecar given. `duringMakeStaged`, where given, runs once each `makeStaged` has made its staged record, before it resolves, for a test that acts while an edit is under way.
  *
  * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each edit
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringMakeStaged: () => void = () => undefined): TestableBoxListing => {
   class FakeSealBox extends TestableBox {
-    protected override makeStaged(base: BoxSparse, { sidecar }: BoxProps): Promise<BoxRecord> {
+    protected override async makeStaged(patch: BoxPatch): Promise<BoxRecord> {
+      const staged = await super.makeStaged(patch)
       duringMakeStaged()
-      return Promise.resolve({ ...base, sidecar, box_key_wrapped: fakeCiphered(`boxkey-${base.revision_tok}`), whisper_ciphered: fakeCiphered(`whisper-${base.revision_tok}`) })
+      return { ...staged, box_key_wrapped: fakeCiphered(`boxkey-${staged.revision_tok}`), whisper_ciphered: fakeCiphered(`whisper-${staged.revision_tok}`) }
     }
   }
   class FakeSealBoxListing extends TestableBoxListing {

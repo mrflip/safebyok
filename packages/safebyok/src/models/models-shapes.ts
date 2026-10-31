@@ -50,7 +50,7 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, bu
     revision_seq: int,
   })
   const times = obj({
-    /** When the thing was first stored. */
+    /** When this life of the thing began: the `written_at` of its birth, a draft's or an edit's over a tombstone, kept by every later revision of that life. */
     registered_at: epochMillis,
     /** When the record in hand was written; on a tombstone, when it was deleted. */
     written_at:    epochMillis,
@@ -70,7 +70,7 @@ export type Am = Z.infer<typeof am>
 /** A record's revision: its `revision_tok`, minted at each put and del, and its `revision_seq`, higher on the later one. */
 export type Revision = Readonly<Z.infer<typeof revision>>
 
-/** When the thing was first stored, and when the record in hand was written; on a tombstone, when it was deleted. */
+/** When this life of the thing began, and when the record in hand was written; on a tombstone, when it was deleted. */
 export type Times = Readonly<Z.infer<typeof times>>
 
 /** Whether a record is alive, damaged or gone: its `am`. */
@@ -257,11 +257,13 @@ export type WhisperHolder = Z.output<typeof whisperHolder>
  * The sparse form keeps `whisper_codec` and `whisper_schema_version`, which say how a whisper is
  * sealed, so a sparse record can be sealed over as it is.
  */
-export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, lit, applabel, user_id, vaultlabel, boxlabel, box_key_wrapped, whisper_ciphered }) => {
+export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, lit, applabel, user_id, vaultlabel, boxlabel, box_tok, box_key_wrapped, whisper_ciphered }) => {
   const boxSparse = obj({
     applabel, user_id, vaultlabel, boxlabel,
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
+    /** The life of the box under its boxlabel: minted at its birth, a draft's or an edit's over a tombstone, and kept by every later revision. */
+    box_tok,
     /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
     whisper_codec:          lit('json_v1'),
     /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
@@ -288,7 +290,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
  *
  * `boxDna` requires the scope too, and fills `whisper_codec` and `whisper_schema_version` with
  * their defaults where missing or undefined; the factory's props are `fmt`, `am`, `vault_tok`,
- * `revision_tok` and the times. The sealed parts never come from a dna: `build` seals every box it
+ * `box_tok`, `revision_tok` and the times. The sealed parts never come from a dna: `build` seals every box it
  * makes, so a dna carrying one refuses, as a field it does not take, and `revision_seq` among them:
  * input carrying one is a record, which `build` holds to the record check.
  *
@@ -307,7 +309,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
  */
 export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, applabel, user_id, vaultlabel, boxlabel }) => {
   const halves  = { whisper: whisperHolder, sidecar }
-  const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
+  const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
     ...halves,

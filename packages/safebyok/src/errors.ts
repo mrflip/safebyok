@@ -152,6 +152,10 @@ export type RefusalMeta = {
    * with no second read.
    */
   vault_stored?: VaultRecord | null
+  /** `stale_write` from an edit whose stored record moved while the edit was being made: the revision storage now holds, as this device received it. */
+  stored_revision?: Readonly<{ revision_tok: string, revision_seq: number }>
+  /** `stale_write` from an edit whose stored record moved while the edit was being made: the revision the edit had staged its record under, which nothing holds. */
+  staged_revision?: Readonly<{ revision_tok: string, revision_seq: number }>
   /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
    * Always there on storage's own `vault_full`. Never on the vault's, which refuses from
    * `vault.snapshot.capacity` before storage is asked.

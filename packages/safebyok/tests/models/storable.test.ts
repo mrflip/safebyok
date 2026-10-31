@@ -520,6 +520,45 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       })
     }
   })
+
+  describe("a rcvd of another life: another box_tok, in this vault", () => {
+    /** The box made anew elsewhere under the same boxlabel: another `box_tok`, registered later. */
+    const OtherLife = { box_tok: 'box-tok-b', registered_at: T0 + 50 }
+
+    for (const rcvdShape of ShapesAll) {
+      it(`other | older | ${rcvdShape} | full takes the older rows: a past life, its revisions ordered with this one's`, () => {
+        expectReceivedUnchanged(boxOf(Centrals.full()), rcvdOf(rcvdShape, { ...OlderRev, ...OtherLife }), rcvdShape === 'ouch' ? 'skip' : 'older')
+      })
+
+      it(`other | same | ${rcvdShape} | full refuses 'record_conflict': one revision cannot begin a life and continue another`, () => {
+        const box = boxOf(Centrals.full(), Staged())
+        const before = stateOf(box)
+        const err = TH.expectSyncRefusal(() => box.receive(rcvdOf(rcvdShape, { ...SameRev, ...OtherLife })), 'record_conflict')
+        expect(err.message).to.eq(Phrases.OneRevisionTwoLives)
+        expect(policies).to.deep.equal([])
+        expect(stateOf(box)).to.deep.equal(before)
+      })
+    }
+
+    for (const centralShape of ShapesAll) {
+      it(`other | newer | full | ${centralShape} takes 'adopt', a birthday: central, box_tok and registered_at become the delivered record's`, () => {
+        const box = boxOf(Centrals[centralShape]())
+        const rcvd = rcvdOf('full', { ...NewerRev, ...OtherLife })
+        box.receive(rcvd)
+        expect(policies).to.deep.equal(['adopt'])
+        expect(box._cheat_central).to.deep.equal(rcvd)
+        expect(box).to.include({ box_tok: 'box-tok-b', registered_at: T0 + 50, revision_seq: 3 })
+      })
+    }
+
+    it("other | newer | full | never stored takes 'adopt' over a draft: a box born elsewhere first is the one storage holds", async () => {
+      const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
+      const rcvd = fullBoxRecord({ revision_seq: 0, revision_tok: 'rev-b0', ...OtherLife })
+      box.receive(rcvd)
+      expect(box._cheat_central).to.deep.equal(rcvd)
+      expect(box).to.include({ box_tok: 'box-tok-b', registered_at: T0 + 50 })
+    })
+  })
 })
 
 describe("storable.receive(rcvd): the reconcileStaged table, through a Box", () => {
@@ -1042,7 +1081,7 @@ describe("storable.edit(patch): the record staged", () => {
   })
 })
 
-/** A box `anthropic_api_key` at revision 1, seeded and timely, whose next `makeStaged` first receives `rcvd`, as a delivery landing mid-edit would. Calls are cleared after. */
+/** A box `anthropic_api_key` at revision 1, seeded and timely, whose next `makeStaged` receives `rcvd` once it has made its staged record, as a delivery landing mid-edit would. Calls are cleared after. */
 const landingBoxOf = async (rcvd: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
   const { mw } = held
   const record = mw.fullBoxRecord()
@@ -1395,27 +1434,23 @@ describe("storable.receive(rcvd): a 'same' answer and the staged tombstone of a 
   })
 })
 
-describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile carries it", () => {
+describe("storable.edit(patch): the 'stale_write' of a central moved meanwhile names both revisions", () => {
   const MovedCases = [
     [() => fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2', sidecar: { note: 'theirs' } }), 'a newer record'],
     [() => tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }),                         'a deletion'],
   ] as const
   for (const [rcvdOf, blurb] of MovedCases) {
-    it(`carries ${blurb} received as meta.box_stored, the central now held`, async () => {
+    it(`carries the revision of ${blurb} received as meta.stored_revision, and the one the edit staged as meta.staged_revision, and nothing more`, async () => {
       const box = await landingBoxOf(rcvdOf())
+      const { revision_tok, revision_seq } = rcvdOf()
       const err = await TH.expectRefusal(box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'mine' } }), 'stale_write')
-      expect(err.meta?.box_stored).to.deep.equal(rcvdOf())
-      expect(err.meta?.box_stored).to.eq(box._cheat_central)
+      expect(err.meta).to.have.all.keys('stored_revision', 'staged_revision')
+      expect(err.meta?.stored_revision).to.deep.equal({ revision_tok, revision_seq })
+      expect(err.meta?.staged_revision).to.have.property('revision_seq', 2)
+      expect(err.meta?.staged_revision?.revision_tok).to.be.a('string').and.not.oneOf(['rev-a1', revision_tok])
       expect(err.message).to.eq(Phrases.MovedUnderEdit)
     })
   }
-
-  it("carries a central where `storedInStaleRefusal` finds it, as storage's own 'stale_write' would carry it", async () => {
-    const box = await landingBoxOf(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-b2' }))
-    const err = await TH.expectRefusal(box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'mine' } }), 'stale_write')
-    const { listing } = box as unknown as { listing: { storedInStaleRefusal: (err: VaultError) => unknown } }
-    expect(listing.storedInStaleRefusal(err)).to.deep.equal(box._cheat_central)
-  })
 })
 
 describe("storable refusal sentences, from phrases.ts", () => {
@@ -1426,7 +1461,7 @@ describe("storable refusal sentences, from phrases.ts", () => {
     expect(err.family).to.eq('condition')
     const twoToks = TH.expectSyncRefusal(() => cmpRevisions({ revision_tok: 'a', revision_seq: 1 }, { revision_tok: 'b', revision_seq: 1 }), 'record_conflict')
     expect(twoToks.message).to.eq(Phrases.OneRevisionTwoToks)
-    for (const message of [Phrases.OneRevisionTwoFates, Phrases.OneRevisionTwoToks]) {
+    for (const message of [Phrases.OneRevisionTwoFates, Phrases.OneRevisionTwoToks, Phrases.OneRevisionTwoLives]) {
       expect(message).to.contain('worth one try').and.to.contain('fundamentally not working')
     }
   })

@@ -220,13 +220,22 @@ describe("BoxListing: build holds a dna to boxDna at its door", () => {
 
   it("ignores the props the factory controls: the box is born alive, in the world's vault, at revision 0, under the clock's time", async () => {
     held.mw.setNow(T0 + 5000)
-    const box = await boxListingOf(held.mw).build({ ...dna(), am: 'x', vault_tok: 'vault-tok-other', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
+    const box = await boxListingOf(held.mw).build({ ...dna(), am: 'x', vault_tok: 'vault-tok-other', box_tok: 'box-tok-given', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
     expect(box.am).to.eq('a')
+    expect(box.box_tok).to.be.a('string').and.not.eq('box-tok-given')
     expect(box.isPresent).to.be.true
     expect(box.vault_tok).to.eq(held.mw.world.vault_tok)
     expect(box.revision_seq).to.eq(0)
     expect(box.revision_tok).to.not.eq('rev-given')
     expect(box.registered_at).to.eq(T0 + 5000)
+  })
+
+  it("gives each box born a box_tok of its own, its birthday gift", async () => {
+    const listing = boxListingOf(held.mw)
+    const one = await listing.build(dna())
+    const two = await listing.build({ ...dna(), boxlabel: 'openai_api_key' })
+    expect(one._cheat_staged).to.have.property('box_tok').that.is.a('string')
+    expect(one.box_tok).to.not.eq(two.box_tok)
   })
 
   it("refuses a factory prop that fails its check, though it would be ignored", async () => {

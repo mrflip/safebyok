@@ -1,7 +1,7 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the device cache they are warmed from, the watch on storage, and every storage call made for that kind of thing. */
 
 import { randomId } from '../crypto'
-import { type RefusalMeta, VaultError } from '../errors'
+import { VaultError } from '../errors'
 import { alreadyHeldError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
@@ -330,7 +330,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, draftOf, makeThing, absentRefusal, storedInStaleRefusal, staleMetaOf
+  // == [Defined by the concrete listing]: vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, draftOf, makeThing, absentRefusal, storedInStaleRefusal
 
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null
@@ -348,8 +348,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   abstract absentRefusal(scope: ScopeT): VaultError
   /** The record a 'stale_write' refusal carries, what storage holds; null for none, or for a record that fails its check. */
   protected abstract storedInStaleRefusal(err: VaultError): Fetched<RecordT, SparseT> | null
-  /** The `meta` of a 'stale_write' this device makes itself, carrying `stored`, the record storage now holds, where {@link storedInStaleRefusal} finds it. */
-  abstract staleMetaOf(stored: Fetched<RecordT, SparseT>): RefusalMeta
   // --
 }
 // --

@@ -16,7 +16,7 @@ export const ciphered = objCheck(({ str }) => ({
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 
-// == [Record fields]: vault_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, VaultTok, RevisionTok, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
+// == [Record fields]: vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, VaultTok, BoxTok, RevisionTok, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
 
 /** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` refuses 'bad_record', quoting none of it.
  * A token is plain text, as a host's adapter may write one by hand. An id or a label is plain
@@ -28,8 +28,9 @@ export type Ciphered = Z.infer<typeof ciphered>
  * @example obj({ wayinkind: lit('passphrase'), salt_b64, vault_key_wayin_wrapped, ... })   // a record's fields, by the names they check
  * @example box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, ctx))               // a BoxKeyWrapped, where the box record is made
  */
-export const { vault_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
+export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1, Phrases.TokenMissing),
+  box_tok:                 str.min(1, Phrases.TokenMissing),
   revision_tok:            str.min(1, Phrases.TokenMissing),
   device_id:               str.min(1),
   key_deriver_label:       str.min(1),
@@ -44,6 +45,9 @@ export const { vault_tok, revision_tok, device_id, key_deriver_label, credential
 
 /** The random token minted for one life of a vault, its `vault_tok`: compared, never parsed further. A thing made under one life carries it, so `demandConsistentWith` tells a thing of another life. */
 export type VaultTok = Z.infer<typeof vault_tok>
+
+/** The random token minted for one life of a box, its `box_tok`: compared, never parsed further. A box deleted and made anew under its boxlabel gets a new one. */
+export type BoxTok = Z.infer<typeof box_tok>
 
 /** The random token minted for each write of a box, its `revision_tok`: a write naming a stale one refuses 'stale_write'. */
 export type RevisionTok = Z.infer<typeof revision_tok>

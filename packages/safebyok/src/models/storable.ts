@@ -44,7 +44,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The vault this thing lies in, inscribed once by `assignInitialProps` and never moved: a record under another `vault_tok` is refused, not taken. */
   declare readonly vault_tok: string
-  /** The revision and times of the record in hand, as plain own props, assigned before the seal by `assignInitialProps` and again by `assign` at each adopt: `registered_at` only at birth and over a tombstone. */
+  /** The revision and times of the record in hand, as plain own props, assigned before the seal by `assignInitialProps` and again by `assign` at each adopt: `registered_at` only at birth and for a record of another life. */
   declare revision_tok:  string
   declare revision_seq:  number
   declare registered_at: number
@@ -104,10 +104,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.assign(combined)
   }
 
-  /** Assign the mutable own props from `record`, the record about to be in hand: for the base, its revision and `written_at` always, and its `registered_at`, which names a life of the thing, only where the central held until now is a tombstone, as it is before a first store and after a death. `adopt` calls it before it replaces central, so that is the central judged; `assignInitialProps` sets `registered_at` at birth itself. Never `vault_tok`, fixed at birth. A concrete class with mutable props of its own overrides it, calls super first, and takes them from `record` alone. */
+  /** Assign the mutable own props from `record`, the record about to be in hand: for the base, its revision and `written_at` always, and its `registered_at`, which dates a life of the thing, only where `record` is of another life than the record in hand until now, as at a birthday made here or received. `adopt` calls it before it replaces central and the staged, so that is the record judged; `assignInitialProps` sets `registered_at` at birth itself. Never `vault_tok`, fixed at birth. A concrete class with mutable props of its own overrides it, calls super first, and takes them from `record` alone. */
   protected assign(record: Fetched<RecordT, SparseT>): void {
     const { revision_tok, revision_seq, written_at, registered_at } = record
-    if (this.isTombstoneRecord(this.#central)) { this.registered_at = registered_at }
+    if (! this.#sameLife(record, this.combined)) { this.registered_at = registered_at }
     this.revision_tok = revision_tok
     this.revision_seq = revision_seq
     this.written_at   = written_at
@@ -280,19 +280,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Lay `patch` over the record in hand under the next revision, alive, through the concrete class's `makeStaged`; reconcile the result in as the staged; settle. Central is untouched; nothing is stored. On a thing gone or damaged, this is its rebirth: the record made is alive over its tombstone's sparse props, registered now. Once past its guards it completes, whether or not the vault locks meanwhile; but a central that moves while `makeStaged` runs refuses 'stale_write', staging nothing, as the record made was laid over one storage no longer holds; the refusal carries that central as a 'stale_write' from storage carries what it holds (`meta.box_stored` for a box). `patch`, through the concrete class's `isFullPatch`, then `opts`, are checked first of all, before any guard, each refusing 'bad_option' and naming the field. */
+  /** Have the concrete class's `makeStaged` make the staged record of `patch`, whole, under the next revision; reconcile it in as the staged; settle. Central is untouched; nothing is stored. On a thing gone or damaged, this is its rebirth, its birthday: the record made is alive over its tombstone's sparse props, registered now, under a new life tok. Once past its guards it completes, whether or not the vault locks meanwhile; but a central that moves while `makeStaged` runs refuses 'stale_write', staging nothing, as the record made was laid over one storage no longer holds: its `meta.stored_revision` is the revision of the central received, and `meta.staged_revision` the one the edit had staged. `patch`, through the concrete class's `isFullPatch`, then `opts`, are checked first of all, before any guard, each refusing 'bad_option' and naming the field. */
   async edit(patch: PatchT, opts: EditOpts = {}): Promise<this> {
     this.isFullPatch(patch)
     const timely = MSX.timelyOpts.parse(opts)
     await this.ensureReadyToEdit(timely)
     const ante = this.#central
-    const nextRevision = this.nextRevision(ante)
-    const now = this.world.clock.now()
-    const { combined } = this
-    const registered_at = MSX.isTombstone(combined) ? now : combined.registered_at
-    const made = await this.makeStaged({ ...combined, ...nextRevision, registered_at, written_at: now, am: 'a' }, patch, timely)
-    if (this.#central.revision_tok !== ante.revision_tok) { throw movedUnderEditError(this.listing.staleMetaOf(this.#central)) }
-    this.adopt(this.#central, this.reconcileStaged({ act: 'edit', central: this.#central, staged: this.staged, patch: made, nextRevision }))
+    const staged = await this.makeStaged(patch, timely)
+    if (this.#central.revision_tok !== ante.revision_tok) {
+      throw movedUnderEditError({ stored_revision: MSX.revision.parse(this.#central), staged_revision: MSX.revision.parse(staged) })
+    }
+    const nextRevision = MSX.revision.parse(staged)
+    this.adopt(this.#central, this.reconcileStaged({ act: 'edit', central: this.#central, staged: this.staged, patch: staged, nextRevision }))
     this.settle()
     return this
   }
@@ -329,7 +328,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
-  // == [Receiving]: receive, adopt, settle, cacheOnDevice, tombstoneFor, nextRevision, priorRevisionTok
+  // == [Receiving]: receive, adopt, settle, cacheOnDevice, tombstoneFor, makeStagedBase, nextRevision, priorRevisionTok
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
@@ -384,6 +383,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return { ...this.sparse, revision_tok, revision_seq, written_at: this.world.clock.now(), am }
   }
 
+  /** The base every concrete `makeStaged` lays its patch over: the record in hand, alive, under the revision after central's, written now. `isBirthday` where the record in hand is a tombstone, deleted, damaged or never stored: the base is then registered at its `written_at`, and the concrete class gives it a fresh life tok by `makeLifeTok`. Otherwise `registered_at` and the life tok carry over from the record in hand. */
+  protected makeStagedBase(): Readonly<{ base: SparseT, isBirthday: boolean }> {
+    const { combined } = this
+    const isBirthday = this.isTombstoneRecord(combined)
+    const written_at = this.world.clock.now()
+    const registered_at = isBirthday ? written_at : combined.registered_at
+    return { base: { ...combined, ...this.nextRevision(this.#central), registered_at, written_at, am: 'a' }, isBirthday }
+  }
+
   /** The revision after `ante`: minted once, then the same while `ante`'s tok is the one it followed, so edits made one after another stage one revision until `send` or `del` spends it. */
   protected nextRevision(ante: Revision): Revision {
     if (this.#memoizedNextRevision?.anteTok === ante.revision_tok) { return this.#memoizedNextRevision.revision }
@@ -399,7 +407,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Reconcile]: reconcileCentral, reconcileStaged, classifyRecordShape
+  // == [Reconcile]: reconcileCentral, sameLife, reconcileStaged, classifyRecordShape
 
   /** The central that results from `rcvd` meeting the central held, and the policy that names the row taken. The staged is not consulted.
    *
@@ -415,32 +423,42 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * Of the shapes, only a deletion against a living record, either way round, refuses 'record_conflict'; `cmpRevisions`
    * refuses another tok at the same seq before any row is weighed.
    *
-   * NOTE, another `vault_tok` (the Coach, 2026-10-30). Before any row, a record of any shape under another `vault_tok`
-   * than this thing's throws 'unexpected_error', over a central alive or a tombstone alike, a central never stored
-   * included: it belongs to another life of the vault, whose revisions this one's do not order, and this thing's
-   * `vault_tok`, fixed at birth, never moves. Not yet: flushing and remaking every instance of a vault made anew.
+   * NOTE, another life (the Coach, 2026-10-31). A record's life is its {@link lifeTokPathOf}, compared with central's by
+   * `#sameLife`. A put lands at the stored row's `revision_seq` + 1, and seqs continue over tombstones, so revisions order
+   * the records of every life of a scope alike. A record of another life is weighed by its age as any other, past two rows
+   * of its own:
+   * * Under another `vault_tok` than this thing's ('other vault'), it throws 'unexpected_error', whatever its age or shape,
+   *   over a central never stored included: this thing's `vault_tok`, tattooed at birth, never moves. A vault's life is its
+   *   `vault_tok`, so every record of another life of a vault takes this row. Not yet: flushing and remaking every instance
+   *   of a vault made anew.
+   * * At the revision held, it throws 'record_conflict': one revision cannot begin a life and continue another.
+   * Past those, a newer record of another life is the thing born anew elsewhere, after a deletion this device may not have
+   * received: a birthday, taken by the newer rows like any other. An older one is a past life's, and is older.
    *
-   * | age   | rcvd   | central | policy                   | central after |
-   * | ----- | ------ | ------- | ------------------------ | ------------- |
-   * | older | any    | any     | 'older'                  | central       |
-   * | older | gone   | any     | 'older'                  | central       |
-   * | older | ouch   | any     | 'skip'                   | central       |
-   * |       |        |         |                          |               |
-   * | same  | ouch   | any     | 'skip'                   | central       |
-   * | same  | gone   | ouch    | 'gone'                   | rcvd          |
-   * | same  | gone   | alive   | throw 'record_conflict'  | -             |
-   * | same  | alive  | gone    | throw 'record_conflict'  | -             |
-   * | same  | sparse | any     | 'same'                   | central       |
-   * | same  | gone   | gone    | 'same'                   | central       |
-   * | same  | full   | full    | 'same'                   | central       |
-   * | same  | full   | sparse  | 'fill'                   | rcvd          |
-   * | same  | full   | ouch    | 'fill'                   | rcvd          |
-   * |       |        |         |                          |               |
-   * | newer | sparse | any     | 'adopt'                  | rcvd          |
-   * | newer | full   | any     | 'adopt'                  | rcvd          |
-   * | newer | gone   | any     | 'gone'                   | rcvd          |
-   * | newer | ouch   | any     | 'ouch'                   | ouchstone     |
-   * |       |        |         |                          |               |
+   * | life        | age   | rcvd   | central | policy                   | central after |
+   * | ----------- | ----- | ------ | ------- | ------------------------ | ------------- |
+   * | other vault | any   | any    | any     | throw 'unexpected_error' | -             |
+   * | other       | same  | any    | any     | throw 'record_conflict'  | -             |
+   * |             |       |        |         |                          |               |
+   * | any         | older | any    | any     | 'older'                  | central       |
+   * | any         | older | gone   | any     | 'older'                  | central       |
+   * | any         | older | ouch   | any     | 'skip'                   | central       |
+   * |             |       |        |         |                          |               |
+   * | same        | same  | ouch   | any     | 'skip'                   | central       |
+   * | same        | same  | gone   | ouch    | 'gone'                   | rcvd          |
+   * | same        | same  | gone   | alive   | throw 'record_conflict'  | -             |
+   * | same        | same  | alive  | gone    | throw 'record_conflict'  | -             |
+   * | same        | same  | sparse | any     | 'same'                   | central       |
+   * | same        | same  | gone   | gone    | 'same'                   | central       |
+   * | same        | same  | full   | full    | 'same'                   | central       |
+   * | same        | same  | full   | sparse  | 'fill'                   | rcvd          |
+   * | same        | same  | full   | ouch    | 'fill'                   | rcvd          |
+   * |             |       |        |         |                          |               |
+   * | any         | newer | sparse | any     | 'adopt'                  | rcvd          |
+   * | any         | newer | full   | any     | 'adopt'                  | rcvd          |
+   * | any         | newer | gone   | any     | 'gone'                   | rcvd          |
+   * | any         | newer | ouch   | any     | 'ouch'                   | ouchstone     |
+   * |             |       |        |         |                          |               |
    *
    * The age is `cmpRevisions(central, rcvd)`, which refuses the same seq under another tok. An ouchstone is a tombstone
    * made here, 'd' under the damaged record's revision, of the sparse props held. For a thing already held, nothing else of
@@ -448,9 +466,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * record's sparse form, so the props held are the damaged record's own.
    */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
-    if (rcvd.vault_tok !== this.vault_tok)                       { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
+    const isSameLife = this.#sameLife(rcvd)
+    if ((! isSameLife) && (rcvd.vault_tok !== this.vault_tok))   { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
     const central = this.#central
     const age = cmpRevisions(central, rcvd)
+    if ((! isSameLife) && (age === 'same'))                      { throw new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
     const centralShape = this.classifyRecordShape(central)
     if ((age === 'older') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
     if ((age === 'older'))                                       { return { central, policy: 'older' } }
@@ -470,6 +490,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       return { central: rcvd, policy: 'adopt' }
     }
     throw new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
+  }
+
+  /** Whether `record` is of the life of `held`, the central held unless given: the same {@link lifeTokPathOf}. */
+  #sameLife(record: Fetched<RecordT, SparseT>, held: Fetched<RecordT, SparseT> = this.#central): boolean {
+    return this.lifeTokPathOf(record) === this.lifeTokPathOf(held)
   }
 
   /** The staged that replaces the one held, given a new central (fill, adopt, gone, ouch) or a verb called here (edit, del); null for nothing staged.
@@ -492,7 +517,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * @param forms.central      - The central held.
    * @param forms.staged       - The staged held; null where nothing is staged.
    * @param forms.rcvd         - For a ReceivedAct, the record storage delivered, as it came.
-   * @param forms.patch        - For edit, the record `makeStaged` made of the patch, whole and sealed.
+   * @param forms.patch        - For edit, the staged record `makeStaged` made of the patch, whole and sealed, under `nextRevision`.
    * @param forms.nextRevision - The revision after the central that results, minted once.
    */
   protected reconcileStaged(forms: StagedForms<RecordT, SparseT>): Fetched<RecordT, SparseT> | null {
@@ -514,14 +539,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Concrete Subclass Required Methods]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
+  // == [Concrete Subclass Required Methods]: isFullRecord, isFullPatch, makeStaged, lifeTokPathOf, makeSnapshot
 
   /** Whether `fetched` is a full record, alive: a tombstone, deleted or damaged, never is. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
   /** The check `edit` (so `send`) makes of its patch first of all, before any guard: it returns for a full patch, one `makeStaged` can lay over the record in hand, and refuses any other 'bad_option', naming the field, through the concrete class's Checker. It returns nothing: `makeStaged` is handed the patch as given, and takes from it only what it lays over the record, so a field the check allows and ignores goes no further. */
   protected abstract isFullPatch(patch: unknown): asserts patch is PatchT
-  /** The step of `edit` only the concrete class can take: `base` is the record in hand, sparse or full, under its next revision; lay the patch over it and seal what needs sealing. The record it returns is held as the staged, full. */
-  protected abstract makeStaged(base: SparseT, patch: PatchT, opts: EditOpts): Promise<RecordT>
+  /** The staged record of `patch`, whole: `makeStagedBase`'s base, the record in hand under the next revision, with the patch laid over it and sealed where the kind seals. At a birthday the concrete class gives the base its fresh life tok, by `makeLifeTok`. The record it returns is held as the staged, full, as made. */
+  protected abstract makeStaged(patch: PatchT, opts: EditOpts): Promise<RecordT>
+  /** The life of the thing `record` is of: the life toks that a birthday mints, joined. Two records of one scope with different paths are of different lives of it. */
+  protected abstract lifeTokPathOf(record: Fetched<RecordT, SparseT>): string
   protected abstract makeSnapshot(): SnapshotT
   // --
 }

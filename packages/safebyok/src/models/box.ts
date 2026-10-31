@@ -1,9 +1,10 @@
 import { verifyConsistent } from '../checks/validator'
+import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
-import { type BoxRecord, type BoxSparse, type EditOpts, type LockedBag, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import { type BoxRecord, type BoxSparse, type EditOpts, type Fetched, type LockedBag, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 import { stubSeal } from './stub-seal'
@@ -41,9 +42,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: an update seals the whisper it is given. */
   #exposed: WhisperHolder | null = null
 
-  // == [Props, as the record has them]: fmt, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
+  // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
 
   get fmt(): number { return this.combined.fmt }
+
+  /** The life of the box under its boxlabel, as the record in hand has it: minted at its birth, and kept by every later revision of that life. */
+  get box_tok(): string { return this.combined.box_tok }
 
   /** The sidecar of the record in hand, which only the full record carries; null otherwise. It holds nothing secret, so it shows whether the vault is locked or not. */
   get sidecar(): Sidecar | null { return this.full?.sidecar ?? null }
@@ -118,7 +122,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   }
   // --
 
-  // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
+  // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, lifeTokPathOf, makeSnapshot
 
   /** A box record alive that carries its sealed whisper. */
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {
@@ -135,11 +139,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** The whisper of `patch`, sealed by {@link stubSeal} with its sidecar under `base`'s props: `base`, sparse or full, lends its scope, revision, times and whisper's form, and none of its sidecar or sealed parts. `patch` was held to `boxPatch` by `isFullPatch` before `edit` called this; of it, only the whisper and the sidecar are taken. */
-  protected makeStaged(base: BoxSparse, patch: BoxPatch): Promise<BoxRecord> {
+  /** The staged record of `patch`: its whisper, sealed by {@link stubSeal} with its sidecar over `makeStagedBase`'s base, which lends its scope, revision, times, `box_tok` and whisper's form, and none of its sidecar or sealed parts. At a birthday, the box's birthday gift is a `box_tok` fresh from {@link makeLifeTok}. `patch` was held to `boxPatch` by `isFullPatch` before `edit` called this; of it, only the whisper and the sidecar are taken. */
+  protected makeStaged(patch: BoxPatch): Promise<BoxRecord> {
     const { whisper, sidecar } = patch
-    return stubSeal({ ...base, sidecar }, whisper)
+    const { base, isBirthday } = this.makeStagedBase()
+    const box_tok = isBirthday ? makeLifeTok() : base.box_tok
+    return stubSeal({ ...base, box_tok, sidecar }, whisper)
   }
+
+  /** A box's life is its vault's and its own: `vault_tok-box_tok`. */
+  protected lifeTokPathOf({ vault_tok, box_tok }: Fetched<BoxRecord, BoxSparse>): string { return `${vault_tok}-${box_tok}` }
 
   protected makeSnapshot(): BoxSnapshot {
     return Object.freeze({

@@ -1,6 +1,7 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB, the device cache and the vault. */
 
-import { type RefusalMeta, VaultError } from '../errors'
+import { makeLifeTok } from '../crypto'
+import { VaultError } from '../errors'
 import { lockedError } from '../helpers/throwers'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
@@ -75,9 +76,9 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return boxRecord.parse(duck) }
 
   // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here. The whisper rides in the dna this far, and no further.
-  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, sealed by {@link stubSeal} over the dna's whisper. */
+  /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, its birthday gift a `box_tok` fresh from {@link makeLifeTok}, sealed by {@link stubSeal} over the dna's whisper. */
   protected draftOf({ whisper, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
-    return stubSeal({ ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }, whisper)
+    return stubSeal({ ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, whisper)
   }
 
   protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>): Box {
@@ -95,11 +96,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     if (full.success) { return full.data }
     const sparse = boxSparse.safeParse(stored)
     return sparse.success ? sparse.data : null
-  }
-
-  staleMetaOf(stored: Fetched<BoxRecord, BoxSparse>): RefusalMeta {
-    // `RefusalMeta` still names the old box forms; the models' records are the ones `storedInStaleRefusal` takes back.
-    return { box_stored: stored as unknown as Required<RefusalMeta>['box_stored'] }
   }
   // --
 }

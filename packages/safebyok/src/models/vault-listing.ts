@@ -1,7 +1,7 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB, the device cache and the bank. */
 
-import { randomId } from '../crypto'
-import { type RefusalMeta, VaultError } from '../errors'
+import { makeLifeTok } from '../crypto'
+import { VaultError } from '../errors'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import { Listing } from './listing'
 import { type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
@@ -49,9 +49,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
-  /** The vault a dna stages at birth: the dna under a `vault_tok` minted here, the life this vault takes if storage holds none. */
+  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none. */
   protected draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times): Promise<VaultRecord> {
-    return Promise.resolve({ ...dna, fmt: VaultFormat, am: 'a', vault_tok: randomId() })
+    return Promise.resolve({ ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() })
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse>, cache: Cache<VaultRecord, VaultSparse>): Vault {
@@ -67,11 +67,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     const stored: unknown = err.meta?.vault_stored
     const full = vaultRecord.safeParse(stored)
     return full.success ? full.data : null
-  }
-
-  staleMetaOf(stored: Fetched<VaultRecord, VaultSparse>): RefusalMeta {
-    // `RefusalMeta` still names the old vault record; the models' records are the ones `storedInStaleRefusal` takes back.
-    return { vault_stored: stored as unknown as Required<RefusalMeta>['vault_stored'] }
   }
   // --
 }

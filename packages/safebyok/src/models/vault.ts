@@ -3,7 +3,7 @@ import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
-import type { LockState, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { Fetched, LockState, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 
@@ -78,7 +78,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
+  // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, lifeTokPathOf, makeSnapshot
 
   /** Every vault record alive is full until the gate exists; a tombstone is not. */
   protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord {
@@ -90,10 +90,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     verifyConsistent(MSX.vaultPatch.parse(patch), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** The record in hand under its next revision is the whole staged record. Not yet: the gate a patch would change. */
-  protected makeStaged(base: VaultSparse): Promise<VaultRecord> {
-    return Promise.resolve(base)
+  /** `makeStagedBase`'s base, the record in hand under its next revision, is the whole staged record, its `vault_tok` kept. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. Not yet: the gate a patch would change. */
+  protected makeStaged(): Promise<VaultRecord> {
+    return Promise.resolve(this.makeStagedBase().base)
   }
+
+  /** A vault's life is its `vault_tok`. */
+  protected lifeTokPathOf({ vault_tok }: Fetched<VaultRecord, VaultSparse>): string { return vault_tok }
 
   protected makeSnapshot(): VaultSnapshot {
     return Object.freeze({

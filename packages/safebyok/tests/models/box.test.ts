@@ -47,7 +47,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   }
 })
 
-describe("box.receive(rcvd): registered_at, set over a tombstone; another vault_tok throws", () => {
+describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok throws", () => {
   it("keeps registered_at over a newer living record registered at another time", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', registered_at: T0 + 7 }))
@@ -55,10 +55,16 @@ describe("box.receive(rcvd): registered_at, set over a tombstone; another vault_
     expect(box.revision_seq).to.eq(2)
   })
 
-  it("takes registered_at from a record received over a tombstone held", async () => {
+  it("takes registered_at and box_tok from a record of another life received over a tombstone held", async () => {
     const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
-    box.receive(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3', registered_at: T0 + 7 }))
-    expect(box).to.include({ registered_at: T0 + 7, vault_tok: 'vault-tok-u1', revision_seq: 3 })
+    box.receive(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-b3', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
+    expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', vault_tok: 'vault-tok-u1', revision_seq: 3 })
+  })
+
+  it("takes registered_at and box_tok from a newer record of another life received over a box held alive, a birthday elsewhere after a deletion this device never received", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.receive(fullBoxRecord({ revision_seq: 4, revision_tok: 'rev-b4', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
+    expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', revision_seq: 4 })
   })
 
   const HeldCases = [
@@ -142,7 +148,7 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     ["d", "rev-d2", 'a damaged box'],
   ] as const
   for (const [am, tok, blurb] of TombstoneCases) {
-    it(`stages ${blurb} alive at the next revision, registered now; a second edit keeps both; send puts it over the tombstone's revision`, async () => {
+    it(`stages ${blurb} alive at the next revision, registered now under a new box_tok; a second edit keeps all three; send puts it over the tombstone's revision`, async () => {
       const tombstone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am)
       held.mw.seedStore(tombstone)
       const box = await fakeSealBoxListingOf(held.mw).build(tombstone)
@@ -151,9 +157,12 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       expect(box.isPresent).to.be.true
       expect(box._cheat_staged).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, written_at: T0 + 5000, sidecar: {} })
       const reborn = box.revision_tok
+      const { box_tok } = box
+      expect(box_tok).to.not.eq('box-tok-a')
+      expect(box.registered_at).to.eq(T0 + 5000)
       held.mw.setNow(T0 + 6000)
       await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'reborn' } })
-      expect(box._cheat_staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
+      expect(box._cheat_staged).to.deep.include({ revision_tok: reborn, box_tok, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
       await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'reborn' } })
       const [put] = held.mw.callsOf('put')
       expect(put?.priorRevisionTok).to.equal(tok)
@@ -168,15 +177,16 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     })
   }
 
-  it("keeps the own registered_at over an edit made while a del is in flight, central being alive, though the record it stages is registered now", async () => {
+  it("makes a birthday of an edit made while a del is in flight, central being alive: the record it stages, and the own props, take a new box_tok, registered now", async () => {
     const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
     held.mw.willDel(() => new Promise(() => undefined))
     void box.del()
     await vi.advanceTimersByTimeAsync(0)
     held.mw.setNow(T0 + 5000)
     await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
-    expect(box.registered_at).to.eq(T0)
     expect(box._cheat_staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
+    expect(box._cheat_staged?.box_tok).to.be.a('string').and.not.eq('box-tok-a')
+    expect(box).to.include({ registered_at: T0 + 5000, box_tok: box._cheat_staged?.box_tok })
   })
 })
 // --

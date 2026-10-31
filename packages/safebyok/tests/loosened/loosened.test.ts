@@ -76,12 +76,13 @@ describe("registered_at over a rebirth", () => {
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000, sidecar: {} })
   })
 
-  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a store that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted, and the rebirth's own time is lost quietly", async () => {
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a store that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted as central quietly, while the box's own registered_at keeps the rebirth's time, the answer being of the same life (thread 25)", async () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
     held.mw.setNow(T0 + 5000)
     held.mw.willPut(({ record }) => held.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
     await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
-    expect(box.registered_at).to.eq(T0)
+    expect(box._cheat_central).to.deep.include({ registered_at: T0 })
+    expect(box.registered_at).to.eq(T0 + 5000)
     expect(held.mw.badnews).to.deep.equal([])
   })
 })
