@@ -32,19 +32,19 @@ const prfBytesOf = (handed: unknown): Uint8Array => (
 
 describe("Proving.makeProvingPair(vault, proofClosure, world): the arguments", () => {
   const ArgsCases = [
-    [{ world: TH.omitting(provingWorldOf(), 'keyDeriver') },      'a world with no keyDeriver'],
-    [{ world: TH.omitting(provingWorldOf(), 'clock') },           'a world with no clock'],
-    [{ world: TH.omitting(provingWorldOf(), 'device_id') },       'a world with no device_id'],
-    [{ world: provingWorldOf({ device_id: '' }) },                'a world with an empty device_id'],
-    [{ vault: { ...duckVaultOf(), vault_tok: undefined } },       'a vault with no vault_tok'],
-    [{ vault: { ...duckVaultOf(), registered_at: 'yesterday' } }, 'a vault registered at a time that is no epoch millis'],
-    [{ vault: null },                                             'no vault at all'],
+    [() => ({ world: TH.omitting(provingWorldOf(), 'keyDeriver') }),      'a world with no keyDeriver'],
+    [() => ({ world: TH.omitting(provingWorldOf(), 'clock') }),           'a world with no clock'],
+    [() => ({ world: TH.omitting(provingWorldOf(), 'device_id') }),       'a world with no device_id'],
+    [() => ({ world: provingWorldOf({ device_id: '' }) }),                'a world with an empty device_id'],
+    [() => ({ vault: { ...duckVaultOf(), vault_tok: undefined } }),       'a vault with no vault_tok'],
+    [() => ({ vault: { ...duckVaultOf(), registered_at: 'yesterday' } }), 'a vault registered at a time that is no epoch millis'],
+    [() => ({ vault: null }),                                             'no vault at all'],
   ] as const
 
-  for (const [args, blurb] of ArgsCases) {
+  for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb} as 'bad_option', before invoking the closure`, async () => {
       const proofClosure = vi.fn(proofClosureOf())
-      const { vault = duckVaultOf(), world = provingWorldOf() } = args as Record<string, unknown>
+      const { vault = duckVaultOf(), world = provingWorldOf() } = argsOf() as Record<string, unknown>
       await TH.expectRefusal(Proving.makeProvingPair(vault as never, proofClosure, world as ProvingWorld), 'bad_option')
       expect(proofClosure).not.toHaveBeenCalled()
     })
