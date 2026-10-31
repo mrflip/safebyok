@@ -380,7 +380,7 @@ export type StorableOpts = Z.infer<typeof storableOpts>
 /** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
 export const lockStateVals = ['unlocked', 'locked'] as const
 
-/** The brand only {@link LOCKED} carries: a symbol of this module's, never `Symbol.for`, so no code outside the package spells it, and the bag's type is one no other object can claim. */
+/** The brand {@link LOCKED} is made with: a symbol of this module's, never `Symbol.for`, so no code outside the package spells it. A copy of LOCKED carries it too, so the brand tells LOCKED from a whisper, never from its copies. */
 const LockedBrand: unique symbol = Symbol('safebyok.locked')
 
 /** The bag a storable answers in place of what the locked vault hides: `box.whisper` answers it while the vault is locked. A frozen singleton, branded by a symbol of the package's own.
@@ -390,7 +390,7 @@ const LockedBrand: unique symbol = Symbol('safebyok.locked')
  */
 export const LOCKED: LockedBag = Object.freeze({ [LockedBrand]: true as const })
 
-/** The type of {@link LOCKED}: no object but that one has it. */
+/** The type of {@link LOCKED}, which a copy of it has too: `Storable.isLockedFUBag` alone tells LOCKED itself. */
 export type LockedBag = Readonly<{ [LockedBrand]: true }>
 
 /** The tag a Listing answers true to, so a storable can tell one without importing it. */
