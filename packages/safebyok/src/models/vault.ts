@@ -93,12 +93,16 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#gate.gate
   }
 
-  /** Build this vault's gate from what `proofClosure` answers, and stage it by `edit`; `send` stores it. A vault born of a dna has none until this lands. Refuses 'bad_option' a vault that has one. */
+  /** Build this vault's gate from what `proofClosure` answers, and stage it by `edit`; `send` stores it. A vault born of a dna has none until this lands. Hydrates first, as an edit does, and refuses 'bad_option' a vault that has a gate before the closure is asked anything; a gate that lands meanwhile, from a call overlapping this one, refuses the same once this one's edit finds it there. */
   async buildGate(proofClosure: ProofClosure): Promise<this> {
     MSX.buildGateArgs.parse({ proofClosure })
+    await this.ensureReadyToEdit()
     if (this.gate !== null) { throw gateAlreadyBuilt() }
     const gate = await Gate.build(this, proofClosure, this.world)
-    return this.edit({ gate: gate.pickle() })
+    const props = gate.pickle()
+    await this.edit({ gate: props })
+    if (this.full?.gate !== props) { throw gateAlreadyBuilt() }
+    return this
   }
   // --
 
