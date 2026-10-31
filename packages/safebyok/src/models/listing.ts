@@ -143,29 +143,32 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
-  /** Put `duck`, a record or a thing ducking as its record, over the revision its instance expects (none, for a thing never stored or not held), and deliver the answer. A 'stale_write' refusal delivers the record storage holds before it is thrown. */
+  /** Put `duck`, a record or a thing ducking as its record, over the `revision_tok` its instance holds (none, for a thing never stored or not held), and deliver the answer. A 'stale_write' refusal delivers the record storage holds before it is thrown.
+   * A record whose `revision_seq` does not fit that tok refuses 'bad_record' before anything is sent: revision 0 goes over no tok, and a later revision over one.
+   */
   async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     const record = this.recordOf(duck)
-    const expectedRevision = this.expectedRevisionOf(this.scopeOf(record))
-    const answer = await this.#store.put(record, expectedRevision)
-    return this.#deliver(answer, this.scopeOf(record))
+    const scope = this.scopeOf(record)
+    const priorTok = this.priorTokOf(scope)
+    if (! fitsPriorTok(record.revision_seq, priorTok)) { throw new VaultError('bad_record', Phrases.PutUnfitForPrior) }
+    const answer = await this.#store.put(record, priorTok)
+    return this.#deliver(answer, scope)
   }
 
   tryPut(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.put(duck)) }
 
-  /** Delete the thing `duck` names, a sparse record or a thing, at the revision its instance expects, and deliver the answer, a tombstone. A 'stale_write' refusal delivers as `put` does. */
+  /** Delete the thing `duck` names, a sparse record or a thing, over the `revision_tok` its instance holds, and deliver the answer, a tombstone. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     const scope = this.scopeOf(duck)
-    const expectedRevision = this.expectedRevisionOf(scope)
-    const answer = await this.#store.del(scope, expectedRevision)
+    const answer = await this.#store.del(scope, this.priorTokOf(scope))
     return this.#deliver(answer, scope)
   }
 
   tryDel(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.del(duck)) }
 
-  /** The revision storage should hold under `scope` when a record is put or deleted: what the instance held there expects; null where none is held. */
-  expectedRevisionOf(scope: ScopeT): Revision | null {
-    return this.at(scope)?.expectedRevision() ?? null
+  /** The `revision_tok` storage should hold under `scope` when a record is put or deleted: the instance held there names it; null where none is held. */
+  priorTokOf(scope: ScopeT): string | null {
+    return this.at(scope)?.priorTok() ?? null
   }
   // --
 
@@ -363,8 +366,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 }
 // --
 
-// == [Helpers]: hasRevision
+// == [Helpers]: hasRevision, fitsPriorTok
 
 /** True for a record handed to `build`, which carries a `revision_seq`; false for a dna. A dna carrying one is taken for a record. */
 export const hasRevision = (input: object): input is Revision & Times => 'revision_seq' in input
+
+/** True where a record at `revision_seq` may be put over `priorTok`: revision 0 over none, a later revision over a tok. */
+const fitsPriorTok = (revision_seq: number, priorTok: string | null): boolean => (priorTok === null ? revision_seq === 0 : revision_seq > 0)
 // --

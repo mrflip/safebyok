@@ -262,7 +262,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryEdit(patch: PatchT, opts: EditOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.edit(patch, opts)) }
 
   /** `edit`, then hand the record it staged to `listing.put`, which resolves once storage's answer is delivered; a 'stale_write' refusal delivers what storage holds, then throws. The revision minted is spent, whatever the answer: the next `edit` mints another.
-   * `opts.ifPresent`, optional, is only ever `'replace'`, the default: every put is the versioned replace, landing only over the revision this device holds (or over no row, for a thing never stored), else refusing 'stale_write'. It is checked and sets nothing; any other value refuses 'bad_option'.
+   * `opts.ifPresent`, optional, is only ever `'replace'`, the default: every put is the versioned replace, landing only over the record whose `revision_tok` this device holds, at its `revision_seq` + 1 (or over no row at revision 0, for a thing never stored), else refused (the `Store` doc block says how). It is checked and sets nothing; any other value refuses 'bad_option'.
    */
   async send(patch: PatchT, opts: SendOpts = {}): Promise<this> {
     const { ifPresent: _ifPresent, ...timely } = MSX.sendOpts.parse(opts)
@@ -289,7 +289,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
-  // == [Receiving]: receive, adopt, settle, tombstoneFor, nextRevision, expectedRevision
+  // == [Receiving]: receive, adopt, settle, tombstoneFor, nextRevision, priorTok
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
@@ -344,10 +344,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return revision
   }
 
-  /** The revision storage is expected to hold when this thing is put or deleted: central's; null for a thing never stored, which expects no record. */
-  expectedRevision(): Revision | null {
+  /** The `revision_tok` storage should hold when this thing is put or deleted: central's; null for a thing never stored, which expects no record. */
+  priorTok(): string | null {
     const { revision_tok, revision_seq } = this.#central
-    return revision_seq === MSX.NeverStoredSeq ? null : { revision_tok, revision_seq }
+    return revision_seq === MSX.NeverStoredSeq ? null : revision_tok
   }
   // --
 

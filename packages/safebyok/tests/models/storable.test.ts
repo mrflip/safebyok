@@ -720,6 +720,7 @@ describe("Storable snapshot and subscription", () => {
     })
 
     it("notifies on an edit and on a del, each a change", async () => {
+      held.mw.seedStore(fullBoxRecord())
       const box = await builtBoxOf()
       box.getSnapshot()
       const listener = vi.fn()
@@ -814,6 +815,7 @@ describe("Storable forms", () => {
     })
 
     it("has no sidecar on the sparse form nor on a tombstone, central or staged", async () => {
+      held.mw.seedStore(fullBoxRecord())
       const full = await builtBoxOf()
       const { staged, central, ...sparse } = cacheableOf(full)
       expect(staged).to.be.null
@@ -1069,7 +1071,7 @@ describe("storable.send(patch): edit, then put", () => {
     await vi.advanceTimersByTimeAsync(0)
     const [put] = held.mw.callsOf('put')
     expect(put?.record).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2, sidecar: { note: 'sent' } })
-    expect(put?.expected).to.deep.equal({ revision_tok: 'rev-a1', revision_seq: 1 })
+    expect(put?.priorTok).to.equal('rev-a1')
     expect(box.hasStaged).to.be.true
     expect(resolved).to.be.false
     hold.open()
@@ -1084,7 +1086,7 @@ describe("storable.send(patch): edit, then put", () => {
     await box.send({ whisper: 'sk-test-0000' }, { maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.deep.equal([])
     const [put] = held.mw.callsOf('put')
-    expect(put?.expected).to.be.null
+    expect(put?.priorTok).to.be.null
     expect(put?.record.revision_seq).to.eq(0)
     expect(box.isPresent).to.be.true
     expect(box.hasStaged).to.be.false
@@ -1098,15 +1100,15 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
   it("stages a tombstone at the next revision, then deletes at central's revision, gone once the answer is adopted", async () => {
     const { box } = await timelyBoxOf()
     const hold = holdOf()
-    held.mw.willDel(async ({ scope, expected }) => {
+    held.mw.willDel(async ({ scope }) => {
       await hold.promise
-      return held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: (expected?.revision_seq ?? 0) + 1, revision_tok: 'rev-x2' }))
+      return held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     })
     const deleting = box.del()
     await vi.advanceTimersByTimeAsync(0)
     expect(box.isPresent).to.be.false
     expect(cacheableOf(box).staged).to.deep.include({ am: 'x', revision_seq: 2 })
-    expect(held.mw.callsOf('del')[0]?.expected).to.deep.equal({ revision_tok: 'rev-a1', revision_seq: 1 })
+    expect(held.mw.callsOf('del')[0]?.priorTok).to.equal('rev-a1')
     hold.open()
     expect(await deleting).to.eq(box)
     expect(box.hasStaged).to.be.false
@@ -1120,7 +1122,7 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
     held.mw.clearCalls()
     await expect(box.del()).resolves.to.eq(box)
     const [del] = held.mw.callsOf('del')
-    expect(del?.expected).to.deep.equal({ revision_tok: tombstone.revision_tok, revision_seq: tombstone.revision_seq })
+    expect(del?.priorTok).to.equal(tombstone.revision_tok)
     expect(cacheableOf(box).central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq + 1 })
     expect(box.hasStaged).to.be.false
   })
@@ -1139,10 +1141,12 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
 
   it("deletes a damaged thing at the ouchstone's revision", async () => {
     const listing = boxListingOf(held.mw)
-    const box = await listing.build(held.mw.tombstoneBoxRecord({ revision_seq: 3, revision_tok: 'rev-d3' }, 'd'))
+    const ouchstone = held.mw.tombstoneBoxRecord({ revision_seq: 3, revision_tok: 'rev-d3' }, 'd')
+    held.mw.seedStore(ouchstone)
+    const box = await listing.build(ouchstone)
     held.mw.clearCalls()
     await expect(box.del()).resolves.to.eq(box)
-    expect(held.mw.callsOf('del')[0]?.expected).to.deep.equal({ revision_tok: 'rev-d3', revision_seq: 3 })
+    expect(held.mw.callsOf('del')[0]?.priorTok).to.equal('rev-d3')
     expect(cacheableOf(box).central).to.deep.include({ am: 'x', revision_seq: 4 })
   })
 })
@@ -1318,9 +1322,9 @@ describe("storable.receive(rcvd): a 'same' answer and the staged tombstone of a 
   it("keeps the staged tombstone of a del in flight over a living box when a record at the revision held arrives meanwhile: only a deletion spends it", async () => {
     const { box } = await timelyBoxOf()
     const hold = holdOf()
-    held.mw.willDel(async ({ scope, expected }) => {
+    held.mw.willDel(async ({ scope }) => {
       await hold.promise
-      return held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: (expected?.revision_seq ?? 0) + 1, revision_tok: 'rev-x2' }))
+      return held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     })
     const deleting = box.del()
     await vi.advanceTimersByTimeAsync(0)

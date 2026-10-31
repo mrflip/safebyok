@@ -142,7 +142,9 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
   ] as const
   for (const [am, tok, blurb] of TombstoneCases) {
     it(`stages ${blurb} alive at the next revision, registered now; a second edit keeps both; send puts it over the tombstone's revision`, async () => {
-      const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am))
+      const tombstone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am)
+      held.mw.seedStore(tombstone)
+      const box = await fakeSealBoxListingOf(held.mw).build(tombstone)
       held.mw.setNow(T0 + 5000)
       await expect(box.edit({ whisper: 'sk-test-0000' })).resolves.to.eq(box)
       expect(box.isPresent).to.be.true
@@ -153,7 +155,7 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       expect(cacheableOf(box).staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
       await box.send({})
       const [put] = held.mw.callsOf('put')
-      expect(put?.expected).to.deep.equal({ revision_tok: tok, revision_seq: 2 })
+      expect(put?.priorTok).to.equal(tok)
       expect(put?.record).to.deep.include({ revision_tok: reborn, revision_seq: 3, registered_at: T0 + 5000 })
       expect(cacheableOf(box).central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
     })
@@ -410,7 +412,9 @@ describe("Box own props", () => {
   it("stay nine through a receive, an edit and a del", async () => {
     const box = await boxOf()
     const keys = Object.keys(box)
-    box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    const received = held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
+    held.mw.seedStore(received)
+    box.receive(received)
     expect(Object.keys(box)).to.have.members(keys)
     await box.edit({ sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
@@ -536,7 +540,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
       const box = await neverStoredBoxOf()
       await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       const [put] = held.mw.callsOf('put')
-      expect(put?.expected).to.be.null
+      expect(put?.priorTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
       expect(box).to.include({ revision_tok: 'rev-stored', revision_seq: 4 })
     })
@@ -546,7 +550,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
       const box = await boxListingOf(held.mw).build({ ...held.mw.boxscope('anthropic_api_key') })
       held.mw.clearCalls()
       await TH.expectRefusal(box.send({ sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
-      expect(held.mw.callsOf('put')[0]?.expected).to.be.null
+      expect(held.mw.callsOf('put')[0]?.priorTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
     })
   }
