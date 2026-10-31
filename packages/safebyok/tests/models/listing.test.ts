@@ -128,7 +128,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       held.mw.clearCalls()
       const answered = await listing.put(box)
       const [call] = held.mw.callsOf('put')
-      expect(call?.priorTok).to.equal('rev-a1')
+      expect(call?.priorRevisionTok).to.equal('rev-a1')
       expect(call?.record).to.deep.equal(staged)
       expect(answered).to.eq(box)
       expect(box.hasStaged).to.be.false
@@ -143,16 +143,16 @@ describe("Listing's pipeline: what every answer takes", () => {
       const record = fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2, sidecar: { note: 'new' } })
       held.mw.clearCalls()
       expect(await listing.put(record)).to.eq(box)
-      expect(held.mw.callsOf('put')[0]?.priorTok).to.equal('rev-a1')
+      expect(held.mw.callsOf('put')[0]?.priorRevisionTok).to.equal('rev-a1')
       expect(box.revision_seq).to.eq(2)
       expect(box.sidecar).to.deep.equal({ note: 'new' })
     })
 
     it("sends no prior tok for a box not held", async () => {
       const listing = boxListingOf(held.mw)
-      expect(listing.priorTokOf(scopeOf())).to.be.null
+      expect(listing.priorRevisionTokOf(scopeOf())).to.be.null
       const box = await listing.put(fullBoxRecord({ revision_seq: 0 }))
-      expect(held.mw.callsOf('put')[0]?.priorTok).to.be.null
+      expect(held.mw.callsOf('put')[0]?.priorRevisionTok).to.be.null
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box?.isFull).to.be.true
     })
@@ -160,10 +160,10 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("sends no prior tok for a thing never stored, and its answer spends the draft", async () => {
       const listing = boxListingOf(held.mw)
       const draft = await listing.build(dnaOf())
-      expect(listing.priorTokOf(draft.scope)).to.be.null
+      expect(listing.priorRevisionTokOf(draft.scope)).to.be.null
       held.mw.clearCalls()
       await listing.put(fullBoxRecord({ revision_seq: 0 }))
-      expect(held.mw.callsOf('put')[0]?.priorTok).to.be.null
+      expect(held.mw.callsOf('put')[0]?.priorRevisionTok).to.be.null
       expect(draft.hasStaged).to.be.false
       expect(draft.isFull).to.be.true
     })
@@ -201,7 +201,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       held.mw.seedStore(fullBoxRecord())
       held.mw.clearCalls()
       expect(await listing.del(box)).to.eq(box)
-      expect(held.mw.callsOf('del')[0]?.priorTok).to.equal('rev-a1')
+      expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
       expect(box.isPresent).to.be.false
       expect(box.am).to.eq('x')
       expect(box.revision_seq).to.eq(2)
@@ -213,7 +213,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = await listing.build(fullBoxRecord())
       held.mw.seedStore(fullBoxRecord())
       await box.del()
-      expect(held.mw.callsOf('del')[0]?.priorTok).to.equal('rev-a1')
+      expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
       expect(box.hasStaged).to.be.false
       expect(box.isPresent).to.be.false
     })
@@ -223,14 +223,14 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = await listing.build(fullBoxRecord())
       held.mw.seedStore(fullBoxRecord())
       await listing.del(sparseBoxRecord())
-      expect(held.mw.callsOf('del')[0]?.priorTok).to.equal('rev-a1')
+      expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
       expect(box.isPresent).to.be.false
     })
 
     it("sends no prior tok for a box not held", async () => {
       const listing = boxListingOf(held.mw)
       await listing.del(sparseBoxRecord())
-      expect(held.mw.callsOf('del')[0]?.priorTok).to.be.null
+      expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.be.null
     })
 
     it("saves the tombstone to the cache once", async () => {
@@ -988,7 +988,7 @@ describe("listing.put: the versioned replace", () => {
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 })), 'stale_write')
     expect(listing.things.map(({ revision_tok }) => revision_tok)).to.deep.equal(['rev-stored'])
-    expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal([null])
+    expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal([null])
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
   })
 
@@ -996,7 +996,7 @@ describe("listing.put: the versioned replace", () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a0', revision_seq: 0 })), 'stale_write')
-    expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal([null])
+    expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal([null])
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
     expect(listing.things.map(({ isPresent }) => isPresent)).to.deep.equal([false])
   })
@@ -1098,11 +1098,11 @@ const PutCells = [
 ] as const
 
 describe("the fake store's put: the versioned replace, cell by cell", () => {
-  for (const [stored, priorTok, revision_seq, verdict, blurb] of PutCells) {
+  for (const [stored, priorRevisionTok, revision_seq, verdict, blurb] of PutCells) {
     it(blurb, async () => {
       if (stored !== null) { held.mw.seedStore(stored) }
       const record = fullBoxRecord({ revision_tok: 'rev-put', revision_seq })
-      expect(verdictOf(await held.mw.store.put(record, priorTok))).to.deep.equal(verdict)
+      expect(verdictOf(await held.mw.store.put(record, priorRevisionTok))).to.deep.equal(verdict)
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.equal('landed' in verdict ? record : (stored ?? undefined))
     })
   }
@@ -1122,22 +1122,22 @@ const DelRefusedCells = [
 ] as const
 
 describe("the fake store's del: the versioned replace, cell by cell", () => {
-  for (const [stored, priorTok, revision_seq, blurb] of DelLandsCells) {
+  for (const [stored, priorRevisionTok, revision_seq, blurb] of DelLandsCells) {
     it(blurb, async () => {
       if (stored !== null) { held.mw.seedStore(stored) }
-      const answer = await held.mw.store.del(scopeOf(), priorTok)
+      const answer = await held.mw.store.del(scopeOf(), priorRevisionTok)
       expect(verdictOf(answer)).to.deep.equal({ landed: revision_seq })
       const kept = held.mw.stored.get('anthropic_api_key')
       expect(kept).to.deep.equal(answer.ok ? answer.val : null)
       expect(kept).to.include({ am: 'x' })
-      expect(kept?.revision_tok).to.not.be.oneOf([priorTok, stored?.revision_tok])
+      expect(kept?.revision_tok).to.not.be.oneOf([priorRevisionTok, stored?.revision_tok])
     })
   }
 
-  for (const [stored, priorTok, carrying, blurb] of DelRefusedCells) {
+  for (const [stored, priorRevisionTok, carrying, blurb] of DelRefusedCells) {
     it(blurb, async () => {
       if (stored !== null) { held.mw.seedStore(stored) }
-      const answer = await held.mw.store.del(scopeOf(), priorTok)
+      const answer = await held.mw.store.del(scopeOf(), priorRevisionTok)
       expect(verdictOf(answer)).to.deep.equal({ refused: 'stale_write', carrying })
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.equal(stored ?? undefined)
     })
@@ -1166,7 +1166,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     held.mw.seedStore(aliveRow)
     const box = await listing.build(aliveRow)
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 })), 'bad_record')
-    expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal(['rev-a1'])
+    expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a1'])
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.equal(aliveRow)
     expect(box.revision_seq).to.eq(1)
   })
@@ -1176,7 +1176,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     held.mw.seedStore(aliveRow)
     const box = await listing.build(aliveRow)
     await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
-    expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal(['rev-a1'])
+    expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a1'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_seq: 2, revision_tok: box.revision_tok })
   })
 
@@ -1198,7 +1198,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'once' } }), 'stale_write')
     await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'twice' } }), 'stale_write')
     expect(box._cheat_central.revision_seq).to.eq(5)
-    expect(held.mw.callsOf('put').map(({ priorTok }) => priorTok)).to.deep.equal(['rev-a5', 'rev-a5'])
+    expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a5', 'rev-a5'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_tok: 'rev-a3' })
   })
 })

@@ -156,7 +156,7 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       expect(box._cheat_staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
       await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'reborn' } })
       const [put] = held.mw.callsOf('put')
-      expect(put?.priorTok).to.equal(tok)
+      expect(put?.priorRevisionTok).to.equal(tok)
       expect(put?.record).to.deep.include({ revision_tok: reborn, revision_seq: 3, registered_at: T0 + 5000 })
       expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
     })
@@ -509,7 +509,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
       const box = await neverStoredBoxOf()
       await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       const [put] = held.mw.callsOf('put')
-      expect(put?.priorTok).to.be.null
+      expect(put?.priorRevisionTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
       expect(box).to.include({ revision_tok: 'rev-stored', revision_seq: 4 })
     })
@@ -519,7 +519,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
       const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
       held.mw.clearCalls()
       await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
-      expect(held.mw.callsOf('put')[0]?.priorTok).to.be.null
+      expect(held.mw.callsOf('put')[0]?.priorRevisionTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
     })
   }
@@ -849,7 +849,7 @@ describe("Box and Storable entries: arguments checked first of all, before any g
     held.mw.clearCalls()
     await expect(box.send(roundTripOf(record), { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity })).resolves.to.eq(box)
     const [put] = held.mw.callsOf('put')
-    expect(put?.priorTok).to.eq('rev-a1')
+    expect(put?.priorRevisionTok).to.eq('rev-a1')
     expect(put?.record).to.deep.include({ am: 'a', revision_seq: 2, registered_at: T0, sidecar: { note: 'round trip' } })
     expect(box._cheat_central).to.deep.include({ revision_seq: 2, sidecar: { note: 'round trip' } })
   })

@@ -66,19 +66,19 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Starting and ending]: hello, goodbye
 
   /** Load the device cache once and revive an instance from each copy whose scope is not already held (an instance held is fresher than its cached copy), each revived instance saving its copy back as it settles; start the watch; hydrate every instance.
-   * The cache is a cache: a load refused, a result that is not an array, a copy that is not a cacheable, or one that cannot be revived, is a cache miss, told to `onBadNews`, and hello goes on without it.
+   * The cache is a cache: a load refused, a result that is not an array, a copy that is not a buildableRecord, or one that cannot be revived, is a cache miss, told to `onBadNews`, and hello goes on without it.
    */
   async hello(): Promise<void> {
     const loaded = await outcomeOf(async () => {
       const copies = await this.#cache.load()
-      MSX.cacheLoaded.parse(copies)
+      MSX.buildableRecords.parse(copies)
       return copies
     })
     if (! loaded.ok) { this.tellBadNews([loaded.err]) }
     const copies = loaded.ok ? loaded.val : []
     for (const copy of copies) {
       const revived = await outcomeOf(() => {
-        MSX.cacheable.parse(copy)
+        MSX.buildableRecord.parse(copy)
         return this.#buildOrReceive(this.scopeOf(copy.central), { flavor: 'cached', copy })
       })
       if (! revived.ok) { this.tellBadNews([revived.err]) }
@@ -151,9 +151,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     const record = this.recordOf(duck)
     const scope = this.scopeOf(record)
-    const priorTok = this.priorTokOf(scope)
-    if (! fitsPriorTok(record.revision_seq, priorTok)) { throw new VaultError('bad_record', Phrases.PutUnfitForPrior) }
-    const answer = await this.#store.put(record, priorTok)
+    const priorRevisionTok = this.priorRevisionTokOf(scope)
+    if (! fitsPriorRevisionTok(record.revision_seq, priorRevisionTok)) { throw new VaultError('bad_record', Phrases.PutUnfitForPrior) }
+    const answer = await this.#store.put(record, priorRevisionTok)
     return this.#deliver(answer, scope)
   }
 
@@ -162,15 +162,15 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Delete the thing `duck` names, a sparse record or a thing, over the `revision_tok` its instance holds, and deliver the answer, a tombstone. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     const scope = this.scopeOf(duck)
-    const answer = await this.#store.del(scope, this.priorTokOf(scope))
+    const answer = await this.#store.del(scope, this.priorRevisionTokOf(scope))
     return this.#deliver(answer, scope)
   }
 
   tryDel(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.del(duck)) }
 
   /** The `revision_tok` storage should hold under `scope` when a record is put or deleted: the instance held there names it; null where none is held. */
-  priorTokOf(scope: ScopeT): string | null {
-    return this.at(scope)?.priorTok() ?? null
+  priorRevisionTokOf(scope: ScopeT): string | null {
+    return this.at(scope)?.priorRevisionTok() ?? null
   }
   // --
 
@@ -354,11 +354,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 }
 // --
 
-// == [Helpers]: hasRevision, fitsPriorTok
+// == [Helpers]: hasRevision, fitsPriorRevisionTok
 
 /** True for a record handed to `build`, which carries a `revision_seq`; false for a dna, and for anything not an object, which the dna's check refuses. A dna carrying one is taken for a record. */
 export const hasRevision = (input: unknown): input is Revision & Times => (typeof input === 'object') && (input !== null) && ('revision_seq' in input)
 
-/** True where a record at `revision_seq` may be put over `priorTok`: revision 0 over none, a later revision over a tok. */
-const fitsPriorTok = (revision_seq: number, priorTok: string | null): boolean => (priorTok === null ? revision_seq === 0 : revision_seq > 0)
+/** True where a record at `revision_seq` may be put over `priorRevisionTok`: revision 0 over none, a later revision over a tok. */
+const fitsPriorRevisionTok = (revision_seq: number, priorRevisionTok: string | null): boolean => (priorRevisionTok === null ? revision_seq === 0 : revision_seq > 0)
 // --

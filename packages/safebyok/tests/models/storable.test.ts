@@ -1082,7 +1082,7 @@ describe("storable.send(patch): edit, then put", () => {
     await vi.advanceTimersByTimeAsync(0)
     const [put] = held.mw.callsOf('put')
     expect(put?.record).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2, sidecar: { note: 'sent' } })
-    expect(put?.priorTok).to.equal('rev-a1')
+    expect(put?.priorRevisionTok).to.equal('rev-a1')
     expect(box.hasStaged).to.be.true
     expect(resolved).to.be.false
     hold.open()
@@ -1097,7 +1097,7 @@ describe("storable.send(patch): edit, then put", () => {
     await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} }, { maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.deep.equal([])
     const [put] = held.mw.callsOf('put')
-    expect(put?.priorTok).to.be.null
+    expect(put?.priorRevisionTok).to.be.null
     expect(put?.record.revision_seq).to.eq(0)
     expect(box.isPresent).to.be.true
     expect(box.hasStaged).to.be.false
@@ -1119,7 +1119,7 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(box.isPresent).to.be.false
     expect(box._cheat_staged).to.deep.include({ am: 'x', revision_seq: 2 })
-    expect(held.mw.callsOf('del')[0]?.priorTok).to.equal('rev-a1')
+    expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
     hold.open()
     expect(await deleting).to.eq(box)
     expect(box.hasStaged).to.be.false
@@ -1133,7 +1133,7 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
     held.mw.clearCalls()
     await expect(box.del()).resolves.to.eq(box)
     const [del] = held.mw.callsOf('del')
-    expect(del?.priorTok).to.equal(tombstone.revision_tok)
+    expect(del?.priorRevisionTok).to.equal(tombstone.revision_tok)
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq + 1 })
     expect(box.hasStaged).to.be.false
   })
@@ -1157,7 +1157,7 @@ describe("storable.del(): a tombstone staged, then deleted", () => {
     const box = await listing.build(ouchstone)
     held.mw.clearCalls()
     await expect(box.del()).resolves.to.eq(box)
-    expect(held.mw.callsOf('del')[0]?.priorTok).to.equal('rev-d3')
+    expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-d3')
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: 4 })
   })
 })
@@ -1564,3 +1564,24 @@ describe("storable.settle saves the box's own copy to the device cache", () => {
   })
 })
 // --
+
+describe("Storable send guards: ensureReadyToSend, demandReadyToSend", () => {
+  it("demandReadyToSend answers the box while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
+    const box = await builtBoxOf()
+    expect(box.demandReadyToSend()).to.eq(box)
+    held.mw.setLockState('locked')
+    TH.expectSyncRefusal(() => box.demandReadyToSend(), 'vault_locked')
+  })
+
+  it("send establishes its own guard first, before the edit's, and checks the patch before either", async () => {
+    const box = await builtBoxOf()
+    const sendGuard = vi.spyOn(Storable.prototype, 'ensureReadyToSend')
+    const editGuard = vi.spyOn(Storable.prototype, 'ensureReadyToEdit')
+    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' } } as never), 'bad_option')
+    expect(sendGuard).not.toHaveBeenCalled()
+    expect(editGuard).not.toHaveBeenCalled()
+    await box.trySend({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+    expect(sendGuard).toHaveBeenCalledOnce()
+    expect(sendGuard.mock.invocationCallOrder[0]).to.be.below(editGuard.mock.invocationCallOrder[0] ?? 0)
+  })
+})

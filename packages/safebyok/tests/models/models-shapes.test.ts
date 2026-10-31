@@ -142,9 +142,9 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
   })
 
-  describe("MSX.cacheable", () => {
+  describe("MSX.buildableRecord", () => {
     const cacheable = { ...sparse, central: sparse, staged: null }
-    holdsCases(MSX.cacheable, 'bad_record', [
+    holdsCases(MSX.buildableRecord, 'bad_record', [
       // good:
       [cacheable,                                          true,  'passes a sparse form with a central and no staged, null'],
       [{ ...sparse, central: gone, staged: full },         true,  'passes a tombstone central and a full staged'],
@@ -157,7 +157,7 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
 
     it("strips a sidecar and the rest from the bag, central and staged included", () => {
-      const parsed = MSX.cacheable.parse({ ...full, central: full, staged: full })
+      const parsed = MSX.buildableRecord.parse({ ...full, central: full, staged: full })
       expect(parsed).to.deep.equal({ ...baseProps, central: baseProps, staged: baseProps })
     })
   })

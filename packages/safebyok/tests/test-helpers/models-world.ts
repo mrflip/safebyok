@@ -78,8 +78,8 @@ export type ModelsCall =
   | { verb: 'ensureTimely', opts: TimelyOpts }
   | { verb: 'takeWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
-  | { verb: 'put',          record: BoxRecord, priorTok: string | null }
-  | { verb: 'del',          scope: Boxscope, priorTok: string | null }
+  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null }
+  | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
   | { verb: 'watch',        onNotice: (notice: Notice<BoxRecord, BoxSparse>) => Promise<void>, fullFor: () => readonly Boxscope[] }
   | { verb: 'unwatch' }
   | { verb: 'load' }
@@ -112,9 +112,9 @@ export type ModelsWorldOpts = {
  * seeded under the boxlabel, or null; `put` keeps the record and answers it; `del` keeps and
  * answers a tombstone at the revision after the one stored, under a fresh tok (revision 0 over no
  * row); `watch` and the cache do as they are told. `put` and `del` enforce the versioned replace as
- * the `Store` doc block states it, case by case: over another tok than `priorTok` (any row, for
- * `priorTok` null), 'stale_write' carrying the row; over no row with a `priorTok`, 'stale_write'
- * carrying nothing; a put's `revision_seq` unfit for `priorTok`, or other than the row's + 1,
+ * the `Store` doc block states it, case by case: over another tok than `priorRevisionTok` (any row, for
+ * `priorRevisionTok` null), 'stale_write' carrying the row; over no row with a `priorRevisionTok`, 'stale_write'
+ * carrying nothing; a put's `revision_seq` unfit for `priorRevisionTok`, or other than the row's + 1,
  * 'bad_record'. A put that lands is kept exactly as given.
  * Each `will...` queues an answer for the next call of its verb, one answer per call, then back to
  * the default.
@@ -158,8 +158,8 @@ export type ModelsWorld = {
   seedCache(...copies: readonly Cacheable<BoxRecord, BoxSparse>[]): void
 
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
-  willPut(...answers: readonly Scripted<{ record: BoxRecord, priorTok: string | null }>[]): void
-  willDel(...answers: readonly Scripted<{ scope: Boxscope, priorTok: string | null }>[]): void
+  willPut(...answers: readonly Scripted<{ record: BoxRecord, priorRevisionTok: string | null }>[]): void
+  willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
   willEnsureTimely(...thunks: readonly ((opts: TimelyOpts) => Promise<void> | void)[]): void
   willLoad(...answers: readonly Scripted<undefined>[]): void
@@ -227,8 +227,8 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const cached = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
   const scripts = {
     get:          new Script<{ scope: Boxscope }>(),
-    put:          new Script<{ record: BoxRecord, priorTok: string | null }>(),
-    del:          new Script<{ scope: Boxscope, priorTok: string | null }>(),
+    put:          new Script<{ record: BoxRecord, priorRevisionTok: string | null }>(),
+    del:          new Script<{ scope: Boxscope, priorRevisionTok: string | null }>(),
     ensureTimely: new Script<TimelyOpts>(),
     load:         new Script<undefined>(),
     save:         new Script<Cacheable<BoxRecord, BoxSparse>>(),
@@ -236,10 +236,10 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
   const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ scope, ok: true, val, world })
   const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null): BoxAnswer => ({ scope, ok: false, err, world })
-  /** The 'stale_write' a put or del over `priorTok` meets where `held` is stored, or null where it may land: over no row with a `priorTok`, carrying nothing; over a row under another tok, carrying it. */
-  const casRefusalOf = (scope: Boxscope, held: Fetched<BoxRecord, BoxSparse> | undefined, priorTok: string | null): BoxAnswer | null => {
-    if (held === undefined) { return priorTok === null ? null : refusalOf(scope, new VaultError('stale_write', Refusals.StaleBoxMessage)) }
-    return held.revision_tok === priorTok ? null : refusalOf(scope, Refusals.staleBox(held))
+  /** The 'stale_write' a put or del over `priorRevisionTok` meets where `held` is stored, or null where it may land: over no row with a `priorRevisionTok`, carrying nothing; over a row under another tok, carrying it. */
+  const casRefusalOf = (scope: Boxscope, held: Fetched<BoxRecord, BoxSparse> | undefined, priorRevisionTok: string | null): BoxAnswer | null => {
+    if (held === undefined) { return priorRevisionTok === null ? null : refusalOf(scope, new VaultError('stale_write', Refusals.StaleBoxMessage)) }
+    return held.revision_tok === priorRevisionTok ? null : refusalOf(scope, Refusals.staleBox(held))
   }
 
   const world: BoxWorld = {
@@ -262,26 +262,26 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       if (scripted) { return (await answer) as BoxAnswer }
       return answerOf(scope, stored.get(scope.boxlabel) ?? null)
     },
-    put: async (record, priorTok) => {
-      calls.push({ verb: 'put', record, priorTok })
-      const { scripted, answer } = scripts.put.take({ record, priorTok })
+    put: async (record, priorRevisionTok) => {
+      calls.push({ verb: 'put', record, priorRevisionTok })
+      const { scripted, answer } = scripts.put.take({ record, priorRevisionTok })
       if (scripted) { return (await answer) as BoxAnswer }
       const held = stored.get(record.boxlabel)
       const scope = CX.boxscope.parse(record)
-      const fitsPriorTok = priorTok === null ? record.revision_seq === 0 : record.revision_seq > 0
-      if (! fitsPriorTok) { return refusalOf(scope, new VaultError('bad_record', Phrases.PutUnfitForPrior)) }
-      const refused = casRefusalOf(scope, held, priorTok)
+      const fitsPriorRevisionTok = priorRevisionTok === null ? record.revision_seq === 0 : record.revision_seq > 0
+      if (! fitsPriorRevisionTok) { return refusalOf(scope, new VaultError('bad_record', Phrases.PutUnfitForPrior)) }
+      const refused = casRefusalOf(scope, held, priorRevisionTok)
       if (refused !== null) { return refused }
       if (held !== undefined && record.revision_seq !== held.revision_seq + 1) { return refusalOf(scope, new VaultError('bad_record', Phrases.PutUnfitForPrior)) }
       stored.set(record.boxlabel, record)
       return answerOf(scope, record)
     },
-    del: async (scope, priorTok) => {
-      calls.push({ verb: 'del', scope, priorTok })
-      const { scripted, answer } = scripts.del.take({ scope, priorTok })
+    del: async (scope, priorRevisionTok) => {
+      calls.push({ verb: 'del', scope, priorRevisionTok })
+      const { scripted, answer } = scripts.del.take({ scope, priorRevisionTok })
       if (scripted) { return (await answer) as BoxAnswer }
       const held = stored.get(scope.boxlabel)
-      const refused = casRefusalOf(scope, held, priorTok)
+      const refused = casRefusalOf(scope, held, priorRevisionTok)
       if (refused !== null) { return refused }
       const tombstone = tombstoneBoxRecord({
         ...scope,

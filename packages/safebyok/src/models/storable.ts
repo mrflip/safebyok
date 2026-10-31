@@ -210,7 +210,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: demandUnlocked, demandPresent, demandFull, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToDel, demandReadyToDel
+  // == [Guards]: demandUnlocked, demandPresent, demandFull, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToSend, demandReadyToSend, ensureReadyToDel, demandReadyToDel
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
@@ -231,6 +231,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** An edit needs the vault unlocked, and no more: a thing gone or damaged is edited back to life. */
   demandReadyToEdit(): this { return this.demandUnlocked() }
+
+  async ensureReadyToSend(opts: TimelyOpts = {}): Promise<this> {
+    await this.hydrate(opts)
+    return this.demandReadyToSend()
+  }
+
+  /** A send needs what an edit does, as what it puts is what the edit stages: for the base, the vault unlocked. */
+  demandReadyToSend(): this { return this.demandReadyToEdit() }
 
   async ensureReadyToDel(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
@@ -285,11 +293,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryEdit(patch: PatchT, opts: EditOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.edit(patch, opts)) }
 
-  /** `edit`, then hand the record it staged to `listing.put`, which resolves once storage's answer is delivered; a 'stale_write' refusal delivers what storage holds, then throws. The revision minted is spent, whatever the answer: the next `edit` mints another.
-   * `opts.ifPresent`, optional, is only ever `'replace'`, the default: every put is the versioned replace, landing only over the record whose `revision_tok` this device holds, at its `revision_seq` + 1 (or over no row at revision 0, for a thing never stored), else refused (the `Store` doc block says how). It is checked and sets nothing; any other value refuses 'bad_option'.
+  /** `ensureReadyToSend`, then `edit`, then hand the record it staged to `listing.put`, which resolves once storage's answer is delivered; a 'stale_write' refusal delivers what storage holds, then throws. The revision minted is spent, whatever the answer: the next `edit` mints another.
+   * `opts.ifPresent`, optional, is only ever `'replace'`, the default: every put is the versioned replace, landing only over the record whose `revision_tok` this device holds, at its `revision_seq` + 1 (or over no row at revision 0, for a thing never stored), else refused (the `Store` doc block says how). It is checked and sets nothing; any other value refuses 'bad_option'. `opts`, then `patch`, are checked first of all, before any guard.
    */
   async send(patch: PatchT, opts: SendOpts = {}): Promise<this> {
     const { ifPresent: _ifPresent, ...timely } = MSX.sendOpts.parse(opts)
+    this.isFullPatch(patch)
+    await this.ensureReadyToSend(timely)
     await this.edit(patch, timely)
     this.#memoizedNextRevision = null
     // The staged record, not this thing ducking as it: a lock may come down between edit and put, and a locked thing's getters hide what it holds.
@@ -313,7 +323,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
-  // == [Receiving]: receive, adopt, settle, saveCopy, tombstoneFor, nextRevision, priorTok
+  // == [Receiving]: receive, adopt, settle, cacheOnDevice, tombstoneFor, nextRevision, priorRevisionTok
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
@@ -348,15 +358,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#staged = staged === null ? null : Object.freeze(staged)
   }
 
-  /** Act on the state as adopted, idempotently: the base replaces the snapshot, saves this thing's copy to the device cache through `#saveCopy` without awaiting it, and tells no news. A subclass calls super last, so that the snapshot sees it. */
+  /** Act on the state as adopted, idempotently: the base replaces the snapshot, saves this thing's copy to the device cache through `#cacheOnDevice` without awaiting it, and tells no news. A subclass calls super last, so that the snapshot sees it. */
   settle(): Settled {
     this.#replaceSnapshot()
-    this.#saveCopy()
+    this.#cacheOnDevice()
     return { badnews: [] }
   }
 
   /** Save the copy, central and the staged beside the sparse form, to the device cache by `cache.save`, not awaited: a save refused is told to `listing.tellBadNews`, never thrown into the verb that settled. The copy holds the records as stored and staged, sealed, and nothing the instance alone keeps, such as an exposed whisper. A thing never stored with nothing staged has nothing to keep, and saves nothing. One is in that state between its birth and the record it was born to receive. */
-  #saveCopy(): void {
+  #cacheOnDevice(): void {
     if (this.#central.revision_seq === MSX.NeverStoredSeq && this.#staged === null) { return }
     const copy = Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
     void outcomeOf(() => this.#cache.save(copy)).then(({ ok, err }) => { if (! ok) { this.listing.tellBadNews([err]) } })
@@ -377,7 +387,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
 
   /** The `revision_tok` storage should hold when this thing is put or deleted: central's; null for a thing never stored, which expects no record. */
-  priorTok(): string | null {
+  priorRevisionTok(): string | null {
     const { revision_tok, revision_seq } = this.#central
     return revision_seq === MSX.NeverStoredSeq ? null : revision_tok
   }

@@ -65,8 +65,8 @@ describe("BoxListing", () => {
     it("sends no prior tok to storage, being never stored", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(dna())
-      expect(box.priorTok()).to.be.null
-      expect(listing.priorTokOf(box.scope)).to.be.null
+      expect(box.priorRevisionTok()).to.be.null
+      expect(listing.priorRevisionTokOf(box.scope)).to.be.null
     })
 
     it("makes a box present, not full, with no sidecar to speak of, and puts it in the snapshot", async () => {
@@ -140,7 +140,7 @@ describe("BoxListing", () => {
       expect(listing.at(box.scope)).to.eq(box)
       expect(box.hasStaged).to.be.false
       expect(box.isFull).to.be.true
-      expect(box.priorTok()).to.equal('rev-a1')
+      expect(box.priorRevisionTok()).to.equal('rev-a1')
       expect(listing.snapshot).to.have.lengthOf(1)
     })
 
@@ -568,7 +568,7 @@ describe("boxListing.build(dna): the box is sealed at birth", () => {
     expect(box.isFull).to.be.true
     expect(box.hasStaged).to.be.true
     expect(box.revision_seq).to.eq(0)
-    expect(box.priorTok()).to.be.null
+    expect(box.priorRevisionTok()).to.be.null
     expect(box.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
     expect(box.whisper_ciphered).to.deep.equal(StubWhisperCiphered)
     expect(box._cheat_central).to.include({ revision_seq: MSX.NeverStoredSeq, am: 'x' })
@@ -595,7 +595,7 @@ describe("boxListing.build(dna): the box is sealed at birth", () => {
     const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: Infinity }).build(dna())
     await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
     const [put] = held.mw.callsOf('put')
-    expect(put?.priorTok).to.be.null
+    expect(put?.priorRevisionTok).to.be.null
     expect(put?.record).to.include({ revision_seq: 0, am: 'a' })
     expect(MSX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
   })

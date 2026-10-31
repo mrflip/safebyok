@@ -25,7 +25,7 @@ const Checks = Checkers('bad_record', ({ unk, custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable, cacheLoaded, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, Cacheable, NeverStoredSeq, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, Cacheable, NeverStoredSeq, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check or its seal, and reads as gone) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
@@ -34,14 +34,15 @@ export const amVals = ['a', 'd', 'x'] as const
 export const tombstoneAmVals = ['d', 'x'] as const
 
 /** The checks of what the base knows of any record, each refusing 'bad_record': `am`, one of {@link amVals}; `revision`, `times`, `liveness` and `vaulted`, a part each; and `sparseBase`, the four together, the least a sparse form carries beside its scope.
- * `tombstone` is a sparse base that is damaged or gone; `cacheable` is one with `central` and
- * `staged` beside it, as a storable saves it to the device cache. Each takes its fields from
- * whatever carries them, a record, a storable or a snapshot, and strips the rest. `cacheLoaded`
- * checks that the cache's load is an array, and leaves each copy in it to `cacheable`.
+ * `tombstone` is a sparse base that is damaged or gone; `buildableRecord` is one with `central` and
+ * `staged` beside it, a copy as a storable saves it to the device cache, uncached and ready for a
+ * listing to build an instance with. Each takes its fields from whatever carries them, a record, a
+ * storable or a snapshot, and strips the rest. `buildableRecords` checks that the cache's load is
+ * an array, and leaves each copy in it to `buildableRecord`.
  *
  * @example sparseBase.parse(box)   // { revision_tok, revision_seq, registered_at, written_at, am, vault_tok }
  */
-export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable, cacheLoaded } = Checkers('bad_record', ({ obj, arr, unk, int, oneof, revision_tok, vault_tok, epochMillis }) => {
+export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords } = Checkers('bad_record', ({ obj, arr, unk, int, oneof, revision_tok, vault_tok, epochMillis }) => {
   const am = oneof(amVals)
   const revision = obj({
     revision_tok,
@@ -58,9 +59,9 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, ca
   const vaulted    = obj({ vault_tok })
   const sparseBase = obj({ ...revision.shape, ...times.shape, ...liveness.shape, ...vaulted.shape })
   const tombstone  = sparseBase.extend({ am: oneof(tombstoneAmVals) })
-  const cacheable  = sparseBase.extend({ central: sparseBase, staged: sparseBase.nullable() })
-  const cacheLoaded = arr(unk)
-  return { am, revision, times, liveness, vaulted, sparseBase, tombstone, cacheable, cacheLoaded }
+  const buildableRecord  = sparseBase.extend({ central: sparseBase, staged: sparseBase.nullable() })
+  const buildableRecords = arr(unk)
+  return { am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords }
 }, [FX])
 
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
@@ -95,7 +96,7 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 /** The DNA of a storable, what a caller hands `listing.build`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
-/** The copy a storable saves to the device cache at each settle, and a listing revives it from: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link cacheable} checks what the base knows of one. */
+/** The copy a storable saves to the device cache at each settle, and a listing revives it from: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link buildableRecord} checks what the base knows of one. */
 export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
   central: Fetched<RecordT, SparseT>
   staged:  Fetched<RecordT, SparseT> | null
@@ -450,20 +451,20 @@ export type ListingWorld = World & {
   takeWorld(world: unknown): void
 }
 
-/** The vaultDB's verbs for one kind of thing, as a listing calls them. `priorTok` is the `revision_tok` of the record this device holds, null where it holds none; no prior `revision_seq` is sent.
+/** The vaultDB's verbs for one kind of thing, as a listing calls them. `priorRevisionTok` is the `revision_tok` of the record this device holds, null where it holds none; no prior `revision_seq` is sent.
  * Every `put` is the versioned replace (compare-and-swap), judged by storage in this order:
- * * `priorTok` null with a `revision_seq` other than 0, or a `priorTok` with a `revision_seq` below 1, refuses 'bad_record': no device of this package puts it.
- * * Over no row, `priorTok` null lands; a `priorTok` given refuses 'stale_write', carrying nothing.
- * * Over a row under another `revision_tok` than `priorTok` (any row, where `priorTok` is null; a tombstone is a row), it refuses 'stale_write', carrying that row.
- * * Over the row under `priorTok`, it lands only at that row's `revision_seq` + 1, which storage computes or queries itself; any other `revision_seq` refuses 'bad_record'.
+ * * `priorRevisionTok` null with a `revision_seq` other than 0, or a `priorRevisionTok` with a `revision_seq` below 1, refuses 'bad_record': no device of this package puts it.
+ * * Over no row, `priorRevisionTok` null lands; a `priorRevisionTok` given refuses 'stale_write', carrying nothing.
+ * * Over a row under another `revision_tok` than `priorRevisionTok` (any row, where `priorRevisionTok` is null; a tombstone is a row), it refuses 'stale_write', carrying that row.
+ * * Over the row under `priorRevisionTok`, it lands only at that row's `revision_seq` + 1, which storage computes or queries itself; any other `revision_seq` refuses 'bad_record'.
  * A put that lands keeps the record exactly as given, never renumbered or patched, and answers what storage then holds.
- * `del` follows the same `priorTok` rule and answers the tombstone it lands, at the row's `revision_seq` + 1 under a fresh `revision_tok`; over no row, with `priorTok` null, it lands a tombstone at revision 0.
+ * `del` follows the same `priorRevisionTok` rule and answers the tombstone it lands, at the row's `revision_seq` + 1 under a fresh `revision_tok`; over no row, with `priorRevisionTok` null, it lands a tombstone at revision 0.
  * `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most.
  */
 export type Store<ScopeT, RecordT, SparseT> = {
   get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
-  put(record: RecordT, priorTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
-  del(scope: ScopeT, priorTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
+  put(record: RecordT, priorRevisionTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
+  del(scope: ScopeT, priorRevisionTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }
 
