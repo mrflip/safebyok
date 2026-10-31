@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #388 (thread 16); thread 17 building on it; then 15, 13, 18, 19, then 6.
+* **Status:** filed through #389 (thread 17); thread 15 building on it, branch `20261031-whisper_required`; then 13, 18, 19, then 6.
 
 ## Read first
 
@@ -535,6 +535,7 @@ assert instead on what the fake cache saved (`mw`'s cache calls), on the snapsho
 put; a test helper may read the fake cache's last save for a scope. Behaviour unchanged: the
 cache is saved when it is today (each delivery, each build; never on `hello`'s revive). Worker
 `sonnet`; review `medium`. Depends on 16 (cut from its tip). Size: medium (mechanical, wide).
+*Review:* flagged (#389): a public `Listing.keepCopy` was a typed write door into the next cache save; reworked to `[MSX.KeepCopy]`, a symbol keyed like `IsListing` (off the typed surface; reflection still finds it), with a note above `adopt` that every adopt is followed by `settle` and a test that a 'same' delivery saves the current state. Second review fixed: that test tightened, doc blocks corrected. Left, minor: a symbol is not a barrier (an ES-private channel would be); no validator on `[KeepCopy]` (thread 18); `adopt` is `protected`; an orphan copy per thrown candidate; `mw.kept` keyed by boxlabel only. Tests read central and staged through `keptOf(held.mw, box)`.
 
 ### 15. A whisper and a sidecar on every update
 
