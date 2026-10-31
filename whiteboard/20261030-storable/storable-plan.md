@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** main has merged through #390; thread 23 (#406) filing, on #405; then 25 (life toks), 24, 19, 20, then 6.
+* **Status:** paused 2026-10-31 on the Coach's call on #407 (thread 25, second review flagged: a damaged central weighed by life). Main has merged through #390; filed through #406 (thread 23); 25 waits unfiled at 01369ba5; then 24, 19, 20, then 6.
 
 ## Read first
 
@@ -741,6 +741,7 @@ vault's `vault_tok` over its own tombstone, and say so as an open matter. Stored
 are not exported, so `box_tok` binds nothing yet; the changeset is likely `--empty`; say so.
 Worker `opus`; review `high` (a new stored field, and the precheck that decides which records a
 thing takes). Depends on 23 (cut from its tip). Size: medium.
+*Review:* 1st flagged (high). Fixed: `vault_tok` checked before `#sameLife` (joined paths collide: 'a-b'+'c' = 'a'+'b-c'); a `makeLifeTok` test. Flagged: a damaged record at the revision held, of another life, refused `record_conflict` against the Coach's damage NOTE; reworked (damage before life). Minors to Cleanup: hold received records to `sparseOf` at delivery; `BoxTok` export; `RefusalMeta`'s hand-spelled revision. 2nd flagged (high), over the rework: the rework holds (2 test fixes); new: an ouchstone keeps the old life's `box_tok`, so the intact copy of its revision throws `OneRevisionTwoLives` where the NOTE says 'fill'/'gone'. The Coach's (a TOP row); rec: damage before life on the central too.
 
 ### 24. The receive table and the trigger's verdict
 
