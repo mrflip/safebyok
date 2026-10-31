@@ -311,9 +311,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return (delSpent || act.success) ? this.settle() : { badnews: [] }
   }
 
+  // Every adopt is followed by a settle: the listing saves the copy last handed in by settle, not the state at the time of the save.
   /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand over the central held until now; the snapshot waits for `settle`. */
   protected adopt(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null): void {
-    // Every adopt is followed by a settle: the listing saves the copy last handed in by settle, not the state at the time of the save.
     const current = this.#central
     this.#central = Object.freeze(central)
     this.#staged = staged === null ? null : Object.freeze(staged)
