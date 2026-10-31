@@ -41,9 +41,9 @@ describe("Gate.build(vault, proofClosure, world)", () => {
   it("wraps a different vaultKey for each gate built", async () => {
     const one = await builtGate()
     const two = await builtGate()
-    const keyOne = await _cheat_vaultKeyBytesOf(one.vault, one.gate.ppWayin, { passphrase: TestPassphrase })
-    const keyTwo = await _cheat_vaultKeyBytesOf(two.vault, two.gate.ppWayin, { passphrase: TestPassphrase })
-    expect(keyOne).to.not.deep.equal(keyTwo)
+    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(one.vault, one.gate.ppWayin, { passphrase: TestPassphrase })
+    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(two.vault, two.gate.ppWayin, { passphrase: TestPassphrase })
+    expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
   })
 
   it("refuses a world its check refuses as 'bad_option', without invoking the closure", async () => {

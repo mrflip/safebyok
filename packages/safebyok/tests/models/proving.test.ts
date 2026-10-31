@@ -230,9 +230,9 @@ describe("proving.makeWayin(source)", () => {
     const vault = duckVaultOf()
     const { passphraseProving: one } = await Proving.makeProvingPair(asVault(vault), proofClosureOf(), provingWorldOf())
     const { passphraseProving: two } = await Proving.makeProvingPair(asVault(vault), proofClosureOf(), provingWorldOf())
-    const keyOne = await _cheat_vaultKeyBytesOf(vault, await one.makeWayin(NOVEL), { passphrase: TestPassphrase })
-    const keyTwo = await _cheat_vaultKeyBytesOf(vault, await two.makeWayin(NOVEL), { passphrase: TestPassphrase })
-    expect(keyOne).to.not.deep.equal(keyTwo)
+    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(vault, await one.makeWayin(NOVEL), { passphrase: TestPassphrase })
+    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(vault, await two.makeWayin(NOVEL), { passphrase: TestPassphrase })
+    expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
   })
 
   it("binds the wayin to its vault: under another vault's stamp it will not open", async () => {

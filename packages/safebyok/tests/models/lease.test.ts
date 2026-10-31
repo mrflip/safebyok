@@ -157,7 +157,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
   })
 
   const MalformedCases = [
-    [(record: LeaseRecord, extractableKey: CryptoKey) => ({ ...record, lease_key: extractableKey }), 'whose leaseKey is extractable (G4)'],
+    [(record: LeaseRecord, extractableVaultKey: CryptoKey) => ({ ...record, lease_key: extractableVaultKey }), 'whose leaseKey is extractable (G4)'],
     [(record: LeaseRecord) => ({ ...record, fmt: 7000 }),                             'of another fmt'],
     [(record: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: undefined }),    'with no wrapped vaultKey'],
     [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                        'with a field no lease has'],
