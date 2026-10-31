@@ -5,7 +5,7 @@
 * **At once**: 3 threads.
 * **Spec**: `whiteboard/20261030-newvault/newvault-spec.md` (the design, one day older than this sprint's folder; the two folders share the name on purpose). The storable spec is `whiteboard/20261028-storable_base/storable-spec.md`.
 * **Base**: every code thread stacks on the models PR, branch `20261031-newvault_models` (the Lease, Wayin, Proving, Gate, `Vault.lock()` and their shapes, filed from the Coach's planning checkout). Its PR number and tip are in the progress document once filed.
-* **Status**: running. Models PR #408 at `4ff14b4b`. Threads 5, 1, 2, 3 filed (#411 c9d12890, #410 7c57356c, #412 c740f161, #413 5a1dc63a). Thread 4 reviewed twice (#414 at a69bdef8) and filing; then thread 5 is restacked onto its tip and thread 6 cut from the top.
+* **Status**: running. Models PR #408 at `4ff14b4b`. Threads 1, 2, 3, 4 filed in a line (#410 7c57356c, #412 c740f161, #413 5a1dc63a, #414 a69bdef8). Thread 5 (#411 at c9d12890, cut from main) is being restacked onto a69bdef8 with its tests adapted; thread 6 is cut from the top of that line.
 
 ## Read first
 
