@@ -1159,7 +1159,7 @@ describe("storable verbs while the vault is locked", () => {
   const EntryCases = [
     [(box: Box) => box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'locked' } }), 'edit'],
     [(box: Box) => box.send({ whisper: 'sk-test-0000', sidecar: { note: 'locked' } }), 'send'],
-    [(box: Box) => box.del(),                                  'del'],
+    [(box: Box) => box.del(),                                                          'del'],
   ] as const
   for (const [verb, verbname] of EntryCases) {
     it(`refuses ${verbname} at its entry with 'vault_locked', staging and storing nothing`, async () => {
@@ -1209,11 +1209,11 @@ const storeDown = (): VaultError => new VaultError('storage_unavailable', "The s
 
 describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
-    [(box: Box) => box.tryFetch(),                          'tryFetch of a stored record'],
-    [(box: Box) => box.tryHydrate(),                        'tryHydrate of a timely record'],
+    [(box: Box) => box.tryFetch(),                                                   'tryFetch of a stored record'],
+    [(box: Box) => box.tryHydrate(),                                                 'tryHydrate of a timely record'],
     [(box: Box) => box.tryEdit({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), 'tryEdit of a full record'],
     [(box: Box) => box.trySend({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), 'trySend that storage takes'],
-    [(box: Box) => box.tryDel(),                            'tryDel that storage takes'],
+    [(box: Box) => box.tryDel(),                                                     'tryDel that storage takes'],
   ] as const
   for (const [tryVerb, blurb] of GoodCases) {
     it(`resolves a good outcome holding the thing: ${blurb}`, async () => {
@@ -1223,12 +1223,12 @@ describe("storable try forms: an outcome, never a rejection", () => {
   }
 
   const BadCases = [
-    [(box: Box) => box.tryFetch(),                          (box: Box) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },    "storage_unavailable", 'tryFetch that storage refuses'],
-    [(box: Box) => box.tryFetch(),                          () => { held.mw.willGet(() => { throw new Error("socket closed") }) },           "unexpected_error",    'tryFetch whose store throws a plain Error'],
-    [(box: Box) => box.tryHydrate(),                        () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },           "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
-    [(box: Box) => box.tryEdit({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), () => { held.mw.setLockState('locked') },                                        "vault_locked",        'tryEdit while locked'],
+    [(box: Box) => box.tryFetch(),                                                   (box: Box) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
+    [(box: Box) => box.tryFetch(),                                                   () => { held.mw.willGet(() => { throw new Error("socket closed") }) },         "unexpected_error",    'tryFetch whose store throws a plain Error'],
+    [(box: Box) => box.tryHydrate(),                                                 () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
+    [(box: Box) => box.tryEdit({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), () => { held.mw.setLockState('locked') },                                      "vault_locked",        'tryEdit while locked'],
     [(box: Box) => box.trySend({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), (box: Box) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'trySend that storage refuses as stale'],
-    [(box: Box) => box.tryDel(),                            () => { held.mw.setLockState('locked') },                                        "vault_locked",        'tryDel while locked'],
+    [(box: Box) => box.tryDel(),                                                     () => { held.mw.setLockState('locked') },                                      "vault_locked",        'tryDel while locked'],
   ] as const
   for (const [tryVerb, arrange, refusalkind, blurb] of BadCases) {
     it(`resolves a bad outcome holding its refusal: ${blurb}`, async () => {
