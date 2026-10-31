@@ -2,20 +2,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { Gate } from '../../src/models/gate'
 import type { GateProps } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, asVault, duckVaultOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
 /** The PRF bytes are copied before the build zeroes them, for the backdoor. */
 const builtGate = async ({ passkey = false } = {}) => {
-  const vault = duckVaultOf()
   const answer = passkey ? passkeyAnswerOf() : undefined
   const prfBytes = answer && new Uint8Array(answer.prfBytes)
-  const gate = await Gate.build(asVault(vault), proofClosureOf(TestPassphrase, answer), provingWorldOf())
-  return { vault, gate, answer, prfBytes }
+  const { gate } = await Gate.build(WorldStamp, proofClosureOf(TestPassphrase, answer), provingWorldOf())
+  return { gate, answer, prfBytes }
 }
 
-describe("Gate.build(vault, proofClosure, world)", () => {
+describe("Gate.build(stamp, proofClosure, world)", () => {
   it("builds a gate of a passphrase wayin alone when the closure hands back a passphrase alone", async () => {
     const { gate } = await builtGate()
     expect(gate.passphrase_wayin.wayinkind).to.eq('passphrase')
@@ -31,39 +30,37 @@ describe("Gate.build(vault, proofClosure, world)", () => {
   })
 
   it("wraps one new vaultKey in both wayins", async () => {
-    const { vault, gate, prfBytes } = await builtGate({ passkey: true })
-    const viaPassphrase = await _cheat_vaultKeyBytesOf(vault, gate.ppWayin, { passphrase: TestPassphrase })
-    const viaPasskey = await _cheat_vaultKeyBytesOf(vault, gate.pkWayin!, { prfBytes: prfBytes! })
+    const { gate, prfBytes } = await builtGate({ passkey: true })
+    const viaPassphrase = await _cheat_vaultKeyBytesOf(WorldStamp, gate.ppWayin, { passphrase: TestPassphrase })
+    const viaPasskey = await _cheat_vaultKeyBytesOf(WorldStamp, gate.pkWayin!, { prfBytes: prfBytes! })
     expect(viaPasskey).to.deep.equal(viaPassphrase)
   })
 
   it("wraps a different vaultKey for each gate built", async () => {
     const one = await builtGate()
     const two = await builtGate()
-    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(one.vault, one.gate.ppWayin, { passphrase: TestPassphrase })
-    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(two.vault, two.gate.ppWayin, { passphrase: TestPassphrase })
+    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(WorldStamp, one.gate.ppWayin, { passphrase: TestPassphrase })
+    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(WorldStamp, two.gate.ppWayin, { passphrase: TestPassphrase })
     expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
   })
 
   it("refuses a world its check refuses as 'bad_option', without invoking the closure", async () => {
     const proofClosure = vi.fn(proofClosureOf())
-    const vault = asVault(duckVaultOf())
     const world = TH.omitting(provingWorldOf(), 'device_id')
-    await TH.expectRefusal(Gate.build(vault, proofClosure, world), 'bad_option')
+    await TH.expectRefusal(Gate.build(WorldStamp, proofClosure, world), 'bad_option')
     expect(proofClosure).not.toHaveBeenCalled()
   })
 
   it("refuses a throwing closure as 'unexpected_error', quoting none of what it threw", async () => {
-    const vault = asVault(duckVaultOf())
-    const err = await TH.expectRefusal(Gate.build(vault, () => { throw new Error(TestPassphrase) }, provingWorldOf()), 'unexpected_error')
+    const err = await TH.expectRefusal(Gate.build(WorldStamp, () => { throw new Error(TestPassphrase) }, provingWorldOf()), 'unexpected_error')
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
 })
 
-describe("new Gate(vault, props): the props check", () => {
+describe("new Gate(stamp, props): the props check", () => {
   it("makes the same gate again from a gate's pickle", async () => {
-    const { vault, gate } = await builtGate({ passkey: true })
-    const again = new Gate(asVault(vault), gate.pickle())
+    const { gate } = await builtGate({ passkey: true })
+    const again = new Gate(WorldStamp, gate.pickle())
     expect(again.pickle()).to.deep.equal(gate.pickle())
     expect(again.toJSON()).to.deep.equal(gate.toJSON())
   })
@@ -78,20 +75,20 @@ describe("new Gate(vault, props): the props check", () => {
 
   for (const [propsOf, blurb] of PropsCases) {
     it(`refuses props with ${blurb} as 'bad_record'`, async () => {
-      const { vault, gate } = await builtGate({ passkey: true })
-      TH.expectSyncRefusal(() => new Gate(asVault(vault), propsOf(gate.pickle())), 'bad_record')
+      const { gate } = await builtGate({ passkey: true })
+      TH.expectSyncRefusal(() => new Gate(WorldStamp, propsOf(gate.pickle())), 'bad_record')
     })
   }
 
-  it("refuses a vault with no stamp as 'bad_option'", async () => {
+  it("refuses a stamp with no vault_tok as 'bad_option'", async () => {
     const { gate } = await builtGate()
-    TH.expectSyncRefusal(() => new Gate(asVault({ ...duckVaultOf(), vault_tok: undefined } as never), gate.pickle()), 'bad_option')
+    TH.expectSyncRefusal(() => new Gate(TH.omitting(WorldStamp, 'vault_tok'), gate.pickle()), 'bad_option')
   })
 
   it("quotes none of refused props in its refusal: no ciphertext", async () => {
-    const { vault, gate } = await builtGate({ passkey: true })
+    const { gate } = await builtGate({ passkey: true })
     const { passphrase_wayin, passkey_wayin } = gate.pickle()
-    const err = TH.expectSyncRefusal(() => new Gate(asVault(vault), { passphrase_wayin: passkey_wayin, passkey_wayin: passphrase_wayin }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => new Gate(WorldStamp, { passphrase_wayin: passkey_wayin, passkey_wayin: passphrase_wayin }), 'bad_record')
     expect(TH.thrownText(err)).to.not.include(passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)
   })
 })
@@ -118,7 +115,7 @@ describe("gate.pickle() and gate.toJSON()", () => {
     expect(gate.toJSON().passkey_wayin).to.be.null
   })
 
-  it("Object.keys shows the two wayin records alone: no Wayin, no vault", async () => {
+  it("Object.keys shows the two wayin records alone: no Wayin, no stamp", async () => {
     const { gate } = await builtGate({ passkey: true })
     expect(Object.keys(gate)).to.have.members(['passphrase_wayin', 'passkey_wayin'])
   })
@@ -129,9 +126,8 @@ describe("gate.pickle() and gate.toJSON()", () => {
     expect(() => { (gate as { passkey_wayin: unknown }).passkey_wayin = gate.passphrase_wayin }).to.throw(TypeError)
   })
 
-  it("holds the vault it was handed, hidden", async () => {
-    const { vault, gate } = await builtGate()
-    expect(gate.vault).to.equal(vault)
-    expect(gate.vault).to.deep.include(WorldStamp)
+  it("holds the stamp it was handed, as parsed, hidden", async () => {
+    const { gate } = await builtGate()
+    expect(gate.stamp).to.deep.equal(WorldStamp)
   })
 })

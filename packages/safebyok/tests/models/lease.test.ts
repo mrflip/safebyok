@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FarFuture } from '../../src/consts'
+import { FarFuture, MaxTimerMillis } from '../../src/consts'
 import { makeLeaseKey, makeVaultKey } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { Lease } from '../../src/models/lease'
@@ -169,6 +169,17 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
       expect(friend.logged.map(({ level }) => level)).to.deep.equal(['warn'])
     })
   }
+
+  it("answers null for a kept lease whose autolock_at has passed, erasing its record once and locking nothing", async () => {
+    const friend = fakeDBFriendOf()
+    await grantedLeaseOf(duckVaultOf(), friend)
+    vi.setSystemTime(T0 + (2 * WeekMillis))
+    const vault = duckVaultOf()
+    expect(await Lease.get(vault, friend)).to.be.null
+    expect(friend.tryDelLease).toHaveBeenCalledTimes(1)
+    expect(friend.kept).to.be.null
+    expect(vault.lock).not.toHaveBeenCalled()
+  })
 })
 
 describe("lease.forget(), isForgotten and isInForce", () => {
@@ -213,6 +224,15 @@ describe("lease.forget(), isForgotten and isInForce", () => {
     expect(lease.isInForce).to.be.false
     expect(lease.isForgotten).to.be.false
   })
+
+  it("refuses sealWith and unsealWith as 'vault_locked' once the clock passes autolock_at, though its timer has yet to fire", async () => {
+    const { lease } = await grantedWorld()
+    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
+    const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
+    vi.setSystemTime(T0 + WeekMillis + 1)
+    await TH.expectRefusal(lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'vault_locked')
+    await TH.expectRefusal(lease.unsealWith(sealed, boxKeyStamp, whisperStamp), 'vault_locked')
+  })
 })
 
 describe("the autolock", () => {
@@ -224,19 +244,18 @@ describe("the autolock", () => {
     expect(lease.isInForce).to.be.true
   })
 
-  it("at autolock_at locks the vault, then forgets the lease, erasing its record", async () => {
+  it("at autolock_at locks the vault, then lets the lease go, erasing nothing itself: the vault's lock() erases the kept record", async () => {
     const { vault, friend, lease } = await grantedWorld()
     await vi.advanceTimersByTimeAsync(WeekMillis)
     expect(vault.lock).toHaveBeenCalledTimes(1)
-    expect(friend.tryDelLease).toHaveBeenCalledTimes(1)
-    expect(vault.lock.mock.invocationCallOrder[0]).to.be.lessThan(friend.tryDelLease.mock.invocationCallOrder[0]!)
+    expect(friend.tryDelLease).not.toHaveBeenCalled()
     expect(lease.isForgotten).to.be.true
     expect(vi.getTimerCount()).to.eq(0)
   })
 
-  it("warns when the forgetting it launches is refused, quoting only the refusalkind", async () => {
-    const { friend } = await grantedWorld()
-    friend.tryDelLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+  it("warns when the vault.lock() it launches throws, quoting only the refusalkind", async () => {
+    const { vault, friend } = await grantedWorld()
+    vault.lock.mockImplementationOnce(() => { throw new VaultError('unexpected_error', 'the store is down') })
     await vi.advanceTimersByTimeAsync(WeekMillis)
     expect(friend.logged.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'Lease.autolock', refusalkind: 'unexpected_error' }]])
   })
@@ -245,6 +264,17 @@ describe("the autolock", () => {
     const { vault } = await grantedWorld()
     await vi.advanceTimersByTimeAsync(WeekMillis * 3)
     expect(vault.lock).toHaveBeenCalledTimes(1)
+  })
+
+  it("notes/wontfix.md:44, 'no autolock timer past the Trigger's cap': a lease longer than MaxTimerMillis arms no timer, so a day past its autolock_at it has locked nothing, yet refuses its seal 'vault_locked'", async () => {
+    const leaseMillis = MaxTimerMillis + WeekMillis
+    const { vault, lease } = await grantedWorld({ leaseMillis })
+    expect(vi.getTimerCount()).to.eq(0)
+    await vi.advanceTimersByTimeAsync(leaseMillis + (24 * 3_600_000))
+    expect(vault.lock).not.toHaveBeenCalled()
+    expect(lease.isForgotten).to.be.false
+    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
+    await TH.expectRefusal(lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'vault_locked')
   })
 })
 
@@ -360,7 +390,7 @@ describe("a tampered lease record", () => {
   ] as const
 
   for (const [tamper, blurb] of TamperCases) {
-    it(`reads as a lease, but with ${blurb} it locks the vault and refuses 'damaged_lease' at its first seal or unseal`, async () => {
+    it(`reads as a lease, but with ${blurb} its first seal or unseal locks the vault, refuses 'damaged_lease' and lets the lease go, erasing nothing itself, so the next refuses 'vault_locked'`, async () => {
       const { friend, lease } = await grantedWorld()
       const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
       const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
@@ -372,9 +402,12 @@ describe("a tampered lease record", () => {
       expect(got).to.be.instanceOf(Lease)
       await TH.expectRefusal(got!.unsealWith(sealed, boxKeyStamp, whisperStamp), 'damaged_lease')
       expect(vault.lock).toHaveBeenCalledTimes(1)
+      expect(got!.isForgotten).to.be.true
+      expect(friend.tryDelLease).not.toHaveBeenCalled()
       const bytes = whisperBytesOf()
-      await TH.expectRefusal(got!.sealWith(bytes, boxKeyStamp, whisperStamp), 'damaged_lease')
+      await TH.expectRefusal(got!.sealWith(bytes, boxKeyStamp, whisperStamp), 'vault_locked')
       expect(isZeroed(bytes)).to.be.true
+      expect(vault.lock).toHaveBeenCalledTimes(1)
     })
   }
 

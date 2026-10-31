@@ -13,7 +13,6 @@ import { MinuteMillis, PasskeySaltBytes } from '../../src/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/crypto'
 import { Lease } from '../../src/models/lease'
 import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type ProofClosure, type ProvingWorld, type VaultStamp, vaultStamp } from '../../src/models/models-shapes'
-import type { Vault } from '../../src/models/vault'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/outcome'
 import type { KeyDeriver } from '../../src/key-deriver'
@@ -33,12 +32,12 @@ export const useFakeClock = (): void => {
 }
 // --
 
-// == [The vault]: WorldStamp, DuckVault, duckVaultOf, asVault
+// == [The vault]: WorldStamp, DuckVault, duckVaultOf
 
 /** The stamp of the vault every builder here makes things in: `u1`'s `main` vault of the app `acme`, registered at {@link T0}. */
 export const WorldStamp: VaultStamp = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
 
-/** A plain stand-in for a vault, as a lease, a proving and a gate are handed one: its stamp, a clock on `Date.now()`, and `lock`, a spy. */
+/** A plain stand-in for a vault, as a lease is handed one: its stamp, a clock on `Date.now()`, and `lock`, a spy. A proving and a gate take its stamp alone, {@link WorldStamp}. */
 export type DuckVault = VaultStamp & { clock: { now: () => number }, lock: Mock<() => void> }
 
 /** A {@link DuckVault} of {@link WorldStamp}, with a fresh `lock` spy.
@@ -51,9 +50,6 @@ export const duckVaultOf = (overrides: Partial<VaultStamp> = {}): DuckVault => (
   clock: { now: () => Date.now() },
   lock:  vi.fn<() => void>(),
 })
-
-/** `duck` typed as the model `Vault`: a lease, a proving and a gate read nothing of a vault past its stamp, its clock and `lock()`. */
-export const asVault = (duck: DuckVault): Vault => duck as unknown as Vault
 // --
 
 // == [The deviceDB friend]: FakeDBFriend, fakeDBFriendOf
