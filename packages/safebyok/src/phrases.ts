@@ -50,7 +50,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, ListingExpected, VaultErrorExpected, LeftOutExpected
+// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, LeftOutExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -60,6 +60,9 @@ export const bytesExpected = (count?: number): string => (count === undefined ? 
 
 /** Anything but a leaseKey as `makeLeaseKey` makes one, where a lease record keeps its key. */
 export const LeaseKeyExpected = "Expected a non-extractable AES-GCM CryptoKey for wrapKey and unwrapKey"
+
+/** Anything but a stamp a lease binds a seal to. */
+export const CtxStampExpected = "Expected a flat object of strings and numbers, with at least one field"
 
 /** The listing a storable is made in. */
 export const ListingExpected = "Expected a Listing"

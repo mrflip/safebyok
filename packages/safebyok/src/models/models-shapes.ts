@@ -639,9 +639,9 @@ export const leaseGrantOpts = objCheck(({ int, lit, union }) => ({
 
 export type LeaseGrantOpts = Z.infer<typeof leaseGrantOpts>
 
-/** True for a stamp a caller hands the lease as additional data: a flat object of strings and finite numbers. */
+/** True for a stamp a caller hands the lease as additional data: a flat object of strings and finite numbers, at least one. */
 const isCtxStamp = (val: unknown): boolean => (
-  typeof val === 'object' && val !== null && ! Array.isArray(val)
+  typeof val === 'object' && val !== null && ! Array.isArray(val) && Object.keys(val).length > 0
     && Object.values(val).every((field) => typeof field === 'string' || Number.isFinite(field))
 )
 
@@ -649,7 +649,7 @@ const isCtxStamp = (val: unknown): boolean => (
 export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, fn, custom, bytes }) => {
   const vault     = obj({ ...vaultStamp.shape, clock: HX.clockShape, lock: fn<() => unknown>() })
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
-  const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, 'Expected a flat object of strings and numbers')
+  const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
   return {
     ctxStamp,
     serializedBytes: bytes(),
