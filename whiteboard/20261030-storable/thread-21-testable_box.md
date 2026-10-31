@@ -1,6 +1,6 @@
 # Thread 21: TestableBox, in place of keptOf (2026-10-31)
 
-Branch `20261031-testable_box`, PR #TBD, stacked on #390. Justify: see the PR's Tests line.
+Branch `20261031-testable_box`, PR #402, stacked on #390. Justify: green (72 files, 4357 passed, 37 skipped).
 
 * **Built**: in `packages/safebyok/tests/test-helpers/models-world.ts`, `TestableBox extends Box` with `get _cheat_central()` and `get _cheat_staged()` (the storable's protected `central` and `staged`), and `TestableBoxListing extends BoxListing`, whose `makeThing` makes a `TestableBox` and whose `build`, `fetch`, `put`, `del` and `at` are typed to give one (each asserts the instance is one). `boxListingOf` and `fakeSealBoxListingOf` return a `TestableBoxListing`; `FakeSealBox` extends `TestableBox`. `keptOf`, `mw.kept` and `KeptBoxListing` are gone, and with them the test-side recording through `[MSX.KeepCopy]`. No change under `src/`; the changeset is empty.
 * **Decisions taken**:
