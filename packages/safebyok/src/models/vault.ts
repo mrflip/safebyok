@@ -115,7 +115,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-
   /** Lock the vault, synchronously: the lease is dropped and the vault reads locked before this returns; the lease's forgetting (its record erased from the deviceDB) is queued as a chore. A box's whisper reads LOCKED from here on. */
   lock(): void {
     this.#isLocked = true
