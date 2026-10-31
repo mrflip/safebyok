@@ -43,8 +43,6 @@ export class Gate {
     return Proving.attempt(this.stamp, this.pickle(), proofClosure, world)
   }
 
-  // == [The next gate]: withPassphraseReplaced, withPasskeyAdded, withPasskeyRevoked
-
   /** The props of the next gate, once `proofClosure` proves this one: a passphrase wayin for the passphrase `passphraseClosure` answers, sealed from the proving that opened, and the passkey wayin as stored, as the vaultKey does not change. */
   async withPassphraseReplaced(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure, world: ProvingWorld): Promise<GateProps> {
     passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
@@ -72,7 +70,6 @@ export class Gate {
     await this.attemptProof(proofClosure, world)
     return gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: null })
   }
-  // --
 
   // not yet: gate_epoch
 
