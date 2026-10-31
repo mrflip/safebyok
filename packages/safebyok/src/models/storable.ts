@@ -61,6 +61,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #watchable = true
   // --
 
+  // == [Statics]: isLockedFUBag
+
+  /** True for {@link MSX.LOCKED}, the bag a storable answers in place of what the locked vault hides, and for nothing else: not a copy of it, nor any bag a host builds, nor `Symbol.for('LOCKED')`. */
+  static isLockedFUBag(val: unknown): val is MSX.LockedBag { return val === MSX.LOCKED }
+  // --
+
   // == [Constructor]: constructor, assignInitialProps, assign
 
   /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. `tell` is how it tells bad news nobody asked about to the host. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */

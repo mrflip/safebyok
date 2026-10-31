@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { type BoxProps, type BoxSnapshot, LOCKED } from '../../src/models/box'
 import type { BoxRecord, BoxSparse, Fetched } from '../../src/models/models-shapes'
+import { Storable } from '../../src/models/storable'
 import { StubBoxKeyWrapped, StubWhisperCiphered } from '../../src/models/stub-seal'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -146,14 +147,14 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
       held.mw.seedStore(tombstone)
       const box = await fakeSealBoxListingOf(held.mw).build(tombstone)
       held.mw.setNow(T0 + 5000)
-      await expect(box.edit({ whisper: 'sk-test-0000', sidecar: {} })).resolves.to.eq(box)
+      await expect(box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: {} })).resolves.to.eq(box)
       expect(box.isPresent).to.be.true
       expect(box._cheat_staged).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, written_at: T0 + 5000, sidecar: {} })
       const reborn = box.revision_tok
       held.mw.setNow(T0 + 6000)
-      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'reborn' } })
+      await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'reborn' } })
       expect(box._cheat_staged).to.deep.include({ revision_tok: reborn, registered_at: T0 + 5000, written_at: T0 + 6000, sidecar: { note: 'reborn' } })
-      await box.send({ whisper: 'sk-test-0000', sidecar: { note: 'reborn' } })
+      await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'reborn' } })
       const [put] = held.mw.callsOf('put')
       expect(put?.priorTok).to.equal(tok)
       expect(put?.record).to.deep.include({ revision_tok: reborn, revision_seq: 3, registered_at: T0 + 5000 })
@@ -173,7 +174,7 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     void box.del()
     await vi.advanceTimersByTimeAsync(0)
     held.mw.setNow(T0 + 5000)
-    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
     expect(box.registered_at).to.eq(T0)
     expect(box._cheat_staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
@@ -185,19 +186,19 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
 describe("box.whisper while the vault is locked", () => {
   it("reads LOCKED over a whisper exposed", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    box.whisper = 'sk-test-0000'
+    box.whisper = { val: 'sk-test-0000' }
     held.mw.setLockState('locked')
     expect(box.whisper).to.eq(LOCKED)
   })
 
   it("keeps the whisper exposed while the vault locks, and reads it again once unlocked", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    box.whisper = 'sk-test-0000'
+    box.whisper = { val: 'sk-test-0000' }
     held.mw.setLockState('locked')
     expect(box.whisper).to.eq(LOCKED)
     expect(box.getSnapshot().exposed).to.be.true
     held.mw.setLockState('unlocked')
-    expect(box.whisper).to.eq('sk-test-0000')
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
   })
 })
 // --
@@ -285,7 +286,7 @@ describe("Box snapshot", () => {
     it("edited: the record in hand is the staged, so the sidecar and the revision are the edit's", async () => {
       const box = await boxOf()
       held.mw.setNow(T0 + 500)
-      await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
+      await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
       expect(box.getSnapshot()).to.deep.include({ sidecar: { note: 'edited' }, revision_seq: 2, written_at: T0 + 500, full: true, present: true })
     })
 
@@ -294,7 +295,7 @@ describe("Box snapshot", () => {
       box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      box.whisper = 'sk-ant-fake-for-test'
+      box.whisper = { val: 'sk-ant-fake-for-test' }
       expect(box.getSnapshot().exposed).to.be.true
       expect(listener.mock.calls).to.have.lengthOf(1)
       expect(JSON.stringify(box.getSnapshot())).to.not.contain('sk-ant-fake-for-test')
@@ -305,8 +306,7 @@ describe("Box snapshot", () => {
 })
 
 describe("Box sidecar, locked or not", () => {
-  it("LOCKED is the registered symbol of that name, which the whisper answers itself", async () => {
-    expect(LOCKED).to.eq(Symbol.for('LOCKED'))
+  it("LOCKED is the bag the whisper answers while locked", async () => {
     const box = await boxOf()
     expect(box.whisper).to.be.null
     held.mw.setLockState('locked')
@@ -400,7 +400,7 @@ describe("Box own props", () => {
     held.mw.seedStore(received)
     box.receive(received)
     expect(Object.keys(box)).to.have.members(keys)
-    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
     await box.del()
     expect(Object.keys(box)).to.have.members(keys)
@@ -427,7 +427,7 @@ describe("box.whisper = null while the vault is locked", () => {
   for (const [forget, blurb] of [[null, 'null'], [LOCKED, 'LOCKED']] as const) {
     it(`passes setting ${blurb}, forgetting the whisper exposed, which stays forgotten once unlocked`, async () => {
       const box = await boxListingOf(held.mw).build(fullBoxRecord())
-      box.whisper = 'sk-test-0000'
+      box.whisper = { val: 'sk-test-0000' }
       held.mw.setLockState('locked')
       box.whisper = forget
       expect(box.getSnapshot().exposed).to.be.false
@@ -438,11 +438,11 @@ describe("box.whisper = null while the vault is locked", () => {
 
   it("refuses 'vault_locked' setting a new whisper, keeping the one exposed", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    box.whisper = 'sk-test-0000'
+    box.whisper = { val: 'sk-test-0000' }
     held.mw.setLockState('locked')
-    TH.expectSyncRefusal(() => { box.whisper = 'sk-test-1111' }, 'vault_locked')
+    TH.expectSyncRefusal(() => { box.whisper = { val: 'sk-test-1111' } }, 'vault_locked')
     held.mw.setLockState('unlocked')
-    expect(box.whisper).to.eq('sk-test-0000')
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
   })
 })
 // --
@@ -452,7 +452,7 @@ describe("box.whisper = null while the vault is locked", () => {
 describe("box.edit(props) with a whisper: the stub seals it", () => {
   it("seals a whisper with its sidecar over a full box at the next revision, its sealed parts the stub's", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
-    await box.seal('sk-test-0000', { account: 'work' })
+    await box.seal({ val: 'sk-test-0000' }, { account: 'work' })
     expect(box.revision_seq).to.eq(2)
     expect(box.sidecar).to.deep.equal({ account: 'work' })
     expect(box.box_key_wrapped).to.deep.equal(StubBoxKeyWrapped)
@@ -461,13 +461,13 @@ describe("box.edit(props) with a whisper: the stub seals it", () => {
 
   it("seals the sidecar given in place of the one the box carries", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
-    await box.edit({ whisper: 'sk-test-0000', sidecar: { account: 'home' } })
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } })
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
   it("seals a deleted box back to life with the sidecar given", async () => {
     const box = await boxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
-    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
     expect(box.isPresent).to.be.true
     expect(box.isFull).to.be.true
     expect(box.sidecar).to.deep.equal({})
@@ -477,14 +477,14 @@ describe("box.edit(props) with a whisper: the stub seals it", () => {
   it("seals the sidecar given over a live box still sparse once hydrated", async () => {
     held.mw.seedStore(sparseBoxRecord())
     const box = await boxListingOf(held.mw).build(sparseBoxRecord())
-    await box.edit({ whisper: 'sk-test-0000', sidecar: { account: 'home' } })
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } })
     expect(box.isFull).to.be.true
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
   it("stages nothing that carries the whisper, in the record in hand, the cache's copy or the snapshot", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    await box.edit({ whisper: { key: 'sk-test-SECRET' }, sidecar: {} })
+    await box.edit({ whisper: { val: { key: 'sk-test-SECRET' } }, sidecar: {} })
     for (const form of [box.toJSON(), { central: box._cheat_central, staged: box._cheat_staged }, box.snapshot]) {
       expect(JSON.stringify(form)).to.not.include('SECRET')
     }
@@ -507,7 +507,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
   for (const opts of [{}, { ifPresent: 'replace' }] as const) {
     it(`refuses 'stale_write' for a box this device believes never stored over a box stored, handing storage the revision none, with opts ${JSON.stringify(opts)}`, async () => {
       const box = await neverStoredBoxOf()
-      await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       const [put] = held.mw.callsOf('put')
       expect(put?.priorTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
@@ -518,7 +518,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
       held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
       const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
       held.mw.clearCalls()
-      await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       expect(held.mw.callsOf('put')[0]?.priorTok).to.be.null
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
     })
@@ -526,7 +526,7 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
 
   it("puts with nothing stored at the revision minted, with ifPresent 'replace'", async () => {
     const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
-    await expect(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
+    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
     expect(box.isPresent).to.be.true
     expect(box.revision_seq).to.eq(0)
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 0 })
@@ -534,14 +534,14 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
 
   it("takes the timely options beside ifPresent, handing the timely ones on", async () => {
     const box = await boxListingOf(held.mw).build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
-    await expect(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
+    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
     expect(held.mw.callsOf('ensureTimely')[0]?.opts).to.deep.equal({ maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })
   })
 
   it("refuses 'bad_option' an ifPresent that is not 'replace', before staging or putting anything", async () => {
     const box = await neverStoredBoxOf()
     const before = { central: box._cheat_central, staged: box._cheat_staged }
-    await TH.expectRefusal(box.send({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
+    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
     expect({ central: box._cheat_central, staged: box._cheat_staged }).to.deep.equal(before)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
@@ -551,13 +551,13 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
 
 describe("box.edit(patch), send and seal: a whisper and a sidecar on every update", () => {
   const PatchCases = [
-    [{ whisper: 'sk-test-0000' },                     'a whisper with no sidecar'],
-    [{ sidecar: { note: 'x' } },                      'a sidecar with no whisper'],
-    [{},                                              'neither'],
-    [{ whisper: undefined, sidecar: { note: 'x' } },  'a whisper given as undefined'],
-    [{ whisper: 'sk-test-0000', sidecar: undefined }, 'a sidecar given as undefined'],
-    [{ whisper: null, sidecar: { note: 'x' } },       'a whisper given as null'],
-    [{ whisper: 'sk-test-0000', sidecar: null },      'a sidecar given as null'],
+    [{ whisper: { val: 'sk-test-0000' } },                     'a whisper with no sidecar'],
+    [{ sidecar: { note: 'x' } },                               'a sidecar with no whisper'],
+    [{},                                                       'neither'],
+    [{ whisper: undefined, sidecar: { note: 'x' } },           'a whisper given as undefined'],
+    [{ whisper: { val: 'sk-test-0000' }, sidecar: undefined }, 'a sidecar given as undefined'],
+    [{ whisper: null, sidecar: { note: 'x' } },                'a whisper given as null'],
+    [{ whisper: { val: 'sk-test-0000' }, sidecar: null },      'a sidecar given as null'],
   ] as const
 
   for (const [patch, blurb] of PatchCases) {
@@ -582,7 +582,7 @@ describe("box.edit(patch), send and seal: a whisper and a sidecar on every updat
 
   it("refuses 'bad_option' a seal given no sidecar", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    await TH.expectRefusal(box.seal('sk-test-0000', undefined as never), 'bad_option')
+    await TH.expectRefusal(box.seal({ val: 'sk-test-0000' }, undefined as never), 'bad_option')
     expect(box.hasStaged).to.be.false
   })
 
@@ -594,7 +594,7 @@ describe("box.edit(patch), send and seal: a whisper and a sidecar on every updat
 
   it("leaves a staged edit as it was when a later edit refuses", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    await box.edit({ whisper: 'sk-test-0000', sidecar: { note: 'staged' } })
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'staged' } })
     const before = box._cheat_staged
     await TH.expectRefusal(box.edit({ sidecar: { note: 'later' } } as unknown as BoxProps), 'bad_option')
     expect(box._cheat_staged).to.deep.equal(before)
@@ -602,7 +602,7 @@ describe("box.edit(patch), send and seal: a whisper and a sidecar on every updat
 
   it("takes no whisper from the one exposed: an edit giving none refuses 'bad_option', though one is exposed", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    box.whisper = 'sk-test-0000'
+    box.whisper = { val: 'sk-test-0000' }
     await TH.expectRefusal(box.edit({ sidecar: { note: 'x' } } as unknown as BoxProps), 'bad_option')
     expect(box.hasStaged).to.be.false
   })
@@ -610,8 +610,8 @@ describe("box.edit(patch), send and seal: a whisper and a sidecar on every updat
   it("seals nothing when the whisper is set: the setter only exposes it", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     held.mw.clearCalls()
-    box.whisper = 'sk-test-0000'
-    expect(box.whisper).to.eq('sk-test-0000')
+    box.whisper = { val: 'sk-test-0000' }
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
     expect(box.hasStaged).to.be.false
     expect(box.revision_seq).to.eq(1)
     expect(held.mw.callsOf('put')).to.deep.equal([])
@@ -619,8 +619,132 @@ describe("box.edit(patch), send and seal: a whisper and a sidecar on every updat
 
   it("seals the sidecar given over a full box, carrying none over from the record in hand", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord({ sidecar: { account: 'work' } }))
-    await box.edit({ whisper: 'sk-test-0000', sidecar: {} })
+    await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
     expect(box.sidecar).to.deep.equal({})
+  })
+})
+// --
+
+// == [LOCKED, a frozen bag]: LOCKED, Storable.isLockedFUBag, the whisper setter
+
+describe("LOCKED and Storable.isLockedFUBag: a frozen bag of the package's own (the Coach, 2026-10-31)", () => {
+  it("is frozen, and shows nothing as JSON", () => {
+    expect(Object.isFrozen(LOCKED)).to.be.true
+    expect(JSON.stringify(LOCKED)).to.eq('{}')
+  })
+
+  const LookalikeCases = [
+    [Symbol.for('LOCKED'),          "Symbol.for('LOCKED'), the symbol it once was"],
+    [{},                            'an empty bag'],
+    [{ ...LOCKED },                 'a copy made by spreading it'],
+    [Object.assign({}, LOCKED),     'a copy made by assigning it'],
+    [{ val: 'sk-test-0000' },       'a whisper given as { val }'],
+    [null,                          'null'],
+    [undefined,                     'undefined'],
+    ['LOCKED',                      'its name'],
+  ] as const
+
+  it("is true for LOCKED", () => {
+    expect(Storable.isLockedFUBag(LOCKED)).to.be.true
+  })
+
+  for (const [lookalike, blurb] of LookalikeCases) {
+    it(`is false for ${blurb}`, () => {
+      expect(Storable.isLockedFUBag(lookalike)).to.be.false
+    })
+  }
+
+  it("is what box.whisper answers while the vault is locked, over a whisper exposed or none", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.setLockState('locked')
+    expect(Storable.isLockedFUBag(box.whisper)).to.be.true
+    held.mw.setLockState('unlocked')
+    box.whisper = { val: 'sk-test-0000' }
+    held.mw.setLockState('locked')
+    expect(box.whisper).to.eq(LOCKED)
+  })
+
+  it("forgets the whisper exposed when set, as null does, while unlocked", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.whisper = { val: 'sk-test-0000' }
+    box.whisper = LOCKED
+    expect(box.whisper).to.be.null
+    expect(box.getSnapshot().exposed).to.be.false
+  })
+
+  it("never takes a whisper for it: a whisper set is exposed, and a copy of LOCKED is refused as no whisper", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.whisper = { val: 'LOCKED' }
+    expect(box.whisper).to.deep.equal({ val: 'LOCKED' })
+    TH.expectSyncRefusal(() => { box.whisper = { ...LOCKED } }, 'bad_whisper')
+    expect(box.whisper).to.deep.equal({ val: 'LOCKED' })
+  })
+})
+// --
+
+// == [The whisper as { val }]: the whisper setter, edit, send
+
+describe("box.whisper and box.edit: the whisper given as { val }", () => {
+  const BadWhisperCases = [
+    ['sk-test-SECRET',                                          'a bare whisper'],
+    [{ val: null },                                             'a val that is null'],
+    [{ val: { apiKey: 'sk-test-SECRET', when: new Date(T0) } }, 'a val JSON would mangle'],
+    [{ val: 'sk-test-SECRET', SECRET_NOTE: 'x' },               'a field beside the val'],
+    [{ value: 'sk-test-SECRET' },                               'a whisper under another name'],
+  ] as const
+
+  for (const [whisper, blurb] of BadWhisperCases) {
+    it(`refuses setting ${blurb} as 'bad_whisper', keeping the whisper exposed and quoting nothing`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      box.whisper = { val: 'sk-test-0000' }
+      const err = TH.expectSyncRefusal(() => { box.whisper = whisper as never }, 'bad_whisper')
+      expect(TH.thrownText(err)).to.not.include('SECRET')
+      expect(JSON.stringify(err.meta)).to.not.include('SECRET')
+      expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
+    })
+
+    it(`refuses an edit of ${blurb} as 'bad_whisper', staging nothing, calling nothing and quoting nothing`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      held.mw.clearCalls()
+      const err = await TH.expectRefusal(box.edit({ whisper: whisper as never, sidecar: {} }), 'bad_whisper')
+      expect(TH.thrownText(err)).to.not.include('SECRET')
+      expect(JSON.stringify(err.meta)).to.not.include('SECRET')
+      expect(box.hasStaged).to.be.false
+      expect(held.mw.calls).to.deep.equal([])
+    })
+
+    it(`refuses a send of ${blurb} as 'bad_whisper', putting nothing`, async () => {
+      const box = await boxListingOf(held.mw).build(fullBoxRecord())
+      held.mw.clearCalls()
+      await TH.expectRefusal(box.send({ whisper: whisper as never, sidecar: {} }), 'bad_whisper')
+      expect(box.hasStaged).to.be.false
+      expect(held.mw.calls).to.deep.equal([])
+    })
+  }
+
+  it("refuses 'bad_whisper' before its guards: a bare whisper refuses so while the vault is locked, set or edited", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    held.mw.setLockState('locked')
+    TH.expectSyncRefusal(() => { box.whisper = 'sk-test-0000' as never }, 'bad_whisper')
+    await TH.expectRefusal(box.edit({ whisper: 'sk-test-0000' as never, sidecar: {} }), 'bad_whisper')
+  })
+
+  it("keeps a frozen copy of the whisper set: the host's later change to its own reaches no box, and the box's cannot be changed in place", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    const given = { val: { apiKey: 'sk-test-0000' } }
+    box.whisper = given
+    given.val.apiKey = 'sk-test-changed'
+    expect(box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000' } })
+    expect(Object.isFrozen(box.whisper)).to.be.true
+    expect(() => { (box.whisper as { val: unknown }).val = 'sk-test-1111' }).to.throw(TypeError)
+  })
+
+  it("shows the whisper exposed in no snapshot or JSON of the box", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    box.whisper = { val: { apiKey: 'sk-test-SECRET' } }
+    for (const form of [box.toJSON(), box, box.getSnapshot(), { central: box._cheat_central, staged: box._cheat_staged }]) {
+      expect(JSON.stringify(form)).to.not.include('SECRET')
+    }
   })
 })
 // --

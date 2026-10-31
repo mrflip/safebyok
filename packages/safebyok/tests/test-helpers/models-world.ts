@@ -456,7 +456,7 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 /** A {@link boxListingOf} whose boxes fake the seal in `edit`, for a test that wants sealed parts it can tell apart by revision, or acts while an edit is under way: the whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, with the sidecar given. `duringMakeStaged`, where given, runs at the top of each `makeStaged`, for a test that acts while an edit is under way.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: 'sk-test', sidecar: {} }) is its rebirth
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each edit
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringMakeStaged: () => void = () => undefined): TestableBoxListing => {
@@ -499,5 +499,5 @@ export function lastSaveOf(mw: ModelsWorld, box: { readonly boxlabel: string }):
  * @example await boxListingOf(mw).build(boxDnaOf(mw.boxscope('anthropic_api_key')))
  * @example boxDnaOf(mw.boxscope('anthropic_api_key'), { sidecar: { account: 'work' } })
  */
-export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: 'sk-test-0000', sidecar: {}, ...overrides })
+export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: { val: 'sk-test-0000' }, sidecar: {}, ...overrides })
 // --

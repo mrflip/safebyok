@@ -535,7 +535,7 @@ describe("The checks of the world and the listing", () => {
 })
 
 describe("MSX.boxDna", () => {
-  const dna = { ...scope, whisper: 'sk-ant-fake', sidecar: {} }
+  const dna = { ...scope, whisper: { val: 'sk-ant-fake' }, sidecar: {} }
   const filled = { ...dna, whisper_codec: 'json_v1', whisper_schema_version: 1 }
   const { box_key_wrapped, whisper_ciphered } = full
   // A dna carries no revision_seq, so the factory's props stop at the rest.
@@ -544,33 +544,37 @@ describe("MSX.boxDna", () => {
   holdsCases(MSX.boxDna, 'bad_option', [
     // the scope, the whisper and the sidecar, and what a caller may give beside them:
     [dna,                                                   true,  'passes the scope, a whisper and a sidecar'],
-    [{ ...dna, whisper: { key: 'sk-ant-fake', orgId: null } }, true, 'passes a whisper that is an object, null inside it'],
+    [{ ...dna, whisper: { val: { key: 'sk-ant-fake', orgId: null } } }, true, 'passes a whisper that is an object, null inside it'],
     [{ ...dna, sidecar: { account: 'work' } },              true,  'passes a sidecar with a field'],
     [{ ...dna, whisper_codec: undefined },                  true,  'passes optional props given as undefined'],
     [{ ...dna, ...factoryProps, fmt: MSX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
     // the whisper and the sidecar, both required:
     [scope,                                                 false, 'refuses the scope alone'],
-    [{ ...scope, whisper: 'sk-ant-fake' },                  false, 'refuses a whisper with no sidecar, as its third example shows'],
+    [{ ...scope, whisper: { val: 'sk-ant-fake' } },         false, 'refuses a whisper with no sidecar, as its third example shows'],
     [{ ...scope, sidecar: {} },                             false, 'refuses a sidecar with no whisper, as its fourth example shows'],
     [{ ...dna, whisper: undefined },                        false, 'refuses a whisper given as undefined'],
     [{ ...dna, sidecar: undefined },                        false, 'refuses a sidecar given as undefined'],
     // the scope refused:
     [{ ...dna, boxlabel: undefined },                       false, 'refuses a dna with no boxlabel'],
-    [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label, as its fifth example shows'],
+    [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label, as its sixth example shows'],
     [{ boxlabel: 'anthropic_api_key' },                     false, 'refuses a boxlabel without its vault'],
     // the record's own props refused:
     [{ ...dna, sidecar: 'work account' },                   false, 'refuses a sidecar that is no object'],
     [{ ...dna, whisper_codec: 'json_v2' },                  false, 'refuses a codec it does not know'],
     [{ ...dna, whisper_schema_version: 2 },                 false, 'refuses a schema version it does not know'],
     [{ ...dna, box_key_wrapped },                           false, 'refuses a box_key_wrapped, which only the seal makes'],
-    [{ ...dna, whisper_ciphered },                          false, 'refuses a whisper_ciphered, which only the seal makes, as its seventh example shows'],
+    [{ ...dna, whisper_ciphered },                          false, 'refuses a whisper_ciphered, which only the seal makes, as its eighth example shows'],
     [{ ...dna, whisper: null },                             false, 'refuses a whisper that is null'],
-    [{ ...dna, whisper: new Date(T0) },                     false, 'refuses a whisper JSON would mangle'],
+    [{ ...dna, whisper: { val: null } },                    false, 'refuses a whisper whose val is null'],
+    [{ ...dna, whisper: { val: new Date(T0) } },            false, 'refuses a whisper JSON would mangle'],
+    [{ ...dna, whisper: 'sk-ant-fake' },                    false, 'refuses a bare whisper, not given as { val }, as its fifth example shows'],
+    [{ ...dna, whisper: {} },                               false, 'refuses a whisper with no val'],
+    [{ ...dna, whisper: { val: 'sk-ant-fake', note: 'x' } }, false, 'refuses a whisper with a field beside its val'],
     // the factory's props, given, must pass their checks:
     [{ ...dna, fmt: 8 },                                    false, 'refuses another format'],
     [{ ...dna, am: 'z' },                                   false, 'refuses an am it does not know'],
     [{ ...dna, vault_tok: 7 },                              false, 'refuses a vault_tok that is no string'],
-    [{ ...dna, revision_seq: 1 },                           false, 'refuses a revision_seq, which a dna never carries, as its sixth example shows'],
+    [{ ...dna, revision_seq: 1 },                           false, 'refuses a revision_seq, which a dna never carries, as its seventh example shows'],
     [{ ...dna, registered_at: 5 },                          false, 'refuses a registered_at that is no epoch'],
     // a bag a person typed:
     [{ ...dna, sidcar: {} },                                false, 'refuses a field it does not take, being strict'],
@@ -602,7 +606,7 @@ describe("MSX.boxDna", () => {
   })
 
   it("names the missing sidecar, and the missing whisper, as its third and fourth examples show", () => {
-    expect(TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, whisper: 'sk-ant-fake' }), 'bad_option').meta?.fieldnames).to.deep.equal(['sidecar'])
+    expect(TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, whisper: { val: 'sk-ant-fake' } }), 'bad_option').meta?.fieldnames).to.deep.equal(['sidecar'])
     expect(TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper'])
   })
 
@@ -662,5 +666,61 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
   it("name the failing field", () => {
     const err = TH.expectSyncRefusal(() => MSX.sendOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['ifPresent'])
+  })
+})
+
+describe("MSX.whisperHolder", () => {
+  holdsCases(MSX.whisperHolder, 'bad_whisper', [
+    // a whisper as its val, any JSON a whisper can carry:
+    [{ val: 'sk-ant-fake' },                                true,  'passes a string, as its first example shows'],
+    [{ val: { apiKey: 'sk-ant-fake', orgId: null } },       true,  'passes a plain object, null inside it, as its second example shows'],
+    [{ val: ['sk-ant-fake', 7, true, null] },               true,  'passes an array, null inside it'],
+    [{ val: 7 },                                            true,  'passes a number'],
+    [{ val: false },                                        true,  'passes a boolean'],
+    // not given as { val }:
+    ['sk-ant-fake',                                         false, 'refuses a bare whisper, as its third example shows'],
+    [null,                                                  false, 'refuses null'],
+    [undefined,                                             false, 'refuses undefined'],
+    [{},                                                    false, 'refuses an object with no val'],
+    [{ value: 'sk-ant-fake' },                              false, 'refuses a whisper under another name'],
+    [{ val: 'sk-ant-fake', note: 'work' },                  false, 'refuses a field beside the val, as its fifth example shows'],
+    [new Map([['val', 'sk-ant-fake']]),                     false, 'refuses a Map'],
+    // a val no whisper may be:
+    [{ val: null },                                         false, 'refuses a val that is null, as its fourth example shows'],
+    [{ val: undefined },                                    false, 'refuses a val given as undefined'],
+    [{ val: new Date(T0) },                                 false, 'refuses a val JSON would mangle'],
+    [{ val: { apiKey: undefined } },                        false, 'refuses a val holding undefined'],
+  ])
+
+  it("hands back a frozen copy, never the object it was given, nor the whisper inside it", () => {
+    const given = { val: { apiKey: 'sk-ant-fake' } }
+    const parsed = MSX.whisperHolder.parse(given)
+    expect(parsed).to.deep.equal(given)
+    expect(parsed).to.not.eq(given)
+    expect(parsed.val).to.not.eq(given.val)
+    expect(Object.isFrozen(parsed)).to.be.true
+    given.val.apiKey = 'sk-ant-changed'
+    expect(parsed).to.deep.equal({ val: { apiKey: 'sk-ant-fake' } })
+  })
+
+  it("names the failing field: val for a val no whisper may be, none for a whisper not given as { val }", () => {
+    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse({ val: null }), 'bad_whisper').meta?.fieldnames).to.deep.equal(['val'])
+    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse('sk-ant-fake'), 'bad_whisper').meta?.fieldnames).to.deep.equal([])
+  })
+
+  it("quotes nothing of what it was handed, a val's secret or a field's name, in its message, meta, cause or stack", () => {
+    const Marked = [
+      'SECRET-BARE',
+      { val: { apiKey: 'SECRET-VAL', when: new Date(T0) } },
+      { val: ['SECRET-VAL', undefined] },
+      { val: { SECRET_KEY: undefined } },
+      { val: 'SECRET-VAL', SECRET_FIELD: 'SECRET-EXTRA' },
+      { SECRET_FIELD: 'SECRET-VAL' },
+    ]
+    for (const marked of Marked) {
+      const err = TH.expectSyncRefusal(() => MSX.whisperHolder.parse(marked), 'bad_whisper')
+      expect(TH.thrownText(err)).to.not.include('SECRET')
+      expect(JSON.stringify(err.meta)).to.not.include('SECRET')
+    }
   })
 })
