@@ -344,7 +344,10 @@ describe("Listing's pipeline: what every answer takes", () => {
       await box.edit({ sidecar: { note: 'staged' } })
       held.mw.clearCalls()
       await listing.fetch(scopeOf())
-      const [saved] = held.mw.callsOf('save')
+      const saves = held.mw.callsOf('save')
+      expect(saves).to.have.lengthOf(1)
+      const [saved] = saves
+      expect(saved?.cacheable.central).to.deep.equal(fullBoxRecord())
       expect(saved?.cacheable.staged).to.deep.include({ sidecar: { note: 'staged' } })
       expect(saved?.cacheable).to.deep.equal(keptOf(held.mw, box))
     })
