@@ -148,7 +148,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.sidecar).to.deep.equal({ note: 'new' })
     })
 
-    it("expects no revision of a box not held", async () => {
+    it("sends no prior tok for a box not held", async () => {
       const listing = boxListingOf(held.mw)
       expect(listing.priorTokOf(scopeOf())).to.be.null
       const box = await listing.put(fullBoxRecord({ revision_seq: 0 }))
@@ -157,7 +157,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box?.isFull).to.be.true
     })
 
-    it("expects no revision of a thing never stored, and its answer spends the draft", async () => {
+    it("sends no prior tok for a thing never stored, and its answer spends the draft", async () => {
       const listing = boxListingOf(held.mw)
       const draft = await listing.build({ ...scopeOf() })
       expect(listing.priorTokOf(draft.scope)).to.be.null
@@ -227,7 +227,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.isPresent).to.be.false
     })
 
-    it("expects no revision for a box not held", async () => {
+    it("sends no prior tok for a box not held", async () => {
       const listing = boxListingOf(held.mw)
       await listing.del(sparseBoxRecord())
       expect(held.mw.callsOf('del')[0]?.priorTok).to.be.null
