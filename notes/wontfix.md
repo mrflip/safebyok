@@ -45,3 +45,11 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
   A lease whose `autolock_at` lies more than `MaxTimerMillis` (about 24.5 days) away arms no
   timer, by design: it locks no vault on its own, but reads not in force, and refuses
   `vault_locked`, once the clock passes its `autolock_at`.
+* 2026-10-31 (the Coach, newvault sprint): **a lease's `forget()` whose device erase is refused
+  is not retried.** `forget()` drops the lease's keys and record, then erases the deviceDB's record
+  once (`tryDelLease`); a refusal is thrown from `forget()`, and a second `forget()` on the same
+  lease erases nothing, as it already dropped its record. The entry on a refused erase of a kept lease covers the refused erase
+  on `Lease.get` and the damaged-lease path; this one covers `forget()` itself. The deviceDB is a
+  cache, and the next session asks for the passphrase. Pinned by
+  `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
+  retrying a refused erase.
