@@ -1,6 +1,6 @@
 # Thread 1: gate_in_record (2026-10-31)
 
-Branch `20261031-gate_in_record`, PR #TBD, stacked on #408 (`20261031-newvault_models`). Base moved mid-thread: rebased onto 4ff14b4b before any commit of mine, recorded as `branch.20261031-gate_in_record.sprintbase`. Justify: green (safebyok 4529 passed, 37 skipped; every package green).
+Branch `20261031-gate_in_record`, PR #410, stacked on #408 (`20261031-newvault_models`). Base moved mid-thread: rebased onto 4ff14b4b before any commit of mine, recorded as `branch.20261031-gate_in_record.sprintbase`. Justify: green (safebyok 4529 passed, 37 skipped; every package green).
 
 * **Built**:
   - `models-shapes.ts`: `vaultRecord` = `vaultSparse` + `gate: gateProps.nullable()` (nested, not flattened); the vault's forms moved below the gate's (TDZ). `vaultPatch` is `vaultRecord.partial().strict()`. `buildGateArgs` (`{ proofClosure }`). New section *The vault's world*: `leaseDeviceDB` (the three lease verbs by scope) and `vaultListingOpts` (checks the world's ProvingWorld, logger, leaseMillis, deviceDB).
