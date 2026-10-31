@@ -1,7 +1,9 @@
 # Thread 25: Life toks, and `makeStaged` makes the whole staged record (2026-10-31)
 
-Branch `20261031-life_tok`, PR [#407](https://github.com/mrflip/safebyok/pull/407), stacked on #406. Justify: green (safebyok 4515 passed,
-37 skipped; every package and the size budget green, no budget moved). Changeset `minor`.
+Branch `20261031-life_tok`, PR [#407](https://github.com/mrflip/safebyok/pull/407) (merged 2026-10-31 06:45,
+before the second rework landed); the second rework is on the same branch past it, awaiting a follow-up PR. Justify:
+green at the rework (safebyok 4522 passed, 37 skipped; every package and the size budget green, no budget
+moved). Changeset `minor`.
 
 * **Built**:
   * *`staleMetaOf` is gone* from Listing, BoxListing and VaultListing, with their `as unknown as`
@@ -70,6 +72,8 @@ Branch `20261031-life_tok`, PR [#407](https://github.com/mrflip/safebyok/pull/40
     equal paths mean equal `box_tok`s.
   * The 'ouch' row over another life builds its ouchstone from the sparse props held, so the
     central becomes a tombstone of the old life; the next edit is a birthday either way.
+    The second review found that this ouchstone, of the old life, then refused the healthy copy
+    of its own revision; see *Rework after second review*.
   * For thread 24: `makeStaged`'s result is the staged record whole, revision included; the
     'edit' row can take it as made, and `nextRevision` is parsed off it.
 
@@ -88,8 +92,35 @@ Branch `20261031-life_tok`, PR [#407](https://github.com/mrflip/safebyok/pull/40
   * *Minor 7.* The changeset's **Stored format** line: the models' box gains `box_tok`; no host
     sees a change. Minor 1 goes to the sprint's Cleanup; 2, 4, 5 and 6 stay.
 
+* **Rework after second review** (the second reviewer's comment on #407, over 5008624d...d92931a6;
+  the Coach ruled option (a), 2026-10-31):
+  * *Significant: damage before life on the central too.* An ouchstone is made of the sparse props
+    held (`tombstoneFor`), so it keeps the life held when the damaged record arrived. Held at rev 2
+    under `box_tok` A, rev 3 remade elsewhere under B received damaged ('newer | ouch') left an
+    ouchstone at rev 3 under A, and rev 3 received intact then threw `OneRevisionTwoLives`. Now
+    `classifyRecordShape(central)` is taken before the other-life row, which fires only when the
+    central is not an ouchstone; the 'gone' and 'fill' rows take over (and 'sparse' → 'same').
+    The `vault_tok` check stays first, the received-damage skip second.
+  * *Set aside*: giving the ouchstone the received record's `box_tok`. It would trust a damaged
+    record's `box_tok` and undo the recorded choice that the ouchstone is of the props held.
+  * *Doc block*: the life NOTE says damage on either side comes first, and why; the table's
+    other-life row reads central `! ouch`, and the same-revision rows it lets through read life
+    `any`. Each inline comment names only the row it governs (minor 1).
+  * *Tests*: storable.test 'other | same | full | ouch' → 'fill' (`box_tok`, `registered_at`
+    follow) and 'other | same | gone | ouch' → 'gone'; box.test follows the review's trace. All
+    three fail without the fix.
+  * *Minor 4*: the changeset's **Stored format** line is a paragraph of its own.
+  * Minor 3 (loosened.test's VOCABULARY cites) is another thread's, on the sprint's Cleanup.
+  * *Untested, by the brief's scope*: 'other | same | sparse | ouch' → 'same', as the table says.
+  * *Discovery*: a staged edit carried past the damaged rev 3 ('ouch' keeps it, under rev 4) is
+    of life A; 'fill' keeps it, so a later `send` puts life A's `box_tok` at rev 4 over life B's
+    rev 3. An open matter for the Coach, not acted on.
+
 * **For the Coach**:
   * Rule on (a): another life, older, is 'older' (a past life), not the "another thing came
     along" case; rollback detection is thread 19's `box_behind`.
   * Rule on (b): the vault keeps its `vault_tok`, no gift.
   * `BoxSnapshot` does not carry `box_tok`. Add it?
+  * A staged edit of the old life, kept by 'ouch' and then by 'fill' over a central of another
+    life: should 'fill' drop a staged of another life than the record filled? Recommend yes,
+    in a later thread (it is `reconcileStaged`'s, and outside this ruling).
