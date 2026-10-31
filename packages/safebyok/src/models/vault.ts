@@ -1,8 +1,10 @@
 import { verifyConsistent } from '../checks/validator'
+import { outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
+import type { Lease } from './lease'
 import type { Fetched, LockState, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
@@ -40,6 +42,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   declare readonly user_id:    string
   declare readonly vaultlabel: string
 
+  /** Locked until a lease is set; `lock()` sets it again. */
+  #isLocked = true
+
+  /** The lease this device holds while the vault is unlocked, null while it is locked. Not yet: setting one, through `ensureUnlocked`. */
+  #lease: Lease | null = null
+
+  /** The deviceDB work on the lease in flight, one chore after another. */
+  #leaseChores: Promise<void> = Promise.resolve()
+
   // == [Props, as the record has them]: fmt
 
   get fmt(): number { return this.combined.fmt }
@@ -49,8 +60,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   get clock(): Clock { return this.world.clock }
 
-  /** Not yet: the lease. Locked until it exists, so nothing of a box unseals. */
-  lockState(): LockState { return 'locked' }
+  lockState(): LockState { return this.#isLocked ? 'locked' : 'unlocked' }
 
   /** The vault's own lock, not its world's: the bank has none. */
   override get isLocked(): boolean { return this.lockState() === 'locked' }
@@ -63,6 +73,28 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The vault record a box's answer carries, received as any record of this vault is. What `receive` hands back goes nowhere: the box listing takes its world synchronously, where the vault listing delivers asynchronously. The vault saves itself to the device cache as it settles, as at any receive. */
   takeWorld(world: unknown): void {
     this.receive(this.listing.sparseOf(world))
+  }
+  // --
+
+  // == [The lease]: lock, leaseChore
+
+  /** Lock the vault, synchronously: the lease is dropped and the vault reads locked before this returns; the lease's forgetting (its record erased from the deviceDB) is queued as a chore. A box's whisper reads LOCKED from here on. */
+  lock(): void {
+    this.#isLocked = true
+    const lease = this.#lease
+    this.#lease = null
+    if (lease !== null) { this.#leaseChore(() => lease.forget()) }
+    this.settle()
+  }
+
+  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. Not yet: `#unlock` awaits the queue before granting, so an erase lands before the next put. */
+  #leaseChore(work: () => Promise<void>): void {
+    const prior = this.#leaseChores
+    this.#leaseChores = (async () => {
+      await prior
+      const done = await outcomeOf(work)
+      if (! done.ok) { this.listing.tellBadNews([done.err]) }
+    })()
   }
   // --
 

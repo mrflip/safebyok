@@ -38,6 +38,9 @@ export const MaxSaltBytes = 65_536
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
 export const PassphraseKeyBytes = 32
 
+/** How many random bytes a passkey wayin's `prf_salt_b64` holds: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
+export const PasskeySaltBytes = 32
+
 /** The longest duration we use for a timer, in hours -- the equivalent of 24.5 days (close to, but below, the hard limit of 2**31-1 milliseconds).
  * A trigger arms no timer for a launch further off than this: the launch waits for a call that finds it due, and the trigger reads untimely once the launch is due, as with any other.
  */
