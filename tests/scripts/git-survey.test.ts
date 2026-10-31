@@ -162,6 +162,15 @@ describe('scripts/git-survey.sh', () => {
     expect(rowsOf(repo.survey()).get('stray')).to.deep.equal({ verdict: 'active', rest: ['-', 'no PR yet'] })
   })
 
+  it('names the first three of many commits with no match on main, and goes on to the next branch', () => {
+    seedKinds(repo)
+    repo.git('switch', '--quiet', 'extra')
+    for (const nth of ['2', '3', '4', '5', '6']) { repo.commit(`extra-${nth}.md`, 'more\n', `feat: nobody took this either, ${nth}`) }
+    const rows = rowsOf(repo.survey('--idle', '0'))
+    expect(rows.get('extra')?.rest[1]?.split(';')).to.have.length(3)
+    expect(rows.get('landed')?.verdict).to.equal('close')
+  })
+
   it('notes an open PR whose head is not the local tip', () => {
     seedKinds(repo)
     repo.git('switch', '--quiet', 'opened')
