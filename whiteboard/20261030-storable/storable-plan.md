@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** filed through #389 (thread 17); thread 15 building on it, branch `20261031-whisper_required`; then 13, 18, 19, then 6.
+* **Status:** filed through #389 (thread 17); thread 15 building on it, branch `20261031-whisper_required`; then 13, 18, 19, 20, then 6.
 
 ## Read first
 
@@ -621,6 +621,30 @@ paths where an older or absent answer meets a live central (a fetch's `get`, a n
 each does today; change none of them, list them in the thread file for the Coach. Worker `opus`;
 review `medium`. Depends on 18 (cut from its tip). Size: small to medium.
 
+### 20. A draft carried onto a tombstone
+
+*Orchestrator, the Coach (2026-10-31), on another agent's issue 3 (a dna built over a deleted
+box loses the dna):* "We must accept the new central value ... In the current code I believe you
+can always seal and so the movement you recommend is possible. I suspect Vault is going to want
+to do this. Do what we're doing for the ouch case and we'll probably end up throwing when it hits
+this weird case and locks between the edit and the send." And on the 'ouch' row's carry, which
+keeps a staged's sealed parts under a new revision though the seal binds the stamp: "leave the
+broken behavior. one-line comment in reconcile that this will break a box edit. (we will lose the
+ability to re-seal, as we won't know what the old sealed revision was) Document with a passing
+failing test in loosened". Label `draft_carried`.
+1. In `reconcileStaged`, a staged draft (staged over the never-stored shim: the `central` handed
+   in has `revision_seq` `NeverStoredSeq`) that meets a tombstone (act `'gone'`) carries forward
+   as `'ouch'` carries the staged, `{ ...staged, ...nextRevision }`. Only `'gone'`: a draft that
+   meets a live record (`'adopt'`) is still dropped, since carrying it would put it over another
+   device's box. The table in the doc block gains the row.
+2. A one-line comment at the `'ouch'` row and the new row: the carry keeps sealed parts bound to
+   the old revision, so it will break a box's seal once the real seal lands.
+3. Tests: `build(dna)` over a scope whose stored tombstone is at seq 8, then `send`, lands the
+   dna's whisper and sidecar at seq 9, both when `send`'s hydrate gets the tombstone and when
+   the put meets it as `stale_write`. In `tests/loosened/loosened.test.ts`, a describe that passes
+   on today's carry ('ouch' and the draft) and names what the real seal will break.
+Worker `sonnet`; review `medium`. Depends on 19 (cut from its tip). Size: small.
+
 ### 6. What this model guarantees
 
 > **6. What this model guarantees.** No code. Read `notes/guarantees.md` *The guarantees* and the README sections in *Read first*, then `tests/loosened/loosened.test.ts` and threads 2 through 5 and 8's thread files, and write `whiteboard/20261028-storable_base/guarantees-of-the-model.md`: a table, one row per guarantee or promise, columns `Guarantee | Old source | Model | Evidence`, where *Model* is `kept`, `changed`, `not yet` or `dropped` and *Evidence* names a test by file and title or a line of code. Every describe of the loosened file appears as `changed` or `dropped` with the Coach's decision left blank; every firm loosening appears as `changed` with the Coach's word as its evidence. Nothing about the seal beyond noting the rows that wait on it. Depends on 2, 3, 4, 5, 8. Size: small, `opus`.
@@ -629,12 +653,12 @@ review `medium`. Depends on 18 (cut from its tip). Size: small to medium.
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
