@@ -166,9 +166,9 @@ describe("Changing the gate, with a box sealed before the change", () => {
   it("revokes the passkey: the passkey's lease held through the revoke still seals; the next session's passkey refuses 'wrong_passkey', and the passphrase opens what that lease sealed", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     vault.lock()
-    const byKey = await vault.ensureUnlocked(byPasskey('laptop'))
+    const passkeyLease = await vault.ensureUnlocked(byPasskey('laptop'))
     await vault.revokePasskey(byPassphrase(Passphrase))
-    expect(vault.demandLease()).to.equal(byKey)
+    expect(vault.demandLease()).to.equal(passkeyLease)
     await box.send({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()
     await TH.eventually(() => deviceDB.keptNow() === null)
