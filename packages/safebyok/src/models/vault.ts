@@ -20,7 +20,7 @@ export type VaultSnapshot = VaultScope & Readonly<{
 /** The patch a host hands `edit` and `send`: nothing yet, so either one only moves the revision, and a draft's `send` stores it. Not yet: a change to the gate, the vault's one payload. */
 export type VaultProps = Readonly<Record<string, never>>
 
-/** What a host hands `edit` and `send`: the {@link VaultProps}, and any prop of the vault's record, which the vault controls and ignores, so `{ ...record }` will do. `vaultPatch` checks it. */
+/** A host's patch for `edit` and `send`: the {@link VaultProps}, and any prop of the vault's record, which the vault controls and ignores, so `{ ...record }` will do. `vaultPatch` checks it. */
 export type VaultPatch = VaultProps & { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | undefined }
 // --
 
