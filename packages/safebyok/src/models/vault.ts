@@ -80,9 +80,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
 
-  /** Every vault record is full until the gate exists. */
-  protected isFullRecord(_fetched: VaultSparse): _fetched is VaultRecord {
-    return true
+  /** Every vault record alive is full until the gate exists; a tombstone is not. */
+  protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord {
+    return fetched.am === 'a'
   }
 
   /** Returns for a full patch of this vault, and refuses any other 'bad_option', naming the field; `edit`, so `send`, calls it first of all, before any guard. Until the gate exists, every patch held to `vaultPatch` is full: `{}`, or the props of the vault's record, each checked and ignored. A scope field that names another vault refuses, naming it. */

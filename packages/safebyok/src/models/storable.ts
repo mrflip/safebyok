@@ -1,13 +1,13 @@
 import { randomId } from '../crypto'
 import { VaultError } from '../errors'
-import { adorn } from '../helpers'
+import { adorn, tattoo } from '../helpers'
 import { type Outcome, outcomeOf } from '../outcome'
 import { stableJsonify } from '../stable-jsonify'
 import { lockedError, movedUnderEditError, notFullError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
-import type { Age, Am, Cache, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, Tell, TimelyOpts, Times, Tombstone, World } from './models-shapes'
+import type { Age, Am, Cache, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -30,7 +30,7 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
   Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown, unknown>>
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, PatchT, SnapshotT> {
-  // == [Declarations]: scope, world, listing, cache, tell, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, staged, minted, snapshot, trigger, listeners, watchable
+  // == [Declarations]: scope, world, listing, cache, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, staged, memoizedNextRevision, snapshot, trigger, listeners, watchable
 
   /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
@@ -41,12 +41,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The device cache of this kind of thing, the listing's, which each `settle` saves this thing's copy to. */
   readonly #cache: Cache<RecordT, SparseT>
-  /** How this thing tells bad news nobody asked about to the host: a refused cache save, a refresh its timer launched that was refused. */
-  readonly #tell: Tell
 
   /** The vault this thing lies in, inscribed once by `assignInitialProps` and never moved: a record under another `vault_tok` is refused, not taken. */
   declare readonly vault_tok: string
-  /** The revision and times of the record in hand, as plain props: inscribed by `assignInitialProps`, set by `assign` at each adopt, `registered_at` only over a tombstone. */
+  /** The revision and times of the record in hand, as plain own props, assigned before the seal by `assignInitialProps` and again by `assign` at each adopt: `registered_at` only at birth and over a tombstone. */
   declare revision_tok:  string
   declare revision_seq:  number
   declare registered_at: number
@@ -57,7 +55,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The record edited here and not yet sent, under the next revision, or a tombstone while `del` is sending; null while nothing is staged. */
   #staged: Fetched<RecordT, SparseT> | null
   /** The revision `nextRevision` last minted, and the `revision_tok` of the record it follows; cleared by `send` and `del` as they hand the record to the listing. */
-  #minted: { revision: Revision, anteTok: string } | null = null
+  #memoizedNextRevision: { revision: Revision, anteTok: string } | null = null
   /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, this>
@@ -74,13 +72,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Constructor]: constructor, assignInitialProps, assign
 
-  /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. `cache` is the listing's device cache, which each settle saves this thing's copy to; `tell` is how it tells bad news nobody asked about to the host. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
-  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, cache: Cache<RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, opts: StorableOpts, tell: Tell) {
-    MSX.storableArgs.parse({ world, listing, cache, central, staged, opts, tell })
+  /** Checks the arguments, holds central and the staged, inscribes the props, settles, and seals itself. `cache` is the listing's device cache, which each settle saves this thing's copy to. Bad news nobody asked about, a refused cache save or a refresh its timer launched that was refused, goes to `listing.tellBadNews`. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
+  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, cache: Cache<RecordT, SparseT>, central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, opts: StorableOpts) {
+    MSX.storableArgs.parse({ world, listing, cache, central, staged, opts })
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
     this.#cache = cache
-    this.#tell  = tell
     this.#scope = Object.freeze(listing.scopeOf(central))
     this.#central = Object.freeze(central)
     this.#staged  = staged === null ? null : Object.freeze(staged)
@@ -96,24 +93,24 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       doTryLaunch: () => this.tryFetch({ ifAbsent: 'nil' }),
       // `receive` notes success by its verdict: a record not older, central or the record in hand whole. The next launch is scheduled after any launch that completes.
       notesOwnSuccess: true,
-      onTimerRefusal:  (err) => { this.#tell([err]) },
+      onTimerRefusal:  (err) => { this.listing.tellBadNews([err]) },
     })
   }
 
-  /** Inscribe the own props, before the seal: the scope and `vault_tok`, immutably, here, and through `assign`, the ones that follow the record in hand. A concrete class with props of its own overrides it, calls super first, and inscribes them the same way: as own props, tattooed or adorned, never as #fields, which do not exist while the base constructor runs. */
+  /** Inscribe the own props, before the seal: the scope and `vault_tok`, tattooed immutably, and `registered_at`, here; through `assign`, the ones that follow the record in hand. A concrete class with props of its own overrides it, calls super first, and inscribes them the same way: as own props, assigned, tattooed or adorned, never as #fields, which do not exist while the base constructor runs. */
   protected assignInitialProps(combined: Fetched<RecordT, SparseT>): void {
     tattoo(this, { ...this.scope, vault_tok: combined.vault_tok }, { writable: false, configurable: false })
-    this.assign(combined, null)
+    this.registered_at = combined.registered_at
+    this.assign(combined)
   }
 
-  /** Set the props that follow `record`, the record in hand: its revision and `written_at` always; its `registered_at`,
-   * which names a life of the thing, only at birth (`current` null) or where `current`, the central held until now, is a
-   * tombstone, as it is before a first store and after a death. Never `vault_tok`, fixed at birth. The concrete class sets
-   * its own after calling this.
-   */
-  protected assign(record: Fetched<RecordT, SparseT>, current: Fetched<RecordT, SparseT> | null): void {
-    if (current === null || MSX.isTombstone(current)) { tattoo(this, lifePropsOf(record), { configurable: false }) }
-    tattoo(this, revisionPropsOf(record), { configurable: false })
+  /** Assign the mutable own props from `record`, the record about to be in hand: for the base, its revision and `written_at` always, and its `registered_at`, which names a life of the thing, only where the central held until now is a tombstone, as it is before a first store and after a death. `adopt` calls it before it replaces central, so that is the central judged; `assignInitialProps` sets `registered_at` at birth itself. Never `vault_tok`, fixed at birth. A concrete class with mutable props of its own overrides it, calls super first, and takes them from `record` alone. */
+  protected assign(record: Fetched<RecordT, SparseT>): void {
+    const { revision_tok, revision_seq, written_at, registered_at } = record
+    if (this.isTombstoneRecord(this.#central)) { this.registered_at = registered_at }
+    this.revision_tok = revision_tok
+    this.revision_seq = revision_seq
+    this.written_at   = written_at
   }
   // --
 
@@ -133,7 +130,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The record in hand where it is the full record, else null. */
   protected get full(): RecordT | null {
     const { combined } = this
-    return ! MSX.isTombstone(combined) && this.isFullRecord(combined) ? combined : null
+    return this.isFullRecord(combined) ? combined : null
   }
 
   /** The sparse form of central: everything but what only the full record carries. */
@@ -144,7 +141,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   toJSON(): SparseT { return this.sparse }
   // --
 
-  // == [States]: isTimely, isLocked, isPresent, isFull, hasStaged, isWatchable
+  // == [States]: isTimely, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, hasStaged, isWatchable
 
   get isTimely(): boolean { return this.#trigger.isTimely }
 
@@ -153,7 +150,21 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The record in hand is not a tombstone: the thing is not gone, and no `del` is sending. */
   get isPresent(): boolean { return ! MSX.isTombstone(this.combined) }
 
-  get isFull(): boolean { return this.full !== null }
+  /** True where the record in hand, the staged edit or else the stored record, has every field filled; false for a sparse view, as a listing's query hands back, or for a tombstone over a deleted or damaged record. */
+  get isFull(): boolean { return this.isFullRecord(this.combined) }
+
+  /** True where the record in hand is whole: {@link isFull}, or a tombstone. A thing built from a dna is staged full, so only a sparse record storage delivered, with nothing staged over it, is not. */
+  get #isWhole(): boolean { return this.isWholeRecord(this.combined) }
+
+  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone, deleted or damaged. A sparse record is not. */
+  protected isWholeRecord(record: Fetched<RecordT, SparseT>): record is RecordT | Tombstone<SparseT> {
+    return this.isTombstoneRecord(record) || this.isFullRecord(record)
+  }
+
+  /** Whether `record` is a tombstone, deleted or damaged. */
+  protected isTombstoneRecord(record: Fetched<RecordT, SparseT>): record is Tombstone<SparseT> {
+    return MSX.isTombstone(record)
+  }
 
   /** A record is staged: edited here and not yet sent. */
   get hasStaged(): boolean { return this.#staged !== null }
@@ -249,7 +260,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const timely = MSX.timelyOpts.parse(opts)
     await this.ensureReadyToFetch(timely)
-    await this.#trigger.ensureTimelyWithin(this.#holdsWhole ? timely.maxMillisSinceRefresh : 0)
+    await this.#trigger.ensureTimelyWithin(this.#isWhole ? timely.maxMillisSinceRefresh : 0)
     return this
   }
 
@@ -280,7 +291,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async send(patch: PatchT, opts: SendOpts = {}): Promise<this> {
     const { ifPresent: _ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     await this.edit(patch, timely)
-    this.#minted = null
+    this.#memoizedNextRevision = null
     // The staged record, not this thing ducking as it: a lock may come down between edit and put, and a locked thing's getters hide what it holds.
     await this.listing.put(this.listing.recordOf(this.#staged))
     return this
@@ -294,7 +305,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const nextRevision = this.nextRevision(this.#central)
     this.adopt(this.#central, this.reconcileStaged({ act: 'del', central: this.#central, staged: this.staged, nextRevision }))
     this.settle()
-    this.#minted = null
+    this.#memoizedNextRevision = null
     await this.listing.del(this)
     return this
   }
@@ -325,17 +336,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     } else if (delSpent) {
       this.adopt(central, null)
     }
-    if (! older && this.#holdsWhole) { this.#trigger.noteSuccessNow() }
+    if (! older && this.#isWhole) { this.#trigger.noteSuccessNow() }
     return (delSpent || act.success) ? this.settle() : { badnews: [] }
   }
 
   // Every adopt is followed by a settle, which the snapshot and the device cache are made from: an adopt left unsettled would leave both behind.
-  /** Hold both, frozen, the staged null where nothing is staged, and assign the props of the record in hand over the central held until now; the snapshot waits for `settle`. */
+  /** Assign the props of the record that will be in hand, judged against the central held until now, then hold both, frozen, the staged null where nothing is staged; the snapshot waits for `settle`. */
   protected adopt(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null): void {
-    const current = this.#central
+    this.assign(staged ?? central)
     this.#central = Object.freeze(central)
     this.#staged = staged === null ? null : Object.freeze(staged)
-    this.assign(this.combined, current)
   }
 
   /** Act on the state as adopted, idempotently: the base replaces the snapshot, saves this thing's copy to the device cache through `#saveCopy` without awaiting it, and tells no news. A subclass calls super last, so that the snapshot sees it. */
@@ -345,11 +355,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return { badnews: [] }
   }
 
-  /** Save the copy, central and the staged beside the sparse form, to the device cache by `cache.save`, not awaited: a save refused is told by `tell`, never thrown into the verb that settled. The copy holds the records as stored and staged, sealed, and nothing the instance alone keeps, such as an exposed whisper. A thing never stored with nothing staged has nothing to keep, and saves nothing. One is in that state between its birth and the record it was born to receive. */
+  /** Save the copy, central and the staged beside the sparse form, to the device cache by `cache.save`, not awaited: a save refused is told to `listing.tellBadNews`, never thrown into the verb that settled. The copy holds the records as stored and staged, sealed, and nothing the instance alone keeps, such as an exposed whisper. A thing never stored with nothing staged has nothing to keep, and saves nothing. One is in that state between its birth and the record it was born to receive. */
   #saveCopy(): void {
     if (this.#central.revision_seq === MSX.NeverStoredSeq && this.#staged === null) { return }
     const copy = Object.freeze({ ...this.listing.sparseOf(this.#central), central: this.#central, staged: this.#staged })
-    void outcomeOf(() => this.#cache.save(copy)).then(({ ok, err }) => { if (! ok) { this.#tell([err]) } })
+    void outcomeOf(() => this.#cache.save(copy)).then(({ ok, err }) => { if (! ok) { this.listing.tellBadNews([err]) } })
   }
 
   /** A tombstone made here, from the sparse props held, under `revision`, written now: `am` 'x' for a deletion, 'd' for damage. */
@@ -360,9 +370,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The revision after `ante`: minted once, then the same while `ante`'s tok is the one it followed, so edits made one after another stage one revision until `send` or `del` spends it. */
   protected nextRevision(ante: Revision): Revision {
-    if (this.#minted?.anteTok === ante.revision_tok) { return this.#minted.revision }
+    if (this.#memoizedNextRevision?.anteTok === ante.revision_tok) { return this.#memoizedNextRevision.revision }
     const revision = { revision_tok: randomId(), revision_seq: ante.revision_seq + 1 }
-    this.#minted = { revision, anteTok: ante.revision_tok }
+    this.#memoizedNextRevision = { revision, anteTok: ante.revision_tok }
     return revision
   }
 
@@ -373,7 +383,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Reconcile]: reconcileCentral, reconcileStaged, classifyRecordShape, isWholeRecord, holdsWhole
+  // == [Reconcile]: reconcileCentral, reconcileStaged, classifyRecordShape
 
   /** The central that results from `rcvd` meeting the central held, and the policy that names the row taken. The staged is not consulted.
    *
@@ -486,18 +496,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if (this.isFullRecord(record))     { return 'full' }
     return 'sparse'
   }
-
-  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone, deleted or damaged. A sparse record is not. */
-  protected isWholeRecord(record: Fetched<RecordT, SparseT>): boolean {
-    return MSX.isTombstone(record) || this.isFullRecord(record)
-  }
-
-  /** Whether the record in hand is whole. A thing built from a dna is staged full, so only a sparse record storage delivered, with nothing staged over it, is not. */
-  get #holdsWhole(): boolean { return this.isWholeRecord(this.combined) }
   // --
 
   // == [Concrete Subclass Required Methods]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
 
+  /** Whether `fetched` is a full record, alive: a tombstone, deleted or damaged, never is. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
   /** The check `edit` (so `send`) makes of its patch first of all, before any guard: it returns for a full patch, one `makeStaged` can lay over the record in hand, and refuses any other 'bad_option', naming the field, through the concrete class's Checker. It returns nothing: `makeStaged` is handed the patch as given, and takes from it only what it lays over the record, so a field the check allows and ignores goes no further. */
   protected abstract isFullPatch(patch: unknown): asserts patch is PatchT
@@ -505,22 +508,5 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   protected abstract makeStaged(base: SparseT, patch: PatchT, opts: EditOpts): Promise<RecordT>
   protected abstract makeSnapshot(): SnapshotT
   // --
-}
-// --
-
-// == [Helpers]: lifePropsOf, revisionPropsOf, tattoo
-
-/** The own prop that names a life of the thing, set at birth and over a tombstone. */
-const lifePropsOf = ({ registered_at }: Times): Pick<Times, 'registered_at'> => ({ registered_at })
-
-/** The own props that follow every record in hand. */
-const revisionPropsOf = ({ revision_tok, revision_seq, written_at }: Revision & Times): Revision & Pick<Times, 'written_at'> => ({ revision_tok, revision_seq, written_at })
-
-/** A placeholder until the helpers worker lands `tattoo`; then this goes and the import takes its place. */
-const tattoo = <BT extends object>(obj: object, shown: BT, opts: { writable?: boolean, configurable?: boolean } = {}): BT => {
-  for (const [ckey, val] of Object.entries(shown)) {
-    Object.defineProperty(obj, ckey, { value: val, enumerable: true, writable: opts.writable ?? true, configurable: opts.configurable ?? true })
-  }
-  return shown
 }
 // --

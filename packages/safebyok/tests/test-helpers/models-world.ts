@@ -16,7 +16,7 @@ import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { type BoxProps, Box } from '../../src/models/box'
 import { BoxListing, type BoxCache, type BoxDna, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type Tell, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import * as Refusals from '../../src/refusals'
@@ -130,8 +130,6 @@ export type ModelsWorld = {
   badnews: readonly VaultError[]
   /** The `onBadNews` {@link boxListingOf} gives the listing: it logs into `badnews`. */
   onBadNews: (news: VaultError) => void
-  /** The `tell` a storable made by hand is given: it logs into `badnews`, as {@link onBadNews} does. */
-  tell: (badnews: readonly VaultError[]) => void
   /** The records the store keeps, by boxlabel: the one vault's boxes. */
   stored: Map<string, Fetched<BoxRecord, BoxSparse>>
   /** The copies the cache keeps, by boxlabel; `save` replaces the one of its box. */
@@ -339,7 +337,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   return {
     world, store, cache, calls, badnews, stored, cached, watches,
     onBadNews:  (news) => { badnews.push(news) },
-    tell:       (told) => { badnews.push(...told) },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0 },
 
@@ -414,8 +411,8 @@ export class TestableBox extends Box {
 
 /** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
-  protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>, tell: Tell): TestableBox {
-    return new TestableBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+  protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>): TestableBox {
+    return new TestableBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
 
   override async build(input: Parameters<BoxListing['build']>[0]): Promise<TestableBox> { return testableOf(await super.build(input)) }
@@ -467,8 +464,8 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
     }
   }
   class FakeSealBoxListing extends TestableBoxListing {
-    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>, tell: Tell): TestableBox {
-      return new FakeSealBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>): TestableBox {
+      return new FakeSealBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
     }
   }
   return new FakeSealBoxListing({

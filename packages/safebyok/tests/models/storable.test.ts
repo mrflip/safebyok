@@ -108,7 +108,7 @@ describe("storable.hydrate(opts): when it fetches", () => {
   it("fetches nothing under maxMillisSinceRefresh Infinity for a thing never fetched, its central full", async () => {
     const { mw } = held
     const listing = boxListingOf(mw)
-    const box = new TestableBox(mw.world, listing, mw.cache, mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, mw.tell)
+    const box = new TestableBox(mw.world, listing, mw.cache, mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
     expect(box.isTimely).to.be.false
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(mw.callsOf('get')).to.deep.equal([])
@@ -275,7 +275,7 @@ const Staged = (): BoxRecord => fullBoxRecord({ revision_seq: 3, revision_tok: '
 
 /** A box holding `central` and `staged`, as `hello` revives one from the device cache: not held by the listing, not yet timely. */
 const boxOf = (central: Rec, staged: Rec | null = null): SpiedBox => (
-  new SpiedBox(held.mw.world, boxListingOf(held.mw), held.mw.cache, central, staged, { maxMillisSinceRefresh: 10 * 60_000 }, held.mw.tell)
+  new SpiedBox(held.mw.world, boxListingOf(held.mw), held.mw.cache, central, staged, { maxMillisSinceRefresh: 10 * 60_000 })
 )
 
 /** The box's held records and the own props that follow the record in hand, for comparing before and after. */
@@ -589,7 +589,7 @@ describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with, and the draft stays staged", async () => {
     const listing = boxListingOf(held.mw)
     const built = await listing.build(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
-    const box = new SpiedBox(held.mw.world, listing, held.mw.cache, built._cheat_central, built._cheat_staged, { maxMillisSinceRefresh: 10 * 60_000 }, held.mw.tell)
+    const box = new SpiedBox(held.mw.world, listing, held.mw.cache, built._cheat_central, built._cheat_staged, { maxMillisSinceRefresh: 10 * 60_000 })
     expect(box._cheat_central.revision_seq).to.eq(MSX.NeverStoredSeq)
     expectReceivedUnchanged(box, null, 'same')
     expect(box._cheat_staged?.revision_seq).to.eq(0)
@@ -671,7 +671,7 @@ describe("Storable snapshot and subscription", () => {
 
     it("is made on the first call, so that a settle before it has none to replace and tells nobody", () => {
       const { mw } = held
-      const box = new TestableBox(mw.world, boxListingOf(mw), mw.cache, mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, mw.tell)
+      const box = new TestableBox(mw.world, boxListingOf(mw), mw.cache, mw.fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
       const listener = vi.fn()
       box.subscribe(listener)
       box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
@@ -892,6 +892,14 @@ describe("Storable own props", () => {
       const box = await builtBoxOf()
       for (const ckey of writable) {
         expect(Object.getOwnPropertyDescriptor(box, ckey), ckey).to.include({ enumerable: true, configurable: false })
+      }
+    })
+
+    it("are plain assigned props for the revision and written_at, writable, and sealed with the rest of the box", async () => {
+      const box = await builtBoxOf()
+      expect(Object.isSealed(box)).to.be.true
+      for (const ckey of ['revision_tok', 'revision_seq', 'written_at', 'registered_at'] as const) {
+        expect(Object.getOwnPropertyDescriptor(box, ckey), ckey).to.include({ enumerable: true, writable: true, configurable: false })
       }
     })
 
@@ -1526,7 +1534,7 @@ describe("storable.settle saves the box's own copy to the device cache", () => {
     expect(lastSaveOf(held.mw, box).central).to.eq(box._cheat_central)
   })
 
-  it("tells a save the cache refuses once, by tell, and the edit that settled resolves as it would have", async () => {
+  it("tells a save the cache refuses once, through the listing's tellBadNews, and the edit that settled resolves as it would have", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     held.mw.willSave(() => Promise.reject(new VaultError('unexpected_error', "The cache is full.")))
     expect(await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'staged' } })).to.eq(box)
@@ -1536,12 +1544,11 @@ describe("storable.settle saves the box's own copy to the device cache", () => {
   })
 
   it("tells a save that throws outright, not by rejecting, the same, and the constructor that settled completes", async () => {
-    const told: VaultError[] = []
     const cache = { load: () => Promise.resolve([]), save: () => { throw new Error("The cache is gone.") } }
-    const box = new TestableBox(held.mw.world, boxListingOf(held.mw), cache, fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, (news) => { told.push(...news) })
+    const box = new TestableBox(held.mw.world, boxListingOf(held.mw), cache, fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
     expect(box._cheat_central).to.deep.equal(fullBoxRecord())
     await microtasks(10)
-    expect(told.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
   })
 
   it("keeps an exposed whisper out of the copy: setting box.whisper settles and saves, and the copy holds the sealed parts alone", async () => {

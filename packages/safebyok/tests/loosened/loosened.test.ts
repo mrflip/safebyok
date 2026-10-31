@@ -12,7 +12,7 @@ describe("the staged edit reconcileStaged drops or carries", () => {
   const CentralRev = { revision_seq: 2, revision_tok: 'rev-c2' }
   const OtherRev   = { revision_seq: 3, revision_tok: 'rev-other', written_at: T0 + 3000 }
   const Staged = () => fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-s3', written_at: T0 + 300, sidecar: { note: 'staged' } })
-  const boxOf = () => new TestableBox(held.mw.world, boxListingOf(held.mw), held.mw.cache, fullBoxRecord(CentralRev), Staged(), { maxMillisSinceRefresh: 10 * 60_000 }, held.mw.tell)
+  const boxOf = () => new TestableBox(held.mw.world, boxListingOf(held.mw), held.mw.cache, fullBoxRecord(CentralRev), Staged(), { maxMillisSinceRefresh: 10 * 60_000 })
 
   it("README.md:1109, 'never merges two writes -- a write that lost must be seen': a fetch meeting another device's newer box drops the edit staged here, resolves, and tells no bad news", async () => {
     const listing = boxListingOf(held.mw)

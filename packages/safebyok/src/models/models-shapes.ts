@@ -105,7 +105,7 @@ export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
 export const NeverStoredSeq = -1
 
 /** True for a record whose `am` says damaged or gone. */
-export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => fetched.am !== 'a'
+export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
 // --
 
 // == [What storage answers]: answer, notice, Answer, Notice
@@ -498,12 +498,9 @@ export const boxListingOpts = objCheck(({ obj, applabel, user_id, vaultlabel, va
 }), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
 // --
 
-// == [Making a storable]: storableArgs, Tell
+// == [Making a storable]: storableArgs
 
-/** How a storable tells bad news nobody asked about, such as a refresh its timer launched that was refused, to the host's `onBadNews` through its listing. */
-export type Tell = (badnews: readonly VaultError[]) => void
-
-/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, the cache answers to `load` and `save`, `central` passes {@link sparseBase}, `staged` does too or is null, the options are {@link storableOpts}, and `tell` is a function. The concrete class's validator judges the records further. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, the cache answers to `load` and `save`, `central` passes {@link sparseBase}, `staged` does too or is null, and the options are {@link storableOpts}. The concrete class's validator judges the records further. Its `parse` refuses 'bad_option'. Checks only. */
 export const storableArgs = objCheck(({ custom, obj, fn }) => ({
   world,
   listing: custom<object>(isListing, Phrases.ListingExpected),
@@ -511,6 +508,5 @@ export const storableArgs = objCheck(({ custom, obj, fn }) => ({
   central: sparseBase,
   staged:  sparseBase.nullable(),
   opts:    storableOpts,
-  tell:    fn(),
 }), 'bad_option')
 // --

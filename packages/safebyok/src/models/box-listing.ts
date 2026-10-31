@@ -6,7 +6,7 @@ import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box } from './box'
 import { Listing, hasRevision } from './listing'
-import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Tell, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { stubSeal } from './stub-seal'
 
@@ -80,8 +80,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return stubSeal({ ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok }, whisper)
   }
 
-  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>, tell: Tell): Box {
-    return new Box(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh }, tell)
+  protected makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>): Box {
+    return new Box(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
 
   absentRefusal(scope: Boxscope): VaultError {

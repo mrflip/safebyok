@@ -905,20 +905,18 @@ describe("listing: an answer names the scope of the record it carries", () => {
   })
 })
 
-describe("storable: the tell it is handed when made", () => {
-  it("tells a refusal of the refresh its timer launches to the tell it was given, not to the listing's onBadNews", async () => {
+describe("storable: the bad news it tells through its listing", () => {
+  it("tells a refusal of the refresh its timer launches to its listing's tellBadNews, so to the host's onBadNews", async () => {
     const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
-    const told: unknown[] = []
-    const box = new TestableBox(held.mw.world, listing, held.mw.cache, fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 }, (news) => { told.push(...news) })
+    const box = new TestableBox(held.mw.world, listing, held.mw.cache, fullBoxRecord(), null, { maxMillisSinceRefresh: 1000 })
     box.receive(fullBoxRecord())
     const down = new VaultError('storage_unavailable', "Down.")
     held.mw.willGet(held.mw.refusalOf(box.scope, down))
     await held.mw.advance(800)
-    expect(told).to.deep.equal([down])
-    expect(held.mw.badnews).to.deep.equal([])
+    expect(held.mw.badnews).to.deep.equal([down])
   })
 
-  it("is handed by the listing to each instance it makes: a revived copy, a record's, a draft's", async () => {
+  it("is told so by each instance the listing makes: a revived copy, a record's, a draft's", async () => {
     const copies = await seededCache()
     const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
     held.mw.willLoad(copies)

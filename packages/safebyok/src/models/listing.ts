@@ -7,7 +7,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Tell, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
+import { type Answer, type Cache, type Cacheable, type Dna, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -242,14 +242,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return []
   }
 
-  /** How the instances made here tell bad news. */
-  readonly #tell: Tell = (badnews) => { this.tellBadNews(badnews) }
-
-  /** A new instance for `intake`, constructed, handed the device cache and `#tell`, and nothing more; null for nothing stored. A record's instance is born over a central never stored, of the record's sparse form, so that `receive` adopts the record as it would any newer one; a copy's revives its central and staged; a draft is staged over a central never stored, of the draft's sparse form. */
+  /** A new instance for `intake`, constructed, handed the device cache, and nothing more; null for nothing stored. A record's instance is born over a central never stored, of the record's sparse form, so that `receive` adopts the record as it would any newer one; a copy's revives its central and staged; a draft is staged over a central never stored, of the draft's sparse form. */
   #makeThingFor(intake: Intake<RecordT, SparseT>): ThingT | null {
-    if (intake.flavor === 'cached')  { return this.makeThing(intake.copy.central, intake.copy.staged, this.#cache, this.#tell) }
-    if (intake.flavor === 'drafted') { return this.makeThing(this.#neverStoredOf(this.sparseOf(intake.draft)), intake.draft, this.#cache, this.#tell) }
-    return intake.record === null ? null : this.makeThing(this.#neverStoredOf(this.sparseOf(intake.record)), null, this.#cache, this.#tell)
+    if (intake.flavor === 'cached')  { return this.makeThing(intake.copy.central, intake.copy.staged, this.#cache) }
+    if (intake.flavor === 'drafted') { return this.makeThing(this.#neverStoredOf(this.sparseOf(intake.draft)), intake.draft, this.#cache) }
+    return intake.record === null ? null : this.makeThing(this.#neverStoredOf(this.sparseOf(intake.record)), null, this.#cache)
   }
 
   /** Hold `thing`, born here, under its scope, and make the listing's snapshot again on each change of the thing's. */
@@ -305,8 +302,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Bad news]: tellBadNews
 
-  /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into a timer's callback or the store's watch. Each item is told once, however many callers meet it. The instances this listing makes are handed this as their `tell`. */
-  protected tellBadNews(badnews: readonly VaultError[]): void {
+  /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into a timer's callback or the store's watch. Each item is told once, however many callers meet it. Public so that the instances this listing makes tell theirs through it: a refused cache save, a refusal of a refresh a timer launched. */
+  tellBadNews(badnews: readonly VaultError[]): void {
     const onBadNews = this.#onBadNews
     if (onBadNews === null) { return }
     for (const news of badnews) {
@@ -346,8 +343,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   abstract recordOf(duck: unknown): RecordT
   /** The full record a stamped dna makes, staged at birth: its defaults filled in, alive, and sealed where the kind seals; a vault's is its novel record. */
   protected abstract draftOf(dna: Dna<ScopeT, RecordT> & Revision & Times): Promise<RecordT>
-  /** Construct the instance, handing it `cache`, the device cache it saves itself to, and `tell`, and nothing more. */
-  protected abstract makeThing(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, cache: Cache<RecordT, SparseT>, tell: Tell): ThingT
+  /** Construct the instance, handing it `cache`, the device cache it saves itself to, and nothing more. */
+  protected abstract makeThing(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, cache: Cache<RecordT, SparseT>): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError
   /** The record a 'stale_write' refusal carries, what storage holds; null for none, or for a record that fails its check. */
   protected abstract storedInStaleRefusal(err: VaultError): Fetched<RecordT, SparseT> | null

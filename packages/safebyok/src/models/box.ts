@@ -115,8 +115,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 
   // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, makeSnapshot
 
+  /** A box record alive that carries its sealed whisper. */
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {
-    return 'whisper_ciphered' in fetched
+    return (fetched.am === 'a') && ('whisper_ciphered' in fetched)
   }
 
   /** Returns for a full patch of this box, and refuses any other 'bad_option', naming the field; `edit`, so `send` and `seal`, calls it first of all, before any guard. Every update of a box seals the whisper it is given, as `{ val }`, with the sidecar it is given, and carries neither over from the record in hand; an exposed whisper is no substitute for the one given.
@@ -129,8 +130,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** The patch's whisper, sealed by {@link stubSeal} with the patch's sidecar under `base`'s props: `base`, sparse or full, lends its scope, revision, times and whisper's form, and none of its sidecar or sealed parts. */
-  protected makeStaged(base: BoxSparse, { whisper, sidecar }: BoxProps): Promise<BoxRecord> {
+  /** The whisper of `patch`, sealed by {@link stubSeal} with its sidecar under `base`'s props: `base`, sparse or full, lends its scope, revision, times and whisper's form, and none of its sidecar or sealed parts. `patch` was held to `boxPatch` by `isFullPatch` before `edit` called this; of it, only the whisper and the sidecar are taken. */
+  protected makeStaged(base: BoxSparse, patch: BoxPatch): Promise<BoxRecord> {
+    const { whisper, sidecar } = patch
     return stubSeal({ ...base, sidecar }, whisper)
   }
 
