@@ -148,6 +148,11 @@ the two disagree. Workers look things up here; the handoffs carry what each thre
   puts or deletes over, and a put over a seeded record carries that record's tok at its seq + 1.
   A `del` with null over no row lays a tombstone at revision 0. The device checks the pairing
   only (the Coach: "leave it, storage owns the + 1 rule").
+* *Thread 17 (#389):* `cacheable` is private. `Storable#settle` pushes a copy through
+  `this.listing[MSX.KeepCopy](copy)`; the listing keeps the last copy per scope and saves it on
+  each delivery and build (never an edit or a revive). Every `adopt` is followed by `settle`.
+  Tests read central and staged through `keptOf(held.mw, box)`; `lastSaveOf(mw, box)` gives the
+  fake cache's last save.
 * *The Coach (2026-10-31):* a device behind a rollback (storage older than central, or empty
   under a live central) "is an impossible situation unless it's by deliberate user action i.e. a
   backup": throw (thread 19). Every entrypoint validates its arguments, `edit` and `send`
