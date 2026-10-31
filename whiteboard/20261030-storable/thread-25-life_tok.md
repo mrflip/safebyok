@@ -1,6 +1,6 @@
 # Thread 25: Life toks, and `makeStaged` makes the whole staged record (2026-10-31)
 
-Branch `20261031-life_tok`, PR #TBD, stacked on #406. Justify: green (safebyok 4513 passed,
+Branch `20261031-life_tok`, PR [#407](https://github.com/mrflip/safebyok/pull/407), stacked on #406. Justify: green (safebyok 4513 passed,
 37 skipped; every package and the size budget green, no budget moved). Changeset `minor`.
 
 * **Built**:
