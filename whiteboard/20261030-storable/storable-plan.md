@@ -630,7 +630,13 @@ control." Label `entry_checks`.
    which might lead to coincidental values. Point being: arg checks first"): every entry checks
    its arguments before any guard (lock, presence, hydrate); `build` parses its dna before its
    lock check (today it refuses `vault_locked` first), as `edit` already does.
-5. Tests: one per entry for a bad argument, and for `edit` and `send` a round-trip of
+5. *Orchestrator, from #390's and #403's reviews:* the sidecar is checked at `edit`'s entry (today a
+   bad one refuses `bad_record` inside `stubSeal`, after hydrate); `edit(undefined)` refuses
+   `bad_option`, not a TypeError from `namesBoth`; a malformed whisper refuses one kind at every
+   entry (`build` says `bad_option`, the setter, `edit` and `send` `bad_whisper`: pick one, say
+   which); `LOCKED` handed to `edit`/`send` gets a refusal that names it ("LOCKED is not a
+   whisper: unseal or expose one first") rather than "val: required".
+6. Tests: one per entry for a bad argument, and for `edit` and `send` a round-trip of
    `{ ...box.snapshot-or-record, whisper, sidecar }` with factory fields given and stripped.
 Worker `opus`; review `medium`. Depends on 22 (cut from its tip; 15 and 13 below it reshape the
 same entries). Size: medium.
