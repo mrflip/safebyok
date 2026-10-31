@@ -95,6 +95,13 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(await vault.ensureUnlocked()).to.equal(lease)
   })
 
+  it("refuses 'bad_option' a stamp of no fields, at the seal and at the unseal: a seal bound to nothing of the box's binds nothing", async () => {
+    const { vault } = await bornVault()
+    const lease = vault.demandLease()
+    await TH.expectRefusal(lease.sealWith(new TextEncoder().encode('sk-test'), {}, WhisperStamp), 'bad_option')
+    await TH.expectRefusal(lease.unsealWith(await seal(lease), BoxKeyStamp, {}), 'bad_option')
+  })
+
   it("locks at `lock()`, erasing the kept lease; then refuses 'vault_locked' with no proof, the proof's own refusal with a wrong one, and unlocks with the right one", async () => {
     const { vault, deviceDB } = await bornVault()
     const born = vault.demandLease()
