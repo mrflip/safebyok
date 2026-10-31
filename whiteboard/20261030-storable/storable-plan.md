@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** main has merged through #390; filed through #405 (thread 18); thread 23 (the Coach's fingerpaints) building on it; then 24, 19, 20, then 6.
+* **Status:** main has merged through #390; thread 23 (#406) filing, on #405; then 25 (life toks), 24, 19, 20, then 6.
 
 ## Read first
 
@@ -685,6 +685,62 @@ intend." Label `coach_sweep`.
   tattoo, and why `configurable: false` doesn't fail on the second `defineProperty`: a
   non-configurable property stays writable, so its value may change).
 Worker `opus`; review `medium`. Depends on 18 (cut from its tip). Size: medium.
+*Review:* fixed (medium). Fixed: the `Cache` doc says to debounce `save` per thing, keyed by scope; `tellBadNews` and `MinRefreshMillis` docs say when, not who; guarantees.md's exposed-whisper line regained its verb; *send establishes its own guard first* seeds the store (it checked order on a send refused `'stale_write'`). Left: the 50 ms window after a newer sparse record (thread 24, `makeBarelyUntimely`); `Cacheable` against `buildableRecord` (a Coach row); revision props writable by a host, as before; `send` hydrates twice, harmless; `isTombstone` reads a missing `am` as alive, behind `oneof(amVals)`; `becomeNotifiable` not in STYLE.md's verbs. Ruled since: `'bad_option'` for a record not full, no `needs_fetch` (the Coach: "bad_option that's fine").
+
+### 25. Life toks, and `makeStaged` makes the whole staged record
+
+*Orchestrator, the Coach (2026-10-31), verbatim:* "ffs I just understood what you meant by stale
+meta of. rip that out of the files I'll fix the caller. Can you have edit move the makeStaged
+lines into makeStaged? Box and Vault need to add box_tok/vault_tok there as birthday gifts
+(makeLifeTok to create it) next to registered_at (which can be set by either written_at or now).
+Add a protected lifeTokPathOf: this says what life you are on (it's vault_tok for vault,
+`vault_tok-box_tok` for box), #sameLife(record) will compare them -- replacing the naked vault_tok
+comparison. This will defend against the "did another thing come along and replace this"
+conundrum. If we're right, the registered_at and life tok won't change except at birthdays." And:
+"I fingerpainted in storable for this." Label `life_tok`.
+* **Fingerpaints:** `whiteboard/20261030-storable/coach-fingerpaints-20261031b.patch` is the whole
+  of the Coach's uncommitted edits in `/workspace/byok`, against main at #390; what is new over
+  `coach-fingerpaints-20261031.patch` (thread 23's) is only in `edit`: "FIXME move this to
+  makeStaged. Makestaged in subclass shoule add box_tok / vault_tok", with `nextRevision`, `now`
+  and `combined` commented out, and the moved-central refusal's meta built in place as
+  `{ stored_revision: <central's revision props>, staged_revision: <staged's> }` where it called
+  `this.listing.staleMetaOf`.
+1. `staleMetaOf` goes: the abstract on `Listing` and both concrete ones, with their `as unknown as`
+   casts. `edit`'s moved-central refusal builds its meta in place as the fingerpaint does (take the
+   revision props by a check's parse or destructuring, not `revisionPropsOf`, which thread 23
+   removed); fit `RefusalMeta` to it rather than cast.
+2. The lines `edit` runs before `makeStaged` (the next revision, `now`, `combined`, the birthday
+   `registered_at`, the `{ ...combined, ...nextRevision, registered_at, written_at: now, am: 'a' }`
+   base) move into `makeStaged`, so `makeStaged` makes the whole staged record. `edit` keeps the
+   guard, `ante`, the moved-central check and the reconcile. A base helper the two concrete
+   `makeStaged`s share is fine; say where it lives.
+3. **Birthday gifts.** At a birthday (the base a tombstone or the never-stored shim), `makeStaged`
+   gives a fresh life tok made by a new `makeLifeTok()` (beside `randomId`; a life tok is a tok,
+   VOCABULARY.md) and `registered_at` = the new record's `written_at`; otherwise both carry over
+   from `combined`. Box gains a stored `box_tok` (in `boxSparse`, factory-controlled, stripped by
+   `boxDna` like `vault_tok`); the box's draft (`BoxListing.draftOf`) gives one too. Vault's life
+   tok is its `vault_tok`, which `VaultListing.draftOf` already mints (switch it to
+   `makeLifeTok`).
+4. **`lifeTokPathOf` and `#sameLife`.** A protected abstract `lifeTokPathOf(record)`: Vault's is
+   `vault_tok`, Box's is `` `${vault_tok}-${box_tok}` ``. A private `#sameLife(record)` compares a
+   record's path with the held central's, and replaces `reconcileCentral`'s naked
+   `rcvd.vault_tok !== this.vault_tok` precheck.
+*Orchestrator gloss:* the code today tattoos `vault_tok` immutably on the instance and throws
+`unexpected_error` (`OtherVaultTok`) for a record under another; `Listing.#demandRecordOfVault`
+checks it again at birth (the Coach: "meh, it's not in the way"; leave that one). Two points the
+Coach's text leaves to the worker, YOLO calls recorded in the thread file and as open matters:
+(a) where a received record of another life is legit: a box remade elsewhere (a newer record of
+another `box_tok`, after a del) is a birthday, not an error, while a record of another life at the
+same or an older seq, or under another `vault_tok`, is the "another thing came along" case; place
+the rule as rows of the reconcile table where it can, since thread 24 makes that table tell the
+whole story; (b) a vault's birthday through `edit` over a vault tombstone would mint a new
+`vault_tok` while the instance's own is tattooed and every box's world names the old: build the
+gift as directed for the box; for the vault, if it cannot follow without remaking the vault's
+boxes (the plan's "Not yet: flushing and remaking every instance of a vault made anew"), keep the
+vault's `vault_tok` over its own tombstone, and say so as an open matter. Stored shape: the models
+are not exported, so `box_tok` binds nothing yet; the changeset is likely `--empty`; say so.
+Worker `opus`; review `high` (a new stored field, and the precheck that decides which records a
+thing takes). Depends on 23 (cut from its tip). Size: medium.
 
 ### 24. The receive table and the trigger's verdict
 
@@ -700,8 +756,17 @@ a thing when this is reconcile's job?" Label `receive_table`.
    (`tryFetch`) resolves to `receive`'s verdict (the record in hand whole and not behind), and the
    trigger counts a launch a success by that outcome, not by a side call to `noteSuccessNow`.
 3. `reconcileStaged`'s `forms.patch` is renamed for what it is, the staged record `makeStaged` made
-   and sealed; the 'edit' row becomes that record under `nextRevision`.
-Worker `opus`; review `medium`. Depends on 23 (cut from its tip). Size: medium.
+   and sealed; since thread 25, `makeStaged` makes it whole, under `nextRevision`, so the 'edit' row
+   takes it as made.
+4. *The Coach (2026-10-31), on the 50 ms window (#406's review: within `MinRefreshMillis` of a full
+   fetch, a newer sparse record leaves `hydrate` skipping the fetch, and `unsealWhisper` refusing
+   `'bad_option'`):* "ok, trigger.makeBarelyUntimely()". A newer record received that is not whole
+   calls a new `Trigger#makeBarelyUntimely()`, so the next hydrate fetches; change the test that
+   pins the window (*shares the last fetch with a hydrate of a sparse central within
+   MinRefreshMillis*), and `demandReadyToUnsealWhisper`'s doc then holds.
+5. *The Coach (2026-10-31), on `Listing.tellBadNews` public and unchecked:* "If you have to ask,
+   Validate". It checks its argument at entry, by a `Checker`.
+Worker `opus`; review `medium`. Depends on 25 (cut from its tip). Size: medium.
 
 ### 19. A rollback, thrown
 
