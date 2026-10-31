@@ -577,7 +577,12 @@ The models' `Box` (`src/models/box.ts`, never the old `src/box.ts`) takes and gi
 as a plain object (`box.whisper = { val: 'sk-…' }`), checked at the setter and at unseal as the
 sidecar is; the seal serializes the object. `null` and `LOCKED` keep their meaning (thread 9's
 setter). **Hands off:** cutting off access to the private value while locked (the Coach: "I will
-have to look at it later"); the setter is documented as it is. Worker `opus`; review `high` (the
+have to look at it later"); the setter is documented as it is.
+*Added (the Coach, 2026-10-31, on Closer Look's `Symbol.for('LOCKED')` flag):* "Probably better to
+use the private symbol and make this a frozen singleton object that we swap in; also give Storable
+a static method "isLockedFUBag" that is true for that bag." Sent to the live worker: `LOCKED`
+becomes a frozen singleton branded by a module-private `Symbol` (never `Symbol.for`), and
+`Storable.isLockedFUBag(value)` is true only for it; the setter forgets on `LOCKED` as on null. Worker `opus`; review `high` (the
 whisper is secret material: no side door, CLAUDE.md). Depends on 21 (cut from its tip; 15 below it). Size: small to medium.
 
 ### 22. `settle` saves to the cache itself
