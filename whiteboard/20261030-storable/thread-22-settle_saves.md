@@ -1,6 +1,6 @@
 # Thread 22: `settle` saves to the cache itself (2026-10-31)
 
-Branch `20261031-settle_saves`, PR #TBD, stacked on #403. Justify: green (safebyok 72 files, 4422 passed, 37 skipped; every package green, no size budget moved). Changeset empty.
+Branch `20261031-settle_saves`, PR #404, stacked on #403. Justify: green (safebyok 72 files, 4422 passed, 37 skipped; every package green, no size budget moved). Changeset empty.
 
 * **Built**, under `packages/safebyok/`:
   * `src/models/storable.ts`: the constructor takes `cache` after `listing`: `(world, listing, cache, central, staged, opts, tell)`, checked by `storableArgs` (`cache: obj({ load: fn(), save: fn() })`). The storable holds `#cache` and `#tell`. `settle()` replaces the snapshot, then `#saveCopy()`: the frozen copy `{ ...sparseOf(central), central, staged }` goes to `cache.save`, through `outcomeOf`, not awaited; a refusal (a rejection, or a save that throws outright) goes to `#tell` once. The comment above `adopt` now gives the new reason: settle is what the snapshot and the device cache are made from.
