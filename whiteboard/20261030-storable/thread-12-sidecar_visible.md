@@ -1,0 +1,9 @@
+# Thread 12: The sidecar, locked or not (2026-10-30)
+
+Branch `20261030-sidecar_visible`, PR #387, stacked on #385. Justify: green (4299 passed, 37 skipped).
+
+* **Built**: `box.sidecar` and the snapshot's `sidecar` answer the sidecar of the record in hand (null where it is not full) whether the vault is locked or not. `LockedSidecar`, `lockedSidecar`, `isLockedSidecar` and `Box.sameSnapshot` are gone from `src/models/box.ts`: the snapshot is compared by the base's stable JSON like any other, and a lock changes nothing in it. `LOCKED` stays for `box.whisper`. The double edge: one end-to-end test and one sentence in `reconcileCentral`'s damage NOTE (`src/models/storable.ts`).
+* **Tests restated** (`tests/models/box.test.ts`, the describe of threads 5 and 4b, now "Box sidecar, locked or not"): "answers itself while unlocked, and the locked bag while locked", "is one frozen bag", "is the snapshot's sidecar too, from the settle after the lock", "is the bag in a snapshot even for a box whose sidecar is empty or absent" and "lets nothing of the sidecar out through ... JSON" now assert the sidecar shows locked; the `it.todo` about a lock settling every box is dropped (a lock no longer changes any snapshot). "Never on the sparse form..." and "LOCKED is the registered symbol" kept in spirit.
+* **Double edge test** (`tests/models/storable.test.ts`, last describe): a built box with an `edit` staged receives a newer damaged record (staged carried to the revision after the ouchstone), then `receive(null)`: central is the deletion at the ouchstone's revision, the staged is null, no badnews, nothing thrown.
+* **Decisions taken**: the test ends with `receive(null)`, not a `fetch` answering nothing: `fetch` of a thing then absent throws `absent_box` to its caller by design, which would muddy "nothing is refused". `send` keeps putting its staged record. `cacheable` untouched (thread 17).
+* **Discoveries**: no code outside `box.ts` read the locked bag.

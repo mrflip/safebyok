@@ -82,6 +82,7 @@ spec that conflicts with the first. `box`-only terms say so.
 * `dna`: scope and seed props handed to `build` ~~or `send` with `ifPresent: 'fetch'` (this will be sugar added later: build().send(ifPresent: 'fetch' maxMillis Infinity))~~.
 * `tombstone`: durable record of a deletion; scope, revision, times, `deleted: true`. _Explain, intelligibly: ~~An answer of nothing stored is one too, at the revision held.~~_
 * tombstone: scope, revision, `registered_at`, `written_at` (when it was deleted), sentinel that it's either gone or damaged. Nothing the user put in the thing (no sidecar).
+* `whole`: a record that says all storage holds of the thing: full, or a tombstone (deleted or damaged), which holds nothing more to fetch. A sparse record is not whole. `isWholeRecord` checks it. Success on a fetch is noted only while central or the record in hand is whole, and `hydrate` fetches whatever the horizon while neither is.
 * `stamp`: the fields the seal binds: without the full set of values, the encrypted value cannot be recovered. For box, its sparse form plus `vault_tok`.
 * `live`: an instance, (eg of `Box`); `pojo` (Plain Ol' Javascript Object): by implication, the fields of a datatype as plain properties and none if its methods (eg `mybox.record` or `{ ...mybox }`).
   * live: an instance, meeting one of those shapes via getters or ownprops, enumerable or not
@@ -121,7 +122,7 @@ spec that conflicts with the first. `box`-only terms say so.
   - ~~`stagedOf(patch, opts)`: the one step of `edit` the concrete class writes: the record fields a patch becomes, sealed where they must be.~~
   - ~~`stagedPropsAndSealBeforeSettling`~~
 * `seal` (box): cipher a whisper under a fresh boxKey wrapped under the vaultKey, cryptographically binding the stamp. `unsealWhisper` opens the stored whisper for one call. ~~`unseal` is not a thing~~
-* `reseal` (box): unseal the stored whisper and edit it back in, sealed again.
+* ~~`reseal` (box): unseal the stored whisper and edit it back in, sealed again.~~ Retired: every update of a box names its whisper and its sidecar (the Coach, 2026-10-30), so there is nothing to carry over or reseal.
 * `expose` (box): unseal and save the `#whisper` internally. This opens a whole ton of questions, and is a NOTYET todo. I have included it as an important forcing consideration for the design.
   - Use of this function presumes a looser threat model and warrants different guarantees.
   - `whisper` get/set access to `#whisper` while unlocked, returns a sentinel otherwise (?)
@@ -185,10 +186,27 @@ Some of these are design considerations / future feature requests but they influ
   - `maxWorldMillis`: the same for the world (not acted on yet).
   - `maxBoxMillis`: specialized for the box (not acted on yet).
 * `ifAbsent`: `'fail' | 'nil'`, policy when attempting to read an absent or tombstoned record -- default `'fail'`.
-* `ifPresent`: `'replace' | 'fail' | 'fetch'`, policy when writing to an already-present record (not acted on yet). (this interacts with `stale_write` and `ensure_x`; its semantics viz tombstone need consideration)
-* `reseal` (box): with no whisper given or exposed, seal the stored one again.
+* `ifPresent`: how `send` meets what storage holds. A put carries the record at revision N, minted
+  on the device over the record it holds, and names that record by its `revision_tok` alone, the
+  prior tok: null where the device holds none. No prior seq is sent: storage enforces that N is
+  the prior row's seq + 1, by a calculation or in its query, and never renumbers or patches. No
+  row requires the prior tok null **and** N = 0; either without the other is inconsistent. A
+  revision lower than expected (storage holding an older row than the device's, under another tok)
+  meets the refusal of today, `stale_write` carrying it.
 
-* `ifPresent`: 'replace', 'fail', 'fetch'
+  | `ifPresent` | no row; prior tok null, N = 0 | row under the prior tok, a tombstone; N = its seq + 1 | row under the prior tok, alive or damaged; N = its seq + 1 | a row under another tok | no row; a prior tok given | prior tok null with N ≠ 0, a tok with N = 0, or N ≠ seq + 1 |
+  |---|---|---|---|---|---|---|
+  | `'replace'` (default; the only one implemented) | lands | lands | lands | `stale_write`, carrying it | `stale_write`, carrying nothing ❓ | refused, inconsistent (`bad_record`) |
+  | `'fetch'` (not implemented) | lands | lands | 🤷 the flag assumes no such row | answers it, `ok: true` ❓ (if newer? 🤷) | 🤷 | refused, inconsistent |
+
+  `'replace'` is the versioned replace (compare-and-swap). The pairing (prior tok null with N = 0,
+  a tok with N > 0) is judged from the request alone, ahead of any `stale_write`, and by the device
+  before it sends; N against seq + 1 is judged only over the row under the prior tok. `del` follows the same tok rule, and storage makes
+  the tombstone at the row's seq + 1 under a fresh tok; over no row, with the prior tok null, it
+  makes one at revision 0. `'fetch'` will not be implemented until a clear need and a scenario
+  table arrive.
+* ~~`reseal` (box): with no whisper given or exposed, seal the stored one again.~~ Retired: every update names a whisper and a sidecar.
+
 * `maxMillisSinceRefresh`, `maxWorldMillis`
 
 ## Local copies
@@ -230,18 +248,18 @@ But: they're not the concern of the op-- all they need to know is that their pre
 * `box.unsealWhisper(opts): Whisper` on the instance unseals the whisper temporarily and returns it, storing nothing in the box (the customer can do what they wish).
   - returns `LOCKED` symbol if locked. or throws. or something.
 * `box.expose(boxlabel, opts): void` unseals the whisper, stores in a private variable and offers it with a public getter on the box. (it's the customer's decision, and if we don't write it some will, but without the guard). On lock, a sentinel symbol is returned in place of the whisper prop
-  - `box.get/set whisper(val)`: accesses private variable #whisper if exposed. returns `LOCKED` symbol if locked. These do not seal -- that happens on `send`
-* `box.seal(whisper)`: uses lease to seal with current props, updating encryptedWhisper
-* `box.reseal(opts)` hydrates, `unseal`s the whisper, then `seal`s it
-* `box.edit({ whisper?, sidecar? }, opts)` Takes up most recent between `edited` and `central`
-  - replaces the sidecar (if given)
-  - seals the whisper (if given or exposed); otherwise, with opts.reseal, `reseal`s (hydrate, unseal, seal)
+  - `box.get/set whisper(val)`: accesses private variable #whisper if exposed. returns `LOCKED` symbol if locked. These only expose: nothing seals the exposed whisper, as an update seals only the whisper it is given.
+* `box.seal(whisper, sidecar)`: `edit({ whisper, sidecar })`; uses lease to seal with current props, updating encryptedWhisper
+* ~~`box.reseal(opts)` hydrates, `unseal`s the whisper, then `seal`s it~~ retired
+* `box.edit({ whisper, sidecar }, opts)` Takes up most recent between `edited` and `central`
+  - both are required, on `edit`, `send`, `seal` and a dna's `build`: one without both refuses `bad_option` before anything is staged (the Coach, 2026-10-30: "greatly simplifying"). Nothing is carried over from the record in hand, and the exposed whisper is no substitute.
+  - seals the whisper with the sidecar given
   - note: the sidecar will not be bound (not part of the cryptoCtx)
 
 ## Box lifecycle
 
-* Must reseal to update revision YES even if nothing changes, even if only sidecar changes
-* Must reseal to send a sidecar update MAYBE NOT YET
+* Every update reseals: it names a whisper and a sidecar, so a new revision is always sealed, even if nothing changes, even if only the sidecar changes.
+* A sidecar update is sent with its whisper, sealed again, by the same rule.
 * Must be unlocked to seal YES -- impossible even if we wanted
 * Seal on every edit YES, very desirable
   - seals at customer's indicated timeliness

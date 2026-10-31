@@ -1,11 +1,11 @@
-import { VaultError } from '../errors'
+import { type RefusalMeta, VaultError } from '../errors'
 import * as Phrases   from '../phrases'
 
 // == [Vault Throwers]
 
 export const goneError        = () => new VaultError('vault_gone', Phrases.VaultGoneWhileOpening)
 
-export const lockedError      = () => new VaultError('vault_locked', 'The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user through requestCleartext, and call again.')
+export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
 
 export const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStoresThanHeld)
 
@@ -14,5 +14,10 @@ export const behindError      = () => new VaultError('vault_behind', Phrases.Vau
 
 // == [Storable Throwers]
 
-export const notFullError    = () => new VaultError('bad_option', 'The record in hand is not full, so it cannot be sent or opened: hydrate it, or edit a full record in, and call again.')
+export const notFullError        = () => new VaultError('bad_option', Phrases.RecordNotFull)
+
+/** The 'stale_write' of an edit laid over a central that moved meanwhile, its `meta` carrying that central as a 'stale_write' from storage carries what storage holds. */
+export const movedUnderEditError = (meta: RefusalMeta) => new VaultError('stale_write', Phrases.MovedUnderEdit, { meta })
+
+export const alreadyHeldError    = () => new VaultError('bad_option', Phrases.AlreadyHeld)
 // --
