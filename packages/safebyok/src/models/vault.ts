@@ -107,7 +107,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** How long a lease granted this vault lasts: the world's `leaseMillis`, else {@link DefaultLeaseMillis}. */
   get leaseMillis(): number { return this.world.leaseMillis ?? DefaultLeaseMillis }
 
-  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else the proof `proofClosure` answers; with none of them, refuses 'vault_locked'. A lease held past its time locks the vault first. */
+  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else the proof `proofClosure` answers; with none of them, refuses 'vault_locked'. A lease held past its time locks the vault first.
+   * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by calling again.
+   */
   async ensureUnlocked(proofClosure?: AttemptClosure): Promise<Lease> {
     await this.ensureTimely({})
     const held = this.#lease
