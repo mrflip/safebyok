@@ -9,8 +9,9 @@ sprint doc is https://claude.ai/artifact/9kdLTv64qR3Rei7Do3nj9C.
 * Models PR #408 at 4ff14b4b (the base).
 * Thread 1 gate_in_record: filed, #410 at 7c57356c, stacked on #408. Reviewed twice (high), both fixed, nothing significant left.
 * Thread 5 tests_models: filed, #411 at c9d12890, cut from main. Its tests change at the restack (`thread-1-restack-notes.md` on thread 1's branch, plus the describe titles the second review named).
-* Thread 2 vault_unlock: built and reviewed (high, fixed, four significant left), #412 at 61cb93dc, stacked on #410; a rework is running on the branch in `/workspace/byok-vault_unlock`, then a second review.
-* Threads 3, 4, 6 wait on 2, 3, and 4+5.
+* Thread 2 vault_unlock: filed, #412 at c740f161, stacked on #410. Reworked after its first review and reviewed again; one significant finding left (after `goodbye`'s let-go, `lock()` cannot erase the kept lease), carried to thread 3 as its first directive and a TOP row.
+* Thread 3 box_seal: building (opus), cut from c740f161, worktree `/workspace/byok-box_seal`.
+* Threads 4 and 6 wait on 3, and on 4+5.
 
 ## Judgment calls made in YOLO (each also on the sprint doc's Cleanup tab or in Resolved)
 
