@@ -1,26 +1,27 @@
-import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered } from '../../src/shapes/fields'
-import * as FX from '../../src/shapes/fields'
-import { toB64 } from '../../src/crypto'
-import { memoryDeviceDB } from '../../src/device-db'
-import type { KeyDeriver } from '../../src/key-deriver'
-import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
-import { memoryStore } from '../../src/string-store'
-import type { BoxDamaged, BoxRecord, BoxSparse } from '../../src/shapes/box'
-import type { VaultScope } from '../../src/shapes/scopes'
-import type { DeviceRecord, LeaseRecord } from '../../src/shapes/device'
-import { type PasskeyAnswer, type GatedVaultRecord, type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf, type VaultDraft } from '../../src/shapes/vault'
-import type { Vault, VaultSnapshot } from '../../src/vault'
-import { Bank } from '../../src/bank'
-import type { MakeBankOpts } from '../../src/shapes/bank-opts'
-import { localVaultDB } from '../../src/local-vault-db'
-import type { VaultDB } from '../../src/vault-db'
-import { good, valOf } from '../../src/outcome'
-import { VaultError } from '../../src/errors'
-import { Lease, sealLeaseRecord } from '../../src/lease'
-import { registerLeaseGetter } from '../../src/held-lease'
-import { vaultRecordHeldBy } from '../../src/proving'
-import { scriptedRequestCleartext } from './gating'
-import { quietLogger } from './logging'
+import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered }                                                                                                                              from '../../src/shapes/fields'
+import      { type PasskeyAnswer, type GatedVaultRecord, type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, type VaultSparse, type VaultStamp, VaultFormat, vaultSparseOf, type VaultDraft } from '../../src/shapes/vault'
+import      * as FX                                 from '../../src/shapes/fields'
+import      { toB64 }                               from '../../src/crypto'
+import      { memoryDeviceDB }                      from '../../src/device-db'
+import type { KeyDeriver }                          from '../../src/key-deriver'
+import      { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
+import      { memoryStore }                         from '../../src/string-store'
+import type { BoxDamaged, BoxRecord, BoxSparse }    from '../../src/shapes/box'
+import type { VaultScope }                          from '../../src/shapes/scopes'
+import type { DeviceRecord, LeaseRecord }           from '../../src/shapes/device'
+import type { Vault, VaultSnapshot }                from '../../src/vault'
+import      { Bank }                                from '../../src/bank'
+import type { MakeBankOpts }                        from '../../src/shapes/bank-opts'
+import      { localVaultDB }                        from '../../src/local-vault-db'
+import type { VaultDB }                             from '../../src/vault-db'
+import      { good, valOf }                         from '../../src/outcome'
+import      { VaultError }                          from '../../src/errors'
+import      { goneError }                           from '../../src/helpers/throwers'
+import      { Lease, sealLeaseRecord }              from '../../src/lease'
+import      { registerLeaseGetter }                 from '../../src/held-lease'
+import      { vaultRecordHeldBy }                   from '../../src/proving'
+import      { scriptedRequestCleartext }            from './gating'
+import      { quietLogger }                         from './logging'
 
 
 /**
@@ -122,7 +123,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
     locks: 0,
     demandConsistentWith: (thing, opts) => {
       const { madeUnder, lease } = slice
-      if (slice.gone) { throw new VaultError('vault_gone', 'The vault this test holds is gone.') }
+      if (slice.gone) { throw goneError() }
       const sameScope = (thing.applabel ?? madeUnder.applabel) === madeUnder.applabel && (thing.user_id ?? madeUnder.user_id) === madeUnder.user_id && (thing.vaultlabel ?? madeUnder.vaultlabel) === madeUnder.vaultlabel
       if (! sameScope || thing.vault_tok !== madeUnder.vault_tok) { throw new VaultError('vault_remade', 'The vault this test holds was made anew.') }
       if ((thing.gate_epoch ?? madeUnder.gate_epoch) !== madeUnder.gate_epoch || (thing.vault_epoch ?? madeUnder.vault_epoch) > madeUnder.vault_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
