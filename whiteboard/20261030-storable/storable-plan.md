@@ -641,6 +641,35 @@ control." Label `entry_checks`.
 Worker `opus`; review `medium`. Depends on 22 (cut from its tip; 15 and 13 below it reshape the
 same entries). Size: medium.
 
+### 23. The Coach's fingerpaints and Closer Look marks
+
+*Orchestrator, the Coach (2026-10-31):* "I have edited a bunch of places in the base repo, and in
+the closer look; so far ~ 60% of the entries are slop, but easy enough to unwind. The edits in my
+base repo are fingerpaints -- sweep them into whatever cleanup thread, it should be obvious what I
+intend." Label `coach_sweep`.
+* **The fingerpaints:** `whiteboard/20261030-storable/coach-fingerpaints-20261031.patch`, the
+  Coach's uncommitted edits in `/workspace/byok` against main at #390 (helpers.ts, models/box.ts,
+  models-shapes.ts, storable.ts). Port their intent onto the line's tip (the code has moved since
+  #390: #402-#404 and 18): `tattoo` and `tattooProp` exported from `src/helpers.ts`, the local
+  copy gone; `#minted` renamed `#memoizedNextRevision`; `assign(record)` with one argument
+  (`registered_at` moves at birth and over a tombstone: keep that behaviour, judged on the central
+  held before the adopt); `lifePropsOf`/`revisionPropsOf` gone ("FIXME: just use a zod type!!!":
+  take the props by a check's parse); `isTombstone` spelled `am === 'd' || am === 'x'`; `full`,
+  `isFull`, `#isWhole`, `isWholeRecord`, `isTombstoneRecord` as the patch has them, with honest
+  type guards; the `tell` constructor argument gone, a timer's refusal going through
+  `this.listing.tellBadNews` (and the cache save's refusal the same way); the FIXMEs (makeStaged's
+  second argument is a patch, named so; "this doc block is wth" on `settle`) acted on.
+* **The Closer Look marks** (the tab, as the Coach left it when the thread is cut; re-read it
+  then): so far `priorTok()` → `priorRevisionTok()`; `settle` calls `#cacheOnDevice` (thread 22's
+  `#saveCopy`, renamed); `ensureReadyToSend` / `demandReadyToSend` restored on `Storable` ("more
+  readable to have its own -- and it means the conditions are established from the start");
+  doc blocks rewritten for the whisper getter and setter, `expose` (from the spec), `edit`,
+  `demandReadyToUnsealWhisper` (the Coach's text: "throws unless unlocked with a full healthy
+  record -- refuses 'absent_box', 'needs_fetch' or 'vault_locked'"; `needs_fetch` is no refusal
+  kind today: say what `demandFull` refuses, and raise it) and `demandReadyToSeal` ("throws
+  unless unlocked ('vault_locked')"). `namesBoth` → abstract `isFullPatch` went to thread 18.
+Worker `opus`; review `medium`. Depends on 18 (cut from its tip). Size: medium.
+
 ### 19. A rollback, thrown
 
 *Orchestrator, the Coach (2026-10-31), on #388's stuck-device row:* "There's nothing we can do
@@ -676,7 +705,7 @@ and a test shows another vault's change is never pushed. A record under another 
 arrives anyway is still refused at once ("it can only be the residue of failing to delete"). Survey the other
 paths where an older or absent answer meets a live central (a fetch's `get`, a notice) and what
 each does today; change none of them, list them in the thread file for the Coach. Worker `opus`;
-review `medium`. Depends on 18 (cut from its tip). Size: small to medium.
+review `medium`. Depends on 23 (cut from its tip). Size: small to medium.
 
 ### 20. A draft carried onto a tombstone
 
@@ -710,12 +739,12 @@ Worker `sonnet`; review `medium`. Depends on 19 (cut from its tip). Size: small.
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 21 (TestableBox) before 13, then 22 (settle saves to the cache), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 21 (TestableBox) before 13, then 22 (settle saves to the cache), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31), 23 (the Coach's fingerpaints) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
