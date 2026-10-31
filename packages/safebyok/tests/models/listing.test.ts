@@ -1074,7 +1074,7 @@ const PutCells = [
   [aliveRow,   'rev-other', 2, { refused: 'stale_write', carrying: aliveRow },   "refuses 'stale_write' over a row under another tok, carrying it"],
   [goneRow,    null,        0, { refused: 'stale_write', carrying: goneRow },    "refuses 'stale_write' with no prior tok over a tombstone, which is a row, carrying it"],
   [null,       'rev-a1',    2, { refused: 'stale_write', carrying: undefined },  "refuses 'stale_write' over no row where a prior tok is given, carrying nothing"],
-  // inconsistent, a put no device of this package makes:
+  // inconsistent, a revision unfit for the prior tok or the row under it:
   [null,       null,        1, { refused: 'bad_record', carrying: undefined },   "refuses 'bad_record' no prior tok with a revision other than 0"],
   [aliveRow,   null,        2, { refused: 'bad_record', carrying: undefined },   "refuses 'bad_record' no prior tok with a revision other than 0 over a row, ahead of the stale_write"],
   [aliveRow,   'rev-a1',    0, { refused: 'bad_record', carrying: undefined },   "refuses 'bad_record' a prior tok with revision 0"],
