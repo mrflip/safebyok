@@ -597,10 +597,16 @@ impossible situation unless it's by deliberate user action i.e. a backup. I thin
 rollback_error -- lmk if I'm confused". Label `rollback_thrown`.
 When storage answers a put or a del with `stale_write` carrying a row older than central
 (`cmpRevisions`), or carrying nothing while central is held alive (the #388 review's purged row),
-the listing throws the rollback kind to the put/del caller, and a background launch tells
-`onBadNews`. Nothing is adopted and central is kept. The kind is the Coach row on its name
-(*rollback_error* does not exist; the row's Rec: a new bad-news kind `box_behind`, beside
-`vault_behind`); if that row is still open at the cut, use its Rec and say so. Survey the other
+the listing throws `box_behind` to the put/del caller, and a background launch tells
+`onBadNews`. Nothing is adopted and central is kept. *Ruled (the Coach, 2026-10-31):* "box_behind
+matches the observation, and the error can name a likely cause -- this shouldn't happen unless the
+data was modified or restored to an earlier point, and there's no way for us to decide among panic
+(Hackers!), roll back (the data is presumably otherwise sound) or somehow apply the current state
+as an edit to the rolled back data -- the customer can do so, we cannot". So: a new bad-news kind
+`box_behind` in `refusalKindVals`, beside `vault_behind`, with its family in
+`RefusalFamilyForKind` and an entry in the package README's *Errors* section; its message names
+the likely cause and says the customer, not the device, chooses among those three. The kind list
+is exported: the changeset says a host may now meet `box_behind`. Survey the other
 paths where an older or absent answer meets a live central (a fetch's `get`, a notice) and what
 each does today; change none of them, list them in the thread file for the Coach. Worker `opus`;
 review `medium`. Depends on 18 (cut from its tip). Size: small to medium.
