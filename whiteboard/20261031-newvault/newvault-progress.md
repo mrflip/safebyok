@@ -26,12 +26,14 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 
 `missing-functionality.md` (sonnet, 2026-10-31): no Bank, no host entry point, no snapshot content for React, no gating reason, no strength check, no gate-epoch voiding or rollback guard, no vault deletion, no limits. Its first five: Bank; snapshot content; gating reason and strength; gate-epoch voiding and the rollback guard; the deviceDB friend and lease options. Thread 6 pins "the vault locks when a received record's gate differs" meanwhile.
 
-## Thread 1 taught (gate_in_record, PR #410)
+## Thread 1 taught (gate_in_record, PR #410, after its rework, tip 7c57356c)
 
-* A draft vault is held first with `gate: null`, then `vault.buildGate(proofClosure)` edits the gate in. A patch's `gate` is taken only while the vault has no gate; later gate changes belong to the gate verbs (threads 2 and 4).
-* `vault.leaseDBFriend()` answers `{ logger, tryGetLease, tryPutLease, tryDelLease }` as arrows bound to the vault's scope; `VaultWorld` carries `keyDeriver`, `device_id`, `leaseMillis`, `deviceDB`, `scope`, `logger`. Thread 2 reads `leaseMillis` from the world.
-* `edit` demands a full record and `send` refuses a gateless vault: a failed proof closure leaves a held, gateless vault that `buildGate` may be called on again; `build(dna)` a second time refuses as already held.
-* `vault.gate` is a prototype getter, so a Vault passed where its record is expected fails `vaultRecord`; nothing does that today.
+* `vaultRecord.gate: GateProps` is required (nested, `passphrase_wayin`, `passkey_wayin | null`); `vaultSparse` has none. `VaultListing.build(dna, proofClosure)` first refuses a scope already held, then drafts the sparse record, builds the gate from the draft's stamp (`Gate.build(MSX.vaultStamp.parse(draft), proofClosure, world)`) and holds `{ ...draft, gate }` through the base `Listing`'s `protected holdDraft(draft)`. `build(record, proofClosure)` refuses the closure. So `vault.gate: Gate` is never null; the getter throws `'bad_option'` on a sparse or tombstone record in hand (hydrate first), and is rebuilt when the record's `gate` object changes identity (every receive after a send).
+* `Proving` and `Gate` adorn `stamp: VaultStamp`, not the vault: `makeProvingPair(stamp, proofClosure, world)`, `PassphraseProving.make(stamp, world, passphrase)`, `PasskeyProving.make(stamp, world, answer)`, `new Gate(stamp, props)`. `Proving.makeLease(vault, dbfriend, opts)` takes the vault at the grant and refuses `leaseOfOtherVault` (`bad_option`) when the vault's stamp disagrees with the proving's, before any key is unwrapped. Inside `Gate.build` no vault exists, so the lease at birth is granted by `VaultListing.build` after holding the vault (thread 2).
+* `makeStaged()` takes no patch for the gate: an edit composes `{ ...base, gate: this.#demandedFull().gate }`; `vaultPatch` admits no `gate`, so a host's patch cannot carry one. `ensureReadyToEdit` fetches the full record when the vault is held sparse. A gate change goes through a private path (threads 2 and 4), never `vault.edit`.
+* `vault.leaseDBFriend()` answers `{ logger, tryGetLease, tryPutLease, tryDelLease }` as arrows bound to the vault's scope; `VaultWorld = ListingWorld & ProvingWorld & { scope, logger, leaseMillis, deviceDB }`. Checkers: `vaultBuildArgs`, `provingPairArgs`/`provingMakeArgs` (field `stamp`).
+* `Vault.#demandedFull()` is a typed re-implementation of `Storable.demandFull()`; `box.ts` wants the same (thread 2 hoists it into `Storable`). Two overlapping `build(dna, …)` calls both run their closures; left (rule 6).
+* `thread-1-restack-notes.md` on the thread's branch lists every call thread 5's tests change at the restack; the second review adds the describe titles (`proving.test.ts` 33, 117, 265; `gate.test.ts` 18, 63) and `proving.test.ts:48`.
 
 ## Rulings, 2026-10-31 (Open Matters, first sweep)
 
@@ -54,7 +56,7 @@ Filed from the Coach's planning checkout: PR [#408](https://github.com/mrflip/sa
 
 ## Thread 1's review taught (PR #410, tip b985fb5d)
 
-* A vault held sparse reads `gate` as null until `edit` hydrates, so anything that judges the gate must hydrate first (`ensureReadyToEdit()`); the rework removes the case, but thread 2's `#unlock` should still take the gate from the record in hand after a hydrate.
+* A vault held sparse has no gate to read until it hydrates: thread 2's `#unlock` hydrates (`ensureReadyToEdit()` or a fetch) before reading `vault.gate`, which throws `'bad_option'` on a sparse record in hand.
 * The public patch must not carry the gate: `edit({ gate })` would store wayins no passphrase proved. Thread 4's gate verbs stage a new gate through a private path, never `vault.edit`.
 * `vault.gate` is rebuilt when the record's `gate` object changes identity (every receive after a send): a held `Gate` goes stale across a send. Thread 2 keys by content or rebuilds on settle if it holds one.
 
