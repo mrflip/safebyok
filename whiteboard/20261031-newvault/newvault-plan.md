@@ -5,7 +5,7 @@
 * **At once**: 3 threads.
 * **Spec**: `whiteboard/20261030-newvault/newvault-spec.md` (the design, one day older than this sprint's folder; the two folders share the name on purpose). The storable spec is `whiteboard/20261028-storable_base/storable-spec.md`.
 * **Base**: every code thread stacks on the models PR, branch `20261031-newvault_models` (the Lease, Wayin, Proving, Gate, `Vault.lock()` and their shapes, filed from the Coach's planning checkout). Its PR number and tip are in the progress document once filed.
-* **Status**: running. Models PR #408 at `4ff14b4b` (amended: the lease takes two stamps, no key handles out); threads 1 and 5 building on it; the gap review is in `missing-functionality.md`.
+* **Status**: running. Models PR #408 at `4ff14b4b`. Thread 5 filed (#411 at c9d12890). Thread 1 reviewed (fixed, #410 at b985fb5d) and in rework so the gate is never null; a second review and its filing follow, then thread 2 is cut from its tip. Threads 3, 4 and 6 wait.
 
 ## Read first
 
@@ -70,7 +70,7 @@
 
 *Built* (PR #411, tip 24873535): 159 model tests in `tests/models/`, thirteen loosened pins in `tests/loosened/lease.test.ts` and `tests/loosened/proving.test.ts` (a file per model, as the Coach asked), the shared fakes in `tests/test-helpers/proving-world.ts` (not `tests/models/`), backdoor `_cheat_vaultKeyBytesOf`. The worker compacted once, early.
 
-*Review (medium, fixed, tip c9d12890):* four fixes (the backdoor refuses a kind mix-up; `keptOf` inlined per the no-coined-verbs ruling; `provingPairOf` → `makeProvingPair`; `ArgsCases` builds per test) and six style commits; nothing significant left; eleven minor in the PR comment. All thirteen pins pass for their titled reason; key bytes leave only through the loud backdoor, never logged. Filed from c9d12890.
+*Review (medium, fixed, tip c9d12890):* four fixes (the backdoor refuses a kind mix-up; `keptOf` inlined per the no-coined-verbs ruling; `provingPairOf` → `makeProvingPair`; `ArgsCases` builds per test) and six style commits; nothing significant left; eleven minor in the PR comment. All thirteen pins pass for their titled reason; key bytes leave only through the loud backdoor, never logged. **Filed** at c9d12890 (PR #411, as cut on 4ff14b4b, base main).
 
 ### Thread 6: tests_vault_box
 
