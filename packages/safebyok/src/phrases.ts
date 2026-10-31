@@ -305,7 +305,7 @@ export const OtherVaultTokAtBirth = "Storage gave a record under another vault_t
 export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
 
 /** Why a put whose `revision_seq` does not fit the `revision_tok` it is laid over is refused, by this device before it is sent or by storage. */
-export const PutUnfitForPrior = "A put's revision_seq does not fit the record it is laid over: revision 0 goes over no record, and each later revision over the record at the revision before it, named by its revision_tok. This package never makes such a put, so the record handed in is not one it built."
+export const PutUnfitForPrior = "A put's revision_seq does not fit the record it is laid over, so nothing was stored: revision 0 goes over no record, and each later revision over the record at the revision before it, named by its revision_tok. An edit mints the revision that fits: put the record an edit staged, not one as it was received or made elsewhere."
 
 /** Why an answer for one scope that was asked for another is not taken in. */
 export const AnswerOfOtherScope = "Storage answered for a scope other than the one asked, so nothing was made or changed of the answer: a bug in the storage adapter, which should answer each call about the scope it is given."
