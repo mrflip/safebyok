@@ -9,7 +9,7 @@
 * **Base:** every thread stacks on #368 (`20261030-storable_base`, draft), which holds
   `src/models/` and the spec. Thread 1 is cut from `origin/20261030-storable_base`.
 * **Sprint doc:** https://claude.ai/artifact/Hup5kM2KFxxbXHDcR76wKB
-* **Status:** restacked onto main ce0e96e0 (#374 and #370 now inside #368); filed through #390 (thread 15); thread 21 (TestableBox) building on it; then 13, 18, 19, 20, then 6.
+* **Status:** restacked onto main ce0e96e0 (#374 and #370 now inside #368); filed through #390 (thread 15); thread 21 (TestableBox) building on it; then 13, 22, 18, 19, 20, then 6.
 
 ## Read first
 
@@ -580,6 +580,26 @@ setter). **Hands off:** cutting off access to the private value while locked (th
 have to look at it later"); the setter is documented as it is. Worker `opus`; review `high` (the
 whisper is secret material: no side door, CLAUDE.md). Depends on 21 (cut from its tip; 15 below it). Size: small to medium.
 
+### 22. `settle` saves to the cache itself
+
+*Orchestrator, the Coach (2026-10-31), on #389's keepCopy row:* "I'm fine with settle caching.
+Have it talk right to the DeviceDB. Don't implement anything yet to read it back, unless you have
+already. If the listing is also doing its own cache of the boxes themselves: - if they are doing
+it naturally, not using the snapshot and not using some backdoor constructed for the purpose,
+leave it. - if there are contraptions that exist only so that the listing can have a duplicate (or
+anything else giving unreasonable access) please disclose. It's reasonable for the listing to
+cache what it owns: the scopes (or scope paths) of its contents, and its own metadata; probably
+facts about its world so it can be reconciled." Label `settle_saves`.
+`Storable#settle` saves its own cacheable to the device cache (the listing's `Cache`, handed to the
+storable at construction as the world and listing are), at every settle: edits, receives, `del`,
+and construction, a revive included. `[MSX.KeepCopy]`, the listing's `#copies` and its
+`settle(scope)` save go; the listing keeps `#things` and its snapshot. A save that refuses is bad
+news (`tell`), never thrown into the verb that settled; `settle` does not await it. Reading back
+is `hello`'s load, as now: nothing new. Tests about the cache assert on `callsOf('save')` and
+`lastSaveOf`, now at every settle; restore the frozen-copy-after-edit assertion #402 lost. The
+spec says the storable saves itself. Worker `opus`; review `medium`. Depends on 13 (cut from its
+tip). Size: small to medium.
+
 ### 18. Validators at every entrypoint
 
 *Orchestrator, the Coach (2026-10-31, in chat):* "would you have a thread put zod validators at
@@ -600,10 +620,15 @@ control." Label `entry_checks`.
    sealed fields), which must pass validation when given and are stripped. A scope field given
    that names another box refuses `bad_option`. Thread 15's whisper-and-sidecar rule becomes part
    of these checks where it fits; say so in the thread file.
-4. Tests: one per entry for a bad argument, and for `edit` and `send` a round-trip of
+4. **Argument checks first** (the Coach, 2026-10-31: "validate preconditions first of all, because
+   those are always programmer mistakes. You don't want to have to create an unlocked scenario --
+   which might lead to coincidental values. Point being: arg checks first"): every entry checks
+   its arguments before any guard (lock, presence, hydrate); `build` parses its dna before its
+   lock check (today it refuses `vault_locked` first), as `edit` already does.
+5. Tests: one per entry for a bad argument, and for `edit` and `send` a round-trip of
    `{ ...box.snapshot-or-record, whisper, sidecar }` with factory fields given and stripped.
-Worker `opus`; review `medium`. Depends on 13 (cut from its tip: 15 and 13 reshape the same
-entries). Size: medium.
+Worker `opus`; review `medium`. Depends on 22 (cut from its tip; 15 and 13 below it reshape the
+same entries). Size: medium.
 
 ### 19. A rollback, thrown
 
@@ -631,7 +656,13 @@ box), not `stale_write` carrying nothing; its `meta` carries the revision put, t
 stored (none) and the `priorTok` expected. The fake follows; the spec table's
 "`stale_write`, carrying nothing ❓" cell names it. A device holding central alive turns that
 refusal into `box_behind` (above); one holding a tombstone or nothing keeps today's behaviour,
-named in the thread file. The `StaleBoxMessage` mismatch on *Cleanup* goes with it. Survey the other
+named in the thread file. The `StaleBoxMessage` mismatch on *Cleanup* goes with it.
+*And (the Coach, 2026-10-31):* "Do our subscriptions limit to only their vault_tok? They should."
+They don't today: `Store.watch(onNotice, fullFor)` names scopes, which carry no `vault_tok`, so
+another vault's notice arrives and is refused `unexpected_error` as bad news. `Store.watch`
+names the listing's `vault_tok` and storage pushes only that vault's records; the fake follows,
+and a test shows another vault's change is never pushed. A record under another `vault_tok` that
+arrives anyway is still refused at once ("it can only be the residue of failing to delete"). Survey the other
 paths where an older or absent answer meets a live central (a fetch's `get`, a notice) and what
 each does today; change none of them, list them in the thread file for the Coach. Worker `opus`;
 review `medium`. Depends on 18 (cut from its tip). Size: small to medium.
@@ -668,12 +699,12 @@ Worker `sonnet`; review `medium`. Depends on 19 (cut from its tip). Size: small.
 so the loosened file and every thread file are in its tree. Reads 4a's and 4b's thread files for
 "thread 4", and 7's too.
 **Levels:** worker `opus`; review `none` (no code; the Coach reads the table).
-**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21.
+**Depends on:** 2, 3, 4a, 4b, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22.
 **Size:** small.
 
 ## Order
 
-*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 21 (TestableBox) before 13, then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
+*Orchestrator (2026-10-30, resumed):* the line is main → #368 → #374 → 1 → 4a → 2 → 5 → 7 → 4b → 3, then 8, 9 and 10 in a chain on top (each touches `listing.ts`), then 14 (build seals: the Coach's blocker), then 11, 12, 16, 17, 15, 13 (the Coach's rulings of the evening: `listing.ts`, then `box.ts` three times; 13's whisper object rides 14's seal and 15's rule), then 21 (TestableBox) before 13, then 22 (settle saves to the cache), then 18 (validators at every entrypoint, the Coach's request of 2026-10-31) and 19 (a rollback, thrown), then 20 (a draft carried onto a tombstone), then 6; thread 16 (the store's versioned replace) runs right after 12. 4b's and 3's reworks build on the line; 8, 9, 10 after them.
 
 
 Thread 1 alone. Once it files: 2, 3 and 4a. As each files: 4b (after 4a), 5, 7. Thread 8 once 3
