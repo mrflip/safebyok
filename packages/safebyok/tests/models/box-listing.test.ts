@@ -645,9 +645,9 @@ describe("boxListing.build(dna): no secret material", () => {
 
 describe("boxListing.build(dna): a whisper and a sidecar, both required", () => {
   const DnaCases = [
-    [{ whisper: undefined },                     ['whisper'],            'a whisper given as undefined'],
-    [{ sidecar: undefined },                     ['sidecar'],            'a sidecar given as undefined'],
-    [{ whisper: undefined, sidecar: undefined }, ['sidecar', 'whisper'], 'neither'],
+    [{ whisper: undefined },                     ["whisper"],            'a whisper given as undefined'],
+    [{ sidecar: undefined },                     ["sidecar"],            'a sidecar given as undefined'],
+    [{ whisper: undefined, sidecar: undefined }, ["sidecar", "whisper"], 'neither'],
   ] as const
 
   for (const [lacks, fieldnames, blurb] of DnaCases) {
