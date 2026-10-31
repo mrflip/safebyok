@@ -557,6 +557,8 @@ describe("box.edit(patch), send and seal: a whisper and a sidecar on every updat
     [{},                                              'neither'],
     [{ whisper: undefined, sidecar: { note: 'x' } },  'a whisper given as undefined'],
     [{ whisper: 'sk-test-0000', sidecar: undefined }, 'a sidecar given as undefined'],
+    [{ whisper: null, sidecar: { note: 'x' } },       'a whisper given as null'],
+    [{ whisper: 'sk-test-0000', sidecar: null },      'a sidecar given as null'],
   ] as const
 
   for (const [patch, blurb] of PatchCases) {
