@@ -65,8 +65,8 @@ const unprovedGateOf = async () => {
 }
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
-const provingOf = async (stamp: { vault_tok: string, registered_at: number }) => {
-  const { passphraseProving } = await Proving.makeProvingPair({ ...Dna, ...stamp }, () => ({ passphrase: Passphrase }), makeVaultWorld().opts.world)
+const provingOf = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
+  const { passphraseProving } = await Proving.makeProvingPair({ ...Dna, vault_tok, registered_at }, () => ({ passphrase: Passphrase }), makeVaultWorld().opts.world)
   await passphraseProving.makeWayin(NOVEL)
   return passphraseProving
 }
