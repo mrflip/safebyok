@@ -28,7 +28,7 @@ export class Lease implements LeaseStamp {
   readonly #vaultStamp: VaultStamp
 
   /** Fires `vault.lock()` at `autolock_at`; disarmed when the lease is forgotten or evicted. */
-  readonly #autolock: Trigger<LeaseSparse, void>
+  readonly #autolock: Trigger<void>
 
   private constructor(vault: LeaseVault, dbfriend: LeaseDBFriend, record: LeaseRecord, intervalMillis: IntervalMillis) {
     this.#record = leaseRecord.parse(record)
@@ -41,7 +41,6 @@ export class Lease implements LeaseStamp {
       clock:          vault.clock,
       intervalMillis,
       eagerFrac:      1,
-      doSnapshot:     () => this.toJSON(),
       doTryLaunch:    () => outcomeOf(() => { this.#autolockNow() }),
       onTimerRefusal: (err) => { dbfriend.logger.warn('The autolock fired, but locking the vault was refused.', { call: 'Lease.autolock', refusalkind: err.refusalkind }) },
     })

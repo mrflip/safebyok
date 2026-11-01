@@ -59,7 +59,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #memoizedNextRevision: { revision: Revision, anteTok: string } | null = null
   /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
-  readonly #trigger: Trigger<SnapshotT, this>
+  readonly #trigger: Trigger<this>
   /** The fetch under way, which every `fetch` made meanwhile joins, resolving whether storage held a record. */
   readonly #oneFetchAtATime = oneAtATime(() => this.doFetch())
   readonly #listeners = new Set<() => void>()
@@ -92,7 +92,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       clock:          world.clock,
       intervalMillis: opts.maxMillisSinceRefresh,
       eagerFrac:      opts.eagerFrac,
-      doSnapshot:     () => this.snapshot,
       // `receive` notes success by its verdict: a record not older, central or the record in hand whole. The next launch is scheduled after any launch that completes.
       doTryLaunch:    () => this.tryFetch({ ifAbsent: 'nil' }),
       onTimerRefusal: (err) => { this.listing.tellBadNews([err]) },

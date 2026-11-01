@@ -100,14 +100,17 @@ thing for good and is what a record is found by (`device_id`, and the `credentia
 `vault_tok` on every life of a vault in its scope, `box_tok` on every life of a box under its
 boxlabel. In code they are `vaultTok`, `boxTok` and `revisionTok`.
 
-**The stamp** is the fields of a record fixed for its life, which are exactly the fields its
-ctx binds: `VaultStamp`, the vault record's `format`, scope, `vault_tok` and `registered_at`;
-`BoxStamp`, every field of a box revision but its two ciphered ones, and its vault's
-`vault_tok`; `LeaseStamp`, a lease record but its key material, `gate_epoch` among it, as a lease
-is granted under one. A thing binds its own stamp and the stamps of what it lies in, but a box
-and a lease bind their vault's without its `format`, so a new vault format leaves them open. An
-epoch moves within a record's life, so it is in no long-lived stamp. Say "stamp" for the bound
-fields, never "the binding" or "the authentics".
+**The stamp** is the fields a thing's ctx binds its ciphertext to, so that it opens under that
+thing and no other. For a vault, a lease and a gate it is the fields fixed for the thing's life:
+`VaultStamp` is the vault's scope, `vault_tok` and `registered_at`; `LeaseStamp` is the lease
+record but its key material, `autolock_at` among them, as a lease is granted for one span. A
+box's stamp is not fixed for its life: `BoxStamp` is every visible field of the one revision it
+seals, `revision_tok`, `revision_seq`, `written_at` and the sidecar included, beside its vault's
+stamp, so a whisper opens only under the very revision it was sealed in, and nothing storage
+splices together opens at all. That is why every edit of a box seals it anew, and why no code
+moves a sealed box to another revision without sealing it again. A thing binds its own stamp and
+the stamps of what it lies in; a vault's stamp carries no `fmt`, so a new vault format leaves its
+boxes and leases open. Say "stamp" for the bound fields, never "the binding" or "the authentics".
 
 **Made under**: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs of the
 vault it was made under (`VaultMadeUnder`), as the vault handed them in when it made the thing,
@@ -196,6 +199,14 @@ The **duckish** of a type is the validator that lets you round-trip an object of
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | **API key**      | A user's credential for some other service, and the usual thing a whisper holds. safebyok never names or inspects it.      |
 | **access token** | Your app's own login credential, which your storage adapter may send to your backend. It never goes into a vault.       |
+
+## Words between Coach and agent
+
+* **fingerpaint.** Comments or edits a Coach leaves in a code file to show a change they want,
+  rather than make it. Where the intent is clear, carry it out, and take the fingerpaint away
+  with the change. A question inside one is a question, not a directive: answer it with the
+  options and a recommendation, and act on it only when you reach a confident conclusion of your
+  own.
 
 ## Words safebyok does not use
 

@@ -688,3 +688,66 @@ export const vaultListingOpts = objCheck(({ obj }) => ({
   world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), deviceDB: leaseDeviceDB }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
+
+// == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, cleartextsForGatingkind, gatingWorld, GatingKind, CleartextsForGatingkind, StrengthChecker
+
+export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey'] as const
+
+export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
+
+export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts } = Checkers('bad_option', ({ oneof, obj, passphraseCleartext, freshPasskeyAnswer }) => ({
+  gatingkind:                  oneof(gatingKindVals),
+  vaultBuildCleartexts:        cleartexts,
+  vaultUnlockCleartexts:       attemptCleartexts,
+  passphraseReplaceCleartexts: obj({ passphrase: passphraseCleartext, nextPassphrase: passphraseCleartext }).strict(),
+  passkeyAddCleartexts:        obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer }).strict(),
+  passkeyRevokeCleartexts:     passphraseCleartexts,
+}), [VX])
+
+export const cleartextsForGatingkind = Object.freeze({
+  build_vault:        vaultBuildCleartexts,
+  unlock_vault:       vaultUnlockCleartexts,
+  replace_passphrase: passphraseReplaceCleartexts,
+  add_passkey:        passkeyAddCleartexts,
+  revoke_passkey:     passkeyRevokeCleartexts,
+} as const)
+
+export const gatingWorld = objCheck(({ fn }) => ({
+  requestCleartext: fn().optional(),
+  strengthChecker:  VX.strengthChecker,
+  logger:           HX.loggerShape,
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+export type GatingKind = typeof gatingKindVals[number]
+
+export type CleartextsForGatingkind = { [KindT in GatingKind]: Z.input<typeof cleartextsForGatingkind[KindT]> }
+
+export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
+// --
+
+// == [The bank's forms]: positiveMinutes, refreshMinutes, bankOpts
+
+export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
+  positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
+  refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
+}))
+
+export const bankOpts = objCheck(({ obj, fn, applabel, user_id, device_id }) => ({
+  applabel,
+  user_id,
+  device_id:           device_id.optional(),
+  vaultStore:          obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
+  vaultCache:          obj({ load: fn(), save: fn() }),
+  deviceDB:            leaseDeviceDB,
+  keyDeriver:          HX.keyDeriverShape,
+  requestCleartext:    fn().optional(),
+  strengthChecker:     VX.strengthChecker.optional(),
+  clock:               HX.clockShape.optional(),
+  logger:              HX.loggerShape.optional(),
+  autolockMinutes:     positiveMinutes.optional(),
+  pesterMinutes:       positiveMinutes.optional(),
+  vaultRefreshMinutes: refreshMinutes.optional(),
+  boxRefreshMinutes:   refreshMinutes.optional(),
+  onBadNews:           fn().optional(),
+}), { refuseAs: 'bad_option' }, [FX])
+// --
