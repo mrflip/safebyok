@@ -109,7 +109,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   readonly #leaseMutex = new Mutex()
 
   /** Each lock and let-go counts here, so an unlock or a look begun before one takes up no lease after it. */
-  #lockSeq = 0
+  #lockSeq = BirthLockSeq
 
   /** The look for the lease this device keeps in flight, which a look begun meanwhile joins; null once it settles, or a lock or let-go overtakes it. */
   #cachedLookup: Promise<Lease | null> | null = null
