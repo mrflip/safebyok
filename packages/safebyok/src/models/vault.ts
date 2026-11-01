@@ -93,7 +93,8 @@ const UnkeptBoxCache: BoxCache = Object.freeze({ load: () => Promise.resolve([])
  * `vault_tok`, so a new instance, built by the listing.
  *
  * Each change of the gate moves `gate_epoch`, and a move voids the lease held under the epoch
- * before. This device's own change stays unlocked, under a new lease from the change's own proof.
+ * before. One received from another device locks the vault; this device's own change stays
+ * unlocked, under a new lease from the change's own proof.
  *
  * It asks the user one thing at a time. A gated verb called while a gating of its kind is
  * launched joins that gating, sharing its outcome; one of another kind waits until it settles.
@@ -654,7 +655,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Required by Storable]: isFullRecord, isFullPatch, makeStaged, lifeTokPathOf, makeSnapshot
+  // == [Required by Storable]: adopt, isFullRecord, isFullPatch, makeStaged, lifeTokPathOf, makeSnapshot
+
+  /** As the base does; a vault unlocked locks on a `gate_epoch` moved by anything but its own staged change, which takes its new lease in `#sendGate`. */
+  protected override adopt(central: Fetched<VaultRecord, VaultSparse>, staged: Fetched<VaultRecord, VaultSparse> | null): void {
+    const isMovedElsewhere = central.gate_epoch !== this.gate_epoch && central.revision_tok !== this.staged?.revision_tok
+    super.adopt(central, staged)
+    if (isMovedElsewhere && this.isUnlocked) { this.lock() }
+  }
 
   /** A full vault record is one alive that carries its `gate`; a sparse one or a tombstone is not. */
   protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord {

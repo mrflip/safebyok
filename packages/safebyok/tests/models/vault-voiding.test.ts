@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/errors'
-import { type LeaseRecord, FirstGateEpoch } from '../../src/models/models-shapes'
+import type { Gating } from '../../src/models/gating'
+import { type LeaseRecord, type VaultRecord, FirstGateEpoch } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
-import { type VaultTestWorld, NewPassphrase, Passphrase, answerAtOnce, byPassphrase, makeBornVault, makeBornVaultWithPasskey, moveGateElsewhere, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
+import { type VaultTestWorld, NewPassphrase, Passphrase, answerAtOnce, byPassphrase, holdNextDialog, makeBornVault, makeBornVaultWithPasskey, moveGateElsewhere, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -86,6 +87,68 @@ describe("a change of the gate on this device", () => {
     expect(vault.gate_epoch).to.eq(FirstGateEpoch + 1)
     expect(vault.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.be.null
+  })
+})
+
+describe("a change of the gate from elsewhere", () => {
+  const HearingCases = [
+    ['a fetch', async ({ vault }) => { await vault.fetch() }],
+    ["the full record, as a box's answer carries it", ({ vault }, stored) => { vault.takeWorld(stored) }],
+    ['a sparse notice', ({ vault, listing }, stored) => { vault.receive(listing.sparseOf(stored)) }],
+  ] as const satisfies readonly (readonly [string, (born: Awaited<ReturnType<typeof makeBornVault>>, stored: VaultRecord) => unknown])[]
+
+  for (const [blurb, hear] of HearingCases) {
+    it(`heard through ${blurb}, locks a vault unlocked, its lease refusing 'gate_moved' and the lease kept erased`, async () => {
+      const born = await makeBornVault()
+      const { vault, deviceDB } = born
+      const held = vault.demandLease()
+      await hear(born, await moveGateElsewhere(born))
+      expect(vault.gate_epoch).to.eq(FirstGateEpoch + 1)
+      expect(vault.isLocked).to.be.true
+      expect(held.isInForce).to.be.false
+      await TH.expectRefusal(roundTrip(held, held), 'gate_moved')
+      await TH.eventually(() => deviceDB.cachedNow() === null)
+    })
+  }
+
+  it("asks again, and only the new passphrase opens", async () => {
+    const born = await makeBornVault()
+    const { vault } = born
+    await moveGateElsewhere(born)
+    await vault.fetch()
+    await TH.expectRefusal(vault.ensureUnlocked(byPassphrase(Passphrase)), 'wrong_passphrase')
+    expect(vault.isLocked).to.be.true
+    const lease = await vault.ensureUnlocked(byPassphrase(NewPassphrase))
+    expect(lease.gate_epoch).to.eq(FirstGateEpoch + 1)
+    expect(lease.isInForce).to.be.true
+  })
+
+  it("ends a gating open on a vault unlocked, as any lock does", async () => {
+    const born = await makeBornVault()
+    const { vault, requestCleartext } = born
+    const dialog = holdNextDialog(requestCleartext)
+    const adding = vault.addPasskey()
+    await dialog.gating
+    await moveGateElsewhere(born)
+    await vault.fetch()
+    await TH.expectRefusal(adding, 'declined')
+    dialog.close()
+  })
+
+  it("leaves a gating open on a vault locked: the user's next answer proves against the new gate", async () => {
+    const born = await makeBornVault()
+    const { vault, requestCleartext, deviceDB } = born
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const dialog = holdNextDialog(requestCleartext)
+    const unlocking = vault.ensureUnlocked()
+    const gating = await dialog.gating as Gating<'unlock_vault'>
+    await moveGateElsewhere(born)
+    await vault.fetch()
+    await gating.attempt(byPassphrase(NewPassphrase))
+    const lease = await unlocking
+    expect(lease.gate_epoch).to.eq(FirstGateEpoch + 1)
+    dialog.close()
   })
 })
 
