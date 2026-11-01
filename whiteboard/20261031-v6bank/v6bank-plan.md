@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** new race-condition work is paused on the Coach's word (2026-11-01, ground rule 13) until they assess Open Matters and the Closer Look. 5b filed. 7b (voiding) and 7c (bad news, sign-out, narrowed) are wrapping up. 7d is held whole. Then 8, 10 and 12, with their race carries held; then 11.
+* **Status:** new race-condition work is paused on the Coach's word (2026-11-01, ground rule 13) until they assess Open Matters and the Closer Look: "leave anything done, it's fine and I don't want churn confusing your context. This is a pause not a cancel." 5b filed. 7b and 7c are in review, and file as they stand, with their separate commits left in. 7d and the race carries wait, as do 8, 10 and 12, for the Coach's word.
 
 ## Read first
 
@@ -392,7 +392,7 @@ G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S
 >
 > (From 4b) Sign-out (storage says the user is no longer signed in) closes the vaults.
 
-*Gloss.* `bank.ts`, `listing.ts`, `vault-listing.ts`, `store-front.ts`. *Orchestrator, carried here:* signed-out arrives as bad news of kind `identity_revoked` (thread 6): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). `onChange` floods bad news (#429 review). Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. Read `wroteOverDamaged` in `Bank.#keepDeviceRecord` and tell the reset as bad news (5b). *Withdrawn under ground rule 13:* `closeVaults` landing wherever `closeVault` does (sibling races 1, 2) and a guard on `goodbye` during `hello` (race 4) are not built; rows wait on the Coach. `onChange`'s flood only if it is simple. **Levels:** worker high effort; review `high` (it reads 5b's conflict resolutions too). **Depends on:** 5b. **Size:** M.
+*Gloss.* `bank.ts`, `listing.ts`, `vault-listing.ts`, `store-front.ts`. *Orchestrator, carried here:* signed-out arrives as bad news of kind `identity_revoked` (thread 6): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). `onChange` floods bad news (#429 review). Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. Read `wroteOverDamaged` in `Bank.#keepDeviceRecord` and tell the reset as bad news (5b). *Under ground rule 13:* `closeVaults` landing wherever `closeVault` does (sibling races 1, 2) and a guard on `goodbye` during `hello` (race 4) were finished before the pause reached the worker; they stay in, as separate commits, on the Coach's "leave anything done". `onChange`'s flood only if it is simple. **Levels:** worker high effort; review `high` (it reads 5b's conflict resolutions too). **Depends on:** 5b. **Size:** M.
 
 ### 7d. lost_build
 
