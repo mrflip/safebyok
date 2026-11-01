@@ -16,7 +16,7 @@ import      { localVaultDB }                        from '../../src/local-vault-
 import type { VaultDB }                             from '../../src/vault-db'
 import      { good, valOf }                         from '../../src/outcome'
 import      { VaultError }                          from '../../src/errors'
-import      { goneError }                           from '../../src/helpers/throwers'
+import * as RefusalFuncs                            from '../../src/helpers/refusal-funcs'
 import      { Lease, sealLeaseRecord }              from '../../src/lease'
 import      { registerLeaseGetter }                 from '../../src/held-lease'
 import      { vaultRecordHeldBy }                   from '../../src/proving'
@@ -123,7 +123,7 @@ export const leasedSliceOf = async (user_id: string, vaultKey: CryptoKey, overri
     locks: 0,
     demandConsistentWith: (thing, opts) => {
       const { madeUnder, lease } = slice
-      if (slice.gone) { throw goneError() }
+      if (slice.gone) { throw RefusalFuncs.vaultGoneWhileOpening() }
       const sameScope = (thing.applabel ?? madeUnder.applabel) === madeUnder.applabel && (thing.user_id ?? madeUnder.user_id) === madeUnder.user_id && (thing.vaultlabel ?? madeUnder.vaultlabel) === madeUnder.vaultlabel
       if (! sameScope || thing.vault_tok !== madeUnder.vault_tok) { throw new VaultError('vault_remade', 'The vault this test holds was made anew.') }
       if ((thing.gate_epoch ?? madeUnder.gate_epoch) !== madeUnder.gate_epoch || (thing.vault_epoch ?? madeUnder.vault_epoch) > madeUnder.vault_epoch) { throw new VaultError('gate_moved', "The vault's ways in moved.") }
@@ -495,7 +495,7 @@ export const deleting = (revisionTok: string | null) => ({ vault_tok: 'vault-tok
 /** A shape-valid DeviceRecord for device-storage tests: `user_id`'s `main` vault, its device `device-one`, having seen `vault_epoch` 1.
  * Any field as `overrides` says otherwise.
  *
- * @example await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
+ * @example await deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1'))
  * @example TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })    // a device that has seen the vault at epoch 3
  */
 export const deviceRecordOf = (user_id: string, overrides: Partial<DeviceRecord> = {}): DeviceRecord => ({

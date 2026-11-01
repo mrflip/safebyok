@@ -40,7 +40,7 @@ export const useWhenShown = (): { whenShown: WhenShown, isShown: () => boolean }
     return () => { shown.current = false }
   }, [])
   // `goOn` is called in the same turn while shown, never after an await: a host awaiting the call
-  // the handler awaited would run first, and could raise another gating before hearing an answer.
+  // the handler awaited would run first, and could launch another gating before hearing an answer.
   // Asked again once woken: the commit that showed the component can hide or unmount it again,
   // by a layout effect's update, before the woken handler's turn comes.
   const whenShown = useCallback(async <ValT>(goOn: () => ValT): Promise<Awaited<ValT>> => {

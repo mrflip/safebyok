@@ -27,7 +27,7 @@ describe("delDamagedVault", () => {
   it("says the device store failing as it clears this device as 'storage_unavailable', naming what failed, the vault already deleted", async () => {
     const world = await damagedVaultWorld()
     const trouble = new Error('device storage is unavailable')
-    TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'incrementDeviceRecord').mockRejectedValueOnce(trouble)
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'storage_unavailable')
     expect(err.message).to.match(/writing its record of this vault/)
     expect(err.cause).to.be.undefined

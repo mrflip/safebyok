@@ -168,11 +168,11 @@ describe("mask", () => {
     for (const script of RtlScripts) {
       it(`keeps the letters and numbers of ${script}`, () => {
         const letters = rtlLettersOf(script)
-        const keptChars = (letters.match(/./gsu) ?? []).filter((chr) => chr.normalize('NFC') === chr && ! Unsafe.test(chr))
-        const kept = keptChars.join('')
-        expect(keptChars.length).to.be.greaterThan(0)
-        expect(mask(kept, { head: 1000, tail: 1000, minStars: 0, maxLen: Infinity })).to.eq(kept)
-        expect(mask(`sk-${kept}abcd1234`, { head: 3, tail: 4, minStars: 0, maxLen: Infinity })).to.eq(`sk-${'*'.repeat(keptChars.length + 4)}1234`)
+        const unmaskedChars = (letters.match(/./gsu) ?? []).filter((chr) => chr.normalize('NFC') === chr && ! Unsafe.test(chr))
+        const unmasked = unmaskedChars.join('')
+        expect(unmaskedChars.length).to.be.greaterThan(0)
+        expect(mask(unmasked, { head: 1000, tail: 1000, minStars: 0, maxLen: Infinity })).to.eq(unmasked)
+        expect(mask(`sk-${unmasked}abcd1234`, { head: 3, tail: 4, minStars: 0, maxLen: Infinity })).to.eq(`sk-${'*'.repeat(unmaskedChars.length + 4)}1234`)
       })
     }
   })
