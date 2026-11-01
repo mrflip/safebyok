@@ -91,7 +91,7 @@ export abstract class DeviceDB {
 
   // == [Cached vaults]: findCachedVaults, putCachedVault, vaultCache, clearCachedVault, their try forms
 
-  /** Every vault copy this device keeps of a bank's scope, as stored. A row filed under another scope than its own is erased and left out; the listing judges the rest at its hello. */
+  /** Every vault copy this device keeps of a bank's scope, as stored. A row that is no copy, or a copy filed under another scope than its own, is erased and left out; the listing judges the rest at its hello. */
   async findCachedVaults(scope: BankScope): Promise<readonly VaultCacheable[]> {
     const prefix = Scopepath.withinBankScopepathPrefix(scope)
     const found = await storeAnswer('findCachedVaults', () => this.doFind(prefix))
