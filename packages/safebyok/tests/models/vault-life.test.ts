@@ -189,6 +189,17 @@ const openOtherDevice = async (stored: VaultRecord) => {
 }
 
 describe("Another device, over the same vaultDB and boxes", () => {
+  it("opens a box sealed before the gate moved elsewhere, once the next passphrase unlocks: voiding a lease does not touch what its vaultKey sealed", async () => {
+    const { vault, demandStored, storeBehindOurBack, unsealIn } = await makeVaultWithBox()
+    const other = await openOtherDevice(demandStored())
+    await other.vault.replacePassphrase({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
+    storeBehindOurBack(other.demandStored())
+    await vault.fetch()
+    expect(vault.isLocked).to.be.true
+    await vault.ensureUnlocked(byPassphrase(NewPassphrase))
+    expect(await unsealIn(vault)).to.deep.equal(Whisper)
+  })
+
   it("asks the other device for the passphrase, though this one keeps a lease; unlocked, it keeps a lease of its own and opens the box this device sealed, and this device's lock() leaves it unlocked", async () => {
     const { vault, unsealIn, demandStored, deviceDB } = await makeVaultWithBox()
     const other = await openOtherDevice(demandStored())

@@ -116,7 +116,8 @@ boxes and leases open. Say "stamp" for the bound fields, never "the binding" or 
 and refuses `gate_moved` once its vault's `gate_epoch` is another; `Lease.get` erases a kept lease
 under another epoch and answers null. The epoch binds in that one ctx, the wrap of the lease's
 vaultKey: a box, a wayin and a gate bind the vault's stamp alone, as the vaultKey outlives every
-gate. A change of the gate on this device takes a new lease from the change's own proof. The old surface (`src/*.ts` outside `models/`) has its own form of
+gate. A change of the gate on this device takes a new lease from the change's own proof; one heard
+from elsewhere locks the vault. The old surface (`src/*.ts` outside `models/`) has its own form of
 this until it goes: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs it was
 made under (`VaultMadeUnder`), and `vault.demandConsistentWith(thing)` compares them with the vault
 record: the vault gone (`vault_gone`), another life (`vault_remade`), another gate (`gate_moved`).
