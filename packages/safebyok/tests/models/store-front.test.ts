@@ -205,9 +205,9 @@ describe("StoreFront's store: delUnparsed", () => {
 describe("StoreFront's storage trouble", () => {
   it("rejects with a hook's refusal as it came, and anything else as 'storage_unavailable'", async () => {
     const store = memoryStore()
-    const front = localStoreFront({ store: { ...store, get: () => { throw new Error('disk on fire') } } })
+    const front = localStoreFront({ store: { ...store, get: () => { throw new Error("disk on fire") } } })
     await TH.expectRefusal(front.boxStore(vaultScope).get(anthropic), 'storage_unavailable')
-    const revoked = localStoreFront({ store: { ...store, get: () => { throw new VaultError('identity_revoked', 'Signed out.') } } })
+    const revoked = localStoreFront({ store: { ...store, get: () => { throw new VaultError('identity_revoked', "Signed out.") } } })
     await TH.expectRefusal(revoked.boxStore(vaultScope).get(anthropic), 'identity_revoked')
   })
 
@@ -303,9 +303,9 @@ describe("StoreFront's watch", () => {
     const front = new ProbeFront()
     const { onChange } = watchOf(front)
     await settle()
-    front.onTrouble(new Error('socket closed'))
+    front.onTrouble(new Error("socket closed"))
     expect(onChange).toHaveBeenCalledTimes(1)
-    front.refusesRows = new VaultError('identity_revoked', 'Signed out.')
+    front.refusesRows = new VaultError('identity_revoked', "Signed out.")
     front.onChange()
     await settle()
     expect(onChange).toHaveBeenCalledTimes(2)
@@ -313,7 +313,7 @@ describe("StoreFront's watch", () => {
 
   it("rings onChange on the next tick where the backend's watch throws as it starts", async () => {
     class ThrowingFront extends ProbeFront {
-      protected override doWatch(): () => void { throw new Error('no socket') }
+      protected override doWatch(): () => void { throw new Error("no socket") }
     }
     const { onChange } = watchOf(new ThrowingFront())
     expect(onChange).not.toHaveBeenCalled()
@@ -327,7 +327,7 @@ describe("StoreFront's watch", () => {
     await settle()
     const { onTrouble } = front
     unwatch()
-    onTrouble(new Error('late'))
+    onTrouble(new Error("late"))
     front.rows.set(boxpath, fullBoxRecord())
     await settle()
     expect(onChange).not.toHaveBeenCalled()
@@ -354,8 +354,8 @@ describe("StoreFront behind a BoxListing", () => {
     const listing = boxListingOf(held.mw, { store: front.boxStore(vaultScope) })
     await listing.fetch(anthropic)
     await listing.hello()
-    front.refusesRows = new VaultError('identity_revoked', 'Signed out.')
-    front.onTrouble(new Error('socket closed'))
+    front.refusesRows = new VaultError('identity_revoked', "Signed out.")
+    front.onTrouble(new Error("socket closed"))
     await vi.waitFor(() => { expect(held.mw.badnews.map((news) => news.refusalkind)).to.include('identity_revoked') })
     listing.goodbye()
   })
