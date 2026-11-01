@@ -609,7 +609,7 @@ export const vaultPatch = Checker(() => vaultRecord.partial().strict(), 'bad_opt
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 
-/** What is wrong with a vault, as its snapshot shows it: the kind of refusal a verb on it meets, and that refusal's sentence. */
+/** What is wrong with a vault, as its snapshot shows it: the refusal kind that names it, and a sentence for the user. */
 export type VaultTrouble = Readonly<{ refusalkind: RefusalKind, message: string }>
 // --
 
