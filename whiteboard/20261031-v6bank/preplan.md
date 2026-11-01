@@ -10,32 +10,37 @@ models for the workers. Nothing here changes a decision already made.
 until they can supervise the big changes slowly: the staged record stays, the own props stay as
 they are inscribed, the listing keeps the work it does for the storable, and Box and Vault keep
 their base class. The Trigger is reviewed apart. *Hold* items stay held: limits and capacity,
-damaged boxes in the snapshot, keep-on-device failure. Vault deletion has no mark and is not
-in. A thread that finds it cannot avoid one of these stops and says so; it does not make the
-change.
+damaged boxes in the snapshot, keep-on-device failure. A thread that finds it cannot avoid one of
+these says so in its report and asks, rather than making the change on its own.
 
 ## Ground rules
 
 Carried from the newvault sprint and the scratchpad; the plan repeats them in every handoff.
 
-1. `try*` answers an `Outcome`; the plain verb throws. A throw goes through a factory in a
-   `Refusals` section whose sentence comes from `phrases.ts`; the factory may take objects it
-   sanitizes and attaches.
-2. No catch-and-relabel, except in the host-call functions that hear the passphrase (G1, G8).
+1. `try*` answers an `Outcome`; the plain verb throws. A refusal is thrown through a factory in
+   a `Refusals` section, its sentence from `phrases.ts`; a factory may take objects it sanitizes
+   and attaches.
+2. A refusal passes through as thrown. `outcomeOf` makes a `try*` form, and that is where an
+   error becomes an `Outcome`; a plain verb does not wrap a call in `outcomeOf` to throw its
+   error again. The host-call functions that hear the passphrase relabel what they catch (G1,
+   G8); elsewhere a catch adds something (zeroing in `finally`, say) or is not there.
 3. Checkers live in `models-shapes.ts`, made by `Checkers`, `Checker` or `objCheck`.
 4. Key bytes are zeroed in `try/finally`. The cleartext (passphrase or PRF answer) takes the
    straightest path from the user's fingertips to the one `Proving` method that handles it; each
-   hop that holds it is named and zeroes or drops it. No proof closures on model verbs.
+   hop that holds it is named and zeroes or drops it. The model verbs take cleartext values, not
+   proof closures.
 5. Stored fields underbar_case; times integer epoch millis; test backdoors `_cheat_`-prefixed.
 6. Doc blocks short, one or two lines, written for the caller; a line that narrates parameters is
-   stripped on sight. No GAP or FIXME comments survive a thread: a gap is a line in the thread's
+   stripped when met. A GAP or FIXME comment the thread cannot close moves to the thread's
    report.
 7. A gated verb's name is its gating kind: `build_vault`, `unlock_vault`, `replace_passphrase`,
-   `add_passkey`, `revoke_passkey`.
+   `add_passkey`, `revoke_passkey`, `del_vault`.
 8. A damaged record fails by name: a refusal kind, told as bad news, shown as the snapshot's
-   trouble, documented as expected control flow. No fate, no tombstone, no silent repair.
+   trouble, documented as expected control flow; not a fate or a tombstone, and not repaired
+   in place.
 9. Consistency checks are welcome where they guard a promise (the rollback guard); the old
-   code's mania for them is not. Insert no retries or whizbangs in a primitive's path.
+   code's mania for them is not. Retries, abort controllers and the like stay out of a
+   primitive's path; a host, or orchestration code we provide, adds them.
 
 ## Threads
 
@@ -85,7 +90,7 @@ Builds on `gating.ts` (the sketch: `Gating<KindT>`, `attempt`, `decline`, `isOpe
   makes no gatings.
 * Drop the closures: `ensureUnlocked`, the gate verbs and `Proving` take cleartext values
   (exists: `AttemptClosure`, `PassphraseClosure`, `PasskeyClosure`, `makeFromClosure`,
-  `invokeProofClosure` go). Ground rule 4 governs every hop.
+  `invokeProofClosure` go). Ground rule 4 applies to each hop.
 * The passkey path: `attemptPasskey` on an `unlock_vault` gating grants a lease through
   `PasskeyProving`; the gating exposes what the host's `createPasskey`/`askPasskey` read (the
   passkey header: `credential_id`, `prf_salt`), so the button has something to read.
@@ -145,8 +150,8 @@ Builds on `bank.ts` (the sketch: `BankOpts`, `make`, `hello`/`goodbye`, `vaultSc
 * `VaultSnapshot` content: lock state, `autolock_at`, the gate's public parts (passkey header
   present or not), the boxes' snapshots, freshness and trouble. `BoxSnapshot` likewise where it
   is thin. React renders from `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`.
-* `try*` forms for every vault verb (exists on the storable and the gate verbs; `ensureUnlocked`,
-  `lock`, the lease verbs need them). Getters `autolockMinutes` and `pesterMinutes` on the vault,
+* `try*` forms for the vault verbs a host calls (exist on the storable and the gate verbs;
+  `ensureUnlocked`, `lock` and the lease verbs need them). Getters `autolockMinutes` and `pesterMinutes` on the vault,
   reading the triggers' intervals.
 * Gate-epoch voiding: `gate_epoch` on the vault record and in the lease stamp; a lease granted
   under an older epoch is voided when the gate moves, here or on another device (exists: the
@@ -157,7 +162,25 @@ Builds on `bank.ts` (the sketch: `BankOpts`, `make`, `hello`/`goodbye`, `vaultSc
 * Bad news: `onBadNews` with the host default and handler-failure isolation (exists on the
   listing), reached from the bank's options.
 
-### 8. whispers_and_names
+### 8. vault_deletion
+
+Added by the Coach (2026-11-01): React's `DelVaultModal` and the demo use it. Builds on threads 3,
+4 and 6.
+
+* `vault.del()` and `tryDel()`: a `del_vault` gating proved by the passphrase (a passkey does not
+  do; the old form was `ProvenByPassphraseForm`), then the listing's `del` under the vault's
+  `priorRevisionTok`, landing the tombstone. The vault locks, its lease is evicted and the kept
+  lease and cache erased, its boxes evicted, and the bank evicts the vault.
+* On the other devices the watch receives the tombstone: the vault locks, is evicted, and
+  `vault_gone` is told as bad news; a vault made anew under the same label is `vault_remade`.
+* `bank.delDamagedVault({ vaultlabel })`: for a vault whose stored record fails its checks, so no
+  proof is possible, on the host's say. How the `Store` expresses a delete over a row that does
+  not read (its `revision_tok` where the sparse record parses, else an unconditional `del`) is
+  settled with thread 6; the old `VaultDelExpectation` with a null `gate_epoch` is the precedent.
+* Neither deletes boxes one by one: the vault's tombstone is the deletion, and a box under a
+  tombstoned vault reads as absent.
+
+### 9. whispers_and_names
 
 * `getWhisper`, `useWhisper` (zeroes the bytes after the callback) and `tryGetWhisper` on the
   box, atop `unsealWhisper` and `expose` (exist). The exposed whisper surviving `lock()` in
@@ -167,7 +190,7 @@ Builds on `bank.ts` (the sketch: `BankOpts`, `make`, `hello`/`goodbye`, `vaultSc
   (`whisper_codec`, `whisper_schema_version`, exist); confirm `whisper-field.ts` and the React
   field need nothing more.
 
-### 9. pester
+### 10. pester
 
 * `pesterMinutes`, default seven days: a Trigger on the vault that asks for the passphrase again
   when its interval is up, reset whenever the passphrase is given. Refuse `null`, accept
@@ -177,20 +200,20 @@ Builds on `bank.ts` (the sketch: `BankOpts`, `make`, `hello`/`goodbye`, `vaultSc
   one it already has (the Coach, 2026-11-01).
 * Distinct from the autolock (reset on every successful gating, default fourteen days).
 
-### 10. v06_entry
+### 11. v06_entry
 
 * `safebyok/v06`: the models' entry point. `Bank`, `Vault`, `Box`, `Lease`, the `Gating` types
   and `RequestCleartext`, `StrengthChecker` and `zxcvbnStrengthChecker`, the `KeyDeriver`
   interface and the argon2id deriver, the `Store` and `DeviceDB` types, the refusal kinds, the
-  record checkers a host validates with. Every type an exported signature names is exported.
-* `src/index.ts` is untouched: the old surface stays until the models reach parity.
+  record checkers a host validates with. The types an exported signature names are exported too.
+* `src/index.ts` is left as it is: the old surface stays until the models reach parity.
 
-### 11. damaged_wayins
+### 12. damaged_wayins
 
 Last, and carefully: a damaged or unknown wayin is told as bad news and the rest of the vault
 stays usable. Only a passkey wayin can be damaged (a passphrase is required). The most likely
 cause of "damage" in code this young is a bug of our own, so the refusal names what failed the
-check, and ground rule 8 governs: by name, as control flow, never repaired in place.
+check, and ground rule 8 applies: by name, as control flow, not repaired in place.
 
 ## Checks and chores, not threads
 
