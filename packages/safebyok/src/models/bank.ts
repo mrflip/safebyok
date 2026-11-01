@@ -172,7 +172,7 @@ export class Bank implements VaultWorld, GatingWorld {
   vaultOf(bag: VaultBag): Vault | null { return this.vaultListing.at(this.vaultScopeOf(bag)) }
 
   /** The vault `bag` names, as the vaultDB holds it; where it holds none, built and stored as {@link VaultListing.ensure} does, of `cleartexts` where handed, else of what the user answers a 'build_vault' gating.
-   * A second call for a vaultlabel while one is in flight joins it, so the user is asked once.
+   * A second call for a vaultlabel that hands no cleartexts, while one is in flight, joins it, so the user is asked once; one that hands its own runs apart.
    * A passkey's answer among `cleartexts` is spent unless refused as correctable (G2).
    */
   ensureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Vault> {
@@ -183,7 +183,8 @@ export class Bank implements VaultWorld, GatingWorld {
 
   #joinEnsuring(scope: VaultScope, cleartexts?: Cleartexts): Promise<Vault> {
     const inFlight = this.#ensuring.get(scope.vaultlabel)
-    if (inFlight !== undefined) { return inFlight }
+    if (inFlight !== undefined && cleartexts === undefined) { return inFlight }
+    if (inFlight !== undefined) { return this.#ensureVault(scope, cleartexts) }
     const ensuring = this.#ensureVaultOnce(scope, cleartexts)
     this.#ensuring.set(scope.vaultlabel, ensuring)
     return ensuring
@@ -204,13 +205,17 @@ export class Bank implements VaultWorld, GatingWorld {
     return Gating.launch('build_vault', { scope, vault: null, world: this, run: (handed) => this.vaultListing.ensure(scope, handed) })
   }
 
-  closeVault(bag: VaultBag): void {
-    this.vaultOf(bag)?.lock()
-    // GAP: listing.ts has no verb to drop a held thing; `Listing.release(scope)` (delete it from `#things`, drop its subscription, remake the snapshot) would finish the close, and `closeVaults` would call it for each. Until then the locked vault stays listed.
+  /** Lock the vault `bag` names, erasing the lease this device keeps, and evict it, as {@link VaultListing.evict} does: the bank holds it no more, and the next `ensureVault` gets it anew. */
+  closeVault(bag: VaultBag): void { this.#closeVault(this.vaultScopeOf(bag)) }
+
+  /** Close every vault the bank holds, as {@link closeVault} does. */
+  closeVaults(): void {
+    for (const vault of this.vaultListing.things) { this.#closeVault(vault.scope) }
   }
 
-  closeVaults(): void {
-    for (const vault of this.vaultListing.things) { vault.lock() }
+  #closeVault(scope: VaultScope): void {
+    this.vaultListing.at(scope)?.lock()
+    this.vaultListing.evict(scope)
   }
   // --
 

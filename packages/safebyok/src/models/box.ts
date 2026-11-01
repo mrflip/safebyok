@@ -51,7 +51,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 
   declare readonly world: BoxWorld
 
-  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, held in memory through `lock()` until the host sets `box.whisper` null. Nothing seals it: an update seals the whisper it is given. */
+  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, held in memory through `lock()` until the host sets `box.whisper` null or the box disarms. Nothing seals it: an update seals the whisper it is given. */
   #exposed: WhisperHolder | null = null
 
   // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
@@ -90,11 +90,11 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   demandReadyToSeal(): this { return this.demandUnlocked() }
   // --
 
-  // == [The whisper]: whisper, getWhisper, tryGetWhisper, useWhisper, unsealWhisper, expose, seal
+  // == [The whisper]: whisper, getWhisper, tryGetWhisper, useWhisper, unsealWhisper, expose, disarm, seal
 
   /** The exposed whisper, `{ val }`, while the vault is unlocked, or null where none is exposed; {@link LOCKED} while the vault is locked.
    * Locking hides the whisper and does not forget it: the box holds it in memory through `lock()`,
-   * and the getter answers it again once the vault unlocks. Set `box.whisper` null to forget it.
+   * and the getter answers it again once the vault unlocks. Set `box.whisper` null, or {@link disarm}, to forget it.
    * Setting it exposes the whisper given, and no more: nothing seals it, as an update seals only the
    * whisper it is given. It needs the vault unlocked; a whisper that is not `{ val }` refuses
    * 'bad_option', naming the field, before the lock is looked at. The box keeps a frozen copy.
@@ -155,6 +155,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     return this
   }
 
+  /** Forget the exposed whisper, as setting `box.whisper` null does: at eviction, and when a tombstone or another device's revision lands. */
+  disarm(): void {
+    this.#exposed = null
+    this.settle()
+  }
+
   /** Seal this whisper, `{ val }`, with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
   seal(whisper: WhisperHolder, sidecar: Sidecar, opts: EditOpts = {}): Promise<this> { return this.edit({ whisper, sidecar }, opts) }
 
@@ -171,6 +177,24 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     } finally {
       bytes.fill(0)
     }
+  }
+  // --
+
+  // == [Overridden from Storable]: evict, adopt
+
+  /** Disarm, then make no more fetches on schedule. */
+  override evict(): void {
+    this.disarm()
+    super.evict()
+  }
+
+  /** Forget the exposed whisper where `central` is a tombstone, or a newer revision than this device staged: the whisper it opened no longer stands. The answer to this device's own `send` keeps it. */
+  protected override adopt(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null): void {
+    const prior = this.central
+    const isOwnSend = central.revision_tok === this.staged?.revision_tok
+    super.adopt(central, staged)
+    if (central === prior) { return }
+    if (MSX.isTombstone(central) || (! isOwnSend && central.revision_seq > prior.revision_seq)) { this.#exposed = null }
   }
   // --
 

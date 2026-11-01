@@ -1283,3 +1283,64 @@ describe("storable.settle: each instance saves its own copy to the cache, and th
   })
 })
 // --
+
+// == [Eviction]: listing.evict lets an instance go, whether or not its evict throws
+
+describe("listing.evict(scope): the instance let go", () => {
+  it("evicts the instance and holds it no more: not at its scope, among the things, nor in the snapshot, telling the listeners", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    box.whisper = { val: 'sk-test-0000' }
+    const evict = vi.spyOn(Box.prototype, 'evict')
+    let told = 0
+    listing.subscribe(() => { told += 1 })
+    listing.evict(scopeOf())
+    expect(evict).toHaveBeenCalledOnce()
+    expect(box.whisper).to.be.null
+    expect(listing.at(scopeOf())).to.be.null
+    expect(listing.things).to.deep.equal([])
+    expect(listing.snapshot).to.deep.equal([])
+    expect(told).to.eq(1)
+  })
+
+  it("hears no more from the instance evicted", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    listing.evict(scopeOf())
+    let told = 0
+    listing.subscribe(() => { told += 1 })
+    box.receive(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+    expect(told).to.eq(0)
+    expect(listing.snapshot).to.deep.equal([])
+  })
+
+  it("builds a new instance at the next answer for the scope", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    listing.evict(scopeOf())
+    held.mw.seedStore(fullBoxRecord())
+    const again = await listing.fetch(scopeOf())
+    expect(again).to.not.eq(box)
+    expect(listing.at(scopeOf())).to.eq(again)
+  })
+
+  it("lets the instance go though its evict throws, and throws that on", async () => {
+    const listing = boxListingOf(held.mw)
+    await listing.build(fullBoxRecord())
+    vi.spyOn(Box.prototype, 'evict').mockImplementationOnce(() => { throw new Error("The evict is broken.") })
+    expect(() => { listing.evict(scopeOf()) }).to.throw("The evict is broken.")
+    expect(listing.at(scopeOf())).to.be.null
+    expect(listing.snapshot).to.deep.equal([])
+  })
+
+  it("leaves the others held, and does nothing for a scope it holds nothing at", async () => {
+    const listing = boxListingOf(held.mw)
+    const kept = await listing.build(fullBoxRecord({ boxlabel: 'kept_box' }))
+    let told = 0
+    listing.subscribe(() => { told += 1 })
+    listing.evict(scopeOf('never_box'))
+    expect(told).to.eq(0)
+    expect(listing.things).to.deep.equal([kept])
+  })
+})
+// --

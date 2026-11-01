@@ -82,9 +82,11 @@ export const leaseNotInForce = (): VaultError => listedRefusal('vault_locked', P
 export const undecodedWhisper = (): VaultError => listedRefusal('damaged_box', Phrases.UndecodedWhisper)
 // --
 
-// == [Vaults]: needVaultUnlocked, leaseOfOtherHolder
+// == [Vaults]: needVaultUnlocked, lockedWhileUnlocking, leaseOfOtherHolder
 
 export const needVaultUnlocked = (): VaultError => listedRefusal('vault_locked', Phrases.NeedVaultUnlocked)
+
+export const lockedWhileUnlocking = (): VaultError => listedRefusal('vault_locked', Phrases.LockedWhileUnlocking)
 
 export const leaseOfOtherHolder = (): VaultError => listedRefusal('bad_option', Phrases.LeaseOfOtherHolder)
 // --

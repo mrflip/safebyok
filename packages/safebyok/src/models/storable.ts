@@ -348,6 +348,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
+  // == [Eviction]: evict
+
+  /** Make no more fetches on schedule: `listing.evict` calls it, then holds this thing no more. A subclass that overrides it calls super. */
+  evict(): void { this.#trigger.disarm() }
+  // --
+
   // == [Receiving]: receive, adopt, settle, cacheOnDevice, tombstoneFor, makeStagedBase, nextRevision, priorRevisionTok
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the

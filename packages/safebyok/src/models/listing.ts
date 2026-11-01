@@ -37,6 +37,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The device cache: loaded by `hello`, and handed to each instance made here, which saves itself to it. */
   readonly #cache: Cache<RecordT, SparseT>
   readonly #things    = new Map<string, ThingT>()
+  /** For each scopepath held, what ends the listing's subscription to its thing. */
+  readonly #unsubscribes = new Map<string, () => void>()
   readonly #listeners = new Set<() => void>()
   readonly #onBadNews: ((news: VaultError) => unknown) | null
   /** The news already told, so one refusal that several callers share, a timer's launch and a `hydrateAll` joined to it, is told once. */
@@ -94,7 +96,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Listing verbs]: at, things, watchableThings, build, hydrateAll
+  // == [Listing verbs]: at, things, watchableThings, build, evict, hydrateAll
 
   /** The instance held under `scope`, or null. Calls nothing. A scope that fails {@link scopeOf} refuses as it does. */
   at(scope: ScopeT): ThingT | null {
@@ -118,6 +120,21 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if (hasRevision(input)) { return this.#buildOrReceive(this.scopeOf(input), { flavor: 'received', record: input }) }
     const draft = await this.draftOf(this.stampDna(input))
     return this.#buildOrReceive(this.scopeOf(draft), { flavor: 'drafted', draft })
+  }
+
+  /** Let go the instance held under `scope`, if any: the listing holds it no more, nor hears it, nor watches it, nor shows it in its snapshot, and then it is evicted, as its own `evict` says, telling the listeners once whether or not that throws. The next answer for the scope builds a new instance. */
+  evict(scope: ScopeT): void {
+    const scopepath = this.scopepathOf(this.scopeOf(scope))
+    const thing = this.#things.get(scopepath)
+    if (thing === undefined) { return }
+    this.#things.delete(scopepath)
+    this.#unsubscribes.get(scopepath)?.()
+    this.#unsubscribes.delete(scopepath)
+    try {
+      thing.evict()
+    } finally {
+      this.#remakeSnapshot()
+    }
   }
 
   /** Hydrate every instance held. A hydrate that is refused is told as bad news, and the others go on; `opts` that fail {@link MSX.timelyOpts} refuse 'bad_option' first, hydrating none. */
@@ -270,9 +287,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Hold `thing`, born here, under its scope, and make the listing's snapshot again on each change of the thing's. */
   #hold(thing: ThingT): void {
-    this.#things.set(this.scopepathOf(thing.scope), thing)
+    const scopepath = this.scopepathOf(thing.scope)
+    this.#things.set(scopepath, thing)
     thing.becomeNotifiable()
-    thing.subscribe(() => { this.#remakeSnapshot() })
+    this.#unsubscribes.set(scopepath, thing.subscribe(() => { this.#remakeSnapshot() }))
   }
 
   /** A central never stored: a tombstone at `NeverStoredSeq` under a new tok, of `sparse`'s props. */

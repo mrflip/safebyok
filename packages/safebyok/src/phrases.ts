@@ -386,7 +386,7 @@ export const LeaseOfOtherVault = "This proving is of another vault: a lease is g
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, LeaseOfOtherHolder, vaultAbsent, boxAbsent
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, LockedWhileUnlocking, LeaseOfOtherHolder, vaultAbsent, boxAbsent
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
@@ -402,6 +402,9 @@ export const LeaseNotInForce = "This lease is no longer in force -- its time ran
 
 /** Why a call that needs the vault unlocked is refused while it is locked. */
 export const NeedVaultUnlocked = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
+
+/** Why an unlock that a lock overtook unlocks nothing. */
+export const LockedWhileUnlocking = "The vault was locked while it was being unlocked, so it stays locked: unlock it again when the user wants the vault."
 
 /** Why a vault takes up no lease of another vault, or granted to another Vault object. */
 export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."

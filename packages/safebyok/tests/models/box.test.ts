@@ -999,3 +999,68 @@ describe("Storable.edit holds its patch to the concrete class's isFullPatch firs
     expect(box.sidecar).to.deep.equal({ note: 'new' })
   })
 })
+
+// == [Disarm]: disarm, evict, a tombstone or another device's revision received or fetched, this device's own send
+
+describe("box.disarm() and box.evict(): the exposed whisper forgotten", () => {
+  it("forgets the whisper exposed on disarm, telling the snapshot and its listeners", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    const listener = vi.fn()
+    box.subscribe(listener)
+    box.disarm()
+    expect(box.whisper).to.be.null
+    expect(box.getSnapshot().exposed).to.be.false
+    expect(listener).toHaveBeenCalled()
+  })
+
+  it("disarms on evict", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.evict()
+    expect(box.whisper).to.be.null
+    expect(box.getSnapshot().exposed).to.be.false
+  })
+})
+
+describe("box.receive(rcvd) and box.fetch(): what a record landing does to the whisper exposed", () => {
+  it("forgets it when a tombstone is received", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    expect(box.whisper).to.be.null
+  })
+
+  it("forgets it when another device's newer revision is received", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    expect(box.whisper).to.be.null
+  })
+
+  it("forgets it when a fetch finds another device's newer revision stored", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    held.mw.seedStore(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    await box.fetch()
+    expect(box.revision_seq).to.eq(2)
+    expect(box.whisper).to.be.null
+  })
+
+  it("keeps it when the revision held is received again", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.receive(fullBoxRecord())
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
+  })
+
+  it("keeps it when the answer to this device's own send lands", async () => {
+    held.mw.seedStore(fullBoxRecord())
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} }, asBuilt)
+    expect(box.revision_seq).to.eq(2)
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
+  })
+})
+// --

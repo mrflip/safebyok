@@ -71,8 +71,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The lease this device holds while the vault is unlocked, null while it is locked. */
   #lease: Lease | null = null
 
-  /** The deviceDB work on the lease in flight, one chore after another. */
-  #leaseChores: Promise<void> = Promise.resolve()
+  /** Held by each piece of deviceDB work on the lease, a lock's erase, a grant's put, a look for the lease kept, so each lands in the order begun. */
+  readonly #leaseMutex = new Mutex()
+
+  /** Each lock and let-go counts here, so an unlock or a look begun before one takes up no lease after it. */
+  #lockSeq = 0
+
+  /** The gatings of this vault still asking the user, which a lock or a let-go declines. */
+  readonly #gatings = new Set<AnyGating>()
 
   /** The look for the lease this device keeps in flight, which a look begun meanwhile joins; null once it settles. */
   #cachedLookup: Promise<Lease | null> | null = null
@@ -216,7 +222,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return launch
   }
 
-  /** Hold the asking turn, fetch the full record where the vault is not full, so the gating carries the passkey header, and ask through `Gating.launch`, the gating held as `#asking` from the moment the host is handed it. */
+  /** Hold the asking turn, fetch the full record where the vault is not full, so the gating carries the passkey header, and ask through `Gating.launch`, the gating held as `#asking`, and among `#gatings` for a lock or a let-go to decline, from the moment the host is handed it. */
   async #askInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<void> {
     await this.#askingMutex.acquire()
     try {
@@ -226,10 +232,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
       // `Gating.launch` hands the host its gating before it first awaits.
       const world: GatingWorld = { strengthChecker, logger, requestCleartext: (gating) => {
         this.#asking = gating
+        this.#gatings.add(gating)
         return requestCleartext(gating)
       } }
       await Gating.launch(gatingkind, { scope: this.scope, vault: this, world, run: async (handed) => { await run(handed); return this } })
     } finally {
+      for (const gating of this.#gatings) { if (! gating.isOpen) { this.#gatings.delete(gating) } }
       this.#asking = null
       this.#launches.delete(gatingkind)
       this.#askingMutex.release()
@@ -258,7 +266,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
    * Wrong cleartexts refuse
    * 'wrong_passphrase' or 'wrong_passkey', leaving unspent a passkey's answer for another passkey
    * or salt; a passkey's answer for a vault with no passkey, 'absent_wayin'; a gating the user
-   * declines, 'declined'.
+   * declines, 'declined'; a lock or let-go while it unlocks, 'vault_locked'.
    */
   ensureUnlocked(cleartexts?: AttemptCleartexts): Promise<Lease> {
     return spendAnswerAfter(cleartexts, async () => {
@@ -321,43 +329,50 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return await inFlight
   }
 
-  /** The unlock by `cleartexts`, or by a gating where none are handed, as the one in flight: `#unlocking`, cleared once it settles. */
+  /** The unlock by `cleartexts`, or by a gating where none are handed, as the one in flight: `#unlocking`, cleared once it settles. A lock or let-go after it begins overtakes it. */
   async #unlockAlone(cleartexts?: AttemptCleartexts): Promise<Lease> {
+    const lockSeq = this.#lockSeq
     try {
       // The await always yields first, so the finally never runs before `#unlock` has set `#unlocking`.
-      return await (cleartexts === undefined ? this.#unlockByGating() : this.#unlockByProof(cleartexts))
+      return await (cleartexts === undefined ? this.#unlockByGating(lockSeq) : this.#unlockByProof(cleartexts, lockSeq))
     } finally {
       this.#unlocking = null
     }
   }
 
   /** Ask the user through an 'unlock_vault' gating, each attempt unlocking through `#unlockByProof`, never `ensureUnlocked`, which would join the unlock this is. */
-  async #unlockByGating(): Promise<Lease> {
-    await this.#launchGating('unlock_vault', (handed) => this.#unlockByProof(handed))
+  async #unlockByGating(lockSeq: number): Promise<Lease> {
+    await this.#launchGating('unlock_vault', (handed) => this.#unlockByProof(handed, lockSeq))
     return this.demandLease()
   }
 
-  /** Prove `cleartexts` against the gate storage holds, fetched first, and hold the lease the proving grants. */
-  async #unlockByProof(cleartexts: AttemptCleartexts): Promise<Lease> {
+  /** Prove `cleartexts` against the gate storage holds, fetched first, and grant a lease, unless a lock or let-go has landed since the unlock began, at `lockSeq`: then it refuses 'vault_locked', granting nothing, or evicting the lease whose record the lock's erase, queued behind the put, then erases. */
+  async #unlockByProof(cleartexts: AttemptCleartexts, lockSeq: number): Promise<Lease> {
     await this.fetch()
     const proving = await this.gate.attemptProof(cleartexts, this.world)
-    // An erase a lock queued lands before this grant's put.
-    await this.#leaseChores
-    return this.#setLease(await proving.makeLease(this, this.leaseDBFriend(), { leaseMillis: this.leaseMillis }))
+    return this.#withLeaseDB(async () => {
+      if (this.#lockSeq !== lockSeq) { throw RefusalFuncs.lockedWhileUnlocking() }
+      const lease = await proving.makeLease(this, this.leaseDBFriend(), { leaseMillis: this.leaseMillis })
+      if (this.#lockSeq !== lockSeq) {
+        lease.evict()
+        throw RefusalFuncs.lockedWhileUnlocking()
+      }
+      return this.#setLease(lease)
+    })
   }
 
   async #lookUpCached(): Promise<Lease | null> {
     try {
-      // An erase a lock queued lands before this look, so a lease just locked is not taken up again. Awaited first, so `#cachedLookup` is set before the finally clears it.
-      await this.#leaseChores
-      const cached = await Lease.tryGet(this, this.leaseDBFriend())
+      const lockSeq = this.#lockSeq
+      // Awaited first, so `#cachedLookup` is set before the finally clears it.
+      const cached = await this.#withLeaseDB(() => Lease.tryGet(this, this.leaseDBFriend()))
       if (! cached.ok) {
         this.listing.tellBadNews([cached.err])
         return null
       }
       if (cached.val === null) { return null }
       // Declined, it is evicted: its autolock would otherwise lock the vault at its own `autolock_at`.
-      if (! cached.val.isInForce || this.#lease?.isInForce === true) {
+      if (! cached.val.isInForce || this.#lease?.isInForce === true || this.#lockSeq !== lockSeq) {
         cached.val.evict()
         return null
       }
@@ -379,7 +394,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [The lease]: leaseDBFriend, lock, letLeaseGo, leaseChore
+  // == [The lease]: leaseDBFriend, lock, letLeaseGo, evict, dropLease, leaseChore, withLeaseDB
 
   /** The deviceDB as this vault's lease reaches it: the world's lease verbs, bound to this vault's scope, so no verb takes one. */
   leaseDBFriend(): LeaseDBFriend {
@@ -392,11 +407,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Lock the vault, synchronously, and erase the lease this device keeps, whether or not the vault holds one: the vault reads locked before this returns; letting the held lease go and the erase are queued as a chore. */
+  /** Lock the vault, synchronously, and erase the lease this device keeps, whether or not the vault holds one: the vault reads locked before this returns, and a gating of it still asking is declined; letting the held lease go and the erase are queued as a chore. */
   lock(): void {
-    this.#isLocked = true
-    const lease = this.#lease
-    this.#lease = null
+    const lease = this.#dropLease()
     const { tryDelLease } = this.leaseDBFriend()
     this.#leaseChore(async () => {
       lease?.evict()
@@ -405,23 +418,42 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
-  /** Let the vault's lease go, the vault reading locked and the lease this device keeps left for the next load: the listing's goodbye, where `lock()` erases. */
+  /** Let the vault's lease go, the vault reading locked, a gating of it still asking declined, and the lease this device keeps left for the next load: the listing's goodbye, where `lock()` erases. */
   letLeaseGo(): void {
-    this.#isLocked = true
-    const lease = this.#lease
-    this.#lease = null
-    lease?.evict()
+    this.#dropLease()?.evict()
     this.settle()
   }
 
-  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlockByProof` awaits the queue before granting and `#lookUpCached` before looking, so a lock's erase lands before the next put or get. */
+  /** Let the lease go, as {@link letLeaseGo} does, and make no more fetches on schedule: `listing.evict` calls it, then holds this vault no more. */
+  override evict(): void {
+    this.letLeaseGo()
+    super.evict()
+  }
+
+  /** Read locked, decline every gating still asking, and hand back the lease held, no longer the vault's. */
+  #dropLease(): Lease | null {
+    this.#isLocked = true
+    this.#lockSeq += 1
+    const lease = this.#lease
+    this.#lease = null
+    for (const gating of this.#gatings) { gating.decline() }
+    this.#gatings.clear()
+    return lease
+  }
+
+  /** Queue deviceDB work on the lease, never awaited by a caller: a refusal is told as bad news. */
   #leaseChore(work: () => Promise<void>): void {
-    const prior = this.#leaseChores
-    this.#leaseChores = (async () => {
-      await prior
-      const done = await outcomeOf(work)
-      if (! done.ok) { this.listing.tellBadNews([done.err]) }
-    })()
+    void outcomeOf(() => this.#withLeaseDB(work)).then((done) => { if (! done.ok) { this.listing.tellBadNews([done.err]) } })
+  }
+
+  /** Run `work` once the deviceDB work on the lease begun before it has landed, holding off any begun after. */
+  async #withLeaseDB<ValT>(work: () => Promise<ValT>): Promise<ValT> {
+    await this.#leaseMutex.acquire()
+    try {
+      return await work()
+    } finally {
+      this.#leaseMutex.release()
+    }
   }
   // --
 
