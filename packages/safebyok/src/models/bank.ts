@@ -105,7 +105,7 @@ export class Bank implements VaultWorld, GatingWorld {
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.pesterMillis = millisOf(pesterMinutes, DefaultPesterMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
-    this.vaultListing = new VaultListing({ world: this, store: vaultDB.vaultStore(this.scope), cache: deviceDB.vaultCache(this.scope), maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
+    this.vaultListing = new VaultListing({ world: this, store: vaultDB.vaultStore(this.scope), cache: deviceDB.vaultCache(this.scope, (news) => { this.vaultListing.tellBadNews([news]) }), maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
     this.#snapshot = this.#snapshotNow()
     this.vaultListing.subscribe(() => { this.#remakeSnapshot() })
     if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
@@ -170,7 +170,7 @@ export class Bank implements VaultWorld, GatingWorld {
 
   /** Advance this device's record of the scope by one holding the bank's `device_id`, and take the `device_id` it holds: a device keeps the first it stored. */
   async #keepDeviceRecord(): Promise<void> {
-    const record = await this.deviceDB.advanceDeviceRecord(deviceRecordOf(this.scope, this.#deviceId))
+    const { record } = await this.deviceDB.advanceDeviceRecord(deviceRecordOf(this.scope, this.#deviceId))
     if (record.device_id === this.#deviceId) { return }
     this.#deviceId = record.device_id
     this.#remakeSnapshot()

@@ -1,4 +1,4 @@
-import type { Cache, DeviceRecord, GateEpochSeen, LeaseRecord, VaultCacheable, VaultRecord, VaultSparse } from '../models/models-shapes'
+import type { Cache, DeviceRecord, DeviceRecordAdvance, GateEpochSeen, LeaseRecord, VaultCacheable, VaultRecord, VaultSparse } from '../models/models-shapes'
 import * as MSX from '../models/models-shapes'
 import type { BankScope, VaultScope } from '../shapes/scopes'
 import * as CX from '../shapes/scopes'
@@ -71,36 +71,42 @@ export abstract class DeviceDB {
   /** Advance this device's record of `record`'s scope by `record`, resolving the record as stored: the `device_id` stored stays, and each vault keeps the higher `gate_epoch` of the two.
    * The store keeps what {@link advancedDeviceRecord} makes of the stored record and `record` in one
    * transaction, so a tab that saw less never undoes what another saw. Over a stored row that fails
-   * its check, `record` is stored as it came.
+   * its check, `record` is stored as it came, and `wroteOverDamaged` says so: what that row had seen is lost.
    *
-   * @example await deviceDB.advanceDeviceRecord(deviceRecordOf(bank.scope, randomId()))   // the record as stored: its device_id the first one stored
+   * @example await deviceDB.advanceDeviceRecord(deviceRecordOf(bank.scope, randomId()))   // { record, wroteOverDamaged: false }: its device_id the first one stored
    */
-  async advanceDeviceRecord(record: DeviceRecord): Promise<DeviceRecord> {
+  async advanceDeviceRecord(record: DeviceRecord): Promise<DeviceRecordAdvance> {
     MSX.deviceRecord.parse(record)
     const bankScopepath = Scopepath.bank(record)
-    let advanced = record
+    let advance: DeviceRecordAdvance = { record, wroteOverDamaged: false }
+    // A store that runs the transaction again calls this again: the last call is the one stored.
     await storeAnswer('advanceDeviceRecord', () => this.doUpdate(bankScopepath, (stored) => {
-      advanced = advancedDeviceRecord(stored, record)
-      return advanced
+      const isDamaged = stored !== undefined && stored !== null && deviceRecordAt(bankScopepath, stored) === null
+      advance = { record: advancedDeviceRecord(stored, record), wroteOverDamaged: isDamaged }
+      return advance.record
     }))
-    return advanced
+    return Object.freeze(advance)
   }
 
-  tryAdvanceDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord>> { return outcomeOf(() => this.advanceDeviceRecord(record)) }
+  tryAdvanceDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecordAdvance>> { return outcomeOf(() => this.advanceDeviceRecord(record)) }
   // --
 
   // == [Cached vaults]: findCachedVaults, putCachedVault, vaultCache, clearCachedVault, their try forms
 
-  /** Every vault copy this device keeps of a bank's scope, as stored. A row that is no copy, or a copy filed under another scope than its own, is erased and left out; the listing judges the rest at its hello. */
-  async findCachedVaults(scope: BankScope): Promise<readonly VaultCacheable[]> {
+  /** Every vault copy this device keeps of a bank's scope, as stored. A row that is no copy, or a copy whose own scope, or whose records' scope, is not the one it is filed under, is erased and left out, each erasure told to `onBadNews` as a 'corrupt_record'; the listing judges the rest at its hello. */
+  async findCachedVaults(scope: BankScope, onBadNews?: OnBadNews): Promise<readonly VaultCacheable[]> {
     const prefix = Scopepath.withinBankScopepathPrefix(scope)
+    const tell = MSX.onBadNews.parse(onBadNews)
     const found = await storeAnswer('findCachedVaults', () => this.doFind(prefix))
     const misfiled = found.filter(({ scopepath, row }) => ! isCopyFiledAt(scopepath, row))
-    await Promise.all(misfiled.map(({ scopepath }) => storeAnswer('findCachedVaults', () => this.doDelDamaged(scopepath, (row) => isCopyFiledAt(scopepath, row)))))
+    await Promise.all(misfiled.map(async ({ scopepath }) => {
+      await storeAnswer('findCachedVaults', () => this.doDelDamaged(scopepath, (row) => isCopyFiledAt(scopepath, row)))
+      tell?.(RefusalFuncs.misfiledCachedCopy())
+    }))
     return found.flatMap(({ scopepath, row }) => (isCopyFiledAt(scopepath, row) ? [row] : []))
   }
 
-  tryFindCachedVaults(scope: BankScope): Promise<Outcome<readonly VaultCacheable[]>> { return outcomeOf(() => this.findCachedVaults(scope)) }
+  tryFindCachedVaults(scope: BankScope, onBadNews?: OnBadNews): Promise<Outcome<readonly VaultCacheable[]>> { return outcomeOf(() => this.findCachedVaults(scope, onBadNews)) }
 
   /** Store `cacheable` as this device's copy of its vault, in place of any before. */
   async putCachedVault(cacheable: VaultCacheable): Promise<void> {
@@ -111,14 +117,15 @@ export abstract class DeviceDB {
 
   tryPutCachedVault(cacheable: VaultCacheable): Promise<Outcome<void>> { return outcomeOf(() => this.putCachedVault(cacheable)) }
 
-  /** The device cache of a bank's vaults, as its vault listing takes it: `load` is {@link findCachedVaults}, and `save` is {@link putCachedVault}.
+  /** The device cache of a bank's vaults, as its vault listing takes it: `load` is {@link findCachedVaults}, telling `onBadNews` of each copy it erases, and `save` is {@link putCachedVault}.
    *
-   * @example new VaultListing({ world, store, cache: deviceDB.vaultCache(bank.scope), maxMillisSinceRefresh })
+   * @example new VaultListing({ world, store, cache: deviceDB.vaultCache(bank.scope, (news) => { listing.tellBadNews([news]) }), maxMillisSinceRefresh })
    */
-  vaultCache(scope: BankScope): Cache<VaultRecord, VaultSparse> {
+  vaultCache(scope: BankScope, onBadNews?: OnBadNews): Cache<VaultRecord, VaultSparse> {
     const bankScope = CX.bankScope.parse(scope)
+    const tell = MSX.onBadNews.parse(onBadNews)
     return Object.freeze({
-      load: () => this.findCachedVaults(bankScope),
+      load: () => this.findCachedVaults(bankScope, tell),
       save: (cacheable: VaultCacheable) => this.putCachedVault(cacheable),
     })
   }
@@ -172,7 +179,7 @@ export abstract class DeviceDB {
   // --
 }
 
-// == [Rows]: DeviceRow, FoundRow, DeviceVerb
+// == [Rows]: DeviceRow, FoundRow, DeviceVerb, OnBadNews
 
 /** What a {@link DeviceDB} stores: a lease record, a device record or a vault's cached copy. */
 export type DeviceRow = LeaseRecord | DeviceRecord | VaultCacheable
@@ -182,6 +189,9 @@ export type FoundRow = Readonly<{ scopepath: string, row: unknown }>
 
 /** A verb of {@link DeviceDB} that reaches the store, by its throwing form's name: `getLease`, whose `try` form is `tryGetLease`. */
 export type DeviceVerb = keyof typeof Phrases.DeviceStoreFailed
+
+/** Where a {@link DeviceDB} tells of a damaged row it erased, as a bank's `onBadNews` hears it: never awaited, and one that throws fails the find, so a bank hands its listing's `tellBadNews`, which never throws. */
+export type OnBadNews = (news: VaultError) => unknown
 // --
 
 // == [The device record]: deviceRecordOf, advancedDeviceRecord, highestGateEpochOf
@@ -228,10 +238,18 @@ const deviceRecordAt = (bankScopepath: string, stored: unknown): DeviceRecord | 
   return checked.data
 }
 
-/** True for a vault copy filed under its own scope's scopepath. Only its filing is judged here; the listing judges the copy. */
+/** True for a vault copy filed under its own scope's scopepath, whose `central`, and `staged` where it holds one, name that scope too: the listing revives the copy under its central's. Only its filing is judged here; the listing judges the copy. */
 const isCopyFiledAt = (scopepath: string, row: unknown): row is VaultCacheable => {
   const checked = MSX.vaultCacheable.safeParse(row)
-  return checked.success && Scopepath.vault(checked.data) === scopepath
+  if (! checked.success || Scopepath.vault(checked.data) !== scopepath) { return false }
+  const { central, staged } = checked.data
+  return isRecordFiledAt(scopepath, central) && (staged === null || isRecordFiledAt(scopepath, staged))
+}
+
+/** True for a record whose scope's scopepath is `scopepath`. */
+const isRecordFiledAt = (scopepath: string, record: unknown): boolean => {
+  const scope = CX.vaultScope.safeParse(record)
+  return scope.success && Scopepath.vault(scope.data) === scopepath
 }
 // --
 

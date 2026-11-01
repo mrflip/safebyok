@@ -169,11 +169,14 @@ export const saltDoesNotFit = (expectedCount: number, handedCount: number): Vaul
 export const insecureContext = (): VaultError => listedRefusal('insecure_context', Phrases.InsecureContext)
 // --
 
-// == [Device store]: deviceStoreBlocked, deviceStoreUnavailable
+// == [Device store]: deviceStoreBlocked, deviceStoreUnavailable, misfiledCachedCopy
 
 /** The 'storage_blocked' of a device store the browser withholds, as `said` tells the verb that met it, naming `thrownName` alone of what the store threw. */
 export const deviceStoreBlocked = (said: Phrases.DeviceStoreSaid, thrownName: string | null): VaultError => listedRefusal('storage_blocked', Phrases.deviceStoreBlocked(said, thrownName))
 
 /** The 'storage_unavailable' of a device store that failed otherwise, as `said` tells the verb that met it, naming `thrownName` alone of what the store threw. */
 export const deviceStoreUnavailable = (said: Phrases.DeviceStoreSaid, thrownName: string | null): VaultError => listedRefusal('storage_unavailable', Phrases.deviceStoreUnavailable(said, thrownName))
+
+/** The 'corrupt_record' of a row the device store kept among a bank's vault copies that was no copy, or a copy holding another vault's records than the scope it lies under: told as bad news once it is erased. */
+export const misfiledCachedCopy = (): VaultError => listedRefusal('corrupt_record', Phrases.MisfiledCachedCopy)
 // --

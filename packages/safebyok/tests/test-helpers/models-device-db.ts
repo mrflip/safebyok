@@ -19,9 +19,9 @@ export const modelsLeaseOf = async (user_id: string, vaultlabel = 'main'): Promi
   vault_key_lease_wrapped: fakeCiphered(`lease-${user_id}`),
 })
 
-/** A cached copy of the vault `scope` names, as the deviceDB files it: what it holds past the scope is the listing's to judge, so a tag stands in for it. */
+/** A cached copy of the vault `scope` names, as the deviceDB files it: what its central holds past the scope is the listing's to judge, so a tag stands in for it. */
 export const cacheableOf = (scope: VaultScope, tag = 'copy'): VaultCacheable => (
-  { ...scope, central: { tag }, staged: null } as unknown as VaultCacheable
+  { ...scope, central: { ...scope, tag }, staged: null } as unknown as VaultCacheable
 )
 
 const [bank1, bank2] = [bankScopeOf('u1'), bankScopeOf('u2')]
@@ -75,14 +75,15 @@ export const describeModelsDeviceDB = (adapterTitle: string, makeDeviceDB: () =>
       const deviceDB = await makeDeviceDB()
       const record = recordOf('device-a', [{ vaultlabel: 'main', gate_epoch: 2 }])
       expect(await deviceDB.getDeviceRecord(bank1)).to.be.null
-      expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal(record)
+      expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal({ record, wroteOverDamaged: false })
       expect(await deviceDB.getDeviceRecord(bank1)).to.deep.equal(record)
     })
 
     it("keeps the first device_id stored, and for each vault the higher gate_epoch, never a lower", async () => {
       const deviceDB = await makeDeviceDB()
       await deviceDB.advanceDeviceRecord(recordOf('device-a', [{ vaultlabel: 'main', gate_epoch: 4 }, { vaultlabel: 'spare', gate_epoch: 1 }]))
-      const advanced = await deviceDB.advanceDeviceRecord(recordOf('device-b', [{ vaultlabel: 'main', gate_epoch: 2 }, { vaultlabel: 'spare', gate_epoch: 3 }, { vaultlabel: 'third', gate_epoch: 5 }]))
+      const { record: advanced, wroteOverDamaged } = await deviceDB.advanceDeviceRecord(recordOf('device-b', [{ vaultlabel: 'main', gate_epoch: 2 }, { vaultlabel: 'spare', gate_epoch: 3 }, { vaultlabel: 'third', gate_epoch: 5 }]))
+      expect(wroteOverDamaged).to.be.false
       expect(advanced.device_id).to.eq('device-a')
       expect(advanced.highest_gate_epochs).to.have.deep.members([{ vaultlabel: 'main', gate_epoch: 4 }, { vaultlabel: 'spare', gate_epoch: 3 }, { vaultlabel: 'third', gate_epoch: 5 }])
       expect(await deviceDB.getDeviceRecord(bank1)).to.deep.equal(advanced)
@@ -103,7 +104,8 @@ export const describeModelsDeviceDB = (adapterTitle: string, makeDeviceDB: () =>
       const deviceDB = await makeDeviceDB()
       await deviceDB.advanceDeviceRecord(recordOf('device-a'))
       expect(await deviceDB.getDeviceRecord(bank2)).to.be.null
-      expect(await deviceDB.advanceDeviceRecord(deviceRecordOf(bank2, 'device-b'))).to.include({ device_id: 'device-b' })
+      const { record } = await deviceDB.advanceDeviceRecord(deviceRecordOf(bank2, 'device-b'))
+      expect(record).to.include({ device_id: 'device-b' })
     })
   })
 

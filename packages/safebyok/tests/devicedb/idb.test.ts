@@ -40,7 +40,7 @@ describe("idbDeviceDB(opts)", () => {
     expect(new Uint8Array(await crypto.subtle.exportKey('raw', unwrapped))).to.deep.equal(new Uint8Array(await crypto.subtle.exportKey('raw', inner)))
   })
 
-  it("erases a misfiled copy its find meets, and writes over a damaged device record at the next advance", async () => {
+  it("erases a misfiled copy its find meets, and writes over a damaged device record at the next advance, saying it did", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
     await set(Scopepath.vault(u1), cacheableOf(TH.scopeOf('u1', 'other')), shelfOf(dbName))
@@ -49,7 +49,7 @@ describe("idbDeviceDB(opts)", () => {
     expect(await get(Scopepath.vault(u1), shelfOf(dbName))).to.be.undefined
     expect(await deviceDB.getDeviceRecord(bank1)).to.be.null
     const record = deviceRecordOf(bank1, 'device-a')
-    expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal(record)
+    expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal({ record, wroteOverDamaged: true })
   })
 
   it("settles a doDelDamaged with its transaction: a throw from isSound rejects it, and the row stays", async () => {

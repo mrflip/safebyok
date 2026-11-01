@@ -72,15 +72,35 @@ describe("DeviceDB's device record, as stored", () => {
     expect([...deviceDB.rows.keys()]).to.deep.equal(['bank^acme^u1'])
   })
 
-  it("reads a stored row that fails its check, or names another scope, as none, and writes over it at the next advance", async () => {
+  it("reads a stored row that fails its check, or names another scope, as none, and writes over it at the next advance, saying it did", async () => {
     const deviceDB = new OpenDeviceDB()
     const record = deviceRecordOf(bank1, 'device-a')
     for (const damaged of [{ fmt: 'junk' }, { ...record, device_id: '' }, deviceRecordOf(bankScopeOf('u2'), 'device-z')]) {
       deviceDB.rows.set(Scopepath.bank(bank1), damaged)
       expect(await deviceDB.getDeviceRecord(bank1)).to.be.null
-      expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal(record)
+      expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal({ record, wroteOverDamaged: true })
       expect(deviceDB.rows.get(Scopepath.bank(bank1))).to.deep.equal(record)
     }
+  })
+
+  it("says an advance over nothing stored, or over a sound record, wrote over no damaged row", async () => {
+    const deviceDB = new OpenDeviceDB()
+    const record = deviceRecordOf(bank1, 'device-a')
+    expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal({ record, wroteOverDamaged: false })
+    expect(await deviceDB.advanceDeviceRecord(deviceRecordOf(bank1, 'device-b'))).to.deep.equal({ record, wroteOverDamaged: false })
+  })
+
+  it("says what the last run of its update stored, where the store runs the update again", async () => {
+    const deviceDB = new OpenDeviceDB()
+    const record = deviceRecordOf(bank1, 'device-a')
+    deviceDB.rows.set(Scopepath.bank(bank1), { fmt: 'junk' })
+    // A transaction retried: the first run saw the damaged row, the second the sound record another tab had stored meanwhile.
+    deviceDB.hooks.doUpdate.mockImplementationOnce((scopepath, updatedFrom) => {
+      updatedFrom(deviceDB.rows.get(scopepath))
+      deviceDB.rows.set(scopepath, updatedFrom(record))
+      return Promise.resolve()
+    })
+    expect(await deviceDB.advanceDeviceRecord(deviceRecordOf(bank1, 'device-b'))).to.deep.equal({ record, wroteOverDamaged: false })
   })
 
   it("refuses 'bad_record' a record that fails its check, before the store sees it", async () => {
@@ -102,6 +122,47 @@ describe("DeviceDB's cached vaults, as stored", () => {
     deviceDB.rows.set(Scopepath.vault(TH.scopeOf('u1', 'third')), 'not a copy')
     expect(await deviceDB.findCachedVaults(bank1)).to.deep.equal([sound])
     expect([...deviceDB.rows.keys()]).to.deep.equal([Scopepath.vault(u1)])
+  })
+
+  it("erases a copy whose central, or staged record, names another vault than the one it is filed under", async () => {
+    const deviceDB = new OpenDeviceDB()
+    const [spare, third, other] = [TH.scopeOf('u1', 'spare'), TH.scopeOf('u1', 'third'), TH.scopeOf('u1', 'other')]
+    deviceDB.rows.set(Scopepath.vault(u1), cacheableOf(u1))
+    deviceDB.rows.set(Scopepath.vault(spare), { ...cacheableOf(spare), central: cacheableOf(other).central })
+    deviceDB.rows.set(Scopepath.vault(third), { ...cacheableOf(third), staged: cacheableOf(other).central })
+    expect(await deviceDB.findCachedVaults(bank1)).to.deep.equal([cacheableOf(u1)])
+    expect([...deviceDB.rows.keys()]).to.deep.equal([Scopepath.vault(u1)])
+  })
+
+  it("keeps a copy whose staged record names its own vault", async () => {
+    const deviceDB = new OpenDeviceDB()
+    const staging = { ...cacheableOf(u1), staged: cacheableOf(u1, 'staged').central }
+    deviceDB.rows.set(Scopepath.vault(u1), staging)
+    expect(await deviceDB.findCachedVaults(bank1)).to.deep.equal([staging])
+  })
+
+  it("tells onBadNews of each copy it erases, as a 'corrupt_record' quoting nothing of the row, and keeps quiet over sound ones", async () => {
+    const deviceDB = new OpenDeviceDB()
+    const onBadNews = vi.fn()
+    deviceDB.rows.set(Scopepath.vault(u1), cacheableOf(u1))
+    expect(await deviceDB.findCachedVaults(bank1, onBadNews)).to.have.lengthOf(1)
+    expect(onBadNews).not.toHaveBeenCalled()
+    deviceDB.rows.set(Scopepath.vault(TH.scopeOf('u1', 'spare')), cacheableOf(TH.scopeOf('u1', 'other'), 'whisper-ish'))
+    deviceDB.rows.set(Scopepath.vault(TH.scopeOf('u1', 'third')), 'not a copy')
+    await deviceDB.vaultCache(bank1, onBadNews).load()
+    expect(onBadNews).toHaveBeenCalledTimes(2)
+    for (const [news] of onBadNews.mock.calls as [VaultError][]) {
+      expect(news).to.be.instanceOf(VaultError)
+      expect(news.refusalkind).to.eq('corrupt_record')
+      expect(JSON.stringify({ message: news.message, meta: news.meta })).not.to.include('whisper-ish')
+    }
+  })
+
+  it("refuses 'bad_option' an onBadNews that is no function, before the store sees it", async () => {
+    const deviceDB = new OpenDeviceDB()
+    await TH.expectBad(deviceDB.tryFindCachedVaults(bank1, 'loud' as unknown as () => void), 'bad_option')
+    expect(() => deviceDB.vaultCache(bank1, 42 as unknown as () => void)).to.throw(VaultError)
+    expect(deviceDB.hooks.doFind).not.toHaveBeenCalled()
   })
 
   it("never erases a sound copy stored since the find that read a damaged one", async () => {
@@ -243,7 +304,7 @@ describe("DeviceDB's try forms", () => {
     const record = deviceRecordOf(bank1, 'device-a')
     expect(await deviceDB.tryPutLease(lease)).to.deep.equal({ ok: true, val: lease })
     expect(await deviceDB.tryGetLease(u1)).to.deep.equal({ ok: true, val: lease })
-    expect(await deviceDB.tryAdvanceDeviceRecord(record)).to.deep.equal({ ok: true, val: record })
+    expect(await deviceDB.tryAdvanceDeviceRecord(record)).to.deep.equal({ ok: true, val: { record, wroteOverDamaged: false } })
     expect(await deviceDB.tryGetDeviceRecord(bank1)).to.deep.equal({ ok: true, val: record })
     expect(await deviceDB.tryPutCachedVault(cacheableOf(u1))).to.deep.equal({ ok: true, val: undefined })
     expect(await deviceDB.tryFindCachedVaults(bank1)).to.deep.equal({ ok: true, val: [cacheableOf(u1)] })

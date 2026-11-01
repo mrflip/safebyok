@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deviceRecordOf } from '../../src/devicedb/devicedb'
+import { memoryDeviceDB } from '../../src/devicedb/memory'
 import { VaultError } from '../../src/errors'
 import * as TH from '../test-helpers'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
+import { cacheableOf } from '../test-helpers/models-device-db'
 import { Dna, Passphrase, byPassphrase, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
@@ -96,6 +98,71 @@ describe("bank.clearCachedVault(bag): the vault closed, and what the device keep
     const { bank, clearCachedVault } = makeBankWorld()
     await TH.expectBad(bank.tryClearCachedVault({ vaultlabel: Dna.vaultlabel, user_id: 'u2' }), 'bad_scope')
     expect(clearCachedVault).not.toHaveBeenCalled()
+  })
+})
+// --
+
+// == [Reloaded over the models' memoryDeviceDB]: a reload takes up the kept lease, and erased copies are told
+
+/** A bank world over a fresh models memoryDeviceDB, whose banks tell `onBadNews` of what goes wrong. */
+const reloadWorld = () => {
+  const deviceDB = memoryDeviceDB()
+  const onBadNews = vi.fn()
+  return { ...makeBankWorld(null, { deviceDB, onBadNews }), deviceDB, onBadNews }
+}
+
+describe("A bank over the models' memoryDeviceDB, and the next session over the same device", () => {
+  it("takes up, at the next session's hello, the lease the first kept: the vault reads unlocked and the user is asked nothing", async () => {
+    const { bank, makeBank, requestCleartext } = reloadWorld()
+    await bank.hello()
+    const vault = await bank.ensureVault(Main, byPassphrase(Passphrase))
+    bank.goodbye()
+    const next = makeBank()
+    await next.hello()
+    const again = next.vaultOf(Main)
+    expect(again).to.not.equal(vault)
+    expect(again?.isLocked).to.be.false
+    expect(requestCleartext).not.toHaveBeenCalled()
+  })
+
+  it("takes up, at the next session's ensureVault, the lease kept of a vault the device kept no copy of, asking nothing", async () => {
+    const { bank, makeBank, deviceDB, requestCleartext } = reloadWorld()
+    await bank.hello()
+    await bank.ensureVault(Main, byPassphrase(Passphrase))
+    bank.goodbye()
+    vi.spyOn(deviceDB, 'findCachedVaults').mockResolvedValueOnce([])
+    const next = makeBank()
+    await next.hello()
+    expect(next.vaultOf(Main)).to.be.null
+    const again = await next.ensureVault(Main)
+    expect(again.isLocked).to.be.false
+    expect(requestCleartext).not.toHaveBeenCalled()
+  })
+
+  it("holds the vault locked in the next session after closeVault: the lock erased the kept lease", async () => {
+    const { bank, makeBank, deviceDB } = reloadWorld()
+    const erasing = vi.spyOn(deviceDB, 'tryDelLease')
+    await bank.hello()
+    await bank.ensureVault(Main, byPassphrase(Passphrase))
+    bank.closeVault(Main)
+    await TH.eventually(() => erasing.mock.results.length > 0)
+    await erasing.mock.results[0]?.value
+    bank.goodbye()
+    const next = makeBank()
+    await next.hello()
+    expect(next.vaultOf(Main)?.isLocked).to.be.true
+  })
+
+  it("tells onBadNews of a kept copy holding another vault's records than the one it is filed under, as a 'corrupt_record', once it is erased", async () => {
+    const { bank, deviceDB, onBadNews } = reloadWorld()
+    const work = { ...BankScope, vaultlabel: 'work' }
+    await deviceDB.putCachedVault({ ...cacheableOf(work), central: cacheableOf({ ...BankScope, ...Main }).central })
+    await bank.hello()
+    expect(await deviceDB.findCachedVaults(BankScope)).to.deep.equal([])
+    expect(bank.vaultOf({ vaultlabel: 'work' })).to.be.null
+    await TH.eventually(() => onBadNews.mock.calls.length > 0)
+    expect(onBadNews).toHaveBeenCalledOnce()
+    expect(onBadNews.mock.calls[0]?.[0]).to.include({ refusalkind: 'corrupt_record' })
   })
 })
 // --

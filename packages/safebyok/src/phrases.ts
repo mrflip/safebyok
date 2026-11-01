@@ -474,7 +474,7 @@ export const saltDoesNotFit = (expectedCount: number, handedCount: number): stri
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."
 // --
 
-// == [Models: the device store]: DeviceStoreFailed, DeviceStoreSaid, deviceStoreBlocked, deviceStoreUnavailable
+// == [Models: the device store]: DeviceStoreFailed, DeviceStoreSaid, deviceStoreBlocked, deviceStoreUnavailable, MisfiledCachedCopy
 
 /** For each verb of the models' device store, what its failure leaves undone, and what the user may do instead of trying again, if anything. */
 export const DeviceStoreFailed = Object.freeze({
@@ -504,4 +504,6 @@ export const deviceStoreUnavailable = ({ failed, instead }: DeviceStoreSaid, thr
   const retry = instead === undefined ? 'try again' : `try again, or ${instead}`
   return `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window.${thrownNameSaid(thrownName)}`
 }
+
+export const MisfiledCachedCopy = "This device kept a copy of one of this user's vaults that was no copy, or held another vault's records than the one it was filed under, so it was erased: that vault loads from storage instead. This package never files a copy so, so the device store, or something else writing to it, damaged it."
 // --
