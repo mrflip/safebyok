@@ -1,6 +1,6 @@
 # Thread 4a: bank (2026-11-01)
 
-Branch `20261101-bank`, PR #TBD, stacked on [#430](https://github.com/mrflip/safebyok/pull/430).
+Branch `20261101-bank`, PR [#432](https://github.com/mrflip/safebyok/pull/432), stacked on [#430](https://github.com/mrflip/safebyok/pull/430).
 Justify: green; core 4846 passed, 37 skipped; every package green.
 
 * **Built**
