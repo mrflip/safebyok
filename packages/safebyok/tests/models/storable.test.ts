@@ -843,7 +843,7 @@ describe("Storable snapshot and subscription", () => {
         await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
         expect(box.hasStaged).to.be.true
         expect(other.mock.calls.length).to.be.greaterThan(0)
-        expect(reported.length).to.eq(other.mock.calls.length)
+        expect(reported).to.have.lengthOf(other.mock.calls.length)
         expect(reported[0]).to.have.property('message', "The listener broke.")
       } finally {
         vi.unstubAllGlobals()

@@ -315,7 +315,7 @@ describe("the refresh's judgment", () => {
     vi.spyOn(world.deviceDB, 'tryGetLease').mockResolvedValueOnce({ ok: true, val: { ...cached, gate_epoch: cached.gate_epoch + 1 } })
     await vault.refresh()
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
-    expect(await world.getLease()).to.deep.eq(cached)
+    expect(await world.getLease()).to.deep.equal(cached)
   })
 
   it("keeps a lease granted after a read began, though that read found none in this device's store", async () => {
