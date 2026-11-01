@@ -97,12 +97,12 @@ describe("vault.autolockMinutes and vault.pesterMinutes: the triggers' intervals
 // == [Try forms]: tryEnsureUnlocked, tryLock, tryTakeUpLease, tryTakeUpCachedLease
 
 describe("the vault's try forms answer an Outcome where the plain verb throws", () => {
-  it("tryEnsureUnlocked answers the lease, or the refusal: a declined gating 'vault_locked', a wrong passphrase 'wrong_passphrase'", async () => {
+  it("tryEnsureUnlocked answers the lease, or the refusal: a declined gating 'declined', a wrong passphrase 'wrong_passphrase'", async () => {
     const { vault, requestCleartext } = await makeBornVault()
     expect(await TH.expectGood(vault.tryEnsureUnlocked())).to.equal(vault.demandLease())
     vault.lock()
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectBad(vault.tryEnsureUnlocked(), 'vault_locked')
+    await TH.expectBad(vault.tryEnsureUnlocked(), 'declined')
     await TH.expectBad(vault.tryEnsureUnlocked(byPassphrase('not the passphrase')), 'wrong_passphrase')
     await TH.expectGood(vault.tryEnsureUnlocked(byPassphrase(Passphrase)))
     expect(vault.isUnlocked).to.be.true

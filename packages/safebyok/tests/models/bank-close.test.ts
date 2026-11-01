@@ -48,7 +48,7 @@ describe("bank.closeVault(bag): the vault locked, its kept lease erased, and evi
     expect(again.isLocked).to.be.true
   })
 
-  it("declines a gating of the vault still asking the user: its ensureUnlocked refuses 'vault_locked'", async () => {
+  it("declines a gating of the vault still asking the user: its ensureUnlocked refuses 'declined'", async () => {
     const { bank, requestCleartext } = makeBankWorld()
     const vault = await bank.ensureVault(Main, byPassphrase(Passphrase))
     vault.lock()
@@ -57,7 +57,7 @@ describe("bank.closeVault(bag): the vault locked, its kept lease erased, and evi
     const pending = vault.ensureUnlocked()
     await TH.eventually(() => asked.gating !== null)
     bank.closeVault(Main)
-    await TH.expectRefusal(pending, 'vault_locked')
+    await TH.expectRefusal(pending, 'declined')
     expect(asked.gating?.isOpen).to.be.false
   })
 
@@ -109,7 +109,7 @@ describe("bank.ensureVault(bag, cleartexts): a call handing its own cleartexts j
     expect(vault.isLocked).to.be.false
     expect(requestCleartext).toHaveBeenCalledOnce()
     asked.gating?.decline()
-    await TH.expectRefusal(asking, 'vault_locked')
+    await TH.expectRefusal(asking, 'declined')
   })
 
   it("is joined by a call that hands none: one vault, the user asked nothing", async () => {

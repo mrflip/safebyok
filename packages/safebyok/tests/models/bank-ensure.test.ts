@@ -39,11 +39,11 @@ describe("Bank.ensureVault: the vault the vaultDB holds, or one built and stored
     expect(isZeroed(passkeyAnswer.prfBytes)).to.be.true
   })
 
-  it("refuses 'vault_locked' where the user declines the gating, storing nothing, and tryEnsureVault answers it", async () => {
+  it("refuses 'declined' where the user declines the gating, storing nothing, and tryEnsureVault answers it", async () => {
     const { bank, requestCleartext, storedNow } = makeBankWorld()
     requestCleartext.mockImplementation(declineAtOnce)
     const answer = await bank.tryEnsureVault({ vaultlabel: Dna.vaultlabel })
-    expect(answer.ok ? null : answer.err.refusalkind).to.eq('vault_locked')
+    expect(answer.ok ? null : answer.err.refusalkind).to.eq('declined')
     expect(storedNow()).to.be.null
   })
 

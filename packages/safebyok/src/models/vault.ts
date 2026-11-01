@@ -298,7 +298,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
    * Wrong cleartexts refuse
    * 'wrong_passphrase' or 'wrong_passkey', leaving unspent a passkey's answer for another passkey
    * or salt; a passkey's answer for a vault with no passkey, 'absent_wayin'; a gating the user
-   * declines, 'declined'; a lock or let-go while it unlocks, 'vault_locked'.
+   * declines, or a lock or let-go ends, 'declined'; a lock or let-go that lands while it unlocks
+   * otherwise, 'vault_locked'.
    */
   ensureUnlocked(cleartexts?: AttemptCleartexts): Promise<Lease> {
     return spendAnswerAfter(cleartexts, async () => {

@@ -20,12 +20,12 @@ const lockedVaultAsking = async () => {
 
 describe("vault.lock() and vault.letLeaseGo(): a gating of the vault still asking is declined", () => {
   for (const verb of ['lock', 'letLeaseGo'] as const) {
-    it(`declines it at ${verb}(): ensureUnlocked refuses 'vault_locked', and an attempt after refuses 'gating_landed'`, async () => {
+    it(`declines it at ${verb}(): ensureUnlocked refuses 'declined', and an attempt after refuses 'gating_landed'`, async () => {
       const { vault, asked } = await lockedVaultAsking()
       const pending = vault.ensureUnlocked()
       await TH.eventually(() => asked.gating !== null)
       vault[verb]()
-      await TH.expectRefusal(pending, 'vault_locked')
+      await TH.expectRefusal(pending, 'declined')
       expect(asked.gating?.isOpen).to.be.false
       await TH.expectRefusal(asked.gating!.attempt(byPassphrase(Passphrase)), 'gating_landed')
       expect(vault.isLocked).to.be.true
@@ -37,7 +37,7 @@ describe("vault.lock() and vault.letLeaseGo(): a gating of the vault still askin
     const pending = vault.ensureUnlocked()
     await TH.eventually(() => asked.gating !== null)
     vault.lock()
-    await TH.expectRefusal(pending, 'vault_locked')
+    await TH.expectRefusal(pending, 'declined')
     const lease = await vault.ensureUnlocked()
     expect(vault.demandLease()).to.equal(lease)
     expect(requestCleartext).toHaveBeenCalledTimes(2)
