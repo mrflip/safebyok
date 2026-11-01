@@ -2,8 +2,9 @@ import { randomId } from '../crypto'
 import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
 import { type Outcome, outcomeOf } from '../outcome'
+import { oneAtATime } from '../one-at-a-time'
 import { stableJsonify } from '../stable-jsonify'
-import { lockedError, movedUnderEditError, notFullError } from '../helpers/throwers'
+import { lockedError, movedUnderEditError, partialLoadError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
@@ -59,6 +60,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
   readonly #trigger: Trigger<SnapshotT, this>
+  /** The fetch under way, which every `fetch` made meanwhile joins, resolving whether storage held a record. */
+  readonly #oneFetchAtATime = oneAtATime(() => this.doFetch())
   readonly #listeners = new Set<() => void>()
   /** Whether the listing's watch should push full records for this thing: true until set otherwise. */
   #watchable = true
@@ -86,14 +89,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     Object.seal(this)
     //
     this.#trigger = new Trigger({
-      clock:       world.clock,
-      maxMillis:   opts.maxMillisSinceRefresh,
-      eagerFrac:   opts.eagerFrac,
-      doSnapshot:  () => this.snapshot,
-      doTryLaunch: () => this.tryFetch({ ifAbsent: 'nil' }),
+      clock:          world.clock,
+      intervalMillis: opts.maxMillisSinceRefresh,
+      eagerFrac:      opts.eagerFrac,
+      doSnapshot:     () => this.snapshot,
       // `receive` notes success by its verdict: a record not older, central or the record in hand whole. The next launch is scheduled after any launch that completes.
-      notesOwnSuccess: true,
-      onTimerRefusal:  (err) => { this.listing.tellBadNews([err]) },
+      doTryLaunch:    () => this.tryFetch({ ifAbsent: 'nil' }),
+      onTimerRefusal: (err) => { this.listing.tellBadNews([err]) },
     })
   }
 
@@ -216,18 +218,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: demandUnlocked, demandPresent, demandFull, demandedFull, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToSend, demandReadyToSend, ensureReadyToDel, demandReadyToDel
+  // == [Guards]: demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToSend, demandReadyToSend, ensureReadyToDel, demandReadyToDel
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
   demandPresent():  this { if (! this.isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
 
-  demandFull():     this { if (! this.isFull)    { throw notFullError() }                              return this }
+  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 
-  /** The full record in hand; a sparse one or a tombstone refuses 'bad_option'. */
-  protected demandedFull(): RecordT {
+  /** The full record in hand, or refuses 'bad_option' where it is sparse or a tombstone. */
+  protected demandFullProps(): RecordT {
     const { full } = this
-    if (full === null) { throw notFullError() }
+    if (full === null) { throw partialLoadError() }
     return full
   }
 
@@ -264,18 +266,26 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, edit, send, del, each with its try form
 
-  /** Get the record storage holds, through the listing, which delivers it to `receive`. Where nothing is stored, or a tombstone,
-   * `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent. `opts` are checked
-   * first, before the world is made timely.
+  /** Get the record storage holds, through the listing, which delivers it to `receive`: one fetch at a time, a call made while one is under way joining it, and settling as it settles, its refusal included.
+   * Where nothing is stored, or a tombstone, `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil'
+   * resolves this thing, absent. It is judged for each call, joined or not. `opts` are checked first, before the world is made timely.
    */
   async fetch(opts: FetchOpts = {}): Promise<this> {
-    const fetchOpts = MSX.fetchOpts.parse(opts)
-    await this.ensureReadyToFetch(fetchOpts)
-    await this.listing.fetch(this.scope, fetchOpts)
+    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
+    await this.ensureReadyToFetch(timely)
+    const isStored = await this.#oneFetchAtATime()
+    if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
     return this
   }
 
-  tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
+  /** Get the record storage holds, through the listing, at once: the one fetch that `fetch` has calls made meanwhile join. Resolves whether storage held a record, not a tombstone. */
+  protected async doFetch(): Promise<boolean> {
+    return (await this.listing.fetch(this.scope, { ifAbsent: 'nil' })) !== null
+  }
+
+  tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> {
+    return outcomeOf(() => this.fetch(opts))
+  }
 
   /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, or by {@link MSX.MinRefreshMillis} where it is not whole, so fetched again whatever its age once that short horizon passes. Calls made during a fetch join it. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
@@ -358,7 +368,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     } else if (delSpent) {
       this.adopt(central, null)
     }
-    if (! older && this.#isWhole) { this.#trigger.noteSuccessNow() }
+    if (! older && this.#isWhole) { this.#trigger.taskCompleted() }
     return (delSpent || act.success) ? this.settle() : { badnews: [] }
   }
 

@@ -22,7 +22,7 @@ describe("Vault.replacePassphrase", () => {
     expect(vault.demandLease()).to.equal(held)
     expect(held.isInForce).to.be.true
     expect(await roundTrip(held, lease)).to.eq('sk-test')
-    lease.letGo()
+    lease.evict()
   })
 
   it("refuses a wrong current proof with the attempt's own refusal, asking for no new passphrase and storing nothing", async () => {
@@ -82,7 +82,7 @@ describe("Vault.addPasskey", () => {
     const proving = await vault.gate.attemptProof(byPasskey('laptop'), world)
     const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis })
     expect(await roundTrip(vault.demandLease(), lease)).to.eq('sk-test')
-    lease.letGo()
+    lease.evict()
   })
 
   it("refuses 'bad_option' on a vault that has a passkey, asking nothing", async () => {

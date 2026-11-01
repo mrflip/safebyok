@@ -1,9 +1,9 @@
 import { consistent } from '../checks/validator'
-import { FarFuture, ForeverMillis } from '../consts'
+import { FarFuture } from '../consts'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
 import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
-import { Trigger } from '../helpers/trigger'
+import { type IntervalMillis, Trigger } from '../helpers/trigger'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type LeaseVault, type SealedWhisper, type VaultStamp, LeaseFormat, leaseGetArgs, leaseGrantArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, serializedBytes, vaultStamp } from './models-shapes'
@@ -27,25 +27,26 @@ export class Lease implements LeaseStamp {
   /** The stamp of the vault this lease is of, parsed once: what every ctx under it binds. */
   readonly #vaultStamp: VaultStamp
 
-  /** Fires `vault.lock()` at `autolock_at`; disposed when the lease is forgotten or let go. */
+  /** Fires `vault.lock()` at `autolock_at`; disarmed when the lease is forgotten or evicted. */
   readonly #autolock: Trigger<LeaseSparse, void>
 
-  private constructor(vault: LeaseVault, dbfriend: LeaseDBFriend, record: LeaseRecord) {
+  private constructor(vault: LeaseVault, dbfriend: LeaseDBFriend, record: LeaseRecord, intervalMillis: IntervalMillis) {
     this.#record = leaseRecord.parse(record)
     tattoo(this, leaseStamp.parse(record), { writable: false, configurable: false })
     adorn(this, 'vault', vault)
     adorn(this, 'dbfriend', dbfriend)
     this.#vaultStamp = vaultStamp.parse(vault)
+    // A lease in hand is a success of the autolock's task: timely, and its timer set, for `intervalMillis` from now, when the autolock fires.
     this.#autolock = new Trigger({
       clock:          vault.clock,
-      maxMillis:      ForeverMillis,
+      intervalMillis,
       eagerFrac:      1,
       doSnapshot:     () => this.toJSON(),
       doTryLaunch:    () => outcomeOf(() => { this.#autolockNow() }),
       onTimerRefusal: (err) => { dbfriend.logger.warn('The autolock fired, but locking the vault was refused.', { call: 'Lease.autolock', refusalkind: err.refusalkind }) },
     })
     Object.freeze(this)
-    this.#autolock.scheduleLaunchAt(this.autolock_at)
+    this.#autolock.taskCompleted()
   }
 
   // == [Making one]: get, tryGet, grant
@@ -66,7 +67,7 @@ export class Lease implements LeaseStamp {
       await eraseKept(dbfriend, 'Lease.get')
       return null
     }
-    return new Lease(vault, dbfriend, checked.data)
+    return new Lease(vault, dbfriend, checked.data, checked.data.autolock_at - vault.clock.now())
   }
 
   static tryGet(vault: LeaseVault, dbfriend: LeaseDBFriend): Promise<Outcome<Lease | null>> {
@@ -83,34 +84,34 @@ export class Lease implements LeaseStamp {
     const put = await dbfriend.tryPutLease(record)
     // The deviceDB is a cache: a put refused costs the next session a passphrase, not this one its proof.
     if (! put.ok) { dbfriend.logger.warn('The lease was granted but could not be kept on this device: the next session asks for the passphrase again.', { call: 'Lease.grant', refusalkind: put.err.refusalkind }) }
-    return new Lease(vault, dbfriend, record)
+    return new Lease(vault, dbfriend, record, leaseMillis)
   }
   // --
 
-  // == [Ending one]: forget, letGo, isForgotten, isInForce, autolockNow
+  // == [Ending one]: forget, evict, isForgotten, isInForce, autolockNow
 
   /** Drop the keys and erase the record where the deviceDB keeps it. Nothing here has bytes to zero: the leaseKey is a non-extractable handle, and the wrap is ciphertext; dropping the record is all that can be done. */
   async forget(): Promise<void> {
     if (this.#record === null) { return }
-    this.letGo()
+    this.evict()
     const del = await this.dbfriend.tryDelLease()
     if (! del.ok) { throw del.err }
   }
 
-  /** Drop the keys and dispose the autolock, leaving the record the deviceDB keeps: a lease displaced or declined, or one its vault said goodbye to. */
-  letGo(): void {
+  /** Drop the keys and disarm the autolock, leaving the record the deviceDB keeps. */
+  evict(): void {
     this.#record = null
-    this.#autolock.dispose()
+    this.#autolock.disarm()
   }
 
   get isForgotten(): boolean { return this.#record === null }
 
   get isInForce(): boolean { return this.#record !== null && this.#autolock.isTimely }
 
-  /** The autolock's launch: lock the vault, which erases the kept lease by scope; let go here too, for a lease the vault never took up. */
+  /** The autolock's launch: lock the vault, which erases the kept lease by scope; evict here too, for a lease the vault never took up. */
   #autolockNow(): void {
     this.vault.lock()
-    this.letGo()
+    this.evict()
   }
   // --
 
@@ -141,11 +142,13 @@ export class Lease implements LeaseStamp {
     const vaultKey = await this.#vaultKey('unwrapKey')
     const boxKeyCtx  = this.#ctxOf(boxKeyStamp, 'box_key_wrapped')
     const whisperCtx = this.#ctxOf(whisperStamp, 'whisper_ciphered')
-    const opened = await outcomeOf(async () => {
+    // Only these two WebCrypto calls are trapped: their rejection is how a damaged whisper is learned. The calls above refuse as they are, or are bugs.
+    try {
       const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, boxKeyCtx, { extractable: false, usage: ['decrypt'] })
-      return decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
-    }, unopenedWhisper)
-    return valOf(opened)
+      return await decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
+    } catch {
+      throw unopenedWhisper()
+    }
   }
 
   /** The caller's stamp under the vault's, bound to one of the lease's purposes. */
@@ -168,9 +171,9 @@ export class Lease implements LeaseStamp {
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
     const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), damagedLease)
     if (! opened.ok) {
-      // Locking drops the vault's lease and erases the kept one by scope; this one is let go too, should the vault hold another.
+      // Locking drops the vault's lease and erases the kept one by scope; this one is evicted too, should the vault hold another.
       this.vault.lock()
-      this.letGo()
+      this.evict()
     }
     return valOf(opened)
   }

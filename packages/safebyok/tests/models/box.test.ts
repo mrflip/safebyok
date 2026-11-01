@@ -39,7 +39,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   for (const [rcvdOf, blurb] of ConfirmingCases) {
     it(`notes success on ${blurb} that only confirms the full central held`, async () => {
       const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(fullBoxRecord())
-      held.mw.setNow(T0 + 800)
+      held.mw.setNow(T0 + 1000)
       expect(box.isTimely).to.be.false
       box.receive(rcvdOf())
       expect(box.isTimely).to.be.true

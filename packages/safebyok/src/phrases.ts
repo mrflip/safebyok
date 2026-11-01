@@ -50,7 +50,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, LeftOutExpected
+// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, ErrorExpected, LeftOutExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -69,6 +69,9 @@ export const ListingExpected = "Expected a Listing"
 
 /** The `err` of a storage call's answer. */
 export const VaultErrorExpected = "Expected a VaultError"
+
+/** The `err` of a task a trigger is told failed. */
+export const ErrorExpected = "Expected an Error"
 
 /** A field a bag must not carry beside another. */
 export const LeftOutExpected = "Expected it left out"
@@ -275,10 +278,10 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: RecordNotFull, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
-export const RecordNotFull = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
+export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why an edit laid over a central that moved while it was being made stages nothing. */
 export const MovedUnderEdit = "Storage delivered a newer record while this edit was being made, so the edit was laid over a record storage no longer holds, and nothing was staged. The record in hand is now the one delivered: call again to edit it."

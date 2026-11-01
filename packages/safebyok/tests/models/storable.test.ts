@@ -37,9 +37,9 @@ describe("storable.hydrate(opts): when it fetches", () => {
     [999,       { maxMillisSinceRefresh: 1000 },     0, 'does not fetch a record timely by the maxMillisSinceRefresh given'],
     [1000,      { maxMillisSinceRefresh: 1000 },     1, 'fetches a record untimely by the maxMillisSinceRefresh given'],
     [1e12,      { maxMillisSinceRefresh: Infinity }, 0, 'fetches nothing under maxMillisSinceRefresh Infinity, however old the record'],
-    // by the launch the thing's own horizon scheduled, at eagerFrac 0.8 of it:
-    [799,       {},                                  0, 'does not fetch, given no horizon, before the launch scheduled'],
-    [800,       {},                                  1, 'fetches, given no horizon, once the launch scheduled is due'],
+    // by the thing's own horizon, the whole of it, not the eagerFrac 0.8 of it its timer fires at:
+    [999,       {},                                  0, 'does not fetch, given no horizon, before the thing is untimely'],
+    [1000,      {},                                  1, 'fetches, given no horizon, once the thing is untimely'],
   ] as const
   for (const [elapsed, opts, gets, blurb] of HorizonCases) {
     it(blurb, async () => {
@@ -181,6 +181,53 @@ describe("storable.hydrate(opts): the world first, and one fetch at a time", () 
   })
 })
 
+describe("storable.fetch(opts): one fetch at a time, ifAbsent judged for each call", () => {
+  it("joins the fetch under way, from fetch or from hydrate: one get serves them all", async () => {
+    const { box } = await timelyBoxOf(1000)
+    const hold = holdOf()
+    const { scope } = box
+    held.mw.willGet(async () => {
+      await hold.promise
+      return held.mw.answerOf(scope, held.mw.fullBoxRecord())
+    })
+    const first = box.fetch()
+    await vi.advanceTimersByTimeAsync(0)
+    const second = box.fetch()
+    const third = box.hydrate({ maxMillisSinceRefresh: 0 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    hold.open()
+    expect(await Promise.all([first, second, third])).to.deep.equal([box, box, box])
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+  })
+
+  it("starts a fetch of its own once the one under way has ended", async () => {
+    const { box } = await timelyBoxOf(1000)
+    await box.fetch()
+    await box.fetch()
+    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
+  })
+
+  it("answers a 'fail' call the absent refusal and a 'nil' call this thing, though they share one fetch of nothing stored", async () => {
+    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(tombstoneBoxRecord({ revision_seq: 2 }))
+    held.mw.clearCalls()
+    const hold = holdOf()
+    const { scope } = box
+    held.mw.willGet(async () => {
+      await hold.promise
+      return held.mw.answerOf(scope, null)
+    })
+    const failing = box.fetch({ ifAbsent: 'fail' })
+    await vi.advanceTimersByTimeAsync(0)
+    const nilling = box.fetch({ ifAbsent: 'nil' })
+    await vi.advanceTimersByTimeAsync(0)
+    hold.open()
+    await expect(nilling).resolves.to.eq(box)
+    await TH.expectRefusal(failing, 'absent_box')
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+  })
+})
+
 describe("storable.hydrate(opts): after a failed fetch", () => {
   it("schedules no launch after the scheduled one fails, and the next hydrate launches on demand", async () => {
     const { box } = await timelyBoxOf(1000)
@@ -207,12 +254,11 @@ describe("storable.hydrate(opts): after a failed fetch", () => {
 
 describe("storable.hydrate(opts): a horizon past MaxTimerMillis", () => {
   const horizonMillis = 2 * MaxTimerMillis
-  const launchMillis = 0.8 * horizonMillis
 
-  it("arms no timer, and reads stale once the launch it schedules is passed", async () => {
+  it("arms no timer, and reads stale once the horizon is passed", async () => {
     const { box } = await timelyBoxOf(horizonMillis)
     expect(vi.getTimerCount()).to.eq(0)
-    await held.mw.advance(launchMillis - 1)
+    await held.mw.advance(horizonMillis - 1)
     expect(box.isTimely).to.be.true
     await held.mw.advance(1)
     expect(box.isTimely).to.be.false
@@ -1350,13 +1396,15 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
 
-  it("notes success for a fetch answered with a newer full record, scheduling the next launch at eagerFrac", async () => {
+  it("notes success for a fetch answered with a newer full record, timely for the whole horizon after it", async () => {
     const { box } = await timelyBoxOf(1000)
     held.mw.setNow(T0 + 1000)
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
     await box.hydrate()
     expect(box.isTimely).to.be.true
-    held.mw.setNow(T0 + 1800)
+    held.mw.setNow(T0 + 1999)
+    expect(box.isTimely).to.be.true
+    held.mw.setNow(T0 + 2000)
     expect(box.isTimely).to.be.false
   })
 
@@ -1482,7 +1530,7 @@ describe("storable refusal sentences, from phrases.ts", () => {
     held.mw.setLockState('unlocked')
     const sparse = await boxListingOf(held.mw).build(sparseBoxRecord({ boxlabel: 'sparse_one' }))
     const notFull = TH.expectSyncRefusal(() => sparse.demandFull(), 'bad_option')
-    expect(notFull.message).to.eq(Phrases.RecordNotFull)
+    expect(notFull.message).to.eq(Phrases.PartialLoad)
   })
 
   it("throws a record under another vault_tok with the sentence phrases.ts holds", async () => {
@@ -1520,8 +1568,11 @@ describe("storable: the timer after a launch that completes", () => {
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
     await held.mw.advance(800)
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    // The answer noted no success: the one at T0 stands, and ages out with its horizon.
+    expect(box.isTimely).to.be.true
+    await held.mw.advance(200)
     expect(box.isTimely).to.be.false
-    await held.mw.advance(800)
+    await held.mw.advance(600)
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
 

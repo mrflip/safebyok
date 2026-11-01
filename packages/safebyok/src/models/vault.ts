@@ -106,7 +106,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   // Made on first read, not at settle: the base constructor settles before this class's fields exist.
   /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. A vault held sparse, or a tombstone, has none in hand and refuses 'bad_option': hydrate first. */
   get gate(): Gate {
-    const full = this.demandedFull()
+    const full = this.demandFullProps()
     if (this.#gate?.props !== full.gate) { this.#gate = { props: full.gate, gate: new Gate(full, full.gate) } }
     return this.#gate.gate
   }
@@ -118,7 +118,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   async replacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<this> {
     MSX.passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
     await this.ensureReadyToEdit()
-    const ante = this.demandedFull().gate
+    const ante = this.demandFullProps().gate
     return this.#sendGate(ante, await this.gate.withPassphraseReplaced(proofClosure, passphraseClosure, this.world))
   }
 
@@ -128,7 +128,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   async addPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<this> {
     MSX.passkeyAddArgs.parse({ proofClosure, passkeyClosure })
     await this.ensureReadyToEdit()
-    const ante = this.demandedFull().gate
+    const ante = this.demandFullProps().gate
     return this.#sendGate(ante, await this.gate.withPasskeyAdded(proofClosure, passkeyClosure, this.world))
   }
 
@@ -138,7 +138,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   async revokePasskey(proofClosure: AttemptClosure): Promise<this> {
     MSX.passkeyRevokeArgs.parse({ proofClosure })
     await this.ensureReadyToEdit()
-    const ante = this.demandedFull().gate
+    const ante = this.demandFullProps().gate
     return this.#sendGate(ante, await this.gate.withPasskeyRevoked(proofClosure, this.world))
   }
 
@@ -229,9 +229,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
         return null
       }
       if (kept.val === null) { return null }
-      // Declined, it is let go: its autolock would otherwise lock the vault at its own `autolock_at`.
+      // Declined, it is evicted: its autolock would otherwise lock the vault at its own `autolock_at`.
       if (! kept.val.isInForce || this.#lease?.isInForce === true) {
-        kept.val.letGo()
+        kept.val.evict()
         return null
       }
       return this.#setLease(kept.val)
@@ -240,13 +240,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Hold `lease` as the vault's, the vault reading unlocked, and let go the lease it displaces. */
+  /** Hold `lease` as the vault's, the vault reading unlocked, and evict the lease it displaces. */
   #setLease(lease: Lease): Lease {
     const displaced = this.#lease
     this.#lease = lease
     this.#isLocked = false
     // Let go, the displaced lease's autolock neither locks the vault nor erases this lease's record at the old `autolock_at`.
-    if (displaced !== null && displaced !== lease) { displaced.letGo() }
+    if (displaced !== null && displaced !== lease) { displaced.evict() }
     this.settle()
     return lease
   }
@@ -272,7 +272,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.#lease = null
     const { tryDelLease } = this.leaseDBFriend()
     this.#leaseChore(async () => {
-      lease?.letGo()
+      lease?.evict()
       valOf(await tryDelLease())
     })
     this.settle()
@@ -283,7 +283,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.#isLocked = true
     const lease = this.#lease
     this.#lease = null
-    lease?.letGo()
+    lease?.evict()
     this.settle()
   }
 
@@ -333,7 +333,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** `makeStagedBase`'s base, the record in hand under its next revision, its `vault_tok` kept, and its gate, but where `#sendGate` stages a new one: a host's patch's props are all ignored. A staged gate proved against another gate than the record's refuses 'stale_write', its `meta` carrying the revisions as `edit`'s own refusal does. No birthday reaches here: `demandReadyToEdit` refuses a vault deleted or damaged, whose new life is a new instance. */
   protected makeStaged(patch: VaultPatch): Promise<VaultRecord> {
     const { base } = this.makeStagedBase()
-    const held = this.demandedFull().gate
+    const held = this.demandFullProps().gate
     if (! (patch instanceof GateStaging)) { return Promise.resolve({ ...base, gate: held }) }
     if (patch.ante !== held) { throw gateMovedUnderChange({ stored_revision: MSX.revision.parse(this.central), staged_revision: MSX.revision.parse(base) }) }
     return Promise.resolve({ ...base, gate: patch.gate })

@@ -29,7 +29,7 @@ guarantees until shown otherwise.
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
 | `packages/safebyok/src/types/types.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 | `packages/safebyok/src/models/proving.ts` | the wayinKey, and the vaultKey unwrapped per call and moved from proving to proving inside `makeWayin(source)`, handed only to `Lease.grant`; the PRF bytes, spent in a `finally` |
-| `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `letGo` and `forget` |
+| `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `forget` |
 | `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; `Gate.build` hands the passphrase proving back to the listing, which drops it after the birth lease |
 | `packages/safebyok/src/models/box.ts` | holds no key: hands the lease the bytes and stamps and gets bytes back; zeroes the opened bytes in a `finally` |
 
