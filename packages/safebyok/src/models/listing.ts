@@ -2,8 +2,7 @@
 
 import { randomId } from '../crypto'
 import { VaultError } from '../errors'
-import { alreadyHeldError } from '../helpers/throwers'
-import * as Phrases from '../phrases'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
@@ -84,7 +83,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       if (! revived.ok) { this.tellBadNews([revived.err]) }
     }
     this.#remakeSnapshot()
-    this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope))
+    this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope), this.#onChange)
     await this.hydrateAll()
   }
 
@@ -156,7 +155,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const record = this.recordOf(duck)
     const scope = this.scopeOf(record)
     const priorRevisionTok = this.priorRevisionTokOf(scope)
-    if (! fitsPriorRevisionTok(record.revision_seq, priorRevisionTok)) { throw new VaultError('bad_record', Phrases.PutUnfitForPrior) }
+    if (! fitsPriorRevisionTok(record.revision_seq, priorRevisionTok)) { throw RefusalFuncs.putUnfitForPrior() }
     const answer = await this.#store.put(record, priorRevisionTok)
     return this.#deliver(answer, scope)
   }
@@ -186,7 +185,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, asked: ScopeT, ifAbsent?: IfAbsent): Promise<ThingT | null> {
     MSX.answer.parse(answer)
-    if (this.scopepathOf(answer.scope) !== this.scopepathOf(asked)) { throw new VaultError('bad_record', Phrases.AnswerOfOtherScope) }
+    if (this.scopepathOf(answer.scope) !== this.scopepathOf(asked)) { throw RefusalFuncs.answerOfOtherScope() }
     this.world.takeWorld(answer.world)
     if (answer.ok) {
       const thing = this.#buildOrReceive(answer.scope, { flavor: 'received', record: answer.val })
@@ -213,7 +212,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #buildOrReceive(scope: ScopeT, intake: Intake<RecordT, SparseT>): ThingT | null
   #buildOrReceive(scope: ScopeT, intake: Intake<RecordT, SparseT>): ThingT | null {
     const held = this.at(scope)
-    if (held !== null && intake.flavor === 'drafted') { throw alreadyHeldError() }
+    if (held !== null && intake.flavor === 'drafted') { throw RefusalFuncs.alreadyHeld() }
     if (held !== null && intake.flavor === 'cached')  { return held }
     if (intake.flavor === 'received' && intake.record !== null) { this.#demandRecordOfScope(intake.record, scope) }
     if (held === null) { this.#demandRecordOfVault(intake) }
@@ -227,7 +226,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Refuse 'bad_record' a `record` whose scope is not `scope`, the one the answer that carries it names. */
   #demandRecordOfScope(record: Fetched<RecordT, SparseT>, scope: ScopeT): void {
-    if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw new VaultError('bad_record', Phrases.RecordOfOtherScope) }
+    if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw RefusalFuncs.recordOfOtherScope() }
   }
 
   /** Refuse 'unexpected_error' an `intake` of a record, or of a cached copy whose central or staged is, under another `vault_tok` than the vault this listing lies in, before any instance is made of it. */
@@ -235,7 +234,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const vault_tok = this.vaultTokOfWorld()
     if (vault_tok === null) { return }
     for (const record of this.#recordsOf(intake)) {
-      if (this.sparseOf(record).vault_tok !== vault_tok) { throw new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth) }
+      if (this.sparseOf(record).vault_tok !== vault_tok) { throw RefusalFuncs.otherVaultTokAtBirth() }
     }
   }
 
@@ -266,7 +265,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [The watch]: onNotice
+  // == [The watch]: onNotice, onChange
 
   /** Deliver a notice as a good answer. Any refusal met on the way, a malformed notice's, the world's or one `receive` throws, is bad news, as nobody asked: told to `onBadNews`, never thrown into the store's watch. */
   readonly #onNotice = async (notice: Notice<RecordT, SparseT>): Promise<void> => {
@@ -278,6 +277,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     })
     if (! ok) { this.tellBadNews([err]) }
   }
+
+  /** Fetch every instance again, whatever its age: the store's watch rings it where it cannot say what changed, so each instance meets what storage now answers, a refusal told as bad news. */
+  readonly #onChange = (): void => { void this.hydrateAll({ maxMillisSinceRefresh: 0 }) }
   // --
 
   // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, remakeSnapshot
@@ -294,13 +296,19 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Make the listing's snapshot again, of the present instances' own; when one differs, replace it and call every listener. */
+  /** Make the listing's snapshot again, of the present instances' own; when one differs, replace it and call every listener. A listener that throws is reported to the platform (`reportToPlatform`), and the others are still called. */
   #remakeSnapshot(): void {
     const next = this.things.filter((thing) => thing.isPresent).map((thing) => thing.getSnapshot())
     const isSame = next.length === this.#snapshot.length && next.every((snapshot, idx) => snapshot === this.#snapshot[idx])
     if (isSame) { return }
     this.#snapshot = Object.freeze(next)
-    for (const listener of this.#listeners) { listener() }
+    for (const listener of this.#listeners) {
+      try {
+        listener()
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    }
   }
   // --
 

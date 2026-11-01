@@ -175,7 +175,7 @@ describe("a gating, kind by kind", () => {
 // == [Correctable]: the four refusals that leave the gating open
 
 describe("an attempt the user can correct", () => {
-  /** Each correctable refusal: the call that raises its gating, the attempt that meets it, and the one that then succeeds. */
+  /** Each correctable refusal: the call that launches its gating, the attempt that meets it, and the one that then succeeds. */
   const Correctables: readonly (readonly [
     RefusalKind,
     (vault: Vault) => Promise<Outcome<Vault>>,
@@ -189,14 +189,14 @@ describe("an attempt the user can correct", () => {
     ['same_passphrase', (vault) => vault.tryPutWayin('passphrase'), (gating) => TH.asKind(gating, 'change_passphrase').attempt('pw', 'pw'), (gating) => TH.asKind(gating, 'change_passphrase').attempt('pw', 'pw two'), 'the same passphrase again'],
   ]
 
-  for (const [refusalkind, raise, mistake, rightOne, blurb] of Correctables) {
+  for (const [refusalkind, launch, mistake, rightOne, blurb] of Correctables) {
     it(`refuses ${refusalkind} for ${blurb}, leaving the gating open: the next attempt with the right one succeeds, and the call resolves`, async () => {
       const { world, vault: maker } = await vaultWithPasskey()
       await maker.lock()
       TH.closeVault(maker)
       const dialog = TH.heldDialog()
       const vault = await world.open({ requestCleartext: dialog.requestCleartext, strengthChecker: weakIsWeak })
-      const calling = raise(vault)
+      const calling = launch(vault)
       const gating = await dialog.asked()
       await TH.expectBad(mistake(gating), refusalkind)
       await TH.expectGood(rightOne(gating))
@@ -433,7 +433,7 @@ describe("a host function that hears the passphrase throwing, quoting it", () =>
 
 // == [Declining]: a declined gating's refusal, worded by kind
 
-/** Each kind of gating, the call that raises it on a vault made as `made` says, and what its decline's message says is left as it was. */
+/** Each kind of gating, the call that launches it on a vault made as `made` says, and what its decline's message says is left as it was. */
 const DeclineCases = [
   ['initialize_gate',   'novel',   (vault: Vault) => vault.tryEnsureUnlocked(),         /first passphrase.*still has no passphrase/],
   ['unlock_vault',      'locked',  (vault: Vault) => vault.tryEnsureUnlocked(),         /unlock it.*stays locked/],
@@ -455,17 +455,17 @@ const vaultMade = async (made: 'novel' | 'locked' | 'passkey', overrides: Partia
 }
 
 describe("a declined gating's refusal", () => {
-  for (const [gatingkind, made, raise, says] of DeclineCases) {
+  for (const [gatingkind, made, launch, says] of DeclineCases) {
     it(`words a declined ${gatingkind} for what it asked, as vault_locked`, async () => {
       const vault = await vaultMade(made, {})
-      const err = await TH.expectBad(raise(vault), 'vault_locked')
+      const err = await TH.expectBad(launch(vault), 'vault_locked')
       expect(err.message).to.match(says)
       expect(err.message).to.match(/declined/)
     })
 
     it(`words a ${gatingkind} with no requestCleartext to ask for what it needed, as vault_locked`, async () => {
       const vault = await vaultMade(made, { requestCleartext: null })
-      const err = await TH.expectBad(raise(vault), 'vault_locked')
+      const err = await TH.expectBad(launch(vault), 'vault_locked')
       expect(err.message).to.match(says)
       expect(err.message).to.match(/no requestCleartext/)
     })
@@ -614,7 +614,7 @@ describe("a lock or a decline landing during an attempt", () => {
     })
   }
 
-  it("has ensureUnlocked wait out a deletion whose write was sent when a lock() lands, raising no second dialog, and refuse vault_gone once the vault is deleted", async () => {
+  it("has ensureUnlocked wait out a deletion whose write was sent when a lock() lands, launching no second dialog, and refuse vault_gone once the vault is deleted", async () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
@@ -756,7 +756,7 @@ describe("joining a gating, by kind", () => {
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("has putWayin('passkey') wait out a pending unlock_vault gating, then raise its own put_passkey", async () => {
+  it("has putWayin('passkey') wait out a pending unlock_vault gating, then launch its own put_passkey", async () => {
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(makeWorld(), { requestCleartext: dialog.requestCleartext })
     const ensuring = vault.tryEnsureUnlocked()
@@ -786,7 +786,7 @@ describe("joining a gating, by kind", () => {
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
   })
 
-  it("has ensureUnlocked() wait out a put_passkey gating the user declines, then raise its own unlock_vault: the decline refuses putWayin alone", async () => {
+  it("has ensureUnlocked() wait out a put_passkey gating the user declines, then launch its own unlock_vault: the decline refuses putWayin alone", async () => {
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(makeWorld(), { requestCleartext: dialog.requestCleartext })
     const putting = vault.tryPutWayin('passkey')
@@ -801,7 +801,7 @@ describe("joining a gating, by kind", () => {
     expect(vault.snapshot.gate?.passkey).to.be.null
   })
 
-  it("has ensureUnlocked({ renewMinutes: 60 }) join an unlock_vault gating whose consult takes up a lease ending within the hour, then raise its own, asking the user once", async () => {
+  it("has ensureUnlocked({ renewMinutes: 60 }) join an unlock_vault gating whose consult takes up a lease ending within the hour, then launch its own, asking the user once", async () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })
@@ -833,7 +833,7 @@ describe("joining a gating, by kind", () => {
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("has del() wait out a pending unlock_vault gating, then raise its own del_vault", async () => {
+  it("has del() wait out a pending unlock_vault gating, then launch its own del_vault", async () => {
     const world = makeWorld()
     const dialog = TH.heldDialog()
     const vault = await lockedVaultIn(world, { requestCleartext: dialog.requestCleartext })

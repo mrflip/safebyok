@@ -284,15 +284,15 @@ export class Lease implements LeaseSparse {
   }
 }
 
-/** A lease as this device's store kept it, fetched but not yet taken up: its record held closed, its stamp showing. What {@link KeptLease.tryGet} hands the bank's birth, the vault's refresh and its pantry consult, so that no code but a Lease, a Proving and the store ever holds a lease record.
+/** A lease as this device's store kept it, fetched but not yet taken up: its record held closed, its stamp showing. What {@link CachedLease.tryGet} hands the bank's birth, the vault's refresh and its pantry consult, so that no code but a Lease, a Proving and the store ever holds a lease record.
  * Its own fields are its {@link LeaseSparse}, which a revocation check compares; the leaseKey and
- * the wrap stay inside, for the Lease that {@link KeptLease.leaseOn} makes once a Vault object takes
+ * the wrap stay inside, for the Lease that {@link CachedLease.leaseOn} makes once a Vault object takes
  * it up. Frozen, and shown in a spread, JSON or a log line by its sparse fields alone.
  *
- * @example const kept = valOf(await KeptLease.tryGet(deviceDB, scope, { logger, call: 'hello' }))   // null when this device holds none
- * @example const lease = kept.leaseOn(vault)   // Lease.make, of the record kept inside
+ * @example const cached = valOf(await CachedLease.tryGet(deviceDB, scope, { logger, call: 'hello' }))   // null when this device holds none
+ * @example const lease = cached.leaseOn(vault)   // Lease.make, of the record kept inside
  */
-export class KeptLease implements LeaseSparse {
+export class CachedLease implements LeaseSparse {
   /** The stored record, checked, its leaseKey and wrap among it: never shown. */
   readonly #record: LeaseRecord
 
@@ -331,25 +331,25 @@ export class KeptLease implements LeaseSparse {
    * beside it, passes none and says nothing. The store's own refusal comes through as the
    * outcome.
    *
-   * @example const kept = valOf(await KeptLease.tryGet(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
-   * @example const beside = valOf(await KeptLease.tryGet(deviceDB, scope))   // the refresh's look, told to no one
+   * @example const cached = valOf(await CachedLease.tryGet(deviceDB, scope, { logger, call: 'ensureUnlocked' }))
+   * @example const beside = valOf(await CachedLease.tryGet(deviceDB, scope))   // the refresh's look, told to no one
    */
-  static async tryGet(deviceDB: Pick<DeviceDB, 'tryGetLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<KeptLease | null>> {
-    const kept = await deviceDB.tryGetLease(scope)
-    if (! kept.ok) { return kept }
-    if (kept.val === null) { return good(null) }
-    const checked = DX.leaseRecord.safeParse(kept.val)
+  static async tryGet(deviceDB: Pick<DeviceDB, 'tryGetLease'>, scope: VaultScope, told?: { logger: VaultLogger, call: 'hello' | 'ensureUnlocked' }): Promise<Outcome<CachedLease | null>> {
+    const cached = await deviceDB.tryGetLease(scope)
+    if (! cached.ok) { return cached }
+    if (cached.val === null) { return good(null) }
+    const checked = DX.leaseRecord.safeParse(cached.val)
     if (! checked.success || ! sameScope(checked.data, scope)) {
       // Neither the record nor what it failed is told: the record may hold key material.
       told?.logger.warn("This device's lease could not be read as a lease of this vault, so it counts as none and was left where it lies: the vault asks for the passphrase, and the next unlock writes over it.", { call: told.call })
       return good(null)
     }
-    return good(new KeptLease(checked.data))
+    return good(new CachedLease(checked.data))
   }
 
-  /** The Lease this kept record stands for on `vault`: {@link Lease.make} of the record, which refuses 'corrupt_record' as that does.
+  /** The Lease this cached record stands for on `vault`: {@link Lease.make} of the record, which refuses 'corrupt_record' as that does.
    *
-   * @example const lease = kept.leaseOn(vault)
+   * @example const lease = cached.leaseOn(vault)
    */
   leaseOn(vault: ConsistencyWith<VaultStamp & Pick<Vault, 'tryLock'>>): Lease {
     return Lease.make(vault, this.#record)

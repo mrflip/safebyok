@@ -660,6 +660,23 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(listing.snapshot).to.deep.equal([])
     })
 
+    it("reports a listener that throws to the platform, still calls the others, and the verb that changed the snapshot resolves", async () => {
+      const reported: unknown[] = []
+      vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+      try {
+        const listing = boxListingOf(held.mw)
+        let told = 0
+        listing.subscribe(() => { throw new Error("The listener broke.") })
+        listing.subscribe(() => { told += 1 })
+        await listing.build(fullBoxRecord())
+        expect(told).to.eq(1)
+        expect(reported).to.have.lengthOf(1)
+        expect(reported[0]).to.have.property('message', "The listener broke.")
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
     it("lets a listener go, and tells none after", async () => {
       const listing = boxListingOf(held.mw)
       let told = 0

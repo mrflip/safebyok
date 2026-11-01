@@ -613,7 +613,7 @@ describe("the sidecar", () => {
     expect(vault.getSnapshot().boxes[0]?.sidecar).to.deep.equal({ note: 'n'.repeat(20) })
   })
 
-  it("refuses a sidecar over maxWhisperBytes alone, its whisper left out, before raising a gating", async () => {
+  it("refuses a sidecar over maxWhisperBytes alone, its whisper left out, before launching a gating", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw', { maxWhisperBytes: 64 })
     await warm.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -1118,7 +1118,7 @@ describe("vault.getBox", () => {
     expect(box).to.be.instanceOf(Box)
   })
 
-  it("raises no gating where the listing shows no box under the boxlabel, resolving null, and raises one when one is there", async () => {
+  it("launches no gating where the listing shows no box under the boxlabel, resolving null, and launches one when one is there", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw')
     await warm.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
@@ -1233,7 +1233,7 @@ describe("box.extractWhisper, through a vault", () => {
     vi.restoreAllMocks()
   })
 
-  it("opens a box with the lease in hand, reading no storage and raising no gating, as its example shows", async () => {
+  it("opens a box with the lease in hand, reading no storage and launching no gating, as its example shows", async () => {
     const world = makeWorld()
     const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
     const vault = await world.openUnlocked('pw', { requestCleartext })
@@ -1275,7 +1275,7 @@ describe("box.extractWhisper, through a vault", () => {
     expect(whisper).to.deep.equal({ apiKey: 'sk-fake' })
   })
 
-  it("refuses 'vault_locked' with no lease in hand, raising no gating", async () => {
+  it("refuses 'vault_locked' with no lease in hand, launching no gating", async () => {
     const world = makeWorld()
     const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
     const vault = await world.openUnlocked('pw', { requestCleartext })
