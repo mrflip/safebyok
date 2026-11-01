@@ -425,13 +425,15 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, PasskeyProvesNot, PasskeyMovedSinceLaunch, GateMadeElsewhere, RequestCleartextThrew, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, LockedWhileAsking, GatingSettled, PasskeyProvesNot, PasskeyMovedSinceLaunch, GateMadeElsewhere, RequestCleartextThrew, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
 export const PositiveMinutesShape = "Expected a number of minutes above zero, fractions too (0.5 is thirty seconds), or Infinity for never"
 
 export const GatingDeclined = "The prompt was declined, or closed before an attempt succeeded, so nothing was unlocked or changed: ask again when the user wants the vault."
+
+export const LockedWhileAsking = "The vault was locked while this prompt was open, which closed it, so nothing was unlocked or changed: ask again when the user wants the vault."
 
 export const GatingSettled = "This prompt has ended -- it was answered, declined, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 

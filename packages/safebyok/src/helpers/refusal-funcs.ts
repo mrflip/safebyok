@@ -126,11 +126,14 @@ export const otherPrfSalt = (): VaultError => listedRefusal('wrong_passkey', Phr
 export const unknownKeyDeriver = (): VaultError => listedRefusal('unknown_key_deriver', Phrases.UnknownKeyDeriver)
 // --
 
-// == [Gatings]: requestCleartextThrew, gatingDeclined, gatingSettled, passkeyProvesNot, passkeyMovedSinceLaunch, gateMadeElsewhere, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
+// == [Gatings]: requestCleartextThrew, gatingDeclined, lockedWhileAsking, gatingSettled, passkeyProvesNot, passkeyMovedSinceLaunch, gateMadeElsewhere, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
 
 export const requestCleartextThrew = (): VaultError => listedRefusal('unexpected_error', Phrases.RequestCleartextThrew)
 
 export const gatingDeclined = (): VaultError => listedRefusal('declined', Phrases.GatingDeclined)
+
+/** The 'declined' of a gating a lock of its vault ended while it asked. */
+export const lockedWhileAsking = (): VaultError => listedRefusal('declined', Phrases.LockedWhileAsking)
 
 export const gatingSettled = (): VaultError => listedRefusal('gating_landed', Phrases.GatingSettled)
 
