@@ -165,6 +165,14 @@ describe("DeviceDB's cached vaults, as stored", () => {
     expect(deviceDB.hooks.doFind).not.toHaveBeenCalled()
   })
 
+  it("fails the find with what an onBadNews threw, the copy it told of erased all the same", async () => {
+    const deviceDB = new OpenDeviceDB()
+    const thrown = new Error('the host hook threw')
+    deviceDB.rows.set(Scopepath.vault(TH.scopeOf('u1', 'spare')), 'not a copy')
+    await expect(deviceDB.findCachedVaults(bank1, () => { throw thrown })).rejects.toThrow(thrown)
+    expect([...deviceDB.rows.keys()]).to.deep.equal([])
+  })
+
   it("never erases a sound copy stored since the find that read a damaged one", async () => {
     const deviceDB = new OpenDeviceDB()
     const sound = cacheableOf(u1)
