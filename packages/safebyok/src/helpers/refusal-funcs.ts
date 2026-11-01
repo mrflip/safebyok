@@ -155,6 +155,15 @@ export const weakPassphrase = (reason: string): VaultError => listedRefusal('wea
 export const samePassphrase = (): VaultError => listedRefusal('same_passphrase', Phrases.SamePassphrase)
 // --
 
+// == [Key derivers]: reservedLabel, suppliedSpecChanged, saltDoesNotFit
+
+export const reservedLabel = (prefix: string): VaultError => listedRefusal('bad_option', Phrases.reservedDeriverLabel(prefix))
+
+export const suppliedSpecChanged = (label: string): VaultError => listedRefusal('bad_option', Phrases.suppliedSpecChanged(label))
+
+export const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => listedRefusal('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
+// --
+
 // == [Banks]: insecureContext
 
 export const insecureContext = (): VaultError => listedRefusal('insecure_context', Phrases.InsecureContext)

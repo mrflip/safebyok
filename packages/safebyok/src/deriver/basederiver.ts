@@ -1,5 +1,4 @@
-import { VaultError } from '../errors'
-import * as Phrases from '../phrases'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefix, keyDeriverSpec } from './shapes'
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
@@ -42,7 +41,7 @@ export const parseKeyDeriverSpec = (candidate: unknown): KeyDeriverSpec => {
   return spec
 }
 
-/** Check that a {@link KeyDeriver} is one a vault can keep, refusing 'bad_option': one declaring `algorithm: 'argon2id'` that Argon2id cannot run, or one wearing a label safebyok reserves or supplies under other parameters. */
+/** Check that a {@link KeyDeriver}, trusted to be one in shape, is one a vault can keep, refusing 'bad_option': one declaring `algorithm: 'argon2id'` that Argon2id cannot run, or one wearing a label safebyok reserves or supplies under other parameters. */
 export const checkKeyDeriver = (keyDeriver: KeyDeriver): void => {
   if (keyDeriver.algorithm === 'argon2id') { parseKeyDeriverSpec(keyDeriver) } else { checkSuppliedSpecUnchanged(keyDeriver) }
 }
@@ -51,28 +50,19 @@ export const checkKeyDeriver = (keyDeriver: KeyDeriver): void => {
 export const checkSuppliedSpecUnchanged = (candidate: Pick<KeyDeriver, 'key_deriver_label'>): void => {
   const supplied = SuppliedSpecs.find((spec) => spec.key_deriver_label === candidate.key_deriver_label)
   if (supplied === undefined) {
-    if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) { throw reservedLabel() }
+    if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) { throw RefusalFuncs.reservedLabel(ReservedLabelPrefix) }
     return
   }
   const carried: Readonly<Record<string, unknown>> = candidate
   const unchanged = Object.entries(supplied).every(([fieldname, val]) => carried[fieldname] === val)
-  if (! unchanged) { throw suppliedSpecChanged(supplied.key_deriver_label) }
+  if (! unchanged) { throw RefusalFuncs.suppliedSpecChanged(supplied.key_deriver_label) }
 }
 
 /** Refuse 'bad_option' a salt of another length than the deriver's `salt_bytes`, naming both lengths and never the salt. */
 export const checkSaltFits = (spec: Pick<KeyDeriverSpec, 'salt_bytes'>, saltBytes: Uint8Array): void => {
-  if (saltBytes.length !== spec.salt_bytes) { throw saltDoesNotFit(spec.salt_bytes, saltBytes.length) }
+  if (saltBytes.length !== spec.salt_bytes) { throw RefusalFuncs.saltDoesNotFit(spec.salt_bytes, saltBytes.length) }
 }
 
 /** Whether the deriver's label begins {@link TestLabelPrefix}: made cheap for tests, and no protection against guessing. */
 export const isTestDeriver = (keyDeriver: Pick<KeyDeriver, 'key_deriver_label'>): boolean => keyDeriver.key_deriver_label.startsWith(TestLabelPrefix)
-// --
-
-// == [Refusals]: reservedLabel, suppliedSpecChanged, saltDoesNotFit
-
-const reservedLabel = (): VaultError => new VaultError('bad_option', Phrases.reservedDeriverLabel(ReservedLabelPrefix))
-
-const suppliedSpecChanged = (label: string): VaultError => new VaultError('bad_option', Phrases.suppliedSpecChanged(label))
-
-const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => new VaultError('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
 // --
