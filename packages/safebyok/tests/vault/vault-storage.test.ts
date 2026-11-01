@@ -881,7 +881,7 @@ describe("vault record behind this device's record", () => {
     expect(reopened.getSnapshot().gate?.passkey).to.be.null
   })
 
-  it("takes an older copy under a advanced vault_epoch as it is, its removed way in opening again", async () => {
+  it("takes an older copy under an advanced vault_epoch as it is, its removed way in opening again", async () => {
     const { world, vault, older } = await rolledBackWorld()
     TH.closeVault(vault)
     world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...(JSON.parse(older) as object), vault_epoch: 9 }))
