@@ -251,7 +251,7 @@ class MemoryDeviceDB extends DeviceDB {
  * `highest_vault_epoch` of the two: a lower one never replaces a higher. Anything else stored --
  * none, or a row that fails its check -- gives way to `record` as it came.
  *
- * It builds a advanced record afresh, checked, so it throws 'bad_record' when it must advance a stored
+ * It builds an advanced record afresh, checked, so it throws 'bad_record' when it must advance a stored
  * record to a `record` whose `highest_vault_epoch` fails its check. The core never hands a DeviceDB
  * such a record: only a host's own call can, and the throw aborts the advance's transaction.
  *
