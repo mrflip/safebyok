@@ -722,6 +722,12 @@ export type GatingKind = typeof gatingKindVals[number]
 
 export type CleartextsForGatingkind = { [KindT in GatingKind]: Z.input<typeof cleartextsForGatingkind[KindT]> }
 
+/** A function from a new passphrase and the vault's scope to a verdict, `{ strong: true }` or `{ strong: false, reason }`, where `reason` is the sentence the user sees.
+ * It may be async, and may carry a `load()` that `bank.hello()` awaits. It hears the passphrase:
+ * log nothing it is given. What it throws is replaced, so a bug in it cannot leak a passphrase.
+ *
+ * @example const strengthChecker: StrengthChecker = (passphrase) => (passphrase.length >= 16 ? { strong: true } : { strong: false, reason: 'Use at least 16 characters.' })
+ */
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 
@@ -732,9 +738,10 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
-export const bankOpts = objCheck(({ obj, fn, applabel, user_id, device_id }) => ({
-  applabel,
-  user_id,
+export const bankOpts = objCheck(({ obj, fn, unk, device_id }) => ({
+  // Judged by `bankScope` after, so a bad name refuses 'bad_scope', as `bank.vaultOf` refuses a bad vaultlabel.
+  applabel:            unk,
+  user_id:             unk,
   device_id:           device_id.optional(),
   vaultStore:          obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
   vaultCache:          obj({ load: fn(), save: fn() }),

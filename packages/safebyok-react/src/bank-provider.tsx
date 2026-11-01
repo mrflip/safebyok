@@ -300,10 +300,10 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
     // Bad news a vault meets once the provider has let its bank go -- a read under way as the user
     // changed -- is told to no one: the handler now may be the next user's.
-    const kept = { held: true }
-    const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? tellBadNews(news) : undefined)
+    const liveness = { held: true }
+    const tellWhileHeld: BadNewsHandler = (news) => (liveness.held ? tellBadNews(news) : undefined)
     // Likewise, a vault let go asks no one: the requestCleartext now may be the next user's.
-    const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
+    const askWhileHeld: RequestCleartext = async (gating) => { if (liveness.held) { await askUser(gating) } }
     const bankOpts = { ...refusable, applabel, user_id, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, requestCleartext: requestOpt === askUser ? askWhileHeld : requestOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heldLogger ?? logger, strengthChecker } satisfies Record<keyof MakeBankOpts, unknown>
     // The bank is this effect's to make and to let go. A refused option throws from here to the
     // nearest error boundary, as the very VaultError.
@@ -311,7 +311,7 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
     const holding = { bank: made }
     setHeld(holding) // eslint-disable-line react-hooks/set-state-in-effect -- the effect owns the bank, making it and letting it go, so a re-run effect (StrictMode's, a hidden Activity shown again) makes a fresh one; the render reads the bank the effect holds now, set once per bank
     return () => {
-      kept.held = false
+      liveness.held = false
       // Letting a vault go ends its prompt: its waiters are refused 'vault_gone', and the dialog
       // over it answers declined and closes.
       made.closeVaults()

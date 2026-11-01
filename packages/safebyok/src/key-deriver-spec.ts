@@ -53,7 +53,7 @@ export const ReservedLabelPrefix = 'argon2id_web_'
 /** Refuse 'bad_option' for a key deriver or spec wearing a label safebyok reserves, unless it carries that spec's every parameter.
  * Otherwise a vault made under it on one device would not open under the real one on another.
  */
-export const checkSuppliedSpecKept = (candidate: Readonly<Record<string, unknown>> & { readonly key_deriver_label: string }) => {
+export const checkSuppliedSpecUnchanged = (candidate: Readonly<Record<string, unknown>> & { readonly key_deriver_label: string }) => {
   const supplied = SuppliedSpecs.find((spec) => spec.key_deriver_label === candidate.key_deriver_label)
   if (supplied === undefined) {
     if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) {
@@ -62,8 +62,8 @@ export const checkSuppliedSpecKept = (candidate: Readonly<Record<string, unknown
     return
   }
   const carried: Readonly<Record<string, unknown>> = candidate
-  const kept = Object.entries(supplied).every(([field, val]) => carried[field] === val)
-  if (! kept) {
+  const unchanged = Object.entries(supplied).every(([field, val]) => carried[field] === val)
+  if (! unchanged) {
     throw new VaultError('bad_option', `A key deriver labelled ${supplied.key_deriver_label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours and test that it derives the same bytes as argon2idWebV1Deriver, or choose a label of your own.`)
   }
 }
@@ -98,7 +98,7 @@ export const checkSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: 
  * It refuses 'bad_option' for a spec Argon2id cannot run, naming each field that fails and what it
  * must be: a salt under 8 bytes or over 65536, memory under 8 KiB a lane or over 1 GiB, no passes,
  * no lanes, or a passphraseKey other than 32 bytes. It refuses a label safebyok reserves as
- * {@link checkSuppliedSpecKept} does.
+ * {@link checkSuppliedSpecUnchanged} does.
  *
  * @example
  *   const spec = parseKeyDeriverSpec({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
@@ -112,7 +112,7 @@ export const checkSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: 
  */
 export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec => {
   const spec = KX.keyDeriverSpec.parse(candidate)
-  checkSuppliedSpecKept(spec)
+  checkSuppliedSpecUnchanged(spec)
   return spec
 }
 

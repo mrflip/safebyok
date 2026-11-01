@@ -308,9 +308,9 @@ describe("the lease, when the host changes leaseHours", () => {
     const otherTab = await world.openUnlocked('pw one', { leaseHours: Infinity })
     const getLease = world.deviceDB.tryGetLease.bind(world.deviceDB)
     vi.spyOn(world.deviceDB, 'tryGetLease').mockImplementationOnce(async (scope) => {
-      const kept = await getLease(scope)
+      const cached = await getLease(scope)
       await otherTab.lock()
-      return kept
+      return cached
     })
     await world.open({ leaseHours: 1 })
     expect(await world.getLease()).to.be.null
@@ -417,15 +417,15 @@ describe("the vault's ask_passphrase_at", () => {
 // Rows that fail the lease's check: the DeviceDB base class reads each as none, and discards it.
 const SpoiledWayins = [
   [(row: Record<string, unknown>) => ({ ...row, format: 'byok-unlock-v1' }),                  "a record under the format tag from before the package's rename"],
-  [({ lease_key: kept, vault_key_lease_wrapped: wrapped, ...row }: Record<string, unknown>) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: kept, vault_key_local_wrapped: wrapped }), 'a record from before the lease, under safebyok-unlock-v1'],
+  [({ lease_key: was, vault_key_lease_wrapped: wrapped, ...row }: Record<string, unknown>) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: was, vault_key_local_wrapped: wrapped }), 'a record from before the lease, under safebyok-unlock-v1'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: '99999999999999' }),       'a deadline written as text, which would compare as a number'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: Infinity }),               'a deadline that never comes'],
   [({ ask_passphrase_at: _gone, ...row }: Record<string, unknown>) => row,                    'a record missing its deadline'],
-  [({ ask_passphrase_at: kept, ...row }: Record<string, unknown>) => ({ ...row, expires_at: kept }), 'a record from before its deadline was named ask_passphrase_at'],
-  [({ gate_epoch: kept, ...row }: Record<string, unknown>) => ({ ...row, passphrase_epoch: kept }), 'a record from before its epoch was named gate_epoch'],
+  [({ ask_passphrase_at: was, ...row }: Record<string, unknown>) => ({ ...row, expires_at: was }), 'a record from before its deadline was named ask_passphrase_at'],
+  [({ gate_epoch: was, ...row }: Record<string, unknown>) => ({ ...row, passphrase_epoch: was }), 'a record from before its epoch was named gate_epoch'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: 1_792_022_400 }),          'a deadline in epoch seconds, before 1981'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: FarFuture + 1 }),          'a deadline past FarFuture'],
-  [({ ask_passphrase_at: kept, ...row }: Record<string, unknown>) => ({ ...row, ask_passphrase_at: (kept as number) - 0.5 }), 'a deadline with a fraction of a millisecond'],
+  [({ ask_passphrase_at: was, ...row }: Record<string, unknown>) => ({ ...row, ask_passphrase_at: (was as number) - 0.5 }), 'a deadline with a fraction of a millisecond'],
   [() => 'not a record at all',                                                               'a row that is not a record'],
 ] as const
 
@@ -628,7 +628,7 @@ describe("a change to the ways in, once it has landed", () => {
     const vault = await world.openUnlocked('pw one')
     // Past the read putWayin makes first, which raises the record too: the raise after its own write fails.
     TH.beforeNextCall(world.vaultDB, 'tryPutVaultRecord', () => {
-      TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
+      TH.spyOnDeviceHook(world.deviceDB, 'incrementDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
       return Promise.resolve()
     })
     await TH.putWayin(vault, 'pw one', 'pw two')
@@ -702,12 +702,12 @@ describe("an unlock this device cannot keep a lease for", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
-  const UnkeptFirstUnlocks: readonly (readonly [RefusalKind, () => Error])[] = [
+  const UncachedFirstUnlocks: readonly (readonly [RefusalKind, () => Error])[] = [
     ['storage_blocked', () => new DOMException('The quota has been exceeded.', 'QuotaExceededError')],
     ['storage_unavailable', () => new Error('device storage is unavailable')],
   ]
 
-  for (const [refusalkind, trouble] of UnkeptFirstUnlocks) {
+  for (const [refusalkind, trouble] of UncachedFirstUnlocks) {
     it(`sets the first passphrase though the device store refuses the lease: the first gate is stored, ensureUnlocked refuses ${refusalkind} saying the passphrase was set, and the vault is locked here`, async () => {
       const world = makeWorld()
       const vault = await world.open()

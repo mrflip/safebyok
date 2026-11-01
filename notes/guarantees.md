@@ -24,7 +24,7 @@ guarantees until shown otherwise.
 |---|---|
 | `packages/safebyok/src/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
 | `packages/safebyok/src/proving.ts` | the passphrase and PRF answer made into a wayinKey; every wrap and unwrap of the vaultKey under one; the lease grant |
-| `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `KeptLease`, the store's edge, which holds a lease record read back closed |
+| `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `CachedLease`, the store's edge, which holds a lease record read back closed |
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
 | `packages/safebyok/src/types/types.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
@@ -108,7 +108,7 @@ Eight values are secret. Everything else safebyok stores or shows is either publ
 | wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
 | vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
 | boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
-| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record` and `KeptLease.#record`, through the `DeviceDB`, and at rest in the device store | the lease | `Lease`, `KeptLease`, `Proving.grantLease`; the `DeviceDB` stores it opaque |
+| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record` and `CachedLease.#record`, through the `DeviceDB`, and at rest in the device store | the lease | `Lease`, `CachedLease`, `Proving.grantLease`; the `DeviceDB` stores it opaque |
 | whisper | the host's JSON value, then its UTF-8 bytes | the host's value in and out; bytes as locals, zeroed | one seal or open | `Box.seal`, `box.extractWhisper`, `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
@@ -171,10 +171,10 @@ only as `box_key_wrapped`.
 `Proving.grantLease`. Carried, as the `lease_key` of a `LeaseRecord`: `grantLease` →
 `DeviceDB.putLease` (`idb.ts` `set`, structured clone; `memoryDeviceDB`'s map; the
 `device-db.ts` guard) → `Lease.make`, in `grantLease` → `Lease.#record`, the Lease the vault is
-handed to hold; read back by `KeptLease.tryGet` (`lease.ts`), which checks `DeviceDB.getLease`'s
-answer and holds it closed in `KeptLease.#record` for `bank.ts`'s birth read, `vault.#loadFromStorage`
-(`#applyVault`, whose `leavesInForce` reads the kept stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
-which take it up with `kept.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
+handed to hold; read back by `CachedLease.tryGet` (`lease.ts`), which checks `DeviceDB.getLease`'s
+answer and holds it closed in `CachedLease.#record` for `bank.ts`'s birth read, `vault.#loadFromStorage`
+(`#applyVault`, whose `leavesInForce` reads the cached stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
+which take it up with `cached.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
 `vault.#lockNow`, `del-damaged-vault.ts` and the bank. Neither the Vault nor the Bank holds a
 record. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
 
@@ -230,7 +230,7 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `provin
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `sealLeaseRecord`; the `lease_key` of a `LeaseRecord`
 written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read back by
-`KeptLease.tryGet`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
+`CachedLease.tryGet`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
 memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
 erased from the store at `lock()`. A record read back whose key is extractable, of another
@@ -290,11 +290,11 @@ not read is warned of without its record. *Host obligation, documented:* a `stre
 **G9. Only `Proving` and `Lease` hold or use a key.** `src/proving.ts` and `src/lease.ts` are the
 only modules that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a
 key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`,
-`KeptLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
-`Proving.grantLease` makes the Lease the vault holds, and `KeptLease.tryGet` (`lease.ts`) checks what
+`CachedLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
+`Proving.grantLease` makes the Lease the vault holds, and `CachedLease.tryGet` (`lease.ts`) checks what
 `DeviceDB.getLease` hands back at the store's edge and holds it closed, so the bank's birth read,
-the vault's refresh (`#loadFromStorage` and `#applyVault`, whose `leavesInForce` reads the kept stamp) and its take-ups
-(`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `KeptLease` and take it up with `leaseOn(vault)`
+the vault's refresh (`#loadFromStorage` and `#applyVault`, whose `leavesInForce` reads the cached stamp) and its take-ups
+(`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `CachedLease` and take it up with `leaseOn(vault)`
 ([#305](https://github.com/mrflip/safebyok/pull/305)). A `Box` reaches the Lease through the
 module-private `heldLeaseOf` and is given cipher and decipher services, never a key; a proving
 reaches the vault's tools through a package-private route (the Symbol-keyed accessor

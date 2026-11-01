@@ -4,7 +4,7 @@ import * as HX from './shapes/host-code'
 import type { VaultScope } from './shapes/scopes'
 import { VaultError, listedKindOf } from './errors'
 import type { KeyDeriver } from './key-deriver'
-import { parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
+import { parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecUnchanged, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
@@ -152,7 +152,7 @@ const checkKeyDeriver = (keyDeriver: KeyDeriver, logger: VaultLogger): void => {
   // A deriver declaring Argon2id must be one Argon2id can run: its refusal here, with a kind, is
   // the one it would otherwise make at the first unlock, as a plain Error from the library.
   if (keyDeriver.algorithm === 'argon2id') { parseKeyDeriverSpec(keyDeriver as KeyDeriverSpec) }
-  checkSuppliedSpecKept(keyDeriver)
+  checkSuppliedSpecUnchanged(keyDeriver)
   if (keyDeriver.key_deriver_label.startsWith(TestLabelPrefix)) {
     logger.warn(TestDeriverNotice, { call: 'make' })
   }
