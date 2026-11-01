@@ -415,6 +415,17 @@ describe("a lease and the gate it was granted under", () => {
     await TH.expectRefusal(lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'gate_moved')
   })
 
+  it("still locks its vault at autolock_at after a move has dropped its keys, as the vault may read unlocked until then", async () => {
+    const { vault, lease } = await grantedWorld()
+    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
+    vault.gate_epoch += 1
+    await TH.expectRefusal(lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'gate_moved')
+    expect(lease.isForgotten).to.be.true
+    expect(vault.lock).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(WeekMillis)
+    expect(vault.lock).toHaveBeenCalledTimes(1)
+  })
+
   const OtherGateCases = [
     [-1, "an older gate than the vault's, here or on another device"],
     [1,  "a newer gate than the vault's, the vault in hand being behind"],
