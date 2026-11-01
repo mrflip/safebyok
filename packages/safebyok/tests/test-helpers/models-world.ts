@@ -22,7 +22,7 @@ import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { type BoxPatch, Box } from '../../src/models/box'
 import { BoxListing, type BoxCache, type BoxDna, type BoxLease, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import * as Refusals from '../../src/refusals'
@@ -122,8 +122,8 @@ export type ModelsWorldOpts = {
 /** The fake vault, store and cache of one box listing, with their calls and the means to script them.
  * By default the store answers as a store that keeps what it is given: `get` answers the record
  * seeded under the boxlabel, or null; `put` keeps the record and answers it; `del` keeps and
- * answers a tombstone at the revision after the one stored, under a fresh tok (revision 0 over no
- * row); `watch` and the cache do as they are told. `put` and `del` enforce the versioned replace as
+ * answers a tombstone at the revision after the one stored, under a fresh tok (null over no row,
+ * landing nothing); `watch` and the cache do as they are told. `put` and `del` enforce the versioned replace as
  * the `Store` doc block states it, case by case: over another tok than `priorRevisionTok` (any row, for
  * `priorRevisionTok` null), 'stale_write' carrying the row; over no row with a `priorRevisionTok`, 'stale_write'
  * carrying nothing; a put's `revision_seq` unfit for `priorRevisionTok`, or other than the row's + 1,
@@ -275,7 +275,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
     demandLease:  () => {
-      if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.UnlockFirst) }
+      if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.NeedVaultUnlocked) }
       return lease
     },
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
@@ -314,11 +314,12 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       const held = stored.get(scope.boxlabel)
       const refused = casRefusalOf(scope, held, priorRevisionTok)
       if (refused !== null) { return refused }
+      if (held === undefined) { return answerOf(scope, null) }
       const tombstone = tombstoneBoxRecord({
         ...scope,
-        ...(held !== undefined && sparseOf(held)),
+        ...sparseOf(held),
         revision_tok: randomId(),
-        revision_seq: (held?.revision_seq ?? NeverStoredSeq) + 1,
+        revision_seq: held.revision_seq + 1,
         written_at:   clockNow(),
       })
       stored.set(scope.boxlabel, tombstone)

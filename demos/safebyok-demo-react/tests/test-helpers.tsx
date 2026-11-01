@@ -2,7 +2,7 @@
  * The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the
  * means to render a component as the demo's App does -- inside a BankProvider -- over stores in
  * memory, to fill its vault beforehand as another device would, to answer the passphrase
- * dialog the provider raises, to watch the vault beside a component, and to stand in for Anthropic.
+ * dialog the provider launches, to watch the vault beside a component, and to stand in for Anthropic.
  */
 import type { ReactNode } from 'react'
 import { expect } from 'vitest'

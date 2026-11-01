@@ -1,5 +1,5 @@
 import { createStore, del, delMany, entries, get, keys, set, clear, update, type UseStore } from 'idb-keyval'
-import type { DeviceRecord, KeptLeaseRow } from './shapes/device'
+import type { DeviceRecord, CachedLeaseRow } from './shapes/device'
 import * as Scopepath from './scopepath'
 import { DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
@@ -25,8 +25,8 @@ export * as ChangeBell from './change-bell'
 const shelfStores = new Map<string, UseStore>()
 const shelfStore = (dbName: string): UseStore => {
   if (typeof indexedDB === 'undefined' || (indexedDB as IDBFactory | null) === null) { throw noIndexedDB() }
-  const kept = shelfStores.get(dbName)
-  if (kept !== undefined) { return kept }
+  const cached = shelfStores.get(dbName)
+  if (cached !== undefined) { return cached }
   const fresh = createStore(`${dbName}:device_db`, 'records')
   shelfStores.set(dbName, fresh)
   return fresh
@@ -78,7 +78,7 @@ class IdbDeviceDB extends DeviceDB {
     return raw
   }
 
-  protected async doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: KeptLeaseRow): Promise<void> {
+  protected async doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: CachedLeaseRow): Promise<void> {
     await set(leaseScopepath, record, this.#shelf())
     this.#ring()
   }
@@ -94,9 +94,9 @@ class IdbDeviceDB extends DeviceDB {
     return await get<unknown>(deviceScopepath, this.#shelf())
   }
 
-  // Read and written in one transaction, so two tabs raising at once never lower each other's.
-  protected async doRaiseDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, raisedFrom: (stored: unknown) => DeviceRecord): Promise<void> {
-    await update<unknown>(deviceScopepath, raisedFrom, this.#shelf())
+  // Read and written in one transaction, so two tabs advancing at once never lower each other's.
+  protected async doAdvanceDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, advancedFrom: (stored: unknown) => DeviceRecord): Promise<void> {
+    await update<unknown>(deviceScopepath, advancedFrom, this.#shelf())
     this.#ring()
   }
 

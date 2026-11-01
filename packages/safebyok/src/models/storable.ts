@@ -1,11 +1,10 @@
 import { randomId } from '../crypto'
-import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
 import { type Outcome, outcomeOf } from '../outcome'
 import { oneAtATime } from '../one-at-a-time'
+import { reportToPlatform } from '../report-error'
 import { stableJsonify } from '../stable-jsonify'
-import { lockedError, movedUnderEditError, partialLoadError } from '../helpers/throwers'
-import * as Phrases from '../phrases'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
 import type { Age, Am, Cache, EditOpts, Fetched, FetchOpts, Reconciled, RecordShape, Revision, SendOpts, Settled, SparseBase, StagedForms, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
@@ -18,7 +17,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
   if (post.revision_tok !== ante.revision_tok) {
-    throw new VaultError('record_conflict', Phrases.OneRevisionTwoToks)
+    throw RefusalFuncs.oneRevisionTwoToks()
   }
   return 'same'
 }
@@ -142,9 +141,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   toJSON(): SparseT { return this.sparse }
   // --
 
-  // == [States]: isTimely, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, hasStaged, isWatchable
+  // == [States]: isTimely, refreshedAt, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, hasStaged, isWatchable
 
   get isTimely(): boolean { return this.#trigger.isTimely }
+
+  /** When storage last confirmed the record in hand, null before it first has: what a snapshot shows as its freshness. */
+  protected get refreshedAt(): number | null { return this.#trigger.timing.lastSucceededAt }
 
   get isLocked(): boolean { return this.listing.lockState() === 'locked' }
 
@@ -203,13 +205,19 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this
   }
 
-  /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */
+  /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. A listener that throws is reported to the platform (`reportToPlatform`), and the others are still called. */
   #replaceSnapshot(): void {
     if (this.#snapshot === null) { return }
     const nextSnapshot = this.makeSnapshot()
     if (this.sameSnapshot(nextSnapshot, this.#snapshot)) { return }
     this.#snapshot = nextSnapshot
-    this.#listeners.forEach((listener) => { listener() })
+    for (const listener of this.#listeners) {
+      try {
+        listener()
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    }
   }
   /** Compare two snapshots for equality: notifications are not sent if old and new are the same */
   protected sameSnapshot(next: SnapshotT, current: SnapshotT): boolean {
@@ -219,16 +227,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Guards]: demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToSend, demandReadyToSend, ensureReadyToDel, demandReadyToDel
 
-  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
+  demandUnlocked(): this { if (this.isLocked)    { throw RefusalFuncs.vaultLocked() }                  return this }
 
   demandPresent():  this { if (! this.isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
 
-  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
+  demandFull():     this { if (! this.isFull)    { throw RefusalFuncs.partialLoad() }                  return this }
 
   /** The full record in hand, or refuses 'bad_option' where it is sparse or a tombstone. */
   protected demandFullProps(): RecordT {
     const { full } = this
-    if (full === null) { throw partialLoadError() }
+    if (full === null) { throw RefusalFuncs.partialLoad() }
     return full
   }
 
@@ -304,7 +312,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const ante = this.#central
     const staged = await this.makeStaged(patch, timely)
     if (this.#central.revision_tok !== ante.revision_tok) {
-      throw movedUnderEditError({ stored_revision: MSX.revision.parse(this.#central), staged_revision: MSX.revision.parse(staged) })
+      throw RefusalFuncs.movedUnderEdit({ stored_revision: MSX.revision.parse(this.#central), staged_revision: MSX.revision.parse(staged) })
     }
     const nextRevision = MSX.revision.parse(staged)
     this.adopt(this.#central, this.reconcileStaged({ act: 'edit', central: this.#central, staged: this.staged, patch: staged, nextRevision }))
@@ -323,7 +331,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     await this.ensureReadyToSend(timely)
     await this.edit(patch, timely)
     this.#memoizedNextRevision = null
-    // The staged record, not this thing ducking as it: a lock may come down between edit and put, and a locked thing's getters hide what it holds.
     await this.listing.put(this.listing.recordOf(this.#staged))
     return this
   }
@@ -344,11 +351,17 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
+  // == [Eviction]: evict
+
+  /** Make no more fetches on schedule, for a thing no listing holds any more. A subclass that overrides it calls super. */
+  evict(): void { this.#trigger.disarm() }
+  // --
+
   // == [Receiving]: receive, adopt, settle, cacheOnDevice, tombstoneFor, makeStagedBase, nextRevision, priorRevisionTok
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
-   * `reconcileCentral` judges it; on 'older', 'same' or 'skip' the receive ends there, but for a deletion at the revision
+   * `reconcileCentral` judges it; on 'older', 'same' or 'skip' nothing is adopted, and only the snapshot's freshness may move, but for a deletion at the revision
    * held met by the staged tombstone of a `del`, which is spent: the staged is dropped, and the thing settles. Otherwise
    * `reconcileStaged` judges the staged against the new central, both are adopted, and the thing settles. A record not
    * older than central notes success where, once it is taken in, the record in hand is whole, so a sparse one that only
@@ -368,7 +381,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       this.adopt(central, null)
     }
     if (! older && this.#isWhole) { this.#trigger.taskCompleted() }
-    return (delSpent || act.success) ? this.settle() : { badnews: [] }
+    if (delSpent || act.success) { return this.settle() }
+    // A receive that only confirms the record in hand moves the snapshot's freshness, where it shows one, and nothing the device cache keeps.
+    this.#replaceSnapshot()
+    return { badnews: [] }
   }
 
   // Every adopt is followed by a settle, which the snapshot and the device cache are made from: an adopt left unsettled would leave both behind.
@@ -484,18 +500,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
     // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
-    if ((rcvd.vault_tok !== this.vault_tok))                     { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
+    if ((rcvd.vault_tok !== this.vault_tok))                     { throw RefusalFuncs.otherVaultTok() }
     const central = this.#central
     const age = cmpRevisions(central, rcvd)
     // Damage before life: a damaged record's box_tok is no more to be trusted than the rest of it.
     if ((age !== 'newer') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
-    if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
+    if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw RefusalFuncs.oneRevisionTwoLives() }
     const centralShape = this.classifyRecordShape(central)
     if ((age === 'older'))                                       { return { central, policy: 'older' } }
     if ((age === 'same')) {
       if ((rcvdShape === 'gone') && (centralShape === 'ouch'))   { return { central: rcvd, policy: 'gone' } }
-      if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
-      if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
+      if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw RefusalFuncs.oneRevisionTwoFates() }
+      if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw RefusalFuncs.oneRevisionTwoFates() }
       if ((rcvdShape === 'gone') && (centralShape === 'gone'))   { return { central, policy: 'same' } }
       if ((rcvdShape === 'sparse'))                              { return { central, policy: 'same' } }
       if ((rcvdShape === 'full') && (centralShape === 'full'))   { return { central, policy: 'same' } }
@@ -506,7 +522,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       if (rcvdShape === 'ouch') { return { central: this.tombstoneFor(rcvd, 'd'), policy: 'ouch' } }
       return { central: rcvd, policy: 'adopt' }
     }
-    throw new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
+    throw RefusalFuncs.shapeUnreconciled()
   }
 
   /** Whether `record` is of the life of `held`, the central held unless given: the same {@link lifeTokPathOf}. */

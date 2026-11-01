@@ -38,10 +38,13 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 export const InstantNotWhole = "An instant is whole epoch milliseconds"
 // --
 
-// == [Records]: GateEpochAndGate
+// == [Records]: GateEpochAndGate, VaultlabelRepeated
 
 /** A vault record whose `gate_epoch` and `gate` disagree: a gate at epoch 0, or none at a later epoch. */
 export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
+
+/** A device record naming one vault twice among the epochs it has seen. */
+export const VaultlabelRepeated = "A device record names each vault at most once among the gate epochs it has seen"
 // --
 
 // == [Bags]: StoreInVaultBag
@@ -191,10 +194,10 @@ export const VaultObjectGone = "This Vault object is gone -- the vault was delet
 export const VaultBehind = "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage."
 // --
 
-// == [Vault: ways in]: PassphraseKept, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
+// == [Vault: ways in]: PassphraseIrremovable, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
 
 /** Why a vault's passphrase is not removed: it can be replaced, never removed. */
-export const PassphraseKept = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
+export const PassphraseIrremovable = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
 
 /** Why removing a passkey the vault does not hold changes nothing. */
 export const NoPasskeyToRemove = "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed."
@@ -266,7 +269,7 @@ export const VaultGoneWhileGettingBox = "The vault this device held was deleted,
 export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
 // --
 
-// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, BadNewsHandlerThrew
+// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, VaultStoredDamaged, BadNewsHandlerThrew
 
 /** Bad news of a box stored damaged, which its meta.box_listed names. */
 export const BoxStoredDamaged = "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it."
@@ -274,11 +277,14 @@ export const BoxStoredDamaged = "A box in this vault is stored damaged, so it ca
 /** Bad news of a wayin stored damaged, which its meta.wayin_listed names. */
 export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
 
+/** A vault's trouble where its stored record is damaged, as its snapshot shows it. */
+export const VaultStoredDamaged = "This vault's stored record is damaged, so no vault unlocker (passphrase or passkey) can be tried against it, and the vault can't be opened or changed. It was left as it is: restore it from a backup, or, if the user chooses to start over, delDamagedVault() clears it."
+
 /** Why the vault's trouble holds a throw from the host's onBadNews handler. */
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: PartialLoad, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, MovedUnderEdit, AlreadyHeld, DnaHandedToBuild, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -288,6 +294,9 @@ export const MovedUnderEdit = "Storage delivered a newer record while this edit 
 
 /** Why `build` makes nothing of a dna for a scope the listing already holds. */
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
+
+/** Why `build` makes nothing of a dna in a listing whose things are born only as stored. */
+export const DnaHandedToBuild = "This listing makes nothing of a dna in build, as each of its instances is born only once storage holds it: ensure it instead (vaultListing.ensure, or bank.ensureVault)."
 
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
 export const BoxPatchAdvice = "Nothing was staged. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
@@ -326,7 +335,22 @@ export const AnswerOfOtherScope = "Storage answered for a scope other than the o
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: stores]: VaultRowDamaged, BoxRowDamaged, ScopeOutsideStore, StoreRowsMiscounted
+
+/** Why a vault row that does not read as a vault record or its tombstone is refused. */
+export const VaultRowDamaged = "The vault stored under this scope does not read as a vault record this version writes, nor as its tombstone: it was damaged, or written by another version. It was left as it is: no way in can be tried, and nothing can be stored over it until it is removed."
+
+/** Why a box row that does not read as a box record or its tombstone is refused. */
+export const BoxRowDamaged = "The box stored under this scope does not read as a box record this version writes, nor as its tombstone: it was damaged, or written by another version. It was left as it is, and nothing can be stored over it until it is removed."
+
+/** Why a store asked about a scope outside the bank or vault it was made for refuses. */
+export const ScopeOutsideStore = "This store was made for one bank's vaults or one vault's boxes, and was asked about a scope outside them: ask the store made for that scope."
+
+/** Why rows a store front's doGetRows answered in another number than asked are refused. */
+export const StoreRowsMiscounted = "The store front's doGetRows answered other than one row, or null, for each scopepath asked, in order: a bug in the storage adapter."
+// --
+
+// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
 export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -364,14 +388,11 @@ export const ProvingOfOtherVault = "The source proving is of another vault: a wa
 /** Why a lease is not granted to a vault other than the one a proving is of. */
 export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds."
 
-/** Why a proof closure's throw is replaced: it heard the passphrase. */
-export const ProofClosureThrew = "The proof closure threw rather than handing back a passphrase. What it threw is left out, as it heard the passphrase."
-
 /** Why a keyDeriver's throw is replaced: it heard the passphrase. */
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, LockedWhileUnlocking, LeaseOfOtherHolder, vaultAbsent, boxAbsent
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
@@ -386,10 +407,10 @@ export const UndecodedWhisper = "That box opened, but what was inside is not a w
 export const LeaseNotInForce = "This lease is no longer in force -- its time ran out, or it was forgotten when the vault locked -- so nothing was read or written: unlock the vault again."
 
 /** Why a call that needs the vault unlocked is refused while it is locked. */
-export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
+export const NeedVaultUnlocked = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
 
-/** Why a locked vault with no lease kept is not unlocked without a proof. */
-export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
+/** Why an unlock that a lock overtook unlocks nothing. */
+export const LockedWhileUnlocking = "The vault was locked while it was being unlocked, so it stays locked: unlock it again when the user wants the vault."
 
 /** Why a vault takes up no lease of another vault, or granted to another Vault object. */
 export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."
@@ -397,14 +418,11 @@ export const LeaseOfOtherHolder = "This lease was granted to another vault, or t
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
 
-/** Why a vault built of a record takes no proof closure. */
-export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."
+/** Why a box absent from storage is refused, by its boxlabel. */
+export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
 // --
 
-// == [Models: gates]: GateChangeNeedsPassphrase, GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
-
-/** Why a passkey's answer does not prove a change to the gate. */
-export const GateChangeNeedsPassphrase = "Only the passphrase proves a change to the vault's passphrase or passkey, and this proof handed in a passkey's answer, so nothing more was asked and nothing changed. The passkey still unlocks the vault: prove the change with the passphrase."
+// == [Models: gates]: GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
 
 /** Why a gate change proved against a record that has since moved is not sent. */
 export const GateMovedUnderChange = "The vault's record was changed elsewhere while this change was being proved, and its passphrase or passkey may have changed with it, so nothing was changed. The vault in hand now holds the newer record: call again to make the change over it."
@@ -416,7 +434,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, RequestCleartextThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, LockedWhileAsking, GatingSettled, PasskeyProvesNot, PasskeyMovedSinceLaunch, GateMadeElsewhere, RequestCleartextThrew, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -424,11 +442,17 @@ export const PositiveMinutesShape = "Expected a number of minutes above zero, fr
 
 export const GatingDeclined = "The prompt was declined, or closed before an attempt succeeded, so nothing was unlocked or changed: ask again when the user wants the vault."
 
+export const LockedWhileAsking = "The vault was locked while this prompt was open or waiting its turn, which closed it, so nothing was unlocked or changed: ask again when the user wants the vault."
+
 export const GatingSettled = "This prompt has ended -- it was answered, declined, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
-export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
+export const PasskeyProvesNot = "A passkey does not prove this kind of prompt, so nothing was attempted: ask for the passphrase, as the prompt's provedBy says."
 
-export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: hand the call a proof closure, or give Bank.make a requestCleartext."
+export const PasskeyMovedSinceLaunch = "This vault's passkey changed since the prompt opened, on this device or another, so the passkey it asked for is not the vault's now, and nothing was unlocked: ask again, and the new prompt asks for the passkey the vault has."
+
+export const GateMadeElsewhere = "This vault's passphrase was just set on another device, so the one entered here was not set, and nothing was changed. Enter the passphrase chosen there to unlock it."
+
+export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
 export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."
 
@@ -445,4 +469,36 @@ export const suppliedSpecChanged = (label: string): string => `A key deriver lab
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): string => `This key deriver takes a salt of ${String(expectedCount)} bytes, and was handed one of ${String(handedCount)}: a salt made by another deriver, or a stored salt that has been damaged.`
 
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."
+// --
+
+// == [Models: the device store]: DeviceStoreFailed, DeviceStoreSaid, deviceStoreBlocked, deviceStoreUnavailable
+
+/** For each verb of the models' device store, what its failure leaves undone, and what the user may do instead of trying again, if anything. */
+export const DeviceStoreFailed = Object.freeze({
+  getLease:            { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with the passphrase or a passkey" },
+  putLease:            { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
+  delLease:            { failed: "erasing the lease it keeps for this vault, so the next open on this device may still take it up" },
+  getDeviceRecord:     { failed: "reading its record of this user's vaults (the newest gate of each it has seen)" },
+  advanceDeviceRecord: { failed: "writing its record of this user's vaults (the newest gate of each it has seen), so it may not be kept" },
+  findCachedVaults:    { failed: "reading the copies of this user's vaults it keeps, so each loads from storage instead" },
+  putCachedVault:      { failed: "writing its copy of this vault, so the next open loads it from storage" },
+  clearCachedVault:    { failed: "erasing what it keeps of this vault, so some of it may remain" },
+  delAll:              { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
+})
+
+/** One entry of {@link DeviceStoreFailed}. */
+export type DeviceStoreSaid = Readonly<{ failed: string, instead?: string }>
+
+/** The device store's own `name` for what it threw, where it has one, closing the message. */
+const thrownNameSaid = (thrownName: string | null): string => (thrownName === null ? '' : ` The device store threw ${thrownName}.`)
+
+export const deviceStoreBlocked = ({ failed, instead }: DeviceStoreSaid, thrownName: string | null): string => {
+  const meanwhile = instead === undefined ? '' : `: ${instead} instead`
+  return `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes${meanwhile}.${thrownNameSaid(thrownName)}`
+}
+
+export const deviceStoreUnavailable = ({ failed, instead }: DeviceStoreSaid, thrownName: string | null): string => {
+  const retry = instead === undefined ? 'try again' : `try again, or ${instead}`
+  return `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window.${thrownNameSaid(thrownName)}`
+}
 // --
