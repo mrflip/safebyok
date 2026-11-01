@@ -59,13 +59,13 @@ export const boxAbsent = (boxlabel: string): VaultError => listedRefusal('absent
 
 // == [Stores]: damagedVaultRow, damagedBoxRow, scopeOutsideStore, storeRowsMiscounted
 
-export const damagedVaultRow = (): VaultError => new VaultError('damaged_vault', Phrases.VaultRowDamaged)
+export const damagedVaultRow = (): VaultError => listedRefusal('damaged_vault', Phrases.VaultRowDamaged)
 
-export const damagedBoxRow = (): VaultError => new VaultError('damaged_box', Phrases.BoxRowDamaged)
+export const damagedBoxRow = (): VaultError => listedRefusal('damaged_box', Phrases.BoxRowDamaged)
 
-export const scopeOutsideStore = (): VaultError => new VaultError('bad_scope', Phrases.ScopeOutsideStore)
+export const scopeOutsideStore = (): VaultError => listedRefusal('bad_scope', Phrases.ScopeOutsideStore)
 
-export const storeRowsMiscounted = (): VaultError => new VaultError('corrupt_record', Phrases.StoreRowsMiscounted)
+export const storeRowsMiscounted = (): VaultError => listedRefusal('corrupt_record', Phrases.StoreRowsMiscounted)
 // --
 
 // == [Leases]: damagedLease, unopenedWhisper, leaseNotInForce
@@ -163,8 +163,8 @@ export const insecureContext = (): VaultError => listedRefusal('insecure_context
 // == [Device store]: deviceStoreBlocked, deviceStoreUnavailable
 
 /** The 'storage_blocked' of a device store the browser withholds, as `said` tells the verb that met it, naming `thrownName` alone of what the store threw. */
-export const deviceStoreBlocked = (said: Phrases.DeviceStoreSaid, thrownName: string | null): VaultError => new VaultError('storage_blocked', Phrases.deviceStoreBlocked(said, thrownName))
+export const deviceStoreBlocked = (said: Phrases.DeviceStoreSaid, thrownName: string | null): VaultError => listedRefusal('storage_blocked', Phrases.deviceStoreBlocked(said, thrownName))
 
 /** The 'storage_unavailable' of a device store that failed otherwise, as `said` tells the verb that met it, naming `thrownName` alone of what the store threw. */
-export const deviceStoreUnavailable = (said: Phrases.DeviceStoreSaid, thrownName: string | null): VaultError => new VaultError('storage_unavailable', Phrases.deviceStoreUnavailable(said, thrownName))
+export const deviceStoreUnavailable = (said: Phrases.DeviceStoreSaid, thrownName: string | null): VaultError => listedRefusal('storage_unavailable', Phrases.deviceStoreUnavailable(said, thrownName))
 // --
