@@ -1,6 +1,6 @@
 import { verifyConsistent } from '../checks/validator'
 import { type CipherCtxRecord, makeLifeTok } from '../crypto'
-import { VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
@@ -126,7 +126,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     const bytes = await this.world.demandLease().unsealWith({ box_key_wrapped, whisper_ciphered }, stamp, stamp)
     try {
       const held = whisperHolder.safeParse(parseJsonOrNull(new TextDecoder().decode(bytes)))
-      if (! held.success) { throw undecodedWhisper() }
+      if (! held.success) { throw RefusalFuncs.undecodedWhisper() }
       return held.data
     } finally {
       bytes.fill(0)
@@ -200,9 +200,4 @@ const parseJsonOrNull = (text: string): unknown => {
     return null
   }
 }
-// --
-
-// == [Refusals]: undecodedWhisper
-
-const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --

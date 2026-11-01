@@ -722,6 +722,12 @@ export type GatingKind = typeof gatingKindVals[number]
 
 export type CleartextsForGatingkind = { [KindT in GatingKind]: Z.input<typeof cleartextsForGatingkind[KindT]> }
 
+/** A function from a new passphrase and the vault's scope to a verdict, `{ strong: true }` or `{ strong: false, reason }`, where `reason` is the sentence the user sees.
+ * It may be async, and may carry a `load()` that `bank.hello()` awaits. It hears the passphrase:
+ * log nothing it is given. What it throws is replaced, so a bug in it cannot leak a passphrase.
+ *
+ * @example const strengthChecker: StrengthChecker = (passphrase) => (passphrase.length >= 16 ? { strong: true } : { strong: false, reason: 'Use at least 16 characters.' })
+ */
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 

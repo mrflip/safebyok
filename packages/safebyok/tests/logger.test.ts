@@ -221,12 +221,12 @@ const warnAtFirstUnlock = async (logger: VaultLogger, overrides: Partial<TH.Born
   const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ logger, ...overrides })
   const bank = Bank.make(bankOpts)
   const vault = await bank.ensureVault({ vaultlabel })
-  TH.spyOnDeviceHook(bankOpts.deviceDB, 'raiseDeviceRecord').mockRejectedValue(new Error('the disk said no'))
+  TH.spyOnDeviceHook(bankOpts.deviceDB, 'incrementDeviceRecord').mockRejectedValue(new Error('the disk said no'))
   await TH.unlock(vault, 'pw')
   bank.closeVaults()
 }
 
-const RaiseWarning = 'could not note the newest copy of the vault'
+const IncrementWarning = 'could not note the newest copy of the vault'
 
 describe("VaultLogger, handed to Bank.make", () => {
   it("hears what a bank's vault says, through the host's own three calls, as its first example shows", async () => {
@@ -240,7 +240,7 @@ describe("VaultLogger, handed to Bank.make", () => {
     expect(telemetry.calls).to.have.length.greaterThan(0)
     for (const call of telemetry.calls) {
       expect(call.level).to.eq('warn')
-      expect(call.message).to.include(RaiseWarning)
+      expect(call.message).to.include(IncrementWarning)
     }
   })
 
@@ -253,7 +253,7 @@ describe("VaultLogger, handed to Bank.make", () => {
   it("takes the console itself, its lines untagged, as its third example shows", async () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     await warnAtFirstUnlock(console)
-    const warned = consoleWarn.mock.calls.map(([message]) => String(message)).find((message) => message.includes(RaiseWarning))
+    const warned = consoleWarn.mock.calls.map(([message]) => String(message)).find((message) => message.includes(IncrementWarning))
     expect(warned).to.match(/^This device could not note/)
   })
 })
@@ -266,7 +266,7 @@ describe("DefaultLogger", () => {
     const storageSpy = TH.spyLogger()
     setDefaultLogger(telemetry.logger)
     await warnAtFirstUnlock(DefaultLogger, { vaultDB: localVaultDB({ store: memoryStore(), logger: storageSpy.logger }) })
-    const warnedOf = (calls: readonly TH.LoggedCall[]) => calls.filter((call) => call.message?.includes(RaiseWarning)).length
+    const warnedOf = (calls: readonly TH.LoggedCall[]) => calls.filter((call) => call.message?.includes(IncrementWarning)).length
     expect(warnedOf(telemetry.calls)).to.be.greaterThan(0)
     expect(warnedOf(storageSpy.calls)).to.eq(0)
   })

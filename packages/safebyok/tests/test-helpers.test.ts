@@ -359,8 +359,8 @@ describe("holdNextAnswer", () => {
     await vault.lock()
     written.release()
     await unlocking
-    const kept = await opts.deviceDB.tryGetLease(TH.scopeOf('u1'))
-    expect(await TH.expectGood(kept)).to.be.null
+    const cached = await opts.deviceDB.tryGetLease(TH.scopeOf('u1'))
+    expect(await TH.expectGood(cached)).to.be.null
   })
 })
 
@@ -743,7 +743,7 @@ describe("the fixtures", () => {
 
   it("deviceRecordOf: a whole device record of the user's main vault, raised as its first example shows", async () => {
     const deviceDB = TH.expectingGood(memoryDeviceDB())
-    await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
+    await deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1'))
     expect(await deviceDB.tryGetDeviceRecord(TH.scopeOf('u1'))).to.deep.equal({ format: 'safebyok-device-v1', ...TH.scopeOf('u1'), device_id: 'device-one', highest_vault_epoch: 1 })
   })
 
@@ -1140,8 +1140,8 @@ class HostDeviceDB extends DeviceDB {
   protected async doPutLease(leaseScopepath: string, record: LeaseRecord) { await this.#touched(() => this.#rows.set(leaseScopepath, record)) }
   protected async doDelLease(leaseScopepath: string) { await this.#touched(() => this.#rows.delete(leaseScopepath)) }
   protected async doGetDeviceRecord(deviceScopepath: string) { return await this.#touched(() => this.#rows.get(deviceScopepath)) }
-  protected async doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) {
-    await this.#touched(() => this.#rows.set(deviceScopepath, raisedFrom(this.#rows.get(deviceScopepath))))
+  protected async doIncrementDeviceRecord(deviceScopepath: string, incrementedFrom: (stored: unknown) => DeviceRecord) {
+    await this.#touched(() => this.#rows.set(deviceScopepath, incrementedFrom(this.#rows.get(deviceScopepath))))
   }
   protected async doDelDeviceRecord(deviceScopepath: string) { await this.#touched(() => this.#rows.delete(deviceScopepath)) }
   protected async doDelAll() { await this.#touched(() => { this.#rows.clear() }) }

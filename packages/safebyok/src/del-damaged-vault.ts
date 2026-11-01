@@ -22,7 +22,7 @@ const { delDamagedVaultOpts } = Checkers('bad_option', ({ unk }) => ({
  * the vault held is gone for good: ask the user first. It takes the options `Bank.make` took
  * beside the vault's `vaultlabel`, and refuses misuse as they do, before touching storage:
  * 'bad_option' for a field neither takes, 'bad_scope' for a name that fails its check.
- * Reaches `VaultDB.delDamagedVault`, then the DeviceDB's `delLease` and `raiseDeviceRecord`, which
+ * Reaches `VaultDB.delDamagedVault`, then the DeviceDB's `delLease` and `incrementDeviceRecord`, which
  * raises this device's record of the scope to the tombstone's `vault_epoch`.
  *
  * Storage decides, by the checks it alone can make: `VaultDB.delDamagedVault` deletes only a vault
@@ -59,7 +59,7 @@ export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, dev
   valOf(await deviceDB.tryDelLease(scope))
   if (tombstone === null) { return }
   // The device_id is kept where a record is stored: raising keeps the first one stored.
-  const raising = deviceRecordOf(scope, randomId(), tombstone.vault_epoch)
-  valOf(await deviceDB.tryRaiseDeviceRecord(raising))
+  const incrementing = deviceRecordOf(scope, randomId(), tombstone.vault_epoch)
+  valOf(await deviceDB.tryIncrementDeviceRecord(incrementing))
 }
 

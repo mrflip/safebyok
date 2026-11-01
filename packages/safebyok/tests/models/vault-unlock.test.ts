@@ -103,7 +103,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
     expect(deviceDB.tryPutLease).toHaveBeenCalledTimes(2)
     expect(deviceDB.tryDelLease.mock.invocationCallOrder[0]).to.be.lessThan(deviceDB.tryPutLease.mock.invocationCallOrder[1] ?? 0)
-    expect(deviceDB.keptNow()).not.to.be.null
+    expect(deviceDB.cachedNow()).not.to.be.null
   })
 
   it("unlocks a vault held sparse by proof, its full record fetched for the gate", async () => {
@@ -157,7 +157,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const proving = await vault.gate.attemptProof(() => ({ passphrase: Passphrase }), world)
     const fresh = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis })
     vault.lock()
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     const look = { answer: null as (() => void) | null }
     deviceDB.tryGetLease.mockImplementationOnce(() => new Promise((resolve) => { look.answer = () => { resolve({ ok: true, val: null, err: null }) } }))
     const pending = vault.ensureUnlocked()
@@ -177,7 +177,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
       await vi.advanceTimersByTimeAsync(LeaseMillis)
       expect(vault.isLocked).to.be.true
       expect(born.isForgotten).to.be.true
-      await TH.eventually(() => deviceDB.keptNow() === null)
+      await TH.eventually(() => deviceDB.cachedNow() === null)
       expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
     } finally {
       vi.useRealTimers()
@@ -201,7 +201,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
       expect(vault.demandLease()).to.equal(lease)
       expect(lease.isInForce).to.be.true
       expect(deviceDB.tryDelLease).not.toHaveBeenCalled()
-      expect(deviceDB.keptNow()).not.to.be.null
+      expect(deviceDB.cachedNow()).not.to.be.null
     } finally {
       vi.useRealTimers()
     }
@@ -229,16 +229,16 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     const again = await later.build(record)
     await later.hello()
     expect(again.isLocked).to.be.true
-    expect(deviceDB.keptNow()).to.be.null
+    expect(deviceDB.cachedNow()).to.be.null
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
   })
 
   it("drops a kept lease that will not open at its first seal: the seal refuses 'damaged_lease', the vault locks, and the record is erased", async () => {
     const { demandStored, anotherSession, deviceDB } = await makeBornVault()
     const record = demandStored()
-    const kept = deviceDB.keptNow() as Record<string, unknown> | null
-    if (kept === null) { throw new Error('no lease kept') }
-    deviceDB.keep({ ...kept, lease_key: await makeLeaseKey() })
+    const cached = deviceDB.cachedNow() as Record<string, unknown> | null
+    if (cached === null) { throw new Error("no lease cached") }
+    deviceDB.cache({ ...cached, lease_key: await makeLeaseKey() })
     const later = anotherSession()
     const again = await later.build(record)
     await later.hello()
@@ -246,7 +246,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     await TH.expectRefusal(seal(lease), 'damaged_lease')
     expect(again.isLocked).to.be.true
     expect(lease.isInForce).to.be.false
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
   })
 
@@ -254,7 +254,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     const { vault, demandStored, anotherSession, deviceDB } = await makeBornVault()
     const record = demandStored()
     vault.lock()
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     const later = anotherSession()
     const again = await later.build(record)
     await later.hello()
@@ -284,7 +284,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     const record = demandStored()
     listing.goodbye()
     vault.lock()
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(deviceDB.tryDelLease).toHaveBeenCalledOnce()
     const later = anotherSession()
     const again = await later.build(record)
