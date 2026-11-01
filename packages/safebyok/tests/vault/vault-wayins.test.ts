@@ -146,22 +146,22 @@ describe("putWayin, with a new passphrase", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
-  it("lands though the bank lets the vault go as the device record is raised after it, but writes no lease, and refuses vault_gone", async () => {
+  it("lands though the bank lets the vault go as the device record is advanced after it, but writes no lease, and refuses vault_gone", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const leaseBefore = await world.getLease()
     const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
-    let raising: ReturnType<typeof TH.holdNextCall> | null = null
-    // Past the read putWayin makes first, which raises the record too: the raise after its own write.
+    let advancing: ReturnType<typeof TH.holdNextCall> | null = null
+    // Past the read putWayin makes first, which advances the record too: the advance after its own write.
     TH.beforeNextCall(world.vaultDB, 'tryPutVaultRecord', () => {
-      raising = TH.holdNextCall(world.deviceDB, 'tryRaiseDeviceRecord')
+      advancing = TH.holdNextCall(world.deviceDB, 'tryAdvanceDeviceRecord')
       return Promise.resolve()
     })
     const putting = TH.tryPutWayin(vault, 'pw', 'pw two')
-    await TH.eventually(() => raising !== null)
-    await raising!.reached
+    await TH.eventually(() => advancing !== null)
+    await advancing!.reached
     TH.closeVault(vault)
-    raising!.release()
+    advancing!.release()
     await TH.expectBad(putting, 'vault_gone')
     expect(storedVaultRecordOf(world)['gate_epoch']).to.eq(2)
     expect(putLease).not.toHaveBeenCalled()
@@ -557,7 +557,7 @@ describe("the vault's passkey", () => {
     const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyAnswer
     const asProof = misshapen as unknown as string
     const phone = await TH.passkeyOf('phone')
-    // Locked, so the unlock is tried; each in turn, as each raises a gating of its own.
+    // Locked, so the unlock is tried; each in turn, as each launches a gating of its own.
     await vault.lock()
     for (const refused of [() => TH.unlock(vault, misshapen), () => TH.putWayin(vault, asProof, 'pw two'), () => TH.putWayin(vault, asProof, phone), () => TH.putWayin(vault, 'pw', misshapen), () => TH.delWayin(vault, asProof)]) {
       const err = await TH.expectRefusal(refused(), 'bad_option')
@@ -614,10 +614,10 @@ describe("the vault's passkey", () => {
 
   it("removal is not revocation: a copy of the vault record from before still opens with the removed passkey (Contract: delWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const kept = world.dbStore.get(u1VaultScopepath) ?? ''
+    const stored = world.dbStore.get(u1VaultScopepath) ?? ''
     await TH.delWayin(vault, 'pw')
     const copy = makeWorld()
-    copy.dbStore.put(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, stored)
     const thief = await copy.open()
     await TH.unlock(thief, laptop)
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')
@@ -882,7 +882,7 @@ describe("a new passphrase's strength", () => {
     expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(before)
   })
 
-  it("refuses a broken checker from a gating's attempt, which requestCleartext sees, and the call that raised it, writing nothing", async () => {
+  it("refuses a broken checker from a gating's attempt, which requestCleartext sees, and the call that launched it, writing nothing", async () => {
     const world = makeWorld()
     const attempts: Outcome<Vault>[] = []
     const requestCleartext = async (gating: Gating) => {
@@ -1210,10 +1210,10 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
   it("a replaced passphrase still opens a copy of the vault record taken before: a change is no revocation (Contract: putWayin, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const kept = storedText(world) ?? ''
+    const stored = storedText(world) ?? ''
     await TH.putWayin(vault, 'pw', 'pw two')
     const copy = makeWorld()
-    copy.dbStore.put(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, stored)
     const thief = await copy.open()
     await TH.unlock(thief, 'pw')
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')
@@ -1221,10 +1221,10 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
 
   it("a replaced passkey still opens a copy of the vault record taken before (Contract: putWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const kept = storedText(world) ?? ''
+    const stored = storedText(world) ?? ''
     await TH.putWayin(vault, 'pw', await TH.passkeyOf('phone'))
     const copy = makeWorld()
-    copy.dbStore.put(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, stored)
     const thief = await copy.open()
     await TH.unlock(thief, laptop)
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')

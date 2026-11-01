@@ -289,7 +289,7 @@ describe("hello", () => {
 })
 // --
 
-// == [Freshness, the vault gone, the device record]: hello's freshness, a vault deleted or made anew, the record raised
+// == [Freshness, the vault gone, the device record]: hello's freshness, a vault deleted or made anew, the record advanced
 
 describe("hello: freshness, the vault gone, and this device's record", () => {
   it("shows its freshness timely after a read, aged once staleMinutes pass, refused once a read fails, and timely again once one succeeds", async () => {
@@ -336,7 +336,7 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     expect(reborn.vault_tok).to.not.eq(vault.vault_tok)
   })
 
-  it("raises this device's record of the vault to what it read", async () => {
+  it("advances this device's record of the vault to what it read", async () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
@@ -346,12 +346,12 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(1)
   })
 
-  it("resolves all the same when the record will not rise, telling the logger, nothing of the device store's error kept", async () => {
+  it("resolves all the same when the record will not rise, telling the logger, nothing of the device store's error cached", async () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     const trouble = new Error('the device store broke: disk full')
-    TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
+    TH.spyOnDeviceHook(world.deviceDB, 'advanceDeviceRecord').mockRejectedValueOnce(trouble)
     expect(await vault.hello({ staleMinutes: 0 })).to.eq(vault)
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
     expect(TH.cheatGetVaultEpoch(vault).gate_epoch).to.eq(1)
@@ -365,10 +365,10 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
 
 // == [Failed hello]: callOf, FailedHelloCases, a hello that fails
 
-/** Call the `try` form of `verb` of `deviceDB` on `u1`'s vault: a raise with a record, delAll with nothing, and the rest with the scope, which a mocked failure never reads. */
+/** Call the `try` form of `verb` of `deviceDB` on `u1`'s vault: an advance with a record, delAll with nothing, and the rest with the scope, which a mocked failure never reads. */
 const callOf = (deviceDB: ReturnType<typeof memoryDeviceDB>, verb: DeviceVerb): Promise<Outcome<unknown>> => {
   if (verb === 'delAll') { return deviceDB.tryDelAll() }
-  if (verb === 'raiseDeviceRecord') { return deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')) }
+  if (verb === 'advanceDeviceRecord') { return deviceDB.tryAdvanceDeviceRecord(TH.deviceRecordOf('u1')) }
   if (verb === 'putLease') { return deviceDB.tryPutLease(TH.scopeOf('u1') as unknown as LeaseRecord) }
   const tried = { getLease: 'tryGetLease', delLease: 'tryDelLease', getDeviceRecord: 'tryGetDeviceRecord', delDeviceRecord: 'tryDelDeviceRecord' } as const
   return (deviceDB[tried[verb]] as (scope: VaultScope) => Promise<Outcome<unknown>>)(TH.scopeOf('u1'))
@@ -450,13 +450,13 @@ describe("a hello that fails", () => {
 
   const DeviceVerbCases = [
     // what each verb's failure says it was doing:
-    ["getLease",            /reading the lease it keeps/,              'reading the lease'],
-    ["putLease",            /writing the lease it keeps/,              'writing the lease'],
-    ["delLease",            /erasing the lease it keeps/,              'erasing the lease'],
-    ["getDeviceRecord",     /reading its record of this vault/,        "reading the device's record"],
-    ["raiseDeviceRecord",   /writing its record of this vault/,        "raising the device's record"],
-    ["delDeviceRecord",     /erasing its record of this vault/,        "erasing the device's record"],
-    ["delAll",              /erasing everything it keeps/,             'erasing everything'],
+    ["getLease",              /reading the lease it keeps/,              'reading the lease'],
+    ["putLease",              /writing the lease it keeps/,              'writing the lease'],
+    ["delLease",              /erasing the lease it keeps/,              'erasing the lease'],
+    ["getDeviceRecord",       /reading its record of this vault/,        "reading the device's record"],
+    ["advanceDeviceRecord", /writing its record of this vault/,        "advancing the device's record"],
+    ["delDeviceRecord",       /erasing its record of this vault/,        "erasing the device's record"],
+    ["delAll",                /erasing everything it keeps/,             'erasing everything'],
   ] as const
 
   for (const [verb, said, blurb] of DeviceVerbCases) {
@@ -488,8 +488,8 @@ describe("a hello that fails", () => {
     it(`says a device store's ${errName} as '${kind}': ${blurb}`, async () => {
       const deviceDB = memoryDeviceDB()
       const trouble = new DOMException('The browser refused.', errName)
-      TH.spyOnDeviceHook(deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(trouble)
-      const err = await TH.expectBad(deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')), kind)
+      TH.spyOnDeviceHook(deviceDB, 'advanceDeviceRecord').mockRejectedValueOnce(trouble)
+      const err = await TH.expectBad(deviceDB.tryAdvanceDeviceRecord(TH.deviceRecordOf('u1')), kind)
       expect(err.cause).to.be.undefined
       expect(err.message).to.match(/writing its record of this vault/)
       expect(err.message).to.match(kind === 'storage_blocked' ? /will not help until that changes/ : /try again/)
@@ -629,7 +629,7 @@ const newsKeeper = () => {
  * A world whose `u1` vault this device has seen move on past a copy of its props. `here` made it
  * with `pw` (vault_epoch 1); `there`, another tab of this device born of `overrides` then, hears no
  * change bells, and took up here's lease. Here then added the passkey `laptop` (epoch 2: `older`,
- * as stored then) and removed it (epoch 3), raising this device's record to 3. `restoreOlder`
+ * as stored then) and removed it (epoch 3), advancing this device's record to 3. `restoreOlder`
  * puts `older` back in storage, as a restore from a backup would.
  */
 const behindWorld = async (overrides?: Partial<TH.BornVaultOpts>) => {
@@ -1058,9 +1058,9 @@ const holdLeaseAfterRead = (world: ReturnType<typeof makeWorld>) => {
   const gate = TH.makeLatch()
   const read = world.deviceDB.tryGetLease.bind(world.deviceDB)
   vi.spyOn(world.deviceDB, 'tryGetLease').mockImplementationOnce(async (scope) => {
-    const kept = await read(scope)
+    const cached = await read(scope)
     await gate.pass()
-    return kept
+    return cached
   })
   return gate
 }
@@ -1182,15 +1182,15 @@ const takeUpHeld = async () => {
   return { world, vault, ensuring, other, release: answering.release }
 }
 
-/** Hold this device's second raise of its record of the vault from here on, before it reaches the store, until released: a call's note of its own write, its read's raise passing first. */
-const holdSecondRaise = (world: ReturnType<typeof makeWorld>) => {
+/** Hold this device's second advance of its record of the vault from here on, before it reaches the store, until released: a call's note of its own write, its read's advance passing first. */
+const holdSecondIncrement = (world: ReturnType<typeof makeWorld>) => {
   const noting = TH.makeLatch()
-  const raise = world.deviceDB.tryRaiseDeviceRecord.bind(world.deviceDB)
-  let raised = 0
-  vi.spyOn(world.deviceDB, 'tryRaiseDeviceRecord').mockImplementation(async (record) => {
-    raised += 1
-    if (raised === 2) { await noting.pass() }
-    return await raise(record)
+  const advance = world.deviceDB.tryAdvanceDeviceRecord.bind(world.deviceDB)
+  let advances = 0
+  vi.spyOn(world.deviceDB, 'tryAdvanceDeviceRecord').mockImplementation(async (record) => {
+    advances += 1
+    if (advances === 2) { await noting.pass() }
+    return await advance(record)
   })
   return noting
 }
@@ -1217,8 +1217,8 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     // A device that hears no change bells: its reads are the test's to make.
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
     const other = await world.open({ deviceDB: memoryDeviceDB() })
-    // The change's own read raises the record first; its note of the change, the second raise, is held.
-    const noting = holdSecondRaise(world)
+    // The change's own read advances the record first; its note of the change, the second advance, is held.
+    const noting = holdSecondIncrement(world)
     const changing = TH.tryPutWayin(vault, 'pw', 'pw-two')
     await noting.reached
     await TH.unlock(other, 'pw-two')
@@ -1235,8 +1235,8 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     const other = await world.open({ deviceDB: memoryDeviceDB() })
-    // The unlock's read raises the record first; its note of the gate it set, the second raise, is held.
-    const noting = holdSecondRaise(world)
+    // The unlock's read advances the record first; its note of the gate it set, the second advance, is held.
+    const noting = holdSecondIncrement(world)
     const making = TH.tryUnlock(vault, 'pw')
     await noting.reached
     // Its picture is novel still: an unlock there would set a first gate, and refuse gate_made_elsewhere.

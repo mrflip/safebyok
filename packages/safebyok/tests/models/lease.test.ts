@@ -29,7 +29,7 @@ describe("Lease.grant(vault, dbfriend, vaultKey, opts)", () => {
   it("keeps a lease record of the vault through tryPutLease: fmt 7001, the vault's stamp, autolock_at leaseMillis from now, a leaseKey handle and the wrapped vaultKey", async () => {
     const { friend } = await grantedWorld()
     expect(friend.tryPutLease).toHaveBeenCalledTimes(1)
-    const record = friend.kept as LeaseRecord
+    const record = friend.cached as LeaseRecord
     expect(record).to.deep.include({ ...WorldStamp, fmt: LeaseFormat, autolock_at: T0 + WeekMillis })
     expect(Object.keys(record)).to.have.members([...StampFieldnames, 'lease_key', 'vault_key_lease_wrapped'])
     expect(Object.keys(record.vault_key_lease_wrapped)).to.have.members(['cipher_iv_b64', 'ciphertext_b64'])
@@ -37,7 +37,7 @@ describe("Lease.grant(vault, dbfriend, vaultKey, opts)", () => {
 
   it("makes its leaseKey non-extractable, usable only to wrap and unwrap (G4)", async () => {
     const { friend } = await grantedWorld()
-    const { lease_key } = friend.kept as LeaseRecord
+    const { lease_key } = friend.cached as LeaseRecord
     expect(isLeaseKey(lease_key)).to.be.true
     expect(lease_key.extractable).to.be.false
   })
@@ -95,7 +95,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
     expect(await Lease.get(duckVaultOf(), fakeDBFriendOf())).to.be.null
   })
 
-  it("answers the kept lease of this vault, which opens what the granted lease sealed", async () => {
+  it("answers the cached lease of this vault, which opens what the granted lease sealed", async () => {
     const { friend, lease: granted } = await grantedWorld()
     const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
     const sealed = await granted.sealWith(whisperBytesOf('{"val":"kept"}'), boxKeyStamp, whisperStamp)
@@ -132,13 +132,13 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
   ] as const
 
   for (const [stamp, blurb] of NotThisVaultCases) {
-    it(`reads a kept lease of ${blurb} as none, with a warning, and leaves it where it lies`, async () => {
+    it(`reads a cached lease of ${blurb} as none, with a warning, and leaves it where it lies`, async () => {
       const friend = fakeDBFriendOf()
       await makeGrantedLease(duckVaultOf(stamp), friend)
-      const { kept } = friend
+      const { cached } = friend
       expect(await Lease.get(duckVaultOf(), friend)).to.be.null
       expect(friend.logged.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'Lease.get' }]])
-      expect(friend.kept).to.equal(kept)
+      expect(friend.cached).to.equal(cached)
       expect(friend.tryDelLease).not.toHaveBeenCalled()
     })
   }
@@ -146,7 +146,7 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
   it("warns of a lease of another vault quoting none of its record: neither its ciphertext nor its stamp", async () => {
     const friend = fakeDBFriendOf()
     await makeGrantedLease(duckVaultOf({ vault_tok: 'vault-tok-SIBLING' }), friend)
-    const { vault_key_lease_wrapped } = friend.kept as LeaseRecord
+    const { vault_key_lease_wrapped } = friend.cached as LeaseRecord
     await Lease.get(duckVaultOf(), friend)
     const logged = TH.loggedText(friend.logged)
     expect(logged).to.not.include(vault_key_lease_wrapped.ciphertext_b64)
@@ -162,33 +162,33 @@ describe("Lease.get(vault, dbfriend) and Lease.tryGet", () => {
   ] as const
 
   for (const [tamper, blurb] of MalformedCases) {
-    it(`reads a kept record ${blurb} as none, with a warning`, async () => {
+    it(`reads a cached record ${blurb} as none, with a warning`, async () => {
       const { friend } = await grantedWorld()
-      friend.kept = tamper(friend.kept as LeaseRecord, await makeVaultKey())
+      friend.cached = tamper(friend.cached as LeaseRecord, await makeVaultKey())
       expect(await Lease.get(duckVaultOf(), friend)).to.be.null
       expect(friend.logged.map(({ level }) => level)).to.deep.equal(['warn'])
     })
   }
 
-  it("answers null for a kept lease whose autolock_at has passed, erasing its record once and locking nothing", async () => {
+  it("answers null for a cached lease whose autolock_at has passed, erasing its record once and locking nothing", async () => {
     const friend = fakeDBFriendOf()
     await makeGrantedLease(duckVaultOf(), friend)
     vi.setSystemTime(T0 + (2 * WeekMillis))
     const vault = duckVaultOf()
     expect(await Lease.get(vault, friend)).to.be.null
     expect(friend.tryDelLease).toHaveBeenCalledTimes(1)
-    expect(friend.kept).to.be.null
+    expect(friend.cached).to.be.null
     expect(vault.lock).not.toHaveBeenCalled()
   })
 })
 
 describe("lease.forget(), isForgotten and isInForce", () => {
-  it("erases the kept record through tryDelLease, disposes the autolock, and leaves the lease forgotten and not in force", async () => {
+  it("erases the cached record through tryDelLease, disposes the autolock, and leaves the lease forgotten and not in force", async () => {
     const { friend, lease } = await grantedWorld()
     expect(vi.getTimerCount()).to.eq(1)
     await lease.forget()
     expect(friend.tryDelLease).toHaveBeenCalledTimes(1)
-    expect(friend.kept).to.be.null
+    expect(friend.cached).to.be.null
     expect(vi.getTimerCount()).to.eq(0)
     expect(lease.isForgotten).to.be.true
     expect(lease.isInForce).to.be.false
@@ -244,7 +244,7 @@ describe("the autolock", () => {
     expect(lease.isInForce).to.be.true
   })
 
-  it("at autolock_at locks the vault, then lets the lease go, erasing nothing itself: the vault's lock() erases the kept record", async () => {
+  it("at autolock_at locks the vault, then lets the lease go, erasing nothing itself: the vault's lock() erases the cached record", async () => {
     const { vault, friend, lease } = await grantedWorld()
     await vi.advanceTimersByTimeAsync(WeekMillis)
     expect(vault.lock).toHaveBeenCalledTimes(1)
@@ -396,7 +396,7 @@ describe("a tampered lease record", () => {
       const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
       const otherFriend = fakeDBFriendOf()
       await makeGrantedLease(duckVaultOf(), otherFriend)
-      friend.kept = tamper(friend.kept as LeaseRecord, otherFriend.kept as LeaseRecord)
+      friend.cached = tamper(friend.cached as LeaseRecord, otherFriend.cached as LeaseRecord)
       const vault = duckVaultOf()
       const got = await Lease.get(vault, friend)
       expect(got).to.be.instanceOf(Lease)
@@ -413,11 +413,11 @@ describe("a tampered lease record", () => {
 
   it("refuses 'damaged_lease' quoting none of the record", async () => {
     const { friend } = await grantedWorld()
-    friend.kept = { ...(friend.kept as LeaseRecord), autolock_at: T0 + (2 * WeekMillis) }
+    friend.cached = { ...(friend.cached as LeaseRecord), autolock_at: T0 + (2 * WeekMillis) }
     const got = await Lease.get(duckVaultOf(), friend)
     const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
     const err = await TH.expectRefusal(got!.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'damaged_lease')
-    expect(TH.thrownText(err)).to.not.include((friend.kept as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
+    expect(TH.thrownText(err)).to.not.include((friend.cached as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
   })
 })
 
@@ -431,7 +431,7 @@ describe("what a lease shows", () => {
     const { friend, lease } = await grantedWorld()
     expect(TH.jsonOf(lease)).to.deep.equal({ ...WorldStamp, fmt: LeaseFormat, autolock_at: T0 + WeekMillis })
     expect(lease.toJSON()).to.deep.equal(TH.jsonOf(lease))
-    expect(JSON.stringify(lease)).to.not.include((friend.kept as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
+    expect(JSON.stringify(lease)).to.not.include((friend.cached as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
   })
 
   it("is frozen: its stamp cannot be changed", async () => {

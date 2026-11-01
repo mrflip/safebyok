@@ -14,8 +14,8 @@ const shelves = new Map<string, UseStore>()
  * @example await get(Scopepath.vault(scope), shelfOf('acme'))
  */
 export const shelfOf = (dbName: string): UseStore => {
-  const kept = shelves.get(dbName)
-  if (kept !== undefined) { return kept }
+  const cached = shelves.get(dbName)
+  if (cached !== undefined) { return cached }
   const fresh = createStore(`${dbName}:vault_db`, 'records')
   shelves.set(dbName, fresh)
   return fresh

@@ -24,7 +24,7 @@ guarantees until shown otherwise.
 |---|---|
 | `packages/safebyok/src/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
 | `packages/safebyok/src/proving.ts` | the passphrase and PRF answer made into a wayinKey; every wrap and unwrap of the vaultKey under one; the lease grant |
-| `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `KeptLease`, the store's edge, which holds a lease record read back closed |
+| `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `CachedLease`, the store's edge, which holds a lease record read back closed |
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
 | `packages/safebyok/src/types/types.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
@@ -108,7 +108,7 @@ Eight values are secret. Everything else safebyok stores or shows is either publ
 | wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
 | vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
 | boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
-| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record` and `KeptLease.#record`, through the `DeviceDB`, and at rest in the device store | the lease | `Lease`, `KeptLease`, `Proving.grantLease`; the `DeviceDB` stores it opaque |
+| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record` and `CachedLease.#record`, through the `DeviceDB`, and at rest in the device store | the lease | `Lease`, `CachedLease`, `Proving.grantLease`; the `DeviceDB` stores it opaque |
 | whisper | the host's JSON value, then its UTF-8 bytes | the host's value in and out; bytes as locals, zeroed | one seal or open | `Box.seal`, `box.extractWhisper`, `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
@@ -171,10 +171,10 @@ only as `box_key_wrapped`.
 `Proving.grantLease`. Carried, as the `lease_key` of a `LeaseRecord`: `grantLease` →
 `DeviceDB.putLease` (`idb.ts` `set`, structured clone; `memoryDeviceDB`'s map; the
 `device-db.ts` guard) → `Lease.make`, in `grantLease` → `Lease.#record`, the Lease the vault is
-handed to hold; read back by `KeptLease.tryGet` (`lease.ts`), which checks `DeviceDB.getLease`'s
-answer and holds it closed in `KeptLease.#record` for `bank.ts`'s birth read, `vault.#loadFromStorage`
-(`#applyVault`, whose `leavesInForce` reads the kept stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
-which take it up with `kept.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
+handed to hold; read back by `CachedLease.tryGet` (`lease.ts`), which checks `DeviceDB.getLease`'s
+answer and holds it closed in `CachedLease.#record` for `bank.ts`'s birth read, `vault.#loadFromStorage`
+(`#applyVault`, whose `leavesInForce` reads the cached stamp alone), `#takeUpFromPantry` and `#takeUpAtBirth`,
+which take it up with `cached.leaseOn(vault)` → `Lease.make`; erased by `DeviceDB.delLease` from
 `vault.#lockNow`, `del-damaged-vault.ts` and the bank. Neither the Vault nor the Bank holds a
 record. Operates: `Lease.#vaultKeyOrNull` (`unwrapKeyUnder`) alone.
 
@@ -207,14 +207,27 @@ whatever happens, so an answer is single-use, and one handed in again is refused
 its all-zero bytes (`checkedPasskeyAnswer`). An attempt that never seals the answer it was handed
 zeroes it too (`spendAnswer`): one refused before the seal, after the gating is over, while
 another attempt runs, or when a lock lands first. Only a refusal the user can correct leaves it
-unspent, for the host to hand in again or zero. *Caveat:* that zeroing is then the host's;
-`safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a hidden dialog to
-show again. The passkeyKey is HKDF-SHA256 of those bytes, its
+unspent, for the host to hand in again or zero. The models hold to the same rule: each export
+that takes cleartexts runs through `spendAnswerAfter` (`models/proving.ts`), which spends the
+answer unless the export refused as `isCorrectable` says, a kind in `correctableKindVals`
+(`models/models-shapes.ts`); an answer that derived a key is spent all the same, so a
+'wrong_passkey' from a key that does not open the wayin (`Proving.attempt`) leaves it spent, as
+the core's `seal` does; a call that joins an unlock in flight attempts its answer through
+that unlock's gating while one is open, spent or not as that attempt says, or spent, where the
+gating closes before the call answers, and otherwise spends it untried (`models/vault.ts`, `#joinUnlocking`, `#attemptThrough`); `attemptPasskey` on a gating whose kind a passkey does
+not prove spends it (`models/gating.ts`); and so does a passkey offered to a vault with none
+(`absent_wayin`, `PasskeyProving.ofWayin`), or refused by a vault whose passkey changed since its
+gating launched (`gate_moved`, `Gating.#judgedAgainstLaunch`), neither a slip the user can correct. `spendPrfBytes` zeroes bytes by the tag the checker
+tests (`isBytes`), so PRF bytes made in another realm are zeroed too. *Caveat:* that zeroing is
+then the host's; `safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a
+hidden dialog to show again. The passkeyKey is HKDF-SHA256 of those bytes, its
 `info` the wayin's whole ctx, derived non-extractable (`deriveWrappingKey`). The result, the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`proving.ts` header). Bytes refused before import: anything but
 32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/proving.test.ts`,
-`tests/wayin.test.ts`, `tests/gating.test.ts` (*a passkey's answer handed to an attempt*).
+`tests/wayin.test.ts`, `tests/gating.test.ts` (*a passkey's answer handed to an attempt*);
+`tests/models/proving.test.ts` (*another realm*), `tests/models/gating.test.ts` (*the passkey
+path*).
 
 **G3. The vaultKey is never stored naked, and never persisted as a handle.** It exists (a) as an
 *extractable* local where WebCrypto requires it to be wrapped: fresh in `sealWayins`
@@ -230,7 +243,7 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `provin
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `sealLeaseRecord`; the `lease_key` of a `LeaseRecord`
 written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read back by
-`KeptLease.tryGet`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
+`CachedLease.tryGet`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
 memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
 erased from the store at `lock()`. A record read back whose key is extractable, of another
@@ -266,7 +279,10 @@ lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests
 *no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
-logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). A WebCrypto
+logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In the
+models, `requestCleartext`'s throw is replaced at `tryHearRequestCleartext` (`models/gating.ts`) by
+`requestCleartextThrew`, kind only; a decline is no relabel there, but a refusal of its own,
+`declined`, made fresh by `gatingDeclined` when the user declines or the dialog closes open. A WebCrypto
 failure is caught and replaced, its error never kept: `wrongProof`, `damaged_lease` and
 `damaged_box` where a wrong key or an altered record explains it, and `crypto_failed`
 (`Lease.cipheredWith`) for a key made, wrapped or a cipher under fresh keys that failed all the
@@ -290,11 +306,11 @@ not read is warned of without its record. *Host obligation, documented:* a `stre
 **G9. Only `Proving` and `Lease` hold or use a key.** `src/proving.ts` and `src/lease.ts` are the
 only modules that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a
 key maker. The wayinKey lives only in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`,
-`KeptLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
-`Proving.grantLease` makes the Lease the vault holds, and `KeptLease.tryGet` (`lease.ts`) checks what
+`CachedLease.#record` and the record at rest. Neither the Vault nor the Bank holds a lease record:
+`Proving.grantLease` makes the Lease the vault holds, and `CachedLease.tryGet` (`lease.ts`) checks what
 `DeviceDB.getLease` hands back at the store's edge and holds it closed, so the bank's birth read,
-the vault's refresh (`#loadFromStorage` and `#applyVault`, whose `leavesInForce` reads the kept stamp) and its take-ups
-(`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `KeptLease` and take it up with `leaseOn(vault)`
+the vault's refresh (`#loadFromStorage` and `#applyVault`, whose `leavesInForce` reads the cached stamp) and its take-ups
+(`#takeUpFromPantry`, `#takeUpAtBirth`) carry a `CachedLease` and take it up with `leaseOn(vault)`
 ([#305](https://github.com/mrflip/safebyok/pull/305)). A `Box` reaches the Lease through the
 module-private `heldLeaseOf` and is given cipher and decipher services, never a key; a proving
 reaches the vault's tools through a package-private route (the Symbol-keyed accessor

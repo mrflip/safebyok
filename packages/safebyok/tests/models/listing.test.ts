@@ -660,6 +660,23 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(listing.snapshot).to.deep.equal([])
     })
 
+    it("reports a listener that throws to the platform, still calls the others, and the verb that changed the snapshot resolves", async () => {
+      const reported: unknown[] = []
+      vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+      try {
+        const listing = boxListingOf(held.mw)
+        let told = 0
+        listing.subscribe(() => { throw new Error("The listener broke.") })
+        listing.subscribe(() => { told += 1 })
+        await listing.build(fullBoxRecord())
+        expect(told).to.eq(1)
+        expect(reported).to.have.lengthOf(1)
+        expect(reported[0]).to.have.property('message', "The listener broke.")
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
     it("lets a listener go, and tells none after", async () => {
       const listing = boxListingOf(held.mw)
       let told = 0
@@ -1109,7 +1126,6 @@ describe("the fake store's put: the versioned replace, cell by cell", () => {
 })
 
 const DelLandsCells = [
-  [null,       null,        0, 'lands a tombstone at revision 0 over no row, with no prior tok, as it always has'],
   [aliveRow,   'rev-a1',    2, "lands a tombstone over a live row under the prior tok, at its seq + 1"],
   [goneRow,    'rev-x2',    3, "lands a tombstone over a tombstone under the prior tok, at its seq + 1"],
   [damagedRow, 'rev-d2',    3, "lands a tombstone over a damaged row under the prior tok, at its seq + 1"],
@@ -1124,13 +1140,13 @@ const DelRefusedCells = [
 describe("the fake store's del: the versioned replace, cell by cell", () => {
   for (const [stored, priorRevisionTok, revision_seq, blurb] of DelLandsCells) {
     it(blurb, async () => {
-      if (stored !== null) { held.mw.seedStore(stored) }
+      held.mw.seedStore(stored)
       const answer = await held.mw.store.del(scopeOf(), priorRevisionTok)
       expect(verdictOf(answer)).to.deep.equal({ landed: revision_seq })
       const kept = held.mw.stored.get('anthropic_api_key')
       expect(kept).to.deep.equal(answer.ok ? answer.val : null)
       expect(kept).to.include({ am: 'x' })
-      expect(kept?.revision_tok).to.not.be.oneOf([priorRevisionTok, stored?.revision_tok])
+      expect(kept?.revision_tok).to.not.be.oneOf([priorRevisionTok, stored.revision_tok])
     })
   }
 
@@ -1142,6 +1158,12 @@ describe("the fake store's del: the versioned replace, cell by cell", () => {
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.equal(stored ?? undefined)
     })
   }
+
+  it("lands nothing over no row, with no prior tok, and answers null, as the Store doc block says", async () => {
+    const answer = await held.mw.store.del(scopeOf(), null)
+    expect(answer.ok && answer.val).to.be.null
+    expect(held.mw.stored.has('anthropic_api_key')).to.be.false
+  })
 })
 
 describe("listing.put and listing.del: the prior tok they send", () => {
@@ -1258,6 +1280,74 @@ describe("storable.settle: each instance saves its own copy to the cache, and th
       symbols.push(...Object.getOwnPropertySymbols(obj))
     }
     expect(symbols).to.deep.equal([])
+  })
+})
+// --
+
+// == [Eviction]: listing.evict lets an instance go, whether or not its evict throws
+
+describe("listing.evict(scope): the instance let go", () => {
+  it("evicts the instance and holds it no more: not at its scope, among the things, nor in the snapshot, telling the listeners", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    box.whisper = { val: 'sk-test-0000' }
+    const evict = vi.spyOn(Box.prototype, 'evict')
+    let told = 0
+    listing.subscribe(() => { told += 1 })
+    listing.evict(scopeOf())
+    expect(evict).toHaveBeenCalledOnce()
+    expect(box.whisper).to.be.null
+    expect(listing.at(scopeOf())).to.be.null
+    expect(listing.things).to.deep.equal([])
+    expect(listing.snapshot).to.deep.equal([])
+    expect(told).to.eq(1)
+  })
+
+  it("hears no more from the instance evicted", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    listing.evict(scopeOf())
+    let told = 0
+    listing.subscribe(() => { told += 1 })
+    box.receive(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+    expect(told).to.eq(0)
+    expect(listing.snapshot).to.deep.equal([])
+  })
+
+  it("builds a new instance at the next answer for the scope", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    listing.evict(scopeOf())
+    held.mw.seedStore(fullBoxRecord())
+    const again = await listing.fetch(scopeOf())
+    expect(again).to.not.eq(box)
+    expect(listing.at(scopeOf())).to.eq(again)
+  })
+
+  it("lets the instance go though its evict throws, and throws that on", async () => {
+    const listing = boxListingOf(held.mw)
+    await listing.build(fullBoxRecord())
+    vi.spyOn(Box.prototype, 'evict').mockImplementationOnce(() => { throw new Error("The evict is broken.") })
+    expect(() => { listing.evict(scopeOf()) }).to.throw("The evict is broken.")
+    expect(listing.at(scopeOf())).to.be.null
+    expect(listing.snapshot).to.deep.equal([])
+  })
+
+  it("leaves the others held, and does nothing for a scope it holds nothing at", async () => {
+    const listing = boxListingOf(held.mw)
+    const kept = await listing.build(fullBoxRecord({ boxlabel: 'kept_box' }))
+    let told = 0
+    listing.subscribe(() => { told += 1 })
+    listing.evict(scopeOf('never_box'))
+    expect(told).to.eq(0)
+    expect(listing.things).to.deep.equal([kept])
+  })
+
+  it("refuses a scope that is no scope as 'bad_scope', letting nothing go", async () => {
+    const listing = boxListingOf(held.mw)
+    const kept = await listing.build(fullBoxRecord())
+    TH.expectSyncRefusal(() => { listing.evict({ ...scopeOf(), boxlabel: 'Not A Label!' }) }, 'bad_scope')
+    expect(listing.things).to.deep.equal([kept])
   })
 })
 // --

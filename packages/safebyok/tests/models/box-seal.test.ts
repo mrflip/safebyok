@@ -1,9 +1,10 @@
 /** The box's seal through a real vault's lease, the one place a box meets real cryptography in `tests/models/`. */
 
 import { afterEach, describe, expect, it } from 'vitest'
+import { LOCKED } from '../../src/models/box'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
-import { Dna, LeaseMillis, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, LeaseMillis, Passphrase, boxWorldOf, byPassphrase, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -17,7 +18,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sideca
 /** Box listings whose world is a real vault, born unlocked under `Passphrase`, over the models world's fake store and cache. */
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
-  const vault = await vaultWorld.listing.build(Dna, () => ({ passphrase: Passphrase }))
+  const vault = await vaultWorld.listing.ensure(Dna, byPassphrase(Passphrase))
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
   const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault) })
@@ -51,5 +52,26 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     advance(LeaseMillis)
     await TH.expectRefusal(box.unsealWhisper(), 'vault_locked')
     await TH.expectRefusal(box.seal({ val: 'sk-test-1111' }, { account: 'home' }), 'vault_locked')
+  })
+})
+
+describe("the box's whisper verbs through a real vault's lease", () => {
+  it("getWhisper and useWhisper open the whisper build sealed, handing the whisper itself", async () => {
+    const { boxes } = await sealWorld()
+    const box = await boxes.build(BoxDna)
+    expect(await box.getWhisper()).to.deep.equal(Whisper.val)
+    expect(await box.useWhisper((whisper) => JSON.stringify(whisper))).to.eq(JSON.stringify(Whisper.val))
+  })
+
+  it("keeps the exposed whisper in memory through vault.lock(), answering LOCKED until the vault unlocks again", async () => {
+    const { boxes, vault } = await sealWorld()
+    const built = await boxes.build(BoxDna)
+    const box = await built.expose()
+    vault.lock()
+    expect(box.whisper).to.eq(LOCKED)
+    expect(box.getSnapshot().exposed).to.be.true
+    await TH.expectRefusal(box.getWhisper(), 'vault_locked')
+    await vault.ensureUnlocked({ passphrase: Passphrase })
+    expect(box.whisper).to.deep.equal(Whisper)
   })
 })
