@@ -1,4 +1,4 @@
-import type { Cache, DeviceRecord, DeviceRecordAdvance, GateEpochSeen, LeaseRecord, VaultCacheable, VaultRecord, VaultSparse } from '../models/models-shapes'
+import type { Cache, DeviceRecord, DeviceRecordAdvance, GateEpochSeen, LeaseRecord, OnBadNews, VaultCacheable, VaultRecord, VaultSparse } from '../models/models-shapes'
 import * as MSX from '../models/models-shapes'
 import type { BankScope, VaultScope } from '../shapes/scopes'
 import * as CX from '../shapes/scopes'
@@ -179,7 +179,7 @@ export abstract class DeviceDB {
   // --
 }
 
-// == [Rows]: DeviceRow, FoundRow, DeviceVerb, OnBadNews
+// == [Rows]: DeviceRow, FoundRow, DeviceVerb
 
 /** What a {@link DeviceDB} stores: a lease record, a device record or a vault's cached copy. */
 export type DeviceRow = LeaseRecord | DeviceRecord | VaultCacheable
@@ -189,9 +189,6 @@ export type FoundRow = Readonly<{ scopepath: string, row: unknown }>
 
 /** A verb of {@link DeviceDB} that reaches the store, by its throwing form's name: `getLease`, whose `try` form is `tryGetLease`. */
 export type DeviceVerb = keyof typeof Phrases.DeviceStoreFailed
-
-/** Where a {@link DeviceDB} tells of a damaged row it erased, as a bank's `onBadNews` hears it: never awaited, and one that throws fails the find with what it threw. */
-export type OnBadNews = (news: VaultError) => unknown
 // --
 
 // == [The device record]: deviceRecordOf, advancedDeviceRecord, highestGateEpochOf

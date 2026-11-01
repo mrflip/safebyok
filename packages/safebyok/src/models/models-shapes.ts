@@ -827,7 +827,7 @@ export type PasskeyGatingKind = { [KindT in GatingKind]: 'passkey' extends typeo
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 
-// == [The device's forms]: DeviceRecordFormat, gateEpochSeen, deviceRecord, onBadNews, vaultCacheable, GateEpochSeen, DeviceRecord, DeviceRecordAdvance, VaultCacheable
+// == [The device's forms]: DeviceRecordFormat, gateEpochSeen, deviceRecord, onBadNews, vaultCacheable, GateEpochSeen, DeviceRecord, DeviceRecordAdvance, VaultCacheable, OnBadNews
 
 /** The device record format these forms describe, as each record carries it in `fmt`. */
 export const DeviceRecordFormat = 8001
@@ -862,6 +862,8 @@ export type DeviceRecord   = Z.infer<typeof deviceRecord>
 /** What an advance of the device record stored: the `record`, and whether it wrote over a row that failed its check, losing what that row had seen. */
 export type DeviceRecordAdvance = Readonly<{ record: DeviceRecord, wroteOverDamaged: boolean }>
 export type VaultCacheable = Cacheable<VaultRecord, VaultSparse>
+/** Where a deviceDB's cache verbs tell of a damaged row they erased, as a bank's `onBadNews` hears it: never awaited, and one that throws fails the find with what it threw. */
+export type OnBadNews = NonNullable<Z.infer<typeof onBadNews>>
 // --
 
 // == [The bank's forms]: positiveMinutes, refreshMinutes, bankDeviceDB, bankVaultDB, bankOpts, cheatClock, BankDeviceDB
@@ -874,7 +876,7 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
 /** The check of the bank's deviceDB: the lease verbs a vault's world carries, as {@link leaseDeviceDB} checks them; `vaultCache`, which hands the device cache of a bank's vaults, telling `onBadNews` of each damaged copy it erases; `advanceDeviceRecord`, which keeps the device record; and `clearCachedVault`, which drops what the device keeps of one vault. Its `parse` refuses 'bad_option'. Checks only. */
 export const bankDeviceDB = objCheck(({ fn }) => ({
   ...leaseDeviceDB.shape,
-  vaultCache:          fn<(scope: BankScope, onBadNews?: (news: VaultError) => unknown) => Cache<VaultRecord, VaultSparse>>(),
+  vaultCache:          fn<(scope: BankScope, onBadNews?: OnBadNews) => Cache<VaultRecord, VaultSparse>>(),
   advanceDeviceRecord: fn<(record: DeviceRecord) => Promise<DeviceRecordAdvance>>(),
   clearCachedVault:    fn<(scope: VaultScope) => Promise<void>>(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
