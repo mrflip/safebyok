@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import type { BankVaultDB } from '../../src/models/bank'
+import type { BoxStore } from '../../src/models/box-listing'
 import type { AnyGating } from '../../src/models/gating'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { VaultStore } from '../../src/models/vault-listing'
@@ -15,8 +17,17 @@ const Work = Object.freeze({ vaultlabel: 'work' })
 
 const noWatch = (): void => undefined
 
-/** A vaultDB holding a vault for each vaultlabel, where the vault world's holds one in all; it checks no prior revision. */
-const vaultDBByLabel = (): VaultStore => {
+/** A vaultDB holding a vault for each vaultlabel, where the vault world's holds one in all; it checks no prior revision, and its box stores are never called. */
+const vaultDBByLabel = (): BankVaultDB => ({ vaultStore: vaultStoreByLabel, boxStore: () => unusedBoxStore })
+
+const unusedBoxStore: BoxStore = {
+  get:   () => Promise.reject(new Error("Not in these tests.")),
+  put:   () => Promise.reject(new Error("Not in these tests.")),
+  del:   () => Promise.reject(new Error("Not in these tests.")),
+  watch: () => noWatch,
+}
+
+const vaultStoreByLabel = (): VaultStore => {
   const stored = new Map<string, VaultRecord>()
   const answerOf = (scope: VaultScope, val: VaultRecord | null) => ({ scope, ok: true as const, val, world: null })
   return {

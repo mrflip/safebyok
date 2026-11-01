@@ -31,9 +31,10 @@ describe("Bank's construction: its options, its clock and the secure context", (
     bank.goodbye()
   })
 
-  it("refuses 'bad_option' options missing a vaultDB verb, a deviceDB without vaultCache, or a _cheat_clock that is no clock", () => {
+  it("refuses 'bad_option' options missing a vaultDB verb, a vault store without watch, a deviceDB without vaultCache, or a _cheat_clock that is no clock", () => {
     const { bankOpts, opts } = makeBankWorld()
-    TH.expectSyncRefusal(() => new Bank({ ...bankOpts, vaultDB: TH.omitting(opts.store, 'watch') }), 'bad_option')
+    TH.expectSyncRefusal(() => new Bank({ ...bankOpts, vaultDB: TH.omitting(bankOpts.vaultDB, 'boxStore') }), 'bad_option')
+    TH.expectSyncRefusal(() => new Bank({ ...bankOpts, vaultDB: { ...bankOpts.vaultDB, vaultStore: () => TH.omitting(opts.store, 'watch') } }), 'bad_option')
     TH.expectSyncRefusal(() => new Bank({ ...bankOpts, deviceDB: TH.omitting(bankOpts.deviceDB, 'vaultCache') }), 'bad_option')
     TH.expectSyncRefusal(() => new Bank(bankOpts, { now: 3 } as never), 'bad_option')
   })

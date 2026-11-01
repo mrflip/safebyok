@@ -8,7 +8,7 @@ import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box, sealedRecordOf } from './box'
 import type { Lease } from './lease'
 import { Listing, hasRevision } from './listing'
-import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type EditOpts, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Given to a box listing]: BoxLease, BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
@@ -44,7 +44,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  // == [Building]: build, demandUnlocked
+  // == [Building]: build, ensure, demandUnlocked
 
   /** {@link Listing.build}, a dna sealed at birth: the box staged is full, the dna's whisper sealed in with its sidecar. Stores nothing.
    * A record is told from a dna as `Listing.build` tells it, by its `revision_seq`, and keeps its
@@ -58,6 +58,24 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     const dna = boxDna.parse(input)
     this.#demandUnlocked()
     return super.build(dna)
+  }
+
+  /** The box `dna` names, as the vaultDB holds it; where it holds none, `dna` sealed and stored: put as a draft, or sent over a box held deleted or damaged, as its rebirth. Where another device stores one first, that box, as it stands.
+   * A box stored is answered as it is, its whisper and sidecar untouched. The dna is held to
+   * {@link boxDna} first, refusing 'bad_option', naming the field; sealing needs the vault unlocked,
+   * refusing 'vault_locked'.
+   */
+  async ensure(dna: BoxDna, opts: EditOpts = {}): Promise<Box> {
+    const filled = boxDna.parse(dna)
+    const timely = MSX.timelyOpts.parse(opts)
+    const scope = this.scopeOf(filled)
+    const fetched = await this.fetch(scope, { ...timely, ifAbsent: 'nil' })
+    if (fetched !== null) { return fetched }
+    const { whisper, sidecar } = filled
+    const held = this.at(scope)
+    if (held !== null) { return held.send({ whisper, sidecar }, timely) }
+    this.#demandUnlocked()
+    return this.putDraft(await this.draftOf({ ...this.stampDna(filled), ...filled }))
   }
 
   /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */

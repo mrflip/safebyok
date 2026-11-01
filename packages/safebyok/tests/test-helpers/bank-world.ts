@@ -32,7 +32,7 @@ export const makeBankWorld = (stored0: VaultRecord | null = null, overrides: Par
     applabel:         Dna.applabel,
     user_id:          Dna.user_id,
     device_id:        'device-1',
-    vaultDB:          store,
+    vaultDB:          { vaultStore: () => store, boxStore: (scope) => world.opts.world.vaultDB.boxStore(scope) },
     deviceDB:         { ...world.deviceDB, vaultCache: () => cache, advanceDeviceRecord, clearCachedVault } as unknown as BankDeviceDB,
     keyDeriver:       testDeriver,
     requestCleartext: world.requestCleartext,

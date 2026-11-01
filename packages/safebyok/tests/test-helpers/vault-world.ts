@@ -1,4 +1,4 @@
-/** The test world of a vault listing in `src/models/`: a vaultDB of one row, a device cache that keeps nothing, a deviceDB that keeps one lease, and a clock the test moves. */
+/** The test world of a vault listing in `src/models/`: a vaultDB of one vault row and a box store, a device cache that keeps nothing, a deviceDB that keeps one lease, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
 import { type RefusalMeta, VaultError } from '../../src/errors'
@@ -10,7 +10,10 @@ import { deferred } from '../../src/helpers/deferred'
 import type { Cleartexts, CleartextsForGatingkind, GatingKind, VaultRecord, VaultSparse } from '../../src/models/models-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, Proving } from '../../src/models/proving'
-import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
+import { localStoreFront } from '../../src/models/store-front'
+import { type BoxVaultDB, type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
+import type { Clock } from '../../src/shapes/bank-opts'
+import { memoryStore } from '../../src/string-store'
 import { quietLogger } from './logging'
 import { anyStrengthChecker, passkeyOf, testDeriver } from './builders'
 
@@ -96,6 +99,23 @@ const makeDeviceDB = () => {
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
+/** The box half of a vaultDB: a `localStoreFront`'s box stores, each answer and notice carrying `vaultRow()` as its world, since the vault row lives in the world's own fake store and not in the front. */
+const makeBoxVaultDB = (clock: Clock, vaultRow: () => VaultRecord | null): BoxVaultDB => {
+  const front = localStoreFront({ store: memoryStore(), clock })
+  const withWorld = <AnswerT extends { world: unknown }>(answer: AnswerT): AnswerT => ({ ...answer, world: vaultRow() })
+  return {
+    boxStore: (scope) => {
+      const store = front.boxStore(scope)
+      return {
+        get:   async (boxscope) => withWorld(await store.get(boxscope)),
+        put:   async (record, priorRevisionTok) => withWorld(await store.put(record, priorRevisionTok)),
+        del:   async (boxscope, priorRevisionTok) => withWorld(await store.del(boxscope, priorRevisionTok)),
+        watch: (onNotice, fullFor, onChange) => store.watch((notice) => onNotice(withWorld(notice)), fullFor, onChange),
+      }
+    },
+  }
+}
+
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world.
  * Its `requestCleartext` is a spy, answering as {@link answerAtOnce} does with {@link UsualAnswers}
  * until a test says otherwise (`requestCleartext.mockImplementation(declineAtOnce)`); its
@@ -107,8 +127,9 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   const deviceDB = makeDeviceDB()
   const requestCleartext = vi.fn(answerAtOnce())
   const strengthChecker = vi.fn(anyStrengthChecker)
+  const clock = { now: () => now }
   const world: VaultWorld = {
-    clock:        { now: () => now },
+    clock,
     lockState:    () => 'unlocked',
     ensureTimely: () => Promise.resolve(),
     takeWorld:    nothing,
@@ -120,6 +141,8 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     device_id:    'device-1',
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB as unknown as VaultWorld['deviceDB'],
+    vaultDB:      makeBoxVaultDB(clock, () => stored),
+    boxRefreshMillis: 10 * 60_000,
     ...worldOverrides,
   }
   const answerOf = (scope: VaultScope, val: VaultRecord | VaultSparse | null) => ({ scope, ok: true as const, val, world: null })

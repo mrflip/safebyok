@@ -5,6 +5,7 @@ import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
+import type { BoxStore } from './box-listing'
 import { Listing } from './listing'
 import { Gate } from './gate'
 import { type PassphraseProving, spendAnswerAfter } from './proving'
@@ -13,15 +14,21 @@ import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrant
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
-// == [Given to a vault listing]: VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
+// == [Given to a vault listing]: BoxVaultDB, VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate, lease and gatings need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
+/** The vaultDB as a vault's boxes reach it: the store of one vault's boxes. A `StoreFront` is one. */
+export type BoxVaultDB = { boxStore(scope: VaultScope): BoxStore }
+
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate, lease, gatings and box listing need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
 export type VaultWorld = ListingWorld & GateWorld & GatingWorld & {
-  scope:         BankScope
-  logger:        VaultLogger
-  leaseMillis?:  LeaseGrantOpts['leaseMillis']
-  pesterMillis?: number
-  deviceDB:      LeaseDeviceDB
+  scope:            BankScope
+  logger:           VaultLogger
+  leaseMillis?:     LeaseGrantOpts['leaseMillis']
+  pesterMillis?:    number
+  deviceDB:         LeaseDeviceDB
+  vaultDB:          BoxVaultDB
+  /** Each box listing's `maxMillisSinceRefresh`. */
+  boxRefreshMillis: number
 }
 
 /** The vaultDB's vault verbs, as this listing calls them. */
@@ -66,10 +73,13 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     await Promise.all(this.things.map((vault) => vault.takeUpCachedLease()))
   }
 
-  /** End the watch, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
+  /** End the watch and each vault's watch of its boxes, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
   override goodbye(): void {
     super.goodbye()
-    for (const vault of this.things) { vault.letLeaseGo() }
+    for (const vault of this.things) {
+      vault.goodbyeBoxes()
+      vault.letLeaseGo()
+    }
   }
 
   // == [Defined by the vault listing]

@@ -170,13 +170,16 @@ export const DeviceScopepathShape = `A device record's scopepath is 'device', an
 export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
 // --
 
-// == [Bank and vault]: VaultBagAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanHeld, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
+// == [Bank and vault]: VaultBagAdvice, otherScope, boxOfOtherVault, VaultGoneWhileOpening, OtherStoresThanHeld, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
 
 /** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
 export const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
 
 /** Why a bag naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
+
+/** Why a vault reaches no box of another vault. */
+export const boxOfOtherVault = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the vault's, which reaches only its own boxes. Ask the vault it names for the box.`
 
 /** Why a vault let go while the bank was opening it hands out no Vault object. */
 export const VaultGoneWhileOpening = "The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault)."

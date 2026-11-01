@@ -715,7 +715,7 @@ export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSea
 }, [FX])
 // --
 
-// == [The vault's world]: leaseDeviceDB, vaultListingOpts, LeaseDeviceDB
+// == [The vault's world]: leaseDeviceDB, boxVaultDB, vaultListingOpts, boxBag, LeaseDeviceDB, BoxBag
 
 /** The deviceDB's lease verbs, as the vault's world carries them: each by the vault's scope, which `vault.leaseDBFriend()` binds, so no verb of the dbfriend takes one. */
 export const leaseDeviceDB = objCheck(({ fn }) => ({
@@ -726,10 +726,30 @@ export const leaseDeviceDB = objCheck(({ fn }) => ({
 
 export type LeaseDeviceDB = Z.infer<typeof leaseDeviceDB>
 
-/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate, lease and gatings need. Its `parse` refuses 'bad_option'. Checks only. */
-export const vaultListingOpts = objCheck(({ obj, fn }) => ({
-  world: obj({ ...gateWorld.shape, requestCleartext: fn(), logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), pesterMillis: leaseGrantOpts.shape.leaseMillis.optional(), deviceDB: leaseDeviceDB }),
+/** The check of the vaultDB as a vault's boxes reach it: `boxStore`, which hands the store of one vault's boxes, as a `StoreFront`'s does. Its `parse` refuses 'bad_option'. Checks only. */
+export const boxVaultDB = objCheck(({ fn }) => ({
+  boxStore: fn(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
+
+/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate, lease, gatings and box listing need. Its `parse` refuses 'bad_option'. Checks only. */
+export const vaultListingOpts = objCheck(({ obj, fn }) => ({
+  world: obj({
+    ...gateWorld.shape, requestCleartext: fn(), logger: HX.loggerShape,
+    leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), pesterMillis: leaseGrantOpts.shape.leaseMillis.optional(),
+    deviceDB: leaseDeviceDB, vaultDB: boxVaultDB, boxRefreshMillis: horizonMillis,
+  }),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+/** The check of the bag naming one of a vault's boxes, as the vault's box verbs are handed it: its `boxlabel`, and the vault's own scope fields if you like, each checked. It takes a box, its snapshot or a dna, and leaves the rest. Its `parse` refuses 'bad_scope'. */
+export const boxBag = Checker(({ obj, applabel, user_id, vaultlabel, boxlabel }) => obj({
+  applabel: applabel.optional(), user_id: user_id.optional(), vaultlabel: vaultlabel.optional(), boxlabel,
+}), 'bad_scope')
+
+/** The bag naming one of a vault's boxes, as {@link boxBag} checks it.
+ *
+ * @example vault.getBox({ boxlabel: 'anthropic' })
+ */
+export type BoxBag = Z.input<typeof boxBag>
 // --
 
 // == [Refusal kinds]: modelsRefusalKindVals, ModelsRefusalKind
@@ -839,7 +859,7 @@ export type DeviceRecord   = Z.infer<typeof deviceRecord>
 export type VaultCacheable = Cacheable<VaultRecord, VaultSparse>
 // --
 
-// == [The bank's forms]: positiveMinutes, refreshMinutes, bankDeviceDB, bankOpts, cheatClock, BankDeviceDB
+// == [The bank's forms]: positiveMinutes, refreshMinutes, bankDeviceDB, bankVaultDB, bankOpts, cheatClock, BankDeviceDB
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
@@ -857,12 +877,18 @@ export const bankDeviceDB = objCheck(({ fn }) => ({
 /** The deviceDB a bank is made with, as {@link bankDeviceDB} checks it. */
 export type BankDeviceDB = Z.infer<typeof bankDeviceDB>
 
-export const bankOpts = objCheck(({ obj, fn, unk, device_id }) => ({
+/** The check of the bank's vaultDB: `vaultStore`, which hands the store of a bank's vaults, and the `boxStore` {@link boxVaultDB} checks; a `StoreFront` answers both. Its `parse` refuses 'bad_option'. Checks only. */
+export const bankVaultDB = objCheck(({ fn }) => ({
+  ...boxVaultDB.shape,
+  vaultStore: fn(),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+export const bankOpts = objCheck(({ fn, unk, device_id }) => ({
   // Judged by `bankScope` after, so a bad name refuses 'bad_scope', as `bank.vaultOf` refuses a bad vaultlabel.
   applabel:            unk,
   user_id:             unk,
   device_id:           device_id.optional(),
-  vaultDB:             obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
+  vaultDB:             bankVaultDB,
   deviceDB:            bankDeviceDB,
   keyDeriver:          HX.keyDeriverShape,
   requestCleartext:    fn(),

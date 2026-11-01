@@ -5,19 +5,19 @@ import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
-import type { VaultScope } from '../shapes/scopes'
-import type { BoxSnapshot } from './box'
-import type { BoxWorld } from './box-listing'
+import type { Boxscope, VaultScope } from '../shapes/scopes'
+import type { Box, BoxSnapshot } from './box'
+import { type BoxCache, type BoxDna, type BoxWorld, BoxListing } from './box-listing'
 import { Gate } from './gate'
 import { type AnyGating, type GatingWorld, Gating } from './gating'
 import { Lease } from './lease'
-import type { AttemptCleartexts, CleartextsForGatingkind, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse, VaultTrouble } from './models-shapes'
+import type { AttemptCleartexts, BoxBag, CleartextsForGatingkind, EditOpts, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse, VaultTrouble } from './models-shapes'
 import * as MSX from './models-shapes'
 import { spendAnswer, spendAnswerAfter } from './proving'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
 
-// == [Record forms]: DefaultLeaseMillis, DefaultPesterMillis, VaultSnapshot, VaultPatch, GateStaging
+// == [Record forms]: DefaultLeaseMillis, DefaultPesterMillis, VaultSnapshot, BoxDnaInVault, VaultPatch, GateStaging, UnkeptBoxCache
 
 /** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * MinuteMillis
@@ -40,18 +40,18 @@ export type VaultSnapshot = VaultScope & Readonly<{
   autolock_at:   number | null
   /** Whether the gate holds a passkey; null while the vault is held sparse. */
   hasPasskey:    boolean | null
-  /** Empty while the vault holds no box listing. */
+  /** The snapshot of each box the vault holds present. */
   boxes:         readonly BoxSnapshot[]
   /** When storage last confirmed the record; null until it first has. */
   refreshedAt:   number | null
   trouble:       VaultTrouble | null
 }>
 
-/** The snapshot's boxes while the vault holds no box listing. */
-const NoBoxes: readonly BoxSnapshot[] = Object.freeze([])
-
 /** The snapshot's trouble for a vault whose stored record is damaged. */
 const DamagedVaultTrouble: VaultTrouble = Object.freeze({ refusalkind: 'damaged_vault', message: Phrases.VaultStoredDamaged })
+
+/** A box's {@link BoxDna} as its vault's verbs take it: the vault's own scope fields may be left out. */
+export type BoxDnaInVault = Omit<BoxDna, keyof VaultScope> & BoxBag
 
 /** A host's patch for `edit` and `send`: any prop of the vault's record, each checked and all ignored, the gate included, so `{}` or `{ ...record }` will do and a patch only moves the revision. `vaultPatch` checks it. */
 export type VaultPatch = { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | undefined }
@@ -67,6 +67,10 @@ class GateStaging {
     Object.freeze(this)
   }
 }
+
+// GAP: no device cache of a vault's boxes yet; each load starts with none held.
+/** The device cache of a vault's boxes, which keeps nothing. */
+const UnkeptBoxCache: BoxCache = Object.freeze({ load: () => Promise.resolve([]), save: () => Promise.resolve() })
 // --
 
 // == [Vault]
@@ -118,6 +122,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   #gate: { props: GateProps, gate: Gate } | null = null
 
+  /** The vault's boxes, each listed by boxlabel; its changes remake the vault's snapshot. */
+  readonly #boxListing: BoxListing = this.#makeBoxListing()
+
+  /** The box listing's hello, begun by the first box verb and joined by the rest; null until then, and again after `goodbyeBoxes`. */
+  #boxesHello: Promise<void> | null = null
+
   // == [Props, as the record has them]: fmt
 
   get fmt(): number { return this.combined.fmt }
@@ -151,6 +161,93 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     const full = this.demandFullProps()
     if (this.#gate?.props !== full.gate) { this.#gate = { props: full.gate, gate: new Gate(full, full.gate) } }
     return this.#gate.gate
+  }
+  // --
+
+  // == [Its boxes]: boxes, boxscopeOf, boxOf, getBox, makeBox, ensureBox, helloBoxes, goodbyeBoxes, makeBoxListing, evictBoxes, each host's verb with its try form
+
+  /** The boxes the vault holds, present or not. */
+  get boxes(): readonly Box[] { return this.#boxListing.things }
+
+  /** The scope of the box `bag` names; a bag naming another vault refuses 'bad_scope'. */
+  boxscopeOf(bag: BoxBag): Boxscope {
+    const { boxlabel } = verifyConsistent(MSX.boxBag.parse(bag), this.scope, { kind: 'bad_scope', message: Phrases.boxOfOtherVault })
+    return { ...this.scope, boxlabel }
+  }
+
+  /** The box `bag` names, as the vault holds it now, or null. Calls nothing. */
+  boxOf(bag: BoxBag): Box | null { return this.#boxListing.at(this.boxscopeOf(bag)) }
+
+  /** The box `bag` names, as the vaultDB holds it; null where it holds none, or a tombstone. */
+  async getBox(bag: BoxBag, opts: TimelyOpts = {}): Promise<Box | null> {
+    const scope = this.boxscopeOf(bag)
+    const timely = MSX.timelyOpts.parse(opts)
+    await this.helloBoxes()
+    return this.#boxListing.fetch(scope, { ...timely, ifAbsent: 'nil' })
+  }
+
+  /** The box, or null, as an {@link Outcome}: the non-throwing form of {@link Vault.getBox}. */
+  tryGetBox(bag: BoxBag, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(bag, opts)) }
+
+  /** A box of `dna`, its whisper sealed in with its sidecar, held and stored nowhere until `box.send`; `BoxListing.build` says how it refuses. A box already held under its boxlabel refuses 'bad_option': edit that one. */
+  async makeBox(dna: BoxDnaInVault): Promise<Box> {
+    const scope = this.boxscopeOf(dna)
+    await this.helloBoxes()
+    return this.#boxListing.build({ ...dna, ...scope })
+  }
+
+  /** The box made, as an {@link Outcome}: the non-throwing form of {@link Vault.makeBox}. */
+  tryMakeBox(dna: BoxDnaInVault): Promise<Outcome<Box>> { return outcomeOf(() => this.makeBox(dna)) }
+
+  /** The box `dna` names, as the vaultDB holds it; where it holds none, made of `dna` and stored, as {@link BoxListing.ensure} does. A box stored keeps its whisper and sidecar. */
+  async ensureBox(dna: BoxDnaInVault, opts: EditOpts = {}): Promise<Box> {
+    const scope = this.boxscopeOf(dna)
+    await this.helloBoxes()
+    return this.#boxListing.ensure({ ...dna, ...scope }, opts)
+  }
+
+  /** The box ensured, as an {@link Outcome}: the non-throwing form of {@link Vault.ensureBox}. */
+  tryEnsureBox(dna: BoxDnaInVault, opts: EditOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.ensureBox(dna, opts)) }
+
+  /** Start the box listing's watch, as `Listing.hello` does, once: each box verb calls it first, and a call while one is under way joins it. One refused is begun again by the next call. */
+  helloBoxes(): Promise<void> {
+    this.#boxesHello ??= this.#helloBoxesOnce()
+    return this.#boxesHello
+  }
+
+  /** End the box listing's watch, its boxes held as they are, so the next box verb starts it again. */
+  goodbyeBoxes(): void {
+    this.#boxListing.goodbye()
+    this.#boxesHello = null
+  }
+
+  async #helloBoxesOnce(): Promise<void> {
+    let isDone = false
+    try {
+      await this.#boxListing.hello()
+      isDone = true
+    } finally {
+      if (! isDone) { this.#boxesHello = null }
+    }
+  }
+
+  // Called by a field initializer, after Storable's constructor has adorned the world and tattooed the scope.
+  #makeBoxListing(): BoxListing {
+    const boxListing = new BoxListing({
+      world:                 this,
+      store:                 this.world.vaultDB.boxStore(this.scope),
+      cache:                 UnkeptBoxCache,
+      maxMillisSinceRefresh: this.world.boxRefreshMillis,
+      onBadNews:             (news) => { this.listing.tellBadNews([news]) },
+    })
+    boxListing.subscribe(() => { this.settle() })
+    return boxListing
+  }
+
+  /** End the box watch and evict every box, as `Box.evict` does, forgetting each whisper exposed. */
+  #evictBoxes(): void {
+    this.goodbyeBoxes()
+    for (const box of this.#boxListing.things) { this.#boxListing.evict(box.scope) }
   }
   // --
 
@@ -470,8 +567,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
-  /** Let the lease go, as {@link letLeaseGo} does, and make no more fetches on schedule, for a vault no listing holds any more. */
+  /** Evict its boxes, each forgetting its exposed whisper, let the lease go, as {@link letLeaseGo} does, and make no more fetches on schedule, for a vault no listing holds any more. */
   override evict(): void {
+    this.#evictBoxes()
     this.letLeaseGo()
     super.evict()
   }
@@ -565,7 +663,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
       lockState:     this.lockState(),
       autolock_at:   this.#lease?.autolock_at ?? null,
       hasPasskey:    full ? this.demandFullProps().gate.passkey_wayin !== null : null,
-      boxes:         NoBoxes,
+      boxes:         this.#boxListing.snapshot,
       refreshedAt:   this.refreshedAt,
       trouble:       this.am === 'd' ? DamagedVaultTrouble : null,
     })

@@ -15,7 +15,7 @@ const noop = () => undefined
 const bankOptsOf = (overrides: Partial<BankOpts> = {}): BankOpts => ({
   applabel:         'acme',
   user_id:          'u1',
-  vaultDB:          { get: noop, put: noop, del: noop, watch: noop } as unknown as BankOpts['vaultDB'],
+  vaultDB:          { vaultStore: () => ({ get: noop, put: noop, del: noop, watch: noop }), boxStore: noop } as unknown as BankOpts['vaultDB'],
   deviceDB:         { tryGetLease: noop, tryPutLease: noop, tryDelLease: noop, vaultCache: () => ({ load: noop, save: noop }), advanceDeviceRecord: noop, clearCachedVault: noop } as unknown as BankOpts['deviceDB'],
   keyDeriver:       TH.testDeriver,
   requestCleartext: noop,

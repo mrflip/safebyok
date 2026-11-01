@@ -19,18 +19,21 @@ import type { BankDeviceDB, Cleartexts, LockState, StrengthChecker } from './mod
 import * as MSX from './models-shapes'
 import { spendAnswerAfter } from './proving'
 import { DefaultLeaseMillis, DefaultPesterMillis, type Vault, type VaultSnapshot } from './vault'
-import { type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
+import { type BoxVaultDB, type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultRefreshMillis, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
+// == [Given to a bank]: DefaultRefreshMillis, BankVaultDB, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
+
+/** The vaultDB a bank is made with: the store of its vaults, and of each vault's boxes. A `StoreFront` is one. */
+export type BankVaultDB = BoxVaultDB & { vaultStore(scope: BankScope): VaultStore }
 
 /** The options `Bank.make` takes. */
 export type BankOpts = {
   applabel:             string
   user_id:              string
   device_id?:           string | undefined
-  vaultDB:              VaultStore
+  vaultDB:              BankVaultDB
   deviceDB:             BankDeviceDB
   /** Required, with no default, so a host that brings its own deriver bundles no Argon2id: in a browser, spread `browserOpts()`. */
   keyDeriver:           KeyDeriver
@@ -63,13 +66,13 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly clock:            Clock
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         BankDeviceDB
+  readonly vaultDB:          BankVaultDB
   readonly logger:           VaultLogger
   readonly requestCleartext: RequestCleartext
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
   // GAP: no pester trigger reads it yet; the vault offers it as `pesterMinutes`.
   readonly pesterMillis:     number
-  // GAP: the box listing a vault makes would take `boxRefreshMillis` as its `maxMillisSinceRefresh`; no vault makes one yet.
   readonly boxRefreshMillis: number
   readonly vaultListing:     VaultListing
 
@@ -95,13 +98,14 @@ export class Bank implements VaultWorld, GatingWorld {
     this.clock = MSX.cheatClock.parse(_cheat_clock) ?? wallClock
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
+    this.vaultDB = vaultDB
     this.logger = logger
     this.requestCleartext = requestCleartext
     this.strengthChecker = strengthChecker
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.pesterMillis = millisOf(pesterMinutes, DefaultPesterMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
-    this.vaultListing = new VaultListing({ world: this, store: vaultDB, cache: deviceDB.vaultCache(this.scope), maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
+    this.vaultListing = new VaultListing({ world: this, store: vaultDB.vaultStore(this.scope), cache: deviceDB.vaultCache(this.scope), maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
     this.#snapshot = this.#snapshotNow()
     this.vaultListing.subscribe(() => { this.#remakeSnapshot() })
     if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
