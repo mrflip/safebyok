@@ -2,8 +2,9 @@ import { noop } from 'es-toolkit'
 import { verifyConsistent } from '../checks/validator'
 import { MinuteMillis } from '../consts'
 import { randomId } from '../crypto'
-import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
+import { type KeyDeriver, checkKeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { tattoo } from '../helpers'
 import { DefaultLogger, type VaultLogger } from '../logger'
 import { type Outcome, outcomeOf } from '../outcome'
@@ -11,8 +12,9 @@ import * as Phrases from '../phrases'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
 import { Gating, type GatingWorld, type RequestCleartext } from './gating'
-import type { LeaseDeviceDB, LockState, ProofClosure, StrengthChecker } from './models-shapes'
+import type { Cleartexts, LeaseDeviceDB, LockState, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
+import { spendAnswerAfter } from './proving'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
 import { type VaultCache, type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
@@ -22,6 +24,7 @@ export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
 
+/** The options `Bank.make` takes. */
 export type BankOpts = {
   applabel:             string
   user_id:              string
@@ -29,8 +32,10 @@ export type BankOpts = {
   vaultStore:           VaultStore
   vaultCache:           VaultCache
   deviceDB:             LeaseDeviceDB
+  /** Required, with no default, so a host that brings its own deriver bundles no Argon2id: in a browser, spread `browserOpts()`. */
   keyDeriver:           KeyDeriver
-  requestCleartext?:    RequestCleartext | undefined
+  requestCleartext:     RequestCleartext
+  /** Left out, every new passphrase is refused as weak until the host configures one (`notes/configuration.md`). */
   strengthChecker?:     StrengthChecker | undefined
   clock?:               Clock | undefined
   logger?:              VaultLogger | undefined
@@ -57,7 +62,7 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         LeaseDeviceDB
   readonly logger:           VaultLogger
-  readonly requestCleartext: RequestCleartext | undefined
+  readonly requestCleartext: RequestCleartext
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
   // GAP: vault-listing.ts `VaultWorld` and models-shapes.ts `vaultListingOpts` name no `pesterMillis`; the vault's pester trigger would read it as `autolock` reads `leaseMillis`, and offer `pesterMinutes` as a getter.
@@ -75,6 +80,7 @@ export class Bank implements VaultWorld, GatingWorld {
     MSX.bankOpts.parse(opts)
     const { applabel, user_id, device_id = randomId(), vaultStore, vaultCache, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
+    checkKeyDeriver(keyDeriver)
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
     this.clock = clock
@@ -126,11 +132,16 @@ export class Bank implements VaultWorld, GatingWorld {
 
   vaultOf(bag: VaultBag): Vault | null { return this.vaultListing.at(this.vaultScopeOf(bag)) }
 
-  async ensureVault(bag: VaultBag, proofClosure?: ProofClosure): Promise<Vault> {
-    const scope = this.vaultScopeOf(bag)
+  ensureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Vault> {
+    return spendAnswerAfter(cleartexts, () => this.#ensureVault(this.vaultScopeOf(bag), cleartexts))
+  }
+
+  tryEnsureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag, cleartexts)) }
+
+  async #ensureVault(scope: VaultScope, cleartexts?: Cleartexts): Promise<Vault> {
     const fetched = await this.vaultListing.fetch(scope, { ifAbsent: 'nil' })
     if (fetched !== null) { return fetched }
-    const built = await outcomeOf(() => this.#buildVault(scope, proofClosure))
+    const built = await outcomeOf(() => (cleartexts === undefined ? this.#launchBuild(scope) : this.#buildVault(scope, cleartexts)))
     if (built.ok) { return built.val }
     if (built.err.refusalkind !== 'stale_write') { throw built.err }
     // GAP: listing.ts keeps the draft held under `scope` after its first send meets 'stale_write', and `Vault.receive` refuses the record stored under the other `vault_tok`; the listing needs to drop the draft (or `#buildOrReceive` to replace a never-stored draft) for this fetch to hand back the vault another device built.
@@ -139,11 +150,13 @@ export class Bank implements VaultWorld, GatingWorld {
     return stored
   }
 
-  tryEnsureVault(bag: VaultBag, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag, proofClosure)) }
+  /** Ask the user through a 'build_vault' gating, each attempt building through `#buildVault`. */
+  #launchBuild(scope: VaultScope): Promise<Vault> {
+    return Gating.launch('build_vault', { scope, vault: null, world: this, run: (handed) => this.#buildVault(scope, handed) })
+  }
 
-  async #buildVault(scope: VaultScope, proofClosure?: ProofClosure): Promise<Vault> {
-    if (proofClosure === undefined) { return Gating.buildVault(this.vaultListing, scope, this) }
-    const vault = await this.vaultListing.build(scope, proofClosure)
+  async #buildVault(scope: VaultScope, cleartexts: Cleartexts): Promise<Vault> {
+    const vault = await this.vaultListing.build(scope, cleartexts)
     return vault.send({})
   }
 
@@ -180,11 +193,6 @@ export class Bank implements VaultWorld, GatingWorld {
 const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : minutes * MinuteMillis)
 
 const checkSecureContext = (): void => {
-  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }
+  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw RefusalFuncs.insecureContext() }
 }
-// --
-
-// == [Refusals]: insecureContext
-
-const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
 // --

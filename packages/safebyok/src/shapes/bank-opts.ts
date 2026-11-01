@@ -108,7 +108,7 @@ export type MakeBankOpts = {
   onBadNews?: BadNewsHandler | null | undefined
   /** Your method that asks the user for a passphrase or passkey: the one place UI meets the vault (see {@link RequestCleartext}).
    * Every call that needs the user -- `ensureUnlocked()` on a vault not unlocked, `putWayin()`,
-   * `delWayin()`, `del()` -- raises a {@link Gating}, and hands it here, one at a time per vault.
+   * `delWayin()`, `del()` -- launches a {@link Gating}, and hands it here, one at a time per vault.
    * Left out or null, every gating is declined at once: the call refuses 'vault_locked'.
    *
    * @example Bank.make({ ...opts, requestCleartext: (gating) => showDialogFor(gating) })

@@ -1,14 +1,16 @@
 import { consistent, verifyConsistent } from '../checks/validator'
-import { type RefusalMeta, VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
 import { Gate } from './gate'
+import { Gating } from './gating'
 import { Lease } from './lease'
-import type { AttemptClosure, Fetched, GateProps, LeaseDBFriend, LockState, PasskeyClosure, PassphraseClosure, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { AttemptCleartexts, CleartextsForGatingkind, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
+import { spendAnswer, spendAnswerAfter } from './proving'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
 
@@ -69,9 +71,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   #leaseChores: Promise<void> = Promise.resolve()
 
   /** The look for the lease this device keeps in flight, which a look begun meanwhile joins; null once it settles. */
-  #keptLookup: Promise<Lease | null> | null = null
+  #cachedLookup: Promise<Lease | null> | null = null
 
-  /** The unlock by proof in flight, which an `ensureUnlocked` begun meanwhile joins; null once it settles. */
+  /** The unlock in flight, by cleartexts or by a gating, which an `ensureUnlocked` begun meanwhile joins; null once it settles. */
   #unlocking: Promise<Lease> | null = null
 
   #gate: { props: GateProps, gate: Gate } | null = null
@@ -112,37 +114,86 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, sendGate, each with its try form
+  // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, launchGating, sendGate, each verb with its try form
 
-  /** Replace the passphrase with the one `passphraseClosure` answers, once `proofClosure` proves the gate by the passphrase, and send. The passkey stays, and must be revoked separately if unwanted; the vaultKey does not change, so a lease held stays in force. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
-  async replacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<this> {
-    MSX.passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
-    await this.ensureReadyToEdit()
-    const ante = this.demandFullProps().gate
-    return this.#sendGate(ante, await this.gate.withPassphraseReplaced(proofClosure, passphraseClosure, this.world))
+  /** Replace the passphrase and send, once the passphrase proves the gate: with `cleartexts` where given, else asking the user through a 'replace_passphrase' gating.
+   * The passkey stays, and must be revoked separately if unwanted. The vaultKey does not change,
+   * so a lease held stays in force. A next passphrase the same as the current one refuses
+   * 'same_passphrase', and a weak one 'weak_passphrase'. A record changed elsewhere while the proof
+   * ran refuses 'stale_write', storing nothing.
+   */
+  replacePassphrase(cleartexts?: PassphraseReplaceCleartexts): Promise<this> {
+    // A passkey's answer has no place here, but a host may hand one in all the same (G2).
+    return spendAnswerAfter(cleartexts, async () => {
+      const { cleartexts: checked } = MSX.passphraseReplaceArgs.parse({ cleartexts })
+      if (checked !== undefined) { return await this.#replacePassphraseBy(checked) }
+      await this.ensureReadyToEdit()
+      return await this.#launchGating('replace_passphrase', (handed) => this.#replacePassphraseBy(handed))
+    })
   }
 
-  tryReplacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase(proofClosure, passphraseClosure)) }
+  tryReplacePassphrase(cleartexts?: PassphraseReplaceCleartexts): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase(cleartexts)) }
 
-  /** Add the passkey whose answer `passkeyClosure` hands in, once `proofClosure` proves the gate by the passphrase, and send. A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a lease held stays in force. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
-  async addPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<this> {
-    MSX.passkeyAddArgs.parse({ proofClosure, passkeyClosure })
+  async #replacePassphraseBy(cleartexts: PassphraseReplaceCleartexts): Promise<this> {
     await this.ensureReadyToEdit()
     const ante = this.demandFullProps().gate
-    return this.#sendGate(ante, await this.gate.withPasskeyAdded(proofClosure, passkeyClosure, this.world))
+    return this.#sendGate(ante, await this.gate.withPassphraseReplaced(cleartexts, this.world))
   }
 
-  tryAddPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey(proofClosure, passkeyClosure)) }
+  /** Add a passkey and send, once the passphrase proves the gate: with `cleartexts` where given, else asking the user through an 'add_passkey' gating. The answer is spent unless the passphrase is refused as wrong (G2).
+   * A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a
+   * lease held stays in force. A record changed elsewhere while the proof ran refuses
+   * 'stale_write', storing nothing.
+   */
+  addPasskey(cleartexts?: PasskeyAddCleartexts): Promise<this> {
+    return spendAnswerAfter(cleartexts, async () => {
+      const { cleartexts: checked } = MSX.passkeyAddArgs.parse({ cleartexts })
+      if (checked !== undefined) { return await this.#addPasskeyBy(checked) }
+      await this.ensureReadyToEdit()
+      this.gate.demandPasskeyAddable()
+      return await this.#launchGating('add_passkey', (handed) => this.#addPasskeyBy(handed))
+    })
+  }
 
-  /** Revoke the passkey, once `proofClosure` proves the gate by the passphrase, and send. A vault without one refuses 'absent_wayin', asking nothing. Removal is not revocation of the vaultKey, which does not change: a lease held stays in force. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
-  async revokePasskey(proofClosure: AttemptClosure): Promise<this> {
-    MSX.passkeyRevokeArgs.parse({ proofClosure })
+  tryAddPasskey(cleartexts?: PasskeyAddCleartexts): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey(cleartexts)) }
+
+  #addPasskeyBy(cleartexts: PasskeyAddCleartexts): Promise<this> {
+    return spendAnswerAfter(cleartexts, async () => {
+      await this.ensureReadyToEdit()
+      const ante = this.demandFullProps().gate
+      return await this.#sendGate(ante, await this.gate.withPasskeyAdded(cleartexts, this.world))
+    })
+  }
+
+  /** Revoke the passkey and send, once the passphrase proves the gate: with `cleartexts` where given, else asking the user through a 'revoke_passkey' gating.
+   * A vault without one refuses 'absent_wayin', asking nothing. Removal is not revocation of the
+   * vaultKey, which does not change: a lease held stays in force. A record changed elsewhere while
+   * the proof ran refuses 'stale_write', storing nothing.
+   */
+  revokePasskey(cleartexts?: PassphraseCleartexts): Promise<this> {
+    // A passkey's answer has no place here, but a host may hand one in all the same (G2).
+    return spendAnswerAfter(cleartexts, async () => {
+      const { cleartexts: checked } = MSX.passkeyRevokeArgs.parse({ cleartexts })
+      if (checked !== undefined) { return await this.#revokePasskeyBy(checked) }
+      await this.ensureReadyToEdit()
+      this.gate.demandPasskeyRevocable()
+      return await this.#launchGating('revoke_passkey', (handed) => this.#revokePasskeyBy(handed))
+    })
+  }
+
+  tryRevokePasskey(cleartexts?: PassphraseCleartexts): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey(cleartexts)) }
+
+  async #revokePasskeyBy(cleartexts: PassphraseCleartexts): Promise<this> {
     await this.ensureReadyToEdit()
     const ante = this.demandFullProps().gate
-    return this.#sendGate(ante, await this.gate.withPasskeyRevoked(proofClosure, this.world))
+    return this.#sendGate(ante, await this.gate.withPasskeyRevoked(cleartexts, this.world))
   }
 
-  tryRevokePasskey(proofClosure: AttemptClosure): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey(proofClosure)) }
+  /** Ask the user through a `gatingkind` gating of this vault, each attempt running `run`, and resolve the vault once one succeeds. */
+  async #launchGating<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<this> {
+    await Gating.launch(gatingkind, { scope: this.scope, vault: this, world: this.world, run: async (handed) => { await run(handed); return this } })
+    return this
+  }
 
   /** Stage `gate` over the record in hand and send it: the vault's one path to a new gate. Where the record's gate is no longer `ante`, the one proved against, it refuses 'stale_write', storing nothing. */
   #sendGate(ante: GateProps, gate: GateProps): Promise<this> {
@@ -150,93 +201,114 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpKeptLease, unlock, unlockAlone, unlockByProof, lookUpKept, setLease
+  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, unlock, joinUnlocking, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
   /** How long a lease granted this vault lasts: the world's `leaseMillis`, else {@link DefaultLeaseMillis}. */
   get leaseMillis(): number { return this.world.leaseMillis ?? DefaultLeaseMillis }
 
-  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else the proof `proofClosure` answers; with none of them, refuses 'vault_locked'. A lease held past its time locks the vault first.
-   * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by calling again.
+  /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else `cleartexts`, else by asking the user through an 'unlock_vault' gating. A lease held past its time locks the vault first.
+   * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by
+   * calling again; cleartexts it handed are spent unused (G2). Wrong cleartexts refuse
+   * 'wrong_passphrase' or 'wrong_passkey', leaving unspent a passkey's answer for another passkey
+   * or salt; a gating the user declines, 'vault_locked'.
    */
-  async ensureUnlocked(proofClosure?: AttemptClosure): Promise<Lease> {
-    await this.ensureTimely({})
-    const held = this.#lease
-    if (held?.isInForce) { return held }
-    if (held !== null) { this.lock() }
-    return this.#unlock(proofClosure)
+  ensureUnlocked(cleartexts?: AttemptCleartexts): Promise<Lease> {
+    return spendAnswerAfter(cleartexts, async () => {
+      const { cleartexts: checked } = MSX.vaultUnlockArgs.parse({ cleartexts })
+      await this.ensureTimely({})
+      const held = this.#lease
+      if (held?.isInForce) { return held }
+      if (held !== null) { this.lock() }
+      return await this.#unlock(checked)
+    })
   }
 
   /** The lease the vault holds; a locked vault refuses 'vault_locked'. */
   demandLease(): Lease {
-    if (this.#isLocked || this.#lease === null) { throw unlockFirst() }
+    if (this.#isLocked || this.#lease === null) { throw RefusalFuncs.needVaultUnlocked() }
     return this.#lease
   }
 
   /** Hold `lease` as the vault's lease, letting go any it held: the vault reads unlocked. A lease of another vault, or granted another Vault object, refuses 'bad_option'; one not in force, 'vault_locked'. */
   takeUpLease(lease: Lease): Lease {
-    if (lease.vault !== this || ! consistent(MSX.vaultStamp.parse(lease), MSX.vaultStamp.parse(this))) { throw leaseOfOtherHolder() }
-    if (! lease.isInForce) { throw leaseNotInForce() }
+    if (lease.vault !== this || ! consistent(MSX.vaultStamp.parse(lease), MSX.vaultStamp.parse(this))) { throw RefusalFuncs.leaseOfOtherHolder() }
+    if (! lease.isInForce) { throw RefusalFuncs.leaseNotInForce() }
     return this.#setLease(lease)
   }
 
-  /** Take up the lease this device keeps of the vault, where the vault holds none and one is kept in force; a refused look is told as bad news. */
-  takeUpKeptLease(): Promise<Lease | null> {
+  /** Take up the lease this device keeps of the vault, where the vault holds none and the one cached is in force; a refused look is told as bad news. */
+  takeUpCachedLease(): Promise<Lease | null> {
     if (this.#lease !== null) { return Promise.resolve(null) }
-    this.#keptLookup ??= this.#lookUpKept()
-    return this.#keptLookup
+    this.#cachedLookup ??= this.#lookUpCached()
+    return this.#cachedLookup
   }
 
-  async #unlock(proofClosure?: AttemptClosure): Promise<Lease> {
+  async #unlock(cleartexts?: AttemptCleartexts): Promise<Lease> {
     const inFlight = this.#unlocking
-    if (inFlight !== null) { return inFlight }
-    const kept = await this.takeUpKeptLease()
-    if (kept !== null) { return kept }
-    // A lease taken up meanwhile, through `takeUpLease`, is the answer: the look declined the kept one for it.
+    if (inFlight !== null) { return this.#joinUnlocking(inFlight, cleartexts) }
+    const cached = await this.takeUpCachedLease()
+    if (cached !== null) { return cached }
+    // A lease taken up meanwhile, through `takeUpLease`, is the answer: the look declined the cached one for it.
     const held = this.#lease
     if (held?.isInForce) { return held }
-    if (proofClosure !== undefined) { this.#unlocking ??= this.#unlockAlone(proofClosure) }
-    if (this.#unlocking === null) { throw noProofToUnlock() }
+    // An unlock begun while the look ran is joined, as one in flight before it is.
+    const begun = this.#unlocking
+    if (begun !== null) { return this.#joinUnlocking(begun, cleartexts) }
+    this.#unlocking = this.#unlockAlone(cleartexts)
     return this.#unlocking
   }
 
-  /** The unlock by proof as the one in flight: `#unlocking`, cleared once it settles. */
-  async #unlockAlone(proofClosure: AttemptClosure): Promise<Lease> {
+  /** Share the outcome of the unlock `inFlight`, spending a passkey's answer in `cleartexts` at once: never tried, it is not left unspent by another's correctable refusal (G2). */
+  #joinUnlocking(inFlight: Promise<Lease>, cleartexts?: AttemptCleartexts): Promise<Lease> {
+    spendAnswer(cleartexts)
+    return inFlight
+  }
+
+  /** The unlock by `cleartexts`, or by a gating where none are handed, as the one in flight: `#unlocking`, cleared once it settles. */
+  async #unlockAlone(cleartexts?: AttemptCleartexts): Promise<Lease> {
     try {
       // The await always yields first, so the finally never runs before `#unlock` has set `#unlocking`.
-      return await this.#unlockByProof(proofClosure)
+      return await (cleartexts === undefined ? this.#unlockByGating() : this.#unlockByProof(cleartexts))
     } finally {
       this.#unlocking = null
     }
   }
 
-  async #unlockByProof(proofClosure: AttemptClosure): Promise<Lease> {
+  /** Ask the user through an 'unlock_vault' gating, each attempt unlocking through `#unlockByProof`, never `ensureUnlocked`, which would join the unlock this is. The full record is fetched first, so the gating carries the passkey header. */
+  async #unlockByGating(): Promise<Lease> {
     if (! this.isFull) { await this.fetch() }
-    const proving = await this.gate.attemptProof(proofClosure, this.world)
+    await this.#launchGating('unlock_vault', (handed) => this.#unlockByProof(handed))
+    return this.demandLease()
+  }
+
+  async #unlockByProof(cleartexts: AttemptCleartexts): Promise<Lease> {
+    if (! this.isFull) { await this.fetch() }
+    const proving = await this.gate.attemptProof(cleartexts, this.world)
     // An erase a lock queued lands before this grant's put.
     await this.#leaseChores
     return this.#setLease(await proving.makeLease(this, this.leaseDBFriend(), { leaseMillis: this.leaseMillis }))
   }
 
-  async #lookUpKept(): Promise<Lease | null> {
+  async #lookUpCached(): Promise<Lease | null> {
     try {
-      // An erase a lock queued lands before this look, so a lease just locked is not taken up again. Awaited first, so `#keptLookup` is set before the finally clears it.
+      // An erase a lock queued lands before this look, so a lease just locked is not taken up again. Awaited first, so `#cachedLookup` is set before the finally clears it.
       await this.#leaseChores
-      const kept = await Lease.tryGet(this, this.leaseDBFriend())
-      if (! kept.ok) {
-        this.listing.tellBadNews([kept.err])
+      const cached = await Lease.tryGet(this, this.leaseDBFriend())
+      if (! cached.ok) {
+        this.listing.tellBadNews([cached.err])
         return null
       }
-      if (kept.val === null) { return null }
+      if (cached.val === null) { return null }
       // Declined, it is evicted: its autolock would otherwise lock the vault at its own `autolock_at`.
-      if (! kept.val.isInForce || this.#lease?.isInForce === true) {
-        kept.val.evict()
+      if (! cached.val.isInForce || this.#lease?.isInForce === true) {
+        cached.val.evict()
         return null
       }
-      return this.#setLease(kept.val)
+      return this.#setLease(cached.val)
     } finally {
-      this.#keptLookup = null
+      this.#cachedLookup = null
     }
   }
 
@@ -287,7 +359,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
-  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlockByProof` awaits the queue before granting and `#lookUpKept` before looking, so a lock's erase lands before the next put or get. */
+  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlockByProof` awaits the queue before granting and `#lookUpCached` before looking, so a lock's erase lands before the next put or get. */
   #leaseChore(work: () => Promise<void>): void {
     const prior = this.#leaseChores
     this.#leaseChores = (async () => {
@@ -335,7 +407,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     const { base } = this.makeStagedBase()
     const held = this.demandFullProps().gate
     if (! (patch instanceof GateStaging)) { return Promise.resolve({ ...base, gate: held }) }
-    if (patch.ante !== held) { throw gateMovedUnderChange({ stored_revision: MSX.revision.parse(this.central), staged_revision: MSX.revision.parse(base) }) }
+    if (patch.ante !== held) { throw RefusalFuncs.gateMovedUnderChange({ stored_revision: MSX.revision.parse(this.central), staged_revision: MSX.revision.parse(base) }) }
     return Promise.resolve({ ...base, gate: patch.gate })
   }
 
@@ -355,18 +427,4 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 }
-// --
-
-// == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce, gateMovedUnderChange
-
-const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
-
-const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
-
-const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
-
-const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
-
-/** The 'stale_write' of a gate change proved against a record that moved meanwhile, its `meta` the revisions `movedUnderEditError` carries. */
-const gateMovedUnderChange = (meta: RefusalMeta): VaultError => new VaultError('stale_write', Phrases.GateMovedUnderChange, { meta })
 // --

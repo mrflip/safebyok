@@ -116,7 +116,7 @@ describe("the tombstone's registered_at", () => {
 describe("a lease a caller holds across lock()", () => {
   it("README.md:616, 'The key is dropped at once, and every call that needs it throws kind vault_locked': the vault reads locked at once, but a Lease taken from it before lock() seals until the forget lock() queued lands", async () => {
     const { listing } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const vault = await listing.build(Dna, { passphrase: Passphrase })
     const lease = vault.demandLease()
     vault.lock()
     expect(vault.isLocked).to.be.true
@@ -132,7 +132,7 @@ describe("a lease a caller holds across lock()", () => {
 describe("the box's seal through the vault's lease", () => {
   it("README.md:591, 'The deadline is the truth, and a timer enforces it': past autolock_at, before the autolock fires, the vault reads unlocked and a box passes its guard, but the lease refuses its seal 'vault_locked', and the vault still reads unlocked after", async () => {
     const { listing, advance } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const vault = await listing.build(Dna, { passphrase: Passphrase })
     const boxes = new BoxListing({ world: boxWorldOf(vault), store: held.mw.store, cache: held.mw.cache, maxMillisSinceRefresh: 10 * 60_000 })
     const box = await boxes.build({ ...Dna, boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' }, sidecar: {} })
     advance(LeaseMillis)
@@ -153,16 +153,14 @@ describe("the box's seal through the vault's lease", () => {
 })
 // --
 
-// == [Changing the gate]: the passkey stays, other devices stay unlocked, no strength check
+// == [Changing the gate]: the passkey stays, other devices stay unlocked
 
 const NewPassphrase = 'a new passphrase for the vault'
-const byPassphrase = (passphrase: string) => () => ({ passphrase })
-const byLaptopPasskey = async () => ({ passkeyAnswer: await TH.passkeyOf('laptop') })
 /** A vault born with a passphrase and the laptop's passkey, and sent. */
 const bornWithPasskey = async () => {
   const world = makeVaultWorld()
   const passkeyAnswer = await TH.passkeyOf('laptop')
-  const vault = await world.listing.build(Dna, () => ({ passphrase: Passphrase, passkeyAnswer }))
+  const vault = await world.listing.build(Dna, { passphrase: Passphrase, passkeyAnswer })
   await vault.send({})
   const demandStored = () => {
     const record = world.storedNow()
@@ -176,9 +174,9 @@ describe("the gate changes the vault sends", () => {
   it("README.md:841, 'A new passphrase removes the passkey with the old one': the passkey wayin is kept as stored, and the passkey still opens", async () => {
     const { vault, demandStored, opts: { world } } = await bornWithPasskey()
     const { passkey_wayin } = demandStored().gate
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await vault.replacePassphrase({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
     expect(demandStored().gate.passkey_wayin).to.deep.equal(passkey_wayin)
-    const proving = await vault.gate.attemptProof(byLaptopPasskey, world)
+    const proving = await vault.gate.attemptProof({ passkeyAnswer: await TH.passkeyOf('laptop') }, world)
     expect(proving.wayinkind).to.eq('passkey')
   })
 
@@ -186,20 +184,13 @@ describe("the gate changes the vault sends", () => {
     const { vault, demandStored } = await bornWithPasskey()
     const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
     const theirs = await other.listing.build(demandStored())
-    await theirs.ensureUnlocked(byPassphrase(Passphrase))
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await theirs.ensureUnlocked({ passphrase: Passphrase })
+    await vault.replacePassphrase({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
     other.storeBehindOurBack(demandStored())
     await theirs.fetch()
     expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
     expect(theirs.isUnlocked).to.be.true
     expect(theirs.demandLease().isInForce).to.be.true
-  })
-
-  it("README.md:853, 'each change_passphrase sets -- is put to the vault's strengthChecker first': a one-letter new passphrase is set, as the world carries no checker", async () => {
-    const { vault, opts: { world } } = await bornWithPasskey()
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase('x'))
-    const proving = await vault.gate.attemptProof(byPassphrase('x'), world)
-    expect(proving.wayinkind).to.eq('passphrase')
   })
 })
 // --
