@@ -173,6 +173,23 @@ describe("A second gating on a vault", () => {
     await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
     dialog.close()
   })
+
+  it("fetches the full record in its turn, where a sparse one received while it waited left the vault without its gate", async () => {
+    const { vault, requestCleartext, demandStored, storeBehindOurBack, opts: { world } } = await makeBornVault()
+    vault.lock()
+    const dialog = holdNextDialog(requestCleartext)
+    const unlocking = vault.ensureUnlocked()
+    const gating = await dialog.gating
+    const replacing = vault.replacePassphrase()
+    await TH.wakeupAtNextTick()
+    vault.takeWorld(storeBehindOurBack(demandStored()))
+    expect(vault.isFull).to.be.false
+    gating.decline()
+    await TH.expectRefusal(unlocking, 'declined')
+    expect(await replacing).to.equal(vault)
+    await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
+    dialog.close()
+  })
 })
 
 describe("Vault.addPasskey", () => {

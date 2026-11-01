@@ -216,10 +216,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return launch
   }
 
-  /** Hold the asking turn, and ask through `Gating.launch`, the gating held as `#asking` from the moment the host is handed it. */
+  /** Hold the asking turn, fetch the full record where the vault is not full, so the gating carries the passkey header, and ask through `Gating.launch`, the gating held as `#asking` from the moment the host is handed it. */
   async #askInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<void> {
     await this.#askingMutex.acquire()
     try {
+      // Fetched in turn: a sparse record received while it waited would leave the gating no gate to read.
+      if (! this.isFull) { await this.fetch() }
       const { requestCleartext, strengthChecker, logger } = this.world
       // `Gating.launch` hands the host its gating before it first awaits.
       const world: GatingWorld = { strengthChecker, logger, requestCleartext: (gating) => {
@@ -329,9 +331,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Ask the user through an 'unlock_vault' gating, each attempt unlocking through `#unlockByProof`, never `ensureUnlocked`, which would join the unlock this is. The full record is fetched first, so the gating carries the passkey header. */
+  /** Ask the user through an 'unlock_vault' gating, each attempt unlocking through `#unlockByProof`, never `ensureUnlocked`, which would join the unlock this is. */
   async #unlockByGating(): Promise<Lease> {
-    if (! this.isFull) { await this.fetch() }
     await this.#launchGating('unlock_vault', (handed) => this.#unlockByProof(handed))
     return this.demandLease()
   }
