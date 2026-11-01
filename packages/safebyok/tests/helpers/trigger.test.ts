@@ -8,10 +8,9 @@ const T0 = 1_700_000_000_000
 /** A trigger on the faked clock, horizon one second, whose launch reports its success and counts itself in `launched`. */
 const triggerOf = () => {
   const launched = { count: 0 }
-  const trigger = new Trigger<number, number>({
+  const trigger = new Trigger<number>({
     clock:       { now: () => Date.now() },
     intervalMillis: 1000,
-    doSnapshot:  () => launched.count,
     doTryLaunch: () => { launched.count += 1; trigger.taskCompleted(); return Promise.resolve(good(launched.count)) },
   })
   return { trigger, launched }
@@ -23,7 +22,6 @@ const scriptedOf = (opts: { outcomes: Outcome<number>[] }) => {
   const trigger = new Trigger({
     clock:           { now: () => Date.now() },
     intervalMillis:  1000,
-    doSnapshot:      () => 0,
     doTryLaunch:     () => Promise.resolve(opts.outcomes.shift() ?? good(0)),
     onTimerRefusal:  (err) => { told.push(err) },
   })
@@ -73,7 +71,7 @@ describe("trigger.isTimely and ensureTimelyWithin(): the interval, not the timer
   })
 
   it("reads untimely before the first success, for an interval of Infinity too", () => {
-    const trigger = new Trigger({ clock: { now: () => Date.now() }, intervalMillis: Infinity, doSnapshot: () => 0, doTryLaunch: () => Promise.resolve(good(0)) })
+    const trigger = new Trigger({ clock: { now: () => Date.now() }, intervalMillis: Infinity, doTryLaunch: () => Promise.resolve(good(0)) })
     expect(trigger.isTimely).to.be.false
   })
 

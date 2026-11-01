@@ -23,12 +23,11 @@ export type IntervalMillis = number
 /** How long something lasts, once, in milliseconds. */
 export type DurationMillis = number
 
-export type TriggerOpts<SnapT, ValT> = {
+export type TriggerOpts<ValT> = {
   clock:                  Clock
   intervalMillis:         IntervalMillis
   // The next launch is scheduled at this fraction of intervalMillis after a success or a launch that completes ok, so it has completed by the horizon. Default 0.8.
   eagerFrac?:             number | undefined
-  doSnapshot:             () => SnapT
   doTryLaunch:            () => Promise<Outcome<ValT>>
   // Told the refusal of a launch the timer made, which no caller awaits.
   onTimerRefusal?:        ((err: VaultError) => void) | undefined
@@ -50,12 +49,11 @@ export type TriggerTiming = Readonly<{
  * Launches run one at a time: a call made during one joins it and settles as it settles.
  * A client asks `isTimely`, `isTimelyWithin` and `ensureTimelyWithin`, and does no time math of its own.
  */
-export class Trigger<SnapT, ValT> {
+export class Trigger<ValT> {
   readonly intervalMillis: IntervalMillis
   readonly eagerFrac:      number
 
   readonly #clock:           Clock
-  readonly #doSnapshot:      () => SnapT
   readonly #doTryLaunch:     () => Promise<Outcome<ValT>>
   readonly #onTimerRefusal:  ((err: VaultError) => void) | null
 
@@ -71,11 +69,10 @@ export class Trigger<SnapT, ValT> {
   #currentTask: Promise<Outcome<ValT>> | null = null
   #timer:   ReturnType<typeof setTimeout> | null = null
 
-  constructor(opts: TriggerOpts<SnapT, ValT>) {
+  constructor(opts: TriggerOpts<ValT>) {
     this.#clock = opts.clock
     this.intervalMillis = opts.intervalMillis
     this.eagerFrac = opts.eagerFrac ?? 0.8
-    this.#doSnapshot = opts.doSnapshot
     this.#doTryLaunch = opts.doTryLaunch
     this.#onTimerRefusal = opts.onTimerRefusal ?? null
     this.#dueAt = this.#clock.now()   // never launched: due now
@@ -119,13 +116,6 @@ export class Trigger<SnapT, ValT> {
   async ensureTimelyWithin(maxMillis?: DurationMillis): Promise<void> {
     const timely = maxMillis === undefined ? this.isTimely : this.isTimelyWithin(maxMillis)
     if (! timely) { await this.launch() }
-  }
-
-  get snapshot(): SnapT { return this.#doSnapshot() }
-
-  async ensure(): Promise<SnapT> {
-    if (! this.isTimely) { await this.launch() }
-    return this.snapshot
   }
 
   async launch(): Promise<ValT> {
