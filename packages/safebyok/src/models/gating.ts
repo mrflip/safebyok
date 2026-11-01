@@ -1,3 +1,4 @@
+import { Mutex } from 'es-toolkit'
 import { Checkers } from '../checks/validator'
 import { deferred } from '../helpers/deferred'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
@@ -84,8 +85,8 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   readonly #run:     (cleartexts: unknown) => Promise<Vault>
   readonly #settled = deferred<Outcome<Vault>>()
   #outcome:  Outcome<Vault> | null = null
-  /** The attempts made, one after another; a settling the host or the launch asks for waits its turn behind them. */
-  #attempts: Promise<unknown> = Promise.resolve()
+  /** Held by each attempt, and by each settling the host or the launch asks for, so each waits its turn behind those begun before it. */
+  readonly #turns = new Mutex()
 
   private constructor(gatingkind: KindT, opts: GatingOpts<KindT>) {
     const { scope, vault, world, run } = Checks.gatingOpts.parse(opts)
@@ -186,14 +187,13 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
 
   // Neither step rejects: an attempt answers an Outcome, and a settling only records one.
-  #inTurn<ValT>(step: () => ValT | Promise<ValT>): Promise<ValT> {
-    const prior = this.#attempts
-    const turn = (async () => {
-      await prior
-      return step()
-    })()
-    this.#attempts = turn
-    return turn
+  async #inTurn<ValT>(step: () => ValT | Promise<ValT>): Promise<ValT> {
+    await this.#turns.acquire()
+    try {
+      return await step()
+    } finally {
+      this.#turns.release()
+    }
   }
 
   #settleOnce(outcome: Outcome<Vault>): void {
