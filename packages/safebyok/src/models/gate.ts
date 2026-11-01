@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { decorate, tattoo } from '../helpers'
 import * as CX from '../shapes/scopes'
@@ -14,7 +15,7 @@ export class Gate {
   declare readonly ppWayin:          Wayin
   declare readonly pkWayin:          Wayin | null
   declare readonly stamp:            VaultStamp
-  /** The passkey wayin's header, what `askPasskey` reads to ask that passkey (its `credential_id` and `prf_salt_b64`), or null where the gate holds no passkey. */
+  /** The passkey wayin's header, for `askPasskey`, or null where the gate holds no passkey. */
   declare readonly passkeyHeader:    PasskeyWayinHeader | null
 
   /** The gate of the vault `stamp` names, its wayins as `props` pickles them. */
@@ -24,7 +25,7 @@ export class Gate {
     const ppWayin = new Wayin(passphrase_wayin)
     const pkWayin = passkey_wayin === null ? null : new Wayin(passkey_wayin)
     tattoo(this, { passphrase_wayin: ppWayin.pickle(), passkey_wayin: pkWayin?.pickle() ?? null }, { writable: false })
-    const passkeyHeader = pkWayin === null ? null : Object.freeze(MSX.passkeyWayinHeader.parse(pkWayin.toJSON()))
+    const passkeyHeader = passkey_wayin === null ? null : Object.freeze(omit(passkey_wayin, ['vault_key_wayin_wrapped']))
     decorate<Gate>(this, { ppWayin, pkWayin, stamp: checked, passkeyHeader })
     Object.freeze(this)
   }

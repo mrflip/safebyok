@@ -174,6 +174,26 @@ describe("A second gating on a vault", () => {
     dialog.close()
   })
 
+  it("asks nothing of an 'unlock_vault' waiting its turn, where a lease is taken up while it waits: ensureUnlocked answers that lease", async () => {
+    const { vault, deviceDB, requestCleartext, opts: { world } } = await makeBornVault()
+    const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
+    const fresh = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis })
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const dialog = holdNextDialog(requestCleartext)
+    const replacing = vault.replacePassphrase()
+    const gating = await dialog.gating
+    const unlocking = vault.ensureUnlocked()
+    await TH.eventually(() => deviceDB.tryGetLease.mock.calls.length > 0)
+    await TH.wakeupAtNextTick()
+    vault.takeUpLease(fresh)
+    gating.decline()
+    await TH.expectRefusal(replacing, 'declined')
+    expect(await unlocking).to.equal(fresh)
+    expect(requestCleartext).toHaveBeenCalledOnce()
+    dialog.close()
+  })
+
   it("fetches the full record in its turn, where a sparse one received while it waited left the vault without its gate", async () => {
     const { vault, requestCleartext, demandStored, storeBehindOurBack, opts: { world } } = await makeBornVault()
     vault.lock()

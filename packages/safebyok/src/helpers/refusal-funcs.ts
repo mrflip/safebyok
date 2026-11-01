@@ -134,7 +134,7 @@ export const requestCleartextThrew = (): VaultError => listedRefusal('unexpected
 
 export const gatingDeclined = (): VaultError => listedRefusal('declined', Phrases.GatingDeclined)
 
-/** The 'declined' of a gating a lock of its vault ended while it asked. */
+/** The 'declined' of a gating a lock of its vault ended while it asked or waited its turn. */
 export const lockedWhileAsking = (): VaultError => listedRefusal('declined', Phrases.LockedWhileAsking)
 
 export const gatingSettled = (): VaultError => listedRefusal('gating_landed', Phrases.GatingSettled)

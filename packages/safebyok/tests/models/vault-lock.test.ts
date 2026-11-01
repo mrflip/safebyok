@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Gating } from '../../src/models/gating'
 import * as TH from '../test-helpers'
-import { Passphrase, byPassphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
+import { Passphrase, byPassphrase, holdNextDialog, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -20,12 +20,13 @@ const lockedVaultAsking = async () => {
 
 describe("vault.lock() and vault.letLeaseGo(): a gating of the vault still asking is declined", () => {
   for (const verb of ['lock', 'letLeaseGo'] as const) {
-    it(`declines it at ${verb}(): ensureUnlocked refuses 'declined', and an attempt after refuses 'gating_landed'`, async () => {
+    it(`declines it at ${verb}(): ensureUnlocked refuses 'declined', saying the vault was locked, and an attempt after refuses 'gating_landed'`, async () => {
       const { vault, asked } = await lockedVaultAsking()
       const pending = vault.ensureUnlocked()
       await TH.eventually(() => asked.gating !== null)
       vault[verb]()
-      await TH.expectRefusal(pending, 'declined')
+      const err = await TH.expectRefusal(pending, 'declined')
+      expect(err.message).to.include('locked while this prompt was open')
       expect(asked.gating?.isOpen).to.be.false
       await TH.expectRefusal(asked.gating!.attempt(byPassphrase(Passphrase)), 'gating_landed')
       expect(vault.isLocked).to.be.true
@@ -41,6 +42,44 @@ describe("vault.lock() and vault.letLeaseGo(): a gating of the vault still askin
     const lease = await vault.ensureUnlocked()
     expect(vault.demandLease()).to.equal(lease)
     expect(requestCleartext).toHaveBeenCalledTimes(2)
+  })
+
+  it("declines too a launch of another kind waiting its turn: replacePassphrase refuses 'declined', and the user is asked nothing more", async () => {
+    const { vault, asked, requestCleartext } = await lockedVaultAsking()
+    const unlocking = vault.ensureUnlocked()
+    await TH.eventually(() => asked.gating !== null)
+    const replacing = vault.replacePassphrase()
+    await TH.wakeupAtNextTick()
+    vault.lock()
+    await TH.expectRefusal(unlocking, 'declined')
+    await TH.expectRefusal(replacing, 'declined')
+    expect(requestCleartext).toHaveBeenCalledOnce()
+  })
+
+  it("asks afresh at an ensureUnlocked called after the lock, though the gating the lock declined still runs an attempt: the new call joins none of it", async () => {
+    const { vault, asked, requestCleartext, opts } = await lockedVaultAsking()
+    const pending = vault.ensureUnlocked()
+    await TH.eventually(() => asked.gating !== null)
+    const get = opts.store.get.bind(opts.store)
+    const fetching = { release: null as (() => void) | null }
+    opts.store.get = (scope) => {
+      opts.store.get = get
+      return new Promise((resolve) => { fetching.release = () => { resolve(get(scope)) } })
+    }
+    const attempt = asked.gating!.attempt(byPassphrase(Passphrase))
+    await TH.eventually(() => fetching.release !== null)
+    vault.lock()
+    const dialog = holdNextDialog(requestCleartext)
+    const after = vault.ensureUnlocked()
+    await TH.wakeupAtNextTick()
+    fetching.release?.()
+    await TH.expectRefusal(attempt, 'vault_locked')
+    await TH.expectRefusal(pending, 'vault_locked')
+    const gating = await dialog.gating as Gating<'unlock_vault'>
+    await gating.attempt(byPassphrase(Passphrase))
+    expect(vault.demandLease()).to.equal(await after)
+    expect(requestCleartext).toHaveBeenCalledTimes(2)
+    dialog.close()
   })
 })
 // --
@@ -96,7 +135,7 @@ describe("vault.lock() overtaking an unlock in flight", () => {
     expect(vault.demandLease()).to.equal(lease)
   })
 
-  it("asks the user nothing where a lock lands while the unlock fetches the full record: ensureUnlocked refuses 'vault_locked'", async () => {
+  it("asks the user nothing where a lock lands while the unlock fetches the full record: ensureUnlocked refuses 'declined', the gating ended before it asked", async () => {
     const { vault, deviceDB, listing, opts, requestCleartext, storeBehindOurBack, demandStored } = await makeBornVault()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -119,7 +158,7 @@ describe("vault.lock() overtaking an unlock in flight", () => {
     await TH.eventually(() => fetching.release !== null)
     vault.lock()
     fetching.release?.()
-    await TH.expectRefusal(pending, 'vault_locked')
+    await TH.expectRefusal(pending, 'declined')
     expect(requestCleartext).not.toHaveBeenCalled()
     expect(vault.isLocked).to.be.true
   })

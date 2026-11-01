@@ -240,6 +240,17 @@ describe("Settling a gating without an attempt", () => {
     close()
   })
 
+  it("refuses the launch 'declined', saying the vault was locked, at declineAtLock(), and an attempt after as 'gating_landed'", async () => {
+    const { gating, run, launched, close } = launchHeld()
+    const held = await asUnlock(gating)
+    held.declineAtLock()
+    const err = await TH.expectBad(launched, 'declined')
+    expect(err.message).to.include('locked while this prompt was open')
+    await TH.expectRefusal(held.attempt({ passphrase: Passphrase }), 'gating_landed')
+    expect(run).not.toHaveBeenCalled()
+    close()
+  })
+
   it("refuses the launch 'declined' when requestCleartext resolves with the gating still open", async () => {
     const { gating, launched, close } = launchHeld()
     const held = await gating

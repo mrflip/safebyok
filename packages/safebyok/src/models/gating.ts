@@ -62,7 +62,7 @@ const Checks = Checkers('bad_option', ({ obj, fn, custom }) => ({
 }))
 // --
 
-// == [Gating]: launch, isOpen, provedBy, attempt, attemptPasskey, decline, checkStrength, toJSON, with the try forms of attempt, attemptPasskey and checkStrength
+// == [Gating]: launch, isOpen, provedBy, attempt, attemptPasskey, decline, declineAtLock, checkStrength, toJSON, with the try forms of attempt, attemptPasskey and checkStrength
 
 /** One request to the user for cleartext: a passphrase, or a passkey's answer, as its `gatingkind` needs.
  * A gated verb called without cleartexts launches one through {@link Gating.launch}, hands it to the
@@ -72,13 +72,13 @@ const Checks = Checkers('bad_option', ({ obj, fn, custom }) => ({
  * answers that outcome. Attempts run one at a time, in the order made.
  */
 export class Gating<KindT extends GatingKind = GatingKind> {
-  declare readonly gatingkind: KindT
-  declare readonly applabel:   string
-  declare readonly user_id:    string
-  declare readonly vaultlabel: string
+  declare readonly gatingkind:    KindT
+  declare readonly applabel:      string
+  declare readonly user_id:       string
+  declare readonly vaultlabel:    string
   /** The vault the gating is for, or null for one the gating builds. */
-  declare readonly vault:      Vault | null
-  /** The vault's passkey header as the gating launched, what `askPasskey` reads to ask that passkey (its `credential_id` and `prf_salt_b64`); null where the vault has no passkey, or is not built yet. */
+  declare readonly vault:         Vault | null
+  /** The vault's passkey header as the gating launched, for `askPasskey`; null where the vault has no passkey, or is not built yet. */
   declare readonly passkeyHeader: PasskeyWayinHeader | null
 
   readonly #world:   GatingWorld
@@ -147,6 +147,9 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 
   /** Settle the gating as declined, once any attempt in flight has run: the gated verb refuses 'declined'. A gating settled already stays as it settled. */
   decline(): void { this.#settleInTurn(bad(RefusalFuncs.gatingDeclined())) }
+
+  /** Settle the gating as a lock of its vault declines it, once any attempt in flight has run: the gated verb refuses 'declined', saying the vault was locked. A gating settled already stays as it settled. */
+  declineAtLock(): void { this.#settleInTurn(bad(RefusalFuncs.lockedWhileAsking())) }
 
   /** Hand `passphrase` to the host's `strengthChecker`, as an attempt would, without running the verb: a weak one refuses 'weak_passphrase', with the checker's reason. */
   checkStrength(passphrase: string): Promise<void> {
