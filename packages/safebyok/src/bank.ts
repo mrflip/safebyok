@@ -18,7 +18,7 @@ import type { BankVaultOpts, MakeBankOpts } from './shapes/bank-opts'
 import * as HX from './shapes/host-code'
 import { type ParsedBankOpts, type VaultParts, parseMakeBankOpts, vaultPartsOf } from './vault-opts'
 import { Vault, bear, goneBy, letGo } from './vault'
-import { KeptLease } from './lease'
+import { CachedLease } from './lease'
 import { delDamagedVaultIn } from './del-damaged-vault'
 import { nextMicrotask } from './helpers'
 import type { VaultDB } from './vault-db'
@@ -566,7 +566,7 @@ export class Bank {
     const refreshedAt = Math.floor(parts.clock.now())
     const recordBefore = await deviceDB.getDeviceRecord(scope)
     this.#demandHeld(vaultScopepath, entry)
-    const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, refreshedAt)), KeptLease.tryGet(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
+    const [ensured, cachedLease] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, refreshedAt)), CachedLease.tryGet(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     this.#demandHeld(vaultScopepath, entry)
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw RefusalFuncs.vaultBehindWhileOpening() }
@@ -575,7 +575,7 @@ export class Bank {
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
     const record = await deviceDB.incrementDeviceRecord(incrementing) ?? incrementing
     this.#demandHeld(vaultScopepath, entry)
-    const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, refreshedAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
+    const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, cachedLease: valOf(cachedLease), record, refreshedAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault
   }
 

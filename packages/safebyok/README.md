@@ -409,14 +409,14 @@ keep records by structured clone, never as JSON.
 
 ```ts
 import { openDB } from 'idb'
-import { Bank, DeviceDB, type DeviceRecord, type KeptLeaseRow } from 'safebyok'
+import { Bank, DeviceDB, type DeviceRecord, type CachedLeaseRow } from 'safebyok'
 
 // The app's own database, with an object store set aside for safebyok's rows from version 3 on.
 const appDB = openDB('acme', 3, { upgrade: (db, oldVersion) => { if (oldVersion < 3) { db.createObjectStore('safebyok_device') } } })
 
 class AcmeDeviceDB extends DeviceDB {
   protected async doGetLease(leaseScopepath: string) { return (await appDB).get('safebyok_device', leaseScopepath) }
-  protected async doPutLease(leaseScopepath: string, record: KeptLeaseRow) { await (await appDB).put('safebyok_device', record, leaseScopepath) }
+  protected async doPutLease(leaseScopepath: string, record: CachedLeaseRow) { await (await appDB).put('safebyok_device', record, leaseScopepath) }
   protected async doDelLease(leaseScopepath: string) { await (await appDB).delete('safebyok_device', leaseScopepath) }
   protected async doGetDeviceRecord(deviceScopepath: string) { return (await appDB).get('safebyok_device', deviceScopepath) }
   protected async doDelDeviceRecord(deviceScopepath: string) { await (await appDB).delete('safebyok_device', deviceScopepath) }

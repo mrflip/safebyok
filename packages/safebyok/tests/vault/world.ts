@@ -1,4 +1,4 @@
-import type { KeptLeaseRow, LeaseRecord, DeviceRecord } from '../../src/shapes/device'
+import type { CachedLeaseRow, LeaseRecord, DeviceRecord } from '../../src/shapes/device'
 import * as DX from '../../src/shapes/device'
 import { DeviceDB, memoryDeviceDB, type DeviceVerb } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
@@ -51,8 +51,8 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
     return vault
   }
   const getLease = async (): Promise<LeaseRecord | null> => {
-    const kept = await TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
-    return kept === null ? null : DX.leaseRecord.parse(kept)
+    const cached = await TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
+    return cached === null ? null : DX.leaseRecord.parse(cached)
   }
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<TH.BornVaultOpts>) => {
@@ -96,7 +96,7 @@ export const spoilableDeviceDB = () => {
   const rowsOf = (scopepath: string) => (Scopepath.isLease(scopepath) ? rows : records)
   class SpoilableDeviceDB extends DeviceDB {
     protected doGetLease(leaseScopepath: string) { return Promise.resolve(rows.get(leaseScopepath)) }
-    protected doPutLease(leaseScopepath: string, record: KeptLeaseRow) { rows.set(leaseScopepath, record); return Promise.resolve() }
+    protected doPutLease(leaseScopepath: string, record: CachedLeaseRow) { rows.set(leaseScopepath, record); return Promise.resolve() }
     protected doDelLease(leaseScopepath: string) { rows.delete(leaseScopepath); return Promise.resolve() }
     protected doGetDeviceRecord(deviceScopepath: string) { return Promise.resolve(records.get(deviceScopepath)) }
     protected doIncrementDeviceRecord(deviceScopepath: string, incrementedFrom: (stored: unknown) => DeviceRecord) { records.set(deviceScopepath, incrementedFrom(records.get(deviceScopepath))); return Promise.resolve() }

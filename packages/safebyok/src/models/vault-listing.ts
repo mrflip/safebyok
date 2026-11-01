@@ -58,10 +58,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return vault
   }
 
-  /** Take up each vault's kept lease, as {@link Vault.takeUpKeptLease} does, once the base's `hello` has revived and hydrated them. */
+  /** Take up each vault's cached lease, as {@link Vault.takeUpCachedLease} does, once the base's `hello` has revived and hydrated them. */
   override async hello(): Promise<void> {
     await super.hello()
-    await Promise.all(this.things.map((vault) => vault.takeUpKeptLease()))
+    await Promise.all(this.things.map((vault) => vault.takeUpCachedLease()))
   }
 
   /** End the watch, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */

@@ -69,7 +69,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   #leaseChores: Promise<void> = Promise.resolve()
 
   /** The look for the lease this device keeps in flight, which a look begun meanwhile joins; null once it settles. */
-  #keptLookup: Promise<Lease | null> | null = null
+  #cachedLookup: Promise<Lease | null> | null = null
 
   /** The unlock by proof in flight, which an `ensureUnlocked` begun meanwhile joins; null once it settles. */
   #unlocking: Promise<Lease> | null = null
@@ -150,7 +150,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpKeptLease, unlock, unlockAlone, unlockByProof, lookUpKept, setLease
+  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, unlock, unlockAlone, unlockByProof, lookUpCached, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
@@ -181,19 +181,19 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#setLease(lease)
   }
 
-  /** Take up the lease this device keeps of the vault, where the vault holds none and one is kept in force; a refused look is told as bad news. */
-  takeUpKeptLease(): Promise<Lease | null> {
+  /** Take up the lease this device keeps of the vault, where the vault holds none and the one cached is in force; a refused look is told as bad news. */
+  takeUpCachedLease(): Promise<Lease | null> {
     if (this.#lease !== null) { return Promise.resolve(null) }
-    this.#keptLookup ??= this.#lookUpKept()
-    return this.#keptLookup
+    this.#cachedLookup ??= this.#lookUpCached()
+    return this.#cachedLookup
   }
 
   async #unlock(proofClosure?: AttemptClosure): Promise<Lease> {
     const inFlight = this.#unlocking
     if (inFlight !== null) { return inFlight }
-    const kept = await this.takeUpKeptLease()
-    if (kept !== null) { return kept }
-    // A lease taken up meanwhile, through `takeUpLease`, is the answer: the look declined the kept one for it.
+    const cached = await this.takeUpCachedLease()
+    if (cached !== null) { return cached }
+    // A lease taken up meanwhile, through `takeUpLease`, is the answer: the look declined the cached one for it.
     const held = this.#lease
     if (held?.isInForce) { return held }
     if (proofClosure !== undefined) { this.#unlocking ??= this.#unlockAlone(proofClosure) }
@@ -219,24 +219,24 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#setLease(await proving.makeLease(this, this.leaseDBFriend(), { leaseMillis: this.leaseMillis }))
   }
 
-  async #lookUpKept(): Promise<Lease | null> {
+  async #lookUpCached(): Promise<Lease | null> {
     try {
-      // An erase a lock queued lands before this look, so a lease just locked is not taken up again. Awaited first, so `#keptLookup` is set before the finally clears it.
+      // An erase a lock queued lands before this look, so a lease just locked is not taken up again. Awaited first, so `#cachedLookup` is set before the finally clears it.
       await this.#leaseChores
-      const kept = await Lease.tryGet(this, this.leaseDBFriend())
-      if (! kept.ok) {
-        this.listing.tellBadNews([kept.err])
+      const cached = await Lease.tryGet(this, this.leaseDBFriend())
+      if (! cached.ok) {
+        this.listing.tellBadNews([cached.err])
         return null
       }
-      if (kept.val === null) { return null }
+      if (cached.val === null) { return null }
       // Declined, it is evicted: its autolock would otherwise lock the vault at its own `autolock_at`.
-      if (! kept.val.isInForce || this.#lease?.isInForce === true) {
-        kept.val.evict()
+      if (! cached.val.isInForce || this.#lease?.isInForce === true) {
+        cached.val.evict()
         return null
       }
-      return this.#setLease(kept.val)
+      return this.#setLease(cached.val)
     } finally {
-      this.#keptLookup = null
+      this.#cachedLookup = null
     }
   }
 
@@ -287,7 +287,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
-  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlockByProof` awaits the queue before granting and `#lookUpKept` before looking, so a lock's erase lands before the next put or get. */
+  /** Queue deviceDB work on the lease, in order, never awaited by a caller: a refusal is told as bad news. `#unlockByProof` awaits the queue before granting and `#lookUpCached` before looking, so a lock's erase lands before the next put or get. */
   #leaseChore(work: () => Promise<void>): void {
     const prior = this.#leaseChores
     this.#leaseChores = (async () => {

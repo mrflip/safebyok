@@ -29,7 +29,7 @@ import { reportToPlatform } from './report-error'
 import * as RefusalFuncs from './helpers/refusal-funcs'
 import { type DeviceDB, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { KeptLease, Lease } from './lease'
+import { CachedLease, Lease } from './lease'
 import { registerLeaseGetter } from './held-lease'
 import { type PassphraseProving, Proving, type ProvingTools, type VaultPrivateTools, provingTools } from './proving'
 import { Gate } from './gate'
@@ -532,7 +532,7 @@ export class Vault implements VaultStamp {
       this.#demandNotGone()
       VX.wayinkind.parse(slotlabel)
       if (slotlabel === 'passphrase') {
-        throw new VaultError('passphrase_required', Phrases.PassphraseKept)
+        throw new VaultError('passphrase_required', Phrases.PassphraseIrremovable)
       }
       await this.#refreshIfStale(this.#staleMillis)
       this.#demandNotGone()
@@ -873,8 +873,8 @@ export class Vault implements VaultStamp {
       heardRefusal: (thrown) => this.#heardRefusal(thrown),
       request:      this.#requestCleartext,
     }
-    this.#applyVault({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, refreshedAt: born.refreshedAt, leasesSeen: this.#leasesHeld })
-    this.#takeUpAtBirth(born.leaseKept)
+    this.#applyVault({ fresh: this.#vaultRecord, listing: born.listing, cachedLease: null, refreshedAt: born.refreshedAt, leasesSeen: this.#leasesHeld })
+    this.#takeUpAtBirth(born.cachedLease)
     this.#watchStorage()
     Object.freeze(this)
   }
@@ -959,10 +959,10 @@ export class Vault implements VaultStamp {
       vaultlabel:        this.vaultlabel,
       format:            this.format,
       vault_tok:         this.vault_tok,
-      gate:              keptIfSame(shown?.gate, gate === null ? null : gateSparseOf(gate)),
-      boxes:             keptIfSame(shown?.boxes, this.#boxes),
-      damagedBoxes:      keptIfSame(shown?.damagedBoxes, this.#damagedBoxes),
-      capacity:          keptIfSame(shown?.capacity, this.#capacity()),
+      gate:              shownIfSame(shown?.gate, gate === null ? null : gateSparseOf(gate)),
+      boxes:             shownIfSame(shown?.boxes, this.#boxes),
+      damagedBoxes:      shownIfSame(shown?.damagedBoxes, this.#damagedBoxes),
+      capacity:          shownIfSame(shown?.capacity, this.#capacity()),
       ask_passphrase_at: this.#leaseInForce(now)?.ask_passphrase_at ?? null,
       freshness:         this.#freshness(now),
       trouble:           this.#trouble,
@@ -1018,7 +1018,7 @@ export class Vault implements VaultStamp {
     const refreshedAt = this.#clockNow()
     const leasesSeen = this.#leasesHeld
     try {
-      const { record, stored, leaseKept } = await this.#loadFromStorage()
+      const { record, stored, cachedLease } = await this.#loadFromStorage()
       if (! stored.ok) {
         await this.#onStorageRefusal(stored)
         throw stored.err
@@ -1040,14 +1040,14 @@ export class Vault implements VaultStamp {
       }
       if (isOlderPicture(this.#vaultRecord, found)) { return }
       const { boxes, damagedBoxes, ...fresh } = found
-      this.#applyVault({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), refreshedAt, leasesSeen })
+      this.#applyVault({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, cachedLease: valOf(cachedLease), refreshedAt, leasesSeen })
       await this.#noteEpochSeen(fresh.vault_epoch, 'refresh')
     } catch (err) { throw this.#onRefreshRefused(err) }
   }
 
   /** Read this device's record of the scope, then the vault and its listing, then this device's lease, and nothing else: the three answers as one plain object.
-   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault`, then {@link KeptLease.tryGet},
-   * the lease kept. The device record's read throws its refusal; the other two answer Outcomes.
+   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault`, then {@link CachedLease.tryGet},
+   * the lease cached. The device record's read throws its refusal; the other two answer Outcomes.
    */
   async #loadFromStorage() {
     // Read the device record before storage, or a write of this device's own that bumps the record
@@ -1055,8 +1055,8 @@ export class Vault implements VaultStamp {
     // behind a record it could not have known.
     const record = await this.#deviceDB.getDeviceRecord(this.#scope)
     const stored = await this.#vaultDB.tryGetVault(this.#scope)
-    const leaseKept = await KeptLease.tryGet(this.#deviceDB, this.#scope)
-    return { record, stored, leaseKept }
+    const cachedLease = await CachedLease.tryGet(this.#deviceDB, this.#scope)
+    return { record, stored, cachedLease }
   }
 
   /** Mark the refresh that met `err` refused, and return `err` for its caller to throw: the snapshot's freshness says `refused`, and the next hello refreshes (`#forceNextRefresh`), whatever its staleMinutes says. */
@@ -1074,7 +1074,7 @@ export class Vault implements VaultStamp {
    * None is taken up here. A refresh finding nothing damaged clears the trouble; bad news it finds is
    * told once the snapshot shows it.
    */
-  #applyVault(found: { fresh: VaultRecord, listing: BoxListing, leaseKept: KeptLease | null, refreshedAt: number, leasesSeen: number }) {
+  #applyVault(found: { fresh: VaultRecord, listing: BoxListing, cachedLease: CachedLease | null, refreshedAt: number, leasesSeen: number }) {
     const { fresh, listing } = found
     const shown = this.#damagedBoxes
     const shownWayins = this.#wayinListOf(this.#shownRecord)
@@ -1089,7 +1089,7 @@ export class Vault implements VaultStamp {
     if (this.#damagedBoxes.length === 0 && damagedWayins.length === 0) { this.#trouble = null }
     const held = this.#lease
     const outdated = held !== null && ! fitsLease(fresh, held)
-    const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! leavesInForce(found.leaseKept, held)
+    const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! leavesInForce(found.cachedLease, held)
     if (outdated || revoked) { this.#dropLease() }
     this.#replaceSnapshot()
     this.#tellListingNews(shown)
@@ -1497,7 +1497,7 @@ export class Vault implements VaultStamp {
     return lease
   }
 
-  /** Take up the lease in this device's store, read with {@link KeptLease.tryGet}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
+  /** Take up the lease in this device's store, read with {@link CachedLease.tryGet}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
    * Make it a gating's first step, before the host is asked. A gating landed while the store is
    * read takes nothing up. A lease that does not fit is left where it lies, never erased: it may be
    * another tab's, and the next grant writes over it. A record that is no lease of this scope reads
@@ -1505,10 +1505,10 @@ export class Vault implements VaultStamp {
    * at its first use, 'damaged_lease'.
    */
   async #takeUpFromPantry(gating: RaisedGating, renewMillis: number): Promise<boolean> {
-    const kept = await KeptLease.tryGet(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
+    const cached = await CachedLease.tryGet(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
     this.#demandNotGone()
     if (gating.landed) { return false }
-    const found = valOf(kept)
+    const found = valOf(cached)
     if (found === null) { return false }
     const lease = found.leaseOn(this)
     if (! this.#fitsTakeUp(lease, renewMillis)) { return false }
@@ -1516,14 +1516,14 @@ export class Vault implements VaultStamp {
     return true
   }
 
-  /** Take up `kept`, the lease the vault's birth found in this device's store ({@link KeptLease.tryGet}), when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
+  /** Take up `cached`, the lease the vault's birth found in this device's store ({@link CachedLease.tryGet}), when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
    * One that does not fit is left where it lies, never erased: it may be another tab's, of another
    * life, and a grant writes over it. Its wrap is not tried: a damaged one refuses at its first
    * use, 'damaged_lease'.
    */
-  #takeUpAtBirth(kept: KeptLease | null) {
-    if (kept === null) { return }
-    const lease = kept.leaseOn(this)
+  #takeUpAtBirth(cached: CachedLease | null) {
+    if (cached === null) { return }
+    const lease = cached.leaseOn(this)
     if (! this.#fitsTakeUp(lease, 0)) { return }
     this.#holdLease(lease)
   }
@@ -1900,7 +1900,7 @@ export type Birth = Readonly<{
   /** The box listing `VaultDB.ensureVault` resolved beside it. */
   listing:     BoxListing
   /** The lease record {@link DeviceDB.tryGetLease} found, or null. */
-  leaseKept:   KeptLease | null
+  cachedLease: CachedLease | null
   /** This device's record of the scope, as raised at birth. */
   record:      DeviceRecord
   /** When the bank's `ensureVault` began, by its clock: the vault's first `refreshedAt`. */
@@ -1925,7 +1925,7 @@ const isOlderPicture = (inHand: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 
 )
 
 /** `next`, or `shown` when it holds the same: a snapshot's slice keeps its identity until what it holds changes. */
-const keptIfSame = <SliceT>(shown: SliceT | undefined, next: SliceT): SliceT => (
+const shownIfSame = <SliceT>(shown: SliceT | undefined, next: SliceT): SliceT => (
   shown !== undefined && stableJsonify(shown) === stableJsonify(next) ? shown : next
 )
 
@@ -1937,8 +1937,8 @@ const fitsLease = (vaultRecord: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, l
  * this tab keeps its own until it ends. None (a lock in another tab), or one under another gate,
  * does not.
  */
-const leavesInForce = (kept: KeptLease | null, held: Lease): boolean => (
-  kept !== null && kept.vault_tok === held.vault_tok && kept.gate_epoch === held.gate_epoch
+const leavesInForce = (cached: CachedLease | null, held: Lease): boolean => (
+  cached !== null && cached.vault_tok === held.vault_tok && cached.gate_epoch === held.gate_epoch
 )
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */

@@ -67,10 +67,10 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.be.null
       const lease = await leaseOf('u1')
       await deviceDB.tryPutLease(lease)
-      const kept = await deviceDB.tryGetLease(scopeOf('u1'))
-      expect(kept).to.deep.equal(lease)
-      expect(kept?.lease_key).to.be.instanceOf(CryptoKey)
-      expect(kept?.lease_key.extractable).to.be.false
+      const cached = await deviceDB.tryGetLease(scopeOf('u1'))
+      expect(cached).to.deep.equal(lease)
+      expect(cached?.lease_key).to.be.instanceOf(CryptoKey)
+      expect(cached?.lease_key.extractable).to.be.false
     })
 
     it("resolves the lease as stored, whole, leaseKey handle and all", async () => {

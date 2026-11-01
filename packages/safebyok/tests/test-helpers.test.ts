@@ -359,8 +359,8 @@ describe("holdNextAnswer", () => {
     await vault.lock()
     written.release()
     await unlocking
-    const kept = await opts.deviceDB.tryGetLease(TH.scopeOf('u1'))
-    expect(await TH.expectGood(kept)).to.be.null
+    const cached = await opts.deviceDB.tryGetLease(TH.scopeOf('u1'))
+    expect(await TH.expectGood(cached)).to.be.null
   })
 })
 

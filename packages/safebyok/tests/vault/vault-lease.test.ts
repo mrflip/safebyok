@@ -308,9 +308,9 @@ describe("the lease, when the host changes leaseHours", () => {
     const otherTab = await world.openUnlocked('pw one', { leaseHours: Infinity })
     const getLease = world.deviceDB.tryGetLease.bind(world.deviceDB)
     vi.spyOn(world.deviceDB, 'tryGetLease').mockImplementationOnce(async (scope) => {
-      const kept = await getLease(scope)
+      const cached = await getLease(scope)
       await otherTab.lock()
-      return kept
+      return cached
     })
     await world.open({ leaseHours: 1 })
     expect(await world.getLease()).to.be.null
@@ -702,12 +702,12 @@ describe("an unlock this device cannot keep a lease for", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
-  const UnkeptFirstUnlocks: readonly (readonly [RefusalKind, () => Error])[] = [
+  const UncachedFirstUnlocks: readonly (readonly [RefusalKind, () => Error])[] = [
     ['storage_blocked', () => new DOMException('The quota has been exceeded.', 'QuotaExceededError')],
     ['storage_unavailable', () => new Error('device storage is unavailable')],
   ]
 
-  for (const [refusalkind, trouble] of UnkeptFirstUnlocks) {
+  for (const [refusalkind, trouble] of UncachedFirstUnlocks) {
     it(`sets the first passphrase though the device store refuses the lease: the first gate is stored, ensureUnlocked refuses ${refusalkind} saying the passphrase was set, and the vault is locked here`, async () => {
       const world = makeWorld()
       const vault = await world.open()

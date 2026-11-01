@@ -398,8 +398,8 @@ describe("the logger", () => {
     await TH.expectRefusal(reopened.getWhisper('anthropic'), 'damaged_lease')
     expect(TH.stateOf(reopened.snapshot)).to.eq('locked')
     await TH.wakeupAtNextTick()
-    const kept = await device.deviceDB.tryGetLease(TH.scopeOf('u1'))
-    expect(valOf(kept)).to.be.null
+    const cached = await device.deviceDB.tryGetLease(TH.scopeOf('u1'))
+    expect(valOf(cached)).to.be.null
   })
 
   it("leaves a lease of another scope where it lies at birth: no erase is tried, and the vault is born locked", async () => {

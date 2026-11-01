@@ -52,17 +52,17 @@ export class Lease implements LeaseStamp {
   /** The lease this device keeps of `vault`, or null for none; one past its `autolock_at` is forgotten, its record erased, and answers null. */
   static async get(vault: LeaseVault, dbfriend: LeaseDBFriend): Promise<Lease | null> {
     leaseGetArgs.parse({ vault, dbfriend })
-    const kept = await dbfriend.tryGetLease()
-    if (! kept.ok) { throw kept.err }
-    if (kept.val === null) { return null }
-    const checked = leaseRecord.safeParse(kept.val)
+    const cached = await dbfriend.tryGetLease()
+    if (! cached.ok) { throw cached.err }
+    if (cached.val === null) { return null }
+    const checked = leaseRecord.safeParse(cached.val)
     if (! checked.success || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(vault))) {
       // Neither the record nor what it failed is told: it may hold key material.
       dbfriend.logger.warn("This device's lease could not be read as a lease of this vault, so it counts as none and was left where it lies: the vault asks for the passphrase, and the next grant writes over it.", { call: 'Lease.get' })
       return null
     }
     if (checked.data.autolock_at <= vault.clock.now()) {
-      await eraseKept(dbfriend, 'Lease.get')
+      await eraseCached(dbfriend, 'Lease.get')
       return null
     }
     return new Lease(vault, dbfriend, checked.data, checked.data.autolock_at - vault.clock.now())
@@ -106,7 +106,7 @@ export class Lease implements LeaseStamp {
 
   get isInForce(): boolean { return this.#record !== null && this.#autolock.isTimely }
 
-  /** The autolock's launch: lock the vault, which erases the kept lease by scope; evict here too, for a lease the vault never took up. */
+  /** The autolock's launch: lock the vault, which erases the cached lease by scope; evict here too, for a lease the vault never took up. */
   #autolockNow(): void {
     this.vault.lock()
     this.evict()
@@ -169,7 +169,7 @@ export class Lease implements LeaseStamp {
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
     const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), RefusalFuncs.damagedLease)
     if (! opened.ok) {
-      // Locking drops the vault's lease and erases the kept one by scope; this one is evicted too, should the vault hold another.
+      // Locking drops the vault's lease and erases the cached one by scope; this one is evicted too, should the vault hold another.
       this.vault.lock()
       this.evict()
     }
@@ -181,10 +181,10 @@ export class Lease implements LeaseStamp {
 }
 // --
 
-// == [Erasing the kept record]: eraseKept
+// == [Erasing the cached record]: eraseCached
 
 /** Erase the record the deviceDB keeps, warning of a refusal: tried once, never again (notes/wontfix.md). */
-const eraseKept = async (dbfriend: LeaseDBFriend, call: string): Promise<void> => {
+const eraseCached = async (dbfriend: LeaseDBFriend, call: string): Promise<void> => {
   const del = await dbfriend.tryDelLease()
   if (! del.ok) { dbfriend.logger.warn("This device's lease could not be erased: the next grant writes over it.", { call, refusalkind: del.err.refusalkind }) }
 }

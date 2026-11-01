@@ -191,10 +191,10 @@ export const VaultObjectGone = "This Vault object is gone -- the vault was delet
 export const VaultBehind = "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage."
 // --
 
-// == [Vault: ways in]: PassphraseKept, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
+// == [Vault: ways in]: PassphraseIrremovable, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
 
 /** Why a vault's passphrase is not removed: it can be replaced, never removed. */
-export const PassphraseKept = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
+export const PassphraseIrremovable = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
 
 /** Why removing a passkey the vault does not hold changes nothing. */
 export const NoPasskeyToRemove = "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed."

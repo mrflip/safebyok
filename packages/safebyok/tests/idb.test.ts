@@ -109,8 +109,8 @@ describe("idbDeviceDB, reading a lease it cannot read", () => {
     const [found, written] = await Promise.all([deviceDB.tryGetLease(TH.scopeOf('u1')), deviceDB.tryPutLease(lease)])
     expect(found).to.deep.equal({ ok: true, val: null })
     expect(written).to.deep.equal({ ok: true, val: lease })
-    const kept = await TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
-    expect(kept).to.deep.equal(lease)
+    const cached = await TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
+    expect(cached).to.deep.equal(lease)
   })
 })
 

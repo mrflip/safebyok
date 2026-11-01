@@ -440,7 +440,7 @@ export class RaisedGating implements ProvingGating {
       await proving.grantLease()
     } catch (err) {
       if (! isVaultError(err) || ! DeviceStoreKinds.has(err.refusalkind)) { throw err }
-      if (this.call === 'ensureUnlocked') { throw unkeptUnlockError(err) }
+      if (this.call === 'ensureUnlocked') { throw uncachedUnlockError(err) }
       this.#vault.logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it is locked here, and asks for the passphrase at its next open.", { call: this.call }, err)
     }
   }
@@ -463,7 +463,7 @@ const spendAnswer = (answer: unknown): void => {
   if (unspent.success) { unspent.data.prfBytes.fill(0) }
 }
 
-// == [Refusals]: checkText, checkTexts, checkPasskey, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, unkeptUnlockError, absentPasskey
+// == [Refusals]: checkText, checkTexts, checkPasskey, checkNewPasskey, checkFirstGate, declinedError, lockLandedError, gatingOverError, attemptInFlightError, samePassphraseError, gateMadeElsewhereError, uncachedUnlockError, absentPasskey
 
 /** Refuse 'bad_option' for a passphrase that is not text, quoting none of it, in a sentence a dialog may show as it is. */
 const checkText = (given: unknown): void => { VX.passphraseCleartext.parse(given) }
@@ -519,7 +519,7 @@ const samePassphraseError = () => new VaultError('same_passphrase', "The new pas
 export const gateMadeElsewhereError = (): VaultError => new VaultError('gate_made_elsewhere', "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it.")
 
 /** The refusal of a first gate that landed when this device's store would not keep its unlock: `err`'s kind, saying the passphrase was set. */
-const unkeptUnlockError = (err: VaultError) => new VaultError(err.refusalkind, "The vault's passphrase was set, but this device's storage would not keep it unlocked, so it is locked here: the next call asks for the passphrase just chosen. If this goes on, the browser may be refusing the site storage (private browsing, or storage full or blocked).", { cause: err })
+const uncachedUnlockError = (err: VaultError) => new VaultError(err.refusalkind, "The vault's passphrase was set, but this device's storage would not keep it unlocked, so it is locked here: the next call asks for the passphrase just chosen. If this goes on, the browser may be refusing the site storage (private browsing, or storage full or blocked).", { cause: err })
 
 const absentPasskey = (then: string) => new VaultError('absent_wayin', `This vault has no passkey: it may have been removed on another device. ${then}`)
 // --

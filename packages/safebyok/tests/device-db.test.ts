@@ -3,7 +3,7 @@ import { DeviceDB, deviceRecordOf, memoryDeviceDB, incrementedDeviceRecord } fro
 import { VaultError } from '../src/errors'
 import type { Outcome } from '../src/outcome'
 import * as Scopepath from '../src/scopepath'
-import { type DeviceRecord, type KeptLeaseRow, type LeaseRecord, ModelsLeaseFormat, keptLeaseRow } from '../src/shapes/device'
+import { type DeviceRecord, type CachedLeaseRow, type LeaseRecord, ModelsLeaseFormat, cachedLeaseRow } from '../src/shapes/device'
 import type { VaultScope } from '../src/shapes/scopes'
 import * as TH from './test-helpers'
 
@@ -18,14 +18,14 @@ describe("memoryDeviceDB", () => {
     expect(await deviceDB.tryGetLease(TH.scopeOf('u1'))).to.be.null  // stays gone
   })
 
-  it("keeps a lease row of the vault models (fmt 7001, of its vault's scope) beside the old shape, resolving the row as handed; keptLeaseRow refuses one lacking a scope name", async () => {
+  it("keeps a lease row of the vault models (fmt 7001, of its vault's scope) beside the old shape, resolving the row as handed; cachedLeaseRow refuses one lacking a scope name", async () => {
     const deviceDB = TH.expectingGood(memoryDeviceDB())
     const { lease_key, vault_key_lease_wrapped } = await TH.leaseOf('u1')
-    const row = { fmt: ModelsLeaseFormat, ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: 1_800_000_000_000, autolock_at: 1_900_000_000_000, lease_key, vault_key_lease_wrapped } satisfies KeptLeaseRow
+    const row = { fmt: ModelsLeaseFormat, ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', registered_at: 1_800_000_000_000, autolock_at: 1_900_000_000_000, lease_key, vault_key_lease_wrapped } satisfies CachedLeaseRow
     expect(await deviceDB.tryPutLease(row)).to.equal(row)
     expect(await deviceDB.tryGetLease(TH.scopeOf('u1'))).to.deep.equal(row)
     const { vaultlabel: _dropped, ...unscoped } = row
-    TH.expectSyncRefusal(() => keptLeaseRow.parse(unscoped), 'bad_record')
+    TH.expectSyncRefusal(() => cachedLeaseRow.parse(unscoped), 'bad_record')
   })
 
   it("treats a mangled device record as none, and clears it", async () => {

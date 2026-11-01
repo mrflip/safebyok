@@ -346,7 +346,7 @@ describe("hello: freshness, the vault gone, and this device's record", () => {
     expect(await recordEpochIn(world)).to.eq(1)
   })
 
-  it("resolves all the same when the record will not rise, telling the logger, nothing of the device store's error kept", async () => {
+  it("resolves all the same when the record will not rise, telling the logger, nothing of the device store's error cached", async () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
@@ -1058,9 +1058,9 @@ const holdLeaseAfterRead = (world: ReturnType<typeof makeWorld>) => {
   const gate = TH.makeLatch()
   const read = world.deviceDB.tryGetLease.bind(world.deviceDB)
   vi.spyOn(world.deviceDB, 'tryGetLease').mockImplementationOnce(async (scope) => {
-    const kept = await read(scope)
+    const cached = await read(scope)
     await gate.pass()
-    return kept
+    return cached
   })
   return gate
 }
