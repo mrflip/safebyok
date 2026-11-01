@@ -20,6 +20,9 @@ const revoked = () => new VaultError('identity_revoked', "Signed out.")
 const down    = () => new VaultError('storage_unavailable', "Down.")
 const behind  = () => new VaultError('vault_behind', "Behind.")
 
+const throwsLogging = (): never => { throw new Error("Logger trouble.") }
+const ThrowingLogger = Object.freeze({ log: throwsLogging, warn: throwsLogging, error: throwsLogging })
+
 /** A vaultDB over rows in a map: `refuses`, once set, answers each `doGetRows` with the refusal it makes of the scopepaths asked, and `trouble` fails every watch live, as a backend signing the user out does. */
 class TroubledFront extends StoreFront {
   readonly rows = new Map<string, unknown>()
@@ -84,6 +87,15 @@ describe("BankOpts.onBadNews left out", () => {
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'onBadNews' })
     expect(reported).to.deep.equal([news])
   })
+
+  it("reaches the platform where the logger throws", () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    const { bank } = makeBankWorld(null, { logger: ThrowingLogger })
+    const news = down()
+    bank.vaultListing.tellBadNews([news])
+    expect(reported).to.deep.equal([news])
+  })
 })
 
 describe("BankOpts.onBadNews given", () => {
@@ -116,6 +128,15 @@ describe("BankOpts.onBadNews given", () => {
     expect(spy.calls).to.have.lengthOf(1)
     expect(spy.calls[0]).to.include({ level: 'error', err: reported[0] })
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'onBadNews' })
+  })
+
+  it("that throws reaches the platform where the logger throws too", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    const { bank } = makeBankWorld(null, { logger: ThrowingLogger, onBadNews: () => { throw new Error("Handler trouble.") } })
+    bank.vaultListing.tellBadNews([down()])
+    await TH.eventually(() => reported.length === 1)
+    expect((reported[0] as Error).message).to.eq("Handler trouble.")
   })
 
   it("hears what a vault's box listing is told: a box's refused fetch under the box store's watch", async () => {

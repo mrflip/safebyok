@@ -7,7 +7,7 @@ import { type KeyDeriver, checkKeyDeriver, isTestDeriver } from '../deriver/base
 import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { tattoo } from '../helpers'
-import { DefaultLogger, type VaultLogger } from '../logger'
+import { type VaultLogger, parseLogger } from '../logger'
 import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { reportToPlatform } from '../report-error'
@@ -100,7 +100,8 @@ export class Bank implements VaultWorld, GatingWorld {
   constructor(opts: BankOpts, _cheat_clock?: Clock) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
+    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, logger: hostLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
+    const logger = parseLogger(hostLogger)
     this.scope = bankScope.parse({ applabel, user_id })
     checkKeyDeriver(keyDeriver)
     tattoo(this, this.scope, { writable: false })
