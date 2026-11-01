@@ -86,6 +86,8 @@ export class Bank implements VaultWorld, GatingWorld {
   #stage:    BankStage = { lifecycle: 'starting' }
   #snapshot: BankSnapshot
   #helloing: Promise<void> | null = null
+  /** Names the latest hello begun; null once a goodbye has overtaken it. */
+  #latestHello: object | null = null
   readonly #onBadNews: BankBadNewsHandler
   /** The `#ensureVault` in flight for each vaultlabel, which a second `ensureVault` joins. */
   readonly #ensuring  = new Map<string, Promise<Vault>>()
@@ -150,15 +152,27 @@ export class Bank implements VaultWorld, GatingWorld {
   /** {@link hello}, as an {@link Outcome}: a load's own error, where not a VaultError, is the `cause` of an 'unexpected_error'. */
   tryHello(): Promise<Outcome<void>> { return outcomeOf(() => this.hello()) }
 
-  /** End the vault listing's watch. */
-  goodbye(): void { this.vaultListing.goodbye() }
+  /** End the vault listing's watch, as {@link VaultListing.goodbye} does, and what a hello in flight goes on to start when it lands. The next hello begins anew, joining none in flight. */
+  goodbye(): void {
+    this.#latestHello = null
+    this.#helloing = null
+    this.vaultListing.goodbye()
+  }
 
   async #helloOnce(): Promise<void> {
+    const hello = {}
+    this.#latestHello = hello
     try {
       await this.#hello()
     } finally {
-      this.#helloing = null
+      this.#landHello(hello)
     }
+  }
+
+  /** `hello`, the latest, leaves no hello to join; overtaken by a goodbye, it ends what it started; overtaken by a newer hello, it leaves that one be. */
+  #landHello(hello: object): void {
+    if (this.#latestHello === hello) { this.#helloing = null }
+    if (this.#latestHello === null) { this.vaultListing.goodbye() }
   }
 
   async #hello(): Promise<void> {
