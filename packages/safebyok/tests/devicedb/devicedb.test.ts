@@ -139,11 +139,11 @@ const verbsOf = async (deviceDB: DeviceDB) => {
 describe("DeviceDB, given trouble in the store", () => {
   it("answers 'storage_blocked' for every verb over a store the browser withholds, naming what failed and the error's name, and quoting nothing more", async () => {
     const deviceDB = new OpenDeviceDB()
-    deviceDB.trouble = new DOMException('sk-SECRET quoted by the store', 'QuotaExceededError')
+    deviceDB.trouble = new DOMException("sk-SECRET quoted by the store", 'QuotaExceededError')
     const verbs = Object.entries(await verbsOf(deviceDB))
     for (const [verb, attempt] of verbs) {
       const refusal = await TH.expectBad(attempt(), 'storage_blocked')
-      expect(refusal.message, verb).to.include('The device store threw QuotaExceededError.')
+      expect(refusal.message, verb).to.include("The device store threw QuotaExceededError.")
       expect(TH.thrownText(refusal), verb).to.not.include('sk-SECRET')
       expect(refusal.cause, verb).to.be.undefined
     }
@@ -151,11 +151,11 @@ describe("DeviceDB, given trouble in the store", () => {
 
   it("answers 'storage_unavailable' for any other failure, naming no scope", async () => {
     const deviceDB = new OpenDeviceDB()
-    deviceDB.trouble = new Error('sk-SECRET lease^acme^u1^main')
+    deviceDB.trouble = new Error("sk-SECRET lease^acme^u1^main")
     const verbs = Object.entries(await verbsOf(deviceDB))
     for (const [verb, attempt] of verbs) {
       const refusal = await TH.expectBad(attempt(), 'storage_unavailable')
-      expect(refusal.message, verb).to.include('The device store threw Error.')
+      expect(refusal.message, verb).to.include("The device store threw Error.")
       expect(TH.thrownText(refusal), verb).to.not.include('sk-SECRET')
       expect(TH.thrownText(refusal), verb).to.not.include('u1')
     }
@@ -163,7 +163,7 @@ describe("DeviceDB, given trouble in the store", () => {
 
   it("passes a VaultError the store throws as it came, and the throwing form rejects with it", async () => {
     const deviceDB = new OpenDeviceDB()
-    const thrown = new VaultError('stale_write', 'the store says so')
+    const thrown = new VaultError('stale_write', "the store says so")
     deviceDB.trouble = thrown
     expect(await deviceDB.tryGetLease(u1)).to.deep.equal({ ok: false, err: thrown })
     await expect(deviceDB.getLease(u1)).rejects.toBe(thrown)

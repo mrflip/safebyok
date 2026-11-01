@@ -60,7 +60,7 @@ describe("idbDeviceDB(opts)", () => {
 
 describe("idbDeviceDB over a store the browser withholds", () => {
   it("answers 'storage_blocked' when every open is refused", async () => {
-    const opening = vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError') })
+    const opening = vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new DOMException("The operation is insecure.", 'SecurityError') })
     onTestFinished(() => { opening.mockRestore() })
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     await TH.expectBad(deviceDB.tryGetLease(u1), 'storage_blocked')
@@ -73,6 +73,6 @@ describe("idbDeviceDB over a store the browser withholds", () => {
     onTestFinished(() => { vi.unstubAllGlobals() })
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     const refusal = await TH.expectBad(deviceDB.tryDelAll(), 'storage_blocked')
-    expect(refusal.message).to.include('The device store threw NotSupportedError.')
+    expect(refusal.message).to.include("The device store threw NotSupportedError.")
   })
 })

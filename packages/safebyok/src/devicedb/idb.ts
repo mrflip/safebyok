@@ -29,7 +29,7 @@ const shelfOf = (dbName: string): UseStore => {
 
 /** The error for a context with no IndexedDB: a `NotSupportedError` DOMException, or a plain Error of that name where there is no DOMException. */
 const noIndexedDB = (): Error => {
-  const message = 'This context offers no IndexedDB, so the device store has nowhere to keep its rows.'
+  const message = "This context offers no IndexedDB, so the device store has nowhere to keep its rows."
   if (typeof DOMException === 'function') { return new DOMException(message, 'NotSupportedError') }
   return new NotSupportedError(message)
 }
@@ -76,7 +76,7 @@ class IdbDeviceDB extends DeviceDB {
     await this.#shelf()('readwrite', (rows) => (
       new Promise<void>((resolve, reject) => {
         const getting = rows.get(scopepath)
-        getting.addEventListener('error', () => { reject(getting.error ?? new Error('IndexedDB could not read a row it found damaged.')) })
+        getting.addEventListener('error', () => { reject(getting.error ?? new Error("IndexedDB could not read a row it found damaged.")) })
         getting.addEventListener('success', () => {
           if (! isSound(getting.result)) { rows.delete(scopepath) }
           resolve()
