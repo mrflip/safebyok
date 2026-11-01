@@ -38,7 +38,7 @@ describe("WaysIn", () => {
     expect(screen.getByText('no passkey')).to.not.be.null
   })
 
-  it("raises putWayin('passphrase') at Change passphrase, which the provider's dialog answers with the current passphrase and the next: the next unlocks the vault", async () => {
+  it("launches putWayin('passphrase') at Change passphrase, which the provider's dialog answers with the current passphrase and the next: the next unlocks the vault", async () => {
     const { world } = await renderWaysIn()
     fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
     const dialog = await screen.findByRole('dialog', { name: 'Change your vault passphrase' })
@@ -65,7 +65,7 @@ describe("WaysIn", () => {
     await TH.unlock(vault, TH.Passphrase)
   })
 
-  it("raises putWayin('passkey') at Add fingerprint, whose dialog takes the passphrase and then asks the authenticator: dismissed, the dialog stays and the vault keeps no passkey", async () => {
+  it("launches putWayin('passkey') at Add fingerprint, whose dialog takes the passphrase and then asks the authenticator: dismissed, the dialog stays and the vault keeps no passkey", async () => {
     const create = installDismissedAuthenticator()
     await renderWaysIn()
     fireEvent.click(screen.getByRole('button', { name: 'Add fingerprint' }))
@@ -85,7 +85,7 @@ describe("WaysIn", () => {
     expect(screen.getByText('no passkey')).to.not.be.null
   })
 
-  it("offers to replace or remove the vault's passkey, and raises delWayin('passkey') at Remove fingerprint, whose dialog takes the passphrase: the passkey goes", async () => {
+  it("offers to replace or remove the vault's passkey, and launches delWayin('passkey') at Remove fingerprint, whose dialog takes the passphrase: the passkey goes", async () => {
     installDismissedAuthenticator()
     await renderWaysIn(async (world) => {
       const vault = await world.openUnlocked()

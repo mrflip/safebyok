@@ -17,6 +17,6 @@ describe("forgetting a lease whose erase is refused", () => {
     expect(lease.isForgotten).to.be.true
     await lease.forget()
     expect(friend.tryDelLease).toHaveBeenCalledTimes(1)
-    expect(friend.kept).to.not.be.null
+    expect(friend.cached).to.not.be.null
   })
 })

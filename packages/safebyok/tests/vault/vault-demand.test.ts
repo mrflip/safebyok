@@ -310,12 +310,12 @@ describe("the refresh's judgment", () => {
   it("drops the lease from memory, erasing nothing, when this device's store holds one under another gate, though the vault record read still shows the old", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
-    const kept = await world.getLease()
-    if (kept === null) { throw new Error("The unlock left no lease in this device's store") }
-    vi.spyOn(world.deviceDB, 'tryGetLease').mockResolvedValueOnce({ ok: true, val: { ...kept, gate_epoch: kept.gate_epoch + 1 } })
+    const cached = await world.getLease()
+    if (cached === null) { throw new Error("The unlock left no lease in this device's store") }
+    vi.spyOn(world.deviceDB, 'tryGetLease').mockResolvedValueOnce({ ok: true, val: { ...cached, gate_epoch: cached.gate_epoch + 1 } })
     await vault.refresh()
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
-    expect(await world.getLease()).to.deep.eq(kept)
+    expect(await world.getLease()).to.deep.equal(cached)
   })
 
   it("keeps a lease granted after a read began, though that read found none in this device's store", async () => {
@@ -343,8 +343,8 @@ describe("the refresh's judgment", () => {
     await TH.putWayin(there, 'pw', 'pw two')
     await vault.refresh()
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
-    const kept = await world.getLease()
-    expect(kept?.gate_epoch).to.eq(1)
+    const cached = await world.getLease()
+    expect(cached?.gate_epoch).to.eq(1)
   })
 
   it("makes the Vault object gone, 'vault_remade', erasing nothing, when the vault was deleted and made anew elsewhere: the old life's lease is never taken up", async () => {
@@ -354,13 +354,13 @@ describe("the refresh's judgment", () => {
     const anew = await remakeElsewhere(world)
     await TH.expectRefusal(vault.refresh(), 'vault_remade')
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_remade')
-    const kept = await world.getLease()
-    expect(kept?.vault_tok).to.eq(formerTok)
+    const cached = await world.getLease()
+    expect(cached?.vault_tok).to.eq(formerTok)
     const reborn = await TH.bankOf(vault).ensureVault({ user_id: 'u1', vaultlabel: 'main' })
     expect(reborn.vault_tok).to.eq(anew.vault_tok)
     expect(TH.stateOf(reborn.snapshot)).to.eq('locked')
-    const stillKept = await world.getLease()
-    expect(stillKept?.vault_tok).to.eq(formerTok)
+    const stillCached = await world.getLease()
+    expect(stillCached?.vault_tok).to.eq(formerTok)
   })
 
   it("takes no lease up: another tab's unlock shows here at the next ensureUnlocked, without a prompt", async () => {

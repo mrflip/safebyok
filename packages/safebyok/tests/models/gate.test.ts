@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Gate } from '../../src/models/gate'
-import type { GateProps } from '../../src/models/models-shapes'
+import type { GateProps, StrengthChecker } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, cleartextsOf, gateWorldOf, isZeroed, passkeyAnswerOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -10,23 +10,31 @@ useFakeClock()
 const builtGate = async ({ passkey = false } = {}) => {
   const answer = passkey ? passkeyAnswerOf() : undefined
   const prfBytes = answer && new Uint8Array(answer.prfBytes)
-  const { gate } = await Gate.build(WorldStamp, proofClosureOf(TestPassphrase, answer), provingWorldOf())
+  const { gate } = await Gate.build(WorldStamp, cleartextsOf(TestPassphrase, answer), gateWorldOf())
   return { gate, answer, prfBytes }
 }
 
-describe("Gate.build(stamp, proofClosure, world)", () => {
-  it("builds a gate of a passphrase wayin alone when the closure hands back a passphrase alone", async () => {
+describe("Gate.build(stamp, cleartexts, world)", () => {
+  it("builds a gate of a passphrase wayin alone of a passphrase alone", async () => {
     const { gate } = await builtGate()
     expect(gate.passphrase_wayin.wayinkind).to.eq('passphrase')
     expect(gate.passkey_wayin).to.be.null
   })
 
-  it("builds a gate of a passphrase and a passkey wayin when the closure hands back a passkey answer, zeroing its PRF bytes (G2)", async () => {
+  it("builds a gate of a passphrase and a passkey wayin of a passphrase and a passkey answer, zeroing its PRF bytes (G2)", async () => {
     const { gate, answer } = await builtGate({ passkey: true })
     expect(gate.passphrase_wayin.wayinkind).to.eq('passphrase')
     expect(gate.passkey_wayin?.wayinkind).to.eq('passkey')
     expect(gate.passkey_wayin?.credential_id).to.eq(answer!.credential_id)
     expect(isZeroed(answer!.prfBytes)).to.be.true
+  })
+
+  it("shows its passkey wayin's header as passkeyHeader, frozen and holding no key, and null when it has no passkey", async () => {
+    const { gate, answer } = await builtGate({ passkey: true })
+    expect(gate.passkeyHeader).to.deep.equal({ wayinkind: 'passkey', credential_id: answer!.credential_id, prf_salt_b64: answer!.prf_salt_b64, device_id: gate.passkey_wayin?.device_id, registered_at: gate.passkey_wayin?.registered_at })
+    expect(Object.isFrozen(gate.passkeyHeader)).to.be.true
+    const { gate: bare } = await builtGate()
+    expect(bare.passkeyHeader).to.be.null
   })
 
   it("wraps one new vaultKey in both wayins", async () => {
@@ -44,16 +52,38 @@ describe("Gate.build(stamp, proofClosure, world)", () => {
     expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
   })
 
-  it("refuses a world its check refuses as 'bad_option', without invoking the closure", async () => {
-    const proofClosure = vi.fn(proofClosureOf())
-    const world = TH.omitting(provingWorldOf(), 'device_id')
-    await TH.expectRefusal(Gate.build(WorldStamp, proofClosure, world), 'bad_option')
-    expect(proofClosure).not.toHaveBeenCalled()
+  it("refuses a world its check refuses as 'bad_option', before the keyDeriver is asked, spending the passkey answer all the same (G2)", async () => {
+    const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const answer = passkeyAnswerOf()
+    const world = TH.omitting(gateWorldOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }), 'device_id')
+    await TH.expectRefusal(Gate.build(WorldStamp, cleartextsOf(TestPassphrase, answer), world), 'bad_option')
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+    expect(isZeroed(answer.prfBytes)).to.be.true
   })
 
-  it("refuses a throwing closure as 'unexpected_error', quoting none of what it threw", async () => {
-    const err = await TH.expectRefusal(Gate.build(WorldStamp, () => { throw new Error(TestPassphrase) }, provingWorldOf()), 'unexpected_error')
-    expect(TH.thrownText(err)).to.not.include(TestPassphrase)
+  it("hands the passphrase to the world's strengthChecker for the vault's scope, and refuses a weak one as 'weak_passphrase' before the keyDeriver is asked, leaving the passkey answer unspent (G2)", async () => {
+    const strengthChecker = vi.fn<StrengthChecker>(() => ({ strong: false, reason: 'Add another word or two.' }))
+    const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const answer = passkeyAnswerOf()
+    const world = gateWorldOf({ strengthChecker, keyDeriver: { ...TH.testDeriver, deriveKeyBytes } })
+    const err = await TH.expectRefusal(Gate.build(WorldStamp, cleartextsOf(TestPassphrase, answer), world), 'weak_passphrase')
+    expect(err.message).to.eq('Add another word or two.')
+    expect(strengthChecker).toHaveBeenCalledWith(TestPassphrase, { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+    expect(isZeroed(answer.prfBytes)).to.be.false
+  })
+
+  it("builds with the passkey answer a weak passphrase left unspent, handed in again beside a stronger one, and spends it then (G2)", async () => {
+    const answer = passkeyAnswerOf()
+    const weak = gateWorldOf({ strengthChecker: () => ({ strong: false, reason: 'Add another word or two.' }) })
+    await TH.expectRefusal(Gate.build(WorldStamp, cleartextsOf(TestPassphrase, answer), weak), 'weak_passphrase')
+    const { gate } = await Gate.build(WorldStamp, cleartextsOf(TestPassphrase, answer), gateWorldOf())
+    expect(gate.passkey_wayin?.credential_id).to.eq(answer.credential_id)
+    expect(isZeroed(answer.prfBytes)).to.be.true
+  })
+
+  it("refuses cleartexts handed as a function, as a proof closure once was, as 'bad_option'", async () => {
+    await TH.expectRefusal(Gate.build(WorldStamp, (() => ({ passphrase: TestPassphrase })) as never, gateWorldOf()), 'bad_option')
   })
 })
 

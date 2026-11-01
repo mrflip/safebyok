@@ -12,12 +12,12 @@ import { afterEach, beforeEach, type Mock, vi } from 'vitest'
 import { MinuteMillis, PasskeySaltBytes } from '../../src/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/crypto'
 import { Lease } from '../../src/models/lease'
-import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type ProofClosure, type ProvingWorld, type VaultStamp, vaultStamp } from '../../src/models/models-shapes'
+import { type LeaseDBFriend, type LeaseGrantOpts, type Cleartexts, type GateWorld, type LeaseRecord, type ProvingWorld, type VaultStamp, vaultStamp } from '../../src/models/models-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/outcome'
 import type { KeyDeriver } from '../../src/key-deriver'
 import * as VX from '../../src/shapes/vault'
-import { testDeriver } from './builders'
+import { anyStrengthChecker, testDeriver } from './builders'
 import { type LoggedCall, spyLogger } from './logging'
 import { T0 } from './models-world'
 
@@ -60,7 +60,7 @@ export type FakeDBFriend = LeaseDBFriend & {
   tryPutLease: Mock<LeaseDBFriend['tryPutLease']>
   tryDelLease: Mock<LeaseDBFriend['tryDelLease']>
   /** The record the slot keeps, null for none. Set it to seed one, whatever it is. */
-  kept:        unknown
+  cached:      unknown
   /** Every call the logger heard, oldest first. */
   logged:      LoggedCall[]
 }
@@ -76,14 +76,14 @@ export const fakeDBFriendOf = (): FakeDBFriend => {
   const friend: FakeDBFriend = {
     logger,
     logged:      calls,
-    kept:        null,
-    tryGetLease: vi.fn(() => Promise.resolve(good(friend.kept as LeaseRecord | null))),
+    cached:      null,
+    tryGetLease: vi.fn(() => Promise.resolve(good(friend.cached as LeaseRecord | null))),
     tryPutLease: vi.fn((record: LeaseRecord) => {
-      friend.kept = record
+      friend.cached = record
       return Promise.resolve(good(record))
     }),
     tryDelLease: vi.fn(() => {
-      friend.kept = null
+      friend.cached = null
       return Promise.resolve(good(undefined))
     }),
   }
@@ -108,7 +108,7 @@ export const sealStampsOf = (boxlabel: string, overrides: Readonly<Record<string
 })
 // --
 
-// == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, proofClosureOf
+// == [Provings]: TestPassphrase, DeviceId, provingWorldOf, gateWorldOf, passkeyAnswerOf, cleartextsOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = VX.passphraseCleartext.parse('correct horse battery staple')
@@ -124,6 +124,13 @@ export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWo
   ...overrides,
 })
 
+/** A gate's world: a {@link provingWorldOf} world that admits every passphrase. */
+export const gateWorldOf = (overrides: Partial<GateWorld> = {}): GateWorld => ({
+  ...provingWorldOf(),
+  strengthChecker: anyStrengthChecker,
+  ...overrides,
+})
+
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
 export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.PasskeyAnswer => ({
   credential_id: 'cred-test-1',
@@ -132,8 +139,8 @@ export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.P
   ...overrides,
 })
 
-/** A synchronous proof closure; a test of an async one, or one that throws, writes its own. */
-export const proofClosureOf = (passphrase: string = TestPassphrase, passkeyAnswer?: VX.PasskeyAnswer): ProofClosure => () => (
+/** The cleartexts of a user who types `passphrase`, and touches the passkey that answers `passkeyAnswer` if one is given. */
+export const cleartextsOf = (passphrase: string = TestPassphrase, passkeyAnswer?: VX.PasskeyAnswer): Cleartexts => (
   passkeyAnswer === undefined ? { passphrase } : { passphrase, passkeyAnswer }
 )
 // --

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, byPassphrase, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -11,49 +11,59 @@ const unprovedGateOf = async () => {
   return gate
 }
 
-describe("VaultListing.build of a dna: the gate is built before the vault is born, and stored in the vault record alone", () => {
-  it("builds the vault's gate from what the closure answers, births the record with it, and `send` stores it in the vault record", async () => {
+describe("VaultListing.ensure: the gate is built before the vault is born, and the vault is held only as stored", () => {
+  it("builds the vault's gate of the cleartexts handed in and stores the vault record with it, unlocked under its lease", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
     expect(vault.gate.passphrase_wayin.wayinkind).to.eq('passphrase')
     expect(vault.gate.passkey_wayin).to.be.null
     expect(vault.gate.stamp).to.deep.equal({ ...Dna, vault_tok: vault.vault_tok, registered_at: T0 })
-    expect(storedNow()).to.be.null
-    await vault.send({})
     expect(storedNow()?.gate).to.deep.equal(vault.gate.pickle())
+    expect(storedNow()?.vault_tok).to.eq(vault.vault_tok)
+    expect(vault.isLocked).to.be.false
   })
 
-  it("refuses a dna without a closure as 'bad_option', holding no vault", async () => {
+  it("refuses a dna handed to build as 'bad_option', holding no vault", async () => {
     const { listing } = makeVaultWorld()
     await TH.expectRefusal(listing.build(Dna), 'bad_option')
     expect(listing.things).to.have.lengthOf(0)
   })
 
-  it("holds no vault where the closure throws: the refusal is the sanitized 'unexpected_error', and a second build is not refused as already held", async () => {
-    const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(listing.build(Dna, () => { throw new Error('the user closed the dialog') }), 'unexpected_error')
+  it("holds and stores nothing where the passphrase is refused: a weak one refuses 'weak_passphrase', and the next ensure stores the vault", async () => {
+    const { listing, storedNow, strengthChecker } = makeVaultWorld()
+    strengthChecker.mockReturnValueOnce({ strong: false, reason: 'Add another word or two.' })
+    await TH.expectRefusal(listing.ensure(Dna, byPassphrase('pw')), 'weak_passphrase')
     expect(listing.things).to.have.lengthOf(0)
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
-    await vault.send({})
+    expect(storedNow()).to.be.null
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
     expect(storedNow()?.gate).to.deep.equal(vault.gate.pickle())
   })
 
-  it("refuses 'bad_option' a dna for a scope already held, before the closure is asked anything", async () => {
-    const { listing } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
-    const closure = vi.fn(() => ({ passphrase: Passphrase }))
-    await TH.expectRefusal(listing.build(Dna, closure), 'bad_option')
-    expect(closure).not.toHaveBeenCalled()
+  it("holds the vault another device stored first, meeting 'stale_write': locked, its gate the stored one, and the record stored untouched", async () => {
+    const theirs = await storedVaultRecord('another passphrase entirely')
+    const { listing, storedNow, storeBehindOurBack } = makeVaultWorld()
+    const landed = storeBehindOurBack(theirs)
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
+    expect(vault.vault_tok).to.eq(theirs.vault_tok)
+    expect(vault.gate.pickle()).to.deep.equal(theirs.gate)
+    expect(vault.isLocked).to.be.true
+    expect(storedNow()).to.deep.equal(landed)
     expect(listing.at(Dna)).to.equal(vault)
+  })
+
+  it("answers the vault already held where it is ensured again, storing nothing new", async () => {
+    const { listing, storedNow } = makeVaultWorld()
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
+    const stored = storedNow()
+    expect(await listing.ensure(Dna, byPassphrase(Passphrase))).to.equal(vault)
+    expect(storedNow()).to.deep.equal(stored)
   })
 })
 
 describe("VaultListing.build of a record, and its constructor", () => {
-  it("holds the vault with the gate its record carries, and takes no closure with a record: one handed refuses 'bad_option', holding nothing", async () => {
+  it("holds the vault with the gate its record carries", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
-    await TH.expectRefusal(listing.build(record, () => ({ passphrase: Passphrase })), 'bad_option')
-    expect(listing.things).to.have.lengthOf(0)
     const vault = await listing.build(record)
     expect(vault.gate.pickle()).to.deep.equal(record.gate)
     expect(vault.gate).to.equal(vault.gate)
@@ -110,7 +120,7 @@ describe("Vault.edit and Vault.send: the gate of the record in hand rides every 
 
   it("ignores a patch's gate, as it does every other prop of the patch: the one stored is the one proved at birth", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
     const { gate } = vault
     const unproved = await unprovedGateOf()
     await vault.edit({ gate: unproved })
@@ -123,7 +133,7 @@ describe("Vault.edit and Vault.send: the gate of the record in hand rides every 
 describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the grant", () => {
   it("grants the vault whose stamp the proving is of a lease, through the vault's dbfriend", async () => {
     const { listing, deviceDB } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
     const proving = await makeProving(vault)
     deviceDB.tryPutLease.mockClear()
     const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 })
@@ -135,7 +145,7 @@ describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the gr
 
   it("refuses 'bad_option' a vault of another stamp, before any key is touched", async () => {
     const { listing, deviceDB } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryPutLease.mockClear()
     await TH.expectRefusal(proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 }), 'bad_option')
@@ -146,7 +156,7 @@ describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the gr
 describe("Vault.leaseDBFriend", () => {
   it("binds the world's lease verbs to the vault's scope, so no verb takes one", async () => {
     const { listing, deviceDB } = makeVaultWorld()
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
     const dbfriend = vault.leaseDBFriend()
     await dbfriend.tryGetLease()
     await dbfriend.tryDelLease()
