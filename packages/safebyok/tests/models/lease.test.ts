@@ -416,8 +416,8 @@ describe("a lease and the gate it was granted under", () => {
   })
 
   const OtherGateCases = [
-    [-1, 'an older gate than the vault\'s, here or on another device'],
-    [1,  'a newer gate than the vault\'s, the vault in hand being behind'],
+    [-1, "an older gate than the vault's, here or on another device"],
+    [1,  "a newer gate than the vault's, the vault in hand being behind"],
   ] as const
 
   for (const [gap, blurb] of OtherGateCases) {
