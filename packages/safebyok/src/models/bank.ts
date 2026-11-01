@@ -12,8 +12,9 @@ import * as Phrases from '../phrases'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
 import { Gating, type GatingWorld, type RequestCleartext } from './gating'
-import type { LeaseDeviceDB, LockState, ProofClosure, StrengthChecker } from './models-shapes'
+import type { Cleartexts, LeaseDeviceDB, LockState, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
+import { spendAnswer } from './proving'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
 import { type VaultCache, type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
@@ -33,7 +34,7 @@ export type BankOpts = {
   deviceDB:             LeaseDeviceDB
   /** Required, with no default, so a host that brings its own deriver bundles no Argon2id: in a browser, spread `browserOpts()`. */
   keyDeriver:           KeyDeriver
-  requestCleartext?:    RequestCleartext | undefined
+  requestCleartext:     RequestCleartext
   /** Left out, every new passphrase is refused as weak until the host configures one (`notes/configuration.md`). */
   strengthChecker?:     StrengthChecker | undefined
   clock?:               Clock | undefined
@@ -61,7 +62,7 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         LeaseDeviceDB
   readonly logger:           VaultLogger
-  readonly requestCleartext: RequestCleartext | undefined
+  readonly requestCleartext: RequestCleartext
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
   // GAP: vault-listing.ts `VaultWorld` and models-shapes.ts `vaultListingOpts` name no `pesterMillis`; the vault's pester trigger would read it as `autolock` reads `leaseMillis`, and offer `pesterMinutes` as a getter.
@@ -131,11 +132,20 @@ export class Bank implements VaultWorld, GatingWorld {
 
   vaultOf(bag: VaultBag): Vault | null { return this.vaultListing.at(this.vaultScopeOf(bag)) }
 
-  async ensureVault(bag: VaultBag, proofClosure?: ProofClosure): Promise<Vault> {
-    const scope = this.vaultScopeOf(bag)
+  async ensureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Vault> {
+    try {
+      return await this.#ensureVault(this.vaultScopeOf(bag), cleartexts)
+    } finally {
+      spendAnswer(cleartexts)
+    }
+  }
+
+  tryEnsureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag, cleartexts)) }
+
+  async #ensureVault(scope: VaultScope, cleartexts?: Cleartexts): Promise<Vault> {
     const fetched = await this.vaultListing.fetch(scope, { ifAbsent: 'nil' })
     if (fetched !== null) { return fetched }
-    const built = await outcomeOf(() => this.#buildVault(scope, proofClosure))
+    const built = await outcomeOf(() => (cleartexts === undefined ? this.#launchBuild(scope) : this.#buildVault(scope, cleartexts)))
     if (built.ok) { return built.val }
     if (built.err.refusalkind !== 'stale_write') { throw built.err }
     // GAP: listing.ts keeps the draft held under `scope` after its first send meets 'stale_write', and `Vault.receive` refuses the record stored under the other `vault_tok`; the listing needs to drop the draft (or `#buildOrReceive` to replace a never-stored draft) for this fetch to hand back the vault another device built.
@@ -144,11 +154,13 @@ export class Bank implements VaultWorld, GatingWorld {
     return stored
   }
 
-  tryEnsureVault(bag: VaultBag, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag, proofClosure)) }
+  /** Ask the user through a 'build_vault' gating, each attempt building through `#buildVault`. */
+  #launchBuild(scope: VaultScope): Promise<Vault> {
+    return Gating.launch('build_vault', { scope, vault: null, world: this, run: (handed) => this.#buildVault(scope, handed) })
+  }
 
-  async #buildVault(scope: VaultScope, proofClosure?: ProofClosure): Promise<Vault> {
-    if (proofClosure === undefined) { return Gating.buildVault(this.vaultListing, scope, this) }
-    const vault = await this.vaultListing.build(scope, proofClosure)
+  async #buildVault(scope: VaultScope, cleartexts: Cleartexts): Promise<Vault> {
+    const vault = await this.vaultListing.build(scope, cleartexts)
     return vault.send({})
   }
 

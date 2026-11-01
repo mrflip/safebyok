@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { LOCKED } from '../../src/models/box'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
-import { Dna, LeaseMillis, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, LeaseMillis, Passphrase, boxWorldOf, byPassphrase, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -18,7 +18,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sideca
 /** Box listings whose world is a real vault, born unlocked under `Passphrase`, over the models world's fake store and cache. */
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
-  const vault = await vaultWorld.listing.build(Dna, () => ({ passphrase: Passphrase }))
+  const vault = await vaultWorld.listing.build(Dna, byPassphrase(Passphrase))
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
   const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault) })

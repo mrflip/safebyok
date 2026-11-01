@@ -7,15 +7,16 @@ import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
 import { Gate } from './gate'
-import type { PassphraseProving } from './proving'
-import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type PassphraseProving, spendAnswer } from './proving'
+import type { GatingWorld } from './gating'
+import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
-export type VaultWorld = ListingWorld & ProvingWorld & {
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate, lease and gatings need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
+export type VaultWorld = ListingWorld & GateWorld & GatingWorld & {
   scope:       BankScope
   logger:      VaultLogger
   leaseMillis?: LeaseGrantOpts['leaseMillis']
@@ -27,7 +28,7 @@ export type VaultStore = Store<VaultScope, VaultRecord, VaultSparse>
 
 export type VaultCache = Cache<VaultRecord, VaultSparse>
 
-/** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `build` makes from its `proofClosure`. */
+/** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `build` makes from its cleartexts. */
 export type VaultDna = Dna<VaultScope, VaultRecord>
 
 export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse> & { world: VaultWorld }
@@ -45,17 +46,21 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing, and a dna for a scope already held refuses 'bad_option' before the closure is asked anything. A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
-  override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
-    if (hasRevision(input)) {
-      if (proofClosure !== undefined) { throw RefusalFuncs.closureWithRecord() }
-      return super.build(input)
+  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no cleartexts: its gate is the one it carries, and cleartexts handed with it refuse 'bad_option'. A dna takes the cleartexts its gate is built from, before the vault is born: cleartexts refused, or none, hold nothing, and a dna for a scope already held refuses 'bad_option' before they are used. A passkey's answer among them is spent either way (G2). A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
+  override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, cleartexts?: Cleartexts): Promise<Vault> {
+    try {
+      if (hasRevision(input)) {
+        if (cleartexts !== undefined) { throw RefusalFuncs.cleartextsWithRecord() }
+        return await super.build(input)
+      }
+      if (this.at(input) !== null) { throw RefusalFuncs.alreadyHeld() }
+      const { draft, proving } = await this.#draftWithProving(this.stampDna(input), cleartexts)
+      const vault = this.holdDraft(draft)
+      vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
+      return vault
+    } finally {
+      spendAnswer(cleartexts)
     }
-    if (this.at(input) !== null) { throw RefusalFuncs.alreadyHeld() }
-    const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
-    const vault = this.holdDraft(draft)
-    vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
-    return vault
   }
 
   /** Take up each vault's cached lease, as {@link Vault.takeUpCachedLease} does, once the base's `hello` has revived and hydrated them. */
@@ -84,16 +89,16 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
-  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and the gate {@link Gate.build} makes of that draft's stamp from what `proofClosure` answers; without one, refuses 'bad_option'. */
-  protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<VaultRecord> {
-    const { draft } = await this.#draftWithProving(dna, proofClosure)
+  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and the gate {@link Gate.build} makes of that draft's stamp from `cleartexts`; without them, refuses 'bad_option'. */
+  protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, cleartexts?: Cleartexts): Promise<VaultRecord> {
+    const { draft } = await this.#draftWithProving(dna, cleartexts)
     return draft
   }
 
-  async #draftWithProving(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
-    const checked = MSX.vaultBuildArgs.parse({ proofClosure })
+  async #draftWithProving(dna: Dna<VaultScope, VaultRecord> & Revision & Times, cleartexts?: Cleartexts): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
+    const checked = MSX.vaultBuildArgs.parse({ cleartexts })
     const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
-    const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.proofClosure, this.world)
+    const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.cleartexts, this.world)
     return { draft: { ...sparse, gate: gate.pickle() }, proving }
   }
 

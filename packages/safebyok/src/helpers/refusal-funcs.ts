@@ -34,7 +34,7 @@ export const otherVaultTok = (): VaultError => new VaultError('unexpected_error'
 export const shapeUnreconciled = (): VaultError => new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
 // --
 
-// == [Listings]: alreadyHeld, putUnfitForPrior, answerOfOtherScope, recordOfOtherScope, otherVaultTokAtBirth, vaultAbsent, boxAbsent, closureWithRecord
+// == [Listings]: alreadyHeld, putUnfitForPrior, answerOfOtherScope, recordOfOtherScope, otherVaultTokAtBirth, vaultAbsent, boxAbsent, cleartextsWithRecord
 
 export const alreadyHeld = (): VaultError => new VaultError('bad_option', Phrases.AlreadyHeld)
 
@@ -50,7 +50,7 @@ export const vaultAbsent = (vaultlabel: string): VaultError => new VaultError('a
 
 export const boxAbsent = (boxlabel: string): VaultError => new VaultError('absent_box', Phrases.boxAbsent(boxlabel))
 
-export const closureWithRecord = (): VaultError => new VaultError('bad_option', Phrases.ClosureWithRecord)
+export const cleartextsWithRecord = (): VaultError => new VaultError('bad_option', Phrases.CleartextsWithRecord)
 // --
 
 // == [Stores]: damagedVaultRow, damagedBoxRow, scopeOutsideStore, storeRowsMiscounted
@@ -78,18 +78,16 @@ export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', 
 export const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --
 
-// == [Vaults]: needVaultUnlocked, noProofToUnlock, leaseOfOtherHolder
+// == [Vaults]: needVaultUnlocked, leaseOfOtherHolder
 
 export const needVaultUnlocked = (): VaultError => new VaultError('vault_locked', Phrases.NeedVaultUnlocked)
 
-export const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
 
 export const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
 // --
 
-// == [Gates]: changeNeedsPassphrase, passkeyHeldAlready, noPasskeyToRevoke, gateMovedUnderChange
+// == [Gates]: passkeyHeldAlready, noPasskeyToRevoke, gateMovedUnderChange
 
-export const changeNeedsPassphrase = (): VaultError => new VaultError('bad_option', Phrases.GateChangeNeedsPassphrase)
 
 export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
 
@@ -99,7 +97,7 @@ export const noPasskeyToRevoke = (): VaultError => new VaultError('absent_wayin'
 export const gateMovedUnderChange = (meta: RefusalMeta): VaultError => new VaultError('stale_write', Phrases.GateMovedUnderChange, { meta })
 // --
 
-// == [Provings]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, provingOfOtherVault, leaseOfOtherVault, proofClosureThrew, keyDeriverThrew, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
+// == [Provings]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, provingOfOtherVault, leaseOfOtherVault, keyDeriverThrew, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
 export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
 
@@ -111,7 +109,6 @@ export const provingOfOtherVault = (): VaultError => new VaultError('bad_option'
 
 export const leaseOfOtherVault = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherVault)
 
-export const proofClosureThrew = (): VaultError => new VaultError('unexpected_error', Phrases.ProofClosureThrew)
 
 export const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverThrew)
 
@@ -128,9 +125,8 @@ export const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Ph
 export const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_deriver', Phrases.UnknownKeyDeriver)
 // --
 
-// == [Gatings]: noRequestCleartext, requestCleartextThrew, gatingDeclined, gatingSettled, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
+// == [Gatings]: requestCleartextThrew, gatingDeclined, gatingSettled, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
 
-export const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrases.NoRequestCleartext)
 
 export const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
 

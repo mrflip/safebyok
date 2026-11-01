@@ -341,7 +341,7 @@ export const ScopeOutsideStore = "This store was made for one bank's vaults or o
 export const StoreRowsMiscounted = "The store front's doGetRows answered other than one row, or null, for each scopepath asked, in order: a bug in the storage adapter."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
 export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -380,13 +380,12 @@ export const ProvingOfOtherVault = "The source proving is of another vault: a wa
 export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds."
 
 /** Why a proof closure's throw is replaced: it heard the passphrase. */
-export const ProofClosureThrew = "The proof closure threw rather than handing back a passphrase. What it threw is left out, as it heard the passphrase."
 
 /** Why a keyDeriver's throw is replaced: it heard the passphrase. */
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, boxAbsent, ClosureWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, LeaseOfOtherHolder, vaultAbsent, boxAbsent, CleartextsWithRecord
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
@@ -404,7 +403,6 @@ export const LeaseNotInForce = "This lease is no longer in force -- its time ran
 export const NeedVaultUnlocked = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
 
 /** Why a locked vault with no lease cached is not unlocked without a proof. */
-export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
 
 /** Why a vault takes up no lease of another vault, or granted to another Vault object. */
 export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."
@@ -416,13 +414,12 @@ export const vaultAbsent = (vaultlabel: string): string => `No vault is stored u
 export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
 
 /** Why a vault built of a record takes no proof closure. */
-export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."
+export const CleartextsWithRecord = "A vault built of a record takes no cleartexts: its gate is the one the record carries."
 // --
 
-// == [Models: gates]: GateChangeNeedsPassphrase, GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
+// == [Models: gates]: GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
 
 /** Why a passkey's answer does not prove a change to the gate. */
-export const GateChangeNeedsPassphrase = "Only the passphrase proves a change to the vault's passphrase or passkey, and this proof handed in a passkey's answer, so nothing more was asked and nothing changed. The passkey still unlocks the vault: prove the change with the passphrase."
 
 /** Why a gate change proved against a record that has since moved is not sent. */
 export const GateMovedUnderChange = "The vault's record was changed elsewhere while this change was being proved, and its passphrase or passkey may have changed with it, so nothing was changed. The vault in hand now holds the newer record: call again to make the change over it."
@@ -434,7 +431,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, RequestCleartextThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, RequestCleartextThrew, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -446,7 +443,6 @@ export const GatingSettled = "This prompt has ended -- it was answered, declined
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
-export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: hand the call a proof closure, or give Bank.make a requestCleartext."
 
 export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."
 
