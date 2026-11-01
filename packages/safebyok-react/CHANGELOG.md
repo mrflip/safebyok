@@ -1,5 +1,12 @@
 # safebyok-react
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [[`2f098b6`](https://github.com/mrflip/safebyok/commit/2f098b62f8bc60ef29ee29cd06fd9681f99f103b), [`ba3fac4`](https://github.com/mrflip/safebyok/commit/ba3fac444c6f681f8b56c01b91eaf3b85511e136), [`87f97c4`](https://github.com/mrflip/safebyok/commit/87f97c43a745560c848bcae0f2078add5ddc874b), [`6589a59`](https://github.com/mrflip/safebyok/commit/6589a5941526634cae1e1b17bc63c411651cc183)]:
+  - safebyok@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes
