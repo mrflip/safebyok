@@ -166,7 +166,7 @@ describe("DeviceDB, given trouble in the store", () => {
     const thrown = new VaultError('stale_write', "the store says so")
     deviceDB.trouble = thrown
     expect(await deviceDB.tryGetLease(u1)).to.deep.equal({ ok: false, err: thrown })
-    await expect(deviceDB.getLease(u1)).rejects.toBe(thrown)
+    expect(await TH.expectRefusal(deviceDB.getLease(u1), 'stale_write')).to.equal(thrown)
   })
 })
 
