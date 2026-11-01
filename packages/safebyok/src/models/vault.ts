@@ -450,7 +450,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Lock the vault, synchronously, and erase the lease this device keeps, whether or not the vault holds one: the vault reads locked before this returns, and a gating of it still asking is declined; letting the held lease go and the erase are queued as a chore. */
+  /** Lock the vault, synchronously, and erase the lease this device keeps, whether or not the vault holds one: the vault reads locked before this returns, and a gating of it asking or waiting its turn is declined; letting the held lease go and the erase are queued as a chore. */
   lock(): void {
     const lease = this.#dropLease()
     const { tryDelLease } = this.leaseDBFriend()
@@ -464,7 +464,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The lock, as an {@link Outcome}: the non-throwing form of {@link Vault.lock}. */
   tryLock(): Promise<Outcome<void>> { return outcomeOf(() => { this.lock() }) }
 
-  /** Let the vault's lease go, the vault reading locked, a gating of it still asking declined, and the lease this device keeps left for the next load: the listing's goodbye, where `lock()` erases. */
+  /** Let the vault's lease go, the vault reading locked, a gating of it asking or waiting its turn declined, and the lease this device keeps left for the next load: the listing's goodbye, where `lock()` erases. */
   letLeaseGo(): void {
     this.#dropLease()?.evict()
     this.settle()
