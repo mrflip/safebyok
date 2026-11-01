@@ -46,12 +46,13 @@ export type BankOpts = {
   vaultRefreshMinutes?: number | undefined
   boxRefreshMinutes?:   number | undefined
   /** Told each piece of bad news once, never awaited: what it throws or rejects with goes to the logger and the platform's `reportError`, and no further. Left out, the news itself goes to those two.
-   * News of kind 'identity_revoked', the user signed out, first closes the vaults, as `bank.closeVaults()` does, whatever this does. It comes of fetching a vault or box the bank holds: a bank holding no vault hears nothing of a sign-out.
+   * A hello or a watch's trouble fetches every vault, or every box of a vault, together, and tells only the first refusal of each kind it meets.
+   * News of kind 'identity_revoked', the user signed out, first closes the vaults, as `bank.closeVaults()` does, whatever this does. It comes of a fetch nobody awaits, of a vault or box the bank holds: one refused to a caller is thrown to that caller, is not news and closes nothing, and a bank holding no vault hears nothing of a sign-out.
    */
   onBadNews?:           BankBadNewsHandler | undefined
 }
 
-/** The type of {@link BankOpts.onBadNews}. */
+/** Hears one piece of bad news, as {@link BankOpts.onBadNews} says; what it answers is heard out and dropped. */
 export type BankBadNewsHandler = (news: VaultError) => unknown
 
 /** Where the bank stands: `starting` until a hello loads what its vaults share, then `ready`; `refused`, with the failed hello's `err`, until the next hello. */
