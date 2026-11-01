@@ -614,10 +614,10 @@ describe("the vault's passkey", () => {
 
   it("removal is not revocation: a copy of the vault record from before still opens with the removed passkey (Contract: delWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const kept = world.dbStore.get(u1VaultScopepath) ?? ''
+    const stored = world.dbStore.get(u1VaultScopepath) ?? ''
     await TH.delWayin(vault, 'pw')
     const copy = makeWorld()
-    copy.dbStore.put(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, stored)
     const thief = await copy.open()
     await TH.unlock(thief, laptop)
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')
@@ -1210,10 +1210,10 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
   it("a replaced passphrase still opens a copy of the vault record taken before: a change is no revocation (Contract: putWayin, Guarantees)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const kept = storedText(world) ?? ''
+    const stored = storedText(world) ?? ''
     await TH.putWayin(vault, 'pw', 'pw two')
     const copy = makeWorld()
-    copy.dbStore.put(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, stored)
     const thief = await copy.open()
     await TH.unlock(thief, 'pw')
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')
@@ -1221,10 +1221,10 @@ describe("putWayin and delWayin, as the Contract's lesser lines say", () => {
 
   it("a replaced passkey still opens a copy of the vault record taken before (Contract: putWayin, Guarantees)", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const kept = storedText(world) ?? ''
+    const stored = storedText(world) ?? ''
     await TH.putWayin(vault, 'pw', await TH.passkeyOf('phone'))
     const copy = makeWorld()
-    copy.dbStore.put(u1VaultScopepath, kept)
+    copy.dbStore.put(u1VaultScopepath, stored)
     const thief = await copy.open()
     await TH.unlock(thief, laptop)
     expect(TH.stateOf(thief.getSnapshot())).to.eq('unlocked')

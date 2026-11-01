@@ -211,8 +211,8 @@ describe("beforeNextCall", () => {
       await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'theirs'))
     })
     await TH.expectBad(vaultDB.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'mine')), 'stale_write')
-    const kept = await TH.expectingGood(vaultDB).tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
-    expect(kept?.revision_tok).to.eq('rev-theirs')
+    const stored = await TH.expectingGood(vaultDB).tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
+    expect(stored?.revision_tok).to.eq('rev-theirs')
   })
 })
 
