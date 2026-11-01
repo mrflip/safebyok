@@ -1,6 +1,6 @@
 # Thread 3b: gating_passkey (2026-11-01)
 
-Branch `20261101-gating_passkey`, PR #PRNUM, stacked on
+Branch `20261101-gating_passkey`, PR [#431](https://github.com/mrflip/safebyok/pull/431), stacked on
 [#430](https://github.com/mrflip/safebyok/pull/430). Justify: green; core 4841 passed, 37
 skipped; every package green; no size budget moved.
 
