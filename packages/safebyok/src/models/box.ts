@@ -1,5 +1,6 @@
 import { verifyConsistent } from '../checks/validator'
 import { type CipherCtxRecord, makeLifeTok } from '../crypto'
+import { parseJsonOrNull } from '../helpers/parse-json'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
@@ -179,7 +180,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 }
 // --
 
-// == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
+// == [The seal]: sealedRecordOf, boxStampOf
 
 /** The full record of `staged` with `sidecar`, `whisper` sealed through `lease`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `staged`, only its sparse fields are taken. */
 export const sealedRecordOf = async (lease: BoxLease, staged: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
@@ -191,13 +192,4 @@ export const sealedRecordOf = async (lease: BoxLease, staged: BoxSparse, sidecar
 
 /** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */
 const boxStampOf = (sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord => ({ ...sparse, sidecar: stableJsonify(sidecar) ?? '' })
-
-/** `text` parsed as JSON, or null where it is none: a SyntaxError can quote what it failed on. */
-const parseJsonOrNull = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
 // --
