@@ -1,6 +1,6 @@
 # Thread 9: whispers_and_names (2026-11-01)
 
-Branch `20261101-whispers_and_names`, PR #TBD, stacked on #426 (`20261101-names_and_refusals`).
+Branch `20261101-whispers_and_names`, PR #428, stacked on #426 (`20261101-names_and_refusals`).
 Justify: green; safebyok 4820 passed, 37 skipped; every other package green; no size budget moved.
 
 * **Built**:
