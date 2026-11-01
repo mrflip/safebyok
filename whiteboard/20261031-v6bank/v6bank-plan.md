@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** **paused** (2026-11-01): all filed through S (on the local restacked line); 5b waits unfiled on the Coach after two flagged reviews; 7b, 8, 10, 12, 11 not started; force-push needed to land the line. See `human/20261101-sprint_v6bank_paused.md`.
+* **Status:** paused on 5b (the Coach's ruling on two G4 gaps) and force-push; thread 13 vault_boxes added by the Coach and starting on S. See `human/20261101-sprint_v6bank_paused.md`.
 
 ## Read first
 
@@ -377,7 +377,7 @@ G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S
 > `demandConsistentWith`) describes the old code; rewrite or drop it when thread 7 settles
 > `gate_epoch`.
 
-*Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
+*Orchestrator:* **the rollback guard is held** (the Coach, 2026-11-01: "Can you proceed without that. Not sure I want a counter"): 7b builds gate-epoch voiding, bad news, sign-out, the box store's `vault_tok` gate and the lost-build telling, but no rollback guard; the device record's highest epoch stays unread, and the YOLO call to key it by `vault_tok` waits with it. *Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
 `VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* tell the host when a lost two-device build discarded the passphrase just chosen, with 3c's "set on another device" sentence (YOLO, #432 review). From thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
 effort; review `high` (guarantees). **Depends on:** S (on the restacked line). **Size:** M.
 
@@ -458,6 +458,20 @@ restacked. **Size:** S.
 
 *Gloss.* `models/gate.ts`, `wayin.ts`, the gate checkers, the vault's snapshot trouble (7a).
 **Levels:** worker high effort; review `high`. **Depends on:** 7b. **Size:** M.
+
+### 13. vault_boxes
+
+> *(the Coach, 2026-11-01: "No thread gives a vault its boxes. Add that.")* A vault holds its boxes:
+> a `BoxListing` the vault makes and delegates to, as the bank does its `VaultListing`.
+
+*Gloss.* `vault.ts`, `box-listing.ts`, `box.ts`, `bank.ts` (the GAP at ~66: `boxRefreshMinutes` →
+the box listing's `maxMillisSinceRefresh`). What 4b, 7a and the reviews left waiting on it:
+`Vault.evict` disarms and evicts its boxes (`Box.disarm`/`Box.evict` are built); the snapshot's
+`boxes` field (7a left it empty); `Box.expose` sets the exposed whisper after an await, so a forget
+landing mid-unseal is undone — a forget counter, an overtaken expose keeping nothing (#434
+review). Held: damaged boxes in the snapshot. **Levels:** review `high` (`box.ts`).
+**Depends on:** S (on the restacked line); 5b's lease work is not under it, so expect a restack
+meeting in `vault.ts`. **Size:** M.
 
 ## Checks and chores
 
