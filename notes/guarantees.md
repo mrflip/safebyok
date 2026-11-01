@@ -212,8 +212,9 @@ that takes cleartexts runs through `spendAnswerAfter` (`models/proving.ts`), whi
 answer unless the export refused as `isCorrectable` says, a kind in `correctableKindVals`
 (`models/models-shapes.ts`); an answer that derived a key is spent all the same, so a
 'wrong_passkey' from a key that does not open the wayin (`Proving.attempt`) leaves it spent, as
-the core's `seal` does; a call that joins an unlock in flight spends its answer untried
-(`models/vault.ts`, `#joinUnlocking`); `attemptPasskey` on a gating whose kind a passkey does
+the core's `seal` does; a call that joins an unlock in flight attempts its answer through
+that unlock's gating while one is open, spent or not as that attempt says, and otherwise spends
+it untried (`models/vault.ts`, `#joinUnlocking`, `#attemptThrough`); `attemptPasskey` on a gating whose kind a passkey does
 not prove spends it (`models/gating.ts`); and so does a passkey offered to a vault with none
 (`absent_wayin`, `PasskeyProving.ofWayin`), or refused by a vault whose passkey changed since its
 gating launched (`gate_moved`, `Gating.#judgedAgainstLaunch`), neither a slip the user can correct. `spendPrfBytes` zeroes bytes by the tag the checker

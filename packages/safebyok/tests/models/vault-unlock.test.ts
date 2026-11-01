@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey, randomBytes } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
+import type { Gating } from '../../src/models/gating'
 import type { Lease } from '../../src/models/lease'
 import { NOVEL, Proving } from '../../src/models/proving'
 import type { VaultWorld } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
-import { Dna, LeaseMillis, Passphrase, T0, byPassphrase, declineAtOnce, makeBornVault, makeVaultWorld, makeProving, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, LeaseMillis, Passphrase, T0, byPasskey, byPassphrase, declineAtOnce, holdNextDialog, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replacePasskeyElsewhere, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -273,6 +274,85 @@ describe("Vault.ensureUnlocked(cleartexts): the passkey answer handed in", () =>
     await TH.expectRefusal(first, 'wrong_passphrase')
     await TH.expectRefusal(second, 'wrong_passphrase')
     expect(isZeroed(joining.passkeyAnswer.prfBytes)).to.be.true
+  })
+})
+
+describe("Vault.ensureUnlocked(cleartexts) while an 'unlock_vault' gating asks the user", () => {
+  it("attempts the cleartexts through the gating: the right ones unlock and settle it, and the call that launched it answers the same lease", async () => {
+    const { vault, requestCleartext } = await makeBornVault()
+    vault.lock()
+    const dialog = holdNextDialog(requestCleartext)
+    const asking = vault.ensureUnlocked()
+    const gating = await dialog.gating
+    const lease = await vault.ensureUnlocked(byPassphrase(Passphrase))
+    expect(gating.isOpen).to.be.false
+    expect(await asking).to.equal(lease)
+    expect(vault.demandLease()).to.equal(lease)
+    expect(requestCleartext).toHaveBeenCalledOnce()
+    dialog.close()
+  })
+
+  it("refuses wrong cleartexts as the proof does, leaving the gating open and the passkey's answer unspent (G2); the dialog's next attempt unlocks", async () => {
+    const { vault, requestCleartext } = await makeBornVaultWithPasskey()
+    vault.lock()
+    const dialog = holdNextDialog(requestCleartext)
+    const asking = vault.ensureUnlocked()
+    const gating = await dialog.gating as Gating<'unlock_vault'>
+    const wrong = await byPasskey('phone')
+    await TH.expectRefusal(vault.ensureUnlocked(wrong), 'wrong_passkey')
+    expect(gating.isOpen).to.be.true
+    expect(isZeroed(wrong.passkeyAnswer.prfBytes)).to.be.false
+    await gating.attempt(byPassphrase(Passphrase))
+    const lease = await asking
+    expect(vault.demandLease()).to.equal(lease)
+    dialog.close()
+  })
+
+  it("shares the gating's settling where an attempt before its own settles it: its own attempt refused 'gating_landed', it answers the lease, its answer spent (G2)", async () => {
+    const { vault, requestCleartext } = await makeBornVaultWithPasskey()
+    vault.lock()
+    const dialog = holdNextDialog(requestCleartext)
+    const asking = vault.ensureUnlocked()
+    await dialog.gating
+    const late = await byPasskey('phone')
+    const [first, second] = await Promise.all([vault.ensureUnlocked(byPassphrase(Passphrase)), vault.ensureUnlocked(late)])
+    expect(second).to.equal(first)
+    expect(await asking).to.equal(first)
+    expect(isZeroed(late.passkeyAnswer.prfBytes)).to.be.true
+    dialog.close()
+  })
+})
+
+describe("Vault.ensureUnlocked: the gate it proves against", () => {
+  const ElsewhereCases = [
+    [null,    "absent_wayin",  'revoked, none in its place'],
+    ["phone", "wrong_passkey", 'replaced by another'],
+  ] as const
+  for (const [tag, refusalkind, blurb] of ElsewhereCases) {
+    it(`refuses '${refusalkind}' the laptop's passkey once another device stores it ${blurb}, though this vault had not fetched since; the passphrase still unlocks`, async () => {
+      const born = await makeBornVaultWithPasskey()
+      born.vault.lock()
+      await replacePasskeyElsewhere(born, tag)
+      await TH.expectRefusal(born.vault.ensureUnlocked(await byPasskey('laptop')), refusalkind)
+      expect(born.vault.isLocked).to.be.true
+      await born.vault.ensureUnlocked(byPassphrase(Passphrase))
+      expect(born.vault.isUnlocked).to.be.true
+    })
+  }
+
+  it("refuses the laptop's passkey through an 'unlock_vault' gating, once another device stores it revoked, though the gating launched asking for it", async () => {
+    const born = await makeBornVaultWithPasskey()
+    born.vault.lock()
+    await replacePasskeyElsewhere(born, null)
+    const shown: { passkeyHeader?: unknown } = {}
+    born.requestCleartext.mockImplementationOnce(async (gating) => {
+      const held = gating as Gating<'unlock_vault'>
+      shown.passkeyHeader = held.passkeyHeader
+      await held.tryAttemptPasskey(await TH.passkeyOf('laptop'))
+    })
+    await TH.expectRefusal(born.vault.ensureUnlocked(), 'absent_wayin')
+    expect(shown.passkeyHeader).not.to.be.null
+    expect(born.vault.isLocked).to.be.true
   })
 })
 

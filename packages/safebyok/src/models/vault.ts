@@ -1,3 +1,4 @@
+import { Mutex } from 'es-toolkit'
 import { consistent, verifyConsistent } from '../checks/validator'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
@@ -6,7 +7,7 @@ import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
 import { Gate } from './gate'
-import { Gating } from './gating'
+import { type AnyGating, type GatingWorld, Gating } from './gating'
 import { Lease } from './lease'
 import type { AttemptCleartexts, CleartextsForGatingkind, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
@@ -53,6 +54,9 @@ class GateStaging {
  * wayins, and nothing else stores them. Its guards take no lock: its record holds no secret. A
  * vault deleted or damaged is not edited back to life, as a box is: a new life is a new
  * `vault_tok`, so a new instance, built by the listing.
+ *
+ * It asks the user one thing at a time. A gated verb called while a gating of its kind is
+ * launched joins that gating, sharing its outcome; one of another kind waits until it settles.
  */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultPatch, VaultSnapshot> implements BoxWorld {
   /** The scope, tattooed on by Storable's constructor. */
@@ -75,6 +79,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   /** The unlock in flight, by cleartexts or by a gating, which an `ensureUnlocked` begun meanwhile joins; null once it settles. */
   #unlocking: Promise<Lease> | null = null
+
+  /** Held by the gating of this vault that asks the user, so a gating of another kind waits its turn. */
+  readonly #askingMutex = new Mutex()
+
+  /** Each gating launched and not yet settled, by kind, from the moment it waits its turn: a launch of a kind held here joins it. */
+  readonly #launches = new Map<GatingKind, Promise<void>>()
+
+  /** The gating asking the user, which an `ensureUnlocked(cleartexts)` attempts through where it unlocks; null while none asks. */
+  #asking: AnyGating | null = null
 
   #gate: { props: GateProps, gate: Gate } | null = null
 
@@ -189,10 +202,36 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#sendGate(ante, await this.gate.withPasskeyRevoked(cleartexts, this.world))
   }
 
-  /** Ask the user through a `gatingkind` gating of this vault, each attempt running `run`, and resolve the vault once one succeeds. */
+  /** Ask the user through a `gatingkind` gating of this vault, each attempt running `run`, and resolve the vault once one succeeds. A gating of the kind launched already is joined, its `run` kept. */
   async #launchGating<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<this> {
-    await Gating.launch(gatingkind, { scope: this.scope, vault: this, world: this.world, run: async (handed) => { await run(handed); return this } })
+    await (this.#launches.get(gatingkind) ?? this.#launchInTurn(gatingkind, run))
     return this
+  }
+
+  /** Launch a `gatingkind` gating once the gating asking has settled, held in `#launches` until it settles. */
+  #launchInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<void> {
+    // `#askInTurn` awaits before anything else, so the launch is held here before its finally lets it go.
+    const launch = this.#askInTurn(gatingkind, run)
+    this.#launches.set(gatingkind, launch)
+    return launch
+  }
+
+  /** Hold the asking turn, and ask through `Gating.launch`, the gating held as `#asking` from the moment the host is handed it. */
+  async #askInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<void> {
+    await this.#askingMutex.acquire()
+    try {
+      const { requestCleartext, strengthChecker, logger } = this.world
+      // `Gating.launch` hands the host its gating before it first awaits.
+      const world: GatingWorld = { strengthChecker, logger, requestCleartext: (gating) => {
+        this.#asking = gating
+        return requestCleartext(gating)
+      } }
+      await Gating.launch(gatingkind, { scope: this.scope, vault: this, world, run: async (handed) => { await run(handed); return this } })
+    } finally {
+      this.#asking = null
+      this.#launches.delete(gatingkind)
+      this.#askingMutex.release()
+    }
   }
 
   /** Stage `gate` over the record in hand and send it: the vault's one path to a new gate. Where the record's gate is no longer `ante`, the one proved against, it refuses 'stale_write', storing nothing. */
@@ -201,7 +240,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, unlock, joinUnlocking, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
+  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, unlock, joinUnlocking, attemptThrough, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
@@ -209,8 +248,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   get leaseMillis(): number { return this.world.leaseMillis ?? DefaultLeaseMillis }
 
   /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else `cleartexts`, else by asking the user through an 'unlock_vault' gating. A lease held past its time locks the vault first.
-   * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by
-   * calling again; cleartexts it handed are spent unused (G2). Wrong cleartexts refuse
+   * A caller that joins an unlock in flight shares its outcome, a refusal included. Where that
+   * unlock asks the user through a gating still open, the caller's cleartexts are attempted
+   * through it, as the dialog's are: a correctable refusal is the caller's alone, and leaves the
+   * gating open. Otherwise cleartexts it handed are spent unused (G2). Every proof is checked
+   * against the gate storage holds, fetched first, so a wayin revoked elsewhere unlocks nothing.
+   * Wrong cleartexts refuse
    * 'wrong_passphrase' or 'wrong_passkey', leaving unspent a passkey's answer for another passkey
    * or salt; a passkey's answer for a vault with no passkey, 'absent_wayin'; a gating the user
    * declines, 'declined'.
@@ -261,10 +304,19 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#unlocking
   }
 
-  /** Share the outcome of the unlock `inFlight`, spending a passkey's answer in `cleartexts` at once: never tried, it is not left unspent by another's correctable refusal (G2). */
+  /** Share the outcome of the unlock `inFlight`, attempting `cleartexts` through its gating where it asks the user; else spending a passkey's answer in them at once: never tried, it is not left unspent by another's correctable refusal (G2). */
   #joinUnlocking(inFlight: Promise<Lease>, cleartexts?: AttemptCleartexts): Promise<Lease> {
+    const asking = this.#asking
+    if (cleartexts !== undefined && asking?.gatingkind === 'unlock_vault' && asking.isOpen) { return this.#attemptThrough(asking, cleartexts, inFlight) }
     spendAnswer(cleartexts)
     return inFlight
+  }
+
+  /** Attempt `cleartexts` through the open `gating` of the unlock `inFlight`: a refusal that leaves the gating open is this caller's, and any other outcome settles it, as `inFlight` answers. */
+  async #attemptThrough(gating: Gating<'unlock_vault'>, cleartexts: AttemptCleartexts, inFlight: Promise<Lease>): Promise<Lease> {
+    const attempted = await gating.tryAttempt(cleartexts)
+    if (! attempted.ok && gating.isOpen) { throw attempted.err }
+    return await inFlight
   }
 
   /** The unlock by `cleartexts`, or by a gating where none are handed, as the one in flight: `#unlocking`, cleared once it settles. */
@@ -284,8 +336,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.demandLease()
   }
 
+  /** Prove `cleartexts` against the gate storage holds, fetched first, and hold the lease the proving grants. */
   async #unlockByProof(cleartexts: AttemptCleartexts): Promise<Lease> {
-    if (! this.isFull) { await this.fetch() }
+    await this.fetch()
     const proving = await this.gate.attemptProof(cleartexts, this.world)
     // An erase a lock queued lands before this grant's put.
     await this.#leaseChores

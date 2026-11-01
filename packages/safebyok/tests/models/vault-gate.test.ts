@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { AnyGating } from '../../src/models/gating'
+import type { AnyGating, Gating } from '../../src/models/gating'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
-import { Dna, LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, declineAtOnce, makeBornVault, makeBornVaultWithPasskey, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, declineAtOnce, holdNextDialog, makeBornVault, makeBornVaultWithPasskey, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -123,6 +123,55 @@ describe("Vault.replacePassphrase(), asking the user", () => {
     requestCleartext.mockImplementationOnce(declineAtOnce)
     await TH.expectRefusal(vault.replacePassphrase(), 'declined')
     expect(storedNow()).to.equal(ante)
+  })
+})
+
+describe("A second gating on a vault", () => {
+  it("joins a gating of its own kind still asking: the user is asked once, and both calls answer what that gating settles", async () => {
+    const { vault, requestCleartext, opts: { world } } = await makeBornVault()
+    const dialog = holdNextDialog(requestCleartext)
+    const first = vault.replacePassphrase()
+    const gating = await dialog.gating as Gating<'replace_passphrase'>
+    const second = vault.replacePassphrase()
+    await TH.wakeupAtNextTick()
+    await gating.attempt({ ...Replacing })
+    expect(await first).to.equal(vault)
+    expect(await second).to.equal(vault)
+    expect(requestCleartext).toHaveBeenCalledOnce()
+    await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
+    dialog.close()
+  })
+
+  it("waits behind a gating of another kind until it settles, then asks the user its own", async () => {
+    const { vault, requestCleartext, opts: { world } } = await makeBornVault()
+    vault.lock()
+    const dialog = holdNextDialog(requestCleartext)
+    const unlocking = vault.ensureUnlocked()
+    const gating = await dialog.gating as Gating<'unlock_vault'>
+    const replacing = vault.replacePassphrase()
+    await TH.wakeupAtNextTick()
+    expect(requestCleartext).toHaveBeenCalledOnce()
+    await gating.attempt(byPassphrase(Passphrase))
+    expect(await unlocking).to.equal(vault.demandLease())
+    expect(await replacing).to.equal(vault)
+    expect(requestCleartext.mock.calls.map(([asked]) => asked.gatingkind)).to.deep.equal(['unlock_vault', 'replace_passphrase'])
+    await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
+    dialog.close()
+  })
+
+  it("asks its own once the gating ahead of it is declined: the decline refuses only the call that launched it", async () => {
+    const { vault, requestCleartext, opts: { world } } = await makeBornVault()
+    vault.lock()
+    const dialog = holdNextDialog(requestCleartext)
+    const unlocking = vault.ensureUnlocked()
+    const gating = await dialog.gating
+    const replacing = vault.replacePassphrase()
+    gating.decline()
+    await TH.expectRefusal(unlocking, 'declined')
+    expect(await replacing).to.equal(vault)
+    expect(requestCleartext).toHaveBeenCalledTimes(2)
+    await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
+    dialog.close()
   })
 })
 

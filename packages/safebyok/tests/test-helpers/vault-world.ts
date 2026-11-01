@@ -5,6 +5,7 @@ import type { VaultScope } from '../../src/shapes/scopes'
 import type { BoxWorld } from '../../src/models/box-listing'
 import type { AnyGating, Gating, RequestCleartext } from '../../src/models/gating'
 import type { Lease } from '../../src/models/lease'
+import { deferred } from '../../src/helpers/deferred'
 import type { Cleartexts, CleartextsForGatingkind, GatingKind, VaultRecord, VaultSparse } from '../../src/models/models-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, Proving } from '../../src/models/proving'
@@ -35,7 +36,7 @@ export const LeaseMillis = 60 * 60_000
 const ok = <ValT>(val: ValT) => Promise.resolve({ ok: true as const, val, err: null })
 const nothing = (): void => undefined
 
-// == [The user at the dialog]: GatingAnswers, UsualAnswers, answerAtOnce, declineAtOnce
+// == [The user at the dialog]: GatingAnswers, UsualAnswers, answerAtOnce, declineAtOnce, holdNextDialog
 
 /** What the user hands each kind of gating, made fresh for each attempt, since an attempt spends it. */
 export type GatingAnswers = { [KindT in GatingKind]?: () => CleartextsForGatingkind[KindT] | Promise<CleartextsForGatingkind[KindT]> }
@@ -58,6 +59,17 @@ export const answerAtOnce = (answers: GatingAnswers = UsualAnswers): RequestClea
 
 /** A requestCleartext whose user declines every gating. */
 export const declineAtOnce: RequestCleartext = (gating: AnyGating) => { gating.decline() }
+
+/** A dialog the test holds open for the next gating `requestCleartext` is handed: `gating` resolves that gating, and `close()` resolves `requestCleartext`, as the host's dialog closing would. */
+export const holdNextDialog = (requestCleartext: VaultTestWorld['requestCleartext']) => {
+  const handed = deferred<AnyGating>()
+  const closed = deferred<undefined>()
+  requestCleartext.mockImplementationOnce((gating: AnyGating) => {
+    handed.resolve(gating)
+    return closed.promise
+  })
+  return { gating: handed.promise, close: () => { closed.resolve(undefined) } }
+}
 // --
 
 /** Every listing made since the last test. */
@@ -167,6 +179,15 @@ export const makeBornVault = async (cleartexts: Cleartexts = byPassphrase(Passph
 export const makeBornVaultWithPasskey = async () => {
   const passkeyAnswer = await passkeyOf('laptop')
   return makeBornVault({ passphrase: Passphrase, passkeyAnswer })
+}
+
+/** Another device revokes the laptop's passkey of `born`'s vault, adding the passkey `tag` names in its place unless it is null, and stores the gate behind `born`'s back: `born`'s vault fetches nothing. */
+export const replacePasskeyElsewhere = async (born: Awaited<ReturnType<typeof makeBornVaultWithPasskey>>, tag: string | null): Promise<void> => {
+  const other = makeVaultWorld(born.demandStored(), { device_id: 'device-2' })
+  const theirs = await other.listing.build(other.demandStored())
+  await theirs.revokePasskey(byPassphrase(Passphrase))
+  if (tag !== null) { await theirs.addPasskey({ passphrase: Passphrase, passkeyAnswer: await passkeyOf(tag) }) }
+  born.storeBehindOurBack(other.demandStored())
 }
 
 const RoundTripBoxKeyStamp  = Object.freeze({ boxlabel: 'anthropic_api_key' })

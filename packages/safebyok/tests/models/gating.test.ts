@@ -10,7 +10,7 @@ import * as TH from '../test-helpers'
 import { quietLogger } from '../test-helpers/logging'
 import { isZeroed } from '../test-helpers/proving-world'
 import { type Outcome, outcomeOf } from '../../src/outcome'
-import { Dna, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, replacePasskeyElsewhere, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -60,16 +60,6 @@ const touchPasskey = (tag: string, handed: PasskeyAnswer[]) => async (gating: An
   const passkeyAnswer = await TH.passkeyOf(tag, held.passkeyHeader?.prf_salt_b64)
   handed.push(passkeyAnswer)
   await held.attemptPasskey(passkeyAnswer)
-}
-
-/** Another device revokes the laptop's passkey, adding the passkey `tag` names in its place unless it is null, and `born`'s vault fetches the record it stored. */
-const replacePasskeyElsewhere = async (born: Awaited<ReturnType<typeof makeBornVaultWithPasskey>>, tag: string | null) => {
-  const other = makeVaultWorld(born.demandStored(), { device_id: 'device-2' })
-  const theirs = await other.listing.build(other.demandStored())
-  await theirs.revokePasskey(byPassphrase(Passphrase))
-  if (tag !== null) { await theirs.addPasskey({ passphrase: Passphrase, passkeyAnswer: await TH.passkeyOf(tag) }) }
-  born.storeBehindOurBack(other.demandStored())
-  await born.vault.fetch()
 }
 
 describe("Gating.launch(gatingkind, opts): what the host is handed", () => {
@@ -356,7 +346,7 @@ describe("gating.attemptPasskey(passkeyAnswer): the passkey path", () => {
     [null,    "absent_wayin", 'a passkey revoked, none in its place'],
   ] as const
   for (const [tag, refusalkind, blurb] of MovedCases) {
-    it(`refuses '${refusalkind}' the passkey the gating launched asking for, after another device puts ${blurb}, settling the gating and spending the answer (G2)`, async () => {
+    it(`refuses '${refusalkind}' the passkey the gating launched asking for, after another device stores ${blurb} unfetched here: the attempt fetches the gate first, settling the gating and spending the answer (G2)`, async () => {
       const born = await makeBornVaultWithPasskey()
       born.vault.lock()
       const laptop = await TH.passkeyOf('laptop')
