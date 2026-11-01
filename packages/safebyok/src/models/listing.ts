@@ -1,5 +1,6 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the device cache they are warmed from, the watch on storage, and every storage call made for that kind of thing. */
 
+import { uniqBy } from 'es-toolkit'
 import { randomId } from '../crypto'
 import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
@@ -140,11 +141,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     }
   }
 
-  /** Hydrate every instance held. A hydrate that is refused is told as bad news, and the others go on; `opts` that fail {@link MSX.timelyOpts} refuse 'bad_option' first, hydrating none. */
+  /** Hydrate every instance held. A hydrate that is refused is told as bad news, one for each kind of refusal however many instances met it, and the others go on; `opts` that fail {@link MSX.timelyOpts} refuse 'bad_option' first, hydrating none. */
   async hydrateAll(opts: TimelyOpts = {}): Promise<void> {
     const timely = MSX.timelyOpts.parse(opts)
     const outcomes = await Promise.all(this.things.map((thing) => thing.tryHydrate(timely)))
-    for (const { ok, err } of outcomes) { if (! ok) { this.tellBadNews([err]) } }
+    const refusals = outcomes.flatMap(({ ok, err }) => (ok ? [] : [err]))
+    this.tellBadNews(uniqBy(refusals, ({ refusalkind }) => refusalkind))
   }
   // --
 
@@ -315,7 +317,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if (! ok) { this.tellBadNews([err]) }
   }
 
-  /** Fetch every instance again, whatever its age: the store's watch rings it where it cannot say what changed, so each instance meets what storage now answers, a refusal told as bad news. */
+  /** Fetch every instance again, whatever its age: the store's watch rings it where it cannot say what changed, so each instance meets what storage now answers, and {@link hydrateAll} tells what is refused. */
   readonly #onChange = (): void => { void this.hydrateAll({ maxMillisSinceRefresh: 0 }) }
   // --
 
@@ -349,7 +351,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Bad news]: tellBadNews
+  // == [Bad news]: tellBadNews, badNewsHandlerFailed
 
   /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into a timer's callback or the store's watch. Each item is told once, however many callers meet it. Call it for bad news no caller waits on, such as a refused cache save or a refusal of a refresh a timer launched. */
   tellBadNews(badnews: readonly VaultError[]): void {
@@ -363,11 +365,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
         try {
           await onBadNews(news)
         } catch (err) {
-          reportToPlatform(err)
+          this.badNewsHandlerFailed(err)
         }
       })()
     }
   }
+
+  /** What becomes of what `onBadNews` threw, or rejected with. */
+  protected badNewsHandlerFailed(err: unknown): void { reportToPlatform(err) }
   // --
 
   // == [Helpers]: stampDna

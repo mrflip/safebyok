@@ -474,7 +474,7 @@ export const saltDoesNotFit = (expectedCount: number, handedCount: number): stri
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."
 // --
 
-// == [Models: the device store]: DeviceStoreFailed, DeviceStoreSaid, deviceStoreBlocked, deviceStoreUnavailable, MisfiledCachedCopy
+// == [Models: the device store]: DeviceStoreFailed, DeviceStoreSaid, deviceStoreBlocked, deviceStoreUnavailable, MisfiledCachedCopy, DeviceRecordWrittenOver, BadNewsUnheard, BadNewsHandlerFailed
 
 /** For each verb of the models' device store, what its failure leaves undone, and what the user may do instead of trying again, if anything. */
 export const DeviceStoreFailed = Object.freeze({
@@ -506,4 +506,13 @@ export const deviceStoreUnavailable = ({ failed, instead }: DeviceStoreSaid, thr
 }
 
 export const MisfiledCachedCopy = "This device kept a copy of one of this user's vaults that was no copy, or held another vault's records than the one it was filed under, so it was erased: that vault loads from storage instead. This package never files a copy so, so the device store, or something else writing to it, damaged it."
+
+/** Bad news that a device record found damaged has been written over. */
+export const DeviceRecordWrittenOver = "This device's own record of this user was damaged, so a new one took its place. What the old one kept is gone: this device's id, and how far it had seen each vault's gate come. Nothing in the backend was touched."
+
+/** The logger's line for bad news told to a bank with no `onBadNews`. */
+export const BadNewsUnheard = "Bad news, and no onBadNews handler was passed to Bank.make to hear it: this error says what happened. The call that met it went on as it would have."
+
+/** The logger's line for an `onBadNews` that failed. */
+export const BadNewsHandlerFailed = "The onBadNews handler passed to Bank.make threw, or its promise rejected, as it was told of bad news: fix the handler. The call that met the news went on as it would have."
 // --

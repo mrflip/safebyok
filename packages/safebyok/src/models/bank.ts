@@ -21,7 +21,7 @@ import { spendAnswerAfter } from './proving'
 import { DefaultLeaseMillis, DefaultPesterMillis, type Vault, type VaultSnapshot } from './vault'
 import { type BoxVaultDB, type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultRefreshMillis, BankVaultDB, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
+// == [Given to a bank]: DefaultRefreshMillis, BankVaultDB, BankOpts, BankBadNewsHandler, BankStage, BankSnapshot, RefusingStrengthChecker
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
 
@@ -45,8 +45,14 @@ export type BankOpts = {
   pesterMinutes?:       number | undefined
   vaultRefreshMinutes?: number | undefined
   boxRefreshMinutes?:   number | undefined
-  onBadNews?:           ((news: VaultError) => unknown) | undefined
+  /** Told each piece of bad news once, never awaited: what it throws or rejects with goes to the logger and the platform's `reportError`, and no further. Left out, the news itself goes to those two.
+   * News of kind 'identity_revoked', the user signed out, first closes the vaults, as `bank.closeVaults()` does, whatever this does. It comes of fetching a vault or box the bank holds: a bank holding no vault hears nothing of a sign-out.
+   */
+  onBadNews?:           BankBadNewsHandler | undefined
 }
+
+/** The type of {@link BankOpts.onBadNews}. */
+export type BankBadNewsHandler = (news: VaultError) => unknown
 
 /** Where the bank stands: `starting` until a hello loads what its vaults share, then `ready`; `refused`, with the failed hello's `err`, until the next hello. */
 export type BankStage = Lifecycled<object> | Refused<object>
@@ -80,6 +86,7 @@ export class Bank implements VaultWorld, GatingWorld {
   #stage:    BankStage = { lifecycle: 'starting' }
   #snapshot: BankSnapshot
   #helloing: Promise<void> | null = null
+  readonly #onBadNews: BankBadNewsHandler
   /** The `#ensureVault` in flight for each vaultlabel, which a second `ensureVault` joins. */
   readonly #ensuring  = new Map<string, Promise<Vault>>()
   readonly #listeners = new Set<() => void>()
@@ -100,12 +107,13 @@ export class Bank implements VaultWorld, GatingWorld {
     this.deviceDB = deviceDB
     this.vaultDB = vaultDB
     this.logger = logger
+    this.#onBadNews = onBadNews ?? ((news) => { reportUnheard(logger, news) })
     this.requestCleartext = requestCleartext
     this.strengthChecker = strengthChecker
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.pesterMillis = millisOf(pesterMinutes, DefaultPesterMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
-    this.vaultListing = new VaultListing({ world: this, store: vaultDB.vaultStore(this.scope), cache: deviceDB.vaultCache(this.scope, (news) => { this.vaultListing.tellBadNews([news]) }), maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
+    this.vaultListing = new VaultListing({ world: this, store: vaultDB.vaultStore(this.scope), cache: deviceDB.vaultCache(this.scope, (news) => { this.vaultListing.tellBadNews([news]) }), maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews: (news) => this.#hearBadNews(news) })
     this.#snapshot = this.#snapshotNow()
     this.vaultListing.subscribe(() => { this.#remakeSnapshot() })
     if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
@@ -170,10 +178,20 @@ export class Bank implements VaultWorld, GatingWorld {
 
   /** Advance this device's record of the scope by one holding the bank's `device_id`, and take the `device_id` it holds: a device keeps the first it stored. */
   async #keepDeviceRecord(): Promise<void> {
-    const { record } = await this.deviceDB.advanceDeviceRecord(deviceRecordOf(this.scope, this.#deviceId))
+    const { record, wroteOverDamaged } = await this.deviceDB.advanceDeviceRecord(deviceRecordOf(this.scope, this.#deviceId))
+    if (wroteOverDamaged) { this.vaultListing.tellBadNews([RefusalFuncs.deviceRecordWrittenOver()]) }
     if (record.device_id === this.#deviceId) { return }
     this.#deviceId = record.device_id
     this.#remakeSnapshot()
+  }
+  // --
+
+  // == [Bad news]: hearBadNews
+
+  /** All the bad news of the bank's vaults and their boxes lands here: a sign-out closes the vaults first, so a handler that throws cannot skip it. */
+  #hearBadNews(news: VaultError): unknown {
+    if (news.refusalkind === 'identity_revoked') { this.closeVaults() }
+    return this.#onBadNews(news)
   }
   // --
 
@@ -281,11 +299,17 @@ export class Bank implements VaultWorld, GatingWorld {
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext
+// == [Helpers]: millisOf, checkSecureContext, reportUnheard
 
 const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : minutes * MinuteMillis)
 
 const checkSecureContext = (): void => {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw RefusalFuncs.insecureContext() }
+}
+
+/** Where the bad news of a host giving no `onBadNews` goes. */
+const reportUnheard = (logger: VaultLogger, news: VaultError): void => {
+  logger.warn(Phrases.BadNewsUnheard, { call: 'onBadNews' }, news)
+  reportToPlatform(news)
 }
 // --

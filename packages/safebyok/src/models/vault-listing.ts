@@ -6,7 +6,8 @@ import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { outcomeOf, valOf } from '../outcome'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
-import type { VaultLogger } from '../logger'
+import { type VaultLogger, asError } from '../logger'
+import * as Phrases from '../phrases'
 import type { BoxStore } from './box-listing'
 import { Listing } from './listing'
 import { Gate } from './gate'
@@ -131,6 +132,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   // == [Defined by the vault listing]
 
   protected vaultTokOfWorld(): null { return null }
+
+  /** A failed `onBadNews` goes to the logger as well: a platform with no `reportError` would lose it. */
+  protected override badNewsHandlerFailed(err: unknown): void {
+    this.world.logger.error(Phrases.BadNewsHandlerFailed, { call: 'onBadNews' }, asError(err))
+    super.badNewsHandlerFailed(err)
+  }
 
   #closeSeqOf(scope: VaultScope): number { return this.#closeSeqs.get(this.scopepathOf(scope)) ?? 0 }
 
