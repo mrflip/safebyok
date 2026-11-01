@@ -2,7 +2,7 @@ import { noop } from 'es-toolkit'
 import { verifyConsistent } from '../checks/validator'
 import { MinuteMillis } from '../consts'
 import { randomId } from '../crypto'
-import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
+import { type KeyDeriver, checkKeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { tattoo } from '../helpers'
@@ -23,6 +23,9 @@ export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
 
+/** What `Bank.make` takes. `keyDeriver` is required, with no default, so a host that never derives bundles no Argon2id: in a browser, spread `browserOpts()`.
+ * `strengthChecker` is optional; left out, every new passphrase is refused until the host configures one (`notes/configuration.md`).
+ */
 export type BankOpts = {
   applabel:             string
   user_id:              string
@@ -74,6 +77,7 @@ export class Bank implements VaultWorld, GatingWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
+    checkKeyDeriver(opts.keyDeriver)
     const { applabel, user_id, device_id = randomId(), vaultStore, vaultCache, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope, { writable: false })
