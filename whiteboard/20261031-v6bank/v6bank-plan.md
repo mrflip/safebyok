@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** new race-condition work is paused on the Coach's word (2026-11-01, ground rule 13) until they assess Open Matters and the Closer Look: "leave anything done, it's fine and I don't want churn confusing your context. This is a pause not a cancel." 5b filed. 7b and 7c are in review, and file as they stand, with their separate commits left in. 7d and the race carries wait, as do 8, 10 and 12, for the Coach's word.
+* **Status:** paused for the Coach to assess Open Matters and the Closer Look (2026-11-01, ground rule 13): "leave anything done, it's fine and I don't want churn confusing your context. This is a pause not a cancel." 5b, 7b and 7c are filed; nothing is running. 7b (#442) and 7c (#441) stand side by side off #438 and are not yet restacked; a trial merge is clean. 7d, the race carries, and 8, 10, 12 and then 11 wait for the Coach's word.
 
 ## Read first
 
@@ -385,6 +385,8 @@ G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S
 *Orchestrator:* **split in three** (the item list outgrew one context; thread 6 and thread 13 each compacted twice on less). 7b and 7c stand off 5b side by side, since one is the record and the lease and the other the bank and the listing's telling; 7d stacks on 7c, both meeting in `vault-listing.ts`. 7b is restacked under them before 8, 10 and 12. "Answers in flight after a close" (#434 review) is gone from the list: 5b's close count and the Coach's won't-fix settle it.
 
 **This 7b: gate-epoch voiding and *Made under*.** *Gloss.* `gate.ts` (`// not yet: gate_epoch`), `lease.ts`, `proving.ts` (the stamp), `models-shapes.ts`, `vault.ts`, `VOCABULARY.md`. No `gate_epoch` exists on the models' record or stamp yet; a shape change needs no compatibility (ground rule 12), only a changeset line. **Levels:** worker high effort; review `high` (guarantees). **Depends on:** 5b. **Size:** M.
+
+*Review:* (#442, high, fixed, filed) a lease used after its gate moved kept disarming its autolock; `gate_epoch` counted from the record in hand after a refused put; doc and style. No significant findings. Left, with rows: a proof racing a move, `ensureUnlocked` during an own change, a second tab on an own change, an own change landing without its re-grant, a re-grant that rejects, `gate_epoch` in no ctx, a refused change staying staged (older than this thread). Commits `939b7385` and `c94cba9c` stay separate and in; dropping `939b7385` now takes the review's fixes with it. The first build's race handling is kept locally at `refs/wip/7b-epoch-in-opts`, unpushed.
 
 ### 7c. bad_news
 
