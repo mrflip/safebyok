@@ -10,9 +10,10 @@ import * as Refusals from '../refusals'
 import { reportToPlatform } from '../report-error'
 import * as Scopepath from '../scopepath'
 import { type Clock, wallClock } from '../shapes/bank-opts'
-import { type BankScope, type Boxscope, type VaultScope, boxscope, vaultScope } from '../shapes/scopes'
+import * as CX from '../shapes/scopes'
+import type { BankScope, Boxscope, VaultScope } from '../shapes/scopes'
 import type { StringStore } from '../string-store'
-import { type Answer, type BoxRecord, type BoxSparse, type Fetched, type FoundRow, type LocalStoreFrontOpts, type Notice, type SparseBase, type Store, type StoreFrontOpts, type Tombstone, type VaultRecord, type VaultSparse, boxRecord, boxSparse, vaultRecord, vaultSparse } from './models-shapes'
+import { type Answer, type BoxRecord, type BoxSparse, type Fetched, type FoundRow, type LocalStoreFrontOpts, type Notice, type SparseBase, type Store, type StoreFrontOpts, type Tombstone, type VaultRecord, type VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Fronted stores]: FrontedStore, FrontedVaultStore, FrontedBoxStore, RowSwap
@@ -51,19 +52,19 @@ type StoreKind<ScopeT, RecordT, SparseT> = Readonly<{
 }>
 
 const BoxKind: StoreKind<Boxscope, BoxRecord, BoxSparse> = {
-  scopeOf:     (duck) => boxscope.parse(duck),
+  scopeOf:     (duck) => CX.boxscope.parse(duck),
   scopepathOf: Scopepath.box,
-  record:      boxRecord,
-  sparse:      boxSparse,
+  record:      MSX.boxRecord,
+  sparse:      MSX.boxSparse,
   damaged:     RefusalFuncs.damagedBoxRow,
   stale:       Refusals.staleBox,
 }
 
 const VaultKind: StoreKind<VaultScope, VaultRecord, VaultSparse> = {
-  scopeOf:     (duck) => vaultScope.parse(duck),
+  scopeOf:     (duck) => CX.vaultScope.parse(duck),
   scopepathOf: Scopepath.vault,
-  record:      vaultRecord,
-  sparse:      vaultSparse,
+  record:      MSX.vaultRecord,
+  sparse:      MSX.vaultSparse,
   damaged:     RefusalFuncs.damagedVaultRow,
   stale:       Refusals.staleVaultRecord,
 }
