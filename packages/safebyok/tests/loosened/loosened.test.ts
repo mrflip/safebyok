@@ -178,18 +178,5 @@ describe("the gate changes the vault sends", () => {
     const proving = await vault.gate.attemptProof({ passkeyAnswer: await TH.passkeyOf('laptop') }, world)
     expect(proving.wayinkind).to.eq('passkey')
   })
-
-  it("README.md:844, 'Every change locks the other devices': another device, unlocked before the change, fetches the new gate and stays unlocked, its lease in force", async () => {
-    const { vault, demandStored } = await bornWithPasskey()
-    const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
-    const theirs = await other.listing.build(demandStored())
-    await theirs.ensureUnlocked({ passphrase: Passphrase })
-    await vault.replacePassphrase({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
-    other.storeBehindOurBack(demandStored())
-    await theirs.fetch()
-    expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
-    expect(theirs.isUnlocked).to.be.true
-    expect(theirs.demandLease().isInForce).to.be.true
-  })
 })
 // --

@@ -103,8 +103,8 @@ boxlabel. In code they are `vaultTok`, `boxTok` and `revisionTok`.
 **The stamp** is the fields a thing's ctx binds its ciphertext to, so that it opens under that
 thing and no other. For a vault, a lease and a gate it is the fields fixed for the thing's life:
 `VaultStamp` is the vault's scope, `vault_tok` and `registered_at`; `LeaseStamp` is the lease
-record but its key material, `autolock_at` among them, as a lease is granted for one span. A
-box's stamp is not fixed for its life: `BoxStamp` is every visible field of the one revision it
+record but its key material, `autolock_at` and `gate_epoch` among them, as a lease is granted for
+one span under one gate. A box's stamp is not fixed for its life: `BoxStamp` is every visible field of the one revision it
 seals, `revision_tok`, `revision_seq`, `written_at` and the sidecar included, beside its vault's
 stamp, so a whisper opens only under the very revision it was sealed in, and nothing storage
 splices together opens at all. That is why every edit of a box seals it anew, and why no code
@@ -112,12 +112,14 @@ moves a sealed box to another revision without sealing it again. A thing binds i
 the stamps of what it lies in; a vault's stamp carries no `fmt`, so a new vault format leaves its
 boxes and leases open. Say "stamp" for the bound fields, never "the binding" or "the authentics".
 
-**Made under**: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs of the
-vault it was made under (`VaultMadeUnder`), as the vault handed them in when it made the thing,
-and `vault.demandConsistentWith(thing)` compares them with the vault record it holds: the vault
-gone (`vault_gone`), another life (`vault_remade`), another gate (`gate_moved`). A Vault object's
-own fields are its stamp alone, which `vault.stamp` hands out as one frozen plain object; the
-epochs it makes things under are no field of it.
+**Made under**: a lease holds, in its stamp, the `gate_epoch` of the vault when it was granted,
+and refuses `gate_moved` once its vault's `gate_epoch` is another; `Lease.get` erases a kept lease
+under another epoch and answers null. The epoch binds in that one ctx, the wrap of the lease's
+vaultKey: a box, a wayin and a gate bind the vault's stamp alone, as the vaultKey outlives every
+gate. A change of the gate on this device takes a new lease from the change's own proof. The old surface (`src/*.ts` outside `models/`) has its own form of
+this until it goes: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs it was
+made under (`VaultMadeUnder`), and `vault.demandConsistentWith(thing)` compares them with the vault
+record: the vault gone (`vault_gone`), another life (`vault_remade`), another gate (`gate_moved`).
 
 ## Names, records and times
 

@@ -3,7 +3,7 @@ import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes } from '../../src/consts'
 import { fromB64, randomBytes, toB64 } from '../../src/crypto'
 import type { KeyDeriver } from '../../src/key-deriver'
-import { type Cleartexts, type ProvingWorld, type StrengthChecker } from '../../src/models/models-shapes'
+import { type Cleartexts, type ProvingWorld, type StrengthChecker, FirstGateEpoch } from '../../src/models/models-shapes'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, checkStrength } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
@@ -354,7 +354,7 @@ describe("proving.makeLease(vault, dbfriend, opts)", () => {
     await passphraseProving.makeWayin(NOVEL)
     const friend = fakeDBFriendOf()
     const lease = await passphraseProving.makeLease(duckVaultOf(), friend, { leaseMillis: WeekMillis })
-    expect(lease.toJSON()).to.deep.include({ ...WorldStamp, autolock_at: T0 + WeekMillis })
+    expect(lease.toJSON()).to.deep.include({ ...WorldStamp, gate_epoch: FirstGateEpoch, autolock_at: T0 + WeekMillis })
     expect(lease.isInForce).to.be.true
     expect(friend.tryPutLease).toHaveBeenCalledTimes(1)
   })

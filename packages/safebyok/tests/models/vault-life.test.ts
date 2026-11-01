@@ -137,11 +137,9 @@ describe("The autolock, with a box in hand", () => {
 })
 
 describe("Changing the gate, with a box sealed before the change", () => {
-  it("replaces the passphrase: the lease held through the change still seals; the next session's old passphrase refuses 'wrong_passphrase', and the new one opens the box, as does the passkey, whose wayin the change kept", async () => {
+  it("replaces the passphrase: the new lease the change grants seals; the next session's old passphrase refuses 'wrong_passphrase', and the new one opens the box, as does the passkey, whose wayin the change kept", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
-    const held = vault.demandLease()
     await vault.replacePassphrase({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
-    expect(vault.demandLease()).to.equal(held)
     await box.send({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -167,12 +165,11 @@ describe("Changing the gate, with a box sealed before the change", () => {
     expect(await unsealIn(again)).to.deep.equal(Whisper)
   })
 
-  it("revokes the passkey: the passkey's lease held through the revoke still seals; the next session's passkey refuses 'absent_wayin', and the passphrase opens what that lease sealed", async () => {
+  it("revokes the passkey: the new lease the revoke grants seals; the next session's passkey refuses 'absent_wayin', and the passphrase opens what that lease sealed", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     vault.lock()
-    const passkeyLease = await vault.ensureUnlocked(await byPasskey('laptop'))
+    await vault.ensureUnlocked(await byPasskey('laptop'))
     await vault.revokePasskey(byPassphrase(Passphrase))
-    expect(vault.demandLease()).to.equal(passkeyLease)
     await box.send({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)

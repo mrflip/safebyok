@@ -216,6 +216,14 @@ export const replacePasskeyElsewhere = async (born: Awaited<ReturnType<typeof ma
   born.storeBehindOurBack(other.demandStored())
 }
 
+/** Another device replaces the passphrase with {@link NewPassphrase}, its put landing in the vaultDB behind `born`'s back: the record stored, under the next `gate_epoch`. `born` has heard nothing yet. */
+export const moveGateElsewhere = async (born: Pick<VaultTestWorld, 'demandStored' | 'storeBehindOurBack'>): Promise<VaultRecord> => {
+  const other = makeVaultWorld(born.demandStored(), { device_id: 'device-2' })
+  const theirs = await other.listing.build(other.demandStored())
+  await theirs.replacePassphrase({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
+  return born.storeBehindOurBack(other.demandStored())
+}
+
 const RoundTripBoxKeyStamp  = Object.freeze({ boxlabel: 'anthropic_api_key' })
 const RoundTripWhisperStamp = Object.freeze({ revision_seq: 1 })
 

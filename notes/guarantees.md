@@ -245,8 +245,9 @@ only as a `CryptoKey` handle: a local in `sealLeaseRecord`; the `lease_key` of a
 written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read back by
 `CachedLease.tryGet`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
 memory for the lease's life, dropped at its
-`ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
-erased from the store at `lock()`. A record read back whose key is extractable, of another
+`ask_passphrase_at`, at `lock()`, when it proves damaged, when the Vault object goes, or (`models/`)
+when it is used after its vault's `gate_epoch` has moved, and erased from the store at `lock()` or
+(`models/`) by the next `Lease.get` that finds it under another epoch. A record read back whose key is extractable, of another
 algorithm, or for another use reads as `corrupt_record` (`isLeaseKey`, `types.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
 vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease

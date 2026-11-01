@@ -68,13 +68,15 @@ export const scopeOutsideStore = (): VaultError => listedRefusal('bad_scope', Ph
 export const storeRowsMiscounted = (): VaultError => listedRefusal('corrupt_record', Phrases.StoreRowsMiscounted)
 // --
 
-// == [Leases]: damagedLease, unopenedWhisper, leaseNotInForce
+// == [Leases]: damagedLease, unopenedWhisper, leaseNotInForce, gateMoved
 
 export const damagedLease = (): VaultError => listedRefusal('damaged_lease', Phrases.DamagedLease)
 
 export const unopenedWhisper = (): VaultError => listedRefusal('damaged_box', Phrases.UnopenedWhisper)
 
 export const leaseNotInForce = (): VaultError => listedRefusal('vault_locked', Phrases.LeaseNotInForce)
+
+export const gateMoved = (): VaultError => listedRefusal('gate_moved', Phrases.GateMoved)
 // --
 
 // == [Boxes]: undecodedWhisper
