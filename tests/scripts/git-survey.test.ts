@@ -141,7 +141,7 @@ describe('scripts/git-survey.sh', () => {
     })
     expect(rows.get('drafted')?.verdict).to.equal('close')
     expect(rows.get('extra')?.verdict).to.equal('weird')
-    expect(rows.get('extra')?.rest[1]).to.match(/^commits with no match on main: \w+ feat: nobody took this$/)
+    expect(rows.get('extra')?.rest[1]).to.match(/^1 commit with no match on main, newest first: \w+ feat: nobody took this$/)
     expect(rows.get('opened')).to.deep.equal({ verdict: 'active', rest: ['#5', 'open'] })
     expect(rows.get('abandoned')).to.deep.equal({ verdict: 'weird', rest: ['-', 'no PR merged into main: #6 closed into main'] })
     expect(rows.get('elsewhere')).to.deep.equal({ verdict: 'weird', rest: ['-', 'no PR merged into main: #7 merged into landed'] })
@@ -162,12 +162,14 @@ describe('scripts/git-survey.sh', () => {
     expect(rowsOf(repo.survey()).get('stray')).to.deep.equal({ verdict: 'active', rest: ['-', 'no PR yet'] })
   })
 
-  it('names the first three of many commits with no match on main, and goes on to the next branch', () => {
+  it('counts many commits with no match on main and names the newest three, then goes on to the next branch', () => {
     seedKinds(repo)
     repo.git('switch', '--quiet', 'extra')
     for (const nth of ['2', '3', '4', '5', '6']) { repo.commit(`extra-${nth}.md`, 'more\n', `feat: nobody took this either, ${nth}`) }
     const rows = rowsOf(repo.survey('--idle', '0'))
-    expect(rows.get('extra')?.rest[1]?.split(';')).to.have.length(3)
+    expect(rows.get('extra')?.rest[1]).to.match(
+      /^6 commits with no match on main, newest first: \w+ feat: nobody took this either, 6;\w+ feat: nobody took this either, 5;\w+ feat: nobody took this either, 4$/,
+    )
     expect(rows.get('landed')?.verdict).to.equal('close')
   })
 

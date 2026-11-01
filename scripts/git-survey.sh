@@ -188,9 +188,12 @@ judge() {
     printf 'weird\t%s\t%s\t-\t%s\t%s\n' "$branch" "$tip" "$pr" "its merged head ${target:0:7} is not in ${against}"
     return
   fi
-  unmatched="$(unmatchedOf "$branch" | sed -n 1,3p | paste -sd ';' -)"
+  # git cherry lists oldest first; the newest three are the likeliest to be work nobody took.
+  unmatched="$(unmatchedOf "$branch")"
   if [[ -n "$unmatched" ]]; then
-    printf 'weird\t%s\t%s\t%s\t%s\t%s\n' "$branch" "$tip" "$target" "$pr" "commits with no match on main: ${unmatched}"
+    printf 'weird\t%s\t%s\t%s\t%s\t%s\n' "$branch" "$tip" "$target" "$pr" \
+      "$(counted "$(grep -c . <<< "$unmatched")" commit) with no match on main, newest first: $(
+        awk '{ line[NR] = $0 } END { for (i = NR; i > NR - 3 && i > 0; i--) print line[i] }' <<< "$unmatched" | paste -sd ';' -)"
     return
   fi
   if [[ -n "$tagged" && "$tip" == "$target" ]]; then
