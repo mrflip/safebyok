@@ -166,7 +166,8 @@ export class Lease implements LeaseStamp {
   /** The record, while the lease is in force: of a gate the vault has moved past, it drops the keys and refuses 'gate_moved', forgotten already or not; past `autolock_at`, or forgotten, 'vault_locked'. */
   #demandRecord(): LeaseRecord {
     if (! this.#isOfVaultsGate) {
-      this.evict()
+      // The keys alone: this locks nothing, so the autolock stays armed for a vault still reading unlocked.
+      this.#record = null
       throw RefusalFuncs.gateMoved()
     }
     if (this.#record === null || ! this.#autolock.isTimely) { throw RefusalFuncs.leaseNotInForce() }
