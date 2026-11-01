@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { BoxStore } from '../../src/models/box-listing'
+import { localStoreFront } from '../../src/models/store-front'
 import * as Phrases from '../../src/phrases'
+import { memoryStore } from '../../src/string-store'
 import * as TH from '../test-helpers'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, byPassphrase, makeBornVault, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
@@ -289,6 +291,21 @@ describe("vault.helloBoxes() and vault.goodbyeBoxes(): the box watch", () => {
     await vault.ensureBox(dnaOf())
     listing.goodbye()
     expect(unwatch).toHaveBeenCalledOnce()
+  })
+})
+// --
+
+// == [A StoreFront as the vaultDB]
+
+describe("Bank.make over a StoreFront: the vaultDB a host hands it", () => {
+  it("stores a vault and its boxes through the front, and a second vault's boxes apart from the first's", async () => {
+    const { bank } = makeBankWorld(null, { vaultDB: localStoreFront({ store: memoryStore() }) })
+    const vault = await bank.ensureVault(Dna, byPassphrase(Passphrase))
+    const box = await vault.ensureBox(dnaOf())
+    await box.expose()
+    expect(box.whisper).to.deep.equal(whisperOf('sk-test-0000'))
+    const other = await bank.ensureVault({ ...Dna, vaultlabel: 'other' }, byPassphrase(Passphrase))
+    expect(await other.getBox({ boxlabel: Boxlabel })).to.be.null
   })
 })
 // --
