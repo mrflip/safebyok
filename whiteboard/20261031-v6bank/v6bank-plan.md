@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 3a–3d, 4a, 4b, 6, 7a, 9 filed; 5a in review; then 5b, then the restack before 7b, which needs force-push (Open Matters, TOP).
+* **Status:** all filed but 5b (building); the restack is under way on local `v6line/*` branches (originals untouched, nothing pushed until the Coach allows force-push); then thread S seams, then 7b.
 
 ## Read first
 
@@ -333,6 +333,29 @@ wayin damage as trouble. **Size:** M.
 
 *Review:* (#436, medium, fixed) a lock during the pre-launch fetch launched a dialog that could not succeed (now refuses `vault_locked`, tested); doc fixes. Left: verbs on a damaged vault refuse by the wrong kind (to 12), unneeded snapshot cost on unadopted receives, `pesterMillis` accepts `Infinity` (to 10), 3b's loose ends (restack).
 
+*Review:* (#437, high, flagged — filed as it stands) seven fixes, among them idb `doDelDamaged` settling before its transaction committed. Significant, latent: the highest epoch is kept per vaultlabel, so a vault deleted and remade elsewhere would be refused for good (to 7b: key by `vault_tok`, YOLO). Left: hello refused by a failed device store (Coach), a damaged device record reset silently (5b logger, 7b telling), `findCachedVaults`' all-or-nothing erasures, the filing check vs central's scope (5b), whole-db `doFind`, style.
+
+### Restack (before S and 7b)
+
+*Orchestrator:* the force-push refusal would stall 7b, so the line is built on local `v6line/<label>`
+branches (non-destructive; the `20261101-*` branches and remotes untouched): main → 1 → 2 → 9 → 6 →
+3a → 3b → 3c → 3d → 4a → 4b → 7a → 5a, then 5b. A worker resolves conflicts only, keeping both
+sides; deliberate fixups go to thread S. When force-push is allowed, each `v6line/<label>` is pushed
+over `20261101-<label>` with a lease on the SHA recorded at the restack.
+
+### S. seams
+
+> *(orchestrator)* The cross-thread fixups the reviews left for the restack: one of 4b's `#gatings`
+> and 3d's `#asking` goes; the lock's decline throws `lockedWhileAsking` (`Gating.decline` takes an
+> optional refusal); launches queued on the asking mutex at a lock are declined; a queued
+> `unlock_vault` re-checks for a lease taken up while it waited; 3b's loose ends (`passkeyHeader`
+> parsed twice, `declare` alignment, the `#unlockByGating` doc sentence naming its reach);
+> `checkKeyDeriver`'s doc says it trusts a typed `KeyDeriver`; the deriver's refusal factories move
+> into `refusal-funcs.ts`; G2 adds "or spent, where the gating closes before the call answers".
+
+*Gloss.* `vault.ts`, `gating.ts`, `gate.ts`, `basederiver.ts`, `refusal-funcs.ts`, notes/guarantees.md
+G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S–M.
+
 ### 7b. vault_guards
 
 > * Gate-epoch voiding: `gate_epoch` on the vault record and in the lease stamp; a lease granted
@@ -352,7 +375,7 @@ wayin damage as trouble. **Size:** M.
 
 *Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
 `VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* tell the host when a lost two-device build discarded the passphrase just chosen, with 3c's "set on another device" sentence (YOLO, #432 review). From thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
-effort; review `high` (guarantees). **Depends on:** 3d, 5b, 6, 7a. **Size:** M.
+effort; review `high` (guarantees). **Depends on:** S (on the restacked line). **Size:** M.
 
 ### 8. vault_deletion
 
