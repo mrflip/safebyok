@@ -118,6 +118,13 @@ describe("oneAtATime", () => {
     expect(next.settled).to.eq('resolved')
   })
 
+  it("hands every caller sharing a run the value it resolves, and a later run its own", async () => {
+    let runs = 0
+    const run = oneAtATime(() => { runs += 1; return Promise.resolve(runs) })
+    expect(await Promise.all([run(), run()])).to.deep.equal([1, 1])
+    expect(await run()).to.eq(2)
+  })
+
   it("rejects, rather than throwing, when the task throws before its first await", async () => {
     const run = oneAtATime(() => { throw new Error('refused at once') })
     await expect(run()).rejects.toThrow('refused at once')

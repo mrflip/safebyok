@@ -120,7 +120,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 
   /** The whisper of the record in hand, opened through the vault's lease and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_box'. */
   async #unseal(): Promise<WhisperHolder> {
-    const record = this.demandedFull()
+    const record = this.demandFullProps()
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(MSX.boxSparse.parse(record), sidecar)
     const bytes = await this.world.demandLease().unsealWith({ box_key_wrapped, whisper_ciphered }, stamp, stamp)

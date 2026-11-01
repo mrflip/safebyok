@@ -748,7 +748,7 @@ describe("listing: a refusal met by a timer's launch and by a call that joins it
   it("tells it to onBadNews once when hydrateAll joins the launch", async () => {
     const down = new VaultError('storage_unavailable', "Down.")
     const { listing, open } = await launchingOf(down)
-    const hydrating = listing.hydrateAll()
+    const hydrating = listing.hydrateAll({ maxMillisSinceRefresh: 800 })
     await vi.advanceTimersByTimeAsync(0)
     open()
     await hydrating
@@ -760,7 +760,7 @@ describe("listing: a refusal met by a timer's launch and by a call that joins it
   it("tells it once, and throws it to the caller, when box.hydrate joins the launch", async () => {
     const down = new VaultError('storage_unavailable', "Down.")
     const { box, open } = await launchingOf(down)
-    const hydrating = box.hydrate()
+    const hydrating = box.hydrate({ maxMillisSinceRefresh: 800 })
     await vi.advanceTimersByTimeAsync(0)
     open()
     await expect(hydrating).rejects.to.eq(down)
@@ -773,7 +773,7 @@ describe("listing: a refusal met by a timer's launch and by a call that joins it
     open()
     await vi.advanceTimersByTimeAsync(0)
     held.mw.willGet(held.mw.refusalOf(listing.things[0]!.scope, new VaultError('storage_unavailable', "Down.")))
-    await listing.hydrateAll()
+    await listing.hydrateAll({ maxMillisSinceRefresh: 800 })
     expect(held.mw.badnews).to.have.lengthOf(2)
   })
 })
