@@ -1,6 +1,6 @@
 # Thread 7a: vault_snapshot (2026-11-01)
 
-Branch `20261101-vault_snapshot`, PR #TBD, stacked on
+Branch `20261101-vault_snapshot`, PR [#436](https://github.com/mrflip/safebyok/pull/436), stacked on
 [#434](https://github.com/mrflip/safebyok/pull/434). Justify: green; safebyok 4886 passed, 37
 skipped; size budgets unmoved.
 
