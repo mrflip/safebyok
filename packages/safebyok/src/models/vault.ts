@@ -25,11 +25,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * MinuteMillis
 /** How often the user is asked for the passphrase where the world names no `pesterMillis`: seven days. */
 export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
 
-/** A vault as a host renders it, frozen, and the same object until what it shows changes. It carries no secret material: no whisper, key or cleartext, and of the gate only whether it holds a passkey.
- * `full`, and so `hasPasskey`, is false and null while the vault is held sparse; `autolock_at` is
- * null while it is locked; `refreshedAt` is null until storage first confirms its record. `boxes`
- * is empty: the vault holds no box listing yet.
- */
+/** A vault as a host renders it, frozen, and the same object until what it shows changes. It carries no secret material: no whisper, key or cleartext, and of the gate only whether it holds a passkey. */
 export type VaultSnapshot = VaultScope & Readonly<{
   vault_tok:     string
   revision_tok:  string
@@ -37,11 +33,16 @@ export type VaultSnapshot = VaultScope & Readonly<{
   registered_at: number
   written_at:    number
   present:       boolean
+  /** False while the vault is held sparse. */
   full:          boolean
   lockState:     LockState
+  /** The held lease's; null while the vault is locked. */
   autolock_at:   number | null
+  /** Whether the gate holds a passkey; null while the vault is held sparse. */
   hasPasskey:    boolean | null
+  /** Empty while the vault holds no box listing. */
   boxes:         readonly BoxSnapshot[]
+  /** When storage last confirmed the record; null until it first has. */
   refreshedAt:   number | null
   trouble:       VaultTrouble | null
 }>
@@ -310,6 +311,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     })
   }
 
+  /** The lease in force, as an {@link Outcome}: the non-throwing form of {@link Vault.ensureUnlocked}. */
   tryEnsureUnlocked(cleartexts?: AttemptCleartexts): Promise<Outcome<Lease>> { return outcomeOf(() => this.ensureUnlocked(cleartexts)) }
 
   /** The lease the vault holds; a locked vault refuses 'vault_locked'. */
@@ -325,6 +327,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#setLease(lease)
   }
 
+  /** The lease taken up, as an {@link Outcome}: the non-throwing form of {@link Vault.takeUpLease}. */
   tryTakeUpLease(lease: Lease): Promise<Outcome<Lease>> { return outcomeOf(() => this.takeUpLease(lease)) }
 
   /** Take up the lease this device keeps of the vault, where the vault holds none and the one cached is in force; a refused look is told as bad news. */
@@ -334,6 +337,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#cachedLookup
   }
 
+  /** The cached lease taken up, or null, as an {@link Outcome}: the non-throwing form of {@link Vault.takeUpCachedLease}. */
   tryTakeUpCachedLease(): Promise<Outcome<Lease | null>> { return outcomeOf(() => this.takeUpCachedLease()) }
 
   async #unlock(cleartexts?: AttemptCleartexts): Promise<Lease> {
@@ -435,7 +439,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [The lease]: leaseDBFriend, lock, letLeaseGo, evict, dropLease, leaseChore, withLeaseDB
+  // == [The lease]: leaseDBFriend, lock, tryLock, letLeaseGo, evict, dropLease, leaseChore, withLeaseDB
 
   /** The deviceDB as this vault's lease reaches it: the world's lease verbs, bound to this vault's scope, so no verb takes one. */
   leaseDBFriend(): LeaseDBFriend {
@@ -459,6 +463,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
+  /** The lock, as an {@link Outcome}: the non-throwing form of {@link Vault.lock}. */
   tryLock(): Promise<Outcome<void>> { return outcomeOf(() => { this.lock() }) }
 
   /** Let the vault's lease go, the vault reading locked, a gating of it still asking declined, and the lease this device keeps left for the next load: the listing's goodbye, where `lock()` erases. */
@@ -546,7 +551,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** A vault's life is its `vault_tok`. */
   protected lifeTokPathOf({ vault_tok }: Fetched<VaultRecord, VaultSparse>): string { return vault_tok }
 
-  /** Builds no Gate, which checks the wayins: a wayin stored damaged leaves the snapshot whole. */
+  /** The frozen {@link VaultSnapshot} of the vault in hand. It builds no Gate, which checks the wayins, so a wayin stored damaged leaves the snapshot whole. */
   protected makeSnapshot(): VaultSnapshot {
     const full = this.isFull
     return Object.freeze({
