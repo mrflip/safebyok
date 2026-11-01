@@ -1126,7 +1126,6 @@ describe("the fake store's put: the versioned replace, cell by cell", () => {
 })
 
 const DelLandsCells = [
-  [null,       null,        0, 'lands a tombstone at revision 0 over no row, with no prior tok, as it always has'],
   [aliveRow,   'rev-a1',    2, "lands a tombstone over a live row under the prior tok, at its seq + 1"],
   [goneRow,    'rev-x2',    3, "lands a tombstone over a tombstone under the prior tok, at its seq + 1"],
   [damagedRow, 'rev-d2',    3, "lands a tombstone over a damaged row under the prior tok, at its seq + 1"],
@@ -1141,13 +1140,13 @@ const DelRefusedCells = [
 describe("the fake store's del: the versioned replace, cell by cell", () => {
   for (const [stored, priorRevisionTok, revision_seq, blurb] of DelLandsCells) {
     it(blurb, async () => {
-      if (stored !== null) { held.mw.seedStore(stored) }
+      held.mw.seedStore(stored)
       const answer = await held.mw.store.del(scopeOf(), priorRevisionTok)
       expect(verdictOf(answer)).to.deep.equal({ landed: revision_seq })
       const kept = held.mw.stored.get('anthropic_api_key')
       expect(kept).to.deep.equal(answer.ok ? answer.val : null)
       expect(kept).to.include({ am: 'x' })
-      expect(kept?.revision_tok).to.not.be.oneOf([priorRevisionTok, stored?.revision_tok])
+      expect(kept?.revision_tok).to.not.be.oneOf([priorRevisionTok, stored.revision_tok])
     })
   }
 
@@ -1159,6 +1158,12 @@ describe("the fake store's del: the versioned replace, cell by cell", () => {
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.equal(stored ?? undefined)
     })
   }
+
+  it("lands nothing over no row, with no prior tok, and answers null, as the Store doc block says", async () => {
+    const answer = await held.mw.store.del(scopeOf(), null)
+    expect(answer.ok && answer.val).to.be.null
+    expect(held.mw.stored.has('anthropic_api_key')).to.be.false
+  })
 })
 
 describe("listing.put and listing.del: the prior tok they send", () => {
