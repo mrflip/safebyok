@@ -347,7 +347,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.demandLease()
   }
 
-  /** Prove `cleartexts` against the gate storage holds, fetched first, and grant a lease, unless a lock or let-go has landed since the unlock began, at `lockSeq`: then it refuses 'vault_locked', granting nothing, or evicting the lease whose record the lock's erase, queued behind the put, then erases. */
+  /** Prove `cleartexts` against the gate storage holds, fetched first, and grant a lease, unless a lock or let-go has landed since the unlock began, at `lockSeq`: then refuse 'vault_locked'.
+   * A lease already put is evicted. A lock's erase, queued behind the put, removes its record; a let-go leaves it, as it leaves any.
+   */
   async #unlockByProof(cleartexts: AttemptCleartexts, lockSeq: number): Promise<Lease> {
     await this.fetch()
     const proving = await this.gate.attemptProof(cleartexts, this.world)
