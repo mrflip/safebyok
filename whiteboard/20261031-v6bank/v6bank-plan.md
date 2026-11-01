@@ -331,7 +331,7 @@ held (ground rule 10): `trouble` is the vault's own. **Levels:** worker medium e
 **Depends on:** 4b. **Look-ahead:** 10 fills the pester trigger the getter reads; 12 shows
 wayin damage as trouble. **Size:** M.
 
-*Review:* (#436, high→medium, fixed) a lock during the pre-launch fetch launched a dialog that could not succeed (now refuses `vault_locked`, tested); doc fixes. Left: verbs on a damaged vault refuse by the wrong kind (to 12), unneeded snapshot cost on unadopted receives, `pesterMillis` accepts `Infinity` (to 10), 3b's loose ends (restack).
+*Review:* (#436, medium, fixed) a lock during the pre-launch fetch launched a dialog that could not succeed (now refuses `vault_locked`, tested); doc fixes. Left: verbs on a damaged vault refuse by the wrong kind (to 12), unneeded snapshot cost on unadopted receives, `pesterMillis` accepts `Infinity` (to 10), 3b's loose ends (restack).
 
 ### 7b. vault_guards
 
