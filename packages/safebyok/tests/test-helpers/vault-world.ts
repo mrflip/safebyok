@@ -46,13 +46,13 @@ export const useVaultWorlds = (): void => {
 
 /** A deviceDB that keeps the one lease last put, and logs each lease verb. */
 const makeDeviceDB = () => {
-  let kept: unknown = null
+  let cached: unknown = null
   return {
-    keptNow:     () => kept,
-    keep:        (record: unknown) => { kept = record },
-    tryGetLease: vi.fn((_scope: VaultScope) => ok(kept)),
-    tryPutLease: vi.fn((record: unknown) => { kept = record; return ok(record) }),
-    tryDelLease: vi.fn((_scope: VaultScope) => { kept = null; return ok(undefined) }),
+    cachedNow:   () => cached,
+    cache:       (record: unknown) => { cached = record },
+    tryGetLease: vi.fn((_scope: VaultScope) => ok(cached)),
+    tryPutLease: vi.fn((record: unknown) => { cached = record; return ok(record) }),
+    tryDelLease: vi.fn((_scope: VaultScope) => { cached = null; return ok(undefined) }),
   }
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>

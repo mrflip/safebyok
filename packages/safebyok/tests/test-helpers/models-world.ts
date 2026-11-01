@@ -275,7 +275,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
     demandLease:  () => {
-      if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.UnlockFirst) }
+      if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.NeedVaultUnlocked) }
       return lease
     },
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },

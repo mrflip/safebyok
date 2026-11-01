@@ -4,6 +4,7 @@ import { MinuteMillis } from '../consts'
 import { randomId } from '../crypto'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { tattoo } from '../helpers'
 import { DefaultLogger, type VaultLogger } from '../logger'
 import { type Outcome, outcomeOf } from '../outcome'
@@ -180,11 +181,6 @@ export class Bank implements VaultWorld, GatingWorld {
 const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : minutes * MinuteMillis)
 
 const checkSecureContext = (): void => {
-  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }
+  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw RefusalFuncs.insecureContext() }
 }
-// --
-
-// == [Refusals]: insecureContext
-
-const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
 // --

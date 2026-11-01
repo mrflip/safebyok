@@ -398,8 +398,8 @@ describe("the logger", () => {
     await TH.expectRefusal(reopened.getWhisper('anthropic'), 'damaged_lease')
     expect(TH.stateOf(reopened.snapshot)).to.eq('locked')
     await TH.wakeupAtNextTick()
-    const kept = await device.deviceDB.tryGetLease(TH.scopeOf('u1'))
-    expect(valOf(kept)).to.be.null
+    const cached = await device.deviceDB.tryGetLease(TH.scopeOf('u1'))
+    expect(valOf(cached)).to.be.null
   })
 
   it("leaves a lease of another scope where it lies at birth: no erase is tried, and the vault is born locked", async () => {
@@ -475,7 +475,7 @@ describe("the logger", () => {
     // every call site: a change whose record could not be raised (the device store's own error
     // kept nowhere, as it may quote the record), a lease that reads but is another scope's, its
     // wrap and all, a background refresh refused
-    TH.spyOnDeviceHook(device.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
+    TH.spyOnDeviceHook(device.deviceDB, 'incrementDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
     await TH.putWayin(vault, passphrase, `${passphrase} two`)
     const secrets = storedSecrets(world)
     device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
@@ -773,7 +773,7 @@ describe("this device's record of the vault", () => {
 
   it("gives way to the record it handed over when the birth's raise resolves none: the first way in carries that record's device_id", async () => {
     const world = makeWorld()
-    vi.spyOn(world.deviceDB, 'raiseDeviceRecord').mockResolvedValueOnce(null)
+    vi.spyOn(world.deviceDB, 'incrementDeviceRecord').mockResolvedValueOnce(null)
     const vault = await world.open()
     await TH.unlock(vault, 'pw')
     expect(storedWayinOf(world, 'passphrase')?.['device_id']).to.be.a('string').and.not.be.empty
