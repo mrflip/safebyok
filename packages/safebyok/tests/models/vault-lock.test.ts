@@ -78,6 +78,24 @@ describe("vault.lock() overtaking an unlock in flight", () => {
     expect(deviceDB.tryDelLease.mock.invocationCallOrder.at(-1)).to.be.greaterThan(deviceDB.tryPutLease.mock.invocationCallOrder.at(-1) ?? Infinity)
   })
 
+  it("unlocks by an ensureUnlocked called after the lock, which joins none of the unlock it overtook", async () => {
+    const { vault, deviceDB } = await makeBornVault()
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const put = deviceDB.tryPutLease.getMockImplementation()!
+    const held = { release: null as (() => void) | null }
+    deviceDB.tryPutLease.mockImplementationOnce((record) => new Promise((resolve) => { held.release = () => { resolve(put(record)) } }))
+    const overtaken = vault.ensureUnlocked(byPassphrase(Passphrase))
+    await TH.eventually(() => held.release !== null)
+    vault.lock()
+    const after = vault.ensureUnlocked(byPassphrase(Passphrase))
+    await TH.wakeupAtNextTick()
+    held.release?.()
+    await TH.expectRefusal(overtaken, 'vault_locked')
+    const lease = await after
+    expect(vault.demandLease()).to.equal(lease)
+  })
+
   it("takes up no kept lease its look finds after a lock landed, and asks the user", async () => {
     const { vault, deviceDB, requestCleartext } = await makeBornVault()
     vault.letLeaseGo()

@@ -80,10 +80,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The gatings of this vault still asking the user, which a lock or a let-go declines. */
   readonly #gatings = new Set<AnyGating>()
 
-  /** The look for the lease this device keeps in flight, which a look begun meanwhile joins; null once it settles. */
+  /** The look for the lease this device keeps in flight, which a look begun meanwhile joins; null once it settles, or a lock or let-go overtakes it. */
   #cachedLookup: Promise<Lease | null> | null = null
 
-  /** The unlock in flight, by cleartexts or by a gating, which an `ensureUnlocked` begun meanwhile joins; null once it settles. */
+  /** The unlock in flight, by cleartexts or by a gating, which an `ensureUnlocked` begun meanwhile joins; null once it settles, or a lock or let-go overtakes it. */
   #unlocking: Promise<Lease> | null = null
 
   /** Held by the gating of this vault that asks the user, so a gating of another kind waits its turn. */
@@ -336,7 +336,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
       // The await always yields first, so the finally never runs before `#unlock` has set `#unlocking`.
       return await (cleartexts === undefined ? this.#unlockByGating(lockSeq) : this.#unlockByProof(cleartexts, lockSeq))
     } finally {
-      this.#unlocking = null
+      // A lock or let-go since it began has cleared it already, and `#unlocking` may be an unlock begun after.
+      if (this.#lockSeq === lockSeq) { this.#unlocking = null }
     }
   }
 
@@ -362,8 +363,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
 
   async #lookUpCached(): Promise<Lease | null> {
+    const lockSeq = this.#lockSeq
     try {
-      const lockSeq = this.#lockSeq
       // Awaited first, so `#cachedLookup` is set before the finally clears it.
       const cached = await this.#withLeaseDB(() => Lease.tryGet(this, this.leaseDBFriend()))
       if (! cached.ok) {
@@ -378,7 +379,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
       }
       return this.#setLease(cached.val)
     } finally {
-      this.#cachedLookup = null
+      // As for `#unlocking`: a lock or let-go since it began has cleared it, and it may be a look begun after.
+      if (this.#lockSeq === lockSeq) { this.#cachedLookup = null }
     }
   }
 
@@ -430,7 +432,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     super.evict()
   }
 
-  /** Read locked, decline every gating still asking, and hand back the lease held, no longer the vault's. */
+  /** Read locked, decline every gating still asking, leave the unlock and the look in flight for no later call to join, and hand back the lease held, no longer the vault's. */
   #dropLease(): Lease | null {
     this.#isLocked = true
     this.#lockSeq += 1
@@ -438,6 +440,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.#lease = null
     for (const gating of this.#gatings) { gating.decline() }
     this.#gatings.clear()
+    this.#unlocking = null
+    this.#cachedLookup = null
     return lease
   }
 
