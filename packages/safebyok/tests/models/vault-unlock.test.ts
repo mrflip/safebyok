@@ -237,7 +237,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     const { demandStored, anotherSession, deviceDB } = await makeBornVault()
     const record = demandStored()
     const cached = deviceDB.cachedNow() as Record<string, unknown> | null
-    if (cached === null) { throw new Error('no lease cached') }
+    if (cached === null) { throw new Error("no lease cached") }
     deviceDB.cache({ ...cached, lease_key: await makeLeaseKey() })
     const later = anotherSession()
     const again = await later.build(record)
