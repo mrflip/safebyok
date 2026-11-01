@@ -73,6 +73,36 @@ orchestrator; workers look things up here, they do not write it. Each worker kee
   with `hydrateAll({ maxMillisSinceRefresh: 0 })`.
 * Signed-out is bad news of kind **`identity_revoked`** (no `signed_out`).
 
+## The restack (local, 2026-11-01)
+
+*Orchestrator:* built on local `v6line/<label>` branches in `/workspace/byok-v6line`; nothing pushed;
+`20261101-*` untouched. `pnpm justify` green at `v6line/devicedb` b7812b65 (safebyok 5155 passed).
+Tips, bottom to top, with the remote SHA each will replace (lease):
+
+| v6line/ | tip | replaces origin/20261101- |
+| --- | --- | --- |
+| names_and_refusals | c1112126 | c1112126 |
+| deriver_and_strength | 09514afb | b23e972c |
+| whispers_and_names | 3b1afab0 | 03e08ad9 |
+| store_fronting | 6012c3f2 | 2a89634b |
+| gating | 70048732 | 3cedd1b7 |
+| gating_passkey | 1b29ce8d | 3a1ad5a9 |
+| gating_telling | 241ba76e | ae7e7f9c |
+| gating_concurrency | e385b8cd | 529615d4 |
+| bank | e304c5f2 | 55299ded |
+| bank_eviction | fb4b5fdb | 5405e69c |
+| vault_snapshot | a1fb98c5 | aadb799b |
+| devicedb | b7812b65 | 9341981e |
+
+* The restack's own commits on `v6line/devicedb`: 23391e45 (tests on replaced APIs), 6c0356df
+  (`declined` wins over `vault_locked` for a gating a lock declines; higher tests adapted),
+  7afd0059 (store and device factories through `listedRefusal`), b7812b65 (nine budgets raised).
+* 7a's lock guard now sits after `#askInTurn`'s fetch via an optional `lockSeq` threaded through
+  `#launchGating`/`#launchInTurn`/`#askInTurn`; `#unlockByGating` does no fetch of its own.
+* Left for S: wire `lockedWhileAsking` (`Gating.decline` takes an optional refusal); one of
+  `#gatings`/`#asking` goes; queued launches at a lock; a new gated `ensureUnlocked` can join a dying
+  declined launch still in `#launches`.
+
 ## Lessons for handoffs
 
 * `gh pr ready` can be refused by the harness's permission classifier: a worker leaves the PR
