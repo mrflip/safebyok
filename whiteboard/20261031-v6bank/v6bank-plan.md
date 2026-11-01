@@ -7,7 +7,8 @@
   and effort; style pass on `style-reviewer`'s pin (`sonnet`). Per-thread levels below.
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
-* **Status:** planned; threads 1 and 2 starting.
+* **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
+* **Status:** threads 1 and 2 building.
 
 ## Read first
 
