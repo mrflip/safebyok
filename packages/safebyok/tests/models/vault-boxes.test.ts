@@ -27,6 +27,38 @@ const makeWatchedVault = async () => {
   return { ...world, vault, watch, unwatch }
 }
 
+const noWatch = (): void => undefined
+
+/** A vault holding a box deleted, and another session's vault of it that stores 'sk-test-other' just after this vault's next `get` answers, heard by this vault's watch or not as `isPushed` says. */
+const makeRebirthRace = async (isPushed: boolean) => {
+  const world = makeVaultWorld()
+  const { vaultDB } = world.opts.world
+  const boxStoreOf = vaultDB.boxStore.bind(vaultDB)
+  let afterGet: (() => Promise<unknown>) | null = null
+  vi.spyOn(vaultDB, 'boxStore').mockImplementation((scope): BoxStore => {
+    const store = boxStoreOf(scope)
+    return {
+      ...store,
+      get:   async (boxscope) => {
+        const answer = await store.get(boxscope)
+        const landing = afterGet
+        afterGet = null
+        await landing?.()
+        return answer
+      },
+      watch: (...args) => (isPushed ? store.watch(...args) : noWatch),
+    }
+  })
+  const vault = await world.listing.ensure(Dna, byPassphrase(Passphrase))
+  const box = await vault.ensureBox(dnaOf())
+  await box.del()
+  const theirVault = await world.anotherSession().build(world.demandStored())
+  await theirVault.takeUpCachedLease()
+  await theirVault.getBox({ boxlabel: Boxlabel })
+  afterGet = () => theirVault.ensureBox(dnaOf('sk-test-other'))
+  return { vault, box, theirVault }
+}
+
 // == [Finding and ensuring]: getBox, makeBox, ensureBox, boxOf, boxes, boxscopeOf
 
 describe("vault.ensureBox(): the box as the vaultDB holds it, made and stored where it holds none", () => {
@@ -49,6 +81,25 @@ describe("vault.ensureBox(): the box as the vaultDB holds it, made and stored wh
     expect(again.revision_seq).to.eq(first.revision_seq)
     await again.expose()
     expect(again.whisper).to.deep.equal(whisperOf('sk-test-0000'))
+  })
+
+  for (const [isPushed, blurb] of [[true, 'its notice reaching the box first'], [false, "the put's 'stale_write' telling the box"]] as const) {
+    it(`answers the box another session stored while a box deleted was coming back, ${blurb}`, async () => {
+      const { vault, box, theirVault } = await makeRebirthRace(isPushed)
+      expect(await vault.ensureBox(dnaOf('sk-test-1111'))).to.eq(box)
+      expect(await box.getWhisper()).to.deep.equal(whisperOf('sk-test-other').val)
+      const stored = await theirVault.getBox({ boxlabel: Boxlabel }, { maxMillisSinceRefresh: 0 })
+      expect(await stored?.getWhisper()).to.deep.equal(whisperOf('sk-test-other').val)
+    })
+  }
+
+  it("brings a box deleted back with the dna's whisper, where nothing else is stored", async () => {
+    const { vault } = await makeBornVault()
+    const box = await vault.ensureBox(dnaOf())
+    await box.del()
+    expect(await vault.ensureBox(dnaOf('sk-test-1111'))).to.eq(box)
+    expect(box.isPresent).to.be.true
+    expect(await box.getWhisper()).to.deep.equal(whisperOf('sk-test-1111').val)
   })
 
   it("refuses 'vault_locked' while the vault is locked, storing nothing", async () => {

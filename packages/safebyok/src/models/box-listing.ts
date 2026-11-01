@@ -5,7 +5,7 @@ import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
-import { type BoxSnapshot, Box, sealedRecordOf } from './box'
+import { type BoxPatch, type BoxSnapshot, Box, sealedRecordOf } from './box'
 import type { Lease } from './lease'
 import { Listing, hasRevision } from './listing'
 import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type EditOpts, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
@@ -44,7 +44,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  // == [Building]: build, ensure, demandUnlocked
+  // == [Building]: build, ensure, rebirthOf, demandUnlocked
 
   /** {@link Listing.build}, a dna sealed at birth: the box staged is full, the dna's whisper sealed in with its sidecar. Stores nothing.
    * A record is told from a dna as `Listing.build` tells it, by its `revision_seq`, and keeps its
@@ -73,9 +73,20 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     if (fetched !== null) { return fetched }
     const { whisper, sidecar } = filled
     const held = this.at(scope)
-    if (held !== null) { return held.send({ whisper, sidecar }, timely) }
+    if (held !== null) { return this.#rebirthOf(held, { whisper, sidecar }, timely) }
     this.#demandUnlocked()
     return this.putDraft(await this.draftOf({ ...this.stampDna(filled), ...filled }))
+  }
+
+  /** `held` sent `patch`; where another device's box has reached it, by a notice since the fetch or with the 'stale_write' that refuses the send, that box, as it stands. */
+  async #rebirthOf(held: Box, patch: BoxPatch, timely: EditOpts): Promise<Box> {
+    if (held.isPresent && ! held.hasStaged) { return held }
+    try {
+      return await held.send(patch, timely)
+    } catch (err) {
+      if ((err instanceof VaultError) && (err.refusalkind === 'stale_write') && held.isPresent && ! held.hasStaged) { return held }
+      throw err
+    }
   }
 
   /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
