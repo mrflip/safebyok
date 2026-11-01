@@ -118,10 +118,10 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   /** Run the gated verb with `cleartexts`, resolving the vault, after any attempt in flight.
    * A correctable refusal ('wrong_passphrase', 'wrong_passkey', 'weak_passphrase',
    * 'same_passphrase') leaves the gating open, and a passkey's answer unspent, for the host to hand
-   * in again or zero; any other outcome settles the gating and spends the answer (G2). A
-   * 'wrong_passkey' from a vault whose passkey changed since the gating launched refuses
-   * 'gate_moved' instead, as {@link Gating.passkeyHeader} asks for a passkey the vault no longer
-   * has. An attempt on a gating settled refuses 'gating_landed'.
+   * in again or zero; any other outcome settles the gating and spends the answer (G2). Once the
+   * vault's passkey has changed since the gating launched, a 'wrong_passkey' refuses 'gate_moved'
+   * instead: {@link Gating.passkeyHeader} names a passkey the vault no longer has. An attempt on a
+   * gating settled refuses 'gating_landed'.
    */
   attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Vault> {
     return spendAnswerAfter(cleartexts, async () => valOf(await this.#inTurn(() => this.#attemptOnce(cleartexts))))
