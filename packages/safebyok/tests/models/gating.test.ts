@@ -321,6 +321,26 @@ describe("gating.attemptPasskey(passkeyAnswer): the passkey path", () => {
     expect(isZeroed(wrong.prfBytes)).to.be.false
   })
 
+  it("tryAttemptPasskey answers a malformed answer as a bad 'bad_option' Outcome, settling the gating: the unlock refuses 'bad_option', and each later attempt 'gating_landed'", async () => {
+    const { vault, requestCleartext } = await makeBornVaultWithPasskey()
+    vault.lock()
+    const seen: { outcomes: Outcome<Vault>[], isOpen?: boolean } = { outcomes: [] }
+    const tryEach = async (gating: AnyGating) => {
+      const held = await asUnlock(Promise.resolve(gating))
+      const laptop = await TH.passkeyOf('laptop')
+      for (const sloppy of [undefined, 42, { ...laptop, prf_salt_b64: undefined }]) {
+        seen.outcomes.push(await held.tryAttemptPasskey(sloppy as unknown as PasskeyAnswer))
+      }
+      seen.isOpen = held.isOpen
+    }
+    let asked = Promise.resolve()
+    requestCleartext.mockImplementationOnce((gating: AnyGating) => (asked = tryEach(gating)))
+    await TH.expectRefusal(vault.ensureUnlocked(), 'bad_option')
+    await asked
+    expect(seen.outcomes.map(({ err }) => err?.refusalkind)).to.deep.equal(['bad_option', 'gating_landed', 'gating_landed'])
+    expect(seen.isOpen).to.be.false
+  })
+
   it("refuses 'bad_option' on a kind a passkey does not prove, running nothing, leaving the gating open, and spending the answer (G2)", async () => {
     const { requestCleartext, gating, close } = heldDialog()
     const run = vi.fn((_cleartexts: unknown): Promise<Vault> => Promise.resolve(Resolved))
