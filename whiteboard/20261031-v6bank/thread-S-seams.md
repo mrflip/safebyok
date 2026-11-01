@@ -1,6 +1,6 @@
 # Thread S: seams (2026-11-01)
 
-Branch `20261101-seams`, PR #TBD, stacked on #437 on the restacked line (main → #426 → #427 →
+Branch `20261101-seams`, PR #439, stacked on #437 on the restacked line (main → #426 → #427 →
 #428 → #429 → #430 → #431 → #433 → #435 → #432 → #434 → #436 → #437), cut from the local
 `v6line/devicedb` (b7812b65). Justify: green (safebyok 5159 passed, 37 skipped; every package
 green; no size budget moved). Empty changeset: nothing under `src/models/` is exported yet, and
