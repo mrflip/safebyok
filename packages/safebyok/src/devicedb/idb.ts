@@ -1,4 +1,4 @@
-import { clear, createStore, del, entries, get, set, update, type UseStore } from 'idb-keyval'
+import { clear, createStore, del, entries, get, promisifyRequest, set, update, type UseStore } from 'idb-keyval'
 import { parseDbName, type IdbOpts } from '../idb-opts'
 import { DeviceDB, type DeviceRow, type FoundRow } from './devicedb'
 
@@ -72,17 +72,13 @@ class IdbDeviceDB extends DeviceDB {
       .map(([scopepath, row]) => ({ scopepath, row }))
   }
 
+  // Settles when the transaction does, so a delete that fails, or a throw from isSound, rejects.
   protected async doDelDamaged(scopepath: string, isSound: (row: unknown) => boolean): Promise<void> {
-    await this.#shelf()('readwrite', (rows) => (
-      new Promise<void>((resolve, reject) => {
-        const getting = rows.get(scopepath)
-        getting.addEventListener('error', () => { reject(getting.error ?? new Error("IndexedDB could not read a row it found damaged.")) })
-        getting.addEventListener('success', () => {
-          if (! isSound(getting.result)) { rows.delete(scopepath) }
-          resolve()
-        })
-      })
-    ))
+    await this.#shelf()('readwrite', (rows) => {
+      const getting = rows.get(scopepath)
+      getting.addEventListener('success', () => { if (! isSound(getting.result)) { rows.delete(scopepath) } })
+      return promisifyRequest(rows.transaction)
+    })
   }
 
   protected async doDelAll(): Promise<void> {

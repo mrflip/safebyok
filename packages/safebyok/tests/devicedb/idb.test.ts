@@ -52,6 +52,14 @@ describe("idbDeviceDB(opts)", () => {
     expect(await deviceDB.advanceDeviceRecord(record)).to.deep.equal(record)
   })
 
+  it("settles a doDelDamaged with its transaction: a throw from isSound rejects it, and the row stays", async () => {
+    const dbName = TH.freshDbName()
+    const deviceDB = idbDeviceDB({ dbName }) as unknown as { doDelDamaged: (scopepath: string, isSound: (row: unknown) => boolean) => Promise<void> }
+    await set(Scopepath.vault(u1), 'damaged', shelfOf(dbName))
+    await expect(deviceDB.doDelDamaged(Scopepath.vault(u1), () => { throw new Error("isSound threw") })).rejects.toThrow()
+    expect(await get(Scopepath.vault(u1), shelfOf(dbName))).to.eq('damaged')
+  })
+
   it("refuses 'bad_option' a dbName that is not non-empty text, or an option it does not take", () => {
     TH.expectSyncRefusal(() => idbDeviceDB({ dbName: '' }), 'bad_option')
     TH.expectSyncRefusal(() => idbDeviceDB({ dbName: 'acme', stray: 1 } as never), 'bad_option')
