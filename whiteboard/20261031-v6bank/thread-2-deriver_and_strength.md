@@ -1,6 +1,6 @@
 # Thread 2: deriver_and_strength (2026-11-01)
 
-Branch `20261101-deriver_and_strength`, cut from origin/main, PR below. Justify: lint, typecheck, test (88 files, 4873 tests) and build green; `size:check` green. An empty changeset: nothing exported changes.
+Branch `20261101-deriver_and_strength`, cut from origin/main, PR #427. Justify: lint, typecheck, test (88 files, 4873 tests) and build green; `size:check` green. An empty changeset: nothing exported changes.
 
 * **Built**: most of the thread was already on main. Confirmed there: `KeyDeriver` as an interface in `src/deriver/basederiver.ts`, `Bank.make`'s `keyDeriver` required with no default, `RefusingStrengthChecker` and `Phrases.NoStrengthChecker`, `notes/configuration.md`, and `zxcvbnStrengthChecker` exported from `src/browser.ts` (`tests/browser.test.ts` covers it). Added:
   - Doc blocks on every export of `src/deriver/`, on `BankOpts` and on `StrengthChecker` (`models-shapes.ts`).
