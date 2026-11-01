@@ -830,6 +830,26 @@ describe("Storable snapshot and subscription", () => {
       expect(other.mock.calls).to.have.lengthOf(1)
     })
 
+    it("reports a listener that throws to the platform, still calls the others, and the edit that settled resolves", async () => {
+      const reported: unknown[] = []
+      vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+      try {
+        held.mw.seedStore(fullBoxRecord())
+        const box = await builtBoxOf()
+        box.getSnapshot()
+        const other = vi.fn()
+        box.subscribe(() => { throw new Error("The listener broke.") })
+        box.subscribe(other)
+        await box.edit({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
+        expect(box.hasStaged).to.be.true
+        expect(other.mock.calls.length).to.be.greaterThan(0)
+        expect(reported).to.have.lengthOf(other.mock.calls.length)
+        expect(reported[0]).to.have.property('message', "The listener broke.")
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
     it("hands each listener the new snapshot to find, already in place when it is called", async () => {
       const box = await builtBoxOf()
       box.getSnapshot()

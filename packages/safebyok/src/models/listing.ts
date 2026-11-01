@@ -2,8 +2,7 @@
 
 import { randomId } from '../crypto'
 import { VaultError } from '../errors'
-import { alreadyHeldError } from '../helpers/throwers'
-import * as Phrases from '../phrases'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
@@ -84,7 +83,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       if (! revived.ok) { this.tellBadNews([revived.err]) }
     }
     this.#remakeSnapshot()
-    this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope))
+    this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope), this.#onChange)
     await this.hydrateAll()
   }
 
@@ -111,17 +110,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * A record, sparse, full or a tombstone, is delivered as a fetch's answer would be: a thing already held under its
    * scope receives it, and a refusal its `receive` throws is thrown.
    * A dna, its defaults filled, is staged at revision 0 over a central never stored, as the full record `draftOf` makes,
-   * so the instance is whole from birth. A dna for a scope already held
+   * so the instance is whole from birth; a listing that makes no draft of a dna refuses it 'bad_option'. A dna for a scope already held
    * refuses 'bad_option': `edit` the instance held, which brings a deleted or damaged one back to life.
    * Either way the instance saves itself to the device cache; a save refused is told to `onBadNews`.
    */
   async build(input: Dna<ScopeT, RecordT> | Fetched<RecordT, SparseT>): Promise<ThingT> {
     if (hasRevision(input)) { return this.#buildOrReceive(this.scopeOf(input), { flavor: 'received', record: input }) }
-    return this.holdDraft(await this.draftOf(this.stampDna(input)))
-  }
-
-  /** Hold the instance of `draft`, the full record `draftOf` made of a dna, as `build` of a dna does: a concrete listing whose draft needs more than the dna calls it itself. */
-  protected holdDraft(draft: RecordT): ThingT {
+    const draft = await this.draftOf(this.stampDna(input))
     return this.#buildOrReceive(this.scopeOf(draft), { flavor: 'drafted', draft })
   }
 
@@ -133,7 +128,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Storage verbs]: fetch, put, del
+  // == [Storage verbs]: fetch, put, putDraft, del
 
   /** The instance under `scope` as storage now holds it, built where none was held, once storage's answer is delivered to it.
    * Where storage holds nothing under `scope`, or a tombstone, deleted or damaged, the instance held, if any, has received it
@@ -156,14 +151,32 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const record = this.recordOf(duck)
     const scope = this.scopeOf(record)
     const priorRevisionTok = this.priorRevisionTokOf(scope)
-    if (! fitsPriorRevisionTok(record.revision_seq, priorRevisionTok)) { throw new VaultError('bad_record', Phrases.PutUnfitForPrior) }
+    if (! fitsPriorRevisionTok(record.revision_seq, priorRevisionTok)) { throw RefusalFuncs.putUnfitForPrior() }
     const answer = await this.#store.put(record, priorRevisionTok)
     return this.#deliver(answer, scope)
   }
 
   tryPut(duck: RecordT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.put(duck)) }
 
-  /** Delete the thing `duck` names, a sparse record or a thing, over the `revision_tok` its instance holds, and deliver the answer, a tombstone. A 'stale_write' refusal delivers as `put` does. */
+  /** Put `draft`, a record at revision 0 that no instance holds, over no `revision_tok`, and hold the instance of what storage then holds: the draft, where it lands; the live record a 'stale_write' carries, where another put landed first.
+   * No instance is held before storage answers. Any other refusal, and a 'stale_write' carrying a tombstone or nothing, is thrown as `put` throws it.
+   */
+  protected async putDraft(draft: RecordT): Promise<ThingT> {
+    const scope = this.scopeOf(draft)
+    const answer = await this.#store.put(draft, null)
+    const met = answer.ok ? null : this.#liveInStaleRefusal(answer.err)
+    if (met === null) { return this.#deliver(answer, scope, 'fail') }
+    return this.#deliver({ scope: answer.scope, world: answer.world, ok: true, val: met }, scope, 'fail')
+  }
+
+  /** The live record a 'stale_write' refusal carries; null for another refusal, or for a tombstone or nothing carried. */
+  #liveInStaleRefusal(err: VaultError): Fetched<RecordT, SparseT> | null {
+    if (err.refusalkind !== 'stale_write') { return null }
+    const stored = this.storedInStaleRefusal(err)
+    return (stored === null || MSX.isTombstone(stored)) ? null : stored
+  }
+
+  /** Delete the thing `duck` names, a sparse record or a thing, over the `revision_tok` its instance holds, and deliver the answer: the tombstone landed, or null where storage held no row. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     const scope = this.scopeOf(duck)
     const answer = await this.#store.del(scope, this.priorRevisionTokOf(scope))
@@ -184,9 +197,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * The answer's own refusals are thrown: its world's, its `err` (a 'stale_write' as it came), or the absent refusal. A refusal `receive` throws is thrown too, as the instance cannot become what storage holds; but where the answer is itself a refusal, that one is thrown, and the carried record's is told to `onBadNews`.
    * Only a fetch judges, by passing its `ifAbsent`: an answer of nothing stored, or of a tombstone, is then absent, once delivered, and throws {@link absentRefusal} under 'fail' and resolves null under 'nil'. A `put`, a `del` and a notice pass none, and have the instance back, a tombstone or not.
    */
+  async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, asked: ScopeT, ifAbsent: 'fail'): Promise<ThingT>
+  async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, asked: ScopeT, ifAbsent?: IfAbsent): Promise<ThingT | null>
   async #deliver(answer: Answer<ScopeT, RecordT, SparseT>, asked: ScopeT, ifAbsent?: IfAbsent): Promise<ThingT | null> {
     MSX.answer.parse(answer)
-    if (this.scopepathOf(answer.scope) !== this.scopepathOf(asked)) { throw new VaultError('bad_record', Phrases.AnswerOfOtherScope) }
+    if (this.scopepathOf(answer.scope) !== this.scopepathOf(asked)) { throw RefusalFuncs.answerOfOtherScope() }
     this.world.takeWorld(answer.world)
     if (answer.ok) {
       const thing = this.#buildOrReceive(answer.scope, { flavor: 'received', record: answer.val })
@@ -213,7 +228,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #buildOrReceive(scope: ScopeT, intake: Intake<RecordT, SparseT>): ThingT | null
   #buildOrReceive(scope: ScopeT, intake: Intake<RecordT, SparseT>): ThingT | null {
     const held = this.at(scope)
-    if (held !== null && intake.flavor === 'drafted') { throw alreadyHeldError() }
+    if (held !== null && intake.flavor === 'drafted') { throw RefusalFuncs.alreadyHeld() }
     if (held !== null && intake.flavor === 'cached')  { return held }
     if (intake.flavor === 'received' && intake.record !== null) { this.#demandRecordOfScope(intake.record, scope) }
     if (held === null) { this.#demandRecordOfVault(intake) }
@@ -227,7 +242,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Refuse 'bad_record' a `record` whose scope is not `scope`, the one the answer that carries it names. */
   #demandRecordOfScope(record: Fetched<RecordT, SparseT>, scope: ScopeT): void {
-    if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw new VaultError('bad_record', Phrases.RecordOfOtherScope) }
+    if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw RefusalFuncs.recordOfOtherScope() }
   }
 
   /** Refuse 'unexpected_error' an `intake` of a record, or of a cached copy whose central or staged is, under another `vault_tok` than the vault this listing lies in, before any instance is made of it. */
@@ -235,7 +250,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const vault_tok = this.vaultTokOfWorld()
     if (vault_tok === null) { return }
     for (const record of this.#recordsOf(intake)) {
-      if (this.sparseOf(record).vault_tok !== vault_tok) { throw new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth) }
+      if (this.sparseOf(record).vault_tok !== vault_tok) { throw RefusalFuncs.otherVaultTokAtBirth() }
     }
   }
 
@@ -266,7 +281,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [The watch]: onNotice
+  // == [The watch]: onNotice, onChange
 
   /** Deliver a notice as a good answer. Any refusal met on the way, a malformed notice's, the world's or one `receive` throws, is bad news, as nobody asked: told to `onBadNews`, never thrown into the store's watch. */
   readonly #onNotice = async (notice: Notice<RecordT, SparseT>): Promise<void> => {
@@ -278,6 +293,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     })
     if (! ok) { this.tellBadNews([err]) }
   }
+
+  /** Fetch every instance again, whatever its age: the store's watch rings it where it cannot say what changed, so each instance meets what storage now answers, a refusal told as bad news. */
+  readonly #onChange = (): void => { void this.hydrateAll({ maxMillisSinceRefresh: 0 }) }
   // --
 
   // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, remakeSnapshot
@@ -294,13 +312,19 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** Make the listing's snapshot again, of the present instances' own; when one differs, replace it and call every listener. */
+  /** Make the listing's snapshot again, of the present instances' own; when one differs, replace it and call every listener. A listener that throws is reported to the platform (`reportToPlatform`), and the others are still called. */
   #remakeSnapshot(): void {
     const next = this.things.filter((thing) => thing.isPresent).map((thing) => thing.getSnapshot())
     const isSame = next.length === this.#snapshot.length && next.every((snapshot, idx) => snapshot === this.#snapshot[idx])
     if (isSame) { return }
     this.#snapshot = Object.freeze(next)
-    for (const listener of this.#listeners) { listener() }
+    for (const listener of this.#listeners) {
+      try {
+        listener()
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    }
   }
   // --
 
@@ -334,7 +358,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, draftOf, makeThing, absentRefusal, storedInStaleRefusal
+  // == [Defined by the concrete listing, or refused]: vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, draftOf, makeThing, absentRefusal, storedInStaleRefusal
 
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null
@@ -345,8 +369,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   abstract sparseOf(duck: unknown): SparseT
   /** The full record `duck` is, as a plain copy; refuses a duck that is not full. */
   abstract recordOf(duck: unknown): RecordT
-  /** The full record a stamped dna makes, staged at birth: its defaults filled in, alive, and sealed where the kind seals; a vault's is its novel record. */
-  protected abstract draftOf(dna: Dna<ScopeT, RecordT> & Revision & Times): Promise<RecordT>
+  /** The full record a stamped dna makes, staged at birth: its defaults filled in, alive, and sealed where the kind seals. A listing whose things are born only through `putDraft`, as a vault listing's are, leaves it to refuse 'bad_option'. */
+  protected draftOf(_dna: Dna<ScopeT, RecordT> & Revision & Times): Promise<RecordT> {
+    return Promise.reject(RefusalFuncs.dnaHandedToBuild())
+  }
   /** Construct the instance, handing it `cache`, the device cache it saves itself to, and nothing more. */
   protected abstract makeThing(central: Fetched<RecordT, SparseT>, staged: Fetched<RecordT, SparseT> | null, cache: Cache<RecordT, SparseT>): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError

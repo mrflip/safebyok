@@ -1,17 +1,18 @@
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes } from '../../src/consts'
 import { fromB64, randomBytes, toB64 } from '../../src/crypto'
 import type { KeyDeriver } from '../../src/key-deriver'
-import { type ProofClosure, type ProvingWorld } from '../../src/models/models-shapes'
-import { NOVEL, PasskeyProving, PassphraseProving, Proving } from '../../src/models/proving'
+import { type Cleartexts, type ProvingWorld, type StrengthChecker } from '../../src/models/models-shapes'
+import { NOVEL, PasskeyProving, PassphraseProving, Proving, checkStrength } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, DeviceId, duckVaultOf, fakeDBFriendOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WeekMillis, WorldStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, cleartextsOf, DeviceId, duckVaultOf, fakeDBFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WeekMillis, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
-const makeProvingPair = async (proofClosure: ProofClosure = proofClosureOf(), world: ProvingWorld = provingWorldOf()) => (
-  Proving.makeProvingPair(WorldStamp, proofClosure, world)
+const makeProvingPair = async (cleartexts: Cleartexts = cleartextsOf(), world: ProvingWorld = provingWorldOf()) => (
+  Proving.makeProvingPair(WorldStamp, cleartexts, world)
 )
 
 /** A key deriver scripted to hand back anything at all, to try what a proving makes of it. */
@@ -25,12 +26,15 @@ const passphraseProvingWith = (keyDeriver: KeyDeriver): Promise<PassphraseProvin
   PassphraseProving.make(WorldStamp, provingWorldOf({ keyDeriver }), TestPassphrase)
 )
 
-/** The PRF bytes a closure's answer carries, or one zero byte where it carries none: zeroed either way once the proving pair is made or refused. */
+/** The PRF bytes the cleartexts carry, or one zero byte where they carry none: zeroed either way once the proving pair is made or refused. */
 const prfBytesOf = (handed: unknown): Uint8Array => (
   (handed as { passkeyAnswer?: { prfBytes?: Uint8Array } } | null)?.passkeyAnswer?.prfBytes ?? new Uint8Array(1)
 )
 
-describe("Proving.makeProvingPair(stamp, proofClosure, world): the arguments", () => {
+/** Cleartexts as a function: what a proof closure once was, and no model verb takes now. */
+const proofClosure = () => ({ passphrase: TestPassphrase })
+
+describe("Proving.makeProvingPair(stamp, cleartexts, world): the arguments", () => {
   const ArgsCases = [
     [() => ({ world: TH.omitting(provingWorldOf(), 'keyDeriver') }),      'a world with no keyDeriver'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'clock') }),           'a world with no clock'],
@@ -42,65 +46,53 @@ describe("Proving.makeProvingPair(stamp, proofClosure, world): the arguments", (
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
-    it(`refuses ${blurb} as 'bad_option', before invoking the closure`, async () => {
-      const proofClosure = vi.fn(proofClosureOf())
-      const { stamp = WorldStamp, world = provingWorldOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(Proving.makeProvingPair(stamp as never, proofClosure, world as ProvingWorld), 'bad_option')
-      expect(proofClosure).not.toHaveBeenCalled()
+    it(`refuses ${blurb} as 'bad_option', before the keyDeriver is asked, spending the passkey answer all the same (G2)`, async () => {
+      const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+      const answer = passkeyAnswerOf()
+      const { stamp = WorldStamp, world = provingWorldOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }) } = argsOf() as Record<string, unknown>
+      await TH.expectRefusal(Proving.makeProvingPair(stamp as never, cleartextsOf(TestPassphrase, answer), world as ProvingWorld), 'bad_option')
+      expect(deriveKeyBytes).not.toHaveBeenCalled()
+      expect(isZeroed(answer.prfBytes)).to.be.true
     })
   }
-
-  it("refuses a proofClosure that is no function as 'bad_option'", async () => {
-    await TH.expectRefusal(makeProvingPair({ passphrase: TestPassphrase } as never), 'bad_option')
-  })
 })
 
-describe("Proving.makeProvingPair: what the closure hands back", () => {
-  it("makes a passphrase proving alone when the closure hands back a passphrase alone", async () => {
+describe("Proving.makeProvingPair: the cleartexts", () => {
+  it("makes a passphrase proving alone of a passphrase alone", async () => {
     const { passphraseProving, passkeyProving } = await makeProvingPair()
     expect(passphraseProving).to.be.instanceOf(PassphraseProving)
     expect(passkeyProving).to.be.null
   })
 
-  it("makes a passphrase proving alone when the closure hands back passkeyAnswer null", async () => {
-    const { passkeyProving } = await makeProvingPair(() => ({ passphrase: TestPassphrase, passkeyAnswer: null }))
+  it("makes a passphrase proving alone of passkeyAnswer null", async () => {
+    const { passkeyProving } = await makeProvingPair({ passphrase: TestPassphrase, passkeyAnswer: null })
     expect(passkeyProving).to.be.null
   })
 
-  it("makes a passkey proving beside it when the closure hands back a passkey answer, and zeroes that answer's PRF bytes (G2)", async () => {
+  it("makes a passkey proving beside it of a passkey answer, and zeroes that answer's PRF bytes (G2)", async () => {
     const answer = passkeyAnswerOf()
-    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, answer))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(cleartextsOf(TestPassphrase, answer))
     expect(passphraseProving).to.be.instanceOf(PassphraseProving)
     expect(passkeyProving).to.be.instanceOf(PasskeyProving)
     expect(isZeroed(answer.prfBytes)).to.be.true
   })
 
-  it("awaits a closure that answers a promise", async () => {
-    const { passphraseProving } = await makeProvingPair(() => Promise.resolve({ passphrase: TestPassphrase }))
-    expect(passphraseProving).to.be.instanceOf(PassphraseProving)
-  })
-
-  it("replaces what a throwing closure threw with 'unexpected_error', quoting none of it and keeping no cause", async () => {
-    const err = await TH.expectRefusal(makeProvingPair(() => { throw new Error(`no good: ${TestPassphrase}`) }), 'unexpected_error')
-    expect(err.cause).to.be.undefined
-    expect(TH.thrownText(err)).to.not.include(TestPassphrase)
-  })
-
-  const AnswerCases = [
+  const CleartextsCases = [
     [() => ({ passphrase: 42 }),                                                                  'a passphrase that is no string'],
     [() => ({}),                                                                                  'no passphrase'],
     [() => null,                                                                                  'null'],
-    [() => ({ passphrase: TestPassphrase, passcode: '1234' }),                                    'a field no closure hands back'],
+    [() => proofClosure,                                                                          'a function, as a proof closure once was'],
+    [() => ({ passphrase: TestPassphrase, passcode: '1234' }),                                    'a field the user hands in no form'],
     [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: new Uint8Array(32) }) }),                     'a spent passkey answer, its PRF bytes all zero (G2)'],
     [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: randomBytes(31) }) }),                        'PRF bytes one short'],
     [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prf_salt_b64: toB64(randomBytes(PasskeySaltBytes - 1)) }) }), 'a passkey salt one byte short'],
     [() => ({ passphrase: TestPassphrase, passkeyAnswer: TH.omitting(passkeyAnswerOf(), 'credential_id') }),                      'a passkey answer with no credential_id'],
   ] as const
 
-  for (const [answerOf, blurb] of AnswerCases) {
+  for (const [cleartextsOfCase, blurb] of CleartextsCases) {
     it(`refuses ${blurb} as 'bad_option', zeroing any PRF bytes it carries`, async () => {
-      const handed = answerOf()
-      const err = await TH.expectRefusal(makeProvingPair(() => handed as never), 'bad_option')
+      const handed = cleartextsOfCase()
+      const err = await TH.expectRefusal(makeProvingPair(handed as never), 'bad_option')
       expect(isZeroed(prfBytesOf(handed))).to.be.true
       expect(TH.thrownText(err)).to.not.include(TestPassphrase)
     })
@@ -109,8 +101,33 @@ describe("Proving.makeProvingPair: what the closure hands back", () => {
   it("zeroes the PRF bytes even when the passphrase's keyDeriver throws after the answer passed its check (G2)", async () => {
     const answer = passkeyAnswerOf()
     const world = provingWorldOf({ keyDeriver: deriverHanding(() => { throw new Error('out of memory') }) })
-    await TH.expectRefusal(makeProvingPair(proofClosureOf(TestPassphrase, answer), world), 'unexpected_error')
+    await TH.expectRefusal(makeProvingPair(cleartextsOf(TestPassphrase, answer), world), 'unexpected_error')
     expect(isZeroed(answer.prfBytes)).to.be.true
+  })
+})
+
+describe("checkStrength(strengthChecker, passphrase, scope)", () => {
+  const Scope = Object.freeze({ applabel: WorldStamp.applabel, user_id: WorldStamp.user_id, vaultlabel: WorldStamp.vaultlabel })
+
+  it("hands the checker the passphrase and the scope, and resolves on a strong verdict", async () => {
+    const strengthChecker = vi.fn<StrengthChecker>(() => ({ strong: true }))
+    await checkStrength(strengthChecker, TestPassphrase, Scope)
+    expect(strengthChecker).toHaveBeenCalledWith(TestPassphrase, Scope)
+  })
+
+  it("refuses a weak verdict as 'weak_passphrase', its message the checker's reason", async () => {
+    const err = await TH.expectRefusal(checkStrength(() => ({ strong: false, reason: 'Add another word or two.' }), TestPassphrase, Scope), 'weak_passphrase')
+    expect(err.message).to.eq('Add another word or two.')
+  })
+
+  it("refuses an answer that is no verdict as 'bad_option'", async () => {
+    await TH.expectRefusal(checkStrength((() => 'strong') as never, TestPassphrase, Scope), 'bad_option')
+  })
+
+  it("replaces what a throwing checker threw with 'unexpected_error', quoting none of it and keeping no cause (G8)", async () => {
+    const err = await TH.expectRefusal(checkStrength(() => { throw new Error(`too short: ${TestPassphrase}`) }, TestPassphrase, Scope), 'unexpected_error')
+    expect(err.cause).to.be.undefined
+    expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
 })
 
@@ -178,6 +195,28 @@ describe("PassphraseProving.make(stamp, world, passphrase): the keyDeriver", () 
   })
 })
 
+/** PRF bytes as a passkey answer from an iframe carries them: a Uint8Array of another realm, which fails `instanceof Uint8Array` here but carries its tag. */
+const foreignPrfBytes = (): Uint8Array => runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
+
+describe("Spending a passkey answer made in another realm (G2)", () => {
+  it("is a byte view that fails `instanceof Uint8Array`, as the test assumes", () => {
+    expect(foreignPrfBytes() instanceof Uint8Array).to.be.false
+  })
+
+  it("makes a passkey proving of an answer whose PRF bytes are another realm's, and zeroes them", async () => {
+    const answer = passkeyAnswerOf({ prfBytes: foreignPrfBytes() })
+    const { passkeyProving } = await makeProvingPair(cleartextsOf(TestPassphrase, answer))
+    expect(passkeyProving).to.be.instanceOf(PasskeyProving)
+    expect(isZeroed(answer.prfBytes)).to.be.true
+  })
+
+  it("zeroes another realm's PRF bytes when the answer is refused for good, as a salt one byte short is", async () => {
+    const answer = passkeyAnswerOf({ prfBytes: foreignPrfBytes(), prf_salt_b64: toB64(randomBytes(PasskeySaltBytes - 1)) })
+    await TH.expectRefusal(PasskeyProving.make(WorldStamp, provingWorldOf(), answer), 'bad_option')
+    expect(isZeroed(answer.prfBytes)).to.be.true
+  })
+})
+
 describe("PasskeyProving.make(stamp, world, passkeyAnswer), called directly", () => {
   it("refuses a spent answer, its PRF bytes all zero, as 'bad_option' (G2)", async () => {
     const spent = passkeyAnswerOf({ prfBytes: new Uint8Array(32) })
@@ -223,7 +262,7 @@ describe("a proving's header", () => {
 
 describe("proving.makeWayin(source)", () => {
   it("from NOVEL wraps a new vaultKey under the proving's key: a wayin of its header that opens with the passphrase", async () => {
-    const { passphraseProving } = await Proving.makeProvingPair(WorldStamp, proofClosureOf(), provingWorldOf())
+    const { passphraseProving } = await Proving.makeProvingPair(WorldStamp, cleartextsOf(), provingWorldOf())
     const wayin = await passphraseProving.makeWayin(NOVEL)
     expect(wayin).to.be.instanceOf(Wayin)
     expect(wayin.toJSON()).to.deep.equal(passphraseProving.header)
@@ -232,7 +271,7 @@ describe("proving.makeWayin(source)", () => {
   })
 
   it("from NOVEL makes a wayin that another passphrase does not open", async () => {
-    const { passphraseProving } = await Proving.makeProvingPair(WorldStamp, proofClosureOf(), provingWorldOf())
+    const { passphraseProving } = await Proving.makeProvingPair(WorldStamp, cleartextsOf(), provingWorldOf())
     const wayin = await passphraseProving.makeWayin(NOVEL)
     await expect(_cheat_vaultKeyBytesOf(WorldStamp, wayin, { passphrase: `${TestPassphrase}, misremembered` })).rejects.toThrow()
   })
@@ -240,7 +279,7 @@ describe("proving.makeWayin(source)", () => {
   it("from another proving wraps that proving's vaultKey: the passphrase and passkey wayins open to the same vaultKey", async () => {
     const answer = passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
-    const { passphraseProving, passkeyProving } = await Proving.makeProvingPair(WorldStamp, proofClosureOf(TestPassphrase, answer), provingWorldOf())
+    const { passphraseProving, passkeyProving } = await Proving.makeProvingPair(WorldStamp, cleartextsOf(TestPassphrase, answer), provingWorldOf())
     const passphraseWayin = await passphraseProving.makeWayin(NOVEL)
     const passkeyWayin = await passkeyProving!.makeWayin(passphraseProving)
     expect(passkeyWayin.toJSON()).to.deep.equal(passkeyProving!.header)
@@ -250,15 +289,15 @@ describe("proving.makeWayin(source)", () => {
   })
 
   it("mints a different vaultKey for each NOVEL wayin of different provings", async () => {
-    const { passphraseProving: one } = await Proving.makeProvingPair(WorldStamp, proofClosureOf(), provingWorldOf())
-    const { passphraseProving: two } = await Proving.makeProvingPair(WorldStamp, proofClosureOf(), provingWorldOf())
+    const { passphraseProving: one } = await Proving.makeProvingPair(WorldStamp, cleartextsOf(), provingWorldOf())
+    const { passphraseProving: two } = await Proving.makeProvingPair(WorldStamp, cleartextsOf(), provingWorldOf())
     const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(WorldStamp, await one.makeWayin(NOVEL), { passphrase: TestPassphrase })
     const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(WorldStamp, await two.makeWayin(NOVEL), { passphrase: TestPassphrase })
     expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
   })
 
   it("binds the wayin to its vault: under another vault's stamp it will not open", async () => {
-    const { passphraseProving } = await Proving.makeProvingPair(WorldStamp, proofClosureOf(), provingWorldOf())
+    const { passphraseProving } = await Proving.makeProvingPair(WorldStamp, cleartextsOf(), provingWorldOf())
     const wayin = await passphraseProving.makeWayin(NOVEL)
     await expect(_cheat_vaultKeyBytesOf({ ...WorldStamp, vault_tok: 'vault-tok-other' }, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
   })
@@ -279,12 +318,12 @@ describe("proving.makeWayin(source)", () => {
 
   it("refuses, as 'unexpected_error', a proving that has made no wayin yet as its source", async () => {
     const answer = passkeyAnswerOf()
-    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, answer))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(cleartextsOf(TestPassphrase, answer))
     await TH.expectRefusal(passkeyProving!.makeWayin(passphraseProving), 'unexpected_error')
   })
 
   it("refuses a proving of another vault as its source, as 'bad_option': a wayin wraps only its own vault's vaultKey", async () => {
-    const { passphraseProving: theirProving } = await Proving.makeProvingPair({ ...WorldStamp, vault_tok: 'vault-tok-other' }, proofClosureOf(), provingWorldOf())
+    const { passphraseProving: theirProving } = await Proving.makeProvingPair({ ...WorldStamp, vault_tok: 'vault-tok-other' }, cleartextsOf(), provingWorldOf())
     await theirProving.makeWayin(NOVEL)
     const { passphraseProving: myProving } = await makeProvingPair()
     await TH.expectRefusal(myProving.makeWayin(theirProving), 'bad_option')
@@ -321,7 +360,7 @@ describe("proving.makeLease(vault, dbfriend, opts)", () => {
   })
 
   it("grants leases over one vaultKey from both provings once both made wayins: what one seals, the other opens", async () => {
-    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(cleartextsOf(TestPassphrase, passkeyAnswerOf()))
     await passphraseProving.makeWayin(NOVEL)
     await passkeyProving!.makeWayin(passphraseProving)
     const viaPassphrase = await passphraseProving.makeLease(duckVaultOf(), fakeDBFriendOf(), { leaseMillis: WeekMillis })
@@ -340,14 +379,14 @@ describe("proving.makeLease(vault, dbfriend, opts)", () => {
 
 describe("what a proving shows", () => {
   it("Object.keys shows its wayinkind and header alone: no key, no wayin, no stamp", async () => {
-    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(cleartextsOf(TestPassphrase, passkeyAnswerOf()))
     await passphraseProving.makeWayin(NOVEL)
     expect(Object.keys(passphraseProving)).to.deep.equal(['wayinkind', 'header'])
     expect(Object.keys(passkeyProving!)).to.deep.equal(['wayinkind', 'header'])
   })
 
   it("JSON.stringify gives its wayinkind alone", async () => {
-    const { passphraseProving, passkeyProving } = await makeProvingPair(proofClosureOf(TestPassphrase, passkeyAnswerOf()))
+    const { passphraseProving, passkeyProving } = await makeProvingPair(cleartextsOf(TestPassphrase, passkeyAnswerOf()))
     expect(JSON.stringify(passphraseProving)).to.eq('{"wayinkind":"passphrase"}')
     expect(JSON.stringify(passkeyProving)).to.eq('{"wayinkind":"passkey"}')
   })

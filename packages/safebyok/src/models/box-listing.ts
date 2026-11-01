@@ -2,7 +2,7 @@
 
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
-import { lockedError } from '../helpers/throwers'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box, sealedRecordOf } from './box'
@@ -61,7 +61,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
-  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw lockedError() } }
+  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw RefusalFuncs.vaultLocked() } }
   // --
 
   // == [Defined by the box listing]
@@ -80,7 +80,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here. The whisper rides in the dna this far, and no further.
   /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, its birthday gift a `box_tok` fresh from {@link makeLifeTok}, its whisper and sidecar sealed through the vault's lease by {@link sealedRecordOf}. */
-  protected draftOf({ whisper, sidecar, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
+  protected override draftOf({ whisper, sidecar, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
     return sealedRecordOf(this.world.demandLease(), { ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
   }
 
@@ -89,7 +89,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   absentRefusal(scope: Boxscope): VaultError {
-    return new VaultError('absent_box', `No box is stored under the label ${this.scopeOf(scope).boxlabel}.`)
+    return RefusalFuncs.boxAbsent(this.scopeOf(scope).boxlabel)
   }
 
   /** The record `meta.box_stored` carries: the full record where it is one, else its sparse form, else null. */
