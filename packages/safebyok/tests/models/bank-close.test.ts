@@ -122,7 +122,7 @@ describe("bank.closeVault(bag): the vault locked, its kept lease erased, and evi
     const onBadNews = vi.fn()
     const deviceDB = memoryDeviceDB()
     const { bank } = makeBankWorld(null, { deviceDB, onBadNews })
-    const refusal = new VaultError('unexpected_error', 'the store is down')
+    const refusal = new VaultError('unexpected_error', "the store is down")
     vi.spyOn(deviceDB, 'tryDelLease').mockResolvedValueOnce(bad(refusal))
     bank.closeVault(Main)
     await TH.eventually(() => onBadNews.mock.calls.length > 0)
