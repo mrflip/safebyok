@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 9 filed; 6 in review; 3a building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
+* **Status:** 1, 2, 3a, 6, 9 filed; 3b and 4a building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
 
 ## Read first
 
@@ -164,11 +164,26 @@ a `reason` field (`'pester'`, thread 10) rides on an `unlock_vault` gating; `del
 `ensure`, so keep `bank.ensureVault`'s body thin. *Orchestrator:* also renames `RaisedGating` → `LaunchedGating` and "raise a gating" → "launch" tree-wide (YOLO, thread 1's open matter).
 **Size:** L.
 
-### 3b. gating_passkey_and_telling
+*Review:* (#430, high, fixed) validator namespaces, orphaned doc blocks and blank lines, a stale doc line; cleartext path traced, no guarantee broken; the strength check in the Gate judged right. Left: cross-realm zeroing (to 3b), spend on correctable refusal (3b), one gating per scope (4a, 3c), lock/eviction settle a gating (4b), cleartexts through an open gating (3c), `#inTurn` onto `Mutex` (3c, and `#leaseChore` in 4b), docs/tests nits.
+
+### 3b. gating_passkey
 
 > * The passkey path: `attemptPasskey` on an `unlock_vault` gating grants a lease through
 >   `PasskeyProving`; the gating exposes what the host's `createPasskey`/`askPasskey` read (the
 >   passkey header: `credential_id`, `prf_salt`), so the button has something to read.
+> * ~~The telling of the two-device races … ; refusal kinds~~ *(split into 3c)*
+
+*Gloss.* `gating.ts`, `proving.ts`'s `PasskeyProving`, `phrases.ts`, `refusal-funcs.ts`, the
+refusal-kind type in `models-shapes.ts`. Runs beside 4a, both off 3a.
+**Levels:** review `high` (guarantees).
+*Orchestrator:* split after 3a's review grew it to ~8 items (3a compacted twice). 3b also: zero a
+cross-realm passkey answer (`spendPrfBytes` tests `instanceof`; zero by the checker's tag test, a
+G2 hole), and match G2 — a passkey answer stays unspent only on a correctable refusal (YOLO).
+**Depends on:** 3a. **Look-ahead:** 7a shows the passkey header in the snapshot; 8's `del_vault`
+refuses a passkey. **Size:** M.
+
+### 3c. gating_telling
+
 > * The telling of the two-device races, which the versioned put already makes safe: a first gate
 >   lost to another device gets its own sentence ("set on another device; enter the passphrase
 >   chosen there"), and a declined gating gets a `declined` refusal kind, replacing the G8 relabel
@@ -176,13 +191,16 @@ a `reason` field (`'pester'`, thread 10) rides on an `unlock_vault` gating; `del
 > * Refusal kinds: the list the gating and the vault verbs throw, declared once, so React's
 >   messages have a contract to map on.
 
-*Gloss.* `gating.ts`, `proving.ts`'s `PasskeyProving`, `phrases.ts`, `refusal-funcs.ts`, the
-refusal-kind type in `models-shapes.ts`. Runs beside 4a, both off 3a.
-**Levels:** review `high` (guarantees).
-**Depends on:** 3a. **Look-ahead:** the kind list carries room for what later threads throw:
-`vault_behind` (7b), `vault_gone`, `vault_remade` (8), `signed_out` (6, 7b), damaged-wayin
-(12); declare those 3b can name now, and say in the doc block that the list grows.
-**Size:** M.
+*Gloss.* Split from 3b. `gating.ts`, `phrases.ts`, `refusal-funcs.ts`, the refusal-kind type in
+`models-shapes.ts`, VOCABULARY.md. *Orchestrator:* also (YOLO, from 3a's review): what a second
+gating on a vault does (with 4a's `ensure` joining one in flight); `ensureUnlocked(cleartexts)`
+attempts through an open gating rather than waiting on it; `Gating.#inTurn` onto es-toolkit's
+`Mutex`; VOCABULARY.md's **cleartext** and **gating** rows brought to the models. The kind list
+reuses `identity_revoked` for signed-out (thread 6). **Levels:** review `high`.
+**Depends on:** 3b. **Look-ahead:** the kind list carries room for what later threads throw:
+`vault_behind` (7b), `vault_gone`, `vault_remade` (8), damaged-wayin (12); declare those 3c can
+name now, and say in the doc block that the list grows. **Size:** M.
+
 
 ### 4a. bank
 
@@ -220,7 +238,7 @@ thread 1). *Orchestrator:* also aligns the models-world test fake, which writes 
 *Gloss.* `listing.ts`, `bank.ts`, `vault.ts`/`box.ts` `evict`. A box's disarm on eviction drops
 its exposed whisper; on `lock()` alone the whisper stays (the Coach's ruling, thread 9).
 *Orchestrator:* sign-out needs thread 6's store signal, so it is wired in 7b, which stands on
-both. **Levels:** worker medium effort. *Orchestrator:* the disarm also clears a box's exposed whisper when a tombstone or a newer revision lands (YOLO, #428 review).
+both. **Levels:** worker medium effort. *Orchestrator:* lock and eviction also settle an open gating; `Vault.#leaseChore` onto es-toolkit's `Mutex` (YOLO, #430 review). The disarm also clears a box's exposed whisper when a tombstone or a newer revision lands (YOLO, #428 review).
 **Depends on:** 4a. **Look-ahead:** 8 evicts on
 deletion and on a received tombstone. **Size:** S.
 
@@ -236,7 +254,7 @@ deletion and on a received tombstone. **Size:** S.
 > * The device record: `device_id` per scope and the highest epoch seen per vault, for thread 7.
 > * `clearCachedVault`: a way to drop a cached vault, damaged or not.
 
-*Gloss.* New `src/devicedb/`, old `device-db.ts`/`idb.ts`, `models/lease.ts`, `vault.ts`,
+*Orchestrator:* rename the host-facing `doDelUnparsed` → `doDelDamaged` only in the models' new DeviceDB, if copied there. *Gloss.* New `src/devicedb/`, old `device-db.ts`/`idb.ts`, `models/lease.ts`, `vault.ts`,
 `bank.ts`. Move or copy is the worker's call by the Coach's rule; a copy leaves the old one for
 the old surface (ground rule 11). `takeUpKeptLease` is `takeUpCachedLease` after thread 1. *Orchestrator:* 5 also renames `incrementDeviceRecord` → `advanceDeviceRecord` (and "raised, never lowered" → "advanced"), in code and VOCABULARY.md (YOLO, thread 1's open matter).
 **Levels:** review `high` (guarantees: `lease.ts`). **Depends on:** 4b.
@@ -258,6 +276,8 @@ if 3b has not landed it here, declared locally and reconciled at the restack); 7
 `closeVaults`. **Depends on:** 1. **Look-ahead:** 8 deletes through the `Store`, including over
 a row whose record does not parse: give `del` a conditional form (`revision_tok`) and say how an
 unconditional one is expressed, or leave the seam and report it. **Size:** M.
+
+*Review:* (#429, medium, fixed) the watch pushed after unwatch and a throwing `onNotice` ended a sweep; validator namespaces; quotes. After review: `delUnparsed` → `delDamaged`, changeset trimmed. Left: the world read after the swap (to 8), `onChange` floods bad news (to 7b), 11 smaller nits.
 
 ### 7a. vault_snapshot
 
@@ -292,7 +312,7 @@ wayin damage as trouble. **Size:** M.
 
 *Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
 `VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* from thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
-effort; review `high` (guarantees). **Depends on:** 3b, 5, 6, 7a. **Size:** M.
+effort; review `high` (guarantees). **Depends on:** 3c, 5, 6, 7a. **Size:** M.
 
 ### 8. vault_deletion
 
