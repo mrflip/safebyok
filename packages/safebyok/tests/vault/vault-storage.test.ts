@@ -123,8 +123,8 @@ const SpoiledShells = [
   [(row: Record<string, unknown>) => ({ ...row, sidecar: { note: 'personal account' } }),               'its sidecar swapped for another'],
   [(row: Record<string, unknown>) => ({ ...row, sidecar: {} }),                                           'its sidecar emptied'],
   [(row: Record<string, unknown>) => ({ ...row, sidecar: { note: ['work account'] } }),                   "its sidecar's note wrapped in a list"],
-  [({ registered_at: kept, ...row }: Record<string, unknown>) => ({ ...row, registered_at: (kept as number) - 1 }), 'its registered_at moved'],
-  [({ written_at: kept, ...row }: Record<string, unknown>) => ({ ...row, written_at: (kept as number) + 1 }),       'its written_at moved'],
+  [({ registered_at: was, ...row }: Record<string, unknown>) => ({ ...row, registered_at: (was as number) - 1 }), 'its registered_at moved'],
+  [({ written_at: was, ...row }: Record<string, unknown>) => ({ ...row, written_at: (was as number) + 1 }),       'its written_at moved'],
   [(row: Record<string, unknown>) => ({ ...row, revision_tok: 'rev-elsewhere' }),                         'its revision_tok swapped'],
 ] as const
 
