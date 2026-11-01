@@ -60,7 +60,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     })
   }
 
-  /** The proving of the stored wayin of `gate` that `cleartexts` open: the passphrase's where they carry one, else the passkey's, whose answer is spent unless refused as correctable before a key is derived from it (G2). A wayin that will not open refuses 'wrong_passphrase' or 'wrong_passkey'; an answer whose key does not open it is spent all the same. */
+  /** The proving of the stored wayin of `gate` that `cleartexts` open: the passphrase's where they carry one, else the passkey's, whose answer is spent unless refused as correctable before a key is derived from it (G2). A wayin that will not open refuses 'wrong_passphrase' or 'wrong_passkey'; an answer whose key does not open it is spent all the same. A passkey's answer for a gate with no passkey wayin refuses 'absent_wayin', spending it. */
   static attempt(stamp: VaultStamp, gate: GateProps, cleartexts: AttemptCleartexts, world: ProvingWorld): Promise<Proving> {
     return spendAnswerAfter(cleartexts, async () => {
       const { stamp: checked, gate: wayins, cleartexts: { passphrase, passkeyAnswer } } = provingAttemptArgs.parse({ stamp, gate, cleartexts, world })
