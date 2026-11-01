@@ -6,15 +6,15 @@ and tests, and matched to them only once that contract is tight.
 
 ## Read first
 
-* `whiteboard/20261028-gripeoween_vault/gripeoween_vault-consistency.md` (untracked in the base
+* `winboard/20261028-gripeoween_vault/gripeoween_vault-consistency.md` (untracked in the base
   checkout; committed on branch `20261028-gripeoween_vault`): the consensus, the six lanes, the
   versioning rules, the session guarantees and the tests that pin them, and **section 9**, which
   is this sprint's brief.
-* `whiteboard/20261028-gripeoween_vault/gripeoween_vault-plan.md`, thread 4's *Orchestrator*
+* `winboard/20261028-gripeoween_vault/gripeoween_vault-plan.md`, thread 4's *Orchestrator*
   paragraphs: the horizon names (`maxMinutesSinceRefresh`, `minMinutesToAutolock`, and their
   millis forms), `#ensureUnlocked` → `#doEnsureUnlocked` under one shape with its public verb,
   the salt (512 B) and `credential_id` (1023 B) bounds. These rulings stand.
-* `whiteboard/20261028-gripeoween/gripeoween-todo.md`: the rows that point here.
+* `winboard/20261028-gripeoween/gripeoween-todo.md`: the rows that point here.
 
 ## Open for the Coach at seed time
 

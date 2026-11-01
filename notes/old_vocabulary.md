@@ -10,10 +10,10 @@ A name in the New column that also stands in the Old one was renamed again, by t
 2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.
 The two rows on `vault_id` and `unlock_epoch` are from the rename of 2026-10-21 (better_paths,
 streamline thread 1); the rows after them, from the primitives sprint of 2026-10-22 and 23
-(`whiteboard/20261022-primitives/`); the rows after `TH.makeLatch`, from the restyle of 2026-10-26
-(`whiteboard/20261025-restyle/`); the rows on standing, from the fixup sprint of 2026-10-27
-(`whiteboard/20261027-fixup_sprint/unstanding.md`); the rows on the stores' verbs, from the catchsweep sprint of
-2026-10-28 (`whiteboard/20261027-catchsweep/`).
+(`winboard/20261022-primitives/`); the rows after `TH.makeLatch`, from the restyle of 2026-10-26
+(`winboard/20261025-restyle/`); the rows on standing, from the fixup sprint of 2026-10-27
+(`winboard/20261027-fixup_sprint/unstanding.md`); the rows on the stores' verbs, from the catchsweep sprint of
+2026-10-28 (`winboard/20261027-catchsweep/`).
 
 To be deleted at 1.0.0.
 
