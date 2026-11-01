@@ -63,7 +63,7 @@ describe("the box's whisper verbs through a real vault's lease", () => {
     expect(await box.useWhisper((whisper) => JSON.stringify(whisper))).to.eq(JSON.stringify(Whisper.val))
   })
 
-  it("keeps the exposed whisper in memory through vault.lock(), answering LOCKED until the vault unlocks again (the Coach's ruling)", async () => {
+  it("keeps the exposed whisper in memory through vault.lock(), answering LOCKED until the vault unlocks again", async () => {
     const { boxes, vault } = await sealWorld()
     const built = await boxes.build(BoxDna)
     const box = await built.expose()
