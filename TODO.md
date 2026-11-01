@@ -73,7 +73,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   container and by a contributor locally. It is what the race battery
   ([#119](https://github.com/mrflip/safebyok/pull/119)) cannot do in-process: Postgres's
   one-statement writes under concurrent connections (one `pg` pool per device) are reasoned in
-  sprint matters' thread 11 (`whiteboard/20261015-matters/thread-11-postgres_verdict.md`), not
+  sprint matters' thread 11 (`winboard/20261015-matters/thread-11-postgres_verdict.md`), not
   tested, and Convex runs against `convex-test`, not a real deployment. Decide: one image or a
   compose file of services; whether `e2e/` owns it; which suites run against it in CI and which
   stay in-process so `pnpm justify` needs no Docker.
@@ -89,7 +89,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   A connector over a list/get/put shelf writes one atomic step, and the base writes every verb on
   top of it, folding `localVaultDB` and `idbVaultDB` into it. It needs a short promise chain we
   would hand-roll, so it waits for a later design; the shared expectation checks of the store base
-  are built, and this builds on them (`whiteboard/20261016-push_to_100_a/store-base-design.md`,
+  are built, and this builds on them (`winboard/20261016-push_to_100_a/store-base-design.md`,
   while it lasts).
 
 * **A test that reads the Postgres README's route recipe.** From #252's review (the Coach took

@@ -31,7 +31,7 @@ which API key a box holds (`sk***...***wxyz`) without showing the key. `mask` is
 for plain text; calling it with arbitrary blobs may give unusual behavior. It strips every
 combining mark, so a script that writes its vowels as marks loses them (Hindi `नमस्ते` comes out as
 `नमसत`); an API key is ASCII, and is untouched.
-`whiteboard/20261013-relic/proposed-README.md` drafts the full README for when the surface
+`winboard/20261013-relic/proposed-README.md` drafts the full README for when the surface
 settles.
 
 ## Quickstart
