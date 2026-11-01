@@ -142,6 +142,28 @@ export const isDevice = (candidate: unknown): candidate is DeviceScopepath => CX
 export const isBox = (candidate: unknown): candidate is BoxScopepath => CX.boxScopepath.safeParse(candidate).success
 // --
 
+// == [Within a bank]: withinBankScopepathPrefix, withinBankScopepathPred
+
+/** The text that begins the scopepath of every vault record in the bank `scope` names, and of nothing else, for a store that reads by prefix or key range.
+ * It ends in the delimiter, so no other user whose user_id starts the same (`u12`) shares it.
+ *
+ * @example Scopepath.withinBankScopepathPrefix({ applabel: 'acme', user_id: 'u1' })   // 'vault^acme^u1^'
+ */
+export const withinBankScopepathPrefix = (scope: BankScope): string => {
+  const        { applabel, user_id } = CX.bankScope.parse(scope)
+  return ['vault', applabel, user_id].join(ScopepathDelimiter) + ScopepathDelimiter
+}
+
+/** A predicate, for filtering a list of scopepaths, true for each that begins as a vault record's in the bank `scope` names, and for nothing else.
+ *
+ * @example store.scopepaths().filter(Scopepath.withinBankScopepathPred(bankScope))   // each row under the bank's vault prefix
+ */
+export const withinBankScopepathPred = (scope: BankScope): ScopepathPred => {
+  const prefix = withinBankScopepathPrefix(scope)
+  return (candidate: unknown): candidate is VaultScopepath => typeof candidate === 'string' && candidate.startsWith(prefix)
+}
+// --
+
 // == [Within a vault]: withinVaultScopepathPrefix, withinVaultScopepathPred
 
 /** The text that begins the scopepath of every box in the vault `scope` names, and of nothing else, for a store that reads by prefix or key range.
