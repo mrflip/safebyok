@@ -129,6 +129,34 @@ branch is the local tip, and the directory holds nothing but the tip's files, `.
 `node_modules` and what the main checkout's `.gitignore` covers. Otherwise it names the strays and leaves the directory.
 By hand: confirm those same things, `rm -rf` it, `git worktree prune`.
 
+## Session dumps
+
+```
+scripts/dump-sessions.sh
+```
+
+Run in the dev container, it copies Claude Code's session records to
+`/workspace/.session-dumps/`, on the host's own disk and outside every repository. Transcripts live
+in the container's config volume, which survives a rebuild but no other container sees, and which
+ages them out by `cleanupPeriodDays`. Task output and scratchpads live in `/tmp`, which a rebuild
+erases: run this first.
+
+A dump's name, `session-dump-<volume born>-<from>-<to>.tar.gz`, is its range. Each run starts where
+the newest dump of this volume ended, and takes what changed since, so a run that finds nothing
+writes nothing. A transcript still growing is taken whole again next time: to read a session, take
+its file from the newest dump that holds it. Deleting the newest dump makes the next run take its
+range again; deleting an older one loses that range.
+
+To find and unpack a session's files, where they cannot land on the live ones:
+
+```
+for d in /workspace/.session-dumps/*.tar.gz; do tar -tzf "$d" | grep -q <session id> && echo "$d"; done
+mkdir /tmp/restored && tar -xzf <that dump> -C /tmp/restored
+```
+
+Transcripts are not scrubbed: a dump holds whatever a session read or was told, so keep it off
+anything shared. The script's header says what it leaves out.
+
 ## CLAUDE.md's long-file list
 
 CLAUDE.md's *Reading* names the files long enough that an agent should search them rather than
