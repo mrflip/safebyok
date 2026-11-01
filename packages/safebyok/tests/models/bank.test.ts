@@ -13,18 +13,18 @@ const noop = () => undefined
 
 /** The options `Bank.make` needs besides its `keyDeriver` and `strengthChecker`: stores that are never called. */
 const bankOptsOf = (overrides: Partial<BankOpts> = {}): BankOpts => ({
-  applabel:    'acme',
-  user_id:     'u1',
-  vaultStore:  { get: noop, put: noop, del: noop, watch: noop } as unknown as BankOpts['vaultStore'],
-  vaultCache:  { load: noop, save: noop } as unknown as BankOpts['vaultCache'],
-  deviceDB:    { tryGetLease: noop, tryPutLease: noop, tryDelLease: noop } as unknown as BankOpts['deviceDB'],
-  keyDeriver:  TH.testDeriver,
-  logger:      TH.spyLogger().logger,
+  applabel:         'acme',
+  user_id:          'u1',
+  vaultDB:          { get: noop, put: noop, del: noop, watch: noop } as unknown as BankOpts['vaultDB'],
+  deviceDB:         { tryGetLease: noop, tryPutLease: noop, tryDelLease: noop, vaultCache: () => ({ load: noop, save: noop }), advanceDeviceRecord: noop, clearCachedVault: noop } as unknown as BankOpts['deviceDB'],
+  keyDeriver:       TH.testDeriver,
+  requestCleartext: noop,
+  logger:           TH.spyLogger().logger,
   ...overrides,
 })
 
 /** `Bank.make` over {@link bankOptsOf}, with `change` laid over loosely, so a test can hand it what no `BankOpts` allows. */
-const makeBank = (change: Record<string, unknown> = {}): Bank => Bank.make(bankOptsOf(change as Partial<BankOpts>))
+const makeBank = (change: Record<string, unknown> = {}): Bank => Bank.make(bankOptsOf(change))
 
 const cheapDerive: KeyDeriver['deriveKeyBytes'] = (passphrase, saltBytes) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
 

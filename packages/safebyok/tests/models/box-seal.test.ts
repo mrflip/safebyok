@@ -71,7 +71,7 @@ describe("the box's whisper verbs through a real vault's lease", () => {
     expect(box.whisper).to.eq(LOCKED)
     expect(box.getSnapshot().exposed).to.be.true
     await TH.expectRefusal(box.getWhisper(), 'vault_locked')
-    await vault.ensureUnlocked(() => ({ passphrase: Passphrase }))
+    await vault.ensureUnlocked({ passphrase: Passphrase })
     expect(box.whisper).to.deep.equal(Whisper)
   })
 })
