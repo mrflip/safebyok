@@ -1,6 +1,6 @@
 # Thread 5a: devicedb (2026-11-01)
 
-Branch `20261101-devicedb`, PR (see below), stacked on #434 (`20261101-bank_eviction`).
+Branch `20261101-devicedb`, PR [#437](https://github.com/mrflip/safebyok/pull/437), stacked on [#434](https://github.com/mrflip/safebyok/pull/434) (`20261101-bank_eviction`).
 Justify: green. safebyok 4938 passed / 37 skipped; root 290; react 326; demo 230/17;
 indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e 107/116.
 
