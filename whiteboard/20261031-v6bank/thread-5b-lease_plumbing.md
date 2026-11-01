@@ -1,8 +1,7 @@
 # Thread 5b: lease_plumbing (2026-11-01)
 
-Branch `20261101-lease_plumbing`, PR [#438](https://github.com/mrflip/safebyok/pull/438), stacked on [#437](https://github.com/mrflip/safebyok/pull/437) (`20261101-devicedb`).
-Justify: green. safebyok 4961 passed / 37 skipped; root 290; react 326; demo 230/17;
-indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e 107/116.
+Branch `20261101-lease_plumbing`, PR [#438](https://github.com/mrflip/safebyok/pull/438), stacked on [#440](https://github.com/mrflip/safebyok/pull/440) (`20261101-vault_boxes`), the top of the line.
+Justify: green. safebyok 5223 passed / 37 skipped; root 290; react 326; demo 230/17; indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e 107/116.
 
 * **Built**
   * **G4 at birth** (commit 9edf2685). `VaultListing.ensure` used to take up its birth lease
@@ -28,15 +27,9 @@ indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e
       `#keepDeviceRecord` reads `.record`; the flag is unread until 7b.
   * **The filing check.** `isCopyFiledAt` now checks the scope of `central`, and of `staged`
     where non-null, against the scopepath the copy is filed under.
-  * **Tests.**
-    * `vault.test.ts`: a lock and a let-go landing mid-birth, and fetch-born take-up.
-    * `bank-close.test.ts`: `closeVault` landing mid-birth.
-    * `bank-devicedb.test.ts`: a reload over the models' `memoryDeviceDB` (hello, and a cache
-      miss), closeVault then reload, and a misfiled copy told to `onBadNews`.
-    * `devicedb.test.ts`: central and staged filing, the onBadNews telling and its check,
-      `wroteOverDamaged` true and false, and a retried update.
-    * The G4 tests and the two reload tests were red on the pre-fix `vault.ts` and
-      `vault-listing.ts`, checked by restoring them from HEAD.
+  * **Tests** in `vault.test.ts`, `bank-close.test.ts`, `bank-devicedb.test.ts` and
+    `devicedb.test.ts`; the G4 and reload tests were red on the pre-fix `vault.ts` and
+    `vault-listing.ts`.
 
 * **Decisions taken**
   * **A mid-birth lock returns the vault locked; `ensure` does not refuse.** The vault is stored,
@@ -60,8 +53,6 @@ indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e
     order.
 
 * **Discoveries**
-  * The old `memoryDeviceDB` (`src/device-db`) was still imported by vault-unlock's
-    real-deviceDB test; it now runs over `src/devicedb/memory`.
   * An `onBadNews` that throws fails the find (documented on `OnBadNews`). The bank's
     `tellBadNews` never throws, so only a host calling the DeviceDB directly could meet this.
 
@@ -99,3 +90,14 @@ indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e
   news there; the highest epoch, keyed by `vault_tok`, is still yours.
 * **For 8**: `clearCachedVault` erases lease and copy. A lock after deletion also erases the lease
   through the vault's mutex, so it queues behind any grant.
+
+* **Final rework** (2026-11-01). Rebased from the pre-restack 5a onto #440. Thread S's `#asking`,
+  3d's fetch-first `#unlockByProof`, 7a's try forms, 13's `BoxListing` and the `listedRefusal`
+  factories all stand beside 5b's substance. `ensure` now tests for the birth grant rather than
+  returning early (`sonarjs/no-invariant-returns`).
+  * **The Coach's rulings on the second review.** A close before `VaultListing.ensure` begins, and
+    the lease lock across banks, are won't-fixes: `notes/wontfix.md` has both, `TODO.md` the
+    singleton line, and `bank-close.test.ts` (*A close before ensure begins*) pins the first, over
+    fresh banks, as the same every time. `closeVault`'s doc says a vault may stay held, locked.
+  * **Siblings of that race:** [thread-5b-sibling_races.md](thread-5b-sibling_races.md), for the
+    Coach and thread 8. None fixed.
