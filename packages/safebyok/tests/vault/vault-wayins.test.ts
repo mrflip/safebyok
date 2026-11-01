@@ -154,7 +154,7 @@ describe("putWayin, with a new passphrase", () => {
     let raising: ReturnType<typeof TH.holdNextCall> | null = null
     // Past the read putWayin makes first, which raises the record too: the raise after its own write.
     TH.beforeNextCall(world.vaultDB, 'tryPutVaultRecord', () => {
-      raising = TH.holdNextCall(world.deviceDB, 'tryRaiseDeviceRecord')
+      raising = TH.holdNextCall(world.deviceDB, 'tryIncrementDeviceRecord')
       return Promise.resolve()
     })
     const putting = TH.tryPutWayin(vault, 'pw', 'pw two')

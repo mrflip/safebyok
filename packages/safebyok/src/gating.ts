@@ -193,8 +193,8 @@ export class RaisedGating implements ProvingGating {
     this.gating = this.#gatingOf(lockLanded)
   }
 
-  /** Raise a gating of `gatingkind` for `call`, not yet run: `onOver` hears it settle, before any waiter does. */
-  static raise(gatingkind: GatingKind, call: GatingCall, vault: Vault, tools: GatingTools, onOver: () => void): RaisedGating {
+  /** Make a gating of `gatingkind` for `call`, not yet run: `onOver` hears it settle, before any waiter does. */
+  static make(gatingkind: GatingKind, call: GatingCall, vault: Vault, tools: GatingTools, onOver: () => void): RaisedGating {
     return new RaisedGating(gatingkind, call, vault, tools, onOver)
   }
 

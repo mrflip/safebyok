@@ -234,7 +234,7 @@ export class Bank {
 
   /** The Vault object for the vault `bag` names, born now from one read of storage, or the one the bank holds: never absent, `novel` until its passphrase is set.
    * It says hello first. A birth reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.ensureVault`
-   * beside {@link DeviceDB.tryGetLease}, then raises the record with {@link DeviceDB.raiseDeviceRecord}.
+   * beside {@link DeviceDB.tryGetLease}, then raises the record with {@link DeviceDB.incrementDeviceRecord}.
    * `VaultDB.ensureVault` resolves the vault as stored, or stores a new, gateless one in one
    * transaction; past a tombstone, a new life, its counter carried on. A lease of the vault's ways
    * in that has not ended, and ends no later than `leaseHours` from now, is taken up: the vault is
@@ -571,9 +571,9 @@ export class Bank {
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw RefusalFuncs.vaultBehindWhileOpening() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
-    const raising = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
+    const incrementing = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
-    const record = await deviceDB.raiseDeviceRecord(raising) ?? raising
+    const record = await deviceDB.incrementDeviceRecord(incrementing) ?? incrementing
     this.#demandHeld(vaultScopepath, entry)
     const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), record, refreshedAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault

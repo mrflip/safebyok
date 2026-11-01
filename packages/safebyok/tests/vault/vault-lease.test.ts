@@ -628,7 +628,7 @@ describe("a change to the ways in, once it has landed", () => {
     const vault = await world.openUnlocked('pw one')
     // Past the read putWayin makes first, which raises the record too: the raise after its own write fails.
     TH.beforeNextCall(world.vaultDB, 'tryPutVaultRecord', () => {
-      TH.spyOnDeviceHook(world.deviceDB, 'raiseDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
+      TH.spyOnDeviceHook(world.deviceDB, 'incrementDeviceRecord').mockRejectedValueOnce(new Error('device storage is full'))
       return Promise.resolve()
     })
     await TH.putWayin(vault, 'pw one', 'pw two')

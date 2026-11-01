@@ -20,7 +20,7 @@ export const { vaultDBShape, deviceDBShape, clockShape, keyDeriverShape } = Chec
   return {
     // The public verbs the bank and its vaults call on a VaultDB, beside its being an instance of the `VaultDB` base class.
     vaultDBShape:    obj({ tryGetVault: verb, tryEnsureVault: verb, tryPutVaultRecord: verb, tryGetBox: verb, tryPutBox: verb, tryDelBox: verb, tryDelVault: verb, tryDelDamagedVault: verb, subscribe: verb }, Phrases.VaultDBShape),
-    deviceDBShape:   obj({ tryGetLease: verb, tryPutLease: verb, tryDelLease: verb, tryGetDeviceRecord: verb, tryRaiseDeviceRecord: verb, tryDelDeviceRecord: verb, tryDelAll: verb }, Phrases.DeviceDBShape),
+    deviceDBShape:   obj({ tryGetLease: verb, tryPutLease: verb, tryDelLease: verb, tryGetDeviceRecord: verb, tryIncrementDeviceRecord: verb, tryDelDeviceRecord: verb, tryDelAll: verb }, Phrases.DeviceDBShape),
     clockShape:      obj({ now: fn<Clock['now']>() }),
     keyDeriverShape: obj({
       algorithm:         str.optional(),

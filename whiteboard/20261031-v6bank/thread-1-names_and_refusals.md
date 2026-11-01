@@ -1,6 +1,6 @@
 # Thread 1: names_and_refusals (2026-11-01)
 
-Branch `20261101-names_and_refusals`, PR pending, cut from main. Justify: green.
+Branch `20261101-names_and_refusals`, PR [#426](https://github.com/mrflip/safebyok/pull/426), cut from main. Justify: green.
 
 * **Built**
   * `packages/safebyok/src/helpers/refusal-funcs.ts`: every refusal factory the models throw, in

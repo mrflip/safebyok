@@ -1119,14 +1119,14 @@ export class Vault implements VaultStamp {
 
   // == [Device record]: noteEpochSeen
 
-  /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryRaiseDeviceRecord}: never a refusal.
+  /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryIncrementDeviceRecord}: never a refusal.
    * A device store that fails to keep it is warned of: a missed raise only weakens the check for a
    * vault served behind what this device has seen, until a later read raises it.
    */
   async #noteEpochSeen(vaultEpoch: number, call: VaultCall): Promise<void> {
-    const raised = await this.#deviceDB.tryRaiseDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
-    if (raised.ok) { return }
-    this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, raised.err)
+    const incremented = await this.#deviceDB.tryIncrementDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
+    if (incremented.ok) { return }
+    this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, incremented.err)
   }
   // --
 
@@ -1214,7 +1214,7 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, raiseGating, landGating, delVault, afterDel
+  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, launchGating, landGating, delVault, afterDel
 
   // The pending gating, if any: one per vault, and every call that needs the user waits on it
   // or on its settling. See ensureUnlocked() and gatingFor().
@@ -1248,7 +1248,7 @@ export class Vault implements VaultStamp {
         continue
       }
       if (shouldAsk?.() === false) { return false }
-      const settled = await (pending ?? this.#raiseGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
+      const settled = await (pending ?? this.#launchGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
       // A let-go lands the gating as a lock does, but its waiters hear the Vault object is gone.
       this.#demandNotGone()
       valOf(settled)
@@ -1275,7 +1275,7 @@ export class Vault implements VaultStamp {
         await pending.settled
         continue
       }
-      const settled = await (pending ?? this.#raiseGating(gatingkind, call, null)).settled
+      const settled = await (pending ?? this.#launchGating(gatingkind, call, null)).settled
       // A deletion that settled leaves the Vault object gone, by design; any other waiter hears a let-go as gone.
       if (call !== 'del' || ! settled.ok) { this.#demandNotGone() }
       valOf(settled)
@@ -1283,14 +1283,14 @@ export class Vault implements VaultStamp {
     }
   }
 
-  /** Raise a gating of `gatingkind` for `call`, pending until it settles: with `renewMillis`, it first takes up a lease from this device's store when one fits (`#takeUpFromPantry`). */
-  #raiseGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): RaisedGating {
-    const raised: RaisedGating = RaisedGating.raise(gatingkind, call, this, this.#gatingTools, () => {
-      if (this.#gating === raised) { this.#gating = null }
+  /** Launch a gating of `gatingkind` for `call`, pending until it settles: with `renewMillis`, it first takes up a lease from this device's store when one fits (`#takeUpFromPantry`). */
+  #launchGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): RaisedGating {
+    const launched: RaisedGating = RaisedGating.make(gatingkind, call, this, this.#gatingTools, () => {
+      if (this.#gating === launched) { this.#gating = null }
     })
-    this.#gating = raised
-    raised.run(renewMillis)
-    return raised
+    this.#gating = launched
+    launched.run(renewMillis)
+    return launched
   }
 
   /** Land a lock, or the vault going gone, on the pending gating, if any: its waiters refuse 'vault_locked', or `told`, and its `lockLanded` settles.

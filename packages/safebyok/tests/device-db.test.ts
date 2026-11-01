@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DeviceDB, deviceRecordOf, memoryDeviceDB, raisedDeviceRecord } from '../src/device-db'
+import { DeviceDB, deviceRecordOf, memoryDeviceDB, incrementedDeviceRecord } from '../src/device-db'
 import { VaultError } from '../src/errors'
 import type { Outcome } from '../src/outcome'
 import * as Scopepath from '../src/scopepath'
@@ -30,7 +30,7 @@ describe("memoryDeviceDB", () => {
 
   it("treats a mangled device record as none, and clears it", async () => {
     const deviceDB = TH.expectingGood(memoryDeviceDB())
-    await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1', { device_id: '' }))
+    await deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1', { device_id: '' }))
     expect(await deviceDB.tryGetDeviceRecord(TH.scopeOf('u1'))).to.be.null
     expect(await deviceDB.tryGetDeviceRecord(TH.scopeOf('u1'))).to.be.null  // stays gone
   })
@@ -57,7 +57,7 @@ describe("memoryDeviceDB", () => {
       protected doPutLease(): Promise<void> { throw shelf }
       protected doDelLease(): Promise<void> { return Promise.resolve() }
       protected doGetDeviceRecord(): Promise<unknown> { return Promise.resolve(undefined) }
-      protected doRaiseDeviceRecord(): Promise<void> { return Promise.resolve() }
+      protected doIncrementDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelAll(): Promise<void> { return Promise.resolve() }
       protected doDelUnparsed(): Promise<void> { return Promise.resolve() }
@@ -79,7 +79,7 @@ describe("memoryDeviceDB", () => {
       protected doPutLease(): Promise<void> { return Promise.resolve() }
       protected doDelLease(): Promise<void> { return Promise.reject(blocked) }
       protected doGetDeviceRecord(): Promise<unknown> { return Promise.resolve(undefined) }
-      protected doRaiseDeviceRecord(): Promise<void> { return Promise.resolve() }
+      protected doIncrementDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelDeviceRecord(): Promise<void> { return Promise.resolve() }
       protected doDelAll(): Promise<void> { return Promise.resolve() }
       protected doDelUnparsed(): Promise<void> { return Promise.resolve() }
@@ -92,26 +92,26 @@ describe("memoryDeviceDB", () => {
   })
 })
 
-describe("raisedDeviceRecord", () => {
+describe("incrementedDeviceRecord", () => {
   const record: DeviceRecord = TH.deviceRecordOf('u1')
 
   it("stores the record as it came where none is stored, as its first example shows", () => {
-    expect(raisedDeviceRecord(undefined, record)).to.eq(record)
+    expect(incrementedDeviceRecord(undefined, record)).to.eq(record)
   })
 
   it("keeps the higher highest_vault_epoch where a record is stored, as its second example shows", () => {
-    expect(raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch).to.eq(5)
+    expect(incrementedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch).to.eq(5)
   })
 
   it("raises a stored record to a higher epoch, keeping its own device_id", () => {
     const stored = TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 })
-    expect(raisedDeviceRecord(stored, TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 4 })))
+    expect(incrementedDeviceRecord(stored, TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 4 })))
       .to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 4 }))
   })
 
   it("throws 'bad_record' rather than raise a stored record to an epoch that fails its check, as its doc block says: no record the core hands it carries one", () => {
     const stored = TH.deviceRecordOf('u1', { highest_vault_epoch: 2 })
-    TH.expectSyncRefusal(() => raisedDeviceRecord(stored, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
+    TH.expectSyncRefusal(() => incrementedDeviceRecord(stored, { ...record, highest_vault_epoch: 4.5 }), 'bad_record')
   })
 
   const GivesWayCases = [
@@ -123,7 +123,7 @@ describe("raisedDeviceRecord", () => {
 
   for (const [stored, blurb] of GivesWayCases) {
     it(`gives way to the record handed to it over ${blurb}`, () => {
-      expect(raisedDeviceRecord(stored, record)).to.eq(record)
+      expect(incrementedDeviceRecord(stored, record)).to.eq(record)
     })
   }
 })
@@ -179,8 +179,8 @@ describe("a device record DeviceDB resolves", () => {
 
   it("resolves a raise of a record that fails its check as none, and a sound raise over it as the sound record", async () => {
     const deviceDB = memoryDeviceDB()
-    expect(await deviceDB.raiseDeviceRecord(TH.deviceRecordOf('u1', { device_id: '' }))).to.be.null
-    expect(await deviceDB.raiseDeviceRecord(record)).to.deep.equal(record)
+    expect(await deviceDB.incrementDeviceRecord(TH.deviceRecordOf('u1', { device_id: '' }))).to.be.null
+    expect(await deviceDB.incrementDeviceRecord(record)).to.deep.equal(record)
   })
 })
 
@@ -200,7 +200,7 @@ class ScriptedDeviceDB extends DeviceDB {
   protected doPutLease(...args: unknown[]) { return this.#heard('doPutLease', args) as Promise<void> }
   protected doDelLease(...args: unknown[]) { return this.#heard('doDelLease', args) as Promise<void> }
   protected doGetDeviceRecord(...args: unknown[]) { return this.#heard('doGetDeviceRecord', args) }
-  protected doRaiseDeviceRecord(...args: unknown[]) { return this.#heard('doRaiseDeviceRecord', args) as Promise<void> }
+  protected doIncrementDeviceRecord(...args: unknown[]) { return this.#heard('doIncrementDeviceRecord', args) as Promise<void> }
   protected doDelDeviceRecord(...args: unknown[]) { return this.#heard('doDelDeviceRecord', args) as Promise<void> }
   protected doDelAll(...args: unknown[]) { return this.#heard('doDelAll', args) as Promise<void> }
   protected doDelUnparsed(...args: unknown[]) { return this.#heard('doDelUnparsed', args) as Promise<void> }
@@ -217,9 +217,9 @@ describe("DeviceDB, the base class", () => {
     const lease = await TH.leaseOf('u1')
     const answers = [
       deviceDB.tryGetLease(TH.scopeOf('u1')), deviceDB.tryPutLease(lease), deviceDB.tryDelLease(TH.scopeOf('u1')),
-      deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')), deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')), deviceDB.tryDelDeviceRecord(TH.scopeOf('u1')), deviceDB.tryDelAll(),
+      deviceDB.tryGetDeviceRecord(TH.scopeOf('u1')), deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1')), deviceDB.tryDelDeviceRecord(TH.scopeOf('u1')), deviceDB.tryDelAll(),
     ]
-    expect(deviceDB.calls).to.deep.equal(['doGetLease', 'doPutLease', 'doDelLease', 'doGetDeviceRecord', 'doRaiseDeviceRecord', 'doDelDeviceRecord', 'doDelAll'])
+    expect(deviceDB.calls).to.deep.equal(['doGetLease', 'doPutLease', 'doDelLease', 'doGetDeviceRecord', 'doIncrementDeviceRecord', 'doDelDeviceRecord', 'doDelAll'])
     await Promise.all(answers)
   })
 
@@ -234,7 +234,7 @@ describe("DeviceDB, the base class", () => {
   it("refuses a scope whose names fail their checks as 'bad_scope', before the store hears of it", async () => {
     const deviceDB = new ScriptedDeviceDB()
     await TH.expectBad(deviceDB.tryGetLease({ ...TH.scopeOf('u1'), user_id: 'u^1' }), 'bad_scope')
-    await TH.expectBad(deviceDB.tryRaiseDeviceRecord({ ...TH.deviceRecordOf('u1'), vaultlabel: 'Main' }), 'bad_scope')
+    await TH.expectBad(deviceDB.tryIncrementDeviceRecord({ ...TH.deviceRecordOf('u1'), vaultlabel: 'Main' }), 'bad_scope')
     expect(deviceDB.calls).to.deep.equal([])
   })
 
@@ -269,16 +269,16 @@ describe("DeviceDB, the base class", () => {
     expect(deviceDB.calls).to.deep.equal(['doGetLease', 'doGetDeviceRecord'])
   })
 
-  it("hands doRaiseDeviceRecord the raise as an updater, resolving what it returned", async () => {
-    let raisedFrom: ((stored: unknown) => DeviceRecord) | undefined
+  it("hands doIncrementDeviceRecord the raise as an updater, resolving what it returned", async () => {
+    let incrementedFrom: ((stored: unknown) => DeviceRecord) | undefined
     const stored = TH.deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 5 })
     const deviceDB = new ScriptedDeviceDB((_hookname, args) => {
-      raisedFrom = args[1] as (stored: unknown) => DeviceRecord
-      raisedFrom(stored)
+      incrementedFrom = args[1] as (stored: unknown) => DeviceRecord
+      incrementedFrom(stored)
     })
-    const raised = await TH.expectGood(deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 })))
-    expect(raised).to.deep.equal(stored)
-    expect(raisedFrom?.(undefined)).to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 }))
+    const incremented = await TH.expectGood(deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 })))
+    expect(incremented).to.deep.equal(stored)
+    expect(incrementedFrom?.(undefined)).to.deep.equal(TH.deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 3 }))
   })
 
   it("says a SecurityError as 'storage_blocked', keeping only the store's error's name, never rejecting", async () => {

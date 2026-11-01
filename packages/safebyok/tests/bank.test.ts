@@ -504,7 +504,7 @@ describe("a vault served behind this device's record", () => {
   it("accepts the vault storage holds once support confirms the restore, as clearCachedVault's example shows", async () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw'))
-    await TH.expectGood(world.deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1', { highest_vault_epoch: 9 })))
+    await TH.expectGood(world.deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1', { highest_vault_epoch: 9 })))
     const bank = bankIn(world)
     const err = await TH.expectRefusal(bank.ensureVault(Main), 'vault_behind')
     if (isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
@@ -550,7 +550,7 @@ describe("bank.clearCachedVault", () => {
     const bank = bankIn(world)
     await bank.ensureVault(Main)
     const otherDeviceDB = memoryDeviceDB()
-    await TH.expectGood(otherDeviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')))
+    await TH.expectGood(otherDeviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1')))
     await bank.clearCachedVault(Main, { deviceDB: otherDeviceDB })
     expect(bank.bankVaultOf(Main)).to.be.null
     const otherRecord = await TH.expectGood(otherDeviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
@@ -917,28 +917,28 @@ describe("bank.closeVault", () => {
     const bank = bankIn(world)
     const reading = TH.holdNextCall(world.deviceDB, 'getDeviceRecord')
     const ensuring = vi.spyOn(world.vaultDB, 'tryEnsureVault')
-    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
+    const incrementing = vi.spyOn(world.deviceDB, 'incrementDeviceRecord')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
     bank.closeVault(Main)
     reading.release()
     await TH.expectBad(birth, 'vault_gone')
     expect(ensuring).not.toHaveBeenCalled()
-    expect(raising).not.toHaveBeenCalled()
+    expect(incrementing).not.toHaveBeenCalled()
   })
 
   it("raises no device record and births no Vault object for a birth let go during its read of storage", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const reading = TH.holdNextCall(world.vaultDB, 'tryEnsureVault')
-    const raising = vi.spyOn(world.deviceDB, 'raiseDeviceRecord')
+    const incrementing = vi.spyOn(world.deviceDB, 'incrementDeviceRecord')
     const subscribing = vi.spyOn(world.vaultDB, 'subscribe')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
     bank.closeVault(Main)
     reading.release()
     await TH.expectBad(birth, 'vault_gone')
-    expect(raising).not.toHaveBeenCalled()
+    expect(incrementing).not.toHaveBeenCalled()
     expect(subscribing).not.toHaveBeenCalled()
   })
 })

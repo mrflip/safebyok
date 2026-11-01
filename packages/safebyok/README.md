@@ -391,8 +391,8 @@ keep records by structured clone, never as JSON.
   that fails its check reads as none, and the base class has `doDelUnparsed` discard it. That
   deletes the row only if `isSound` is still false of it as read in the same transaction, so
   a record written since the read is never lost.
-* **The device record is raised, never lowered.** `doRaiseDeviceRecord(scopepath, raisedFrom)`
-  reads the row, hands it to `raisedFrom` and writes what comes back, all in one transaction, so
+* **The device record is raised, never lowered.** `doIncrementDeviceRecord(scopepath, incrementedFrom)`
+  reads the row, hands it to `incrementedFrom` and writes what comes back, all in one transaction, so
   two tabs raising at once never lower each other's record.
 * **Calls land in the order they were made.** Each verb calls its `do*` method before awaiting
   anything, so a store that starts each call's work in the order it is called keeps that order,
@@ -422,9 +422,9 @@ class AcmeDeviceDB extends DeviceDB {
   protected async doDelDeviceRecord(deviceScopepath: string) { await (await appDB).delete('safebyok_device', deviceScopepath) }
   protected async doDelAll() { await (await appDB).clear('safebyok_device') }
 
-  protected async doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) {
+  protected async doIncrementDeviceRecord(deviceScopepath: string, incrementedFrom: (stored: unknown) => DeviceRecord) {
     const tx = (await appDB).transaction('safebyok_device', 'readwrite')   // the read and the write, in one transaction
-    await tx.store.put(raisedFrom(await tx.store.get(deviceScopepath)), deviceScopepath)
+    await tx.store.put(incrementedFrom(await tx.store.get(deviceScopepath)), deviceScopepath)
     await tx.done
   }
 

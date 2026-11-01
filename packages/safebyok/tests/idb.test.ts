@@ -63,7 +63,7 @@ describe("idbDeviceDB over storage the browser withholds", () => {
     failWritesOverQuota()
     const refused = await TH.expectBad(deviceDB.tryPutLease(await TH.leaseOf('u1')), 'storage_blocked')
     expect(refused.cause).to.be.undefined
-    await TH.expectBad(deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1')), 'storage_blocked')
     const scope = TH.scopeOf('u1')
     expect(await TH.expectGood(deviceDB.tryGetLease(scope))).to.be.null
     expect(await TH.expectGood(deviceDB.tryGetDeviceRecord(scope))).to.be.null
@@ -79,7 +79,7 @@ describe("idbDeviceDB over storage the browser withholds", () => {
     await TH.expectBad(deviceDB.tryPutLease(await TH.leaseOf('u1')), 'storage_blocked')
     await TH.expectBad(deviceDB.tryDelLease(scope), 'storage_blocked')
     await TH.expectBad(deviceDB.tryGetDeviceRecord(scope), 'storage_blocked')
-    await TH.expectBad(deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1')), 'storage_blocked')
     await TH.expectBad(deviceDB.tryDelDeviceRecord(scope), 'storage_blocked')
     await TH.expectBad(deviceDB.tryDelAll(), 'storage_blocked')
   })
@@ -134,9 +134,9 @@ describe("idbDeviceDB, two tabs raising at once", () => {
       const otherTab = idbDeviceDB({ dbName })
       const thisRecord = TH.deviceRecordOf('u1', { highest_vault_epoch: first })
       const otherRecord = TH.deviceRecordOf('u1', { highest_vault_epoch: second })
-      const [thisRaised, otherRaised] = await Promise.all([TH.expectGood(thisTab.tryRaiseDeviceRecord(thisRecord)), TH.expectGood(otherTab.tryRaiseDeviceRecord(otherRecord))])
+      const [thisIncremented, otherIncremented] = await Promise.all([TH.expectGood(thisTab.tryIncrementDeviceRecord(thisRecord)), TH.expectGood(otherTab.tryIncrementDeviceRecord(otherRecord))])
       // Each resolves what it stored: the one that landed second saw the first's raise.
-      expect(Math.max(thisRaised?.highest_vault_epoch ?? 0, otherRaised?.highest_vault_epoch ?? 0)).to.eq(7)
+      expect(Math.max(thisIncremented?.highest_vault_epoch ?? 0, otherIncremented?.highest_vault_epoch ?? 0)).to.eq(7)
       const highest = TH.deviceRecordOf('u1', { highest_vault_epoch: 7 })
       const scope = TH.scopeOf('u1')
       expect(await TH.expectGood(thisTab.tryGetDeviceRecord(scope))).to.deep.equal(highest)
@@ -275,7 +275,7 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
-    await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
+    await deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1'))
     // Even a record that would read today is swept unread: its key is not a scopepath this version files.
     await set('unlock^acme^u1^main', await TH.leaseOf('u1'), shelf)
     expect(await deviceDB.tryGetLease(TH.scopeOf('u1'))).to.be.null
@@ -289,7 +289,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
-    await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
+    await deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1'))
     await deviceDB.tryGetLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.scopepath)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])
@@ -313,7 +313,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('mark^acme^u1^main', { format: 'safebyok-mark-v1', applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }, shelf)
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
-    await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
+    await deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1'))
     await deviceDB.tryGetLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.scopepath)).to.deep.equal([Scopepath.device(TH.scopeOf('u1'))])

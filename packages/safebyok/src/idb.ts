@@ -95,8 +95,8 @@ class IdbDeviceDB extends DeviceDB {
   }
 
   // Read and written in one transaction, so two tabs raising at once never lower each other's.
-  protected async doRaiseDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, raisedFrom: (stored: unknown) => DeviceRecord): Promise<void> {
-    await update<unknown>(deviceScopepath, raisedFrom, this.#shelf())
+  protected async doIncrementDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, incrementedFrom: (stored: unknown) => DeviceRecord): Promise<void> {
+    await update<unknown>(deviceScopepath, incrementedFrom, this.#shelf())
     this.#ring()
   }
 
