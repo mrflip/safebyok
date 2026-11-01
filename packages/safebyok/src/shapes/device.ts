@@ -5,7 +5,7 @@ import * as Phrases from '../phrases'
 import { Checker, objCheck } from '../checks/validator'
 import * as FX from './fields'
 
-// == [Lease]: LeaseFormat, isLeaseKey, leaseRecord, ModelsLeaseFormat, keptLeaseRow, leaseStamp, LeaseSparse, leaseGrant
+// == [Lease]: LeaseFormat, isLeaseKey, leaseRecord, ModelsLeaseFormat, cachedLeaseRow, leaseStamp, LeaseSparse, leaseGrant
 
 /** The `format` a {@link LeaseRecord} carries, in its stamp. */
 export const LeaseFormat = 'safebyok-lease-v1'
@@ -50,7 +50,7 @@ export type LeaseRecord = Z.infer<typeof leaseRecord>
 export const ModelsLeaseFormat = 7001
 
 /** A lease row as `putLease` takes it and `getLease` answers it: a {@link LeaseRecord}, or a row of its vault's scope carrying `fmt` {@link ModelsLeaseFormat}, which only the models' `Lease.get` checks further. Its `parse` refuses 'bad_record'. */
-export const keptLeaseRow = Checker(({ obj, lit, custom, applabel, user_id, vaultlabel, vault_key_lease_wrapped }) => leaseRecord.or(obj({
+export const cachedLeaseRow = Checker(({ obj, lit, custom, applabel, user_id, vaultlabel, vault_key_lease_wrapped }) => leaseRecord.or(obj({
   fmt:       lit(ModelsLeaseFormat),
   applabel,
   user_id,
@@ -58,7 +58,7 @@ export const keptLeaseRow = Checker(({ obj, lit, custom, applabel, user_id, vaul
   lease_key: custom<CryptoKey>(isLeaseKey, Phrases.LeaseKeyExpected),
   vault_key_lease_wrapped,
 }).loose()), 'bad_record', [FX])
-export type KeptLeaseRow = Z.infer<typeof keptLeaseRow>
+export type CachedLeaseRow = Z.infer<typeof cachedLeaseRow>
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` takes it from a lease or its record, and refuses 'bad_record'.
  * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the

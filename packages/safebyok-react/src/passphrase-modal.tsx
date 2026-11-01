@@ -24,7 +24,7 @@ import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
  * passkey" comes first, and takes the focus.
  *
  * It follows the vault as it changes -- a passkey added brings its button; whether it chooses or
- * unlocks is its gating's kind, fixed when raised -- and handed another gating, it starts afresh,
+ * unlocks is its gating's kind, fixed when launched -- and handed another gating, it starts afresh,
  * keeping nothing typed for the last. Taken away, it lets go: an attempt or advice still
  * under way finishes unheard, calling `onDone` no more and showing nothing. Hidden by an
  * `<Activity>` or a Suspense boundary, it waits: what settles meanwhile, a lock landing among it,
@@ -119,7 +119,7 @@ const UnlockForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
-  // The gating's kind, fixed when it was raised: a first passphrase, or an unlock.
+  // The gating's kind, fixed when it was launched: a first passphrase, or an unlock.
   const creating = gating.gatingkind === 'initialize_gate'
   // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
   const advice = useAdvice(passphraseAdvice, vault, creating, fail)

@@ -174,7 +174,7 @@ class StringStoreVaultDB extends VaultDB {
 }
 
 /** Stored text as the JSON it holds, or as itself when it holds none: a damaged row, which the base class refuses or the listing marks. */
-const jsonOrText = (text: string): unknown => {
+export const jsonOrText = (text: string): unknown => {
   try {
     return JSON.parse(text)
   } catch {
@@ -183,7 +183,7 @@ const jsonOrText = (text: string): unknown => {
 }
 
 /** The row under `scopepath` as {@link jsonOrText} reads it, or null when there is none. */
-const getJson = (store: StringStore, scopepath: string): unknown => {
+export const getJson = (store: StringStore, scopepath: string): unknown => {
   const text = store.get(scopepath)
   return text === null ? null : jsonOrText(text)
 }

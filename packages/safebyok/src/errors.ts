@@ -15,8 +15,8 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `crypto_failed`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
- *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`,
- *   `same_passphrase`.
+ *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `declined`, `no_whisper`,
+ *   `attempt_in_flight`, `same_passphrase`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
  *   `vault_behind`, `identity_revoked`.
@@ -72,6 +72,7 @@ export const refusalKindVals = [
   'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
   'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
+  'declined',            // the user declined a gating, or its dialog closed before an attempt succeeded: nothing was unlocked or changed
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box is stored under that label
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
@@ -130,6 +131,7 @@ export const RefusalFamilyForKind = {
   vault_remade:        'condition',
   gate_moved:          'condition',
   gating_landed:       'condition',
+  declined:            'condition',
   damaged_lease:       'bad_news',
   no_whisper:          'condition',
   attempt_in_flight:   'condition',

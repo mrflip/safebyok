@@ -1,4 +1,4 @@
-import type { KeptLeaseRow, LeaseRecord, DeviceRecord } from '../../src/shapes/device'
+import type { CachedLeaseRow, LeaseRecord, DeviceRecord } from '../../src/shapes/device'
 import * as DX from '../../src/shapes/device'
 import { DeviceDB, memoryDeviceDB, type DeviceVerb } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
@@ -51,8 +51,8 @@ export const makeWorld = (defaults?: Partial<TH.BornVaultOpts>) => {
     return vault
   }
   const getLease = async (): Promise<LeaseRecord | null> => {
-    const kept = await TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
-    return kept === null ? null : DX.leaseRecord.parse(kept)
+    const cached = await TH.expectGood(deviceDB.tryGetLease(TH.scopeOf('u1')))
+    return cached === null ? null : DX.leaseRecord.parse(cached)
   }
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<TH.BornVaultOpts>) => {
@@ -70,7 +70,7 @@ const answeredNull = () => Promise.resolve(TH.good(null))
 
 /** A device store as one was written before DeviceDB was a class: an object holding the seven verbs, each answering an Outcome. */
 const plainDeviceDB = () => ({
-  tryGetLease: answeredNull, tryPutLease: answeredNull, tryDelLease: answeredNull, tryGetDeviceRecord: answeredNull, tryRaiseDeviceRecord: answeredNull, tryDelDeviceRecord: answeredNull, tryDelAll: answeredNull,
+  tryGetLease: answeredNull, tryPutLease: answeredNull, tryDelLease: answeredNull, tryGetDeviceRecord: answeredNull, tryIncrementDeviceRecord: answeredNull, tryDelDeviceRecord: answeredNull, tryDelAll: answeredNull,
 })
 
 /** Storage adapters Bank.make refuses: short of a verb the vault calls, or no DeviceDB at all. */
@@ -96,10 +96,10 @@ export const spoilableDeviceDB = () => {
   const rowsOf = (scopepath: string) => (Scopepath.isLease(scopepath) ? rows : records)
   class SpoilableDeviceDB extends DeviceDB {
     protected doGetLease(leaseScopepath: string) { return Promise.resolve(rows.get(leaseScopepath)) }
-    protected doPutLease(leaseScopepath: string, record: KeptLeaseRow) { rows.set(leaseScopepath, record); return Promise.resolve() }
+    protected doPutLease(leaseScopepath: string, record: CachedLeaseRow) { rows.set(leaseScopepath, record); return Promise.resolve() }
     protected doDelLease(leaseScopepath: string) { rows.delete(leaseScopepath); return Promise.resolve() }
     protected doGetDeviceRecord(deviceScopepath: string) { return Promise.resolve(records.get(deviceScopepath)) }
-    protected doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) { records.set(deviceScopepath, raisedFrom(records.get(deviceScopepath))); return Promise.resolve() }
+    protected doIncrementDeviceRecord(deviceScopepath: string, incrementedFrom: (stored: unknown) => DeviceRecord) { records.set(deviceScopepath, incrementedFrom(records.get(deviceScopepath))); return Promise.resolve() }
     protected doDelDeviceRecord(deviceScopepath: string) { records.delete(deviceScopepath); return Promise.resolve() }
     protected doDelAll() { rows.clear(); records.clear(); return Promise.resolve() }
     protected doDelUnparsed(scopepath: string, isSound: (row: unknown) => boolean) {
@@ -151,7 +151,7 @@ export const damagedVaultWorld = async () => {
 export const VaultDBVerbsUsed = ['tryGetVault', 'tryEnsureVault', 'tryPutVaultRecord', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'tryDelVault', 'tryDelDamagedVault', 'subscribe'] as const
 
 /** Every verb of a DeviceDB, by name: a class instance's verbs are on its prototype, where `Object.keys` never finds them. */
-export const DeviceDBVerbs = ['getLease', 'putLease', 'delLease', 'getDeviceRecord', 'raiseDeviceRecord', 'delDeviceRecord', 'delAll'] as const satisfies readonly DeviceVerb[]
+export const DeviceDBVerbs = ['getLease', 'putLease', 'delLease', 'getDeviceRecord', 'incrementDeviceRecord', 'delDeviceRecord', 'delAll'] as const satisfies readonly DeviceVerb[]
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {

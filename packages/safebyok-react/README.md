@@ -253,7 +253,7 @@ a fresh attempt:
 ## Asking for the passphrase
 
 Data calls never contain UI: a call that needs the vault unlocked and finds it locked (or `novel`,
-with no passphrase yet) raises a gating, handed to the vault's `requestCleartext`, which the provider is unless you pass your own.
+with no passphrase yet) launches a gating, handed to the vault's `requestCleartext`, which the provider is unless you pass your own.
 So a component just calls the vault, and the dialog comes up on its own:
 
 ```tsx
@@ -276,10 +276,10 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
 * **Unlock ahead of time** with `vault.ensureUnlocked()` on a button: `onClick={() => { void
   vault.tryEnsureUnlocked() }}`; `vault.ensureUnlocked({ renewMinutes: 60 })` asks now if the
   lease ends within the hour.
-* **Changes to the ways in, and deleting the vault**, raise gatings of their own kinds:
-  `vault.putWayin('passphrase')` raises `change_passphrase` (`initialize_gate` on a vault with no
-  passphrase yet), `vault.putWayin('passkey')` raises `put_passkey`, `vault.delWayin('passkey')`
-  raises `del_passkey`, and `vault.del()` raises `del_vault`. The provider's dialog asks for each,
+* **Changes to the ways in, and deleting the vault**, launch gatings of their own kinds:
+  `vault.putWayin('passphrase')` launches `change_passphrase` (`initialize_gate` on a vault with no
+  passphrase yet), `vault.putWayin('passkey')` launches `put_passkey`, `vault.delWayin('passkey')`
+  launches `del_passkey`, and `vault.del()` launches `del_vault`. The provider's dialog asks for each,
   proven by the passphrase; cancelled, the call refuses `vault_locked`, its message saying what
   is unchanged ("The passphrase is unchanged.", "Nothing was deleted."), and nothing was changed.
   `vault.putWayin('passkey')` on a vault with no passphrase yet refuses `absent_vault`, asking
@@ -352,7 +352,7 @@ opening fails*, above), where it fires on every load, before any user has typed 
 ## Starting over
 
 A forgotten passphrase cannot be recovered: the vault and its whispers are gone with it. Deleting
-a vault is proven by its passphrase (`vault.del()` raises a `del_vault` gating), so a user who has
+a vault is proven by its passphrase (`vault.del()` launches a `del_vault` gating), so a user who has
 forgotten it cannot delete it from the dialog: "Forgot it? Start a new vault" is not offered for
 now, and `allowStartOver` and `onStartedOver` are taken and do nothing. A vault with a passkey
 still unlocks with it.
@@ -492,13 +492,13 @@ alike: a security key's `hmac-secret` is what PRF runs on).
 import { askPasskey, createPasskey, passkeysAvailable } from 'safebyok-react'
 
 // Putting one asks for the passphrase as proof, even while unlocked: the vault keeps no copy of
-// its vaultKey to wrap anew. vault.putWayin('passkey') raises a put_passkey gating; in your
+// its vaultKey to wrap anew. vault.putWayin('passkey') launches a put_passkey gating; in your
 // dialog for it, make the passkey first, then attempt with the passphrase. A vault holds at most
 // one passkey: putting another replaces it.
 const answer = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
 if (answer !== null) { await gating.attempt(passphrase, answer) }   // null: the user dismissed the prompt
 
-// Removing it, again with the passphrase as proof: vault.delWayin('passkey') raises del_passkey.
+// Removing it, again with the passphrase as proof: vault.delWayin('passkey') launches del_passkey.
 
 // Unlocking, inside an unlock_vault gating's dialog of your own: the browser asks the user to
 // touch the vault's passkey, and it answers.
@@ -540,7 +540,7 @@ if (passkey !== null) { const { ok } = await gating.attemptPasskey(passkey) }
   named for the `applabel`, at the page's own domain. It keeps no answer across attempts: after a
   typo, the next submit makes another passkey, and the first stays on the authenticator, unused.
 * **A passkey unlocks; only the passphrase changes things.** `vault.putWayin('passphrase')`,
-  `vault.putWayin('passkey')` and `vault.delWayin('passkey')` each raise a gating whose attempt
+  `vault.putWayin('passkey')` and `vault.delWayin('passkey')` each launch a gating whose attempt
   takes the current passphrase as proof, never a passkey's answer. A user who forgot the passphrase can still unlock
   with the passkey, but can set a new passphrase only by starting over (*Starting over*, above).
   A new passphrase removes the passkey, which was matched to the old one: offer to add it again,
