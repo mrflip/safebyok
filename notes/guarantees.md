@@ -210,12 +210,14 @@ another attempt runs, or when a lock lands first. Only a refusal the user can co
 unspent, for the host to hand in again or zero. The models hold to the same rule: each export
 that takes cleartexts runs through `spendAnswerAfter` (`models/proving.ts`), which spends the
 answer unless the export refused as `isCorrectable` says, a kind in `correctableKindVals`
-(`models/models-shapes.ts`); a call that joins an unlock in flight spends its answer untried
+(`models/models-shapes.ts`); an answer that derived a key is spent all the same, so a
+'wrong_passkey' from a key that does not open the wayin (`Proving.attempt`) leaves it spent, as
+the core's `seal` does; a call that joins an unlock in flight spends its answer untried
 (`models/vault.ts`, `#joinUnlocking`); and `attemptPasskey` on a gating whose kind a passkey does
 not prove spends it (`models/gating.ts`). `spendPrfBytes` zeroes bytes by the tag the checker
-tests (`isBytes`), so PRF bytes made in another realm are zeroed too. *Caveat:* that zeroing is then the host's;
-`safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a hidden dialog to
-show again. The passkeyKey is HKDF-SHA256 of those bytes, its
+tests (`isBytes`), so PRF bytes made in another realm are zeroed too. *Caveat:* that zeroing is
+then the host's; `safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a
+hidden dialog to show again. The passkeyKey is HKDF-SHA256 of those bytes, its
 `info` the wayin's whole ctx, derived non-extractable (`deriveWrappingKey`). The result, the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`proving.ts` header). Bytes refused before import: anything but

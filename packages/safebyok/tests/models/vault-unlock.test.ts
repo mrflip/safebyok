@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { makeLeaseKey } from '../../src/crypto'
+import { makeLeaseKey, randomBytes } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { Lease } from '../../src/models/lease'
 import { NOVEL, Proving } from '../../src/models/proving'
@@ -254,6 +254,14 @@ describe("Vault.ensureUnlocked(cleartexts): the passkey answer handed in", () =>
     const wrong = { passkeyAnswer: await TH.passkeyOf('phone') }
     await TH.expectRefusal(vault.ensureUnlocked(wrong), 'wrong_passkey')
     expect(isZeroed(wrong.passkeyAnswer.prfBytes)).to.be.false
+  })
+
+  it("is spent by a 'wrong_passkey' whose bytes, for the right credential and salt, derived a key that does not open the passkey wayin (G2)", async () => {
+    const { vault } = await makeBornVault({ passphrase: Passphrase, passkeyAnswer: await TH.passkeyOf('laptop') })
+    vault.lock()
+    const otherBytes = { passkeyAnswer: { ...await TH.passkeyOf('laptop'), prfBytes: randomBytes(32) } }
+    await TH.expectRefusal(vault.ensureUnlocked(otherBytes), 'wrong_passkey')
+    expect(isZeroed(otherBytes.passkeyAnswer.prfBytes)).to.be.true
   })
 
   it("is spent unused when the call joins an unlock in flight, even one refused as correctable (G2)", async () => {

@@ -211,8 +211,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else `cleartexts`, else by asking the user through an 'unlock_vault' gating. A lease held past its time locks the vault first.
    * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by
    * calling again; cleartexts it handed are spent unused (G2). Wrong cleartexts refuse
-   * 'wrong_passphrase' or 'wrong_passkey', leaving a passkey's answer unspent; a gating the user
-   * declines, 'vault_locked'.
+   * 'wrong_passphrase' or 'wrong_passkey', leaving unspent a passkey's answer for another passkey
+   * or salt; a gating the user declines, 'vault_locked'.
    */
   ensureUnlocked(cleartexts?: AttemptCleartexts): Promise<Lease> {
     return spendAnswerAfter(cleartexts, async () => {
