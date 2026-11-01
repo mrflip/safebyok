@@ -831,3 +831,14 @@ describe("MSX.vaultPatch: the duckish of a vault's patch, which Vault.isFullPatc
     expectTypeOf<MSX.VaultRecord>().toExtend<VaultPatch>()
   })
 })
+
+describe("MSX.modelsRefusalKindVals", () => {
+  it("lists each refusalkind once, every correctable kind among them", () => {
+    expect(new Set(MSX.modelsRefusalKindVals).size).to.eq(MSX.modelsRefusalKindVals.length)
+    expect(MSX.modelsRefusalKindVals).to.include.members([...MSX.correctableKindVals])
+  })
+
+  it("lists the kinds the vault verbs will throw, and 'declined', which a gating does", () => {
+    expect(MSX.modelsRefusalKindVals).to.include.members(['declined', 'identity_revoked', 'vault_behind', 'vault_gone', 'vault_remade', 'damaged_wayin'])
+  })
+})

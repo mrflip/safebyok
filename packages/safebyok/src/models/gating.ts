@@ -2,6 +2,7 @@ import { Checkers } from '../checks/validator'
 import { deferred } from '../helpers/deferred'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { adorn, tattoo } from '../helpers'
+import { isVaultError } from '../errors'
 import type { VaultLogger } from '../logger'
 import { type Outcome, bad, good, outcomeOf, valOf } from '../outcome'
 import * as VX from '../shapes/vault'
@@ -97,9 +98,9 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
 
   /** Ask the user for cleartext through the world's {@link RequestCleartext}, and resolve the vault once an attempt succeeds.
-   * Answers as soon as the gating settles, the dialog open or not. Refuses 'vault_locked' when the
+   * Answers as soon as the gating settles, the dialog open or not. Refuses 'declined' when the
    * user declines, or the host's dialog closes with the gating still open; 'unexpected_error' when
-   * `requestCleartext` throws; and as the verb refused when an attempt settles it.
+   * `requestCleartext` throws; and as the attempt refused when an attempt settles it.
    */
   static async launch<KindT extends GatingKind>(gatingkind: KindT, opts: GatingOpts<KindT>): Promise<Vault> {
     const gating = new Gating(gatingkind, opts)
@@ -117,8 +118,10 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   /** Run the gated verb with `cleartexts`, resolving the vault, after any attempt in flight.
    * A correctable refusal ('wrong_passphrase', 'wrong_passkey', 'weak_passphrase',
    * 'same_passphrase') leaves the gating open, and a passkey's answer unspent, for the host to hand
-   * in again or zero; any other outcome settles the gating and spends the answer (G2). An attempt
-   * on a gating settled refuses 'gating_landed'.
+   * in again or zero; any other outcome settles the gating and spends the answer (G2). A
+   * 'wrong_passkey' from a vault whose passkey changed since the gating launched refuses
+   * 'gate_moved' instead, as {@link Gating.passkeyHeader} asks for a passkey the vault no longer
+   * has. An attempt on a gating settled refuses 'gating_landed'.
    */
   attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Vault> {
     return spendAnswerAfter(cleartexts, async () => valOf(await this.#inTurn(() => this.#attemptOnce(cleartexts))))
@@ -141,7 +144,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   /** The vault a passkey's attempt resolves, as an {@link Outcome}: the non-throwing form of {@link Gating.attemptPasskey}. */
   tryAttemptPasskey(this: Gating<PasskeyGatingKind>, passkeyAnswer: VX.PasskeyAnswer): Promise<Outcome<Vault>> { return outcomeOf(() => this.attemptPasskey(passkeyAnswer)) }
 
-  /** Settle the gating as declined, once any attempt in flight has run: the gated verb refuses 'vault_locked'. A gating settled already stays as it settled. */
+  /** Settle the gating as declined, once any attempt in flight has run: the gated verb refuses 'declined'. A gating settled already stays as it settled. */
   decline(): void { this.#settleInTurn(bad(RefusalFuncs.gatingDeclined())) }
 
   /** Hand `passphrase` to the host's `strengthChecker`, as an attempt would, without running the verb: a weak one refuses 'weak_passphrase', with the checker's reason. */
@@ -154,9 +157,22 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 
   async #attemptOnce(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome<Vault>> {
     if (this.#outcome !== null) { return bad(RefusalFuncs.gatingSettled()) }
-    const outcome = await outcomeOf(() => this.#run(cleartexts))
+    const outcome = this.#judgedAgainstLaunch(await outcomeOf(() => this.#run(cleartexts)))
     if (outcome.ok || ! MSX.isCorrectable(outcome.err)) { this.#settleOnce(outcome) }
     return outcome
+  }
+
+  // A passkey refused by a vault whose passkey changed since launch is no slip the user can correct: the dialog asks for a passkey the vault no longer has.
+  #judgedAgainstLaunch(outcome: Outcome<Vault>): Outcome<Vault> {
+    if (outcome.ok || ! isVaultError(outcome.err, 'wrong_passkey') || ! this.#isPasskeyMovedSinceLaunch()) { return outcome }
+    return bad(RefusalFuncs.passkeyMovedSinceLaunch())
+  }
+
+  #isPasskeyMovedSinceLaunch(): boolean {
+    const { vault, passkeyHeader: launched } = this
+    if (vault?.isFull !== true) { return false }
+    const current = vault.gate.passkeyHeader
+    return launched?.credential_id !== current?.credential_id || launched?.prf_salt_b64 !== current?.prf_salt_b64
   }
 
   // The dialog closing settles a gating still open, as a decline does.

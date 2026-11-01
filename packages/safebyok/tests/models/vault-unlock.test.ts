@@ -51,9 +51,9 @@ describe("Gate.attemptProof and Proving.attempt: the proving of a stored wayin t
     await TH.expectRefusal(vault.gate.attemptProof({ passkeyAnswer: await TH.passkeyOf('laptop', otherSalt) }, world), 'wrong_passkey')
   })
 
-  it("refuses 'wrong_passkey' a passkey where the gate has no passkey wayin, and 'bad_option' a proof that hands neither", async () => {
+  it("refuses 'absent_wayin' a passkey where the gate has no passkey wayin, and 'bad_option' a proof that hands neither", async () => {
     const { vault, opts: { world } } = await makeBornVault()
-    await TH.expectRefusal(vault.gate.attemptProof({ passkeyAnswer: await TH.passkeyOf('laptop') }, world), 'wrong_passkey')
+    await TH.expectRefusal(vault.gate.attemptProof({ passkeyAnswer: await TH.passkeyOf('laptop') }, world), 'absent_wayin')
     await TH.expectRefusal(vault.gate.attemptProof({}, world), 'bad_option')
   })
 })
@@ -88,14 +88,14 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(lease.unsealWith(await seal(lease), BoxKeyStamp, {}), 'bad_option')
   })
 
-  it("locks at `lock()`, erasing the kept lease; then refuses 'vault_locked' when the user declines, the proof's own refusal with a wrong one, and unlocks with the right one", async () => {
+  it("locks at `lock()`, erasing the kept lease; then refuses 'declined' when the user declines, the proof's own refusal with a wrong one, and unlocks with the right one", async () => {
     const { vault, deviceDB, requestCleartext } = await makeBornVault()
     const born = vault.demandLease()
     vault.lock()
     expect(vault.isLocked).to.be.true
     TH.expectSyncRefusal(() => vault.demandLease(), 'vault_locked')
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'declined')
     await TH.expectRefusal(vault.ensureUnlocked(byPassphrase('not the passphrase')), 'wrong_passphrase')
     expect(vault.isLocked).to.be.true
     const lease = await vault.ensureUnlocked(byPassphrase(Passphrase))
@@ -126,7 +126,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(born.isInForce).to.be.false
     await TH.expectRefusal(seal(born), 'vault_locked')
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'declined')
     expect(requestCleartext.mock.calls.map(([gating]) => gating.gatingkind)).to.deep.equal(['unlock_vault'])
     expect(vault.isLocked).to.be.true
     const lease = await vault.ensureUnlocked(byPassphrase(Passphrase))
@@ -299,7 +299,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     expect(again.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.be.null
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
   })
 
   it("drops a kept lease that will not open at its first seal: the seal refuses 'damaged_lease', the vault locks, and the record is erased", async () => {
@@ -328,7 +328,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     const again = await later.build(record)
     await later.hello()
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
     const lease = await vault.ensureUnlocked(byPassphrase(Passphrase))
     const taken = await again.ensureUnlocked()
     expect(again.demandLease()).to.equal(taken)
@@ -361,7 +361,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     await later.hello()
     expect(again.isLocked).to.be.true
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
   })
 })
 

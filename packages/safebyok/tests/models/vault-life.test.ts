@@ -66,7 +66,7 @@ describe("Locking, and the sessions after it on this device", () => {
     const box = await boxIn(again)
     await TH.expectRefusal(box.unsealWhisper(), 'vault_locked')
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
     await TH.expectRefusal(again.ensureUnlocked(byPassphrase('not the passphrase')), 'wrong_passphrase')
     await again.ensureUnlocked(byPassphrase(Passphrase))
     expect(await box.unsealWhisper()).to.deep.equal(Whisper)
@@ -83,7 +83,7 @@ describe("Locking, and the sessions after it on this device", () => {
     const third = await openNextSession()
     expect(third.vault.isLocked).to.be.true
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(third.vault.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(third.vault.ensureUnlocked(), 'declined')
     await third.vault.ensureUnlocked(byPassphrase(Passphrase))
     expect(await unsealIn(third.vault)).to.deep.equal(Whisper)
   })
@@ -120,7 +120,7 @@ describe("The autolock, with a box in hand", () => {
     const { vault: again } = await openNextSession()
     expect(again.isLocked).to.be.true
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
   })
 
   it("keeps the exposed whisper through the autolock, as locking forgets nothing the box exposed: unlocked again by the passphrase, under a lease that runs from the new unlock, the box answers it again", async () => {
@@ -167,7 +167,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     expect(await unsealIn(again)).to.deep.equal(Whisper)
   })
 
-  it("revokes the passkey: the passkey's lease held through the revoke still seals; the next session's passkey refuses 'wrong_passkey', and the passphrase opens what that lease sealed", async () => {
+  it("revokes the passkey: the passkey's lease held through the revoke still seals; the next session's passkey refuses 'absent_wayin', and the passphrase opens what that lease sealed", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     vault.lock()
     const passkeyLease = await vault.ensureUnlocked(await byPasskey('laptop'))
@@ -177,7 +177,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
-    await TH.expectRefusal(again.ensureUnlocked(await byPasskey('laptop')), 'wrong_passkey')
+    await TH.expectRefusal(again.ensureUnlocked(await byPasskey('laptop')), 'absent_wayin')
     await again.ensureUnlocked(byPassphrase(Passphrase))
     expect(await unsealIn(again)).to.deep.equal(NewWhisper)
   })
@@ -197,7 +197,7 @@ describe("Another device, over the same vaultDB and boxes", () => {
     const other = await openOtherDevice(demandStored())
     expect(other.vault.isLocked).to.be.true
     other.requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(other.vault.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(other.vault.ensureUnlocked(), 'declined')
     await other.vault.ensureUnlocked(byPassphrase(Passphrase))
     expect(other.deviceDB.cachedNow()).not.to.be.null
     expect(await unsealIn(other.vault)).to.deep.equal(Whisper)

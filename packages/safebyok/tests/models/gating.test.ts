@@ -10,7 +10,7 @@ import * as TH from '../test-helpers'
 import { quietLogger } from '../test-helpers/logging'
 import { isZeroed } from '../test-helpers/proving-world'
 import { type Outcome, outcomeOf } from '../../src/outcome'
-import { Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -62,6 +62,16 @@ const touchPasskey = (tag: string, handed: PasskeyAnswer[]) => async (gating: An
   await held.attemptPasskey(passkeyAnswer)
 }
 
+/** Another device revokes the laptop's passkey, adding the passkey `tag` names in its place unless it is null, and `born`'s vault fetches the record it stored. */
+const replacePasskeyElsewhere = async (born: Awaited<ReturnType<typeof makeBornVaultWithPasskey>>, tag: string | null) => {
+  const other = makeVaultWorld(born.demandStored(), { device_id: 'device-2' })
+  const theirs = await other.listing.build(other.demandStored())
+  await theirs.revokePasskey(byPassphrase(Passphrase))
+  if (tag !== null) { await theirs.addPasskey({ passphrase: Passphrase, passkeyAnswer: await TH.passkeyOf(tag) }) }
+  born.storeBehindOurBack(other.demandStored())
+  await born.vault.fetch()
+}
+
 describe("Gating.launch(gatingkind, opts): what the host is handed", () => {
   it("hands requestCleartext an open gating of the kind and scope, for the vault given", async () => {
     const { vault } = await makeBornVault()
@@ -100,7 +110,7 @@ describe("Gating.launch(gatingkind, opts): what the host is handed", () => {
       const held = await gating
       expect(held.provedBy).to.deep.equal(provedBy)
       close()
-      await TH.expectRefusal(launched, 'vault_locked')
+      await TH.expectRefusal(launched, 'declined')
     })
   }
 })
@@ -219,22 +229,22 @@ describe("gating.attempt(cleartexts): the ask loop", () => {
 })
 
 describe("Settling a gating without an attempt", () => {
-  it("refuses the launch 'vault_locked' when the host declines, and an attempt after as 'gating_landed'", async () => {
+  it("refuses the launch 'declined' when the host declines, and an attempt after as 'gating_landed'", async () => {
     const { gating, run, launched, close } = launchHeld()
     const held = await asUnlock(gating)
     held.decline()
-    await TH.expectBad(launched, 'vault_locked')
+    await TH.expectBad(launched, 'declined')
     expect(held.isOpen).to.be.false
     await TH.expectRefusal(held.attempt({ passphrase: Passphrase }), 'gating_landed')
     expect(run).not.toHaveBeenCalled()
     close()
   })
 
-  it("refuses the launch 'vault_locked' when requestCleartext resolves with the gating still open", async () => {
+  it("refuses the launch 'declined' when requestCleartext resolves with the gating still open", async () => {
     const { gating, launched, close } = launchHeld()
     const held = await gating
     close()
-    await TH.expectBad(launched, 'vault_locked')
+    await TH.expectBad(launched, 'declined')
     expect(held.isOpen).to.be.false
   })
 
@@ -292,7 +302,7 @@ describe("gating.attemptPasskey(passkeyAnswer): the passkey path", () => {
     for (const { vault, requestCleartext } of [await makeBornVaultWithPasskey(), await makeBornVault()]) {
       vault.lock()
       requestCleartext.mockImplementationOnce(peekAndDecline)
-      await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+      await TH.expectRefusal(vault.ensureUnlocked(), 'declined')
     }
     expect(seen[0]).to.deep.include({ wayinkind: 'passkey', credential_id: laptop.credential_id, prf_salt_b64: laptop.prf_salt_b64 })
     expect(Object.isFrozen(seen[0])).to.be.true
@@ -341,6 +351,45 @@ describe("gating.attemptPasskey(passkeyAnswer): the passkey path", () => {
     expect(seen.isOpen).to.be.false
   })
 
+  const MovedCases = [
+    ["phone", "gate_moved",   'a passkey the vault no longer has, another in its place'],
+    [null,    "absent_wayin", 'a passkey revoked, none in its place'],
+  ] as const
+  for (const [tag, refusalkind, blurb] of MovedCases) {
+    it(`refuses '${refusalkind}' the passkey the gating launched asking for, after another device puts ${blurb}, settling the gating and spending the answer (G2)`, async () => {
+      const born = await makeBornVaultWithPasskey()
+      born.vault.lock()
+      const laptop = await TH.passkeyOf('laptop')
+      const seen: { outcome?: Outcome<Vault>, isOpen?: boolean } = {}
+      born.requestCleartext.mockImplementationOnce(async (gating: AnyGating) => {
+        const held = await asUnlock(Promise.resolve(gating))
+        await replacePasskeyElsewhere(born, tag)
+        seen.outcome = await held.tryAttemptPasskey(laptop)
+        seen.isOpen = held.isOpen
+      })
+      await TH.expectRefusal(born.vault.ensureUnlocked(), refusalkind)
+      expect(seen.outcome?.err?.refusalkind).to.eq(refusalkind)
+      expect(seen.isOpen).to.be.false
+      expect(isZeroed(laptop.prfBytes)).to.be.true
+    })
+  }
+
+  it("refuses 'absent_wayin' a passkey offered to a vault with none, settling the gating and spending the answer (G2)", async () => {
+    const { vault, requestCleartext } = await makeBornVault()
+    vault.lock()
+    const laptop = await TH.passkeyOf('laptop')
+    const seen: { outcome?: Outcome<Vault>, isOpen?: boolean } = {}
+    requestCleartext.mockImplementationOnce(async (gating: AnyGating) => {
+      const held = await asUnlock(Promise.resolve(gating))
+      seen.outcome = await held.tryAttemptPasskey(laptop)
+      seen.isOpen = held.isOpen
+    })
+    await TH.expectRefusal(vault.ensureUnlocked(), 'absent_wayin')
+    expect(seen.outcome?.err?.refusalkind).to.eq('absent_wayin')
+    expect(seen.isOpen).to.be.false
+    expect(isZeroed(laptop.prfBytes)).to.be.true
+  })
+
   it("refuses 'bad_option' on a kind a passkey does not prove, running nothing, leaving the gating open, and spending the answer (G2)", async () => {
     const { requestCleartext, gating, close } = heldDialog()
     const run = vi.fn((_cleartexts: unknown): Promise<Vault> => Promise.resolve(Resolved))
@@ -352,7 +401,7 @@ describe("gating.attemptPasskey(passkeyAnswer): the passkey path", () => {
     expect(held.isOpen).to.be.true
     expect(isZeroed(passkeyAnswer.prfBytes)).to.be.true
     close()
-    await TH.expectBad(launched, 'vault_locked')
+    await TH.expectBad(launched, 'declined')
   })
 
   it("is offered only on the kinds a passkey proves: 'unlock_vault' alone", () => {
@@ -383,7 +432,7 @@ describe("gating.checkStrength(passphrase)", () => {
     expect(run).not.toHaveBeenCalled()
     expect(held.isOpen).to.be.true
     close()
-    await TH.expectRefusal(launched, 'vault_locked')
+    await TH.expectRefusal(launched, 'declined')
   })
 
   it("refuses a weak passphrase 'weak_passphrase' with the checker's reason, leaving the gating open; tryCheckStrength answers it as an Outcome", async () => {
@@ -395,6 +444,6 @@ describe("gating.checkStrength(passphrase)", () => {
     await TH.expectBad(held.tryCheckStrength('pw'), 'weak_passphrase')
     expect(held.isOpen).to.be.true
     close()
-    await TH.expectRefusal(launched, 'vault_locked')
+    await TH.expectRefusal(launched, 'declined')
   })
 })

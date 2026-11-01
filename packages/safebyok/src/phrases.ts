@@ -425,7 +425,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, PasskeyProvesNot, RequestCleartextThrew, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, PasskeyProvesNot, PasskeyMovedSinceLaunch, GateMadeElsewhere, RequestCleartextThrew, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -436,6 +436,10 @@ export const GatingDeclined = "The prompt was declined, or closed before an atte
 export const GatingSettled = "This prompt has ended -- it was answered, declined, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
 export const PasskeyProvesNot = "A passkey does not prove this kind of prompt, so nothing was attempted: ask for the passphrase, as the prompt's provedBy says."
+
+export const PasskeyMovedSinceLaunch = "This vault's passkey changed since the prompt opened, on this device or another, so the passkey it asked for is not the vault's now, and nothing was unlocked: ask again, and the new prompt asks for the passkey the vault has."
+
+export const GateMadeElsewhere = "This vault's passphrase was just set on another device, so the one entered here was not set, and nothing was changed. Enter the passphrase chosen there to unlock it."
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 

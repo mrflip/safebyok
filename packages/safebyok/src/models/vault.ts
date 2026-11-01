@@ -212,7 +212,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
    * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by
    * calling again; cleartexts it handed are spent unused (G2). Wrong cleartexts refuse
    * 'wrong_passphrase' or 'wrong_passkey', leaving unspent a passkey's answer for another passkey
-   * or salt; a gating the user declines, 'vault_locked'.
+   * or salt; a passkey's answer for a vault with no passkey, 'absent_wayin'; a gating the user
+   * declines, 'declined'.
    */
   ensureUnlocked(cleartexts?: AttemptCleartexts): Promise<Lease> {
     return spendAnswerAfter(cleartexts, async () => {

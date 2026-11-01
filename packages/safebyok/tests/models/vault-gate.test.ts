@@ -117,11 +117,11 @@ describe("Vault.replacePassphrase(), asking the user", () => {
     await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
   })
 
-  it("refuses 'vault_locked' when the user declines, storing nothing", async () => {
+  it("refuses 'declined' when the user declines, storing nothing", async () => {
     const { vault, storedNow, requestCleartext } = await makeBornVault()
     const ante = storedNow()
     requestCleartext.mockImplementationOnce(declineAtOnce)
-    await TH.expectRefusal(vault.replacePassphrase(), 'vault_locked')
+    await TH.expectRefusal(vault.replacePassphrase(), 'declined')
     expect(storedNow()).to.equal(ante)
   })
 })
@@ -181,12 +181,12 @@ describe("Vault.addPasskey", () => {
 })
 
 describe("Vault.revokePasskey", () => {
-  it("revokes the passkey: the gate holds none, the passkey refuses 'wrong_passkey', and the passphrase still opens", async () => {
+  it("revokes the passkey: the gate holds none, the passkey refuses 'absent_wayin', and the passphrase still opens", async () => {
     const { vault, demandStored, opts: { world } } = await makeBornVaultWithPasskey()
     const ante = demandStored().gate
     await vault.revokePasskey(byPassphrase(Passphrase))
     expect(demandStored().gate).to.deep.equal({ passphrase_wayin: ante.passphrase_wayin, passkey_wayin: null })
-    await TH.expectRefusal(vault.gate.attemptProof(await byPasskey('laptop'), world), 'wrong_passkey')
+    await TH.expectRefusal(vault.gate.attemptProof(await byPasskey('laptop'), world), 'absent_wayin')
     const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
     expect(proving.wayinkind).to.eq('passphrase')
   })

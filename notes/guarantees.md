@@ -213,8 +213,10 @@ answer unless the export refused as `isCorrectable` says, a kind in `correctable
 (`models/models-shapes.ts`); an answer that derived a key is spent all the same, so a
 'wrong_passkey' from a key that does not open the wayin (`Proving.attempt`) leaves it spent, as
 the core's `seal` does; a call that joins an unlock in flight spends its answer untried
-(`models/vault.ts`, `#joinUnlocking`); and `attemptPasskey` on a gating whose kind a passkey does
-not prove spends it (`models/gating.ts`). `spendPrfBytes` zeroes bytes by the tag the checker
+(`models/vault.ts`, `#joinUnlocking`); `attemptPasskey` on a gating whose kind a passkey does
+not prove spends it (`models/gating.ts`); and so does a passkey offered to a vault with none
+(`absent_wayin`, `PasskeyProving.ofWayin`), or refused by a vault whose passkey changed since its
+gating launched (`gate_moved`, `Gating.#judgedAgainstLaunch`), neither a slip the user can correct. `spendPrfBytes` zeroes bytes by the tag the checker
 tests (`isBytes`), so PRF bytes made in another realm are zeroed too. *Caveat:* that zeroing is
 then the host's; `safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a
 hidden dialog to show again. The passkeyKey is HKDF-SHA256 of those bytes, its
@@ -276,7 +278,10 @@ lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests
 *no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
-logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). A WebCrypto
+logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In the
+models, `requestCleartext`'s throw is replaced at `tryHearRequestCleartext` (`models/gating.ts`) by
+`requestCleartextThrew`, kind only; a decline is no relabel there, but a refusal of its own,
+`declined`, made fresh by `gatingDeclined` when the user declines or the dialog closes open. A WebCrypto
 failure is caught and replaced, its error never kept: `wrongProof`, `damaged_lease` and
 `damaged_box` where a wrong key or an altered record explains it, and `crypto_failed`
 (`Lease.cipheredWith`) for a key made, wrapped or a cipher under fresh keys that failed all the

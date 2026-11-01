@@ -154,7 +154,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
     })
   }
 
-  /** The proving of the stored passkey wayin; an answer for another credential or salt, or a vault with no passkey wayin, refuses 'wrong_passkey', leaving the answer unspent (G2). Opening it is the caller's. */
+  /** The proving of the stored passkey wayin; an answer for another credential or salt refuses 'wrong_passkey', leaving the answer unspent (G2), and a vault with no passkey wayin 'absent_wayin', spending it. Opening it is the caller's. */
   static ofWayin(stamp: VaultStamp, stored: PasskeyWayinRecord | null, passkeyAnswer: unknown): Promise<PasskeyProving> {
     return spendAnswerAfter({ passkeyAnswer }, async () => {
       if (stored === null) { throw RefusalFuncs.noPasskeyWayin() }
