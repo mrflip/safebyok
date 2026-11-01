@@ -3,14 +3,15 @@ import { memoryDeviceDB } from '../../src/devicedb/memory'
 import { VaultError } from '../../src/errors'
 import type { BankVaultDB } from '../../src/models/bank'
 import type { BoxStore } from '../../src/models/box-listing'
-import type { AnyGating } from '../../src/models/gating'
+import type { AnyGating, Gating } from '../../src/models/gating'
 import type { VaultRecord } from '../../src/models/models-shapes'
+import type { Vault } from '../../src/models/vault'
 import type { VaultStore } from '../../src/models/vault-listing'
 import { bad } from '../../src/outcome'
 import type { VaultScope } from '../../src/shapes/scopes'
 import * as TH from '../test-helpers'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
-import { Dna, Passphrase, byPassphrase, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, holdNextDialog, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 useBankWorlds()
@@ -185,6 +186,78 @@ describe("bank.closeVaults(): each vault closed", () => {
     bank.closeVaults()
     expect(bank.snapshot.vaults).to.deep.equal([])
     expect(deviceDB.tryDelLease).not.toHaveBeenCalled()
+  })
+})
+// --
+
+// == [A close before ensure begins]: the behaviour notes/wontfix.md records, the same every time
+
+describe("a close before VaultListing.ensure begins, a won't-fix (notes/wontfix.md, 2026-11-01): ensureVault answers the vault unlocked, its lease kept, every time", () => {
+  const Rounds = 5
+
+  /** Over `Rounds` fresh banks, have `oneRound` land its close mid-ensureVault and answer the vault: it reads unlocked and held, its lease kept, the close having erased a lease first or not, as `erases` says. */
+  const expectEachRound = async (oneRound: (world: ReturnType<typeof makeBankWorld>) => Promise<Vault>, erases: boolean): Promise<void> => {
+    for (let round = 0; round < Rounds; round += 1) {
+      const world = makeBankWorld()
+      const vault = await oneRound(world)
+      await TH.wakeupAtNextTick()
+      expect(vault.isLocked).to.be.false
+      expect(world.bank.vaultOf(Main)).to.equal(vault)
+      expect(world.deviceDB.cachedNow()).to.not.be.null
+      expect(world.deviceDB.tryDelLease).toHaveBeenCalledTimes(erases ? 1 : 0)
+      expect(world.deviceDB.tryPutLease).toHaveBeenCalledOnce()
+    }
+  }
+
+  it("is not stopped by a closeVault landing while its fetch finds nothing stored: the close's erase lands first, and the birth puts its lease", async () => {
+    await expectEachRound(async ({ bank, opts: { store } }) => {
+      const got = TH.holdNextAnswer(store, 'get')
+      const ensuring = bank.ensureVault(Main, byPassphrase(Passphrase))
+      await got.reached
+      bank.closeVault(Main)
+      got.release()
+      return ensuring
+    }, true)
+  })
+
+  it("is not stopped by a closeVault landing while the build dialog asks: the dialog stays up, and the answer builds the vault", async () => {
+    await expectEachRound(async ({ bank, requestCleartext }) => {
+      const dialog = holdNextDialog(requestCleartext)
+      const ensuring = bank.ensureVault(Main)
+      const gating = await dialog.gating as Gating<'build_vault'>
+      bank.closeVault(Main)
+      await gating.attempt(byPassphrase(Passphrase))
+      dialog.close()
+      return ensuring
+    }, true)
+  })
+
+  it("is not stopped by a closeVaults landing while it stores, as closeVaults closes only the vaults the bank holds", async () => {
+    await expectEachRound(async ({ bank, opts: { store } }) => {
+      const stored = TH.holdNextAnswer(store, 'put')
+      const ensuring = bank.ensureVault(Main, byPassphrase(Passphrase))
+      await stored.reached
+      bank.closeVaults()
+      stored.release()
+      return ensuring
+    }, false)
+  })
+
+  it("is stopped, by contrast, by a closeVault landing while its fetch finds the vault stored: it answers the vault locked, held, no lease kept", async () => {
+    const deviceDB = memoryDeviceDB()
+    const { bank, makeBank, opts: { store } } = makeBankWorld(null, { deviceDB })
+    await bank.ensureVault(Main, byPassphrase(Passphrase))
+    bank.goodbye()
+    const next = makeBank()
+    const got = TH.holdNextAnswer(store, 'get')
+    const ensuring = next.ensureVault(Main)
+    await got.reached
+    next.closeVault(Main)
+    got.release()
+    const vault = await ensuring
+    expect(vault.isLocked).to.be.true
+    expect(next.vaultOf(Main)).to.equal(vault)
+    expect(await deviceDB.getLease({ ...Dna })).to.be.null
   })
 })
 // --

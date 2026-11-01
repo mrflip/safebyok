@@ -220,10 +220,12 @@ export class Bank implements VaultWorld, GatingWorld {
     return Gating.launch('build_vault', { scope, vault: null, world: this, run: (handed) => this.vaultListing.ensure(scope, handed) })
   }
 
-  /** Lock the vault `bag` names, erasing the lease this device keeps, held or not, and evict it, as {@link VaultListing.close} does: the bank holds it no more, and the next `ensureVault` gets it anew, locked. */
+  /** Lock the vault `bag` names, erasing the lease this device keeps, held or not, and evict it, as {@link VaultListing.close} does: the next `ensureVault` gets it anew, locked.
+   * A vault a call in flight then stores or fetches is held all the same, locked. An `ensureVault` that has yet to build its vault is not stopped, and answers unlocked (`notes/wontfix.md`).
+   */
   closeVault(bag: VaultBag): void { this.vaultListing.close(this.vaultScopeOf(bag)) }
 
-  /** Close every vault the bank holds, as {@link closeVault} does. */
+  /** Close every vault the bank holds, as {@link closeVault} does; a vault not yet held, as one `ensureVault` is storing, is not closed (`notes/wontfix.md`). */
   closeVaults(): void {
     for (const vault of this.vaultListing.things) { this.vaultListing.close(vault.scope) }
   }
