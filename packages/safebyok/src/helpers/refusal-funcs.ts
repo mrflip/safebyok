@@ -122,13 +122,15 @@ export const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Ph
 export const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_deriver', Phrases.UnknownKeyDeriver)
 // --
 
-// == [Gatings]: requestCleartextThrew, gatingDeclined, gatingSettled, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
+// == [Gatings]: requestCleartextThrew, gatingDeclined, gatingSettled, passkeyProvesNot, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
 
 export const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
 
 export const gatingDeclined = (): VaultError => new VaultError('vault_locked', Phrases.GatingDeclined)
 
 export const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)
+
+export const passkeyProvesNot = (): VaultError => new VaultError('bad_option', Phrases.PasskeyProvesNot)
 
 export const strengthCheckerThrew = (): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerThrew)
 

@@ -1,5 +1,4 @@
 import { Checkers } from '../checks/validator'
-import type { VaultError } from '../errors'
 import { deferred } from '../helpers/deferred'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { adorn, tattoo } from '../helpers'
@@ -8,9 +7,9 @@ import { type Outcome, bad, good, outcomeOf, valOf } from '../outcome'
 import * as VX from '../shapes/vault'
 import * as CX from '../shapes/scopes'
 import type { VaultScope } from '../shapes/scopes'
-import type { CleartextsForGatingkind, GatingKind, StrengthChecker, WayinKind } from './models-shapes'
+import type { CleartextsForGatingkind, GatingKind, PasskeyGatingKind, PasskeyWayinHeader, StrengthChecker, WayinKind } from './models-shapes'
 import * as MSX from './models-shapes'
-import { checkStrength, spendAnswer } from './proving'
+import { checkStrength, spendAnswerAfter } from './proving'
 import { Storable } from './storable'
 import type { Vault } from './vault'
 
@@ -61,7 +60,7 @@ const Checks = Checkers('bad_option', ({ obj, fn, custom }) => ({
 }))
 // --
 
-// == [Gating]: launch, isOpen, provedBy, attempt, decline, checkStrength, toJSON, with the try forms of attempt and checkStrength
+// == [Gating]: launch, isOpen, provedBy, attempt, attemptPasskey, decline, checkStrength, toJSON, with the try forms of attempt, attemptPasskey and checkStrength
 
 /** One request to the user for cleartext: a passphrase, or a passkey's answer, as its `gatingkind` needs.
  * A gated verb called without cleartexts launches one through {@link Gating.launch}, hands it to the
@@ -77,6 +76,8 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   declare readonly vaultlabel: string
   /** The vault the gating is for, or null for one the gating builds. */
   declare readonly vault:      Vault | null
+  /** The vault's passkey header as the gating launched, what `askPasskey` reads to ask that passkey (its `credential_id` and `prf_salt_b64`); null where the vault has no passkey, or is not built yet. */
+  declare readonly passkeyHeader: PasskeyWayinHeader | null
 
   readonly #world:   GatingWorld
   readonly #run:     (cleartexts: unknown) => Promise<Vault>
@@ -89,6 +90,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     const { scope, vault, world, run } = Checks.gatingOpts.parse(opts)
     tattoo(this, { gatingkind: MSX.gatingkind.parse(gatingkind) as KindT, ...scope }, { writable: false })
     adorn(this, 'vault', vault)
+    adorn(this, 'passkeyHeader', vault === null ? null : vault.gate.passkeyHeader)
     this.#world = world as GatingWorld
     this.#run = run
     Object.freeze(this)
@@ -112,21 +114,32 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   /** The wayins whose proof an attempt may hand in: none to build a vault, either to unlock one, and the passphrase alone to change its gate. */
   get provedBy(): readonly WayinKind[] { return MSX.ProvedByForGatingkind[this.gatingkind] }
 
-  /** Run the gated verb with `cleartexts`, resolving the vault, after any attempt in flight. A passkey's answer is spent either way (G2).
+  /** Run the gated verb with `cleartexts`, resolving the vault, after any attempt in flight.
    * A correctable refusal ('wrong_passphrase', 'wrong_passkey', 'weak_passphrase',
-   * 'same_passphrase') leaves the gating open; any other outcome settles it. An attempt on a
-   * gating settled refuses 'gating_landed'.
+   * 'same_passphrase') leaves the gating open, and a passkey's answer unspent, for the host to hand
+   * in again or zero; any other outcome settles the gating and spends the answer (G2). An attempt
+   * on a gating settled refuses 'gating_landed'.
    */
-  async attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Vault> { return valOf(await this.tryAttempt(cleartexts)) }
+  attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Vault> {
+    return spendAnswerAfter(cleartexts, async () => valOf(await this.#inTurn(() => this.#attemptOnce(cleartexts))))
+  }
 
   /** The vault an attempt resolves, as an {@link Outcome}: the non-throwing form of {@link Gating.attempt}, as a dialog wants it. */
-  async tryAttempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome<Vault>> {
-    try {
-      return await this.#inTurn(() => this.#attemptOnce(cleartexts))
-    } finally {
-      spendAnswer(cleartexts)
-    }
+  tryAttempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome<Vault>> { return outcomeOf(() => this.attempt(cleartexts)) }
+
+  /** Run the gated verb with a passkey's answer, as `askPasskey` gives it for {@link Gating.passkeyHeader}: an {@link Gating.attempt} of `{ passkeyAnswer }`.
+   * A gating no passkey proves (its `provedBy` says) refuses 'bad_option', attempting nothing and
+   * leaving the gating open; the answer is spent all the same.
+   */
+  attemptPasskey(this: Gating<PasskeyGatingKind>, passkeyAnswer: VX.PasskeyAnswer): Promise<Vault> {
+    return spendAnswerAfter({ passkeyAnswer }, () => {
+      if (! this.provedBy.includes('passkey')) { throw RefusalFuncs.passkeyProvesNot() }
+      return this.attempt({ passkeyAnswer })
+    })
   }
+
+  /** The vault a passkey's attempt resolves, as an {@link Outcome}: the non-throwing form of {@link Gating.attemptPasskey}. */
+  tryAttemptPasskey(this: Gating<PasskeyGatingKind>, passkeyAnswer: VX.PasskeyAnswer): Promise<Outcome<Vault>> { return outcomeOf(() => this.attemptPasskey(passkeyAnswer)) }
 
   /** Settle the gating as declined, once any attempt in flight has run: the gated verb refuses 'vault_locked'. A gating settled already stays as it settled. */
   decline(): void { this.#settleInTurn(bad(RefusalFuncs.gatingDeclined())) }
@@ -142,7 +155,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   async #attemptOnce(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome<Vault>> {
     if (this.#outcome !== null) { return bad(RefusalFuncs.gatingSettled()) }
     const outcome = await outcomeOf(() => this.#run(cleartexts))
-    if (outcome.ok || ! isCorrectable(outcome.err)) { this.#settleOnce(outcome) }
+    if (outcome.ok || ! MSX.isCorrectable(outcome.err)) { this.#settleOnce(outcome) }
     return outcome
   }
 
@@ -182,7 +195,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 }
 // --
 
-// == [Host calls]: tryHearRequestCleartext, isCorrectable
+// == [Host calls]: tryHearRequestCleartext
 
 // The host function that hears the passphrase (guarantees.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
 const tryHearRequestCleartext = async (requestCleartext: RequestCleartext, gating: Gating): Promise<Outcome<void>> => {
@@ -193,6 +206,4 @@ const tryHearRequestCleartext = async (requestCleartext: RequestCleartext, gatin
     return bad(RefusalFuncs.requestCleartextThrew())
   }
 }
-
-const isCorrectable = (err: VaultError): boolean => (MSX.correctableKindVals as readonly string[]).includes(err.refusalkind)
 // --

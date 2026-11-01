@@ -14,7 +14,7 @@ import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } f
 import { Gating, type GatingWorld, type RequestCleartext } from './gating'
 import type { Cleartexts, LeaseDeviceDB, LockState, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
-import { spendAnswer } from './proving'
+import { spendAnswerAfter } from './proving'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
 import { type VaultCache, type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
@@ -132,12 +132,8 @@ export class Bank implements VaultWorld, GatingWorld {
 
   vaultOf(bag: VaultBag): Vault | null { return this.vaultListing.at(this.vaultScopeOf(bag)) }
 
-  async ensureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Vault> {
-    try {
-      return await this.#ensureVault(this.vaultScopeOf(bag), cleartexts)
-    } finally {
-      spendAnswer(cleartexts)
-    }
+  ensureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Vault> {
+    return spendAnswerAfter(cleartexts, () => this.#ensureVault(this.vaultScopeOf(bag), cleartexts))
   }
 
   tryEnsureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag, cleartexts)) }

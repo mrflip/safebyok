@@ -1,14 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { runInNewContext } from 'node:vm'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { deferred } from '../../src/helpers/deferred'
 import { type AnyGating, Gating, type GatingOpts, type GatingWorld, type RequestCleartext } from '../../src/models/gating'
-import { type StrengthChecker, correctableKindVals } from '../../src/models/models-shapes'
+import { type PasskeyGatingKind, type PasskeyWayinHeader, type StrengthChecker, correctableKindVals } from '../../src/models/models-shapes'
 import type { Vault } from '../../src/models/vault'
+import type { PasskeyAnswer } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 import { quietLogger } from '../test-helpers/logging'
 import { isZeroed } from '../test-helpers/proving-world'
-import { outcomeOf } from '../../src/outcome'
-import { Dna, Passphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
+import { type Outcome, outcomeOf } from '../../src/outcome'
+import { Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -51,6 +53,14 @@ const asUnlock = async (gating: Promise<AnyGating>): Promise<Gating<'unlock_vaul
 const weakChecker: StrengthChecker = () => ({ strong: false, reason: 'Add another word or two.' })
 
 const refusalOf = (refusalkind: VaultError['refusalkind']) => new VaultError(refusalkind, `Refused as ${refusalkind}.`)
+
+/** A requestCleartext whose user touches the passkey `tag` names, answering the salt the gating's passkeyHeader shows; each answer it hands is pushed onto `handed`. */
+const touchPasskey = (tag: string, handed: PasskeyAnswer[]) => async (gating: AnyGating) => {
+  const held = await asUnlock(Promise.resolve(gating))
+  const passkeyAnswer = await TH.passkeyOf(tag, held.passkeyHeader?.prf_salt_b64)
+  handed.push(passkeyAnswer)
+  await held.attemptPasskey(passkeyAnswer)
+}
 
 describe("Gating.launch(gatingkind, opts): what the host is handed", () => {
   it("hands requestCleartext an open gating of the kind and scope, for the vault given", async () => {
@@ -161,15 +171,26 @@ describe("gating.attempt(cleartexts): the ask loop", () => {
     close()
   })
 
-  it("spends the passkey answer of an attempt, whether the verb resolves or refuses (G2)", async () => {
+  it("leaves the passkey answer of an attempt refused as correctable unspent, and spends the one whose attempt resolves (G2)", async () => {
     const { gating, run, close } = launchHeld()
     run.mockRejectedValueOnce(refusalOf('wrong_passkey'))
     const held = await asUnlock(gating)
     const wrong = { passkeyAnswer: await TH.passkeyOf('phone') }
     await TH.expectRefusal(held.attempt(wrong), 'wrong_passkey')
+    expect(isZeroed(wrong.passkeyAnswer.prfBytes)).to.be.false
     const right = { passkeyAnswer: await TH.passkeyOf('laptop') }
     await held.attempt(right)
-    expect(isZeroed(wrong.passkeyAnswer.prfBytes) && isZeroed(right.passkeyAnswer.prfBytes)).to.be.true
+    expect(isZeroed(right.passkeyAnswer.prfBytes)).to.be.true
+    close()
+  })
+
+  it("spends the passkey answer of an attempt the verb refuses for good, settling the gating (G2)", async () => {
+    const { gating, run, close } = launchHeld()
+    run.mockRejectedValueOnce(refusalOf('stale_write'))
+    const held = await asUnlock(gating)
+    const cleartexts = { passkeyAnswer: await TH.passkeyOf('laptop') }
+    await TH.expectRefusal(held.attempt(cleartexts), 'stale_write')
+    expect(isZeroed(cleartexts.passkeyAnswer.prfBytes)).to.be.true
     close()
   })
 
@@ -250,6 +271,83 @@ describe("Settling a gating without an attempt", () => {
   it("resolves when requestCleartext attempts at once and returns no promise", async () => {
     const requestCleartext = (gating: AnyGating) => { void (gating as Gating).tryAttempt({ passphrase: Passphrase }) }
     expect(await Gating.launch('unlock_vault', { scope: Dna, vault: null, world: worldOf(requestCleartext), run: () => Promise.resolve(Resolved) })).to.equal(Resolved)
+  })
+})
+
+describe("gating.attemptPasskey(passkeyAnswer): the passkey path", () => {
+  it("unlocks a vault through its passkey, as asked for the salt its passkeyHeader shows, and spends the answer (G2)", async () => {
+    const { vault, requestCleartext } = await makeBornVaultWithPasskey()
+    vault.lock()
+    const handed: PasskeyAnswer[] = []
+    requestCleartext.mockImplementationOnce(touchPasskey('laptop', handed))
+    await vault.ensureUnlocked()
+    expect(vault.isUnlocked).to.be.true
+    expect(handed.map(({ prfBytes }) => isZeroed(prfBytes))).to.deep.equal([true])
+  })
+
+  it("shows the vault's passkey header as the gating launched, frozen, and null for a vault with no passkey or no vault at all", async () => {
+    const seen: (PasskeyWayinHeader | null)[] = []
+    const peekAndDecline = (gating: AnyGating) => { seen.push(gating.passkeyHeader); gating.decline() }
+    const laptop = await TH.passkeyOf('laptop')
+    for (const { vault, requestCleartext } of [await makeBornVaultWithPasskey(), await makeBornVault()]) {
+      vault.lock()
+      requestCleartext.mockImplementationOnce(peekAndDecline)
+      await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+    }
+    expect(seen[0]).to.deep.include({ wayinkind: 'passkey', credential_id: laptop.credential_id, prf_salt_b64: laptop.prf_salt_b64 })
+    expect(Object.isFrozen(seen[0])).to.be.true
+    expect(seen[1]).to.be.null
+    const { gating, close } = launchHeld()
+    const bare = await gating
+    expect(bare.passkeyHeader).to.be.null
+    close()
+  })
+
+  it("tryAttemptPasskey answers a wrong passkey as a bad 'wrong_passkey' Outcome, the gating left open and the answer unspent; the right passkey unlocks after (G2)", async () => {
+    const { vault, requestCleartext } = await makeBornVaultWithPasskey()
+    vault.lock()
+    const wrong = await TH.passkeyOf('phone')
+    const seen: { outcome?: Outcome<Vault>, isOpen?: boolean } = {}
+    requestCleartext.mockImplementationOnce(async (gating: AnyGating) => {
+      const held = await asUnlock(Promise.resolve(gating))
+      seen.outcome = await held.tryAttemptPasskey(wrong)
+      seen.isOpen = held.isOpen
+      await held.attemptPasskey(await TH.passkeyOf('laptop'))
+    })
+    await vault.ensureUnlocked()
+    expect(vault.isUnlocked).to.be.true
+    expect(seen.outcome?.err?.refusalkind).to.eq('wrong_passkey')
+    expect(seen.isOpen).to.be.true
+    expect(isZeroed(wrong.prfBytes)).to.be.false
+  })
+
+  it("refuses 'bad_option' on a kind a passkey does not prove, running nothing, leaving the gating open, and spending the answer (G2)", async () => {
+    const { requestCleartext, gating, close } = heldDialog()
+    const run = vi.fn((_cleartexts: unknown): Promise<Vault> => Promise.resolve(Resolved))
+    const launched = outcomeOf(() => Gating.launch('add_passkey', { scope: Dna, vault: null, world: worldOf(requestCleartext), run }))
+    const held = await gating as unknown as Gating<'unlock_vault'>
+    const passkeyAnswer = await TH.passkeyOf('laptop')
+    await TH.expectRefusal(held.attemptPasskey(passkeyAnswer), 'bad_option')
+    expect(run).not.toHaveBeenCalled()
+    expect(held.isOpen).to.be.true
+    expect(isZeroed(passkeyAnswer.prfBytes)).to.be.true
+    close()
+    await TH.expectBad(launched, 'vault_locked')
+  })
+
+  it("is offered only on the kinds a passkey proves: 'unlock_vault' alone", () => {
+    expectTypeOf<PasskeyGatingKind>().toEqualTypeOf<'unlock_vault'>()
+  })
+
+  it("zeroes PRF bytes made in another realm, which fail `instanceof Uint8Array` but carry its tag, when the attempt is refused for good (G2)", async () => {
+    const { gating, run, close } = launchHeld()
+    run.mockRejectedValueOnce(refusalOf('stale_write'))
+    const held = await asUnlock(gating)
+    const passkeyAnswer = { ...await TH.passkeyOf('laptop'), prfBytes: runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array }
+    expect(passkeyAnswer.prfBytes instanceof Uint8Array).to.be.false
+    await TH.expectRefusal(held.attemptPasskey(passkeyAnswer), 'stale_write')
+    expect(isZeroed(passkeyAnswer.prfBytes)).to.be.true
+    close()
   })
 })
 

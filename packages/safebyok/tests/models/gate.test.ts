@@ -29,6 +29,14 @@ describe("Gate.build(stamp, cleartexts, world)", () => {
     expect(isZeroed(answer!.prfBytes)).to.be.true
   })
 
+  it("shows its passkey wayin's header as passkeyHeader, frozen and holding no key, and null when it has no passkey", async () => {
+    const { gate, answer } = await builtGate({ passkey: true })
+    expect(gate.passkeyHeader).to.deep.equal({ wayinkind: 'passkey', credential_id: answer!.credential_id, prf_salt_b64: answer!.prf_salt_b64, device_id: gate.passkey_wayin?.device_id, registered_at: gate.passkey_wayin?.registered_at })
+    expect(Object.isFrozen(gate.passkeyHeader)).to.be.true
+    const { gate: bare } = await builtGate()
+    expect(bare.passkeyHeader).to.be.null
+  })
+
   it("wraps one new vaultKey in both wayins", async () => {
     const { gate, prfBytes } = await builtGate({ passkey: true })
     const viaPassphrase = await _cheat_vaultKeyBytesOf(WorldStamp, gate.ppWayin, { passphrase: TestPassphrase })
@@ -53,7 +61,7 @@ describe("Gate.build(stamp, cleartexts, world)", () => {
     expect(isZeroed(answer.prfBytes)).to.be.true
   })
 
-  it("hands the passphrase to the world's strengthChecker for the vault's scope, and refuses a weak one as 'weak_passphrase' before the keyDeriver is asked (G2)", async () => {
+  it("hands the passphrase to the world's strengthChecker for the vault's scope, and refuses a weak one as 'weak_passphrase' before the keyDeriver is asked, leaving the passkey answer unspent (G2)", async () => {
     const strengthChecker = vi.fn<StrengthChecker>(() => ({ strong: false, reason: 'Add another word or two.' }))
     const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
     const answer = passkeyAnswerOf()
@@ -62,6 +70,15 @@ describe("Gate.build(stamp, cleartexts, world)", () => {
     expect(err.message).to.eq('Add another word or two.')
     expect(strengthChecker).toHaveBeenCalledWith(TestPassphrase, { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
     expect(deriveKeyBytes).not.toHaveBeenCalled()
+    expect(isZeroed(answer.prfBytes)).to.be.false
+  })
+
+  it("builds with the passkey answer a weak passphrase left unspent, handed in again beside a stronger one, and spends it then (G2)", async () => {
+    const answer = passkeyAnswerOf()
+    const weak = gateWorldOf({ strengthChecker: () => ({ strong: false, reason: 'Add another word or two.' }) })
+    await TH.expectRefusal(Gate.build(WorldStamp, cleartextsOf(TestPassphrase, answer), weak), 'weak_passphrase')
+    const { gate } = await Gate.build(WorldStamp, cleartextsOf(TestPassphrase, answer), gateWorldOf())
+    expect(gate.passkey_wayin?.credential_id).to.eq(answer.credential_id)
     expect(isZeroed(answer.prfBytes)).to.be.true
   })
 

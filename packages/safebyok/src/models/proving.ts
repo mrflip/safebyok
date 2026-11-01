@@ -1,4 +1,4 @@
-import { Checkers, consistent } from '../checks/validator'
+import { Checkers, consistent, isBytes } from '../checks/validator'
 import { PassphraseKeyBytes } from '../consts'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
@@ -6,7 +6,7 @@ import { adorn } from '../helpers'
 import { outcomeOf, valOf } from '../outcome'
 import * as VX from '../shapes/vault'
 import { Lease } from './lease'
-import { type AttemptCleartexts, type Cleartexts, type GateProps, type LeaseDBFriend, type LeaseGrantOpts, type LeaseVault, type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type ProvingWorld, type StrengthChecker, type VaultStamp, type WayinHeader, type WayinKind, passkeyWayinHeader, passkeyWayinRecord, passphraseMakeArgs, passphraseWayinHeader, passphraseWayinRecord, provingAttemptArgs, provingMakeArgs, provingPairArgs, vaultStamp } from './models-shapes'
+import { type AttemptCleartexts, type Cleartexts, type GateProps, type LeaseDBFriend, type LeaseGrantOpts, type LeaseVault, type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type ProvingWorld, type StrengthChecker, type VaultStamp, type WayinHeader, type WayinKind, isCorrectable, passkeyWayinHeader, passkeyWayinRecord, passphraseMakeArgs, passphraseWayinHeader, passphraseWayinRecord, provingAttemptArgs, provingMakeArgs, provingPairArgs, vaultStamp } from './models-shapes'
 import type { VaultScope } from '../shapes/scopes'
 import { Wayin, wayinCtxOf } from './wayin'
 
@@ -50,30 +50,26 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     Object.freeze(this)
   }
 
-  /** The provings of the vault `stamp` names, from `cleartexts`: a passphrase proving, and a passkey proving where they carry a passkey's answer too, which is spent either way (G2). */
-  static async makeProvingPair(stamp: VaultStamp, cleartexts: Cleartexts, world: ProvingWorld): Promise<ProvingPair> {
-    try {
+  /** The provings of the vault `stamp` names, from `cleartexts`: a passphrase proving, and a passkey proving where they carry a passkey's answer too, which is spent (G2). */
+  static makeProvingPair(stamp: VaultStamp, cleartexts: Cleartexts, world: ProvingWorld): Promise<ProvingPair> {
+    return spendAnswerAfter(cleartexts, async () => {
       const { stamp: checked, cleartexts: { passphrase, passkeyAnswer } } = provingPairArgs.parse({ stamp, cleartexts, world })
       const passphraseProving = await PassphraseProving.make(checked, world, passphrase)
       const passkeyProving = passkeyAnswer ? await PasskeyProving.make(checked, world, passkeyAnswer) : null
       return { passphraseProving, passkeyProving }
-    } finally {
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
-  /** The proving of the stored wayin of `gate` that `cleartexts` open: the passphrase's where they carry one, else the passkey's, whose answer is spent either way (G2). A wayin that will not open refuses 'wrong_passphrase' or 'wrong_passkey'. */
-  static async attempt(stamp: VaultStamp, gate: GateProps, cleartexts: AttemptCleartexts, world: ProvingWorld): Promise<Proving> {
-    try {
+  /** The proving of the stored wayin of `gate` that `cleartexts` open: the passphrase's where they carry one, else the passkey's, whose answer is spent unless refused as correctable (G2). A wayin that will not open refuses 'wrong_passphrase' or 'wrong_passkey'. */
+  static attempt(stamp: VaultStamp, gate: GateProps, cleartexts: AttemptCleartexts, world: ProvingWorld): Promise<Proving> {
+    return spendAnswerAfter(cleartexts, async () => {
       const { stamp: checked, gate: wayins, cleartexts: { passphrase, passkeyAnswer } } = provingAttemptArgs.parse({ stamp, gate, cleartexts, world })
       const proving: Proving = passphrase === undefined
         ? await PasskeyProving.ofWayin(checked, wayins.passkey_wayin, passkeyAnswer)
         : await PassphraseProving.ofWayin(checked, world, wayins.passphrase_wayin, passphrase)
       await proving.#checkOpens()
       return proving
-    } finally {
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
   /** The wayin this proving holds, made under a vaultKey new (`NOVEL`) or held by the `source` proving of the same vault. A proving holds one wayin: one that holds one already refuses. */
@@ -148,21 +144,19 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   /** A new passkey proving of the vault `stamp` names, for the passkey whose answer is handed in; the answer is spent, made or refused (G2). */
-  static async make(stamp: VaultStamp, world: ProvingWorld, passkeyAnswer: unknown): Promise<PasskeyProving> {
-    try {
+  static make(stamp: VaultStamp, world: ProvingWorld, passkeyAnswer: unknown): Promise<PasskeyProving> {
+    return spendAnswerAfter({ passkeyAnswer }, async () => {
       const { stamp: checked } = provingMakeArgs.parse({ stamp, world })
       const answer = VX.freshPasskeyAnswer.parse(passkeyAnswer)
       const header = mintPasskeyHeader(world, answer)
       const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checked, header))
       return new PasskeyProving(checked, header, passkeyKey)
-    } finally {
-      spendPrfBytes(passkeyAnswer)
-    }
+    })
   }
 
-  /** The proving of the stored passkey wayin; an answer for another credential or salt, or a vault with no passkey wayin, refuses 'wrong_passkey'. Opening it is the caller's. */
-  static async ofWayin(stamp: VaultStamp, stored: PasskeyWayinRecord | null, passkeyAnswer: unknown): Promise<PasskeyProving> {
-    try {
+  /** The proving of the stored passkey wayin; an answer for another credential or salt, or a vault with no passkey wayin, refuses 'wrong_passkey', leaving the answer unspent (G2). Opening it is the caller's. */
+  static ofWayin(stamp: VaultStamp, stored: PasskeyWayinRecord | null, passkeyAnswer: unknown): Promise<PasskeyProving> {
+    return spendAnswerAfter({ passkeyAnswer }, async () => {
       if (stored === null) { throw RefusalFuncs.noPasskeyWayin() }
       const checked = vaultStamp.parse(stamp)
       const answer = VX.passkeyAnswer.parse(passkeyAnswer)
@@ -172,9 +166,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
       if (answer.prf_salt_b64 !== header.prf_salt_b64) { throw RefusalFuncs.otherPrfSalt() }
       const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checked, header))
       return new PasskeyProving(checked, header, passkeyKey, wayin)
-    } finally {
-      spendPrfBytes(passkeyAnswer)
-    }
+    })
   }
 }
 // --
@@ -202,7 +194,7 @@ const passphraseWayinRecordOf = (wayin: Wayin): PassphraseWayinRecord => passphr
 const passkeyWayinRecordOf = (wayin: Wayin): PasskeyWayinRecord => passkeyWayinRecord.parse(wayin.pickle())
 // --
 
-// == [Host calls]: checkStrength, verdictOf, deriveKeyBytes, spendAnswer, spendPrfBytes
+// == [Host calls]: checkStrength, verdictOf, deriveKeyBytes, spendAnswerAfter, spendAnswer, spendPrfBytes
 
 // The host functions that hear the passphrase (guarantees.md, G1 and G8): what they throw may quote it, so it is replaced, not kept as a cause.
 
@@ -229,7 +221,20 @@ const deriveKeyBytes = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase
   }
 }
 
-/** Zero a passkey answer's PRF bytes wherever `handed` carries them, as the cleartexts of a proof do, checked or not: an answer is single-use (G2). Every export that takes cleartexts calls it in a `finally`. */
+/** Run `work`, then spend the passkey answer `handed` carries, as {@link spendAnswer} does, unless `work` refused as the user can correct ({@link isCorrectable}): that answer stays the host's, to hand in again or zero (G2). Every export that takes cleartexts runs through it. */
+export const spendAnswerAfter = async <ValT>(handed: unknown, work: () => Promise<ValT>): Promise<ValT> => {
+  let isLeftUnspent = false
+  try {
+    return await work()
+  } catch (err) {
+    isLeftUnspent = isCorrectable(err)
+    throw err
+  } finally {
+    if (! isLeftUnspent) { spendAnswer(handed) }
+  }
+}
+
+/** Zero a passkey answer's PRF bytes wherever `handed` carries them, as the cleartexts of a proof do, checked or not: an answer is single-use (G2). */
 export const spendAnswer = (handed: unknown): void => {
   // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the refusal or the proving it follows.
   try {
@@ -237,12 +242,12 @@ export const spendAnswer = (handed: unknown): void => {
   } catch { /* nothing left to spend */ }
 }
 
-/** Zero a passkey answer's PRF bytes, checked or not. */
+/** Zero a passkey answer's PRF bytes, checked or not, judged by their tag as the checks judge them, so bytes made in another realm, an iframe's, are zeroed too. */
 const spendPrfBytes = (answer: unknown): void => {
   // As in spendAnswer: the host's object may throw as it is reached into.
   try {
     const prfBytes: unknown = (answer as { prfBytes?: unknown } | null)?.prfBytes
-    if (prfBytes instanceof Uint8Array) { prfBytes.fill(0) }
+    if (isBytes(prfBytes)) { prfBytes.fill(0) }
   } catch { /* nothing left to spend */ }
 }
 // --

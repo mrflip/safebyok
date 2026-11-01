@@ -158,13 +158,16 @@ describe("Vault.addPasskey", () => {
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 
-  it("refuses a wrong current passphrase 'wrong_passphrase', spending the answer and storing nothing", async () => {
-    const { vault, storedNow } = await makeBornVault()
+  it("refuses a wrong current passphrase 'wrong_passphrase', storing nothing and leaving the answer unspent, so the same passkey is added once the passphrase is right (G2)", async () => {
+    const { vault, storedNow, demandStored } = await makeBornVault()
     const ante = storedNow()
     const passkeyAnswer = await TH.passkeyOf('laptop')
     await TH.expectRefusal(vault.addPasskey({ passphrase: 'not the passphrase', passkeyAnswer }), 'wrong_passphrase')
-    expect(isZeroed(passkeyAnswer.prfBytes)).to.be.true
+    expect(isZeroed(passkeyAnswer.prfBytes)).to.be.false
     expect(storedNow()).to.equal(ante)
+    await vault.addPasskey({ passphrase: Passphrase, passkeyAnswer })
+    expect(demandStored().gate.passkey_wayin?.credential_id).to.eq(passkeyAnswer.credential_id)
+    expect(isZeroed(passkeyAnswer.prfBytes)).to.be.true
   })
 
   it("zeroes the PRF bytes of cleartexts it refuses: a field beside the passphrase and the answer refuses 'bad_option', and stores nothing", async () => {

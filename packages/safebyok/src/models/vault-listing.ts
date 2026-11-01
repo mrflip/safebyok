@@ -7,7 +7,7 @@ import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
 import { Gate } from './gate'
-import { type PassphraseProving, spendAnswer } from './proving'
+import { type PassphraseProving, spendAnswerAfter } from './proving'
 import type { GatingWorld } from './gating'
 import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
@@ -46,9 +46,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no cleartexts: its gate is the one it carries, and cleartexts handed with it refuse 'bad_option'. A dna takes the cleartexts its gate is built from, before the vault is born: cleartexts refused, or none, hold nothing, and a dna for a scope already held refuses 'bad_option' before they are used. A passkey's answer among them is spent either way (G2). A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
-  override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, cleartexts?: Cleartexts): Promise<Vault> {
-    try {
+  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no cleartexts: its gate is the one it carries, and cleartexts handed with it refuse 'bad_option'. A dna takes the cleartexts its gate is built from, before the vault is born: cleartexts refused, or none, hold nothing, and a dna for a scope already held refuses 'bad_option' before they are used. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2). A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
+  override build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, cleartexts?: Cleartexts): Promise<Vault> {
+    return spendAnswerAfter(cleartexts, async () => {
       if (hasRevision(input)) {
         if (cleartexts !== undefined) { throw RefusalFuncs.cleartextsWithRecord() }
         return await super.build(input)
@@ -58,9 +58,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
       const vault = this.holdDraft(draft)
       vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
       return vault
-    } finally {
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
   /** Take up each vault's cached lease, as {@link Vault.takeUpCachedLease} does, once the base's `hello` has revived and hydrated them. */

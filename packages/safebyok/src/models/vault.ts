@@ -10,7 +10,7 @@ import { Gating } from './gating'
 import { Lease } from './lease'
 import type { AttemptCleartexts, CleartextsForGatingkind, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-import { spendAnswer } from './proving'
+import { spendAnswer, spendAnswerAfter } from './proving'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
 
@@ -122,16 +122,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
    * 'same_passphrase', and a weak one 'weak_passphrase'. A record changed elsewhere while the proof
    * ran refuses 'stale_write', storing nothing.
    */
-  async replacePassphrase(cleartexts?: PassphraseReplaceCleartexts): Promise<this> {
-    try {
+  replacePassphrase(cleartexts?: PassphraseReplaceCleartexts): Promise<this> {
+    // A passkey's answer has no place here, but a host may hand one in all the same (G2).
+    return spendAnswerAfter(cleartexts, async () => {
       const { cleartexts: checked } = MSX.passphraseReplaceArgs.parse({ cleartexts })
       if (checked !== undefined) { return await this.#replacePassphraseBy(checked) }
       await this.ensureReadyToEdit()
       return await this.#launchGating('replace_passphrase', (handed) => this.#replacePassphraseBy(handed))
-    } finally {
-      // A passkey's answer has no place here, but a host may hand one in all the same (G2).
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
   tryReplacePassphrase(cleartexts?: PassphraseReplaceCleartexts): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase(cleartexts)) }
@@ -142,33 +140,29 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#sendGate(ante, await this.gate.withPassphraseReplaced(cleartexts, this.world))
   }
 
-  /** Add a passkey and send, once the passphrase proves the gate: with `cleartexts` where given, else asking the user through an 'add_passkey' gating. The answer is spent either way (G2).
+  /** Add a passkey and send, once the passphrase proves the gate: with `cleartexts` where given, else asking the user through an 'add_passkey' gating. The answer is spent unless the passphrase is refused as wrong (G2).
    * A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a
    * lease held stays in force. A record changed elsewhere while the proof ran refuses
    * 'stale_write', storing nothing.
    */
-  async addPasskey(cleartexts?: PasskeyAddCleartexts): Promise<this> {
-    try {
+  addPasskey(cleartexts?: PasskeyAddCleartexts): Promise<this> {
+    return spendAnswerAfter(cleartexts, async () => {
       const { cleartexts: checked } = MSX.passkeyAddArgs.parse({ cleartexts })
       if (checked !== undefined) { return await this.#addPasskeyBy(checked) }
       await this.ensureReadyToEdit()
       this.gate.demandPasskeyAddable()
       return await this.#launchGating('add_passkey', (handed) => this.#addPasskeyBy(handed))
-    } finally {
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
   tryAddPasskey(cleartexts?: PasskeyAddCleartexts): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey(cleartexts)) }
 
-  async #addPasskeyBy(cleartexts: PasskeyAddCleartexts): Promise<this> {
-    try {
+  #addPasskeyBy(cleartexts: PasskeyAddCleartexts): Promise<this> {
+    return spendAnswerAfter(cleartexts, async () => {
       await this.ensureReadyToEdit()
       const ante = this.demandFullProps().gate
       return await this.#sendGate(ante, await this.gate.withPasskeyAdded(cleartexts, this.world))
-    } finally {
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
   /** Revoke the passkey and send, once the passphrase proves the gate: with `cleartexts` where given, else asking the user through a 'revoke_passkey' gating.
@@ -176,17 +170,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
    * vaultKey, which does not change: a lease held stays in force. A record changed elsewhere while
    * the proof ran refuses 'stale_write', storing nothing.
    */
-  async revokePasskey(cleartexts?: PassphraseCleartexts): Promise<this> {
-    try {
+  revokePasskey(cleartexts?: PassphraseCleartexts): Promise<this> {
+    // A passkey's answer has no place here, but a host may hand one in all the same (G2).
+    return spendAnswerAfter(cleartexts, async () => {
       const { cleartexts: checked } = MSX.passkeyRevokeArgs.parse({ cleartexts })
       if (checked !== undefined) { return await this.#revokePasskeyBy(checked) }
       await this.ensureReadyToEdit()
       this.gate.demandPasskeyRevocable()
       return await this.#launchGating('revoke_passkey', (handed) => this.#revokePasskeyBy(handed))
-    } finally {
-      // A passkey's answer has no place here, but a host may hand one in all the same (G2).
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
   tryRevokePasskey(cleartexts?: PassphraseCleartexts): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey(cleartexts)) }
@@ -209,7 +201,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, unlock, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
+  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, unlock, joinUnlocking, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
@@ -219,19 +211,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else `cleartexts`, else by asking the user through an 'unlock_vault' gating. A lease held past its time locks the vault first.
    * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by
    * calling again; cleartexts it handed are spent unused (G2). Wrong cleartexts refuse
-   * 'wrong_passphrase' or 'wrong_passkey'; a gating the user declines, 'vault_locked'.
+   * 'wrong_passphrase' or 'wrong_passkey', leaving a passkey's answer unspent; a gating the user
+   * declines, 'vault_locked'.
    */
-  async ensureUnlocked(cleartexts?: AttemptCleartexts): Promise<Lease> {
-    try {
+  ensureUnlocked(cleartexts?: AttemptCleartexts): Promise<Lease> {
+    return spendAnswerAfter(cleartexts, async () => {
       const { cleartexts: checked } = MSX.vaultUnlockArgs.parse({ cleartexts })
       await this.ensureTimely({})
       const held = this.#lease
       if (held?.isInForce) { return held }
       if (held !== null) { this.lock() }
       return await this.#unlock(checked)
-    } finally {
-      spendAnswer(cleartexts)
-    }
+    })
   }
 
   /** The lease the vault holds; a locked vault refuses 'vault_locked'. */
@@ -256,14 +247,23 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   async #unlock(cleartexts?: AttemptCleartexts): Promise<Lease> {
     const inFlight = this.#unlocking
-    if (inFlight !== null) { return inFlight }
+    if (inFlight !== null) { return this.#joinUnlocking(inFlight, cleartexts) }
     const cached = await this.takeUpCachedLease()
     if (cached !== null) { return cached }
     // A lease taken up meanwhile, through `takeUpLease`, is the answer: the look declined the cached one for it.
     const held = this.#lease
     if (held?.isInForce) { return held }
-    this.#unlocking ??= this.#unlockAlone(cleartexts)
+    // An unlock begun while the look ran is joined, as one in flight before it is.
+    const begun = this.#unlocking
+    if (begun !== null) { return this.#joinUnlocking(begun, cleartexts) }
+    this.#unlocking = this.#unlockAlone(cleartexts)
     return this.#unlocking
+  }
+
+  /** Share the outcome of the unlock `inFlight`, spending a passkey's answer in `cleartexts` at once: never tried, it is not left unspent by another's correctable refusal (G2). */
+  #joinUnlocking(inFlight: Promise<Lease>, cleartexts?: AttemptCleartexts): Promise<Lease> {
+    spendAnswer(cleartexts)
+    return inFlight
   }
 
   /** The unlock by `cleartexts`, or by a gating where none are handed, as the one in flight: `#unlocking`, cleared once it settles. */
@@ -276,8 +276,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     }
   }
 
-  /** Ask the user through an 'unlock_vault' gating, each attempt unlocking through `#unlockByProof`, never `ensureUnlocked`, which would join the unlock this is. */
+  /** Ask the user through an 'unlock_vault' gating, each attempt unlocking through `#unlockByProof`, never `ensureUnlocked`, which would join the unlock this is. The full record is fetched first, so the gating carries the passkey header. */
   async #unlockByGating(): Promise<Lease> {
+    if (! this.isFull) { await this.fetch() }
     await this.#launchGating('unlock_vault', (handed) => this.#unlockByProof(handed))
     return this.demandLease()
   }

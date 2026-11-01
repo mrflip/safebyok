@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes } from '../../src/consts'
 import { fromB64, randomBytes, toB64 } from '../../src/crypto'
@@ -191,6 +192,28 @@ describe("PassphraseProving.make(stamp, world, passphrase): the keyDeriver", () 
     const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes }
     await TH.expectRefusal(PassphraseProving.make(WorldStamp, provingWorldOf({ keyDeriver }), 42 as never), 'bad_option')
     expect(deriveKeyBytes).not.toHaveBeenCalled()
+  })
+})
+
+/** PRF bytes as a passkey answer from an iframe carries them: a Uint8Array of another realm, which fails `instanceof Uint8Array` here but carries its tag. */
+const foreignPrfBytes = (): Uint8Array => runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
+
+describe("Spending a passkey answer made in another realm (G2)", () => {
+  it("is a byte view that fails `instanceof Uint8Array`, as the test assumes", () => {
+    expect(foreignPrfBytes() instanceof Uint8Array).to.be.false
+  })
+
+  it("makes a passkey proving of an answer whose PRF bytes are another realm's, and zeroes them", async () => {
+    const answer = passkeyAnswerOf({ prfBytes: foreignPrfBytes() })
+    const { passkeyProving } = await makeProvingPair(cleartextsOf(TestPassphrase, answer))
+    expect(passkeyProving).to.be.instanceOf(PasskeyProving)
+    expect(isZeroed(answer.prfBytes)).to.be.true
+  })
+
+  it("zeroes another realm's PRF bytes when the answer is refused for good, as a salt one byte short is", async () => {
+    const answer = passkeyAnswerOf({ prfBytes: foreignPrfBytes(), prf_salt_b64: toB64(randomBytes(PasskeySaltBytes - 1)) })
+    await TH.expectRefusal(PasskeyProving.make(WorldStamp, provingWorldOf(), answer), 'bad_option')
+    expect(isZeroed(answer.prfBytes)).to.be.true
   })
 })
 

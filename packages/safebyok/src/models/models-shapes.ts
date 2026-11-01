@@ -729,12 +729,15 @@ export const vaultListingOpts = objCheck(({ obj, fn }) => ({
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
 
-// == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, cleartextsForGatingkind, ProvedByForGatingkind, gatingWorld, GatingKind, CleartextsForGatingkind, StrengthChecker
+// == [The gating's forms]: gatingKindVals, correctableKindVals, isCorrectable, gatingkind, cleartextsForGatingkind, ProvedByForGatingkind, gatingWorld, GatingKind, CleartextsForGatingkind, PasskeyGatingKind, StrengthChecker
 
 export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey'] as const
 
 /** The refusals of an attempt that leave its gating open, for the user to try again. */
 export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
+
+/** True for a refusal of a kind in {@link correctableKindVals}: one that leaves a gating open, and a passkey's answer unspent (G2). */
+export const isCorrectable = (err: unknown): boolean => isVaultError(err) && (correctableKindVals as readonly string[]).includes(err.refusalkind)
 
 export const gatingkind = Checker(({ oneof }) => oneof(gatingKindVals), 'bad_option')
 
@@ -748,13 +751,13 @@ export const cleartextsForGatingkind = Object.freeze({
 } as const)
 
 /** The wayins whose proof each kind of gating takes: none for a vault not yet built, either to unlock, and the passphrase alone to change the gate. */
-export const ProvedByForGatingkind: Readonly<Record<GatingKind, readonly WayinKind[]>> = Object.freeze({
-  build_vault:        Object.freeze([]),
+export const ProvedByForGatingkind = Object.freeze({
+  build_vault:        Object.freeze([] as const),
   unlock_vault:       Object.freeze(['passphrase', 'passkey'] as const),
   replace_passphrase: Object.freeze(['passphrase'] as const),
   add_passkey:        Object.freeze(['passphrase'] as const),
   revoke_passkey:     Object.freeze(['passphrase'] as const),
-})
+} as const satisfies Readonly<Record<GatingKind, readonly WayinKind[]>>)
 
 export const gatingWorld = objCheck(({ fn }) => ({
   requestCleartext: fn(),
@@ -765,6 +768,9 @@ export const gatingWorld = objCheck(({ fn }) => ({
 export type GatingKind = typeof gatingKindVals[number]
 
 export type CleartextsForGatingkind = { [KindT in GatingKind]: Z.input<typeof cleartextsForGatingkind[KindT]> }
+
+/** The kinds of gating a passkey's answer may prove, as {@link ProvedByForGatingkind} says: the kinds `attemptPasskey` is called on. */
+export type PasskeyGatingKind = { [KindT in GatingKind]: 'passkey' extends typeof ProvedByForGatingkind[KindT][number] ? KindT : never }[GatingKind]
 
 /** A function from a new passphrase and the vault's scope to a verdict, `{ strong: true }` or `{ strong: false, reason }`, where `reason` is the sentence the user sees.
  * It may be async, and may carry a `load()` that `bank.hello()` awaits. It hears the passphrase:

@@ -244,7 +244,7 @@ describe("Vault.ensureUnlocked(), asking the user", () => {
 })
 
 describe("Vault.ensureUnlocked(cleartexts): the passkey answer handed in", () => {
-  it("is spent once the unlock is done, or refused (G2)", async () => {
+  it("is spent once the unlock is done, and left unspent by a 'wrong_passkey', which the user can correct (G2)", async () => {
     const { vault } = await makeBornVault({ passphrase: Passphrase, passkeyAnswer: await TH.passkeyOf('laptop') })
     vault.lock()
     const good = { passkeyAnswer: await TH.passkeyOf('laptop') }
@@ -253,7 +253,18 @@ describe("Vault.ensureUnlocked(cleartexts): the passkey answer handed in", () =>
     vault.lock()
     const wrong = { passkeyAnswer: await TH.passkeyOf('phone') }
     await TH.expectRefusal(vault.ensureUnlocked(wrong), 'wrong_passkey')
-    expect(isZeroed(wrong.passkeyAnswer.prfBytes)).to.be.true
+    expect(isZeroed(wrong.passkeyAnswer.prfBytes)).to.be.false
+  })
+
+  it("is spent unused when the call joins an unlock in flight, even one refused as correctable (G2)", async () => {
+    const { vault } = await makeBornVault({ passphrase: Passphrase, passkeyAnswer: await TH.passkeyOf('laptop') })
+    vault.lock()
+    const joining = { passkeyAnswer: await TH.passkeyOf('laptop') }
+    const first = vault.ensureUnlocked(byPassphrase('not the passphrase'))
+    const second = vault.ensureUnlocked(joining)
+    await TH.expectRefusal(first, 'wrong_passphrase')
+    await TH.expectRefusal(second, 'wrong_passphrase')
+    expect(isZeroed(joining.passkeyAnswer.prfBytes)).to.be.true
   })
 })
 

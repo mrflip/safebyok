@@ -207,14 +207,22 @@ whatever happens, so an answer is single-use, and one handed in again is refused
 its all-zero bytes (`checkedPasskeyAnswer`). An attempt that never seals the answer it was handed
 zeroes it too (`spendAnswer`): one refused before the seal, after the gating is over, while
 another attempt runs, or when a lock lands first. Only a refusal the user can correct leaves it
-unspent, for the host to hand in again or zero. *Caveat:* that zeroing is then the host's;
+unspent, for the host to hand in again or zero. The models hold to the same rule: each export
+that takes cleartexts runs through `spendAnswerAfter` (`models/proving.ts`), which spends the
+answer unless the export refused as `isCorrectable` says, a kind in `correctableKindVals`
+(`models/models-shapes.ts`); a call that joins an unlock in flight spends its answer untried
+(`models/vault.ts`, `#joinUnlocking`); and `attemptPasskey` on a gating whose kind a passkey does
+not prove spends it (`models/gating.ts`). `spendPrfBytes` zeroes bytes by the tag the checker
+tests (`isBytes`), so PRF bytes made in another realm are zeroed too. *Caveat:* that zeroing is then the host's;
 `safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a hidden dialog to
 show again. The passkeyKey is HKDF-SHA256 of those bytes, its
 `info` the wayin's whole ctx, derived non-extractable (`deriveWrappingKey`). The result, the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`proving.ts` header). Bytes refused before import: anything but
 32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/proving.test.ts`,
-`tests/wayin.test.ts`, `tests/gating.test.ts` (*a passkey's answer handed to an attempt*).
+`tests/wayin.test.ts`, `tests/gating.test.ts` (*a passkey's answer handed to an attempt*);
+`tests/models/proving.test.ts` (*another realm*), `tests/models/gating.test.ts` (*the passkey
+path*).
 
 **G3. The vaultKey is never stored naked, and never persisted as a handle.** It exists (a) as an
 *extractable* local where WebCrypto requires it to be wrapped: fresh in `sealWayins`
