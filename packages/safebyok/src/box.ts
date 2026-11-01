@@ -2,6 +2,7 @@ import { deepFreeze } from 'es-toolkit'
 import { randomId } from './crypto'
 import { VaultError } from './errors'
 import { heldLeaseOf } from './held-lease'
+import { parseJsonOrNull } from './helpers/parse-json'
 import { type Outcome, outcomeOf, refusalOf, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
 import { BoxFormat, type BoxSparse, type Sidecar, type MadeUnder, type BoxRecord, type SealBoxProps, type Whisper } from './shapes/box'
@@ -243,19 +244,10 @@ export const boxSparseOf = (record: BoxSparse & { box_key_wrapped?: unknown, whi
 }
 // --
 
-// == [Helpers]: whisperBytesOf, parseJsonOrNull, lockedError
+// == [Helpers]: whisperBytesOf, lockedError
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. Zero them once used. */
 export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(BX.whisper.parse(whisper)))
-
-/** `text` parsed as JSON, or null when it is none. */
-const parseJsonOrNull = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
 
 /** The refusal of a seal or an extract with no lease in hand. */
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked, so the box was neither sealed nor opened: unlock it first, or go through the vault (getWhisper, putBox), which asks for a proof.')

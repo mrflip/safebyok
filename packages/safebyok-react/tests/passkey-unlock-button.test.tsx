@@ -21,7 +21,7 @@ vi.mock('../src/passkey', async (importOriginal) => {
   return { ...passkey, askPasskey: askPasskeyNoting }
 })
 
-/** A locked vault in memory with one passkey, made through the fake authenticator, that authenticator, and the `unlock_vault` gating the vault raised, held open. */
+/** A locked vault in memory with one passkey, made through the fake authenticator, that authenticator, and the `unlock_vault` gating the vault launched, held open. */
 const lockedVaultWithPasskey = async () => {
   const authenticator = TH.installFakeAuthenticator()
   const vaultDB = localVaultDB({ store: memoryStore() })
@@ -229,7 +229,7 @@ describe("PasskeyUnlockButton", () => {
     }
 
     it("never unlocks with a passkey the user touched after it unmounted", async () => {
-      const { vault, gating: raised } = await lockedVaultWithPasskey()
+      const { vault, gating: launched } = await lockedVaultWithPasskey()
       const touching = TH.held()
       const answered = TH.held()
       const fakeGet = navigator.credentials.get.bind(navigator.credentials)
@@ -239,8 +239,8 @@ describe("PasskeyUnlockButton", () => {
         answered.resolve(undefined)
         return credential
       })
-      const attemptPasskey = vi.fn(raised.attemptPasskey)
-      const gating: UnlockVaultGating = { ...raised, attemptPasskey }
+      const attemptPasskey = vi.fn(launched.attemptPasskey)
+      const gating: UnlockVaultGating = { ...launched, attemptPasskey }
       const gripes: (string | null)[] = []
       const { unmount } = render(<PasskeyUnlockButton gating={gating} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
       fireEvent.click(screen.getByText('Use a passkey'))
@@ -288,7 +288,7 @@ describe("PasskeyUnlockButton", () => {
     })
 
     it("never tries a passkey the user touched while it was hidden, zeroing its answer at once: once it shows again, a press unlocks", async () => {
-      const { vault, gating: raised } = await lockedVaultWithPasskey()
+      const { vault, gating: launched } = await lockedVaultWithPasskey()
       asked.length = 0
       const touching = TH.held()
       const answered = TH.held()
@@ -299,8 +299,8 @@ describe("PasskeyUnlockButton", () => {
         answered.resolve(undefined)
         return credential
       })
-      const attemptPasskey = vi.fn(raised.attemptPasskey)
-      const gating: UnlockVaultGating = { ...raised, attemptPasskey }
+      const attemptPasskey = vi.fn(launched.attemptPasskey)
+      const gating: UnlockVaultGating = { ...launched, attemptPasskey }
       const heard: DialogAnswer[] = []
       const button = <PasskeyUnlockButton gating={gating} onDone={(answer) => { heard.push(answer) }} onGripe={noop} />
       const { rerender } = render(TH.inActivity('visible', button))

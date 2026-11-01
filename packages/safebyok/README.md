@@ -391,8 +391,8 @@ keep records by structured clone, never as JSON.
   that fails its check reads as none, and the base class has `doDelUnparsed` discard it. That
   deletes the row only if `isSound` is still false of it as read in the same transaction, so
   a record written since the read is never lost.
-* **The device record is raised, never lowered.** `doRaiseDeviceRecord(scopepath, raisedFrom)`
-  reads the row, hands it to `raisedFrom` and writes what comes back, all in one transaction, so
+* **The device record is raised, never lowered.** `doIncrementDeviceRecord(scopepath, incrementedFrom)`
+  reads the row, hands it to `incrementedFrom` and writes what comes back, all in one transaction, so
   two tabs raising at once never lower each other's record.
 * **Calls land in the order they were made.** Each verb calls its `do*` method before awaiting
   anything, so a store that starts each call's work in the order it is called keeps that order,
@@ -409,22 +409,22 @@ keep records by structured clone, never as JSON.
 
 ```ts
 import { openDB } from 'idb'
-import { Bank, DeviceDB, type DeviceRecord, type KeptLeaseRow } from 'safebyok'
+import { Bank, DeviceDB, type DeviceRecord, type CachedLeaseRow } from 'safebyok'
 
 // The app's own database, with an object store set aside for safebyok's rows from version 3 on.
 const appDB = openDB('acme', 3, { upgrade: (db, oldVersion) => { if (oldVersion < 3) { db.createObjectStore('safebyok_device') } } })
 
 class AcmeDeviceDB extends DeviceDB {
   protected async doGetLease(leaseScopepath: string) { return (await appDB).get('safebyok_device', leaseScopepath) }
-  protected async doPutLease(leaseScopepath: string, record: KeptLeaseRow) { await (await appDB).put('safebyok_device', record, leaseScopepath) }
+  protected async doPutLease(leaseScopepath: string, record: CachedLeaseRow) { await (await appDB).put('safebyok_device', record, leaseScopepath) }
   protected async doDelLease(leaseScopepath: string) { await (await appDB).delete('safebyok_device', leaseScopepath) }
   protected async doGetDeviceRecord(deviceScopepath: string) { return (await appDB).get('safebyok_device', deviceScopepath) }
   protected async doDelDeviceRecord(deviceScopepath: string) { await (await appDB).delete('safebyok_device', deviceScopepath) }
   protected async doDelAll() { await (await appDB).clear('safebyok_device') }
 
-  protected async doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) {
+  protected async doIncrementDeviceRecord(deviceScopepath: string, incrementedFrom: (stored: unknown) => DeviceRecord) {
     const tx = (await appDB).transaction('safebyok_device', 'readwrite')   // the read and the write, in one transaction
-    await tx.store.put(raisedFrom(await tx.store.get(deviceScopepath)), deviceScopepath)
+    await tx.store.put(incrementedFrom(await tx.store.get(deviceScopepath)), deviceScopepath)
     await tx.done
   }
 
@@ -507,7 +507,7 @@ warm up. The derivers above carry none.
 
 Data calls never contain UI, and no vault call takes a passphrase. A call that needs the vault
 unlocked -- `putBox`, `getBox`, `getWhisper`, `useWhisper`, `delBox` -- goes through
-`vault.ensureUnlocked()`, which says `hello()`, and, when the vault is locked or `novel`, raises a
+`vault.ensureUnlocked()`, which says `hello()`, and, when the vault is locked or `novel`, launches a
 **gating**: one request for the user's passphrase or passkey, handed to your `requestCleartext`.
 So do the changes only the user can prove: `vault.putWayin(slotlabel)`, `vault.delWayin('passkey')`
 and `vault.del()`. `safebyok-react`'s `BankProvider` is a `requestCleartext` already: its dialog.
@@ -556,8 +556,8 @@ const requestCleartext: RequestCleartext = async (gating) => {
   `renewMinutes` has the call ask again for itself. `ensureUnlocked()` waits out a change to the
   ways in or a deletion, whatever it settles with, then asks for itself only if the vault is
   still locked: declining "add a passkey" does not refuse a `getWhisper` waiting behind it, which
-  then raises its own unlock. `putWayin`, `delWayin` and `del` join one of their own kind and wait
-  out any other. A call raises at most one gating of its own. A `lock()` landing while a gating
+  then launches its own unlock. `putWayin`, `delWayin` and `del` join one of their own kind and wait
+  out any other. A call launches at most one gating of its own. A `lock()` landing while a gating
   is pending refuses every call joined to it `vault_locked`, and the bank letting the vault go
   (`bank.closeVault`) refuses them `vault_gone`; either way `gating.lockLanded` settles: close the
   dialog. An attempt under way
@@ -820,7 +820,7 @@ await vault.putWayin('passkey')      // put_passkey: the passkey put, replacing 
 await vault.delWayin('passkey')      // del_passkey: the passkey removed; delWayin('passphrase') refuses passphrase_required
 ```
 
-Each raises its gating, which your `requestCleartext` answers with the passphrase (and the next
+Each launches its gating, which your `requestCleartext` answers with the passphrase (and the next
 passphrase, or a new passkey's answer), and resolves the vault once the change is stored; the
 snapshot's `gate` shows it. Each leaves the vault unlocked, its lease
 starting again from now (`tryPutWayin` and `tryDelWayin` resolve the same as an `Outcome`). Each
@@ -1059,6 +1059,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `vault_remade`        | the vault was deleted and made anew on another device: what the call held belongs to the vault that was deleted. The Vault object is gone, and every later call on it refuses so | Ask the bank for the vault again (`bank.ensureVault`), and unlock the one stored now, with the passphrase chosen there |
 | `gate_moved`          | a vault unlocker changed while a call was under way -- the passphrase or passkey was changed, here or on another device -- so what the call held, proven under the old ones, opens nothing now | Unlock again: the vault asks for the passphrase as it is now |
 | `gating_landed`       | a gating's attempt under way, or made, was for a gating that ended meanwhile -- a `lock()` landed, or it was settled or declined -- so it attached no lease | Nothing: the user asks again when they want the vault |
+| `declined`            | a gating of the coming vault models (not yet exported) was declined: the user cancelled it (`decline()`), or the host's dialog closed with the gating still open. Nothing was unlocked or changed | Nothing to retry: the user said no. Call again when they want the vault |
 | `attempt_in_flight`   | a gating's attempt was made while another of its attempts was under way, so it was not tried | Disable the dialog's submit while an attempt runs |
 | `same_passphrase`     | a `change_passphrase` attempt whose next passphrase is the current one; the gating stays open | Show it in place, and ask for a different one |
 | `no_whisper`          | a `putBox()` left out the whisper, to keep the one the box holds, and no box is stored under that label | Hand `putBox()` the whisper to store |

@@ -1,5 +1,5 @@
 import type * as Z from 'zod'
-import { DeviceRecordFormat, type DeviceRecord, type KeptLeaseRow } from './shapes/device'
+import { DeviceRecordFormat, type DeviceRecord, type CachedLeaseRow } from './shapes/device'
 import * as DX from './shapes/device'
 import type { VaultScope } from './shapes/scopes'
 import * as CX from './shapes/scopes'
@@ -9,7 +9,7 @@ import { type Outcome, outcomeOf } from './outcome'
 import { isStorageBlocked } from './refusals'
 
 /** Storage on this device for what it keeps of each vault: its lease, which survives a page reload, and its device record. Extend it, and implement its `do*` methods against your store.
- * Nothing here ever goes to the backend. A {@link KeptLeaseRow} holds a non-extractable leaseKey, a
+ * Nothing here ever goes to the backend. A {@link CachedLeaseRow} holds a non-extractable leaseKey, a
  * CryptoKey with no JSON form, so a store keeps records by structured clone or in memory, never as
  * JSON. `memoryDeviceDB` and `idbDeviceDB` (from `safebyok/idb`) are the two supplied; the README's
  * *Your own storage adapter* shows a third, and `describeDeviceDB` (from `safebyok/testing`) checks
@@ -30,7 +30,7 @@ import { isStorageBlocked } from './refusals'
  * **Calls land in the order they were made.** Each verb calls its `do*` method before it awaits
  * anything, so a store that starts each call's work in the order it is called keeps one scope's
  * calls in the order the vault made them, awaited or not: a lock's `tryDelLease`, made after a
- * grant's `tryPutLease`, must erase it. `doRaiseDeviceRecord` and `doDelUnparsed` each say what
+ * grant's `tryPutLease`, must erase it. `doIncrementDeviceRecord` and `doDelUnparsed` each say what
  * else they owe.
  *
  * @example
@@ -42,33 +42,33 @@ import { isStorageBlocked } from './refusals'
 export abstract class DeviceDB {
   // == [Lease verbs]: getLease, putLease, delLease, their try forms
 
-  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryGet`, which checks it and holds it closed; the vault judges whether it still fits.
+  /** Read the lease of one vault, or null for none. The core reads it through `CachedLease.tryGet`, which checks it and holds it closed; the vault judges whether it still fits.
    *
    * @example await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
    */
-  async getLease(scope: VaultScope): Promise<KeptLeaseRow | null> {
+  async getLease(scope: VaultScope): Promise<CachedLeaseRow | null> {
     const leaseScopepath = Scopepath.lease(scope)
     const raw = await storeAnswer('getLease', () => this.doGetLease(leaseScopepath))
-    return await this.#parseOrDel('getLease', DX.keptLeaseRow, leaseScopepath, raw)
+    return await this.#parseOrDel('getLease', DX.cachedLeaseRow, leaseScopepath, raw)
   }
 
   /** The lease of one vault, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.getLease}.
    *
    * @example await deviceDB.tryGetLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
    */
-  tryGetLease(scope: VaultScope): Promise<Outcome<KeptLeaseRow | null>> {
+  tryGetLease(scope: VaultScope): Promise<Outcome<CachedLeaseRow | null>> {
     return outcomeOf(() => this.getLease(scope))
   }
 
   /** Store `record` as the lease of its vault, in place of any before, resolving the record as stored. */
-  async putLease<RowT extends KeptLeaseRow>(record: RowT): Promise<RowT> {
+  async putLease<RowT extends CachedLeaseRow>(record: RowT): Promise<RowT> {
     const leaseScopepath = Scopepath.lease(record)
     await storeAnswer('putLease', () => this.doPutLease(leaseScopepath, record))
     return record
   }
 
   /** The lease as stored, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.putLease}. */
-  tryPutLease<RowT extends KeptLeaseRow>(record: RowT): Promise<Outcome<RowT>> {
+  tryPutLease<RowT extends CachedLeaseRow>(record: RowT): Promise<Outcome<RowT>> {
     return outcomeOf(() => this.putLease(record))
   }
 
@@ -84,7 +84,7 @@ export abstract class DeviceDB {
   }
   // --
 
-  // == [Device record verbs]: getDeviceRecord, raiseDeviceRecord, delDeviceRecord, delAll, their try forms
+  // == [Device record verbs]: getDeviceRecord, incrementDeviceRecord, delDeviceRecord, delAll, their try forms
 
   /** Read this device's record of one scope, or null for none. The bank judges what it says.
    * A record misfiled under the scope, naming another, reads as none, as a malformed one does: it
@@ -107,23 +107,23 @@ export abstract class DeviceDB {
   }
 
   /** Store `record` as this device's record of its scope, never lowering what is stored, resolving the record as stored, or null where that fails its check.
-   * The store keeps what {@link raisedDeviceRecord} makes of the stored record and `record`, in one
+   * The store keeps what {@link incrementedDeviceRecord} makes of the stored record and `record`, in one
    * transaction, so a tab that saw less never lowers what another saw. Hand it a record
    * {@link deviceRecordOf} made: one that fails its check may be stored as it came, and resolves null.
    */
-  async raiseDeviceRecord(record: DeviceRecord): Promise<DeviceRecord | null> {
-    let raised = record
+  async incrementDeviceRecord(record: DeviceRecord): Promise<DeviceRecord | null> {
+    let incremented = record
     const deviceScopepath = Scopepath.device(record)
-    await storeAnswer('raiseDeviceRecord', () => this.doRaiseDeviceRecord(deviceScopepath, (stored) => {
-      raised = raisedDeviceRecord(stored, record)
-      return raised
+    await storeAnswer('incrementDeviceRecord', () => this.doIncrementDeviceRecord(deviceScopepath, (stored) => {
+      incremented = incrementedDeviceRecord(stored, record)
+      return incremented
     }))
-    return deviceRecordFor(deviceScopepath, raised)
+    return deviceRecordFor(deviceScopepath, incremented)
   }
 
-  /** The device record as stored, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.raiseDeviceRecord}. */
-  tryRaiseDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord | null>> {
-    return outcomeOf(() => this.raiseDeviceRecord(record))
+  /** The device record as stored, or null, as an {@link Outcome}: the non-throwing form of {@link DeviceDB.incrementDeviceRecord}. */
+  tryIncrementDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceRecord | null>> {
+    return outcomeOf(() => this.incrementDeviceRecord(record))
   }
 
   /** Erase this device's record of one scope. */
@@ -159,24 +159,24 @@ export abstract class DeviceDB {
   }
   // --
 
-  // == [The half you write]: doGetLease, doPutLease, doDelLease, doGetDeviceRecord, doRaiseDeviceRecord, doDelDeviceRecord, doDelAll, doDelUnparsed
+  // == [The half you write]: doGetLease, doPutLease, doDelLease, doGetDeviceRecord, doIncrementDeviceRecord, doDelDeviceRecord, doDelAll, doDelUnparsed
 
   // --------------------------------------------------------------------------- the half you write
 
   /** Read the row under `leaseScopepath` exactly as stored, undefined or null for none. */
   protected abstract doGetLease(leaseScopepath: Scopepath.LeaseScopepath): Promise<unknown>
   /** Store `record` under `leaseScopepath`, in place of any row there. */
-  protected abstract doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: KeptLeaseRow): Promise<void>
+  protected abstract doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: CachedLeaseRow): Promise<void>
   /** Delete the row under `leaseScopepath`, if any. */
   protected abstract doDelLease(leaseScopepath: Scopepath.LeaseScopepath): Promise<void>
   /** Read the row under `deviceScopepath` exactly as stored, undefined or null for none. */
   protected abstract doGetDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath): Promise<unknown>
-  /** Read the row under `deviceScopepath` (undefined for none), hand it to `raisedFrom`, and store what that returns, as one read-modify-write.
+  /** Read the row under `deviceScopepath` (undefined for none), hand it to `incrementedFrom`, and store what that returns, as one read-modify-write.
    * No write may land between the read and the write, or two tabs raising at once could lower each
-   * other's record. A store that runs the transaction again on a conflict calls `raisedFrom` again,
-   * with the row it then reads. Let a throw from `raisedFrom` abort the transaction.
+   * other's record. A store that runs the transaction again on a conflict calls `incrementedFrom` again,
+   * with the row it then reads. Let a throw from `incrementedFrom` abort the transaction.
    */
-  protected abstract doRaiseDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, raisedFrom: (stored: unknown) => DeviceRecord): Promise<void>
+  protected abstract doIncrementDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, incrementedFrom: (stored: unknown) => DeviceRecord): Promise<void>
   /** Delete the row under `deviceScopepath`, if any. */
   protected abstract doDelDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath): Promise<void>
   /** Delete every lease and device record this store keeps. */
@@ -211,7 +211,7 @@ class MemoryDeviceDB extends DeviceDB {
     return Promise.resolve(this.#rows.get(leaseScopepath))
   }
 
-  protected doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: KeptLeaseRow): Promise<void> {
+  protected doPutLease(leaseScopepath: Scopepath.LeaseScopepath, record: CachedLeaseRow): Promise<void> {
     this.#rows.set(leaseScopepath, record)
     return Promise.resolve()
   }
@@ -225,8 +225,8 @@ class MemoryDeviceDB extends DeviceDB {
     return Promise.resolve(this.#rows.get(deviceScopepath))
   }
 
-  protected doRaiseDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, raisedFrom: (stored: unknown) => DeviceRecord): Promise<void> {
-    this.#rows.set(deviceScopepath, raisedFrom(this.#rows.get(deviceScopepath)))
+  protected doIncrementDeviceRecord(deviceScopepath: Scopepath.DeviceScopepath, incrementedFrom: (stored: unknown) => DeviceRecord): Promise<void> {
+    this.#rows.set(deviceScopepath, incrementedFrom(this.#rows.get(deviceScopepath)))
     return Promise.resolve()
   }
 
@@ -246,7 +246,7 @@ class MemoryDeviceDB extends DeviceDB {
   }
 }
 
-/** The device record a {@link DeviceDB.raiseDeviceRecord} stores, given what is stored under its scopepath (`stored`, as read, unchecked) and the `record` handed to it.
+/** The device record a {@link DeviceDB.incrementDeviceRecord} stores, given what is stored under its scopepath (`stored`, as read, unchecked) and the `record` handed to it.
  * Where `stored` is a device record of the same scope, it keeps its `device_id`, and the higher
  * `highest_vault_epoch` of the two: a lower one never replaces a higher. Anything else stored --
  * none, or a row that fails its check -- gives way to `record` as it came.
@@ -255,22 +255,22 @@ class MemoryDeviceDB extends DeviceDB {
  * record to a `record` whose `highest_vault_epoch` fails its check. The core never hands a DeviceDB
  * such a record: only a host's own call can, and the throw aborts the raise's transaction.
  *
- * @example raisedDeviceRecord(undefined, record)                                    // record
- * @example raisedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch   // 5
+ * @example incrementedDeviceRecord(undefined, record)                                    // record
+ * @example incrementedDeviceRecord({ ...record, highest_vault_epoch: 5 }, { ...record, highest_vault_epoch: 3 }).highest_vault_epoch   // 5
  */
-export const raisedDeviceRecord = (stored: unknown, record: DeviceRecord): DeviceRecord => {
+export const incrementedDeviceRecord = (stored: unknown, record: DeviceRecord): DeviceRecord => {
   const checked = DX.deviceRecord.safeParse(stored)
   if (! checked.success || Scopepath.device(checked.data) !== Scopepath.device(record)) { return record }
-  const kept = checked.data
-  if (kept.highest_vault_epoch >= record.highest_vault_epoch) { return kept }
-  return deviceRecordOf(kept, kept.device_id, record.highest_vault_epoch)
+  const storedRecord = checked.data
+  if (storedRecord.highest_vault_epoch >= record.highest_vault_epoch) { return storedRecord }
+  return deviceRecordOf(storedRecord, storedRecord.device_id, record.highest_vault_epoch)
 }
 
 /** The device record of `scope` holding `device_id` and `highest_vault_epoch`, frozen: built from the scope's parsed names, so nothing else `scope` carries is stored.
  * Throws 'bad_scope' for a scope that fails its check, and 'bad_record' for a `device_id` or an
  * epoch that does.
  *
- * @example deviceDB.raiseDeviceRecord(deviceRecordOf(vault, deviceId, vaultEpoch))   // a Vault object passes as its scope
+ * @example deviceDB.incrementDeviceRecord(deviceRecordOf(vault, deviceId, vaultEpoch))   // a Vault object passes as its scope
  */
 export const deviceRecordOf = (scope: VaultScope, device_id: string, highest_vault_epoch: number): DeviceRecord => {
   const { applabel, user_id, vaultlabel } = CX.vaultScope.parse(scope)
@@ -301,7 +301,7 @@ const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }
   putLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
   delLease: { failed: "erasing the lease it keeps for this vault, so the next vault made on this device, as at the next page load, may still take it up" },
   getDeviceRecord:   { failed: "reading its record of this vault (the newest copy of the vault it has seen), so the vault could not check storage against it" },
-  raiseDeviceRecord: { failed: "writing its record of this vault (the newest copy of the vault it has seen), so it may not be kept" },
+  incrementDeviceRecord: { failed: "writing its record of this vault (the newest copy of the vault it has seen), so it may not be kept" },
   delDeviceRecord:   { failed: "erasing its record of this vault, so it still holds the newest copy of the vault it had seen" },
   delAll:   { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
 }

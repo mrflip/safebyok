@@ -166,8 +166,8 @@ const DamagedListings = [
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, written_at: 1_792_022_400_000.5 }), 'damaged',      'whose written_at holds a fraction of a millisecond'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, sidecar: undefined }),              'damaged',      'whose sidecar is gone'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v9' }),       'newer_format', 'written in a format this version does not know, which a newer one may have written'],
-  [({ sidecar: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v7', sidecar_json: JSON.stringify(kept) }), 'damaged', 'written before the sidecar was a JSON value, as safebyok-box-v7 with its sidecar_json'],
-  [({ written_at: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v3', changed_at: kept }), 'damaged', 'written before written_at, as safebyok-box-v3 with its changed_at'],
+  [({ sidecar: was, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v7', sidecar_json: JSON.stringify(was) }), 'damaged', 'written before the sidecar was a JSON value, as safebyok-box-v7 with its sidecar_json'],
+  [({ written_at: was, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v3', changed_at: was }), 'damaged', 'written before written_at, as safebyok-box-v3 with its changed_at'],
 ] as const
 
 /** A world holding `anthropic`, spoiled by `spoil`, beside a sound `openai` with a sidecar; and the vault that stored them, unlocked. */
