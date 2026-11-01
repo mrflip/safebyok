@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 3a, 3b, 6, 9 filed; 4a in review; 3c building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
+* **Status:** 1, 2, 3a, 3b, 4a, 6, 9 filed; 3c and 4b building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
 
 ## Read first
 
@@ -241,6 +241,8 @@ thread 1). *Orchestrator:* also aligns the models-world test fake, which writes 
 **Look-ahead:** 4b adds `evict` beside `ensure`; 5 plumbs the deviceDB to each vault; 7b reads
 `onBadNews` from the bank's options. **Size:** M.
 
+*Review:* (#432, medium, fixed) a chai form, quotes, a `TH` import, a doc line. Left: the `KeyDeriver` switch to the old type only quiets a test helper (restack takes thread 2's), a tombstoned vault re-ensured asks before refusing (to 8), a lost build's new passphrase untold (to 7b, YOLO), a joined call drops its cleartexts (to 4b, YOLO), a failed re-hello of a ready bank reads `refused` (Coach's call), test casts, style nits.
+
 ### 4b. bank_eviction
 
 > * `Listing.evict(scope)`: `try { thing.evict() }`, remove the thing, remake the snapshot.
@@ -251,7 +253,7 @@ thread 1). *Orchestrator:* also aligns the models-world test fake, which writes 
 *Gloss.* `listing.ts`, `bank.ts`, `vault.ts`/`box.ts` `evict`. A box's disarm on eviction drops
 its exposed whisper; on `lock()` alone the whisper stays (the Coach's ruling, thread 9).
 *Orchestrator:* sign-out needs thread 6's store signal, so it is wired in 7b, which stands on
-both. **Levels:** worker medium effort. *Orchestrator:* lock and eviction also settle an open gating; `Vault.#leaseChore` onto es-toolkit's `Mutex` (YOLO, #430 review). The disarm also clears a box's exposed whisper when a tombstone or a newer revision lands (YOLO, #428 review).
+both. **Levels:** worker medium effort. *Orchestrator:* a call to `ensureVault` that hands its own cleartexts does not join one in flight (YOLO, #432 review). Lock and eviction also settle an open gating; `Vault.#leaseChore` onto es-toolkit's `Mutex` (YOLO, #430 review). The disarm also clears a box's exposed whisper when a tombstone or a newer revision lands (YOLO, #428 review).
 **Depends on:** 4a. **Look-ahead:** 8 evicts on
 deletion and on a received tombstone. **Size:** S.
 
@@ -324,7 +326,7 @@ wayin damage as trouble. **Size:** M.
 > `gate_epoch`.
 
 *Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
-`VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* from thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
+`VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* tell the host when a lost two-device build discarded the passphrase just chosen, with 3c's "set on another device" sentence (YOLO, #432 review). From thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
 effort; review `high` (guarantees). **Depends on:** 3d, 5, 6, 7a. **Size:** M.
 
 ### 8. vault_deletion
