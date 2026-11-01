@@ -23,9 +23,7 @@ export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
 
-/** What `Bank.make` takes. `keyDeriver` is required, with no default, so a host that never derives bundles no Argon2id: in a browser, spread `browserOpts()`.
- * `strengthChecker` is optional; left out, every new passphrase is refused until the host configures one (`notes/configuration.md`).
- */
+/** The options `Bank.make` takes. */
 export type BankOpts = {
   applabel:             string
   user_id:              string
@@ -33,8 +31,10 @@ export type BankOpts = {
   vaultStore:           VaultStore
   vaultCache:           VaultCache
   deviceDB:             LeaseDeviceDB
+  /** Required, with no default, so a host that brings its own deriver bundles no Argon2id: in a browser, spread `browserOpts()`. */
   keyDeriver:           KeyDeriver
   requestCleartext?:    RequestCleartext | undefined
+  /** Left out, every new passphrase is refused as weak until the host configures one (`notes/configuration.md`). */
   strengthChecker?:     StrengthChecker | undefined
   clock?:               Clock | undefined
   logger?:              VaultLogger | undefined
