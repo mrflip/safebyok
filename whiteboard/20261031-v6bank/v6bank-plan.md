@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** all filed but 5b (building); the restack is under way on local `v6line/*` branches (originals untouched, nothing pushed until the Coach allows force-push); then thread S seams, then 7b.
+* **Status:** every thread up to 7a filed; the line restacked locally (`v6line/*`); 5b waits unfiled on the Coach (two G4 gaps after a second review); S building on the line; 7b and on wait on 5b's ruling and on force-push.
 
 ## Read first
 
@@ -334,6 +334,8 @@ wayin damage as trouble. **Size:** M.
 *Review:* (#436, medium, fixed) a lock during the pre-launch fetch launched a dialog that could not succeed (now refuses `vault_locked`, tested); doc fixes. Left: verbs on a damaged vault refuse by the wrong kind (to 12), unneeded snapshot cost on unadopted receives, `pesterMillis` accepts `Infinity` (to 10), 3b's loose ends (restack).
 
 *Review:* (#437, high, flagged — filed as it stands) seven fixes, among them idb `doDelDamaged` settling before its transaction committed. Significant, latent: the highest epoch is kept per vaultlabel, so a vault deleted and remade elsewhere would be refused for good (to 7b: key by `vault_tok`, YOLO). Left: hello refused by a failed device store (Coach), a damaged device record reset silently (5b logger, 7b telling), `findCachedVaults`' all-or-nothing erasures, the filing check vs central's scope (5b), whole-db `doFind`, style.
+
+*Review:* (#438, high, flagged twice) first: a reopen after `closeVault` could answer unlocked (per-instance lease mutex) — reworked to one mutex per scope on the listing, and a close during `putDraft` leaves the vault locked. Second: two G4 gaps remain — a close before `ensure` begins (during the fetch or the build dialog, or `closeVaults` while a vault is stored) is lost; the scope mutex does not reach across banks sharing a deviceDB. Per the skill, no third review: **the Coach's** (Open Matters, TOP). 5b waits unfiled in `/workspace/byok-lease_plumbing` at 9602d12b, pushed.
 
 ### Restack (before S and 7b)
 
