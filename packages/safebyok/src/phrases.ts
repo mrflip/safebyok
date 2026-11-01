@@ -326,6 +326,21 @@ export const AnswerOfOtherScope = "Storage answered for a scope other than the o
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
+// == [Models: stores]: VaultRowDamaged, BoxRowDamaged, ScopeOutsideStore, StoreRowsMiscounted
+
+/** Why a vault row that does not read as a vault record or its tombstone is refused. */
+export const VaultRowDamaged = "The vault stored under this scope does not read as a vault record this version writes, nor as its tombstone: it was damaged, or written by another version. It was left as it is: no way in can be tried, and nothing can be stored over it until it is removed."
+
+/** Why a box row that does not read as a box record or its tombstone is refused. */
+export const BoxRowDamaged = "The box stored under this scope does not read as a box record this version writes, nor as its tombstone: it was damaged, or written by another version. It was left as it is, and nothing can be stored over it until it is removed."
+
+/** Why a store asked about a scope outside the bank or vault it was made for refuses. */
+export const ScopeOutsideStore = "This store was made for one bank's vaults or one vault's boxes, and was asked about a scope outside them: ask the store made for that scope."
+
+/** Why rows a store front's doGetRows answered in another number than asked are refused. */
+export const StoreRowsMiscounted = "The store front's doGetRows answered other than one row, or null, for each scopepath asked, in order: a bug in the storage adapter."
+// --
+
 // == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, ProofClosureThrew, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */

@@ -53,6 +53,17 @@ export const boxAbsent = (boxlabel: string): VaultError => new VaultError('absen
 export const closureWithRecord = (): VaultError => new VaultError('bad_option', Phrases.ClosureWithRecord)
 // --
 
+// == [Stores]: damagedVaultRow, damagedBoxRow, scopeOutsideStore, storeRowsMiscounted
+
+export const damagedVaultRow = (): VaultError => new VaultError('damaged_vault', Phrases.VaultRowDamaged)
+
+export const damagedBoxRow = (): VaultError => new VaultError('damaged_box', Phrases.BoxRowDamaged)
+
+export const scopeOutsideStore = (): VaultError => new VaultError('bad_scope', Phrases.ScopeOutsideStore)
+
+export const storeRowsMiscounted = (): VaultError => new VaultError('corrupt_record', Phrases.StoreRowsMiscounted)
+// --
+
 // == [Leases]: damagedLease, unopenedWhisper, leaseNotInForce
 
 export const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)

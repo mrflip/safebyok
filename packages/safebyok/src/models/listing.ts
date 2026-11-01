@@ -83,7 +83,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       if (! revived.ok) { this.tellBadNews([revived.err]) }
     }
     this.#remakeSnapshot()
-    this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope))
+    this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope), this.#onChange)
     await this.hydrateAll()
   }
 
@@ -265,7 +265,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [The watch]: onNotice
+  // == [The watch]: onNotice, onChange
 
   /** Deliver a notice as a good answer. Any refusal met on the way, a malformed notice's, the world's or one `receive` throws, is bad news, as nobody asked: told to `onBadNews`, never thrown into the store's watch. */
   readonly #onNotice = async (notice: Notice<RecordT, SparseT>): Promise<void> => {
@@ -277,6 +277,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     })
     if (! ok) { this.tellBadNews([err]) }
   }
+
+  /** Fetch every instance again, whatever its age: the store's watch rings it where it cannot say what changed, so each instance meets what storage now answers, a refusal told as bad news. */
+  readonly #onChange = (): void => { void this.hydrateAll({ maxMillisSinceRefresh: 0 }) }
   // --
 
   // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, remakeSnapshot

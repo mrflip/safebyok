@@ -40,7 +40,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the scopepaths an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(Safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
+    expect(Object.keys(Safebyok.Scopepath)).to.have.members(['Delimiter', 'bank', 'vault', 'lease', 'device', 'box', 'bankScope', 'vaultScope', 'boxscope', 'isLease', 'isDevice', 'isBox', 'withinBankScopepathPrefix', 'withinBankScopepathPred', 'withinVaultScopepathPrefix', 'withinVaultScopepathPred'])
   })
 
   it("exports each validator a host or an adapter calls by name, no namespace of them, each the object its module makes, and Checkers, Checker, objCheck and their kit to make more", () => {

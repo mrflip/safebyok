@@ -17,6 +17,7 @@ import type { CipherCtxRecord } from '../crypto'
 import * as VX from '../shapes/vault'
 import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
 import type { Clock } from '../shapes/bank-opts'
+import type { StringStore } from '../string-store'
 import type { VaultScope } from '../shapes/scopes'
 import { sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
@@ -88,10 +89,9 @@ export type Vaulted = Readonly<Z.infer<typeof vaulted>>
 export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
 
 /** The sparse form of a thing damaged or gone: every sparse prop stays on it, for the record; nothing the user put in the thing does. {@link tombstone} checks what the base knows of one.
- * A stored record that fails its check arrives as a tombstone, `am` 'd': the sparse props as far
- * as storage recovered them, and the kind's constants filled in by the adapter, so that the
- * concrete listing's `sparseOf` accepts it. Where that much cannot be recovered, the store
- * refuses 'corrupt_record' instead. For a box, see {@link boxSparse}.
+ * A store makes no tombstone of a row that reads as neither the kind's record nor its tombstone:
+ * it refuses it by name, 'damaged_box' or 'damaged_vault'. A row stored as a tombstone, `am` 'd'
+ * or 'x', is delivered as stored. For a box, see {@link boxSparse}.
  */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals[number] }>
 
@@ -139,13 +139,13 @@ export const { answer, notice } = Checkers('bad_record', ({ obj, union, lit, unk
 type AnswerBase<ScopeT> = Readonly<{ scope: ScopeT, world: unknown }>
 
 /** The outcome of a storage call about `scope`, as the concrete listing maps it: an {@link Outcome} whose `val` is the record stored (null for none), or whose `err` is the refusal, with the `scope` and the `world` it lies in as storage holds it now beside it.
- * Whatever an `Outcome` carries, an answer carries. A stored record that fails its check is
- * delivered as a damaged {@link Tombstone}, in the kind's sparse form, or refused 'corrupt_record'
- * by the store. {@link answer} checks what the base knows of one.
+ * Whatever an `Outcome` carries, an answer carries. A stored row that reads as neither the kind's
+ * record nor its tombstone is refused by name, 'damaged_box' or 'damaged_vault', and never delivered.
+ * {@link answer} checks what the base knows of one.
  */
 export type Answer<ScopeT, RecordT, SparseT> = Outcome<Fetched<RecordT, SparseT> | null> & AnswerBase<ScopeT>
 
-/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least; a damaged one arrives as {@link Answer} says, a {@link Tombstone}. {@link notice} checks what the base knows of one. */
+/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least. A row that does not read sends no notice: the watch rings its `onChange` instead. {@link notice} checks what the base knows of one. */
 export type Notice<RecordT, SparseT> = Readonly<{ record: Fetched<RecordT, SparseT>, world: unknown }>
 // --
 
@@ -440,14 +440,15 @@ export type ListingWorld = World & {
  * * Over a row under another `revision_tok` than `priorRevisionTok` (any row, where `priorRevisionTok` is null; a tombstone is a row), it refuses 'stale_write', carrying that row.
  * * Over the row under `priorRevisionTok`, it lands only at that row's `revision_seq` + 1, which storage computes or queries itself; any other `revision_seq` refuses 'bad_record'.
  * A put that lands keeps the record exactly as given, never renumbered or patched, and answers what storage then holds.
- * `del` follows the same `priorRevisionTok` rule and answers the tombstone it lands, at the row's `revision_seq` + 1 under a fresh `revision_tok`; over no row, with `priorRevisionTok` null, it lands a tombstone at revision 0.
- * `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most.
+ * `del` follows the same `priorRevisionTok` rule and answers the tombstone it lands, at the row's `revision_seq` + 1 under a fresh `revision_tok`; over no row, with `priorRevisionTok` null, it lands nothing and answers null.
+ * A row that reads as neither the kind's record nor its tombstone is refused by name, 'damaged_box' or 'damaged_vault', by each verb that meets it, and nothing is stored over it.
+ * `watch` pushes a notice for every change since it began; `fullFor` names the scopes to push full records for, every other notice sparse at most. Where it cannot say what changed (its backend failed, a row does not read, or one vanished) it rings `onChange`, so each thing fetches again and meets the refusal itself.
  */
 export type Store<ScopeT, RecordT, SparseT> = {
   get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
   put(record: RecordT, priorRevisionTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
   del(scope: ScopeT, priorRevisionTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
-  watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
+  watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[], onChange: () => void): () => void
 }
 
 /** The deviceDB's cache of one kind of thing: loaded once, by the listing's `hello`; saved by each instance's settle, the listing handing it to each instance it makes.
@@ -486,6 +487,42 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
 export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
   world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, demandLease: fn() }),
 }), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
+// --
+
+// == [Store fronts]: storeFrontOpts, localStoreFrontOpts, storeWatchArgs, priorRevisionTok, storeRows, foundRows, StoreFrontOpts, LocalStoreFrontOpts, FoundRow
+
+/** The check of a `StoreFront`'s options: a `clock`, which stamps each tombstone it lands, `wallClock` where left out. Its `parse` refuses 'bad_option'. */
+export const storeFrontOpts = objCheck(() => ({ clock: HX.clockShape.optional() }), 'bad_option')
+
+/** The check of `localStoreFront`'s options: a `store` carrying a StringStore's five calls, and the `clock` {@link storeFrontOpts} takes. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
+export const localStoreFrontOpts = objCheck(({ obj, fn }) => {
+  const call = fn()
+  return {
+    store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape),
+    clock: HX.clockShape.optional(),
+  }
+}, 'bad_option')
+
+/** The check of what a store's `watch` is handed: its `onNotice`, `fullFor` and `onChange`, each a function. Its `parse` refuses 'bad_option'. */
+export const storeWatchArgs = objCheck(({ fn }) => ({ onNotice: fn(), fullFor: fn(), onChange: fn() }), 'bad_option')
+
+/** The check of a `put` or `del`'s `priorRevisionTok`: a `revision_tok`, or null for no record held. Its `parse` refuses 'bad_record'. */
+export const priorRevisionTok = Checker(({ revision_tok }) => revision_tok.nullable(), 'bad_record', [FX])
+
+/** The checks of what a store front's hooks answer, each refusing 'corrupt_record', a bug in the adapter: `storeRows`, `doGetRows`' list of rows, and `foundRows`, `doFindRows`' list of `{ scopepath, row }`. Checks only: each row is judged as the kind's. */
+export const { storeRows, foundRows } = Checkers('corrupt_record', ({ arr, obj, str, unk }) => ({
+  storeRows: arr(unk),
+  foundRows: arr(obj({ scopepath: str, row: unk })),
+}))
+
+/** The options of a `StoreFront`, as {@link storeFrontOpts} checks them. */
+export type StoreFrontOpts = { clock?: Clock | undefined }
+
+/** The options of `localStoreFront`, as {@link localStoreFrontOpts} checks them: where the rows live (`domStore(localStorage, prefix)`, `memoryStore()`, or a StringStore of your own), and the clock. */
+export type LocalStoreFrontOpts = StoreFrontOpts & { store: StringStore }
+
+/** A row `doFindRows` found: its `scopepath`, and the `row` as stored, unjudged. */
+export type FoundRow = Z.infer<typeof foundRows>[number]
 // --
 
 // == [Making a storable]: storableArgs
