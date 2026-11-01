@@ -791,7 +791,7 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
 
 describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault record, and nowhere in the sparse form", () => {
   const { boxlabel: _boxlabel, ...vaultscope } = scope
-  const sparseVault = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps }
+  const sparseVault = { ...vaultscope, fmt: MSX.VaultFormat, gate_epoch: MSX.FirstGateEpoch, ...baseProps }
 
   const gate = { passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
@@ -800,9 +800,12 @@ describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault recor
     [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
     [sparseVault,                    false, 'refuses a record without its gate'],
     [{ ...sparseVault, gate: {} },   false, 'refuses a gate without its wayins'],
+    [{ ...sparseVault, gate, gate_epoch: undefined }, false, 'refuses a record without its gate_epoch'],
+    [{ ...sparseVault, gate, gate_epoch: -1 },        false, 'refuses a negative gate_epoch'],
+    [{ ...sparseVault, gate, gate_epoch: 1.5 },       false, 'refuses a gate_epoch that is not whole'],
   ])
 
-  it("strips the gate from the sparse form", () => {
+  it("strips the gate from the sparse form, and keeps its gate_epoch, so a notice tells of a gate moved", () => {
     expect(MSX.vaultSparse.parse({ ...sparseVault, gate })).to.deep.equal(sparseVault)
   })
 })

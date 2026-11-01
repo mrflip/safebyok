@@ -9,9 +9,8 @@ useVaultWorlds()
 const Replacing = Object.freeze({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
 
 describe("Vault.replacePassphrase(cleartexts)", () => {
-  it("replaces the passphrase wayin and keeps the passkey wayin as stored: the new passphrase opens, the old refuses 'wrong_passphrase', the passkey still opens, and the lease held stays in force", async () => {
+  it("replaces the passphrase wayin and keeps the passkey wayin as stored: the new passphrase opens, the old refuses 'wrong_passphrase', and the passkey still opens", async () => {
     const { vault, demandStored, requestCleartext, opts: { world } } = await makeBornVaultWithPasskey()
-    const held = vault.demandLease()
     const ante = demandStored().gate
     expect(await vault.replacePassphrase({ ...Replacing })).to.equal(vault)
     expect(requestCleartext).not.toHaveBeenCalled()
@@ -24,9 +23,7 @@ describe("Vault.replacePassphrase(cleartexts)", () => {
     expect(byKey.wayinkind).to.eq('passkey')
     const proving = await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
     const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis })
-    expect(vault.demandLease()).to.equal(held)
-    expect(held.isInForce).to.be.true
-    expect(await roundTrip(held, lease)).to.eq('sk-test')
+    expect(await roundTrip(vault.demandLease(), lease)).to.eq('sk-test')
     lease.evict()
   })
 

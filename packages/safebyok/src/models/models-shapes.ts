@@ -593,9 +593,12 @@ export type GateProps = Z.infer<typeof gateProps>
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const VaultFormat = 6001
 
+/** The `gate_epoch` of a vault's first gate: above the 0 a device answers for having seen none, and moved up by one at each change of the gate. */
+export const FirstGateEpoch = 1
+
 /** The checks of a vault's forms, each refusing 'bad_record', from a record or from a vault ducking as one: `vaultSparse`, a plain copy of the scope and the base's fields, the rest stripped; `vaultRecord`, those fields and the `gate`, its wayins as {@link gateProps} checks them, strict, as a stored record is. A vault record is never without its gate. The scope alone is `vaultScope` in shapes/scopes. */
-export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, applabel, user_id, vaultlabel }) => {
-  const vaultSparse = obj({ applabel, user_id, vaultlabel, fmt: lit(VaultFormat), ...sparseBase.shape })
+export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, uint, applabel, user_id, vaultlabel }) => {
+  const vaultSparse = obj({ applabel, user_id, vaultlabel, fmt: lit(VaultFormat), gate_epoch: uint, ...sparseBase.shape })
   const vaultRecord = vaultSparse.extend({ gate: gateProps }).strict()
   return { vaultRecord, vaultSparse }
 }, [FX])
@@ -657,8 +660,8 @@ export const { provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAtte
 
 export const LeaseFormat = ModelsLeaseFormat
 
-export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, custom, epochMillis, vault_key_lease_wrapped }) => {
-  const leaseStamp  = obj({ fmt: lit(LeaseFormat), ...vaultStamp.shape, autolock_at: epochMillis })
+export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, uint, custom, epochMillis, vault_key_lease_wrapped }) => {
+  const leaseStamp  = obj({ fmt: lit(LeaseFormat), ...vaultStamp.shape, gate_epoch: uint, autolock_at: epochMillis })
   const leaseRecord = leaseStamp.extend({
     lease_key:               custom<CryptoKey>(isLeaseKey, Phrases.LeaseKeyExpected),
     vault_key_lease_wrapped: vault_key_lease_wrapped.readonly(),
@@ -675,7 +678,7 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
 /** What a lease needs of its vault: the stamp, the clock, and `lock()`, called when the lease proves damaged or its autolock fires. The lease erases nothing itself then: `lock()` erases the lease the device keeps, by scope, whether or not the vault holds one. */
-export type LeaseVault = VaultStamp & { clock: Clock, lock(): unknown }
+export type LeaseVault = VaultStamp & { gate_epoch: number, clock: Clock, lock(): unknown }
 
 /** The deviceDB as a lease reaches it, bound to the vault's scope by the vault that makes the friend, so no verb takes a scope. */
 export const leaseDBFriend = objCheck(({ fn }) => ({
@@ -700,8 +703,8 @@ const isCtxStamp = (val: unknown): boolean => (
 )
 
 /** The arguments of each lease verb. A stamp is the caller's own fields fixed for its record's life, flat; the lease binds each under the vault's stamp and its own purpose (`box_key_wrapped`, `whisper_ciphered`), so the purposes never leave it. */
-export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, fn, custom, bytes }) => {
-  const vault     = obj({ ...vaultStamp.shape, clock: HX.clockShape, lock: fn<() => unknown>() })
+export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, fn, uint, custom, bytes }) => {
+  const vault     = obj({ ...vaultStamp.shape, gate_epoch: uint, clock: HX.clockShape, lock: fn<() => unknown>() })
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
   return {

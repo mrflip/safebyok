@@ -7,6 +7,12 @@ import * as MSX from './models-shapes'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, checkStrength, spendAnswerAfter } from './proving'
 import { Wayin } from './wayin'
 
+// == [Forms]: GateChange
+
+/** A change of the gate as a `with...` verb makes it: the next gate's props, and the proving of this gate that allowed it, which still opens the vaultKey, so can grant a lease under the next gate once it lands. */
+export type GateChange = Readonly<{ props: GateProps, proved: Proving }>
+// --
+
 // == [Gate]: build, novelWayins, attemptProof, demandPasskeyAddable, demandPasskeyRevocable, withPassphraseReplaced, withPasskeyAdded, withPasskeyRevoked, pickle, toJSON
 
 export class Gate {
@@ -64,38 +70,36 @@ export class Gate {
     return this
   }
 
-  /** The props of the next gate, once `passphrase` proves this one: a passphrase wayin for `nextPassphrase`, sealed from that proving, and the passkey wayin as stored, as the vaultKey does not change. A next passphrase the same as the one handed refuses 'same_passphrase', and one the host's `strengthChecker` finds weak 'weak_passphrase', each before the proof. */
-  async withPassphraseReplaced(cleartexts: PassphraseReplaceCleartexts, world: GateWorld): Promise<GateProps> {
+  /** The next gate, once `passphrase` proves this one: a passphrase wayin for `nextPassphrase`, sealed from that proving, and the passkey wayin as stored, as the vaultKey does not change. A next passphrase the same as the one handed refuses 'same_passphrase', and one the host's `strengthChecker` finds weak 'weak_passphrase', each before the proof. */
+  async withPassphraseReplaced(cleartexts: PassphraseReplaceCleartexts, world: GateWorld): Promise<GateChange> {
     const { passphrase, nextPassphrase } = MSX.passphraseReplaceCleartexts.parse(cleartexts)
     if (passphrase === nextPassphrase) { throw RefusalFuncs.samePassphrase() }
     await checkStrength(world.strengthChecker, nextPassphrase, CX.vaultScope.parse(this.stamp))
     const proved = await this.attemptProof({ passphrase }, world)
     const proving = await PassphraseProving.make(this.stamp, world, nextPassphrase)
     const wayin = await proving.makeWayin(proved)
-    return MSX.gateProps.parse({ passphrase_wayin: wayin.pickle(), passkey_wayin: this.passkey_wayin })
+    return { props: MSX.gateProps.parse({ passphrase_wayin: wayin.pickle(), passkey_wayin: this.passkey_wayin }), proved }
   }
 
-  /** The props of the next gate, once `passphrase` proves this one: a passkey wayin for the passkey whose answer is handed in, sealed from that proving; the answer is spent unless the passphrase is refused as wrong (G2). A gate that holds a passkey refuses 'bad_option' before the proof. */
-  withPasskeyAdded(cleartexts: PasskeyAddCleartexts, world: ProvingWorld): Promise<GateProps> {
+  /** The next gate, once `passphrase` proves this one: a passkey wayin for the passkey whose answer is handed in, sealed from that proving; the answer is spent unless the passphrase is refused as wrong (G2). A gate that holds a passkey refuses 'bad_option' before the proof. */
+  withPasskeyAdded(cleartexts: PasskeyAddCleartexts, world: ProvingWorld): Promise<GateChange> {
     return spendAnswerAfter(cleartexts, async () => {
       this.demandPasskeyAddable()
       const { passphrase, passkeyAnswer } = MSX.passkeyAddCleartexts.parse(cleartexts)
       const proved = await this.attemptProof({ passphrase }, world)
       const proving = await PasskeyProving.make(this.stamp, world, passkeyAnswer)
       const passkey = await proving.makeWayin(proved)
-      return MSX.gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: passkey.pickle() })
+      return { props: MSX.gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: passkey.pickle() }), proved }
     })
   }
 
-  /** The props of the next gate, once `passphrase` proves this one: the passphrase wayin as stored, and no passkey wayin. A gate without a passkey refuses 'absent_wayin' before the proof. */
-  async withPasskeyRevoked(cleartexts: PassphraseCleartexts, world: ProvingWorld): Promise<GateProps> {
+  /** The next gate, once `passphrase` proves this one: the passphrase wayin as stored, and no passkey wayin. A gate without a passkey refuses 'absent_wayin' before the proof. */
+  async withPasskeyRevoked(cleartexts: PassphraseCleartexts, world: ProvingWorld): Promise<GateChange> {
     this.demandPasskeyRevocable()
     const { passphrase } = MSX.passphraseCleartexts.parse(cleartexts)
-    await this.attemptProof({ passphrase }, world)
-    return MSX.gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: null })
+    const proved = await this.attemptProof({ passphrase }, world)
+    return { props: MSX.gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: null }), proved }
   }
-
-  // not yet: gate_epoch
 
   pickle(): GateProps {
     const { passphrase_wayin, passkey_wayin } = this

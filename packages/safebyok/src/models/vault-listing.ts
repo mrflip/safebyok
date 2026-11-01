@@ -12,7 +12,7 @@ import { Listing } from './listing'
 import { Gate } from './gate'
 import { type PassphraseProving, spendAnswerAfter } from './proving'
 import type { GatingWorld } from './gating'
-import { type Cache, type Dna, type Fetched, type FetchOpts, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type Cache, type Dna, type Fetched, type FetchOpts, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, FirstGateEpoch, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, UnlockAtBirth, Vault, WithLeaseDB } from './vault'
 
@@ -147,7 +147,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** The novel record of a vault, the stamped dna under a `vault_tok` fresh from {@link makeLifeTok}, and the proving of the gate {@link Gate.build} makes of it from `cleartexts`. */
   async #buildDraft(dna: Dna<VaultScope, VaultRecord> & Revision & Times, cleartexts?: Cleartexts): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
     const checked = MSX.vaultBuildArgs.parse({ cleartexts })
-    const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
+    const sparse: VaultSparse = { ...dna, fmt: VaultFormat, gate_epoch: FirstGateEpoch, am: 'a', vault_tok: makeLifeTok() }
     const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.cleartexts, this.world)
     return { draft: { ...sparse, gate: gate.pickle() }, proving }
   }

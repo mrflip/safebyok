@@ -14,6 +14,7 @@ export const modelsLeaseOf = async (user_id: string, vaultlabel = 'main'): Promi
   ...scopeOf(user_id, vaultlabel),
   vault_tok:               `vault-tok-${user_id}`,
   registered_at:           1_800_000_000_000,
+  gate_epoch:              1,
   autolock_at:             1_900_000_000_000,
   lease_key:               await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']),
   vault_key_lease_wrapped: fakeCiphered(`lease-${user_id}`),

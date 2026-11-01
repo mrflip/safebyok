@@ -12,7 +12,7 @@ import { afterEach, beforeEach, type Mock, vi } from 'vitest'
 import { MinuteMillis, PasskeySaltBytes } from '../../src/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/crypto'
 import { Lease } from '../../src/models/lease'
-import { type LeaseDBFriend, type LeaseGrantOpts, type Cleartexts, type GateWorld, type LeaseRecord, type ProvingWorld, type VaultStamp, vaultStamp } from '../../src/models/models-shapes'
+import { type LeaseDBFriend, type LeaseGrantOpts, type Cleartexts, type GateWorld, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/outcome'
 import type { KeyDeriver } from '../../src/key-deriver'
@@ -37,15 +37,16 @@ export const useFakeClock = (): void => {
 /** The stamp of the vault every builder here makes things in: `u1`'s `main` vault of the app `acme`, registered at {@link T0}. */
 export const WorldStamp: VaultStamp = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
 
-/** A plain stand-in for a vault, as a lease is handed one: its stamp, a clock on `Date.now()`, and `lock`, a spy. A proving and a gate take its stamp alone, {@link WorldStamp}. */
-export type DuckVault = VaultStamp & { clock: { now: () => number }, lock: Mock<() => void> }
+/** A plain stand-in for a vault, as a lease is handed one: its stamp, its `gate_epoch`, which a test moves by assigning it, a clock on `Date.now()`, and `lock`, a spy. A proving and a gate take its stamp alone, {@link WorldStamp}. */
+export type DuckVault = VaultStamp & { gate_epoch: number, clock: { now: () => number }, lock: Mock<() => void> }
 
 /** A {@link DuckVault} of {@link WorldStamp}, with a fresh `lock` spy.
  *
  * @example const vault = duckVaultOf({ vault_tok: 'vault-tok-other' })
  */
-export const duckVaultOf = (overrides: Partial<VaultStamp> = {}): DuckVault => ({
+export const duckVaultOf = (overrides: Partial<VaultStamp & { gate_epoch: number }> = {}): DuckVault => ({
   ...WorldStamp,
+  gate_epoch: FirstGateEpoch,
   ...overrides,
   clock: { now: () => Date.now() },
   lock:  vi.fn<() => void>(),
