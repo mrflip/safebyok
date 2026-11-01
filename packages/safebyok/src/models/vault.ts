@@ -212,7 +212,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The box ensured, as an {@link Outcome}: the non-throwing form of {@link Vault.ensureBox}. */
   tryEnsureBox(dna: BoxDnaInVault, opts: EditOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.ensureBox(dna, opts)) }
 
-  /** Start the box listing's watch, as `Listing.hello` does, once: each box verb calls it first, and a call while one is under way joins it. One refused is begun again by the next call. */
+  /** Start the box listing's watch, as `Listing.hello` does, once. A call while one is under way joins it; one refused is begun again by the next call. */
   helloBoxes(): Promise<void> {
     this.#boxesHello ??= this.#helloBoxesOnce()
     return this.#boxesHello

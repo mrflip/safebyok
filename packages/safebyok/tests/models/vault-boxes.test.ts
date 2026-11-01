@@ -128,6 +128,11 @@ describe("vault.getBox(): the box as the vaultDB holds it, or null", () => {
     expect(vault.boxOf({ boxlabel: Boxlabel })).to.be.null
   })
 
+  it("takes a bag of a boxlabel alone, as BoxBag's example shows", async () => {
+    const { vault } = await makeBornVault()
+    expect(await vault.getBox({ boxlabel: 'anthropic' })).to.be.null
+  })
+
   it("answers the box another session stored, from the vaultDB", async () => {
     const { vault, anotherSession, demandStored } = await makeBornVault()
     const ours = await vault.ensureBox(dnaOf())
@@ -141,6 +146,15 @@ describe("vault.getBox(): the box as the vaultDB holds it, or null", () => {
 })
 
 describe("vault.makeBox(): a box held and stored nowhere until it is sent", () => {
+  it("refuses 'bad_option' a dna whose whisper is no { val }, as ensureBox does, naming the field and holding nothing", async () => {
+    const { vault } = await makeBornVault()
+    const badDna = { boxlabel: Boxlabel, whisper: {}, sidecar: {} } as never
+    for (const refused of [await TH.expectRefusal(vault.makeBox(badDna), 'bad_option'), await TH.expectRefusal(vault.ensureBox(badDna), 'bad_option')]) {
+      expect(refused.message).to.contain('whisper')
+    }
+    expect(vault.boxes).to.deep.equal([])
+  })
+
   it("holds a box of the dna and stores nothing until box.send()", async () => {
     const { vault, anotherSession, demandStored } = await makeBornVault()
     const box = await vault.makeBox(dnaOf())

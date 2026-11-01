@@ -60,10 +60,11 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return super.build(dna)
   }
 
-  /** The box `dna` names, as the vaultDB holds it; where it holds none, `dna` sealed and stored: put as a draft, or sent over a box held deleted or damaged, as its rebirth. Where another device stores one first, that box, as it stands.
-   * A box stored is answered as it is, its whisper and sidecar untouched. The dna is held to
-   * {@link boxDna} first, refusing 'bad_option', naming the field; sealing needs the vault unlocked,
-   * refusing 'vault_locked'.
+  /** The box `dna` names, as the vaultDB holds it, whisper and sidecar untouched; where it holds none, `dna` sealed and stored.
+   * A box held deleted or damaged is sent `dna`, which brings it back, and so is a draft held, in place
+   * of what it staged. Where another device stores a box first, that box, as it stands.
+   * The dna is held to {@link boxDna} first, refusing 'bad_option', naming the field; sealing needs
+   * the vault unlocked, refusing 'vault_locked'.
    */
   async ensure(dna: BoxDna, opts: EditOpts = {}): Promise<Box> {
     const filled = boxDna.parse(dna)
