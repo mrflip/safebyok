@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** threads 1 and 2 building.
+* **Status:** 1 and 2 filed; 3a, 6, 9 building.
 
 ## Read first
 
@@ -109,6 +109,8 @@ old stored shapes).
 thread 3b declares the refusal-kind list, so 1 renames factories and leaves the kinds as they are.
 **Size:** M.
 
+*Review:* (#426, low, fixed) padded columns, chai forms, a quote style and a stale banner fixed; left: listener throws silent where there is no `reportError` (Open Matters), stale `KeptLease` in VOCABULARY/guarantees (to thread 9), 47 factories without doc blocks (Open Matters), untested `CachedLease` examples (minor, predates), a `raise` test local (thread 5).
+
 ### 2. deriver_and_strength
 
 > * `KeyDeriver` as an interface in `src/deriver/` (exists: `shapes.ts`, `basederiver.ts`,
@@ -127,6 +129,8 @@ loop. Runs beside thread 1 from `origin/main`: it leaves every `kept` and `raise
 **Levels:** worker `sonnet`; review `low`.
 **Depends on:** nothing. **Look-ahead:** 11 exports the deriver interface and argon2id deriver.
 **Size:** S.
+
+*Review:* (#427, low, fixed) a test refusal form, two doc blocks' placement, and a prototype-dropping spread in `checkSuppliedSpecKept` fixed; `checkKeyDeriver` judged sound and kept. Left: long doc-block first lines and two untwinned examples (documentarian, Open Matters), `checkKeyDeriver`'s doc on trusted input (Cleanup).
 
 ### 3a. gating
 
@@ -157,7 +161,8 @@ one already in the tree; else a few lines in `src/helpers/`, said so in the PR.
 a `reason` field (`'pester'`, thread 10) rides on an `unlock_vault` gating; `del_vault`
 (thread 8) is passphrase-only, so a kind says which proofs it accepts; 3b adds
 `attemptPasskey` and the refusal-kind list; 4a moves `ensureVault` onto the listing's put-first
-`ensure`, so keep `bank.ensureVault`'s body thin. **Size:** L.
+`ensure`, so keep `bank.ensureVault`'s body thin. *Orchestrator:* also renames `RaisedGating` → `LaunchedGating` and "raise a gating" → "launch" tree-wide (YOLO, thread 1's open matter).
+**Size:** L.
 
 ### 3b. gating_passkey_and_telling
 
@@ -200,7 +205,8 @@ refusal-kind type in `models-shapes.ts`. Runs beside 4a, both off 3a.
 
 *Gloss.* `bank.ts`, `vault-listing.ts`, `listing.ts`. Removes `VaultListing.draftOf` (from
 thread 1). *Orchestrator:* the device record's contents and its `load`/`save` are thread 5's;
-4a keeps the sketch's `device_id` handling and leaves a seam. **Depends on:** 3a.
+4a keeps the sketch's `device_id` handling and leaves a seam. *Orchestrator:* the Coach took the Rec on `hello()`'s failed deriver load: left bare, `tryHello`'s Outcome carries it; 4a confirms in its doc block. Thread 2's `checkKeyDeriver` line in `Bank`'s constructor stays (it joins at the restack).
+**Depends on:** 3a.
 **Look-ahead:** 4b adds `evict` beside `ensure`; 5 plumbs the deviceDB to each vault; 7b reads
 `onBadNews` from the bank's options. **Size:** M.
 
@@ -231,7 +237,7 @@ deletion and on a received tombstone. **Size:** S.
 
 *Gloss.* New `src/devicedb/`, old `device-db.ts`/`idb.ts`, `models/lease.ts`, `vault.ts`,
 `bank.ts`. Move or copy is the worker's call by the Coach's rule; a copy leaves the old one for
-the old surface (ground rule 11). `takeUpKeptLease` will be `takeUpCachedLease` after thread 1.
+the old surface (ground rule 11). `takeUpKeptLease` is `takeUpCachedLease` after thread 1. *Orchestrator:* 5 also renames `incrementDeviceRecord` → `advanceDeviceRecord` (and "raised, never lowered" → "advanced"), in code and VOCABULARY.md (YOLO, thread 1's open matter).
 **Levels:** review `high` (guarantees: `lease.ts`). **Depends on:** 4b.
 **Look-ahead:** 7b's rollback guard reads and raises the highest epoch seen; 8 erases the cached
 lease and cache. **Size:** M.
@@ -322,6 +328,7 @@ effort; review `high` (guarantees). **Depends on:** 3b, 5, 6, 7a. **Size:** M.
 > when a thread is there anyway.
 
 *Gloss.* `models/box.ts`, the label checkers in `models-shapes.ts`, `src/helpers/`.
+*Orchestrator:* also takes thread 1's leftover `kept` names (test locals → `stored`/`was`, convex `tallyRow`/`storedTally`, react `liveness`, `unmaskedChars`) and `KeptLease` → `CachedLease` in VOCABULARY.md and notes/guarantees.md.
 **Levels:** review `high` (guarantees: `box.ts`). **Depends on:** 1. **Size:** S–M.
 
 ### 10. pester
