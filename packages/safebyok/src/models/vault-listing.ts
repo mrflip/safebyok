@@ -57,6 +57,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** By scopepath, how many closes have landed, so an `ensure` whose scope was closed while it stored grants no lease. */
   readonly #closeSeqs = new Map<string, number>()
 
+  /** How many `closeAll`s have landed, so a vault a fetch or hello then holds takes up no lease. */
+  #closeAllSeq = 0
+
   constructor(opts: VaultListingOpts) {
     super(opts)
     MSX.vaultListingOpts.parse(opts)
@@ -80,16 +83,20 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** The vault under `scope` as storage now holds it, as the base's `fetch` says; a vault this fetch gave birth to first takes up the lease this device keeps of it, as {@link Vault.takeUpCachedLease} does, so it is answered unlocked where one is kept. */
   override async fetch(scope: VaultScope, opts: FetchOpts = {}): Promise<Vault | null> {
     const held = this.at(scope)
+    const closeAllSeq = this.#closeAllSeq
     const vault = await super.fetch(scope, opts)
-    if (vault !== null && vault !== held) { await vault.takeUpCachedLease() }
+    if (vault !== null && vault !== held) { await this.#takeUpKeptLease(vault, closeAllSeq) }
     return vault
   }
 
-  /** Take up each vault's cached lease, as {@link Vault.takeUpCachedLease} does, once the base's `hello` has revived and hydrated them. */
-  override async hello(): Promise<void> {
+  /** Take up each vault's cached lease, as {@link Vault.takeUpCachedLease} does, once the base's `hello` has revived and hydrated them; where a `closeAll` has landed since `closeAllSeqAtStart`, a {@link closeAllSeq} read earlier, a locked vault erases its lease instead. */
+  override async hello(closeAllSeqAtStart: number = this.#closeAllSeq): Promise<void> {
     await super.hello()
-    await Promise.all(this.things.map((vault) => vault.takeUpCachedLease()))
+    await Promise.all(this.things.map((vault) => this.#takeUpKeptLease(vault, closeAllSeqAtStart)))
   }
+
+  /** How many {@link closeAll}s have landed: read it where a hello begins, before anything it awaits, and hand it to {@link hello}. */
+  get closeAllSeq(): number { return this.#closeAllSeq }
 
   /** Lock the vault under `scope`, as `vault.lock()` does, and evict it; where none is held, erase the lease this device keeps of the scope all the same, so no vault of it taken up later finds one. A refused erase is told as bad news. */
   close(scope: VaultScope): void {
@@ -105,6 +112,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     const { deviceDB } = this.world
     void outcomeOf(() => this[WithLeaseDB](checked, async () => { valOf(await deviceDB.tryDelLease(checked)) }))
       .then((done) => { if (! done.ok) { this.tellBadNews([done.err]) } })
+  }
+
+  /** {@link close} every vault held, and leave a vault that a fetch or hello in flight then holds locked, its lease erased. */
+  closeAll(): void {
+    this.#closeAllSeq += 1
+    for (const vault of this.things) { this.close(vault.scope) }
   }
 
   /** Run `work` once the deviceDB work on the lease of `scope` begun before it has landed, by any Vault object of the scope or by `close`, holding off any begun after. */
@@ -132,6 +145,15 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   // == [Defined by the vault listing]
 
   protected vaultTokOfWorld(): null { return null }
+
+  /** A vault just held takes up the lease this device keeps, unless a `closeAll` has landed since: then a locked one erases it, and one unlocked was unlocked since the close, and stays. */
+  async #takeUpKeptLease(vault: Vault, closeAllSeqAtStart: number): Promise<void> {
+    if (this.#closeAllSeq === closeAllSeqAtStart) {
+      await vault.takeUpCachedLease()
+      return
+    }
+    if (vault.isLocked) { vault.lock() }
+  }
 
   /** A failed `onBadNews` goes to the logger as well: a platform with no `reportError` would lose it. */
   protected override badNewsHandlerFailed(err: unknown): void {

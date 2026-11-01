@@ -162,13 +162,14 @@ export class Bank implements VaultWorld, GatingWorld {
   }
 
   async #hello(): Promise<void> {
+    const closeAllSeq = this.vaultListing.closeAllSeq
     if (this.#stage.lifecycle === 'refused') { this.#setStage({ lifecycle: 'starting' }) }
     // The catch records the refusal in the snapshot; the error goes on as thrown.
     try {
       await this.keyDeriver.load?.()
       await this.strengthChecker.load?.()
       await this.#keepDeviceRecord()
-      await this.vaultListing.hello()
+      await this.vaultListing.hello(closeAllSeq)
     } catch (err) {
       this.#setStage({ lifecycle: 'refused', err: refusalOf(err) })
       throw err
@@ -243,10 +244,10 @@ export class Bank implements VaultWorld, GatingWorld {
    */
   closeVault(bag: VaultBag): void { this.vaultListing.close(this.vaultScopeOf(bag)) }
 
-  /** Close every vault the bank holds, as {@link closeVault} does; a vault not yet held, as one `ensureVault` is storing, is not closed (`notes/wontfix.md`). */
-  closeVaults(): void {
-    for (const vault of this.vaultListing.things) { this.vaultListing.close(vault.scope) }
-  }
+  /** Close every vault the bank holds, as {@link closeVault} does, and any stored one an `ensureVault` or a hello in flight then holds, which is held locked, its lease erased.
+   * A vault not stored, as one `ensureVault` is building, is not stopped (`notes/wontfix.md`), and a lease kept of a vault neither held nor in flight stays until {@link closeVault} names it.
+   */
+  closeVaults(): void { this.vaultListing.closeAll() }
 
   /** Close the vault `bag` names, as {@link closeVault} does, then erase what this device keeps of it, sound or damaged: its lease and its cached copy. This device's record of the scope stays.
    * Refuses as the deviceDB does where it fails the erase: call again to finish.
