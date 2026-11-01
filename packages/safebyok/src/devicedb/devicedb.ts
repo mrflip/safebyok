@@ -190,7 +190,7 @@ export type FoundRow = Readonly<{ scopepath: string, row: unknown }>
 /** A verb of {@link DeviceDB} that reaches the store, by its throwing form's name: `getLease`, whose `try` form is `tryGetLease`. */
 export type DeviceVerb = keyof typeof Phrases.DeviceStoreFailed
 
-/** Where a {@link DeviceDB} tells of a damaged row it erased, as a bank's `onBadNews` hears it: never awaited, and one that throws fails the find, so a bank hands its listing's `tellBadNews`, which never throws. */
+/** Where a {@link DeviceDB} tells of a damaged row it erased, as a bank's `onBadNews` hears it: never awaited, and one that throws fails the find with what it threw. */
 export type OnBadNews = (news: VaultError) => unknown
 // --
 
