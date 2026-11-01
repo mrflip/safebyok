@@ -5,7 +5,7 @@ import { passkeysAvailable, useVault, useVaultSnapshot } from 'safebyok-react'
 /**
  * The vault's two ways in -- its one passphrase, and its passkey if it has one, shown even while
  * locked, under the heading "Vault unlockers", as the user is shown them -- and the buttons that
- * change them. Each raises its gating, which the provider's own
+ * change them. Each launches its gating, which the provider's own
  * dialog answers, proven by the passphrase: `vault.putWayin('passphrase')` asks for the current
  * passphrase and the next (typed twice), and removes the passkey with the old one; `vault.putWayin('passkey')`
  * asks for the passphrase, then has the browser make a passkey, which replaces the one the vault

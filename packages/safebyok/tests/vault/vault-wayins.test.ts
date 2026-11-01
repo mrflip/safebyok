@@ -557,7 +557,7 @@ describe("the vault's passkey", () => {
     const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyAnswer
     const asProof = misshapen as unknown as string
     const phone = await TH.passkeyOf('phone')
-    // Locked, so the unlock is tried; each in turn, as each raises a gating of its own.
+    // Locked, so the unlock is tried; each in turn, as each launches a gating of its own.
     await vault.lock()
     for (const refused of [() => TH.unlock(vault, misshapen), () => TH.putWayin(vault, asProof, 'pw two'), () => TH.putWayin(vault, asProof, phone), () => TH.putWayin(vault, 'pw', misshapen), () => TH.delWayin(vault, asProof)]) {
       const err = await TH.expectRefusal(refused(), 'bad_option')
@@ -882,7 +882,7 @@ describe("a new passphrase's strength", () => {
     expect(await TH.vaultRecordIn(world.vaultDB, TH.scopeOf('u1'))).to.deep.equal(before)
   })
 
-  it("refuses a broken checker from a gating's attempt, which requestCleartext sees, and the call that raised it, writing nothing", async () => {
+  it("refuses a broken checker from a gating's attempt, which requestCleartext sees, and the call that launched it, writing nothing", async () => {
     const world = makeWorld()
     const attempts: Outcome<Vault>[] = []
     const requestCleartext = async (gating: Gating) => {

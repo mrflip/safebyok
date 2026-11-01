@@ -24,11 +24,11 @@ import * as FX from './shapes/fields'
 import { PasskeyWayin, PassphraseWayin, Wayin, isSaltOf, wayinCtxOf } from './wayin'
 
 /** The gating a proving is made for, asked whether it has landed: settled, declined, or ended by a lock. A landed gating's provings open nothing more.
- * `call` is the vault call that raised it, which a demand's refusal names in the log.
+ * `call` is the vault call that launched it, which a demand's refusal names in the log.
  */
 export type ProvingGating = { readonly landed: boolean, readonly call?: ProvingCall | undefined }
 
-/** The vault calls a proving's demand names: those that raise a gating, and the demand itself for a proving made outside one. */
+/** The vault calls a proving's demand names: those that launch a gating, and the demand itself for a proving made outside one. */
 export type ProvingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del' | 'demandConsistentWith'
 
 /** The gating of a proving made outside any gating, which never lands: a test hands it to `seal`. Every vault call's proving is made for a real gating. */

@@ -264,8 +264,8 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
   }, [])
 
   // The provider's own requestCleartext: the dialog for the gating's kind, shown only while the
-  // user's gesture is in hand, one at a time. A vault raises one gating at a time, but the bank's other vaults may
-  // raise over it: the newest is shown, and the one it replaces declined, never left waiting.
+  // user's gesture is in hand, one at a time. A vault launches one gating at a time, but the bank's other vaults may
+  // launch over it: the newest is shown, and the one it replaces declined, never left waiting.
   const askByDialog = useCallback<RequestCleartext>((gating) => new Promise<void>((close) => {
     if (! hasUserGesture()) { close(); return }
     if (showingRef.current !== null) { endShowing(showingRef.current) }

@@ -1,4 +1,4 @@
-/** Gatings: one request for cleartext, raised by a vault call that needs the user's passphrase or passkey, and the chain each attempt at it runs.
+/** Gatings: one request for cleartext, launched by a vault call that needs the user's passphrase or passkey, and the chain each attempt at it runs.
  * A gating owns its chain, by the rule that whoever touches a secret owns it: its attempt is where
  * the cleartext becomes a proving, and where the provings make the gate. The vault offers it
  * `putGate` and knows nothing of passphrases; the provings do the cryptography. One gating is pending
@@ -31,7 +31,7 @@ export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_p
 /** Whether `err` is a refusal the user can correct, which leaves its gating open. */
 const isCorrectable = (err: VaultError): boolean => (correctableKindVals as readonly string[]).includes(err.refusalkind)
 
-/** The vault call a gating was raised by, as the logger names it. */
+/** The vault call a gating was launched by, as the logger names it. */
 export type GatingCall = 'ensureUnlocked' | 'putWayin' | 'delWayin' | 'del'
 
 /** What every gating carries, whatever its kind. */
@@ -120,10 +120,10 @@ export type DelVaultGating = GatingCommon & {
 export type Gating = InitializeGateGating | UnlockVaultGating | ChangePassphraseGating | PutPasskeyGating | DelPasskeyGating | DelVaultGating
 
 /** Your method, the one place UI meets the vault: handed a {@link Gating}, it shows a dialog for its `gatingkind`, and resolves once the dialog closes.
- * The vault raises a gating when a call needs the user's passphrase or passkey: `ensureUnlocked()`
+ * The vault launches a gating when a call needs the user's passphrase or passkey: `ensureUnlocked()`
  * on a locked or novel vault, `putWayin()`, `delWayin()` and `del()`. One is pending at a time per
  * vault. Call the gating's attempt on each submit; on Cancel, resolve (or call `decline()`). A
- * gating still open when this resolves is declined: the call that raised it refuses
+ * gating still open when this resolves is declined: the call that launched it refuses
  * 'vault_locked'. It hears the passphrase the user types: keep it on the device, and never log it
  * or let it reach an error tracker. Whatever it throws refuses the call 'unexpected_error', which
  * carries none of it: the logger hears only that it threw.
@@ -141,7 +141,7 @@ export type RequestCleartext = (gating: Gating) => void | Promise<void>
  */
 export type GatingTools = VaultPrivateTools & {
   /** Read storage now through the refresh join, demand the Vault object is not gone and `gating` has not landed, and resolve the vault record held. */
-  freshen:      (gating: RaisedGating) => Promise<VaultRecord>
+  freshen:      (gating: LaunchedGating) => Promise<VaultRecord>
   /** Store `gate` over its base, `vault.putGate`, within the attempt's hold. */
   putGate:      (gate: Gate, call: GatingCall) => Promise<Gate>
   /** Delete the vault `proving` proved, once a demand on it holds, expecting the `vault_tok` and `gate_epoch` of the vault record held, resolving the tombstone's `vault_epoch`. */
@@ -149,21 +149,21 @@ export type GatingTools = VaultPrivateTools & {
   /** Once the gating that deleted the vault settled: lock, let the Vault object go, and raise the device record to `vaultEpoch`. */
   afterDel:     (vaultEpoch: number) => Promise<void>
   /** Consult this device's store for a lease that fits, ending past `renewMillis` from now, and take it up: true when taken. */
-  takeUp:       (gating: RaisedGating, renewMillis: number) => Promise<boolean>
+  takeUp:       (gating: LaunchedGating, renewMillis: number) => Promise<boolean>
   /** The refusal `thrown` makes, bad news told, as a public call throws it. */
   heardRefusal: (thrown: unknown) => VaultError
   /** The host's request for cleartext, guarded, or null for none. */
   request:      ((gating: Gating) => Promise<void>) | null
 }
 
-/** One gating, raised: what the vault keeps to run, join, settle and land it, and the {@link Gating} it hands the host.
+/** One gating, launched: what the vault keeps to run, join, settle and land it, and the {@link Gating} it hands the host.
  * It is the {@link ProvingGating} its provings are made for: `landed` once it settled, was declined,
  * or a lock landed.
  */
-export class RaisedGating implements ProvingGating {
-  /** The kind it was raised as. */
+export class LaunchedGating implements ProvingGating {
+  /** The kind it was launched as. */
   readonly gatingkind: GatingKind
-  /** The vault call that raised it, as the logger names it. */
+  /** The vault call that launched it, as the logger names it. */
   readonly call: GatingCall
   /** The one outcome every call waiting on it shares. */
   readonly settled: Promise<Outcome<void>>
@@ -194,8 +194,8 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** Make a gating of `gatingkind` for `call`, not yet run: `onOver` hears it settle, before any waiter does. */
-  static make(gatingkind: GatingKind, call: GatingCall, vault: Vault, tools: GatingTools, onOver: () => void): RaisedGating {
-    return new RaisedGating(gatingkind, call, vault, tools, onOver)
+  static make(gatingkind: GatingKind, call: GatingCall, vault: Vault, tools: GatingTools, onOver: () => void): LaunchedGating {
+    return new LaunchedGating(gatingkind, call, vault, tools, onOver)
   }
 
   /** Run it, once the vault holds it as its pending gating: the pantry consult first when `renewMillis` is given, then the host's request. */
@@ -446,7 +446,7 @@ export class RaisedGating implements ProvingGating {
   }
 
   /** Read storage through `freshen`, resolving the vault record held, which has a gate.
-   * One without refuses 'absent_vault': only `initialize_gate` is raised on such a vault, and a gate
+   * One without refuses 'absent_vault': only `initialize_gate` is launched on such a vault, and a gate
    * never goes.
    */
   async #freshenGated(): Promise<GatedVaultRecord> {

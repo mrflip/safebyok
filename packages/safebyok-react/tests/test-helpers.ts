@@ -98,7 +98,7 @@ const gatingsMade = new WeakMap<Vault, PassphraseGating>()
 
 /**
  * A gating over `vault`, as a dialog reads one, for rendering a dialog or a button without a vault
- * raising it: its `gatingkind` (by default `initialize_gate` for a vault shown novel, `unlock_vault`
+ * launching it: its `gatingkind` (by default `initialize_gate` for a vault shown novel, `unlock_vault`
  * otherwise), the vault, its kind's attempts, each running `opts.attempt` and resolving the vault
  * or the refusal as an Outcome (a throw that is no VaultError said as 'unexpected_error'), a
  * `decline` that does nothing, and a `lockLanded` that settles when `opts.lockLanded` does, or
@@ -149,8 +149,8 @@ export const gatingUnlockingWith = (unlock: (passphrase: string) => Promise<void
 export const wrong = () => gatingUnlockingWith(() => Promise.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')))
 
 /**
- * A vault made from `opts`, as a host's requestCleartext meets it: the first gating it raised,
- * handed to a dialog the test holds open (`TH.heldDialog`), its `ensuring`, the call that raised
+ * A vault made from `opts`, as a host's requestCleartext meets it: the first gating it launched,
+ * handed to a dialog the test holds open (`TH.heldDialog`), its `ensuring`, the call that launched
  * it (a `tryEnsureUnlocked`), and `close`, which closes every dialog held, declining a gating
  * still open.
  *
@@ -162,33 +162,33 @@ export const gatedBy = async (opts: BornVaultOpts) => {
   const dialog = heldDialog()
   const vault = await settledVault({ ...opts, requestCleartext: dialog.requestCleartext })
   const ensuring = vault.tryEnsureUnlocked()
-  const raised = await dialog.asked()
-  if (raised.gatingkind !== 'unlock_vault' && raised.gatingkind !== 'initialize_gate') { throw new Error(`The vault raised a ${raised.gatingkind} gating, which no passphrase dialog answers.`) }
-  const gating: PassphraseGating = raised
+  const launched = await dialog.asked()
+  if (launched.gatingkind !== 'unlock_vault' && launched.gatingkind !== 'initialize_gate') { throw new Error(`The vault launched a ${launched.gatingkind} gating, which no passphrase dialog answers.`) }
+  const gating: PassphraseGating = launched
   return { vault, gating, ensuring, close: dialog.close }
 }
 
 /**
- * The gating of kind `gatingkind` that `raise` has `vault` raise, held open as a host's dialog
- * holds it until the test closes it: `gating`, narrowed to its kind; `raising`, the outcome of the
- * call that raised it; and `close`, which resolves the request, declining the gating if still
+ * The gating of kind `gatingkind` that `launch` has `vault` launch, held open as a host's dialog
+ * holds it until the test closes it: `gating`, narrowed to its kind; `launching`, the outcome of the
+ * call that launched it; and `close`, which resolves the request, declining the gating if still
  * open. `vault` answers through `TH.scriptedRequestCleartext`, as `settledVault` makes it by
- * default. Throws when the vault raises another kind.
+ * default. Throws when the vault launches another kind.
  *
  * @example
- *   const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+ *   const { gating, launching } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
  *   render(<GatingModal gating={gating} onDone={noop} />)
  */
-export const heldGatingOf = async <KindT extends GatingKind, OutcomeT>(vault: Vault, raise: (vault: Vault) => Promise<OutcomeT>, gatingkind: KindT) => {
+export const heldGatingOf = async <KindT extends GatingKind, OutcomeT>(vault: Vault, launch: (vault: Vault) => Promise<OutcomeT>, gatingkind: KindT) => {
   const handed = held<Gating>()
   const closing = held()
   answering(vault, async (gating) => {
     handed.resolve(gating)
     await closing.promise
   })
-  const raising = raise(vault)
+  const launching = launch(vault)
   const gating = asKind(await handed.promise, gatingkind)
-  return { gating, raising, close: () => { closing.resolve(undefined) } }
+  return { gating, launching, close: () => { closing.resolve(undefined) } }
 }
 
 /** Types the passphrase in the dialog and presses Unlock. */

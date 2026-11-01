@@ -507,7 +507,7 @@ warm up. The derivers above carry none.
 
 Data calls never contain UI, and no vault call takes a passphrase. A call that needs the vault
 unlocked -- `putBox`, `getBox`, `getWhisper`, `useWhisper`, `delBox` -- goes through
-`vault.ensureUnlocked()`, which says `hello()`, and, when the vault is locked or `novel`, raises a
+`vault.ensureUnlocked()`, which says `hello()`, and, when the vault is locked or `novel`, launches a
 **gating**: one request for the user's passphrase or passkey, handed to your `requestCleartext`.
 So do the changes only the user can prove: `vault.putWayin(slotlabel)`, `vault.delWayin('passkey')`
 and `vault.del()`. `safebyok-react`'s `BankProvider` is a `requestCleartext` already: its dialog.
@@ -556,8 +556,8 @@ const requestCleartext: RequestCleartext = async (gating) => {
   `renewMinutes` has the call ask again for itself. `ensureUnlocked()` waits out a change to the
   ways in or a deletion, whatever it settles with, then asks for itself only if the vault is
   still locked: declining "add a passkey" does not refuse a `getWhisper` waiting behind it, which
-  then raises its own unlock. `putWayin`, `delWayin` and `del` join one of their own kind and wait
-  out any other. A call raises at most one gating of its own. A `lock()` landing while a gating
+  then launches its own unlock. `putWayin`, `delWayin` and `del` join one of their own kind and wait
+  out any other. A call launches at most one gating of its own. A `lock()` landing while a gating
   is pending refuses every call joined to it `vault_locked`, and the bank letting the vault go
   (`bank.closeVault`) refuses them `vault_gone`; either way `gating.lockLanded` settles: close the
   dialog. An attempt under way
@@ -820,7 +820,7 @@ await vault.putWayin('passkey')      // put_passkey: the passkey put, replacing 
 await vault.delWayin('passkey')      // del_passkey: the passkey removed; delWayin('passphrase') refuses passphrase_required
 ```
 
-Each raises its gating, which your `requestCleartext` answers with the passphrase (and the next
+Each launches its gating, which your `requestCleartext` answers with the passphrase (and the next
 passphrase, or a new passkey's answer), and resolves the vault once the change is stored; the
 snapshot's `gate` shows it. Each leaves the vault unlocked, its lease
 starting again from now (`tryPutWayin` and `tryDelWayin` resolve the same as an `Outcome`). Each

@@ -909,7 +909,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(putLease).not.toHaveBeenCalled()
   })
 
-  it("raises initialize_gate on a vault with no passphrase yet, and its attempt sets the first (Contract: ensureUnlocked, Does 3)", async () => {
+  it("launches initialize_gate on a vault with no passphrase yet, and its attempt sets the first (Contract: ensureUnlocked, Does 3)", async () => {
     const world = makeWorld()
     const requestCleartext = typingPw()
     const vault = await world.open({ requestCleartext })
@@ -919,7 +919,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(vault.snapshot.gate?.passphrase).to.not.be.null
   })
 
-  it("raises unlock_vault on a stored vault, with no lease on this device (Contract: ensureUnlocked, Does 3)", async () => {
+  it("launches unlock_vault on a stored vault, with no lease on this device (Contract: ensureUnlocked, Does 3)", async () => {
     const requestCleartext = typingPw()
     const { vault } = await lockedVaultWith({ requestCleartext })
     await vault.ensureUnlocked()
@@ -927,7 +927,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(TH.stateOf(vault.snapshot)).to.eq('unlocked')
   })
 
-  it("raises unlock_vault when the lease ends within renewMinutes, and renews it, never taking its own twilight lease back up from this device's store (Contract: ensureUnlocked, Does 3)", async () => {
+  it("launches unlock_vault when the lease ends within renewMinutes, and renews it, never taking its own twilight lease back up from this device's store (Contract: ensureUnlocked, Does 3)", async () => {
     const world = makeWorld()
     const requestCleartext = typingPw()
     const vault = await world.openUnlocked('pw', { requestCleartext, leaseHours: 1 })
@@ -945,7 +945,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(twilight?.ask_passphrase_at).to.be.below(world.clock.now() + HourMillis)
   })
 
-  it("raises one gating at a time: a second caller that finds one pending waits on it (Contract: ensureUnlocked, Does 3.1, and Guarantees)", async () => {
+  it("launches one gating at a time: a second caller that finds one pending waits on it (Contract: ensureUnlocked, Does 3.1, and Guarantees)", async () => {
     const dialog = TH.heldDialog()
     const { vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
     const first = vault.ensureUnlocked()
@@ -960,7 +960,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(dialog.requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("raises a fresh gating for the next call once one has settled (Contract: ensureUnlocked, Guarantees)", async () => {
+  it("launches a fresh gating for the next call once one has settled (Contract: ensureUnlocked, Guarantees)", async () => {
     const requestCleartext = vi.fn<RequestCleartext>()
     const { vault } = await lockedVaultWith({ requestCleartext })
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
@@ -996,13 +996,13 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(await TH.expectGood(ensuring)).to.eq(vault)
   })
 
-  it("hands requestCleartext a frozen gating it can only answer: the package offers a host no way to make, raise or rewrite one", async () => {
+  it("hands requestCleartext a frozen gating it can only answer: the package offers a host no way to make, launch or rewrite one", async () => {
     const dialog = TH.heldDialog()
     const { vault } = await lockedVaultWith({ requestCleartext: dialog.requestCleartext })
     const ensuring = vault.tryEnsureUnlocked()
     const gating = await dialog.asked()
     expect(Object.isFrozen(gating)).to.be.true
-    expect(Object.keys(Safebyok)).to.not.include('RaisedGating')
+    expect(Object.keys(Safebyok)).to.not.include('LaunchedGating')
     gating.decline()
     await TH.expectBad(ensuring, 'vault_locked')
   })
@@ -1025,7 +1025,7 @@ describe("vault.ensureUnlocked, by the Contract", () => {
     expect(TH.stateOf(vault.snapshot)).to.eq('locked')
   })
 
-  it("refuses vault_locked when the user declines a gating raised as the lease nears its end, and does not lock: the lease in hand stays in force, its deadline unmoved (Contract: ensureUnlocked, Does 3.6)", async () => {
+  it("refuses vault_locked when the user declines a gating launched as the lease nears its end, and does not lock: the lease in hand stays in force, its deadline unmoved (Contract: ensureUnlocked, Does 3.6)", async () => {
     const world = makeWorld()
     const requestCleartext = vi.fn<RequestCleartext>(TH.scriptedRequestCleartext)
     const vault = await world.openUnlocked('pw', { requestCleartext, leaseHours: 1 })

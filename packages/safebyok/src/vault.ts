@@ -33,7 +33,7 @@ import { CachedLease, Lease } from './lease'
 import { registerLeaseGetter } from './held-lease'
 import { type PassphraseProving, Proving, type ProvingTools, type VaultPrivateTools, provingTools } from './proving'
 import { Gate } from './gate'
-import { type GatingCall, type GatingTools, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
+import { type GatingCall, type GatingTools, type GatingKind, LaunchedGating, gateMadeElsewhereError } from './gating'
 
 // == [Public types]: VaultFreshness, VaultSnapshot, bear, letGo, goneBy
 
@@ -153,7 +153,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * wrap it to hand it on, as to an event handler: `() => vault.tryHello()`.
  *
  * Nothing prompts on open. A call that needs a whisper goes through {@link Vault.ensureUnlocked}:
- * a vault that is not unlocked raises a gating, handed to the host's `requestCleartext`, one at a
+ * a vault that is not unlocked launches a gating, handed to the host's `requestCleartext`, one at a
  * time.
  *
  * Every call holds to these, unless its own doc says otherwise:
@@ -327,10 +327,10 @@ export class Vault implements VaultStamp {
    * on a button. Under a lease of the ways in held that does not end
    * within `renewMinutes` (0 left out), it resolves at once, with no prompt and no write.
    *
-   * Otherwise it raises an `unlock_vault` gating (`initialize_gate` while the vault is `novel`), or
+   * Otherwise it launches an `unlock_vault` gating (`initialize_gate` while the vault is `novel`), or
    * joins one pending: one dialog answers every call waiting on it. A pending gating of another kind
    * it waits out, whatever that settles with, and asks again; so it does when a joined gating
-   * leaves no lease in force past `renewMinutes`. It raises at most one gating of its own. That
+   * leaves no lease in force past `renewMinutes`. It launches at most one gating of its own. That
    * gating first takes up a lease another tab granted, when one fits (of the ways in held, ending
    * past `renewMinutes` and no later than `leaseHours` from now), before the host is asked.
    *
@@ -468,10 +468,10 @@ export class Vault implements VaultStamp {
   }
 
   /** Put a way into the vault at `slotlabel`, through a gating the user answers, resolving the vault.
-   * On a `novel` vault `'passphrase'` raises `initialize_gate`: the first passphrase, and a passkey
-   * beside it if the dialog offers one. Otherwise `'passphrase'` raises `change_passphrase`: the
+   * On a `novel` vault `'passphrase'` launches `initialize_gate`: the first passphrase, and a passkey
+   * beside it if the dialog offers one. Otherwise `'passphrase'` launches `change_passphrase`: the
    * current passphrase and the next, which replaces it and removes the passkey, if any. `'passkey'`
-   * raises `put_passkey`: the passphrase and a new passkey's answer, which becomes the vault's
+   * launches `put_passkey`: the passphrase and a new passkey's answer, which becomes the vault's
    * passkey, replacing any; the snapshot's `gate.passkey` says which, so the host can warn the user
    * first. Only the passphrase proves a change to the ways in, never a passkey. Boxes are untouched,
    * so the call costs the same however many there are. The gating's attempt writes with
@@ -1218,7 +1218,7 @@ export class Vault implements VaultStamp {
 
   // The pending gating, if any: one per vault, and every call that needs the user waits on it
   // or on its settling. See ensureUnlocked() and gatingFor().
-  #gating: RaisedGating | null = null
+  #gating: LaunchedGating | null = null
   // What a gating reaches of this Vault object, which no getter shows: see GatingTools.
   readonly #gatingTools: GatingTools
   // What a proving reaches of this Vault object, through its [provingTools] getter: see ProvingTools.
@@ -1226,12 +1226,12 @@ export class Vault implements VaultStamp {
 
   /** Have the vault unlocked, as {@link Vault.ensureUnlocked} says, resolving true; or resolve false, asking nobody, when `shouldAsk` says not to ask.
    * `shouldAsk` runs only when the vault must ask, after the hello and before any gating is joined
-   * or raised: a call checks there what it can know without the key, so a call that cannot land
+   * or launched: a call checks there what it can know without the key, so a call that cannot land
    * never prompts. It demands nothing once unlocked: demand the lease before using it.
    */
   async #ensureUnlocked(renewMillis: number, shouldAsk?: () => boolean): Promise<boolean> {
     await this.#refreshIfStale(this.#staleMillis)
-    // The bank letting the vault go during the hello: no gating is raised over a gone Vault object.
+    // The bank letting the vault go during the hello: no gating is launched over a gone Vault object.
     this.#demandNotGone()
     for (;;) {
       if (this.#leaseLastsPast(renewMillis)) { return true }
@@ -1263,7 +1263,7 @@ export class Vault implements VaultStamp {
     return fitsLease(this.#vaultRecord, held) && ! held.endsBy(this.#clockNow() + renewMillis)
   }
 
-  /** Join the pending gating when it is of the kind `kindNow` names, else wait it out and raise one of that kind, for `call`; resolve once it settles with success, refusing as it refuses.
+  /** Join the pending gating when it is of the kind `kindNow` names, else wait it out and launch one of that kind, for `call`; resolve once it settles with success, refusing as it refuses.
    * `kindNow` judges the picture in hand each time round, and may refuse.
    */
   async #gatingFor(kindNow: () => GatingKind, call: GatingCall): Promise<void> {
@@ -1284,8 +1284,8 @@ export class Vault implements VaultStamp {
   }
 
   /** Launch a gating of `gatingkind` for `call`, pending until it settles: with `renewMillis`, it first takes up a lease from this device's store when one fits (`#takeUpFromPantry`). */
-  #launchGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): RaisedGating {
-    const launched: RaisedGating = RaisedGating.make(gatingkind, call, this, this.#gatingTools, () => {
+  #launchGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): LaunchedGating {
+    const launched: LaunchedGating = LaunchedGating.make(gatingkind, call, this, this.#gatingTools, () => {
       if (this.#gating === launched) { this.#gating = null }
     })
     this.#gating = launched
@@ -1294,7 +1294,7 @@ export class Vault implements VaultStamp {
   }
 
   /** Land a lock, or the vault going gone, on the pending gating, if any: its waiters refuse 'vault_locked', or `told`, and its `lockLanded` settles.
-   * A deletion whose write is sent stays pending until its chain settles it, so no call raises a
+   * A deletion whose write is sent stays pending until its chain settles it, so no call launches a
    * gating over a vault being deleted.
    */
   #landGating(told?: VaultError) {
@@ -1504,7 +1504,7 @@ export class Vault implements VaultStamp {
    * as none, warned of by the read, and is left too. Its wrap is not tried: a damaged one refuses
    * at its first use, 'damaged_lease'.
    */
-  async #takeUpFromPantry(gating: RaisedGating, renewMillis: number): Promise<boolean> {
+  async #takeUpFromPantry(gating: LaunchedGating, renewMillis: number): Promise<boolean> {
     const cached = await CachedLease.tryGet(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
     this.#demandNotGone()
     if (gating.landed) { return false }
@@ -1601,7 +1601,7 @@ export class Vault implements VaultStamp {
   /** `boxlabel`, once it is a label: 'bad_scope' otherwise, naming the field and quoting none of it. */
   #checkedBoxlabel(boxlabel: unknown): string { return CX.boxscope.parse({ ...this.#scope, boxlabel }).boxlabel }
 
-  /** True when the snapshot's listing shows a box under `boxlabel`, sound or damaged: what a locked vault can know before it raises a gating. */
+  /** True when the snapshot's listing shows a box under `boxlabel`, sound or damaged: what a locked vault can know before it launches a gating. */
   #isListed(boxlabel: string): boolean { return this.#listedOf(boxlabel) !== undefined }
 
   /** True when the snapshot's listing shows the box under `boxlabel` as damaged. */
