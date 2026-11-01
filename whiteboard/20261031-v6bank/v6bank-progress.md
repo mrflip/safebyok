@@ -50,8 +50,36 @@ orchestrator; workers look things up here, they do not write it. Each worker kee
 * `bank.hello()` awaits `keyDeriver.load?.()` bare: a failed load surfaces as the deriver's own
   error (open matter; 4a owns hello).
 
+### 9. whispers_and_names (#428, filed)
+
+* `Box.getWhisper`/`tryGetWhisper`/`useWhisper` on `unsealWhisper`; `useWhisper` zeroes the
+  opened bytes before the callback (the callback gets the parsed value); `getWhisper` always
+  opens the stored record. `parseJsonOrNull` → `src/helpers/parse-json.ts`.
+* The models' `Bank`: `bankOpts` takes `applabel`/`user_id` as `unk`, `bankScope` refuses
+  `bad_scope`; a second `checkKeyDeriver` (duplicate of thread 2's), called after
+  `bankScope.parse`. **Until the restack, the line under 3a has thread 9's copy, not thread 2's.**
+* `kept` leftovers renamed; VOCABULARY.md and guarantees.md say `CachedLease`.
+
+### 6. store_fronting (#429, built, in review)
+
+* `src/models/store-front.ts`: abstract `StoreFront` with hooks `doGetRows`, `doSwapRow`
+  (atomic read-and-swap answering the row read), `doFindRows`, `doWatch`; `vaultStore(bankScope)`,
+  `boxStore(vaultScope)`; `localStoreFront({ store })` over a StringStore. The old `VaultDB` is
+  untouched.
+* Versioned `put`/`del` refuse a stale `revision_tok` with `stale_write` carrying the stored row;
+  `revision_seq` computed by the front. A damaged row is refused by name (`damaged_box`,
+  `damaged_vault`), never written over. `delUnparsed(scope)` is the unconditional delete.
+* `Store.watch(…, onChange)`: rung when the watch cannot say what changed; the listing answers
+  with `hydrateAll({ maxMillisSinceRefresh: 0 })`.
+* Signed-out is bad news of kind **`identity_revoked`** (no `signed_out`).
+
 ## Lessons for handoffs
 
 * `gh pr ready` can be refused by the harness's permission classifier: a worker leaves the PR
   in draft and says so, without retrying; the Coach flips it.
-* Worker contexts reach ~130k on S/M threads: keep handoffs lean.
+* Worker contexts reach ~130k on S/M threads: keep handoffs lean. Thread 6 (M) compacted twice
+  before its first justify: an M thread that builds a new module plus its tests is near the cap.
+  Split 7b, 8 and 12 further if their glosses grow.
+* **A handoff names what a sibling thread on another branch already built in the same files**
+  (thread 9 duplicated thread 2's `checkKeyDeriver` for want of it).
+* Force-push is refused by the harness classifier; workers fix forward with new commits.
