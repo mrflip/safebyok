@@ -40,7 +40,9 @@ Carried from the newvault sprint and the scratchpad; the plan repeats them in ev
 ## Threads
 
 In a rough order of dependence. "Exists" names what `src/models` already has, so the worker
-extends rather than rebuilds.
+extends rather than rebuilds. Threads 3 (gating) and 4 (bank) are the large ones: the plan
+splits the passkey path and the telling out of 3, and eviction and sign-out out of 4 (the Coach,
+2026-11-01).
 
 ### 1. names_and_refusals
 
@@ -49,14 +51,14 @@ Mechanical and first, so the later threads build on the names.
 * Move every refusal factory the models use into `helpers/refusal-funcs.ts`, including those
   the old code shares. A factory's name states what was observed, not a guess at cause or
   remedy: `gateMovedUnderChange` stays; `unlockFirst` becomes `needVaultUnlocked`.
+* Survey `raiseX`, and rename: an error is `refuseX`, an increment `incrementX`,
+  a making `makeX` (sync) or`buildX`/`launchX` (async); and so on. Report any other sense.
 * Survey `kept`: where it means *cached* (the deviceDB's copy of a lease or a record), rename to
-  `cached`; report the other senses with a recommended name each.
-* Survey `raiseX`: an error is `refuseX`, an increment `incrementX`, a making `makeX` (sync) or
-  `buildX`/`launchX` (async); report any other sense.
+  `cached`; and similarly other senses. Report the other senses you found.
 * Isolate the storable's listeners at settle: each call caught and reported, as `tellBadNews`
   already does, so one throwing listener cannot abort a verb.
-* Scrub dead code: `VaultListing.draftOf` once put-first `ensure` lands (thread 4 may do this
-  instead), the stale comment in `send` about a locked thing's getters.
+* Scrub two pieces of dead code: `VaultListing.draftOf` once put-first `ensure` lands
+  (thread 4 may do this instead), the stale comment in `send` about a locked thing's getters.
 
 ### 2. deriver_and_strength
 
@@ -119,9 +121,10 @@ Builds on `bank.ts` (the sketch: `BankOpts`, `make`, `hello`/`goodbye`, `vaultSc
 
 ### 5. devicedb
 
-* `src/devicedb/`: the `DeviceDB` base class (the current one, moved and typed against the
-  models' lease record and device record), `memoryDeviceDB`, the idb adapter with `doPutLease`
-  widened to the models' row.
+* `src/devicedb/`: the `DeviceDB` base class (the current one, moved there and typed against
+  the models' lease record and device record, or a copy of it if much of it slims down on the
+  way: the Coach, 2026-11-01), `memoryDeviceDB`, the idb adapter with `doPutLease` widened to
+  the models' row.
 * The `LeaseDBFriend` plumbing from the bank's deviceDB to each vault (exists: `leaseDBFriend()`
   on the vault, `Lease.get`, `takeUpKeptLease`), so a reload takes up the kept lease at birth and
   does not ask again.
@@ -170,7 +173,9 @@ Builds on `bank.ts` (the sketch: `BankOpts`, `make`, `hello`/`goodbye`, `vaultSc
   when its interval is up, reset whenever the passphrase is given. Refuse `null`, accept
   `Infinity`; an interval past the 24.5-day timer cap sets no timer and is checked on the next
   call, a looser best-effort guarantee the doc states.
-* Distinct from the autolock (reset on every lease grant or renewal, default fourteen days).
+* The pester raises an `unlock_vault` gating with `reason: 'pester'`, so a host's dialog is the
+  one it already has (the Coach, 2026-11-01).
+* Distinct from the autolock (reset on every successful gating, default fourteen days).
 
 ### 10. v06_entry
 
@@ -198,14 +203,3 @@ check, and ground rule 8 governs: by name, as control flow, never repaired in pl
 * The `safebyok-react` package reads the old surface; a parity note at the sprint's end lists
   what `BankProvider`, `useVault`, `GatingModal` and the passkey button still lack.
 
-## Open questions for the plan
-
-Small ones; none blocks a thread above.
-
-1. The pester asks for the passphrase: is that an `unlock_vault` gating with a `reason`, or a
-   kind of its own? Rec: `unlock_vault` with `reason: 'pester'`, so a host's dialog is the same.
-2. The current `DeviceDB` moves to `src/devicedb/` (the 2026-11-01 mark) or stays where it is and
-   is typed against the models (the 2026-10-31 ruling "implement using the current DeviceDB")?
-   Rec: move it; the old core keeps importing it from its new path.
-3. Thread sizes: 3 (gating) and 4 (bank) are the large ones; the plan may split the passkey path
-   and the telling out of 3, and eviction and sign-out out of 4.
