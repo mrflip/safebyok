@@ -3,6 +3,7 @@ import type { BoxProps, BoxSnapshot } from '../../src/models/box'
 import type { BoxLease, BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
+import { deferred } from '../../src/helpers/deferred'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -177,7 +178,7 @@ describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
 // --
 
 /** A full box over the test world whose lease opens each whisper to what `openedOf` answers, and seals nothing. */
-const openingBoxOf = async (openedOf: () => Uint8Array): Promise<TestableBox> => {
+const openingBoxOf = async (openedOf: () => Uint8Array | Promise<Uint8Array>): Promise<TestableBox> => {
   const lease: BoxLease = { sealWith: () => Promise.reject(new Error('nothing is sealed here')), unsealWith: () => Promise.resolve(openedOf()) }
   const { world } = held.mw
   const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (opts) => world.ensureTimely(opts), demandLease: () => lease }
@@ -300,6 +301,74 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     expect(box._cheat_staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
     expect(box._cheat_staged?.box_tok).to.be.a('string').and.not.eq('box-tok-a')
     expect(box).to.include({ registered_at: T0 + 5000, box_tok: box._cheat_staged?.box_tok })
+  })
+})
+// --
+
+// == [Expose overtaken]: a forget or a whisper set while expose unseals
+
+/** A box over a lease whose unseal waits on the test: `asked` resolves once the box has asked the lease, and `open()` lets each unseal answer fresh bytes of the whisper. */
+const heldOpenBoxOf = async () => {
+  const opened = deferred<undefined>()
+  const asked = deferred<undefined>()
+  const box = await openingBoxOf(async () => { asked.resolve(undefined); await opened.promise; return openedWhisperOf() })
+  return { box, asked: asked.promise, open: () => { opened.resolve(undefined) } }
+}
+
+describe("box.expose() overtaken while it unseals", () => {
+  const ForgetCases = [
+    [(box: TestableBox) => { box.disarm() },                                                          'a disarm'],
+    [(box: TestableBox) => { box.evict() },                                                           'an eviction'],
+    [(box: TestableBox) => { box.whisper = null },                                                    'box.whisper set null'],
+    [(box: TestableBox) => { box.receive(tombstoneBoxRecord({ revision_seq: 2 })) },                  'a tombstone received'],
+    [(box: TestableBox) => { box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-2' })) }, 'a newer revision received'],
+  ] as const
+
+  for (const [overtake, blurb] of ForgetCases) {
+    it(`keeps nothing where ${blurb} lands before the unseal answers, and resolves all the same`, async () => {
+      const { box, asked, open } = await heldOpenBoxOf()
+      const exposing = box.expose()
+      await asked
+      overtake(box)
+      open()
+      expect(await exposing).to.eq(box)
+      expect(box.whisper).to.be.null
+      expect(box.getSnapshot().exposed).to.be.false
+    })
+  }
+
+  it("keeps the whisper a host set while it unseals, not the one it opened", async () => {
+    const { box, asked, open } = await heldOpenBoxOf()
+    const exposing = box.expose()
+    await asked
+    box.whisper = { val: 'sk-test-1111' }
+    open()
+    await exposing
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-1111' })
+  })
+
+  it("keeps what it opened where the vault locks while it unseals, as locking forgets nothing, answering LOCKED until it unlocks", async () => {
+    const { box, asked, open } = await heldOpenBoxOf()
+    const exposing = box.expose()
+    await asked
+    held.mw.setLockState('locked')
+    open()
+    await exposing
+    expect(box.whisper).to.eq(LOCKED)
+    expect(box.getSnapshot().exposed).to.be.true
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000', orgId: null } })
+  })
+
+  it("keeps what it opened where nothing overtakes it, and a later expose keeps its own", async () => {
+    const first = await heldOpenBoxOf()
+    const exposing = first.box.expose()
+    first.open()
+    await exposing
+    expect(first.box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000', orgId: null } })
+    first.box.disarm()
+    await first.box.expose()
+    expect(first.box.getSnapshot().exposed).to.be.true
   })
 })
 // --

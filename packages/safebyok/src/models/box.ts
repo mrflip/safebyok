@@ -54,6 +54,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, held in memory through `lock()` until the host sets `box.whisper` null or the box disarms. Nothing seals it: an update seals the whisper it is given. */
   #exposed: WhisperHolder | null = null
 
+  /** Counts each change to `#exposed` but an expose's own, so an expose overtaken by one while it unseals keeps nothing. */
+  #exposedSeq = 0
+
   // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
 
   get fmt(): number { return this.combined.fmt }
@@ -109,7 +112,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     const forgets = (whisper === null) || Storable.isLockedFUBag(whisper)
     const exposed = forgets ? null : whisperHolder.parse(whisper)
     if (! forgets) { this.demandUnlocked() }
-    this.#exposed = exposed
+    this.#replaceExposed(exposed)
     this.settle()
   }
 
@@ -148,17 +151,28 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
    * Keeping it is the host's decision, which a host would otherwise make for itself, without the
    * guard. The box holds it in memory until the host sets `box.whisper` null: `lock()` does not
    * forget it, and while the vault is locked `box.whisper` answers LOCKED in its place.
+   * Where the box forgets or is handed a whisper while this unseals, as a disarm, an eviction, a
+   * tombstone or a newer revision makes it forget, this keeps nothing and resolves all the same.
    */
   async expose(opts: EditOpts = {}): Promise<this> {
-    this.#exposed = await this.unsealWhisper(opts)
+    const seqAtStart = this.#exposedSeq
+    const opened = await this.unsealWhisper(opts)
+    if (this.#exposedSeq !== seqAtStart) { return this }
+    this.#exposed = opened
     this.settle()
     return this
   }
 
   /** Forget the exposed whisper, as setting `box.whisper` null does, once it no longer stands for the box. */
   disarm(): void {
-    this.#exposed = null
+    this.#replaceExposed(null)
     this.settle()
+  }
+
+  /** Hold `exposed` in place of the exposed whisper, counted so an expose in flight keeps nothing. */
+  #replaceExposed(exposed: WhisperHolder | null): void {
+    this.#exposed = exposed
+    this.#exposedSeq += 1
   }
 
   /** Seal this whisper, `{ val }`, with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
@@ -194,7 +208,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     const isOwnSend = central.revision_tok === this.staged?.revision_tok
     super.adopt(central, staged)
     if (central === prior) { return }
-    if (MSX.isTombstone(central) || (! isOwnSend && central.revision_seq > prior.revision_seq)) { this.#exposed = null }
+    if (MSX.isTombstone(central) || (! isOwnSend && central.revision_seq > prior.revision_seq)) { this.#replaceExposed(null) }
   }
   // --
 
