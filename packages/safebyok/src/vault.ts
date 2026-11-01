@@ -26,14 +26,14 @@ import * as Phrases from './phrases'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
-import { lockedError } from './helpers/throwers'
+import * as RefusalFuncs from './helpers/refusal-funcs'
 import { type DeviceDB, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { KeptLease, Lease } from './lease'
+import { CachedLease, Lease } from './lease'
 import { registerLeaseGetter } from './held-lease'
 import { type PassphraseProving, Proving, type ProvingTools, type VaultPrivateTools, provingTools } from './proving'
 import { Gate } from './gate'
-import { type GatingCall, type GatingTools, type GatingKind, RaisedGating, gateMadeElsewhereError } from './gating'
+import { type GatingCall, type GatingTools, type GatingKind, LaunchedGating, gateMadeElsewhereError } from './gating'
 
 // == [Public types]: VaultFreshness, VaultSnapshot, bear, letGo, goneBy
 
@@ -153,7 +153,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * wrap it to hand it on, as to an event handler: `() => vault.tryHello()`.
  *
  * Nothing prompts on open. A call that needs a whisper goes through {@link Vault.ensureUnlocked}:
- * a vault that is not unlocked raises a gating, handed to the host's `requestCleartext`, one at a
+ * a vault that is not unlocked launches a gating, handed to the host's `requestCleartext`, one at a
  * time.
  *
  * Every call holds to these, unless its own doc says otherwise:
@@ -327,10 +327,10 @@ export class Vault implements VaultStamp {
    * on a button. Under a lease of the ways in held that does not end
    * within `renewMinutes` (0 left out), it resolves at once, with no prompt and no write.
    *
-   * Otherwise it raises an `unlock_vault` gating (`initialize_gate` while the vault is `novel`), or
+   * Otherwise it launches an `unlock_vault` gating (`initialize_gate` while the vault is `novel`), or
    * joins one pending: one dialog answers every call waiting on it. A pending gating of another kind
    * it waits out, whatever that settles with, and asks again; so it does when a joined gating
-   * leaves no lease in force past `renewMinutes`. It raises at most one gating of its own. That
+   * leaves no lease in force past `renewMinutes`. It launches at most one gating of its own. That
    * gating first takes up a lease another tab granted, when one fits (of the ways in held, ending
    * past `renewMinutes` and no later than `leaseHours` from now), before the host is asked.
    *
@@ -468,10 +468,10 @@ export class Vault implements VaultStamp {
   }
 
   /** Put a way into the vault at `slotlabel`, through a gating the user answers, resolving the vault.
-   * On a `novel` vault `'passphrase'` raises `initialize_gate`: the first passphrase, and a passkey
-   * beside it if the dialog offers one. Otherwise `'passphrase'` raises `change_passphrase`: the
+   * On a `novel` vault `'passphrase'` launches `initialize_gate`: the first passphrase, and a passkey
+   * beside it if the dialog offers one. Otherwise `'passphrase'` launches `change_passphrase`: the
    * current passphrase and the next, which replaces it and removes the passkey, if any. `'passkey'`
-   * raises `put_passkey`: the passphrase and a new passkey's answer, which becomes the vault's
+   * launches `put_passkey`: the passphrase and a new passkey's answer, which becomes the vault's
    * passkey, replacing any; the snapshot's `gate.passkey` says which, so the host can warn the user
    * first. Only the passphrase proves a change to the ways in, never a passkey. Boxes are untouched,
    * so the call costs the same however many there are. The gating's attempt writes with
@@ -532,7 +532,7 @@ export class Vault implements VaultStamp {
       this.#demandNotGone()
       VX.wayinkind.parse(slotlabel)
       if (slotlabel === 'passphrase') {
-        throw new VaultError('passphrase_required', Phrases.PassphraseKept)
+        throw new VaultError('passphrase_required', Phrases.PassphraseIrremovable)
       }
       await this.#refreshIfStale(this.#staleMillis)
       this.#demandNotGone()
@@ -873,8 +873,8 @@ export class Vault implements VaultStamp {
       heardRefusal: (thrown) => this.#heardRefusal(thrown),
       request:      this.#requestCleartext,
     }
-    this.#applyVault({ fresh: this.#vaultRecord, listing: born.listing, leaseKept: null, refreshedAt: born.refreshedAt, leasesSeen: this.#leasesHeld })
-    this.#takeUpAtBirth(born.leaseKept)
+    this.#applyVault({ fresh: this.#vaultRecord, listing: born.listing, cachedLease: null, refreshedAt: born.refreshedAt, leasesSeen: this.#leasesHeld })
+    this.#takeUpAtBirth(born.cachedLease)
     this.#watchStorage()
     Object.freeze(this)
   }
@@ -959,10 +959,10 @@ export class Vault implements VaultStamp {
       vaultlabel:        this.vaultlabel,
       format:            this.format,
       vault_tok:         this.vault_tok,
-      gate:              keptIfSame(shown?.gate, gate === null ? null : gateSparseOf(gate)),
-      boxes:             keptIfSame(shown?.boxes, this.#boxes),
-      damagedBoxes:      keptIfSame(shown?.damagedBoxes, this.#damagedBoxes),
-      capacity:          keptIfSame(shown?.capacity, this.#capacity()),
+      gate:              shownIfSame(shown?.gate, gate === null ? null : gateSparseOf(gate)),
+      boxes:             shownIfSame(shown?.boxes, this.#boxes),
+      damagedBoxes:      shownIfSame(shown?.damagedBoxes, this.#damagedBoxes),
+      capacity:          shownIfSame(shown?.capacity, this.#capacity()),
       ask_passphrase_at: this.#leaseInForce(now)?.ask_passphrase_at ?? null,
       freshness:         this.#freshness(now),
       trouble:           this.#trouble,
@@ -1018,7 +1018,7 @@ export class Vault implements VaultStamp {
     const refreshedAt = this.#clockNow()
     const leasesSeen = this.#leasesHeld
     try {
-      const { record, stored, leaseKept } = await this.#loadFromStorage()
+      const { record, stored, cachedLease } = await this.#loadFromStorage()
       if (! stored.ok) {
         await this.#onStorageRefusal(stored)
         throw stored.err
@@ -1040,14 +1040,14 @@ export class Vault implements VaultStamp {
       }
       if (isOlderPicture(this.#vaultRecord, found)) { return }
       const { boxes, damagedBoxes, ...fresh } = found
-      this.#applyVault({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, leaseKept: valOf(leaseKept), refreshedAt, leasesSeen })
+      this.#applyVault({ fresh: frozenVaultRecord(fresh), listing: { boxes, damagedBoxes }, cachedLease: valOf(cachedLease), refreshedAt, leasesSeen })
       await this.#noteEpochSeen(fresh.vault_epoch, 'refresh')
     } catch (err) { throw this.#onRefreshRefused(err) }
   }
 
   /** Read this device's record of the scope, then the vault and its listing, then this device's lease, and nothing else: the three answers as one plain object.
-   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault`, then {@link KeptLease.tryGet},
-   * the lease kept. The device record's read throws its refusal; the other two answer Outcomes.
+   * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault`, then {@link CachedLease.tryGet},
+   * the lease cached. The device record's read throws its refusal; the other two answer Outcomes.
    */
   async #loadFromStorage() {
     // Read the device record before storage, or a write of this device's own that bumps the record
@@ -1055,8 +1055,8 @@ export class Vault implements VaultStamp {
     // behind a record it could not have known.
     const record = await this.#deviceDB.getDeviceRecord(this.#scope)
     const stored = await this.#vaultDB.tryGetVault(this.#scope)
-    const leaseKept = await KeptLease.tryGet(this.#deviceDB, this.#scope)
-    return { record, stored, leaseKept }
+    const cachedLease = await CachedLease.tryGet(this.#deviceDB, this.#scope)
+    return { record, stored, cachedLease }
   }
 
   /** Mark the refresh that met `err` refused, and return `err` for its caller to throw: the snapshot's freshness says `refused`, and the next hello refreshes (`#forceNextRefresh`), whatever its staleMinutes says. */
@@ -1074,7 +1074,7 @@ export class Vault implements VaultStamp {
    * None is taken up here. A refresh finding nothing damaged clears the trouble; bad news it finds is
    * told once the snapshot shows it.
    */
-  #applyVault(found: { fresh: VaultRecord, listing: BoxListing, leaseKept: KeptLease | null, refreshedAt: number, leasesSeen: number }) {
+  #applyVault(found: { fresh: VaultRecord, listing: BoxListing, cachedLease: CachedLease | null, refreshedAt: number, leasesSeen: number }) {
     const { fresh, listing } = found
     const shown = this.#damagedBoxes
     const shownWayins = this.#wayinListOf(this.#shownRecord)
@@ -1089,7 +1089,7 @@ export class Vault implements VaultStamp {
     if (this.#damagedBoxes.length === 0 && damagedWayins.length === 0) { this.#trouble = null }
     const held = this.#lease
     const outdated = held !== null && ! fitsLease(fresh, held)
-    const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! leavesInForce(found.leaseKept, held)
+    const revoked = held !== null && found.leasesSeen >= this.#leasesHeld && ! leavesInForce(found.cachedLease, held)
     if (outdated || revoked) { this.#dropLease() }
     this.#replaceSnapshot()
     this.#tellListingNews(shown)
@@ -1119,14 +1119,14 @@ export class Vault implements VaultStamp {
 
   // == [Device record]: noteEpochSeen
 
-  /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryRaiseDeviceRecord}: never a refusal.
+  /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryIncrementDeviceRecord}: never a refusal.
    * A device store that fails to keep it is warned of: a missed raise only weakens the check for a
    * vault served behind what this device has seen, until a later read raises it.
    */
   async #noteEpochSeen(vaultEpoch: number, call: VaultCall): Promise<void> {
-    const raised = await this.#deviceDB.tryRaiseDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
-    if (raised.ok) { return }
-    this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, raised.err)
+    const incremented = await this.#deviceDB.tryIncrementDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
+    if (incremented.ok) { return }
+    this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, incremented.err)
   }
   // --
 
@@ -1194,13 +1194,13 @@ export class Vault implements VaultStamp {
   #leaseRefusal(): VaultError | null {
     if (this.#leaseInForce() !== null) { return null }
     if (this.#lease !== null) { this.#dropLease() }
-    return lockedError()
+    return RefusalFuncs.vaultLocked()
   }
 
   /** The lease in hand, for `call` about to use it, demanded consistent with the picture and in force: 'vault_locked' with none. */
   #demandLease(call: VaultCall): Lease {
     const lease = this.#lease
-    if (lease === null) { throw lockedError() }
+    if (lease === null) { throw RefusalFuncs.vaultLocked() }
     this.#demand(lease, { leaseBound: true, call })
     return lease
   }
@@ -1214,11 +1214,11 @@ export class Vault implements VaultStamp {
   }
   // --
 
-  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, raiseGating, landGating, delVault, afterDel
+  // == [Gating]: gating, gatingTools, ensureUnlocked, leaseLastsPast, gatingFor, launchGating, landGating, delVault, afterDel
 
   // The pending gating, if any: one per vault, and every call that needs the user waits on it
   // or on its settling. See ensureUnlocked() and gatingFor().
-  #gating: RaisedGating | null = null
+  #gating: LaunchedGating | null = null
   // What a gating reaches of this Vault object, which no getter shows: see GatingTools.
   readonly #gatingTools: GatingTools
   // What a proving reaches of this Vault object, through its [provingTools] getter: see ProvingTools.
@@ -1226,12 +1226,12 @@ export class Vault implements VaultStamp {
 
   /** Have the vault unlocked, as {@link Vault.ensureUnlocked} says, resolving true; or resolve false, asking nobody, when `shouldAsk` says not to ask.
    * `shouldAsk` runs only when the vault must ask, after the hello and before any gating is joined
-   * or raised: a call checks there what it can know without the key, so a call that cannot land
+   * or launched: a call checks there what it can know without the key, so a call that cannot land
    * never prompts. It demands nothing once unlocked: demand the lease before using it.
    */
   async #ensureUnlocked(renewMillis: number, shouldAsk?: () => boolean): Promise<boolean> {
     await this.#refreshIfStale(this.#staleMillis)
-    // The bank letting the vault go during the hello: no gating is raised over a gone Vault object.
+    // The bank letting the vault go during the hello: no gating is launched over a gone Vault object.
     this.#demandNotGone()
     for (;;) {
       if (this.#leaseLastsPast(renewMillis)) { return true }
@@ -1248,7 +1248,7 @@ export class Vault implements VaultStamp {
         continue
       }
       if (shouldAsk?.() === false) { return false }
-      const settled = await (pending ?? this.#raiseGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
+      const settled = await (pending ?? this.#launchGating(isGated(this.#vaultRecord) ? 'unlock_vault' : 'initialize_gate', 'ensureUnlocked', renewMillis)).settled
       // A let-go lands the gating as a lock does, but its waiters hear the Vault object is gone.
       this.#demandNotGone()
       valOf(settled)
@@ -1263,7 +1263,7 @@ export class Vault implements VaultStamp {
     return fitsLease(this.#vaultRecord, held) && ! held.endsBy(this.#clockNow() + renewMillis)
   }
 
-  /** Join the pending gating when it is of the kind `kindNow` names, else wait it out and raise one of that kind, for `call`; resolve once it settles with success, refusing as it refuses.
+  /** Join the pending gating when it is of the kind `kindNow` names, else wait it out and launch one of that kind, for `call`; resolve once it settles with success, refusing as it refuses.
    * `kindNow` judges the picture in hand each time round, and may refuse.
    */
   async #gatingFor(kindNow: () => GatingKind, call: GatingCall): Promise<void> {
@@ -1275,7 +1275,7 @@ export class Vault implements VaultStamp {
         await pending.settled
         continue
       }
-      const settled = await (pending ?? this.#raiseGating(gatingkind, call, null)).settled
+      const settled = await (pending ?? this.#launchGating(gatingkind, call, null)).settled
       // A deletion that settled leaves the Vault object gone, by design; any other waiter hears a let-go as gone.
       if (call !== 'del' || ! settled.ok) { this.#demandNotGone() }
       valOf(settled)
@@ -1283,18 +1283,18 @@ export class Vault implements VaultStamp {
     }
   }
 
-  /** Raise a gating of `gatingkind` for `call`, pending until it settles: with `renewMillis`, it first takes up a lease from this device's store when one fits (`#takeUpFromPantry`). */
-  #raiseGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): RaisedGating {
-    const raised: RaisedGating = RaisedGating.raise(gatingkind, call, this, this.#gatingTools, () => {
-      if (this.#gating === raised) { this.#gating = null }
+  /** Launch a gating of `gatingkind` for `call`, pending until it settles: with `renewMillis`, it first takes up a lease from this device's store when one fits (`#takeUpFromPantry`). */
+  #launchGating(gatingkind: GatingKind, call: GatingCall, renewMillis: number | null): LaunchedGating {
+    const launched: LaunchedGating = LaunchedGating.make(gatingkind, call, this, this.#gatingTools, () => {
+      if (this.#gating === launched) { this.#gating = null }
     })
-    this.#gating = raised
-    raised.run(renewMillis)
-    return raised
+    this.#gating = launched
+    launched.run(renewMillis)
+    return launched
   }
 
   /** Land a lock, or the vault going gone, on the pending gating, if any: its waiters refuse 'vault_locked', or `told`, and its `lockLanded` settles.
-   * A deletion whose write is sent stays pending until its chain settles it, so no call raises a
+   * A deletion whose write is sent stays pending until its chain settles it, so no call launches a
    * gating over a vault being deleted.
    */
   #landGating(told?: VaultError) {
@@ -1497,18 +1497,18 @@ export class Vault implements VaultStamp {
     return lease
   }
 
-  /** Take up the lease in this device's store, read with {@link KeptLease.tryGet}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
+  /** Take up the lease in this device's store, read with {@link CachedLease.tryGet}, when another tab granted one that fits by `#fitsTakeUp` past `renewMillis`, resolving true when taken.
    * Make it a gating's first step, before the host is asked. A gating landed while the store is
    * read takes nothing up. A lease that does not fit is left where it lies, never erased: it may be
    * another tab's, and the next grant writes over it. A record that is no lease of this scope reads
    * as none, warned of by the read, and is left too. Its wrap is not tried: a damaged one refuses
    * at its first use, 'damaged_lease'.
    */
-  async #takeUpFromPantry(gating: RaisedGating, renewMillis: number): Promise<boolean> {
-    const kept = await KeptLease.tryGet(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
+  async #takeUpFromPantry(gating: LaunchedGating, renewMillis: number): Promise<boolean> {
+    const cached = await CachedLease.tryGet(this.#deviceDB, this.#scope, { logger: this.#logger, call: 'ensureUnlocked' })
     this.#demandNotGone()
     if (gating.landed) { return false }
-    const found = valOf(kept)
+    const found = valOf(cached)
     if (found === null) { return false }
     const lease = found.leaseOn(this)
     if (! this.#fitsTakeUp(lease, renewMillis)) { return false }
@@ -1516,14 +1516,14 @@ export class Vault implements VaultStamp {
     return true
   }
 
-  /** Take up `kept`, the lease the vault's birth found in this device's store ({@link KeptLease.tryGet}), when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
+  /** Take up `cached`, the lease the vault's birth found in this device's store ({@link CachedLease.tryGet}), when it fits by `#fitsTakeUp`: the vault is born unlocked, its expiry armed.
    * One that does not fit is left where it lies, never erased: it may be another tab's, of another
    * life, and a grant writes over it. Its wrap is not tried: a damaged one refuses at its first
    * use, 'damaged_lease'.
    */
-  #takeUpAtBirth(kept: KeptLease | null) {
-    if (kept === null) { return }
-    const lease = kept.leaseOn(this)
+  #takeUpAtBirth(cached: CachedLease | null) {
+    if (cached === null) { return }
+    const lease = cached.leaseOn(this)
     if (! this.#fitsTakeUp(lease, 0)) { return }
     this.#holdLease(lease)
   }
@@ -1601,7 +1601,7 @@ export class Vault implements VaultStamp {
   /** `boxlabel`, once it is a label: 'bad_scope' otherwise, naming the field and quoting none of it. */
   #checkedBoxlabel(boxlabel: unknown): string { return CX.boxscope.parse({ ...this.#scope, boxlabel }).boxlabel }
 
-  /** True when the snapshot's listing shows a box under `boxlabel`, sound or damaged: what a locked vault can know before it raises a gating. */
+  /** True when the snapshot's listing shows a box under `boxlabel`, sound or damaged: what a locked vault can know before it launches a gating. */
   #isListed(boxlabel: string): boolean { return this.#listedOf(boxlabel) !== undefined }
 
   /** True when the snapshot's listing shows the box under `boxlabel` as damaged. */
@@ -1900,7 +1900,7 @@ export type Birth = Readonly<{
   /** The box listing `VaultDB.ensureVault` resolved beside it. */
   listing:     BoxListing
   /** The lease record {@link DeviceDB.tryGetLease} found, or null. */
-  leaseKept:   KeptLease | null
+  cachedLease: CachedLease | null
   /** This device's record of the scope, as raised at birth. */
   record:      DeviceRecord
   /** When the bank's `ensureVault` began, by its clock: the vault's first `refreshedAt`. */
@@ -1925,7 +1925,7 @@ const isOlderPicture = (inHand: Pick<VaultSparse, 'vault_tok' | 'vault_epoch' | 
 )
 
 /** `next`, or `shown` when it holds the same: a snapshot's slice keeps its identity until what it holds changes. */
-const keptIfSame = <SliceT>(shown: SliceT | undefined, next: SliceT): SliceT => (
+const shownIfSame = <SliceT>(shown: SliceT | undefined, next: SliceT): SliceT => (
   shown !== undefined && stableJsonify(shown) === stableJsonify(next) ? shown : next
 )
 
@@ -1937,8 +1937,8 @@ const fitsLease = (vaultRecord: Pick<VaultSparse, 'vault_tok' | 'gate_epoch'>, l
  * this tab keeps its own until it ends. None (a lock in another tab), or one under another gate,
  * does not.
  */
-const leavesInForce = (kept: KeptLease | null, held: Lease): boolean => (
-  kept !== null && kept.vault_tok === held.vault_tok && kept.gate_epoch === held.gate_epoch
+const leavesInForce = (cached: CachedLease | null, held: Lease): boolean => (
+  cached !== null && cached.vault_tok === held.vault_tok && cached.gate_epoch === held.gate_epoch
 )
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */

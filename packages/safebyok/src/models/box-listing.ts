@@ -2,7 +2,7 @@
 
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
-import { lockedError } from '../helpers/throwers'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import { type BoxSnapshot, Box, sealedRecordOf } from './box'
@@ -61,7 +61,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
-  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw lockedError() } }
+  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw RefusalFuncs.vaultLocked() } }
   // --
 
   // == [Defined by the box listing]
@@ -89,7 +89,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   absentRefusal(scope: Boxscope): VaultError {
-    return new VaultError('absent_box', `No box is stored under the label ${this.scopeOf(scope).boxlabel}.`)
+    return RefusalFuncs.boxAbsent(this.scopeOf(scope).boxlabel)
   }
 
   /** The record `meta.box_stored` carries: the full record where it is one, else its sparse form, else null. */
