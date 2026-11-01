@@ -82,12 +82,10 @@ export const undecodedWhisper = (): VaultError => new VaultError('damaged_box', 
 
 export const needVaultUnlocked = (): VaultError => new VaultError('vault_locked', Phrases.NeedVaultUnlocked)
 
-
 export const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
 // --
 
 // == [Gates]: passkeyHeldAlready, noPasskeyToRevoke, gateMovedUnderChange
-
 
 export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
 
@@ -109,7 +107,6 @@ export const provingOfOtherVault = (): VaultError => new VaultError('bad_option'
 
 export const leaseOfOtherVault = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherVault)
 
-
 export const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverThrew)
 
 export const wrongPassphrase = (): VaultError => new VaultError('wrong_passphrase', Phrases.WrongPassphrase)
@@ -126,7 +123,6 @@ export const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_d
 // --
 
 // == [Gatings]: requestCleartextThrew, gatingDeclined, gatingSettled, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
-
 
 export const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
 
