@@ -231,26 +231,28 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#sendGate(ante, await this.gate.withPasskeyRevoked(cleartexts, this.world))
   }
 
-  /** Ask the user through a `gatingkind` gating of this vault, each attempt running `run`, and resolve the vault once one succeeds. A gating of the kind launched already is joined, its `run` kept. */
-  async #launchGating<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<this> {
-    await (this.#launches.get(gatingkind) ?? this.#launchInTurn(gatingkind, run))
+  /** Ask the user through a `gatingkind` gating of this vault, each attempt running `run`, and resolve the vault once one succeeds. A gating of the kind launched already is joined, its `run` kept. An unlock hands the `lockSeq` it began at, so a lock or let-go landing before its gating asks refuses 'vault_locked'. */
+  async #launchGating<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>, lockSeq?: number): Promise<this> {
+    await (this.#launches.get(gatingkind) ?? this.#launchInTurn(gatingkind, run, lockSeq))
     return this
   }
 
   /** Launch a `gatingkind` gating once the gating asking has settled, held in `#launches` until it settles. */
-  #launchInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<void> {
+  #launchInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>, lockSeq?: number): Promise<void> {
     // `#askInTurn` awaits before anything else, so the launch is held here before its finally lets it go.
-    const launch = this.#askInTurn(gatingkind, run)
+    const launch = this.#askInTurn(gatingkind, run, lockSeq)
     this.#launches.set(gatingkind, launch)
     return launch
   }
 
   /** Hold the asking turn, fetch the full record where the vault is not full, so the gating carries the passkey header, and ask through `Gating.launch`, the gating held as `#asking`, and among `#gatings` for a lock or a let-go to decline, from the moment the host is handed it. */
-  async #askInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>): Promise<void> {
+  async #askInTurn<KindT extends GatingKind>(gatingkind: KindT, run: (cleartexts: CleartextsForGatingkind[KindT]) => Promise<unknown>, lockSeq?: number): Promise<void> {
     await this.#askingMutex.acquire()
     try {
       // Fetched in turn: a sparse record received while it waited would leave the gating no gate to read.
       if (! this.isFull) { await this.fetch() }
+      // A lock or let-go while it waited or fetched found no gating to decline: refuse, rather than ask the user for an unlock it overtook.
+      if (lockSeq !== undefined && this.#lockSeq !== lockSeq) { throw RefusalFuncs.lockedWhileUnlocking() }
       const { requestCleartext, strengthChecker, logger } = this.world
       // `Gating.launch` hands the host its gating before it first awaits.
       const world: GatingWorld = { strengthChecker, logger, requestCleartext: (gating) => {
@@ -378,7 +380,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   /** Ask the user through an 'unlock_vault' gating, each attempt unlocking through `#unlockByProof`, never `ensureUnlocked`, which would join the unlock this is. */
   async #unlockByGating(lockSeq: number): Promise<Lease> {
-    await this.#launchGating('unlock_vault', (handed) => this.#unlockByProof(handed, lockSeq))
+    await this.#launchGating('unlock_vault', (handed) => this.#unlockByProof(handed, lockSeq), lockSeq)
     return this.demandLease()
   }
 

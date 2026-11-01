@@ -96,6 +96,34 @@ describe("vault.lock() overtaking an unlock in flight", () => {
     expect(vault.demandLease()).to.equal(lease)
   })
 
+  it("asks the user nothing where a lock lands while the unlock fetches the full record: ensureUnlocked refuses 'vault_locked'", async () => {
+    const { vault, deviceDB, listing, opts, requestCleartext, storeBehindOurBack, demandStored } = await makeBornVault()
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const look = { answer: null as (() => void) | null }
+    const getLease = deviceDB.tryGetLease.getMockImplementation()!
+    deviceDB.tryGetLease.mockImplementationOnce((scope) => new Promise((resolve) => { look.answer = () => { resolve(getLease(scope)) } }))
+    const pending = vault.ensureUnlocked()
+    await TH.eventually(() => look.answer !== null)
+    // A newer revision, told sparse, leaves the vault no full record for the gating's passkey header: the unlock fetches it.
+    const newer = storeBehindOurBack(demandStored())
+    vault.receive(listing.sparseOf(newer))
+    expect(vault.isFull).to.be.false
+    const get = opts.store.get.bind(opts.store)
+    const fetching = { release: null as (() => void) | null }
+    opts.store.get = (scope) => {
+      opts.store.get = get
+      return new Promise((resolve) => { fetching.release = () => { resolve(get(scope)) } })
+    }
+    look.answer?.()
+    await TH.eventually(() => fetching.release !== null)
+    vault.lock()
+    fetching.release?.()
+    await TH.expectRefusal(pending, 'vault_locked')
+    expect(requestCleartext).not.toHaveBeenCalled()
+    expect(vault.isLocked).to.be.true
+  })
+
   it("takes up no kept lease its look finds after a lock landed, and asks the user", async () => {
     const { vault, deviceDB, requestCleartext } = await makeBornVault()
     vault.letLeaseGo()
