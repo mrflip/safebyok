@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 5b filed on top of #440 (the two G4 gaps ruled won't-fix/undefined, with tests and a TODO). 7b split in three: 7b and 7c side by side off 5b; 7d stacked on 7c; 7b restacked under them; then 8, 10, 12 side by side; then 11.
+* **Status:** new race-condition work is paused on the Coach's word (2026-11-01, ground rule 13) until they assess Open Matters and the Closer Look. 5b filed. 7b (voiding) and 7c (bad news, sign-out, narrowed) are wrapping up. 7d is held whole. Then 8, 10 and 12, with their race carries held; then 11.
 
 ## Read first
 
@@ -65,6 +65,7 @@ Particular to this sprint:
     renames, thread 5's move, thread 6's fronting). The models reach parity first.
 12. Pre-1.0: no shims, no migrations (CLAUDE.md). The models' stored shapes are not yet written
     by any host, so a change to them needs no compatibility, only a line in the changeset.
+13. **The Coach's priorities, and the pause (2026-11-01).** "I'm not asking for rework to be done on any consistency line. I would like the system to be simple and easy to read; predictable; .... and at a vastly lower priority consistently failsafe in every edge case. Pause new work addressing these race condition management -- adding, removing or aligning; wrap up anything under way until I can asssess the open matters and closer look. Don't remove counters or guards, or set a rule against their use, or over-weight my earlier comment on "I'm not sure I want a counter" which in my head had the second part "I'm not sure I want a counter, it's probably the right thing but I'd like to be sure the machinery is worth the peril"". A race met is reported, not managed, while this stands.
 
 ## Shape of the sprint
 
@@ -379,7 +380,7 @@ G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S
 > `demandConsistentWith`) describes the old code; rewrite or drop it when thread 7 settles
 > `gate_epoch`.
 
-*Orchestrator:* **the rollback guard is held** (the Coach, 2026-11-01: "Can you proceed without that. Not sure I want a counter"): no thread builds it; the device record's highest epoch stays unread, and the YOLO call to key it by `vault_tok` waits with it.
+*Orchestrator:* **the rollback guard is held, not rejected.** The Coach, 2026-11-01: "Can you proceed without that", and later the whole thought: "I'm not sure I want a counter, it's probably the right thing but I'd like to be sure the machinery is worth the peril". No thread builds it while they assess; the device record's highest epoch stays unread, and the YOLO call to key it by `vault_tok` waits with it.
 
 *Orchestrator:* **split in three** (the item list outgrew one context; thread 6 and thread 13 each compacted twice on less). 7b and 7c stand off 5b side by side, since one is the record and the lease and the other the bank and the listing's telling; 7d stacks on 7c, both meeting in `vault-listing.ts`. 7b is restacked under them before 8, 10 and 12. "Answers in flight after a close" (#434 review) is gone from the list: 5b's close count and the Coach's won't-fix settle it.
 
@@ -391,9 +392,11 @@ G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S
 >
 > (From 4b) Sign-out (storage says the user is no longer signed in) closes the vaults.
 
-*Gloss.* `bank.ts`, `listing.ts`, `vault-listing.ts`, `store-front.ts`. *Orchestrator, carried here:* signed-out arrives as bad news of kind `identity_revoked` (thread 6): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). `onChange` floods bad news (#429 review). Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. Read `wroteOverDamaged` in `Bank.#keepDeviceRecord` and tell the reset as bad news (5b). *YOLO, from 5b's sibling races:* `closeVaults` lands wherever `closeVault` does, through the same close count (today a sign-out during a reload leaves the vault unlocked, items 1 and 2); a `goodbye` during `hello` ends the watch it would start, with a count as `Vault.#helloBoxesOnce` does (item 4). **Levels:** worker high effort; review `high` (it reads 5b's conflict resolutions too). **Depends on:** 5b. **Size:** M.
+*Gloss.* `bank.ts`, `listing.ts`, `vault-listing.ts`, `store-front.ts`. *Orchestrator, carried here:* signed-out arrives as bad news of kind `identity_revoked` (thread 6): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). `onChange` floods bad news (#429 review). Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. Read `wroteOverDamaged` in `Bank.#keepDeviceRecord` and tell the reset as bad news (5b). *Withdrawn under ground rule 13:* `closeVaults` landing wherever `closeVault` does (sibling races 1, 2) and a guard on `goodbye` during `hello` (race 4) are not built; rows wait on the Coach. `onChange`'s flood only if it is simple. **Levels:** worker high effort; review `high` (it reads 5b's conflict resolutions too). **Depends on:** 5b. **Size:** M.
 
 ### 7d. lost_build
+
+*Orchestrator:* **held whole under ground rule 13**, not started: each of its items manages a race or adds a consistency guard, and each was my YOLO call. Rows wait on the Coach. 8, 10 and 12 no longer depend on it.
 
 > *(orchestrator, YOLO)* The telling a two-device build owes, and the two guards left beside it.
 
@@ -418,8 +421,8 @@ G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S
 >   tombstoned vault reads as absent.
 
 *Gloss.* `vault.ts`, `vault-listing.ts`, `bank.ts`, `gating.ts` (the kind), devicedb erase.
-**Levels:** review `high` (lease erase). *Orchestrator:* from 13's review (YOLO): the box verbs refuse `vault_gone` (`Phrases.VaultObjectGone`) on an evicted vault, at the head of each verb and after its awaits, evicting anything fetched late; `ensureBox` over a held draft refuses `bad_option`; a box verb checks its vault is present. *Orchestrator:* from thread 6: `Store.del` is conditional on `revision_tok`; `delUnparsed(scope)` is the unconditional delete for a damaged row (removes it only while it still reads as damaged). `Vault.takeWorld` refuses a box answer whose vault row is absent or damaged: settle it with the tombstone rule. *Orchestrator:* from 5b's sibling races: `clearCachedVault` erases outside the scope's lease mutex, so during the first `ensureVault`'s fetch the vault ends unlocked with its lease kept, and a settle can undo the copy's erase; settle both when deletion uses it. A `closeVault` during `vault.getBox` of a held box leaves a Box on the evicted vault: the `vault_gone` refusal above covers it.
-**Depends on:** 7b, 7c, 7d, restacked. Beside 10 and 12. **Size:** M.
+**Levels:** review `high` (lease erase). *Orchestrator:* **held under ground rule 13**, the two carries that manage races: box verbs on an evicted vault, and `clearCachedVault`'s erase outside the mutex; the build is the Coach's text. From 13's review (YOLO): the box verbs refuse `vault_gone` (`Phrases.VaultObjectGone`) on an evicted vault, at the head of each verb and after its awaits, evicting anything fetched late; `ensureBox` over a held draft refuses `bad_option`; a box verb checks its vault is present. *Orchestrator:* from thread 6: `Store.del` is conditional on `revision_tok`; `delUnparsed(scope)` is the unconditional delete for a damaged row (removes it only while it still reads as damaged). `Vault.takeWorld` refuses a box answer whose vault row is absent or damaged: settle it with the tombstone rule. *Orchestrator:* from 5b's sibling races: `clearCachedVault` erases outside the scope's lease mutex, so during the first `ensureVault`'s fetch the vault ends unlocked with its lease kept, and a settle can undo the copy's erase; settle both when deletion uses it. A `closeVault` during `vault.getBox` of a held box leaves a Box on the evicted vault: the `vault_gone` refusal above covers it.
+**Depends on:** 7b, 7c, restacked. Beside 10 and 12. **Size:** M.
 
 ### 9. whispers_and_names
 
@@ -452,7 +455,7 @@ G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S
 
 *Gloss.* `vault.ts`, `gating.ts` (`reason`, designed in 3a), the Trigger as it stands (it is
 reviewed apart: use it, do not reshape it). **Levels:** worker `sonnet`.
-**Depends on:** 7b, 7c, 7d, restacked. **Size:** S.
+**Depends on:** 7b, 7c, restacked. **Size:** S.
 
 ### 11. v06_entry
 
@@ -475,7 +478,7 @@ restacked. **Size:** S.
 > check, and ground rule 8 applies: by name, as control flow, not repaired in place.
 
 *Gloss.* `models/gate.ts`, `wayin.ts`, the gate checkers, the vault's snapshot trouble (7a).
-**Levels:** worker high effort; review `high`. **Depends on:** 7b, 7c, 7d, restacked. **Size:** M.
+**Levels:** worker high effort; review `high`. **Depends on:** 7b, 7c, restacked. **Size:** M.
 
 ### 13. vault_boxes
 
