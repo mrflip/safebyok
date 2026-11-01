@@ -1,8 +1,10 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB, the device cache and the bank. */
 
+import { Mutex } from 'es-toolkit'
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
+import { outcomeOf, valOf } from '../outcome'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import type { BoxStore } from './box-listing'
@@ -12,7 +14,7 @@ import { type PassphraseProving, spendAnswerAfter } from './proving'
 import type { GatingWorld } from './gating'
 import { type Cache, type Dna, type Fetched, type FetchOpts, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-import { type VaultSnapshot, UnlockAtBirth, Vault } from './vault'
+import { type VaultSnapshot, UnlockAtBirth, Vault, WithLeaseDB } from './vault'
 
 // == [Given to a vault listing]: BoxVaultDB, VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
 
@@ -48,6 +50,12 @@ export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse>
 export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault> {
   declare readonly world: VaultWorld
 
+  /** By scopepath, the mutex that every Vault object of the scope, and `close`, queue deviceDB work on the lease behind: it outlives an instance evicted, so one born after waits for what the evicted one queued. */
+  readonly #leaseMutexes = new Map<string, Mutex>()
+
+  /** By scopepath, how many closes have landed, so an `ensure` whose scope was closed while it stored grants no lease. */
+  readonly #closeSeqs = new Map<string, number>()
+
   constructor(opts: VaultListingOpts) {
     super(opts)
     MSX.vaultListingOpts.parse(opts)
@@ -55,14 +63,15 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   /** Build a vault of `dna` gated by `cleartexts`, put it, and hold the vault as stored: unlocked under a lease its passphrase proving grants, where the put lands; where another device stored a vault under the scope first, that vault, as it stands.
-   * Nothing is held before storage takes the vault, so cleartexts refused hold nothing. A lock or let-go of the vault before its lease is taken up leaves it locked, no lease kept. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2).
+   * Nothing is held before storage takes the vault, so cleartexts refused hold nothing. A `close` of the scope while it stores, or a lock or let-go of the vault before its lease is taken up, leaves it locked, no lease kept. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2).
    */
   ensure(dna: VaultDna, cleartexts: Cleartexts): Promise<Vault> {
     return spendAnswerAfter(cleartexts, async () => {
-      const { draft, proving } = await this.#buildDraft(this.stampDna(this.scopeOf(dna)), cleartexts)
+      const scope = this.scopeOf(dna)
+      const closeSeq = this.#closeSeqOf(scope)
+      const { draft, proving } = await this.#buildDraft(this.stampDna(scope), cleartexts)
       const vault = await this.putDraft(draft)
-      if (vault.vault_tok !== draft.vault_tok) { return vault }
-      await vault[UnlockAtBirth](proving)
+      if (vault.vault_tok === draft.vault_tok && this.#closeSeqOf(scope) === closeSeq) { await vault[UnlockAtBirth](proving) }
       return vault
     })
   }
@@ -81,6 +90,35 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     await Promise.all(this.things.map((vault) => vault.takeUpCachedLease()))
   }
 
+  /** Lock the vault under `scope`, as `vault.lock()` does, and evict it; where none is held, erase the lease this device keeps of the scope all the same, so no vault of it taken up later finds one. A refused erase is told as bad news. */
+  close(scope: VaultScope): void {
+    const checked = this.scopeOf(scope)
+    const scopepath = this.scopepathOf(checked)
+    this.#closeSeqs.set(scopepath, this.#closeSeqOf(checked) + 1)
+    const held = this.at(checked)
+    if (held !== null) {
+      held.lock()
+      this.evict(checked)
+      return
+    }
+    const { deviceDB } = this.world
+    void outcomeOf(() => this[WithLeaseDB](checked, async () => { valOf(await deviceDB.tryDelLease(checked)) }))
+      .then((done) => { if (! done.ok) { this.tellBadNews([done.err]) } })
+  }
+
+  /** Run `work` once the deviceDB work on the lease of `scope` begun before it has landed, by any Vault object of the scope or by `close`, holding off any begun after. */
+  async [WithLeaseDB]<ValT>(scope: VaultScope, work: () => Promise<ValT>): Promise<ValT> {
+    const scopepath = this.scopepathOf(scope)
+    const mutex = this.#leaseMutexes.get(scopepath) ?? new Mutex()
+    this.#leaseMutexes.set(scopepath, mutex)
+    await mutex.acquire()
+    try {
+      return await work()
+    } finally {
+      mutex.release()
+    }
+  }
+
   /** End the watch and each vault's watch of its boxes, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
   override goodbye(): void {
     super.goodbye()
@@ -93,6 +131,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   // == [Defined by the vault listing]
 
   protected vaultTokOfWorld(): null { return null }
+
+  #closeSeqOf(scope: VaultScope): number { return this.#closeSeqs.get(this.scopepathOf(scope)) ?? 0 }
 
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')

@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { memoryDeviceDB } from '../../src/devicedb/memory'
+import { VaultError } from '../../src/errors'
 import type { BankVaultDB } from '../../src/models/bank'
 import type { BoxStore } from '../../src/models/box-listing'
 import type { AnyGating } from '../../src/models/gating'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { VaultStore } from '../../src/models/vault-listing'
+import { bad } from '../../src/outcome'
 import type { VaultScope } from '../../src/shapes/scopes'
 import * as TH from '../test-helpers'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
@@ -90,14 +93,75 @@ describe("bank.closeVault(bag): the vault locked, its kept lease erased, and evi
     expect(deviceDB.tryDelLease.mock.invocationCallOrder.at(-1)).to.be.greaterThan(deviceDB.tryPutLease.mock.invocationCallOrder.at(-1) ?? Infinity)
   })
 
-  it("does nothing for a vaultlabel the bank holds no vault of, and refuses 'bad_scope' a bag of another user", async () => {
-    const { bank } = makeBankWorld()
+  it("leaves the vaults the bank holds as they are for a vaultlabel it holds none of, and refuses 'bad_scope' a bag of another user", async () => {
+    const deviceDB = memoryDeviceDB()
+    const { bank } = makeBankWorld(null, { deviceDB })
     const vault = await bank.ensureVault(Main, byPassphrase(Passphrase))
     bank.closeVault(Work)
     expect(bank.vaultOf(Main)).to.equal(vault)
     expect(vault.isLocked).to.be.false
     TH.expectSyncRefusal(() => { bank.closeVault({ vaultlabel: Dna.vaultlabel, user_id: 'u2' }) }, 'bad_scope')
     expect(bank.vaultOf(Main)).to.equal(vault)
+    await TH.wakeupAtNextTick()
+    expect(await deviceDB.getLease({ ...Dna })).to.not.be.null
+  })
+
+  it("erases the lease this device keeps of a vault the bank does not hold, so the next ensureVault gets it locked", async () => {
+    const deviceDB = memoryDeviceDB()
+    const { bank, makeBank } = makeBankWorld(null, { deviceDB })
+    await bank.ensureVault(Main, byPassphrase(Passphrase))
+    bank.goodbye()
+    const next = makeBank()
+    next.closeVault(Main)
+    const again = await next.ensureVault(Main)
+    expect(again.isLocked).to.be.true
+    expect(await deviceDB.getLease({ ...Dna })).to.be.null
+  })
+
+  it("tells onBadNews of a refused erase of the lease kept of a vault the bank does not hold", async () => {
+    const onBadNews = vi.fn()
+    const deviceDB = memoryDeviceDB()
+    const { bank } = makeBankWorld(null, { deviceDB, onBadNews })
+    const refusal = new VaultError('unexpected_error', 'the store is down')
+    vi.spyOn(deviceDB, 'tryDelLease').mockResolvedValueOnce(bad(refusal))
+    bank.closeVault(Main)
+    await TH.eventually(() => onBadNews.mock.calls.length > 0)
+    expect(onBadNews).toHaveBeenCalledWith(refusal)
+  })
+
+  it("leaves a vault closed while ensureVault stores it locked, no lease put", async () => {
+    const { bank, deviceDB, opts: { store } } = makeBankWorld()
+    const stored = TH.holdNextAnswer(store, 'put')
+    const ensuring = bank.ensureVault(Main, byPassphrase(Passphrase))
+    await stored.reached
+    bank.closeVault(Main)
+    stored.release()
+    const vault = await ensuring
+    expect(vault.isLocked).to.be.true
+    await TH.wakeupAtNextTick()
+    expect(deviceDB.tryPutLease).not.toHaveBeenCalled()
+    expect(deviceDB.cachedNow()).to.be.null
+  })
+
+  it("leaves a vault reopened after a close locked, though the evicted vault's look for its kept lease was in flight (G4)", async () => {
+    const deviceDB = memoryDeviceDB()
+    const { bank, makeBank } = makeBankWorld(null, { deviceDB })
+    await bank.ensureVault(Main, byPassphrase(Passphrase))
+    bank.goodbye()
+    const next = makeBank()
+    const looked = TH.holdNextAnswer(deviceDB, 'tryGetLease')
+    const greeting = next.hello()
+    await looked.reached
+    next.closeVault(Main)
+    const reopening = next.ensureVault(Main)
+    // Two ticks: time enough for a look nothing holds back to land before the erase.
+    await TH.wakeupAtNextTick()
+    await TH.wakeupAtNextTick()
+    looked.release()
+    await greeting
+    const again = await reopening
+    expect(again.isLocked).to.be.true
+    expect(await deviceDB.getLease({ ...Dna })).to.be.null
   })
 })
 

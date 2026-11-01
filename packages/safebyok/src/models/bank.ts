@@ -220,12 +220,12 @@ export class Bank implements VaultWorld, GatingWorld {
     return Gating.launch('build_vault', { scope, vault: null, world: this, run: (handed) => this.vaultListing.ensure(scope, handed) })
   }
 
-  /** Lock the vault `bag` names, erasing the lease this device keeps, and evict it, as {@link VaultListing.evict} does: the bank holds it no more, and the next `ensureVault` gets it anew. */
-  closeVault(bag: VaultBag): void { this.#closeVault(this.vaultScopeOf(bag)) }
+  /** Lock the vault `bag` names, erasing the lease this device keeps, held or not, and evict it, as {@link VaultListing.close} does: the bank holds it no more, and the next `ensureVault` gets it anew, locked. */
+  closeVault(bag: VaultBag): void { this.vaultListing.close(this.vaultScopeOf(bag)) }
 
   /** Close every vault the bank holds, as {@link closeVault} does. */
   closeVaults(): void {
-    for (const vault of this.vaultListing.things) { this.#closeVault(vault.scope) }
+    for (const vault of this.vaultListing.things) { this.vaultListing.close(vault.scope) }
   }
 
   /** Close the vault `bag` names, as {@link closeVault} does, then erase what this device keeps of it, sound or damaged: its lease and its cached copy. This device's record of the scope stays.
@@ -233,16 +233,11 @@ export class Bank implements VaultWorld, GatingWorld {
    */
   async clearCachedVault(bag: VaultBag): Promise<void> {
     const scope = this.vaultScopeOf(bag)
-    this.#closeVault(scope)
+    this.vaultListing.close(scope)
     await this.deviceDB.clearCachedVault(scope)
   }
 
   tryClearCachedVault(bag: VaultBag): Promise<Outcome<void>> { return outcomeOf(() => this.clearCachedVault(bag)) }
-
-  #closeVault(scope: VaultScope): void {
-    this.vaultListing.at(scope)?.lock()
-    this.vaultListing.evict(scope)
-  }
   // --
 
   // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, toJSON

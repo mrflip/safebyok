@@ -15,9 +15,9 @@ import type { AttemptCleartexts, BoxBag, CleartextsForGatingkind, EditOpts, Fetc
 import * as MSX from './models-shapes'
 import { type Proving, spendAnswer, spendAnswerAfter } from './proving'
 import { Storable } from './storable'
-import type { VaultWorld } from './vault-listing'
+import type { VaultListing, VaultWorld } from './vault-listing'
 
-// == [Record forms]: DefaultLeaseMillis, DefaultPesterMillis, UnlockAtBirth, VaultSnapshot, BoxDnaInVault, VaultPatch, GateStaging, UnkeptBoxCache
+// == [Record forms]: DefaultLeaseMillis, DefaultPesterMillis, UnlockAtBirth, WithLeaseDB, VaultSnapshot, BoxDnaInVault, VaultPatch, GateStaging, UnkeptBoxCache
 
 /** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * MinuteMillis
@@ -27,6 +27,9 @@ export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
 
 /** The key of `vault[UnlockAtBirth](proving)`, the vault listing's route to unlock a vault it has just stored: package-private, as no entry point exports it. */
 export const UnlockAtBirth: unique symbol = Symbol('safebyok.unlockAtBirth')
+
+/** The key of `listing[WithLeaseDB](scope, work)`, which queues a Vault object's deviceDB work on the lease behind that of every Vault object of its scope, an evicted one included: package-private, as no entry point exports it. */
+export const WithLeaseDB: unique symbol = Symbol('safebyok.withLeaseDB')
 
 /** The lock count of a vault no lock or let-go has reached since its birth. */
 const BirthLockSeq = 0
@@ -98,15 +101,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   declare readonly user_id:    string
   declare readonly vaultlabel: string
   declare readonly world:      VaultWorld
+  declare readonly listing:    VaultListing
 
   /** Locked until a lease is set; `lock()` sets it again. */
   #isLocked = true
 
   /** The lease this device holds while the vault is unlocked, null while it is locked. */
   #lease: Lease | null = null
-
-  /** Held by each piece of deviceDB work on the lease, a lock's erase, a grant's put, a look for the lease kept, so each lands in the order begun. */
-  readonly #leaseMutex = new Mutex()
 
   /** Each lock and let-go counts here, so an unlock or a look begun before one takes up no lease after it. */
   #lockSeq = BirthLockSeq
@@ -617,14 +618,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     void outcomeOf(() => this.#withLeaseDB(work)).then((done) => { if (! done.ok) { this.listing.tellBadNews([done.err]) } })
   }
 
-  /** Run `work` once the deviceDB work on the lease begun before it has landed, holding off any begun after. */
-  async #withLeaseDB<ValT>(work: () => Promise<ValT>): Promise<ValT> {
-    await this.#leaseMutex.acquire()
-    try {
-      return await work()
-    } finally {
-      this.#leaseMutex.release()
-    }
+  /** Run `work` once the deviceDB work on the lease begun before it has landed, a lock's erase, a grant's put, a look for the lease kept, by this or any Vault object of the scope, holding off any begun after. */
+  #withLeaseDB<ValT>(work: () => Promise<ValT>): Promise<ValT> {
+    return this.listing[WithLeaseDB](this.scope, work)
   }
   // --
 
