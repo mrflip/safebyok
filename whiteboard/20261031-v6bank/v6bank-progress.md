@@ -73,6 +73,13 @@ orchestrator; workers look things up here, they do not write it. Each worker kee
   with `hydrateAll({ maxMillisSinceRefresh: 0 })`.
 * Signed-out is bad news of kind **`identity_revoked`** (no `signed_out`).
 
+### 5b. lease_plumbing (#438, filed)
+
+* One lease mutex per vault scope, on the listing; `VaultListing.close` counts closes, so `ensure` grants no lease after one. A close during `ensure`'s store leaves the vault held and locked.
+* The Coach's won't-fixes: a close before `ensure` begins, and the lease lock across banks (`notes/wontfix.md`; `TODO.md`'s singleton line; tests in `bank-close.test.ts`). Don't reopen them.
+* `thread-5b-sibling_races.md` on the branch lists the probes. Only `closeVaults` (items 1, 2) and `goodbye` during `hello` (item 4) are being fixed, in 7c.
+* `BankOpts.vaultDB` is `{ vaultStore, boxStore }` since 13; a vault's box watch starts at its first box verb and `goodbye` ends it.
+
 ## The restack (local, 2026-11-01)
 
 *Orchestrator:* built on local `v6line/<label>` branches in `/workspace/byok-v6line`; nothing pushed;
@@ -112,4 +119,4 @@ Tips, bottom to top, with the remote SHA each will replace (lease):
   Split 7b, 8 and 12 further if their glosses grow.
 * **A handoff names what a sibling thread on another branch already built in the same files**
   (thread 9 duplicated thread 2's `checkKeyDeriver` for want of it).
-* Force-push is refused by the harness classifier; workers fix forward with new commits.
+* Force-push with a lease is allowed now (the Coach, 2026-11-01), on branches this sprint owns. A plain force-push is not.
