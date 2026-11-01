@@ -191,10 +191,10 @@ export const VaultObjectGone = "This Vault object is gone -- the vault was delet
 export const VaultBehind = "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage."
 // --
 
-// == [Vault: ways in]: PassphraseKept, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
+// == [Vault: ways in]: PassphraseIrremovable, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
 
 /** Why a vault's passphrase is not removed: it can be replaced, never removed. */
-export const PassphraseKept = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
+export const PassphraseIrremovable = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
 
 /** Why removing a passkey the vault does not hold changes nothing. */
 export const NoPasskeyToRemove = "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed."
@@ -326,6 +326,21 @@ export const AnswerOfOtherScope = "Storage answered for a scope other than the o
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
+// == [Models: stores]: VaultRowDamaged, BoxRowDamaged, ScopeOutsideStore, StoreRowsMiscounted
+
+/** Why a vault row that does not read as a vault record or its tombstone is refused. */
+export const VaultRowDamaged = "The vault stored under this scope does not read as a vault record this version writes, nor as its tombstone: it was damaged, or written by another version. It was left as it is: no way in can be tried, and nothing can be stored over it until it is removed."
+
+/** Why a box row that does not read as a box record or its tombstone is refused. */
+export const BoxRowDamaged = "The box stored under this scope does not read as a box record this version writes, nor as its tombstone: it was damaged, or written by another version. It was left as it is, and nothing can be stored over it until it is removed."
+
+/** Why a store asked about a scope outside the bank or vault it was made for refuses. */
+export const ScopeOutsideStore = "This store was made for one bank's vaults or one vault's boxes, and was asked about a scope outside them: ask the store made for that scope."
+
+/** Why rows a store front's doGetRows answered in another number than asked are refused. */
+export const StoreRowsMiscounted = "The store front's doGetRows answered other than one row, or null, for each scopepath asked, in order: a bug in the storage adapter."
+// --
+
 // == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, ProofClosureThrew, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
@@ -371,7 +386,7 @@ export const ProofClosureThrew = "The proof closure threw rather than handing ba
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, boxAbsent, ClosureWithRecord
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
@@ -386,9 +401,9 @@ export const UndecodedWhisper = "That box opened, but what was inside is not a w
 export const LeaseNotInForce = "This lease is no longer in force -- its time ran out, or it was forgotten when the vault locked -- so nothing was read or written: unlock the vault again."
 
 /** Why a call that needs the vault unlocked is refused while it is locked. */
-export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
+export const NeedVaultUnlocked = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
 
-/** Why a locked vault with no lease kept is not unlocked without a proof. */
+/** Why a locked vault with no lease cached is not unlocked without a proof. */
 export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
 
 /** Why a vault takes up no lease of another vault, or granted to another Vault object. */
@@ -396,6 +411,9 @@ export const LeaseOfOtherHolder = "This lease was granted to another vault, or t
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
+
+/** Why a box absent from storage is refused, by its boxlabel. */
+export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
 
 /** Why a vault built of a record takes no proof closure. */
 export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."

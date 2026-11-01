@@ -37,7 +37,7 @@ describe("the ways in changing under a vault unlocked", () => {
     other.storeBehindOurBack(demandStored())
     const later = other.anotherSession()
     const again = await later.build(other.demandStored())
-    expect(other.deviceDB.keptNow()).not.to.be.null
+    expect(other.deviceDB.cachedNow()).not.to.be.null
     expect(again.isLocked).to.be.true
     await later.hello()
     expect(again.gate.pkWayin).to.be.null
@@ -52,7 +52,7 @@ describe("an older copy of the vault record", () => {
     const ante = demandStored()
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     vault.lock()
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     await opts.store.put(ante, null)
     const later = anotherSession()
     const restored = await later.build(demandStored())

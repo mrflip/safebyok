@@ -2,8 +2,9 @@ import { noop } from 'es-toolkit'
 import { verifyConsistent } from '../checks/validator'
 import { MinuteMillis } from '../consts'
 import { randomId } from '../crypto'
-import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
+import { type KeyDeriver, checkKeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { tattoo } from '../helpers'
 import { DefaultLogger, type VaultLogger } from '../logger'
 import { type Outcome, outcomeOf } from '../outcome'
@@ -22,6 +23,7 @@ export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
 
+/** The options `Bank.make` takes. */
 export type BankOpts = {
   applabel:             string
   user_id:              string
@@ -29,8 +31,10 @@ export type BankOpts = {
   vaultStore:           VaultStore
   vaultCache:           VaultCache
   deviceDB:             LeaseDeviceDB
+  /** Required, with no default, so a host that brings its own deriver bundles no Argon2id: in a browser, spread `browserOpts()`. */
   keyDeriver:           KeyDeriver
   requestCleartext?:    RequestCleartext | undefined
+  /** Left out, every new passphrase is refused as weak until the host configures one (`notes/configuration.md`). */
   strengthChecker?:     StrengthChecker | undefined
   clock?:               Clock | undefined
   logger?:              VaultLogger | undefined
@@ -75,6 +79,7 @@ export class Bank implements VaultWorld, GatingWorld {
     MSX.bankOpts.parse(opts)
     const { applabel, user_id, device_id = randomId(), vaultStore, vaultCache, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
+    checkKeyDeriver(keyDeriver)
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
     this.clock = clock
@@ -180,11 +185,6 @@ export class Bank implements VaultWorld, GatingWorld {
 const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : minutes * MinuteMillis)
 
 const checkSecureContext = (): void => {
-  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }
+  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw RefusalFuncs.insecureContext() }
 }
-// --
-
-// == [Refusals]: insecureContext
-
-const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
 // --

@@ -66,8 +66,8 @@ export const listen = (bellname: string, listener: () => void): (() => void) => 
 // platform has no BroadcastChannel.
 const channelOf = (bellname: string): BroadcastChannel | undefined => {
   if (typeof BroadcastChannel === 'undefined') { return undefined }
-  const kept = channels.get(bellname)
-  if (kept !== undefined) { return kept }
+  const cached = channels.get(bellname)
+  if (cached !== undefined) { return cached }
   const channel = new BroadcastChannel(bellname)
   channel.addEventListener('message', () => { callEach(listenersByBell.get(bellname)) })
   letProcessExit(channel)

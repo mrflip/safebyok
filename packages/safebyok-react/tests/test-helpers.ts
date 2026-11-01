@@ -109,8 +109,8 @@ const gatingsMade = new WeakMap<Vault, PassphraseGating>()
  */
 export const gatingOf = (vault: Vault, opts: GatingOfOpts = {}): PassphraseGating => {
   const plain = opts.attempt === undefined && opts.lockLanded === undefined && opts.gatingkind === undefined && opts.leaseMillis === undefined
-  const kept = plain ? gatingsMade.get(vault) : undefined
-  if (kept !== undefined) { return kept }
+  const cached = plain ? gatingsMade.get(vault) : undefined
+  if (cached !== undefined) { return cached }
   const attempt = opts.attempt ?? (() => Promise.resolve())
   const tried = async (cleartext: string | PasskeyAnswer): Promise<Outcome<Vault>> => {
     const { ok, err } = await outcomeOf(() => attempt(cleartext))
