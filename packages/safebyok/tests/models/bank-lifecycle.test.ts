@@ -64,7 +64,7 @@ describe("Bank.hello and the bank's lifecycle", () => {
     const trouble = new Error('the wasm would not load')
     const load = vi.fn().mockRejectedValueOnce(trouble).mockRejectedValueOnce(trouble).mockResolvedValue(undefined)
     const { bank } = makeBankWorld(null, { keyDeriver: { ...testDeriver, load } })
-    await expect(bank.hello()).rejects.toBe(trouble)
+    await expect(bank.hello()).rejects.to.eq(trouble)
     expect(bank.snapshot.lifecycle).to.eq('refused')
     const answer = await bank.tryHello()
     expect(answer.ok ? null : answer.err.refusalkind).to.eq('unexpected_error')
