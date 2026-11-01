@@ -637,7 +637,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf, goneError, behindError, otherStoresError
+// == [Helpers]: loadLibs, frozenBankVault, refusedBankVault, checkSameStores, draftOf
 
 /** Load what the vaults of a bank of `parts` share, the strength checker and the key deriver, each `load` that one carries, side by side, resolving how it went: good once both have loaded, or the strength checker's refusal, else the key deriver's. */
 const loadLibs = async (parts: ParsedBankOpts): Promise<Outcome<void>> => {
