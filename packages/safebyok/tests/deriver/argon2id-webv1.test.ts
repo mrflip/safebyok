@@ -86,18 +86,18 @@ describe("a deriver's salt", () => {
 
   for (const [salt, blurb] of Misfits) {
     it(`is refused by argon2idWebV1Deriver as bad_option, before it derives: ${blurb}`, async () => {
-      await expect(argon2idWebV1Deriver.deriveKeyBytes('pw', salt)).rejects.toSatisfy((err: unknown) => isVaultError(err, 'bad_option'))
+      await TH.expectRefusal(argon2idWebV1Deriver.deriveKeyBytes('pw', salt), 'bad_option')
     })
 
     it(`is refused by a deriver of a host's spec as bad_option: ${blurb}`, async () => {
-      await expect(argon2idDeriver(CheapSpec).deriveKeyBytes('pw', salt)).rejects.toSatisfy((err: unknown) => isVaultError(err, 'bad_option'))
+      await TH.expectRefusal(argon2idDeriver(CheapSpec).deriveKeyBytes('pw', salt), 'bad_option')
     })
   }
 
   it("is taken at the spec's own length, whatever that is: 8 for a spec asking 8", async () => {
     const deriver = argon2idDeriver({ ...CheapSpec, salt_bytes: 8 })
     expect(await deriver.deriveKeyBytes('pw', new Uint8Array(8))).to.have.lengthOf(32)
-    await expect(deriver.deriveKeyBytes('pw', new Uint8Array(16))).rejects.toSatisfy((err: unknown) => isVaultError(err, 'bad_option'))
+    await TH.expectRefusal(deriver.deriveKeyBytes('pw', new Uint8Array(16)), 'bad_option')
   })
 })
 
