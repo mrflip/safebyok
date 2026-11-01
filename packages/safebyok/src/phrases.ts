@@ -409,7 +409,7 @@ export const vaultAbsent = (vaultlabel: string): string => `No vault is stored u
 /** Why a box absent from storage is refused, by its boxlabel. */
 export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
 
-/** Why a vault built of a record takes no proof closure. */
+/** Why a vault built of a record takes no cleartexts. */
 export const CleartextsWithRecord = "A vault built of a record takes no cleartexts: its gate is the one the record carries."
 // --
 
