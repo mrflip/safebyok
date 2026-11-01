@@ -1,6 +1,6 @@
 # Thread 5b: lease_plumbing (2026-11-01)
 
-Branch `20261101-lease_plumbing`, PR #TBD, stacked on [#437](https://github.com/mrflip/safebyok/pull/437) (`20261101-devicedb`).
+Branch `20261101-lease_plumbing`, PR [#438](https://github.com/mrflip/safebyok/pull/438), stacked on [#437](https://github.com/mrflip/safebyok/pull/437) (`20261101-devicedb`).
 Justify: green. safebyok 4956 passed / 37 skipped; root 290; react 326; demo 230/17;
 indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e 107/116.
 
