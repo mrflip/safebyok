@@ -1,6 +1,6 @@
 # Thread 7c: bad_news (2026-11-01)
 
-Branch `20261101-bad_news`, PR #PRNUM, stacked on #438. Justify: green; safebyok 5250 passed, 37 skipped; root scripts 290.
+Branch `20261101-bad_news`, PR #441, stacked on #438. Justify: green; safebyok 5250 passed, 37 skipped; root scripts 290.
 
 The Coach paused new race-condition work mid-thread (2026-11-01), and the orchestrator withdrew two
 carries. Both were already finished and tested, so each stands as its own commit, prefixed
