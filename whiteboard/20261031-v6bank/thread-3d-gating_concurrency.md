@@ -1,6 +1,6 @@
 # Thread 3d: gating_concurrency (2026-11-01)
 
-Branch `20261101-gating_concurrency`, PR #TBD, stacked on #433 (3c, `20261101-gating_telling`).
+Branch `20261101-gating_concurrency`, PR #435, stacked on #433 (3c, `20261101-gating_telling`).
 Justify: green (safebyok 4860 passed, 37 skipped; every package green; no size moves).
 
 * **Built**
