@@ -379,8 +379,6 @@ export const ProvingOfOtherVault = "The source proving is of another vault: a wa
 /** Why a lease is not granted to a vault other than the one a proving is of. */
 export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds."
 
-/** Why a proof closure's throw is replaced: it heard the passphrase. */
-
 /** Why a keyDeriver's throw is replaced: it heard the passphrase. */
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
@@ -402,8 +400,6 @@ export const LeaseNotInForce = "This lease is no longer in force -- its time ran
 /** Why a call that needs the vault unlocked is refused while it is locked. */
 export const NeedVaultUnlocked = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
 
-/** Why a locked vault with no lease cached is not unlocked without a proof. */
-
 /** Why a vault takes up no lease of another vault, or granted to another Vault object. */
 export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."
 
@@ -418,8 +414,6 @@ export const CleartextsWithRecord = "A vault built of a record takes no cleartex
 // --
 
 // == [Models: gates]: GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
-
-/** Why a passkey's answer does not prove a change to the gate. */
 
 /** Why a gate change proved against a record that has since moved is not sent. */
 export const GateMovedUnderChange = "The vault's record was changed elsewhere while this change was being proved, and its passphrase or passkey may have changed with it, so nothing was changed. The vault in hand now holds the newer record: call again to make the change over it."
@@ -442,7 +436,6 @@ export const GatingDeclined = "The prompt was declined, or closed before an atte
 export const GatingSettled = "This prompt has ended -- it was answered, declined, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
-
 
 export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."
 
