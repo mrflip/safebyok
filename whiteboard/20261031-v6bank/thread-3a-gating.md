@@ -1,6 +1,6 @@
 # Thread 3a: gating (2026-11-01)
 
-Branch `20261101-gating`, PR (draft, number below once open), stacked on
+Branch `20261101-gating`, PR [#430](https://github.com/mrflip/safebyok/pull/430), stacked on
 [#426](https://github.com/mrflip/safebyok/pull/426). Justify: green; core 4828 passed, 37
 skipped; every package green.
 
@@ -62,5 +62,6 @@ skipped; every package green.
     put-first ensure, 4b's eviction).
 * **For the Coach**
   * **Suppressions**: none added.
+  * **launch answers on settling**: recommend keeping it (see Decisions).
   * **bad_option settles a gating**: recommend keeping it; 3b declares the refusal-kind list.
   * **deferred() hand-written**: a few lines, no library in the tree; say if one should own it.
