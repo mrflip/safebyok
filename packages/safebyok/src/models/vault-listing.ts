@@ -5,7 +5,7 @@ import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
-import { Listing, hasRevision } from './listing'
+import { Listing } from './listing'
 import { Gate } from './gate'
 import { type PassphraseProving, spendAnswerAfter } from './proving'
 import type { GatingWorld } from './gating'
@@ -28,7 +28,7 @@ export type VaultStore = Store<VaultScope, VaultRecord, VaultSparse>
 
 export type VaultCache = Cache<VaultRecord, VaultSparse>
 
-/** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `build` makes from its cleartexts. */
+/** The dna of a vault: its scope. Anything else it carries is ignored: the gate of a vault ensured is the one built from its cleartexts. */
 export type VaultDna = Dna<VaultScope, VaultRecord>
 
 export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse> & { world: VaultWorld }
@@ -36,7 +36,7 @@ export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse>
 
 // == [VaultListing]
 
-/** One bank's vaults, by vaultlabel. */
+/** One bank's vaults, by vaultlabel. A vault is born only as stored, through `ensure`; `build` takes a record alone. */
 export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault> {
   declare readonly world: VaultWorld
 
@@ -46,16 +46,14 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no cleartexts: its gate is the one it carries, and cleartexts handed with it refuse 'bad_option'. A dna takes the cleartexts its gate is built from, before the vault is born: cleartexts refused, or none, hold nothing, and a dna for a scope already held refuses 'bad_option' before they are used. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2). A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
-  override build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, cleartexts?: Cleartexts): Promise<Vault> {
+  /** Build a vault of `dna` gated by `cleartexts`, put it, and hold the vault as stored: unlocked under a lease its passphrase proving grants, where the put lands; where another device stored a vault under the scope first, that vault, as it stands.
+   * Nothing is held before storage takes the vault, so cleartexts refused hold nothing. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2).
+   */
+  ensure(dna: VaultDna, cleartexts: Cleartexts): Promise<Vault> {
     return spendAnswerAfter(cleartexts, async () => {
-      if (hasRevision(input)) {
-        if (cleartexts !== undefined) { throw RefusalFuncs.cleartextsWithRecord() }
-        return await super.build(input)
-      }
-      if (this.at(input) !== null) { throw RefusalFuncs.alreadyHeld() }
-      const { draft, proving } = await this.#draftWithProving(this.stampDna(input), cleartexts)
-      const vault = this.holdDraft(draft)
+      const { draft, proving } = await this.#buildDraft(this.stampDna(this.scopeOf(dna)), cleartexts)
+      const vault = await this.putDraft(draft)
+      if (vault.vault_tok !== draft.vault_tok) { return vault }
       vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
       return vault
     })
@@ -87,13 +85,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
-  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and the gate {@link Gate.build} makes of that draft's stamp from `cleartexts`; without them, refuses 'bad_option'. */
-  protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, cleartexts?: Cleartexts): Promise<VaultRecord> {
-    const { draft } = await this.#draftWithProving(dna, cleartexts)
-    return draft
-  }
-
-  async #draftWithProving(dna: Dna<VaultScope, VaultRecord> & Revision & Times, cleartexts?: Cleartexts): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
+  /** The novel record of a vault, the stamped dna under a `vault_tok` fresh from {@link makeLifeTok}, and the proving of the gate {@link Gate.build} makes of it from `cleartexts`. */
+  async #buildDraft(dna: Dna<VaultScope, VaultRecord> & Revision & Times, cleartexts?: Cleartexts): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
     const checked = MSX.vaultBuildArgs.parse({ cleartexts })
     const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
     const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.cleartexts, this.world)

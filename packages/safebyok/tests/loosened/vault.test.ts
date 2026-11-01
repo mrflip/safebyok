@@ -53,7 +53,7 @@ describe("an older copy of the vault record", () => {
     await vault.replacePassphrase({ passphrase: Passphrase, nextPassphrase: NewPassphrase })
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    await opts.store.put(ante, null)
+    await opts.store.put(ante, demandStored().revision_tok)
     const later = anotherSession()
     const restored = await later.build(demandStored())
     await later.hello()

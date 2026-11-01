@@ -18,7 +18,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sideca
 /** Box listings whose world is a real vault, born unlocked under `Passphrase`, over the models world's fake store and cache. */
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
-  const vault = await vaultWorld.listing.build(Dna, byPassphrase(Passphrase))
+  const vault = await vaultWorld.listing.ensure(Dna, byPassphrase(Passphrase))
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
   const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault) })

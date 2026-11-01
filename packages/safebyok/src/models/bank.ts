@@ -7,18 +7,20 @@ import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { tattoo } from '../helpers'
 import { DefaultLogger, type VaultLogger } from '../logger'
-import { type Outcome, outcomeOf } from '../outcome'
+import { type Outcome, outcomeOf, refusalOf } from '../outcome'
 import * as Phrases from '../phrases'
+import { reportToPlatform } from '../report-error'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
+import type { Lifecycled, Refused } from '../types/type-aliases'
 import { Gating, type GatingWorld, type RequestCleartext } from './gating'
-import type { Cleartexts, LeaseDeviceDB, LockState, StrengthChecker } from './models-shapes'
+import type { BankDeviceDB, Cleartexts, LockState, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
 import { spendAnswerAfter } from './proving'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
-import { type VaultCache, type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
+import { type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultPesterMillis, DefaultRefreshMillis, BankOpts, BankSnapshot, RefusingStrengthChecker
+// == [Given to a bank]: DefaultPesterMillis, DefaultRefreshMillis, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
 
 export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
 
@@ -29,15 +31,13 @@ export type BankOpts = {
   applabel:             string
   user_id:              string
   device_id?:           string | undefined
-  vaultStore:           VaultStore
-  vaultCache:           VaultCache
-  deviceDB:             LeaseDeviceDB
+  vaultDB:              VaultStore
+  deviceDB:             BankDeviceDB
   /** Required, with no default, so a host that brings its own deriver bundles no Argon2id: in a browser, spread `browserOpts()`. */
   keyDeriver:           KeyDeriver
   requestCleartext:     RequestCleartext
   /** Left out, every new passphrase is refused as weak until the host configures one (`notes/configuration.md`). */
   strengthChecker?:     StrengthChecker | undefined
-  clock?:               Clock | undefined
   logger?:              VaultLogger | undefined
   autolockMinutes?:     number | undefined
   pesterMinutes?:       number | undefined
@@ -46,7 +46,11 @@ export type BankOpts = {
   onBadNews?:           ((news: VaultError) => unknown) | undefined
 }
 
-export type BankSnapshot = BankScope & Readonly<{ device_id: string, vaults: readonly VaultSnapshot[] }>
+/** Where the bank stands: `starting` until a hello loads what its vaults share, then `ready`; `refused`, with the failed hello's `err`, until the next hello. */
+export type BankStage = Lifecycled<object> | Refused<object>
+
+/** The bank as a host renders it: its scope, its stage and each held vault's snapshot. Frozen, and the same object until one of them changes. */
+export type BankSnapshot = BankScope & Readonly<{ device_id: string, vaults: readonly VaultSnapshot[] }> & BankStage
 
 const RefusingStrengthChecker: StrengthChecker = () => ({ strong: false, reason: Phrases.NoStrengthChecker })
 // --
@@ -60,7 +64,7 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly device_id:        string
   readonly clock:            Clock
   readonly keyDeriver:       KeyDeriver
-  readonly deviceDB:         LeaseDeviceDB
+  readonly deviceDB:         BankDeviceDB
   readonly logger:           VaultLogger
   readonly requestCleartext: RequestCleartext
   readonly strengthChecker:  StrengthChecker
@@ -71,19 +75,25 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly boxRefreshMillis: number
   readonly vaultListing:     VaultListing
 
-  #snapshot: BankSnapshot | null = null
+  #stage:    BankStage = { lifecycle: 'starting' }
+  #snapshot: BankSnapshot
+  #helloing: Promise<void> | null = null
+  /** The `#ensureVault` in flight for each vaultlabel, which a second `ensureVault` joins. */
+  readonly #ensuring  = new Map<string, Promise<Vault>>()
+  readonly #listeners = new Set<() => void>()
 
   static make(opts: BankOpts): Bank { return new Bank(opts) }
 
-  constructor(opts: BankOpts) {
+  /** A bank as {@link Bank.make} makes it; a test hands `_cheat_clock` to stand in for the wall clock. */
+  constructor(opts: BankOpts, _cheat_clock?: Clock) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultStore, vaultCache, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
+    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     checkKeyDeriver(keyDeriver)
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
-    this.clock = clock
+    this.clock = MSX.cheatClock.parse(_cheat_clock) ?? wallClock
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
     this.logger = logger
@@ -92,7 +102,9 @@ export class Bank implements VaultWorld, GatingWorld {
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.pesterMillis = millisOf(pesterMinutes, DefaultPesterMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
-    this.vaultListing = new VaultListing({ world: this, store: vaultStore, cache: vaultCache, maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
+    this.vaultListing = new VaultListing({ world: this, store: vaultDB, cache: deviceDB.vaultCache(this.scope), maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
+    this.#snapshot = this.#snapshotNow()
+    this.vaultListing.subscribe(() => { this.#remakeSnapshot() })
     if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
     Object.freeze(this)
   }
@@ -110,17 +122,44 @@ export class Bank implements VaultWorld, GatingWorld {
   get pesterMinutes(): number { return this.pesterMillis / MinuteMillis }
   // --
 
-  // == [Starting and ending]: hello, goodbye
+  // == [Starting and ending]: hello, goodbye, with hello's try form
 
-  async hello(): Promise<void> {
-    await this.keyDeriver.load?.()
-    await this.strengthChecker.load?.()
-    await this.vaultListing.hello()
+  /** Load the key deriver and the strength checker, then warm the vault listing from the device's cache and start its watch, as {@link VaultListing.hello} does; the bank then reads `ready`.
+   * A hello in flight is joined, and a `ready` bank stays `ready` through another.
+   * A load that fails refuses with the deriver's or checker's own error, as thrown, and the bank reads `refused` until the next hello; {@link tryHello}'s Outcome carries that error.
+   */
+  hello(): Promise<void> {
+    this.#helloing ??= this.#helloOnce()
+    return this.#helloing
   }
 
+  /** {@link hello}, as an {@link Outcome}: a load's own error, where not a VaultError, is the `cause` of an 'unexpected_error'. */
   tryHello(): Promise<Outcome<void>> { return outcomeOf(() => this.hello()) }
 
+  /** End the vault listing's watch. */
   goodbye(): void { this.vaultListing.goodbye() }
+
+  async #helloOnce(): Promise<void> {
+    try {
+      await this.#hello()
+    } finally {
+      this.#helloing = null
+    }
+  }
+
+  async #hello(): Promise<void> {
+    if (this.#stage.lifecycle === 'refused') { this.#setStage({ lifecycle: 'starting' }) }
+    // The catch records the refusal in the snapshot; the error goes on as thrown.
+    try {
+      await this.keyDeriver.load?.()
+      await this.strengthChecker.load?.()
+      await this.vaultListing.hello()
+    } catch (err) {
+      this.#setStage({ lifecycle: 'refused', err: refusalOf(err) })
+      throw err
+    }
+    if (this.#stage.lifecycle !== 'ready') { this.#setStage({ lifecycle: 'ready' }) }
+  }
   // --
 
   // == [Vaults]: vaultScopeOf, vaultOf, ensureVault, closeVault, closeVaults, with ensureVault's try form
@@ -132,32 +171,37 @@ export class Bank implements VaultWorld, GatingWorld {
 
   vaultOf(bag: VaultBag): Vault | null { return this.vaultListing.at(this.vaultScopeOf(bag)) }
 
+  /** The vault `bag` names, as the vaultDB holds it; where it holds none, built and stored as {@link VaultListing.ensure} does, of `cleartexts` where handed, else of what the user answers a 'build_vault' gating.
+   * A second call for a vaultlabel while one is in flight joins it, so the user is asked once.
+   * A passkey's answer among `cleartexts` is spent unless refused as correctable (G2).
+   */
   ensureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Vault> {
-    return spendAnswerAfter(cleartexts, () => this.#ensureVault(this.vaultScopeOf(bag), cleartexts))
+    return spendAnswerAfter(cleartexts, () => this.#joinEnsuring(this.vaultScopeOf(bag), cleartexts))
   }
 
   tryEnsureVault(bag: VaultBag, cleartexts?: Cleartexts): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag, cleartexts)) }
 
+  #joinEnsuring(scope: VaultScope, cleartexts?: Cleartexts): Promise<Vault> {
+    const inFlight = this.#ensuring.get(scope.vaultlabel)
+    if (inFlight !== undefined) { return inFlight }
+    const ensuring = this.#ensureVaultOnce(scope, cleartexts)
+    this.#ensuring.set(scope.vaultlabel, ensuring)
+    return ensuring
+  }
+
+  async #ensureVaultOnce(scope: VaultScope, cleartexts?: Cleartexts): Promise<Vault> {
+    try {
+      return await this.#ensureVault(scope, cleartexts)
+    } finally {
+      this.#ensuring.delete(scope.vaultlabel)
+    }
+  }
+
   async #ensureVault(scope: VaultScope, cleartexts?: Cleartexts): Promise<Vault> {
     const fetched = await this.vaultListing.fetch(scope, { ifAbsent: 'nil' })
     if (fetched !== null) { return fetched }
-    const built = await outcomeOf(() => (cleartexts === undefined ? this.#launchBuild(scope) : this.#buildVault(scope, cleartexts)))
-    if (built.ok) { return built.val }
-    if (built.err.refusalkind !== 'stale_write') { throw built.err }
-    // GAP: listing.ts keeps the draft held under `scope` after its first send meets 'stale_write', and `Vault.receive` refuses the record stored under the other `vault_tok`; the listing needs to drop the draft (or `#buildOrReceive` to replace a never-stored draft) for this fetch to hand back the vault another device built.
-    const stored = await this.vaultListing.fetch(scope)
-    if (stored === null) { throw this.vaultListing.absentRefusal(scope) }
-    return stored
-  }
-
-  /** Ask the user through a 'build_vault' gating, each attempt building through `#buildVault`. */
-  #launchBuild(scope: VaultScope): Promise<Vault> {
-    return Gating.launch('build_vault', { scope, vault: null, world: this, run: (handed) => this.#buildVault(scope, handed) })
-  }
-
-  async #buildVault(scope: VaultScope, cleartexts: Cleartexts): Promise<Vault> {
-    const vault = await this.vaultListing.build(scope, cleartexts)
-    return vault.send({})
+    if (cleartexts !== undefined) { return this.vaultListing.ensure(scope, cleartexts) }
+    return Gating.launch('build_vault', { scope, vault: null, world: this, run: (handed) => this.vaultListing.ensure(scope, handed) })
   }
 
   closeVault(bag: VaultBag): void {
@@ -172,18 +216,39 @@ export class Bank implements VaultWorld, GatingWorld {
 
   // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, toJSON
 
-  get snapshot(): BankSnapshot {
-    const vaults = this.vaultListing.snapshot
-    if (this.#snapshot?.vaults !== vaults) { this.#snapshot = Object.freeze({ ...this.scope, device_id: this.device_id, vaults }) }
-    return this.#snapshot
-  }
+  get snapshot(): BankSnapshot { return this.#snapshot }
 
   get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
-  readonly #getSnapshot = (): BankSnapshot => this.snapshot
+  readonly #getSnapshot = (): BankSnapshot => this.#snapshot
 
-  get subscribe(): (listener: () => void) => (() => void) { return this.vaultListing.subscribe }
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+  readonly #subscribe = (listener: () => void): (() => void) => {
+    this.#listeners.add(MSX.listener.parse(listener))
+    return () => { this.#listeners.delete(listener) }
+  }
 
-  toJSON(): BankSnapshot { return this.snapshot }
+  toJSON(): BankSnapshot { return this.#snapshot }
+
+  #setStage(stage: BankStage): void {
+    this.#stage = stage
+    this.#remakeSnapshot()
+  }
+
+  /** A listener that throws is reported to the platform, and the rest are still called. */
+  #remakeSnapshot(): void {
+    this.#snapshot = this.#snapshotNow()
+    for (const listener of this.#listeners) {
+      try {
+        listener()
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    }
+  }
+
+  #snapshotNow(): BankSnapshot {
+    return Object.freeze({ ...this.scope, device_id: this.device_id, ...this.#stage, vaults: this.vaultListing.snapshot })
+  }
   // --
 }
 // --

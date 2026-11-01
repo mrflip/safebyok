@@ -278,7 +278,7 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: PartialLoad, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, MovedUnderEdit, AlreadyHeld, DnaHandedToBuild, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -288,6 +288,9 @@ export const MovedUnderEdit = "Storage delivered a newer record while this edit 
 
 /** Why `build` makes nothing of a dna for a scope the listing already holds. */
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
+
+/** Why `build` makes nothing of a dna in a listing whose things are born only as stored. */
+export const DnaHandedToBuild = "This listing makes nothing of a dna in build, as each of its instances is born only once storage holds it: ensure it instead (vaultListing.ensure, or bank.ensureVault)."
 
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
 export const BoxPatchAdvice = "Nothing was staged. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
@@ -383,7 +386,7 @@ export const LeaseOfOtherVault = "This proving is of another vault: a lease is g
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, LeaseOfOtherHolder, vaultAbsent, boxAbsent, CleartextsWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, LeaseOfOtherHolder, vaultAbsent, boxAbsent
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
@@ -408,9 +411,6 @@ export const vaultAbsent = (vaultlabel: string): string => `No vault is stored u
 
 /** Why a box absent from storage is refused, by its boxlabel. */
 export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
-
-/** Why a vault built of a record takes no cleartexts. */
-export const CleartextsWithRecord = "A vault built of a record takes no cleartexts: its gate is the one the record carries."
 // --
 
 // == [Models: gates]: GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke

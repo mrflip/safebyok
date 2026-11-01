@@ -80,7 +80,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here. The whisper rides in the dna this far, and no further.
   /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, its birthday gift a `box_tok` fresh from {@link makeLifeTok}, its whisper and sidecar sealed through the vault's lease by {@link sealedRecordOf}. */
-  protected draftOf({ whisper, sidecar, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
+  protected override draftOf({ whisper, sidecar, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
     return sealedRecordOf(this.world.demandLease(), { ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
   }
 

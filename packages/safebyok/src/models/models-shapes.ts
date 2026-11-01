@@ -18,7 +18,7 @@ import * as VX from '../shapes/vault'
 import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
 import type { Clock } from '../shapes/bank-opts'
 import type { StringStore } from '../string-store'
-import type { VaultScope } from '../shapes/scopes'
+import type { BankScope, VaultScope } from '../shapes/scopes'
 import { sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
 
@@ -804,25 +804,32 @@ export type PasskeyGatingKind = { [KindT in GatingKind]: 'passkey' extends typeo
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 
-// == [The bank's forms]: positiveMinutes, refreshMinutes, bankOpts
+// == [The bank's forms]: positiveMinutes, refreshMinutes, bankDeviceDB, bankOpts, cheatClock, BankDeviceDB
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
+/** The check of the bank's deviceDB: the lease verbs a vault's world carries, as {@link leaseDeviceDB} checks them, and `vaultCache`, which hands the device cache of a bank's vaults. Its `parse` refuses 'bad_option'. Checks only. */
+export const bankDeviceDB = objCheck(({ fn }) => ({
+  ...leaseDeviceDB.shape,
+  vaultCache: fn<(scope: BankScope) => Cache<VaultRecord, VaultSparse>>(),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+/** The deviceDB a bank is made with, as {@link bankDeviceDB} checks it. */
+export type BankDeviceDB = Z.infer<typeof bankDeviceDB>
+
 export const bankOpts = objCheck(({ obj, fn, unk, device_id }) => ({
   // Judged by `bankScope` after, so a bad name refuses 'bad_scope', as `bank.vaultOf` refuses a bad vaultlabel.
   applabel:            unk,
   user_id:             unk,
   device_id:           device_id.optional(),
-  vaultStore:          obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
-  vaultCache:          obj({ load: fn(), save: fn() }),
-  deviceDB:            leaseDeviceDB,
+  vaultDB:             obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
+  deviceDB:            bankDeviceDB,
   keyDeriver:          HX.keyDeriverShape,
   requestCleartext:    fn(),
   strengthChecker:     VX.strengthChecker.optional(),
-  clock:               HX.clockShape.optional(),
   logger:              HX.loggerShape.optional(),
   autolockMinutes:     positiveMinutes.optional(),
   pesterMinutes:       positiveMinutes.optional(),
@@ -830,4 +837,7 @@ export const bankOpts = objCheck(({ obj, fn, unk, device_id }) => ({
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn().optional(),
 }), { refuseAs: 'bad_option' }, [FX])
+
+/** The check of a test's `_cheat_clock`, the clock a bank is made with in place of the wall clock. Its `parse` refuses 'bad_option'. */
+export const cheatClock = Checker(() => HX.clockShape.optional(), 'bad_option')
 // --

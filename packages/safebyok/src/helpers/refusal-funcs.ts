@@ -38,9 +38,11 @@ export const otherVaultTok = (): VaultError => listedRefusal('unexpected_error',
 export const shapeUnreconciled = (): VaultError => listedRefusal('unexpected_error', Phrases.ShapeUnreconciled)
 // --
 
-// == [Listings]: alreadyHeld, putUnfitForPrior, answerOfOtherScope, recordOfOtherScope, otherVaultTokAtBirth, vaultAbsent, boxAbsent, cleartextsWithRecord
+// == [Listings]: alreadyHeld, dnaHandedToBuild, putUnfitForPrior, answerOfOtherScope, recordOfOtherScope, otherVaultTokAtBirth, vaultAbsent, boxAbsent
 
 export const alreadyHeld = (): VaultError => listedRefusal('bad_option', Phrases.AlreadyHeld)
+
+export const dnaHandedToBuild = (): VaultError => listedRefusal('bad_option', Phrases.DnaHandedToBuild)
 
 export const putUnfitForPrior = (): VaultError => listedRefusal('bad_record', Phrases.PutUnfitForPrior)
 
@@ -53,8 +55,6 @@ export const otherVaultTokAtBirth = (): VaultError => listedRefusal('unexpected_
 export const vaultAbsent = (vaultlabel: string): VaultError => listedRefusal('absent_vault', Phrases.vaultAbsent(vaultlabel))
 
 export const boxAbsent = (boxlabel: string): VaultError => listedRefusal('absent_box', Phrases.boxAbsent(boxlabel))
-
-export const cleartextsWithRecord = (): VaultError => listedRefusal('bad_option', Phrases.CleartextsWithRecord)
 // --
 
 // == [Stores]: damagedVaultRow, damagedBoxRow, scopeOutsideStore, storeRowsMiscounted

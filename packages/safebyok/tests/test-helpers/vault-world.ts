@@ -1,6 +1,7 @@
 /** The test world of a vault listing in `src/models/`: a vaultDB of one row, a device cache that keeps nothing, a deviceDB that keeps one lease, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
+import { type RefusalMeta, VaultError } from '../../src/errors'
 import type { VaultScope } from '../../src/shapes/scopes'
 import type { BoxWorld } from '../../src/models/box-listing'
 import type { AnyGating, Gating, RequestCleartext } from '../../src/models/gating'
@@ -98,7 +99,7 @@ export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world.
  * Its `requestCleartext` is a spy, answering as {@link answerAtOnce} does with {@link UsualAnswers}
  * until a test says otherwise (`requestCleartext.mockImplementation(declineAtOnce)`); its
- * `strengthChecker` a spy admitting every passphrase.
+ * `strengthChecker` a spy admitting every passphrase. Its vaultDB's `put` refuses 'stale_write', carrying the row, over any revision but `priorRevisionTok`.
  */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: Partial<VaultWorld> = {}) => {
   let stored = stored0
@@ -126,7 +127,11 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     world,
     store: {
       get:   (scope) => Promise.resolve(answerOf(scope, stored)),
-      put:   (record) => { stored = record; return Promise.resolve(answerOf(record, record)) },
+      put:   (record, priorRevisionTok) => {
+        if ((stored?.revision_tok ?? null) !== priorRevisionTok) { return Promise.resolve({ scope: record, ok: false as const, err: new VaultError('stale_write', 'stored under another revision', { meta: { vault_stored: stored } as unknown as RefusalMeta }), world: null }) }
+        stored = record
+        return Promise.resolve(answerOf(record, record))
+      },
       del:   () => Promise.reject(new Error('not in these tests')),
       watch: () => nothing,
     },
@@ -159,19 +164,17 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
 }
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
-/** The record of a vault built of `Dna`, gated under `passphrase` and sent, as a vaultDB holds it. */
+/** The record of a vault ensured of `Dna` under `passphrase`, as a vaultDB holds it. */
 export const storedVaultRecord = async (passphrase: string = Passphrase): Promise<VaultRecord> => {
   const { listing, demandStored } = makeVaultWorld()
-  const vault = await listing.build(Dna, byPassphrase(passphrase))
-  await vault.send({})
+  await listing.ensure(Dna, byPassphrase(passphrase))
   return demandStored()
 }
 
-/** A vault born of `Dna` of `cleartexts` (under {@link Passphrase} unless told otherwise) and sent, in a fresh world: unlocked, its lease kept on the device. */
+/** A vault ensured of `Dna` of `cleartexts` (under {@link Passphrase} unless told otherwise), in a fresh world: stored, unlocked, its lease kept on the device. */
 export const makeBornVault = async (cleartexts: Cleartexts = byPassphrase(Passphrase)) => {
   const world = makeVaultWorld()
-  const vault = await world.listing.build(Dna, cleartexts)
-  await vault.send({})
+  const vault = await world.listing.ensure(Dna, cleartexts)
   return { ...world, vault }
 }
 
