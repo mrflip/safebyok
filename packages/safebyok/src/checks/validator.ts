@@ -9,7 +9,7 @@ import * as PX from '../shapes/primitives'
 // == [Kit]: isBytes, Kit, KitWith, Merged
 
 /** True for a Uint8Array from any realm: judged by its tag, as `instanceof` refuses one made in an iframe or a test's jsdom. */
-const isBytes = (candidate: unknown): candidate is Uint8Array => ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]'
+export const isBytes = (candidate: unknown): candidate is Uint8Array => ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]'
 
 /** The makers a `Checkers` builder is handed: Zod's under short names, its scalars ready made, the scope names, and `epochMillis`.
  * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.

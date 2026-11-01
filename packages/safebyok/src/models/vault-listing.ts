@@ -1,26 +1,36 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB, the device cache and the bank. */
 
+import { Mutex } from 'es-toolkit'
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
-import { alreadyHeldError } from '../helpers/throwers'
-import * as Phrases from '../phrases'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
+import { outcomeOf, valOf } from '../outcome'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
-import { Listing, hasRevision } from './listing'
+import type { BoxStore } from './box-listing'
+import { Listing } from './listing'
 import { Gate } from './gate'
-import type { PassphraseProving } from './proving'
-import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type PassphraseProving, spendAnswerAfter } from './proving'
+import type { GatingWorld } from './gating'
+import { type Cache, type Dna, type Fetched, type FetchOpts, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, FirstGateEpoch, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-import { type VaultSnapshot, Vault } from './vault'
+import { type VaultSnapshot, UnlockAtBirth, Vault, WithLeaseDB } from './vault'
 
-// == [Given to a vault listing]: VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
+// == [Given to a vault listing]: BoxVaultDB, VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
-export type VaultWorld = ListingWorld & ProvingWorld & {
-  scope:       BankScope
-  logger:      VaultLogger
-  leaseMillis?: LeaseGrantOpts['leaseMillis']
-  deviceDB:    LeaseDeviceDB
+/** The vaultDB as a vault's boxes reach it: the store of one vault's boxes. A `StoreFront` is one. */
+export type BoxVaultDB = { boxStore(scope: VaultScope): BoxStore }
+
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate, lease, gatings and box listing need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
+export type VaultWorld = ListingWorld & GateWorld & GatingWorld & {
+  scope:            BankScope
+  logger:           VaultLogger
+  leaseMillis?:     LeaseGrantOpts['leaseMillis']
+  pesterMillis?:    number
+  deviceDB:         LeaseDeviceDB
+  vaultDB:          BoxVaultDB
+  /** Each box listing's `maxMillisSinceRefresh`. */
+  boxRefreshMillis: number
 }
 
 /** The vaultDB's vault verbs, as this listing calls them. */
@@ -28,7 +38,7 @@ export type VaultStore = Store<VaultScope, VaultRecord, VaultSparse>
 
 export type VaultCache = Cache<VaultRecord, VaultSparse>
 
-/** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `build` makes from its `proofClosure`. */
+/** The dna of a vault: its scope. Anything else it carries is ignored: the gate of a vault ensured is the one built from its cleartexts. */
 export type VaultDna = Dna<VaultScope, VaultRecord>
 
 export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse> & { world: VaultWorld }
@@ -36,9 +46,15 @@ export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse>
 
 // == [VaultListing]
 
-/** One bank's vaults, by vaultlabel. */
+/** One bank's vaults, by vaultlabel. A vault is born only as stored, through `ensure`; `build` takes a record alone. */
 export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault> {
   declare readonly world: VaultWorld
+
+  /** By scopepath, the mutex that every Vault object of the scope, and `close`, queue deviceDB work on the lease behind: it outlives an instance evicted, so one born after waits for what the evicted one queued. */
+  readonly #leaseMutexes = new Map<string, Mutex>()
+
+  /** By scopepath, how many closes have landed, so an `ensure` whose scope was closed while it stored grants no lease. */
+  readonly #closeSeqs = new Map<string, number>()
 
   constructor(opts: VaultListingOpts) {
     super(opts)
@@ -46,34 +62,77 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing, and a dna for a scope already held refuses 'bad_option' before the closure is asked anything. A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
-  override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
-    if (hasRevision(input)) {
-      if (proofClosure !== undefined) { throw closureWithRecord() }
-      return super.build(input)
-    }
-    if (this.at(input) !== null) { throw alreadyHeldError() }
-    const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
-    const vault = this.holdDraft(draft)
-    vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
+  /** Build a vault of `dna` gated by `cleartexts`, put it, and hold the vault as stored: unlocked under a lease its passphrase proving grants, where the put lands; where another device stored a vault under the scope first, that vault, as it stands.
+   * Nothing is held before storage takes the vault, so cleartexts refused hold nothing. A `close` of the scope while it stores, or a lock or let-go of the vault before its lease is taken up, leaves it locked, no lease kept. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2).
+   */
+  ensure(dna: VaultDna, cleartexts: Cleartexts): Promise<Vault> {
+    return spendAnswerAfter(cleartexts, async () => {
+      const scope = this.scopeOf(dna)
+      const closeSeq = this.#closeSeqOf(scope)
+      const { draft, proving } = await this.#buildDraft(this.stampDna(scope), cleartexts)
+      const vault = await this.putDraft(draft)
+      if (vault.vault_tok === draft.vault_tok && this.#closeSeqOf(scope) === closeSeq) { await vault[UnlockAtBirth](proving) }
+      return vault
+    })
+  }
+
+  /** The vault under `scope` as storage now holds it, as the base's `fetch` says; a vault this fetch gave birth to first takes up the lease this device keeps of it, as {@link Vault.takeUpCachedLease} does, so it is answered unlocked where one is kept. */
+  override async fetch(scope: VaultScope, opts: FetchOpts = {}): Promise<Vault | null> {
+    const held = this.at(scope)
+    const vault = await super.fetch(scope, opts)
+    if (vault !== null && vault !== held) { await vault.takeUpCachedLease() }
     return vault
   }
 
-  /** Take up each vault's kept lease, as {@link Vault.takeUpKeptLease} does, once the base's `hello` has revived and hydrated them. */
+  /** Take up each vault's cached lease, as {@link Vault.takeUpCachedLease} does, once the base's `hello` has revived and hydrated them. */
   override async hello(): Promise<void> {
     await super.hello()
-    await Promise.all(this.things.map((vault) => vault.takeUpKeptLease()))
+    await Promise.all(this.things.map((vault) => vault.takeUpCachedLease()))
   }
 
-  /** End the watch, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
+  /** Lock the vault under `scope`, as `vault.lock()` does, and evict it; where none is held, erase the lease this device keeps of the scope all the same, so no vault of it taken up later finds one. A refused erase is told as bad news. */
+  close(scope: VaultScope): void {
+    const checked = this.scopeOf(scope)
+    const scopepath = this.scopepathOf(checked)
+    this.#closeSeqs.set(scopepath, this.#closeSeqOf(checked) + 1)
+    const held = this.at(checked)
+    if (held !== null) {
+      held.lock()
+      this.evict(checked)
+      return
+    }
+    const { deviceDB } = this.world
+    void outcomeOf(() => this[WithLeaseDB](checked, async () => { valOf(await deviceDB.tryDelLease(checked)) }))
+      .then((done) => { if (! done.ok) { this.tellBadNews([done.err]) } })
+  }
+
+  /** Run `work` once the deviceDB work on the lease of `scope` begun before it has landed, by any Vault object of the scope or by `close`, holding off any begun after. */
+  async [WithLeaseDB]<ValT>(scope: VaultScope, work: () => Promise<ValT>): Promise<ValT> {
+    const scopepath = this.scopepathOf(scope)
+    const mutex = this.#leaseMutexes.get(scopepath) ?? new Mutex()
+    this.#leaseMutexes.set(scopepath, mutex)
+    await mutex.acquire()
+    try {
+      return await work()
+    } finally {
+      mutex.release()
+    }
+  }
+
+  /** End the watch and each vault's watch of its boxes, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
   override goodbye(): void {
     super.goodbye()
-    for (const vault of this.things) { vault.letLeaseGo() }
+    for (const vault of this.things) {
+      vault.goodbyeBoxes()
+      vault.letLeaseGo()
+    }
   }
 
   // == [Defined by the vault listing]
 
   protected vaultTokOfWorld(): null { return null }
+
+  #closeSeqOf(scope: VaultScope): number { return this.#closeSeqs.get(this.scopepathOf(scope)) ?? 0 }
 
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
@@ -85,16 +144,11 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
-  /** The vault a dna stages at birth: the dna under a `vault_tok` fresh from {@link makeLifeTok}, the life this vault takes if storage holds none, and the gate {@link Gate.build} makes of that draft's stamp from what `proofClosure` answers; without one, refuses 'bad_option'. */
-  protected async draftOf(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<VaultRecord> {
-    const { draft } = await this.#draftWithProving(dna, proofClosure)
-    return draft
-  }
-
-  async #draftWithProving(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
-    const checked = MSX.vaultBuildArgs.parse({ proofClosure })
-    const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
-    const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.proofClosure, this.world)
+  /** The novel record of a vault, the stamped dna under a `vault_tok` fresh from {@link makeLifeTok}, and the proving of the gate {@link Gate.build} makes of it from `cleartexts`. */
+  async #buildDraft(dna: Dna<VaultScope, VaultRecord> & Revision & Times, cleartexts?: Cleartexts): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
+    const checked = MSX.vaultBuildArgs.parse({ cleartexts })
+    const sparse: VaultSparse = { ...dna, fmt: VaultFormat, gate_epoch: FirstGateEpoch, am: 'a', vault_tok: makeLifeTok() }
+    const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.cleartexts, this.world)
     return { draft: { ...sparse, gate: gate.pickle() }, proving }
   }
 
@@ -103,7 +157,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   absentRefusal(scope: VaultScope): VaultError {
-    return new VaultError('absent_vault', Phrases.vaultAbsent(scope.vaultlabel))
+    return RefusalFuncs.vaultAbsent(scope.vaultlabel)
   }
 
   /** The record `meta.vault_stored` carries, where it is a record of these forms; else null. */
@@ -114,9 +168,4 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 }
-// --
-
-// == [Refusals]: closureWithRecord
-
-const closureWithRecord = (): VaultError => new VaultError('bad_option', Phrases.ClosureWithRecord)
 // --

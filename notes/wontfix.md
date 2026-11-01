@@ -53,3 +53,22 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
   cache, and the next session asks for the passphrase. Pinned by
   `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
   retrying a refused erase.
+* 2026-11-01 (the Coach, v6bank sprint, thread 5b, on #438's second review): **a close before
+  `VaultListing.ensure` begins does not stop that `ensureVault`.** The Coach: "'close that lands
+  before ensure' sounds correct, or at least I could justify either, and wildly unlikely -- but it
+  also sounds like there may be other similar races that don't land. This is a won't fix, but we
+  should have a test demonstrating that at least the same thing happens every time." Today a
+  `closeVault` landing while `ensureVault` is still fetching and the fetch finds nothing stored, or
+  while it asks through the 'build_vault' gating, and a `closeVaults` landing while a vault is
+  being stored (`closeVaults` closes only the vaults the bank holds), do not stop it: it answers
+  the vault unlocked, held, its lease kept. `closeVault`'s erase of the kept lease lands before the
+  birth puts one, and the dialog stays up. A `closeVault` landing once `ensure` has begun leaves
+  the vault locked, as does one landing during a fetch that finds the vault stored. Pinned by
+  `packages/safebyok/tests/models/bank-close.test.ts`, *A close before ensure begins*.
+* 2026-11-01 (the Coach, v6bank sprint, thread 5b, on #438's second review): **two banks sharing a
+  deviceDB do not order their lease work against each other.** The Coach: "I'm fine with the
+  locking across banks being one the other or undefined -- if we did anything it would be to have
+  one bank per process. Do not want to dive into that now." The lease mutex is one per scope on
+  each bank's `VaultListing`. What a remount does within the latency of an erase is undefined: today a
+  bank made while another's `closeVault` erase is still in flight can take up the lease that erase
+  is about to remove, and read unlocked after the close. `TODO.md` carries the singleton.

@@ -111,6 +111,10 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` in the user's locale for
   `vault.askPassphraseAt`, as a `passphraseDeadlineText` ("Tue, Oct 27, 3:00 PM") and a
   `passphraseUntilText` ("in 2 days"); `askPassphraseAt`'s doc block already hints at them.
+* **make bank be a singleton where it ought to be and hermetically sealed where it oughtn't.** The
+  Coach, 2026-11-01 (on #438's second review): two banks sharing a deviceDB don't order their lease
+  work against each other (`notes/wontfix.md`); if we did anything it would be to have one bank per
+  process.
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
   (`bank.clearCachedVault` is that clear), never delete it from the vaultDB, which needs the

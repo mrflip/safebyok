@@ -8,8 +8,8 @@ import { eventually } from './timing'
 /**
  * A user at the dialog, for tests: a `requestCleartext` that answers each gating as a test
  * scripted it, and the calls that script it -- an unlock, a change to the ways in, a deletion --
- * each raising its gating and answering it in one step, as a naked client answering its own
- * `requestCleartext` would. A vault knows nothing of these: it raises gatings, and the host's
+ * each launching its gating and answering it in one step, as a naked client answering its own
+ * `requestCleartext` would. A vault knows nothing of these: it launches gatings, and the host's
  * `requestCleartext` answers them.
  */
 
@@ -130,7 +130,7 @@ export const del = async (vault: Vault, passphrase: string): Promise<void> => {
 /** A user at a dialog the test holds open: a `requestCleartext` spy that keeps each gating it is handed, unanswered, until the test closes it.
  * `asked(nth)` resolves the gating it was handed `nth` (0, the first, by default), once handed; the
  * test attempts on it as the user would. `close()` closes every dialog so far, as Cancel does: a
- * gating still open then is declined. Count the dialogs raised with `requestCleartext`'s calls.
+ * gating still open then is declined. Count the dialogs launched with `requestCleartext`'s calls.
  *
  * @example
  *   const dialog = TH.heldDialog()

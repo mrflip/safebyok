@@ -211,8 +211,8 @@ describe("beforeNextCall", () => {
       await TH.expectingGood(vaultDB).tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'theirs'))
     })
     await TH.expectBad(vaultDB.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'mine')), 'stale_write')
-    const kept = await TH.expectingGood(vaultDB).tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
-    expect(kept?.revision_tok).to.eq('rev-theirs')
+    const stored = await TH.expectingGood(vaultDB).tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
+    expect(stored?.revision_tok).to.eq('rev-theirs')
   })
 })
 
@@ -359,8 +359,8 @@ describe("holdNextAnswer", () => {
     await vault.lock()
     written.release()
     await unlocking
-    const kept = await opts.deviceDB.tryGetLease(TH.scopeOf('u1'))
-    expect(await TH.expectGood(kept)).to.be.null
+    const cached = await opts.deviceDB.tryGetLease(TH.scopeOf('u1'))
+    expect(await TH.expectGood(cached)).to.be.null
   })
 })
 
@@ -741,9 +741,9 @@ describe("the fixtures", () => {
     expect(slice.vault_tok).to.eq('vault-tok-other')
   })
 
-  it("deviceRecordOf: a whole device record of the user's main vault, raised as its first example shows", async () => {
+  it("deviceRecordOf: a whole device record of the user's main vault, advanced as its first example shows", async () => {
     const deviceDB = TH.expectingGood(memoryDeviceDB())
-    await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
+    await deviceDB.tryAdvanceDeviceRecord(TH.deviceRecordOf('u1'))
     expect(await deviceDB.tryGetDeviceRecord(TH.scopeOf('u1'))).to.deep.equal({ format: 'safebyok-device-v1', ...TH.scopeOf('u1'), device_id: 'device-one', highest_vault_epoch: 1 })
   })
 
@@ -1140,8 +1140,8 @@ class HostDeviceDB extends DeviceDB {
   protected async doPutLease(leaseScopepath: string, record: LeaseRecord) { await this.#touched(() => this.#rows.set(leaseScopepath, record)) }
   protected async doDelLease(leaseScopepath: string) { await this.#touched(() => this.#rows.delete(leaseScopepath)) }
   protected async doGetDeviceRecord(deviceScopepath: string) { return await this.#touched(() => this.#rows.get(deviceScopepath)) }
-  protected async doRaiseDeviceRecord(deviceScopepath: string, raisedFrom: (stored: unknown) => DeviceRecord) {
-    await this.#touched(() => this.#rows.set(deviceScopepath, raisedFrom(this.#rows.get(deviceScopepath))))
+  protected async doAdvanceDeviceRecord(deviceScopepath: string, advancedFrom: (stored: unknown) => DeviceRecord) {
+    await this.#touched(() => this.#rows.set(deviceScopepath, advancedFrom(this.#rows.get(deviceScopepath))))
   }
   protected async doDelDeviceRecord(deviceScopepath: string) { await this.#touched(() => this.#rows.delete(deviceScopepath)) }
   protected async doDelAll() { await this.#touched(() => { this.#rows.clear() }) }

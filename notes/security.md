@@ -41,6 +41,37 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-01 (sprint v6bank, thread 7b, PR #442; code in `packages/safebyok/src/models/lease.ts` and `models/vault.ts`): **a
+  gate change voids every lease of the old gate by a comparison of `gate_epoch`, not by cryptography, and the epoch binds only in the
+  lease's ctx.** The vault record and the lease stamp carry `gate_epoch`, an unsigned integer starting at 1 and moved by one at each
+  change of the gate (`replacePassphrase`, `addPasskey`, `revokePasskey`); a host's own patch cannot move it.
+  (1) Where it binds. It is in `leaseStamp`, and the lease's wrap of the vaultKey is `cipherCtx([vaultStamp, leaseStamp],
+  'vault_key_lease_wrapped')`, so an epoch edited in the deviceDB fails the unwrap and reads `damaged_lease`. It is deliberately not in
+  `vaultStamp`, so it binds in no box ctx (`box_key_wrapped`, `whisper_ciphered`) and no wayin ctx: the vaultKey outlives every gate, and
+  a gate change re-seals neither the boxes nor the wayin left in place. A short-lived thing made under one value of a counter holds that
+  value in its own stamp.
+  (2) What voiding is. A `Lease` whose `gate_epoch` differs from its vault's refuses `gate_moved` on seal and unseal and drops its keys;
+  `Lease.get` erases a kept lease under any other epoch and answers null, so a reload does not unlock from it. This is a refusal by
+  honest code, not revocation: the vaultKey does not change, so whoever already holds the old non-extractable leaseKey handle and the
+  wrapped key in the page can still unwrap it directly (G4 of `notes/guarantees.md`). Voiding does not rotate the vaultKey.
+  (3) Own change and heard change. A change of the gate on this device, on a vault unlocked, grants a new lease after the put lands, from
+  the proving that allowed the change (a proving of the old gate, which still opens the same vaultKey), so the vault stays unlocked. A
+  change heard from another device calls `lock()`, which also erases the kept lease by scope.
+  (4) Known window, left unhandled on the Coach's direction to keep this plain (the Coach, 2026-11-01). `Lease.grant` stamps
+  `vault.gate_epoch`, read from the vault's central record at the moment of the grant. A proof of the old gate already running on a locked
+  vault when a gate move is heard yields, when it lands, a lease stamped with the new epoch, so an old passphrase typed in that moment
+  unlocks this one session. The window is the length of one key derivation; the old passphrase did open the vaultKey that proof reached.
+  (5) No rollback guard. Nothing here reads the device's `highest_gate_epochs`, so storage serving an older gate is not detected; a kept
+  lease under a newer epoch than the record in hand is erased and counted as none. The guard is held by the Coach, undecided, not
+  rejected: "I'm not sure I want a counter, it's probably the right thing but I'd like to be sure the machinery is worth the peril."
+* 2026-11-01 (sprint v6bank, thread 3d, PR [#435](https://github.com/mrflip/safebyok/pull/435), branch `20261101-seams`; the Coach's decision): **revoking a
+  passkey rotates no vault key.** The vaultKey is static (G10 in `notes/guarantees.md`), so a device that kept a copy of the vault props and
+  still holds the revoked passkey's PRF answer can unwrap the vaultKey whatever the library does: revocation is enforced only on the honest
+  path. That path is the fetch-first rule of thread 3d: every unlock by proof fetches the gate from storage before it unlocks, so a revoked
+  passkey no longer unlocks through the library. Not changed, by decision: rotating the vaultKey on revocation would revoke every key and
+  need re-syndication (re-wrapping and re-distributing to every device and wayin); the Coach judges the risk of leaving it out less than the
+  risk of adding it. Related: with the fetch-first rule there is no passphrase unlock while offline (a cached lease still unlocks); the
+  Coach keeps that for now.
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
   value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,

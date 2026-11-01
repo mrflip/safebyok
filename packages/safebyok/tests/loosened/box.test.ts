@@ -17,7 +17,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sideca
 describe("a lock() landing while an unseal is under way", () => {
   it("README.md:617, 'getBox(), getWhisper() or useWhisper() under way refuses with vault_locked too, handing nothing back': an unseal whose lease was handed out just before lock() resolves with the whisper, the vault locked", async () => {
     const { listing } = makeVaultWorld()
-    const vault = await listing.build(Dna, byPassphrase(Passphrase))
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
     const mw = makeModelsWorld({ fakeTimers: false })
     modelsWorlds.push(mw)
     const built = await boxListingOf(mw, { world: boxWorldOf(vault) }).build(BoxDna)
