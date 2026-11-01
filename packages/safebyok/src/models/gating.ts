@@ -5,8 +5,9 @@ import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { adorn, tattoo } from '../helpers'
 import type { VaultLogger } from '../logger'
 import { type Outcome, bad, good, outcomeOf, valOf } from '../outcome'
-import { passphraseCleartext } from '../shapes/vault'
-import { type VaultScope, vaultScope } from '../shapes/scopes'
+import * as VX from '../shapes/vault'
+import * as CX from '../shapes/scopes'
+import type { VaultScope } from '../shapes/scopes'
 import type { CleartextsForGatingkind, GatingKind, StrengthChecker, WayinKind } from './models-shapes'
 import * as MSX from './models-shapes'
 import { checkStrength, spendAnswer } from './proving'
@@ -52,7 +53,7 @@ export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
 /** Stays here: it names the class. */
 const Checks = Checkers('bad_option', ({ obj, fn, custom }) => ({
   gatingOpts: obj({
-    scope: vaultScope,
+    scope: CX.vaultScope,
     vault: custom<Vault | null>((val) => val === null || val instanceof Storable, 'Expected a vault, or null'),
     world: MSX.gatingWorld,
     run:   fn<(cleartexts: unknown) => Promise<Vault>>(),
@@ -132,7 +133,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 
   /** Hand `passphrase` to the host's `strengthChecker`, as an attempt would, without running the verb: a weak one refuses 'weak_passphrase', with the checker's reason. */
   checkStrength(passphrase: string): Promise<void> {
-    return checkStrength(this.#world.strengthChecker, passphraseCleartext.parse(passphrase), this.#scope())
+    return checkStrength(this.#world.strengthChecker, VX.passphraseCleartext.parse(passphrase), this.#scope())
   }
 
   /** The strength check as an {@link Outcome}: the non-throwing form of {@link Gating.checkStrength}. */

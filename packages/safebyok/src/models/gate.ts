@@ -1,6 +1,6 @@
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { decorate, tattoo } from '../helpers'
-import { vaultScope } from '../shapes/scopes'
+import * as CX from '../shapes/scopes'
 import type { AttemptCleartexts, Cleartexts, GateProps, GateWorld, PasskeyAddCleartexts, PasskeyWayinRecord, PassphraseCleartexts, PassphraseReplaceCleartexts, PassphraseWayinRecord, ProvingWorld, VaultStamp, WayinHeader } from './models-shapes'
 import * as MSX from './models-shapes'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, checkStrength, spendAnswer } from './proving'
@@ -30,7 +30,7 @@ export class Gate {
   static async build(stamp: VaultStamp, cleartexts: Cleartexts, world: GateWorld): Promise<{ gate: Gate, proving: PassphraseProving }> {
     try {
       const checked = MSX.cleartexts.parse(cleartexts)
-      await checkStrength(world.strengthChecker, checked.passphrase, vaultScope.parse(stamp))
+      await checkStrength(world.strengthChecker, checked.passphrase, CX.vaultScope.parse(stamp))
       const { proving, passphrase, passkey } = await Gate.#novelWayins(stamp, checked, world)
       return { gate: new Gate(stamp, { passphrase_wayin: passphrase.pickle(), passkey_wayin: passkey?.pickle() ?? null }), proving }
     } finally {
@@ -66,7 +66,7 @@ export class Gate {
   async withPassphraseReplaced(cleartexts: PassphraseReplaceCleartexts, world: GateWorld): Promise<GateProps> {
     const { passphrase, nextPassphrase } = MSX.passphraseReplaceCleartexts.parse(cleartexts)
     if (passphrase === nextPassphrase) { throw RefusalFuncs.samePassphrase() }
-    await checkStrength(world.strengthChecker, nextPassphrase, vaultScope.parse(this.stamp))
+    await checkStrength(world.strengthChecker, nextPassphrase, CX.vaultScope.parse(this.stamp))
     const proved = await this.attemptProof({ passphrase }, world)
     const proving = await PassphraseProving.make(this.stamp, world, nextPassphrase)
     const wayin = await proving.makeWayin(proved)
