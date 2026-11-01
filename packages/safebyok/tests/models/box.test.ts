@@ -231,7 +231,9 @@ describe("box.getWhisper(), tryGetWhisper() and useWhisper(handed): the stored w
   it("useWhisper rejects with the callback's own throw, as it came", async () => {
     const box = await openingBoxOf(openedWhisperOf)
     const thrown = new Error('the host fumbled')
-    await expect(box.useWhisper(() => { throw thrown })).rejects.toBe(thrown)
+    let caught: unknown
+    try { await box.useWhisper(() => { throw thrown }) } catch (err) { caught = err }
+    expect(caught).to.eq(thrown)
   })
 
   const RefusedCases = [
