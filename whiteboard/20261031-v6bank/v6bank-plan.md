@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 3a, 3b, 3c, 4a, 4b, 6, 9 filed; 3d, 5a, 7a building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
+* **Status:** 1, 2, 3a–3d, 4a, 4b, 6, 9 filed; 7a in review; 5a building; then 5b, then the restack before 7b, which needs force-push (Open Matters, TOP).
 
 ## Read first
 
@@ -216,6 +216,8 @@ name now, and say in the doc block that the list grows. **Size:** M.
 *Orchestrator:* also: an unlock gating's run refreshes the gate first, so a passkey revoked elsewhere no longer unlocks (YOLO, #433 review); a lock's decline gets its own sentence (#434). *Gloss.* `gating.ts`, `vault.ts`'s unlock join. **Levels:** review `high`. **Depends on:** 3c.
 **Size:** S–M.
 
+
+*Review:* (#435, high, fixed) a gating that waited its turn found the vault sparse and refused `bad_option`; `#askInTurn` now fetches at the turn (tested). Left: offline unlock (Coach), a racing close spends a joiner's answer (G2 wording, Cleanup), a joined in-flight fetch can predate a revocation, extra round trips, a queued unlock re-check and queued launches at a lock (restack). The static vault key (G10) makes revocation an honest-path check (Open Matters). The thread file's "#unlockByGating still fetches before launch" is stale: `#askInTurn` fetches at the turn.
 
 ### 4a. bank
 
