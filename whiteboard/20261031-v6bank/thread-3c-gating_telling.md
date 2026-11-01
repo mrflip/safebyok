@@ -1,6 +1,6 @@
 # Thread 3c: gating_telling (2026-11-01)
 
-Branch `20261101-gating_telling`, PR #TBD, stacked on
+Branch `20261101-gating_telling`, PR [#433](https://github.com/mrflip/safebyok/pull/433), stacked on
 [#431](https://github.com/mrflip/safebyok/pull/431). Justify: green; core 4851 passed, 37
 skipped; every package green; no size budget moved.
 
