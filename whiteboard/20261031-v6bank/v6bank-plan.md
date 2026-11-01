@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 3a–3d, 4a, 4b, 6, 9 filed; 7a in review; 5a building; then 5b, then the restack before 7b, which needs force-push (Open Matters, TOP).
+* **Status:** 1, 2, 3a–3d, 4a, 4b, 6, 7a, 9 filed; 5a in review; then 5b, then the restack before 7b, which needs force-push (Open Matters, TOP).
 
 ## Read first
 
@@ -330,6 +330,8 @@ unconditional one is expressed, or leave the seam and report it. **Size:** M.
 held (ground rule 10): `trouble` is the vault's own. **Levels:** worker medium effort.
 **Depends on:** 4b. **Look-ahead:** 10 fills the pester trigger the getter reads; 12 shows
 wayin damage as trouble. **Size:** M.
+
+*Review:* (#436, high→medium, fixed) a lock during the pre-launch fetch launched a dialog that could not succeed (now refuses `vault_locked`, tested); doc fixes. Left: verbs on a damaged vault refuse by the wrong kind (to 12), unneeded snapshot cost on unadopted receives, `pesterMillis` accepts `Infinity` (to 10), 3b's loose ends (restack).
 
 ### 7b. vault_guards
 
