@@ -234,7 +234,7 @@ export class Bank implements VaultWorld, GatingWorld {
     this.#remakeSnapshot()
   }
 
-  /** A listener that throws is reported to the platform, and the rest are still called. */
+  /** Remake the snapshot and tell each listener; one that throws is reported to the platform, and the rest are still called. */
   #remakeSnapshot(): void {
     this.#snapshot = this.#snapshotNow()
     for (const listener of this.#listeners) {
