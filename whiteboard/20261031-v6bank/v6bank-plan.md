@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1 and 2 filed; 3a, 6, 9 building.
+* **Status:** 1, 2, 9 filed; 6 in review; 3a building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
 
 ## Read first
 
@@ -204,7 +204,7 @@ refusal-kind type in `models-shapes.ts`. Runs beside 4a, both off 3a.
 >   (exists on the listing), `goodbye` ending the watch.
 
 *Gloss.* `bank.ts`, `vault-listing.ts`, `listing.ts`. Removes `VaultListing.draftOf` (from
-thread 1). *Orchestrator:* the device record's contents and its `load`/`save` are thread 5's;
+thread 1). *Orchestrator:* also aligns the models-world test fake, which writes a revision-0 tombstone on a `del` over no row, with thread 6's store, which answers null. *Orchestrator:* the device record's contents and its `load`/`save` are thread 5's;
 4a keeps the sketch's `device_id` handling and leaves a seam. *Orchestrator:* the Coach took the Rec on `hello()`'s failed deriver load: left bare, `tryHello`'s Outcome carries it; 4a confirms in its doc block. Thread 2's `checkKeyDeriver` line in `Bank`'s constructor stays (it joins at the restack).
 **Depends on:** 3a.
 **Look-ahead:** 4b adds `evict` beside `ensure`; 5 plumbs the deviceDB to each vault; 7b reads
@@ -220,7 +220,8 @@ thread 1). *Orchestrator:* the device record's contents and its `load`/`save` ar
 *Gloss.* `listing.ts`, `bank.ts`, `vault.ts`/`box.ts` `evict`. A box's disarm on eviction drops
 its exposed whisper; on `lock()` alone the whisper stays (the Coach's ruling, thread 9).
 *Orchestrator:* sign-out needs thread 6's store signal, so it is wired in 7b, which stands on
-both. **Levels:** worker medium effort. **Depends on:** 4a. **Look-ahead:** 8 evicts on
+both. **Levels:** worker medium effort. *Orchestrator:* the disarm also clears a box's exposed whisper when a tombstone or a newer revision lands (YOLO, #428 review).
+**Depends on:** 4a. **Look-ahead:** 8 evicts on
 deletion and on a received tombstone. **Size:** S.
 
 ### 5. devicedb
@@ -290,7 +291,7 @@ wayin damage as trouble. **Size:** M.
 > `gate_epoch`.
 
 *Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
-`VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). **Levels:** worker high
+`VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* from thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
 effort; review `high` (guarantees). **Depends on:** 3b, 5, 6, 7a. **Size:** M.
 
 ### 8. vault_deletion
@@ -312,7 +313,8 @@ effort; review `high` (guarantees). **Depends on:** 3b, 5, 6, 7a. **Size:** M.
 >   tombstoned vault reads as absent.
 
 *Gloss.* `vault.ts`, `vault-listing.ts`, `bank.ts`, `gating.ts` (the kind), devicedb erase.
-**Levels:** review `high` (lease erase). **Depends on:** 7b. Beside 10 and 12. **Size:** M.
+**Levels:** review `high` (lease erase). *Orchestrator:* from thread 6: `Store.del` is conditional on `revision_tok`; `delUnparsed(scope)` is the unconditional delete for a damaged row (removes it only while it still reads as damaged). `Vault.takeWorld` refuses a box answer whose vault row is absent or damaged: settle it with the tombstone rule.
+**Depends on:** 7b. Beside 10 and 12. **Size:** M.
 
 ### 9. whispers_and_names
 
@@ -330,6 +332,8 @@ effort; review `high` (guarantees). **Depends on:** 3b, 5, 6, 7a. **Size:** M.
 *Gloss.* `models/box.ts`, the label checkers in `models-shapes.ts`, `src/helpers/`.
 *Orchestrator:* also takes thread 1's leftover `kept` names (test locals → `stored`/`was`, convex `tallyRow`/`storedTally`, react `liveness`, `unmaskedChars`) and `KeptLease` → `CachedLease` in VOCABULARY.md and notes/guarantees.md.
 **Levels:** review `high` (guarantees: `box.ts`). **Depends on:** 1. **Size:** S–M.
+
+*Review:* (#428, high, fixed) a chai form, the `checkKeyDeriver` call moved after `bankScope.parse` (parity with the core's `bad_scope` first), a test name. Left: the exposed whisper outlives a delete or rewrite (to 4b, Open Matters), guarantees.md lacks the whisper routes (wrap-up), `box.ts` type re-exports (to 11), no `tryUseWhisper` (as the core), the duplicate deriver checks with thread 2 (restack), two doc-block nits. *Orchestrator:* thread 9 read "the reserved `test_` namespace" as the deriver's reserved labels and duplicated thread 2's `checkKeyDeriver` and `tests/models/bank.test.ts` — my handoff's gap; reconciled at the restack, thread 2's as the base, keeping 9's `unk` scope fields, `bad_scope` tests and call order.
 
 ### 10. pester
 
@@ -353,7 +357,7 @@ reviewed apart: use it, do not reshape it). **Levels:** worker `sonnet`.
 >   record checkers a host validates with. The types an exported signature names are exported too.
 > * `src/index.ts` is left as it is: the old surface stays until the models reach parity.
 
-*Gloss.* New `src/v06.ts`, `package.json` exports, the build config, `.size-limit.json` (a new
+*Orchestrator:* export `Box`'s types from their defining files and drop `box.ts`'s re-exports (#428 review). *Gloss.* New `src/v06.ts`, `package.json` exports, the build config, `.size-limit.json` (a new
 line: run `pnpm size:budget --write`). An additive entry point, pre-1.0: a two-way door.
 **Levels:** worker `sonnet`; review `low`; style pass default. **Depends on:** everything,
 restacked. **Size:** S.
