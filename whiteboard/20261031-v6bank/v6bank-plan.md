@@ -400,7 +400,7 @@ effort; review `high` (guarantees). **Depends on:** S (on the restacked line). *
 >   tombstoned vault reads as absent.
 
 *Gloss.* `vault.ts`, `vault-listing.ts`, `bank.ts`, `gating.ts` (the kind), devicedb erase.
-**Levels:** review `high` (lease erase). *Orchestrator:* from thread 6: `Store.del` is conditional on `revision_tok`; `delUnparsed(scope)` is the unconditional delete for a damaged row (removes it only while it still reads as damaged). `Vault.takeWorld` refuses a box answer whose vault row is absent or damaged: settle it with the tombstone rule.
+**Levels:** review `high` (lease erase). *Orchestrator:* from 13's review (YOLO): the box verbs refuse `vault_gone` (`Phrases.VaultObjectGone`) on an evicted vault, at the head of each verb and after its awaits, evicting anything fetched late; `ensureBox` over a held draft refuses `bad_option`; a box verb checks its vault is present. *Orchestrator:* from thread 6: `Store.del` is conditional on `revision_tok`; `delUnparsed(scope)` is the unconditional delete for a damaged row (removes it only while it still reads as damaged). `Vault.takeWorld` refuses a box answer whose vault row is absent or damaged: settle it with the tombstone rule.
 **Depends on:** 7b. Beside 10 and 12. **Size:** M.
 
 ### 9. whispers_and_names
@@ -472,6 +472,8 @@ landing mid-unseal is undone — a forget counter, an overtaken expose keeping n
 review). Held: damaged boxes in the snapshot. **Levels:** review `high` (`box.ts`).
 **Depends on:** S (on the restacked line); 5b's lease work is not under it, so expect a restack
 meeting in `vault.ts`. **Size:** M.
+
+*Review:* (#440, high, flagged — filed as it stands) five fixes: an expose on a stale box counting its own hydrate's forget; a hello's late watch outliving `goodbyeBoxes`; `BoxListing.ensure` overwriting another device's box; a test over a real `localStoreFront`; docs and tests. Significant: box verbs on an evicted vault restart its watch and hold a box nothing ends (to 8, YOLO). Left: `ensureBox` over a held draft replaces it (to 8: refuse `bad_option`), box verbs under a tombstoned vault (8), each box change re-saving the vault's copy, naming and doc nits. The thread file's counter wording is stale.
 
 ## Checks and chores
 
