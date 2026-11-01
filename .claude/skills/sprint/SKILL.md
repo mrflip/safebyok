@@ -17,6 +17,9 @@ Coach and other agents: never write to it, switch its branch, or touch anything 
 there. You write the sprint's documents in a worktree of the sprint's own, and you are the only
 writer of the sprint doc.
 
+**When your conversation opens with a summary**, you were compacted: read `post-compaction.md`
+beside this file before going on.
+
 ## 1. Plan
 
 Pick a short `sprint_name` from the work (the Coach's word for it, if they gave one), and cut the
