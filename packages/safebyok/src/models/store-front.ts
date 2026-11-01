@@ -18,9 +18,9 @@ import * as MSX from './models-shapes'
 
 // == [Fronted stores]: FrontedStore, FrontedVaultStore, FrontedBoxStore, RowSwap
 
-/** A {@link Store} as a `StoreFront` makes it, with `delUnparsed`: remove the row under `scope` only while, read in the same atomic step, it still reads as neither the kind's record nor its tombstone; answer what is then stored, null where it was removed. The one way to remove a row `del` refuses as damaged. */
+/** A {@link Store} as a `StoreFront` makes it, with `delDamaged`: remove the row under `scope` only while, read in the same atomic step, it still reads as neither the kind's record nor its tombstone; answer what is then stored, null where it was removed. The one way to remove a row `del` refuses as damaged. */
 export type FrontedStore<ScopeT, RecordT, SparseT> = Store<ScopeT, RecordT, SparseT> & {
-  delUnparsed(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
+  delDamaged(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
 }
 
 /** One bank's vault records, as a `StoreFront` serves them. */
@@ -175,7 +175,7 @@ class FrontedRows<ScopeT extends object, SparseT extends SparseBase<ScopeT>, Rec
     this.#worldpath = worldpath
   }
 
-  // == [Store verbs]: get, put, del, delUnparsed
+  // == [Store verbs]: get, put, del, delDamaged
 
   async get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>> {
     const { asked, scopepath } = this.#askedOf(scope)
@@ -206,7 +206,7 @@ class FrontedRows<ScopeT extends object, SparseT extends SparseBase<ScopeT>, Rec
     return { ...judge(stored), scope: asked, world: await this.#worldNow() }
   }
 
-  async delUnparsed(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>> {
+  async delDamaged(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>> {
     const { asked, scopepath } = this.#askedOf(scope)
     const isDamaged = (row: unknown): boolean => ! this.#fetchedOf(scopepath, row).ok
     const stored = await this.#front.swapRow(scopepath, (row) => (isDamaged(row) ? null : undefined))

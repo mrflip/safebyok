@@ -185,19 +185,19 @@ describe("StoreFront's store: del", () => {
   })
 })
 
-describe("StoreFront's store: delUnparsed", () => {
+describe("StoreFront's store: delDamaged", () => {
   it("removes a row that does not read, answering null", async () => {
     const { store, boxes } = frontOf()
     store.put(boxpath, 'not json')
-    expect(await TH.expectGood(boxes.delUnparsed(anthropic))).to.be.null
+    expect(await TH.expectGood(boxes.delDamaged(anthropic))).to.be.null
     expect(store.get(boxpath)).to.be.null
   })
 
   it("leaves a row that reads, answering it, and answers null over no row", async () => {
     const { store, boxes } = frontOf()
-    expect(await TH.expectGood(boxes.delUnparsed(anthropic))).to.be.null
+    expect(await TH.expectGood(boxes.delDamaged(anthropic))).to.be.null
     store.put(boxpath, JSON.stringify(fullBoxRecord()))
-    expect(await TH.expectGood(boxes.delUnparsed(anthropic))).to.deep.equal(fullBoxRecord())
+    expect(await TH.expectGood(boxes.delDamaged(anthropic))).to.deep.equal(fullBoxRecord())
     expect(rowOf(store)).to.deep.equal(fullBoxRecord())
   })
 })
