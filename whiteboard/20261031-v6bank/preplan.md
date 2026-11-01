@@ -20,8 +20,10 @@ Carried from the newvault sprint and the scratchpad; the plan repeats them in ev
 1. `try*` answers an `Outcome`; the plain verb throws. A refusal is thrown through a factory in
    a `Refusals` section, its sentence from `phrases.ts`; a factory may take objects it sanitizes
    and attaches.
-2. Catch-and-rethrow only where it earns its lines; the host-call functions that hear the
-   passphrase relabel what they catch (G1, G8), and little else should.
+2. A refusal passes through as thrown. `outcomeOf` makes a `try*` form, and that is where an
+   error becomes an `Outcome`; a plain verb does not wrap a call in `outcomeOf` to throw its
+   error again. The host-call functions that hear the passphrase relabel what they catch (G1,
+   G8); elsewhere a catch adds something (zeroing in `finally`, say) or is not there.
 3. Checkers live in `models-shapes.ts`, made by `Checkers`, `Checker` or `objCheck`.
 4. Key bytes are zeroed in `try/finally`. The cleartext (passphrase or PRF answer) takes the
    straightest path from the user's fingertips to the one `Proving` method that handles it; each
