@@ -41,7 +41,7 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
-* 2026-11-01 (sprint v6bank, thread 7b, PR not yet numbered; code in `packages/safebyok/src/models/lease.ts` and `models/vault.ts`): **a
+* 2026-11-01 (sprint v6bank, thread 7b, PR #442; code in `packages/safebyok/src/models/lease.ts` and `models/vault.ts`): **a
   gate change voids every lease of the old gate by a comparison of `gate_epoch`, not by cryptography, and the epoch binds only in the
   lease's ctx.** The vault record and the lease stamp carry `gate_epoch`, an unsigned integer starting at 1 and moved by one at each
   change of the gate (`replacePassphrase`, `addPasskey`, `revokePasskey`); a host's own patch cannot move it.

@@ -1,6 +1,6 @@
 # Thread 7b: gate-epoch voiding (2026-11-01)
 
-Branch `20261101-vault_guards`, PR #NNN, stacked on #438. Justify: green, core 5,253 passed, 37 skipped.
+Branch `20261101-vault_guards`, PR #442, stacked on #438. Justify: green, core 5,253 passed, 37 skipped.
 
 Built to the Coach's direction of 2026-11-01, relayed by the orchestrator: the plainest thing that
 keeps the promise; a race met is reported, not handled; no counter, mutex or guard added or removed.
