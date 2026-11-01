@@ -1,7 +1,7 @@
 # Thread 5b: lease_plumbing (2026-11-01)
 
 Branch `20261101-lease_plumbing`, PR [#438](https://github.com/mrflip/safebyok/pull/438), stacked on [#437](https://github.com/mrflip/safebyok/pull/437) (`20261101-devicedb`).
-Justify: green. safebyok 4956 passed / 37 skipped; root 290; react 326; demo 230/17;
+Justify: green. safebyok 4961 passed / 37 skipped; root 290; react 326; demo 230/17;
 indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e 107/116.
 
 * **Built**
@@ -64,6 +64,36 @@ indexeddb 167/11; postgres 322/15; fastkey 49; convex 375/9; graphql 345/15; e2e
     real-deviceDB test; it now runs over `src/devicedb/memory`.
   * An `onBadNews` that throws fails the find (documented on `OnBadNews`). The bank's
     `tellBadNews` never throws, so only a host calling the DeviceDB directly could meet this.
+
+* **Rework after review** (commits d0371329, 3be71027). The reviewer found G4 held per instance
+  but not per scope.
+  * **One lease mutex per scope.** `VaultListing` keeps a `Map<scopepath, Mutex>`; a Vault
+    object's `#withLeaseDB` calls `listing[WithLeaseDB](scope, work)` (a Symbol from
+    `models/vault.ts`, beside `UnlockAtBirth`; defined there because `vault-listing.ts` imports
+    `Vault` as a value, so the other way would be a runtime import cycle). An evicted vault's
+    erase and a new instance's take-up now queue on the same mutex. `#lockSeq`/`BirthLockSeq` stay
+    per instance: a scope-wide count would let a host's stray `lock()` on an evicted object void
+    the live object's unlock.
+  * **`VaultListing.close(scope)`** takes over the bank's `#closeVault`. It counts closes per
+    scope (`#closeSeqs`). Where no vault is held, it erases the kept lease on the scope's mutex
+    (a refused erase is told as bad news).
+  * **Item 2, done.** `ensure` reads the scope's close count before it builds and again once
+    `putDraft` answers; if a close landed, it grants no lease and returns the vault locked (held,
+    not evicted). It does not replay the close: a host that closed and reopened meanwhile would
+    have its reopened vault evicted. With the erase on an unheld close, a `hello` or `fetch`
+    whose vault was not yet held when the close landed takes up nothing either: its look queues
+    behind the erase.
+  * **Behaviour change:** `closeVault` of a vaultlabel the bank holds no vault of used to do
+    nothing; it now erases that vault's kept lease, so `closeVault`'s "erasing the lease this
+    device keeps" holds whatever is held.
+  * **`OnBadNews`** is derived from `MSX.onBadNews` in `models-shapes.ts`, and named by
+    `bankDeviceDB.vaultCache` and the DeviceDB. `BankOpts.onBadNews` and `ListingOpts.onBadNews`
+    still spell the type out: a different hook, whose doc would not fit.
+  * **Tests** (`bank-close.test.ts`): the reviewer's probe (a reopen while the evicted vault's
+    look is in flight), a close while `ensure` stores, an unheld close erasing the kept lease,
+    its refused erase told to `onBadNews`. The first three were red without the `src/` change.
+  * G4 in `notes/guarantees.md` ("erased from the store at `lock()`") stays true, now across
+    instances; no edit.
 
 * **For 7b**: read `wroteOverDamaged` in `Bank.#keepDeviceRecord` and tell the reset guard as bad
   news there; the highest epoch, keyed by `vault_tok`, is still yours.
