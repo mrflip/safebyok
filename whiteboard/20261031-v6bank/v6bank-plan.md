@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 3a, 6, 9 filed; 3b and 4a building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
+* **Status:** 1, 2, 3a, 3b, 6, 9 filed; 4a in review; 3c building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
 
 ## Read first
 
@@ -182,6 +182,8 @@ G2 hole), and match G2 — a passkey answer stays unspent only on a correctable 
 **Depends on:** 3a. **Look-ahead:** 7a shows the passkey header in the snapshot; 8's `del_vault`
 refuses a passkey. **Size:** M.
 
+*Review:* (#431, high, fixed) G2's text overstated what a 'wrong_passkey' leaves unspent (corrected, pinned by a test); a malformed-answer test. Left: a stale passkey header loops a correctable refusal and a passkey on a vault without one stays correctable (both to 3c, YOLO), nested spends (harmless), React must bind `tryAttemptPasskey` (parity note), doc-block tone.
+
 ### 3c. gating_telling
 
 > * The telling of the two-device races, which the versioned put already makes safe: a first gate
@@ -192,14 +194,25 @@ refuses a passkey. **Size:** M.
 >   messages have a contract to map on.
 
 *Gloss.* Split from 3b. `gating.ts`, `phrases.ts`, `refusal-funcs.ts`, the refusal-kind type in
-`models-shapes.ts`, VOCABULARY.md. *Orchestrator:* also (YOLO, from 3a's review): what a second
-gating on a vault does (with 4a's `ensure` joining one in flight); `ensureUnlocked(cleartexts)`
-attempts through an open gating rather than waiting on it; `Gating.#inTurn` onto es-toolkit's
-`Mutex`; VOCABULARY.md's **cleartext** and **gating** rows brought to the models. The kind list
+`models-shapes.ts`, VOCABULARY.md. *Orchestrator:* also (YOLO, from the reviews of 3a and 3b): a
+passkey offered to a vault without one, and a `wrong_passkey` against a gate changed since
+launch, refuse non-correctably (keeping G2 true); a wrong-kind `attemptPasskey` may get a kind of
+its own; VOCABULARY.md's **cleartext** and **gating** rows brought to the models. Concurrency
+moved to 3d. The kind list
 reuses `identity_revoked` for signed-out (thread 6). **Levels:** review `high`.
 **Depends on:** 3b. **Look-ahead:** the kind list carries room for what later threads throw:
 `vault_behind` (7b), `vault_gone`, `vault_remade` (8), damaged-wayin (12); declare those 3c can
 name now, and say in the doc block that the list grows. **Size:** M.
+
+### 3d. gating_concurrency
+
+> *(split from 3c by the orchestrator; YOLO calls from 3a's review)* What a second gating on a
+> vault does (with 4a's `ensure` joining an `ensureVault` in flight); `ensureUnlocked(cleartexts)`
+> attempts through an open gating rather than waiting on it; `Gating.#inTurn` onto es-toolkit's
+> `Mutex`.
+
+*Gloss.* `gating.ts`, `vault.ts`'s unlock join. **Levels:** review `high`. **Depends on:** 3c.
+**Size:** S–M.
 
 
 ### 4a. bank
@@ -312,7 +325,7 @@ wayin damage as trouble. **Size:** M.
 
 *Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
 `VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* from thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
-effort; review `high` (guarantees). **Depends on:** 3c, 5, 6, 7a. **Size:** M.
+effort; review `high` (guarantees). **Depends on:** 3d, 5, 6, 7a. **Size:** M.
 
 ### 8. vault_deletion
 
