@@ -54,8 +54,11 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, held in memory through `lock()` until the host sets `box.whisper` null or the box disarms. Nothing seals it: an update seals the whisper it is given. */
   #exposed: WhisperHolder | null = null
 
-  /** Counts each change to `#exposed` but an expose's own, so an expose overtaken by one while it unseals keeps nothing. */
+  /** Counts each whisper the host sets or forgets on the box, and each eviction's forget, so an expose overtaken by one keeps nothing. */
   #exposedSeq = 0
+
+  /** Counts each forget a tombstone or a newer revision makes, so an expose whose record is replaced while it unseals keeps nothing; one its own hydrate brings in is the record it opens. */
+  #revisedSeq = 0
 
   // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
 
@@ -153,11 +156,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
    * forget it, and while the vault is locked `box.whisper` answers LOCKED in its place.
    * Where the box forgets or is handed a whisper while this unseals, as a disarm, an eviction, a
    * tombstone or a newer revision makes it forget, this keeps nothing and resolves all the same.
+   * A newer revision its own fetch brings in, for a box gone stale, is the one it opens and keeps.
    */
   async expose(opts: EditOpts = {}): Promise<this> {
-    const seqAtStart = this.#exposedSeq
-    const opened = await this.unsealWhisper(opts)
-    if (this.#exposedSeq !== seqAtStart) { return this }
+    const exposedSeqAtStart = this.#exposedSeq
+    await this.ensureReadyToUnsealWhisper(opts)
+    const revisedSeqAtUnseal = this.#revisedSeq
+    const opened = await this.#unseal()
+    if ((this.#exposedSeq !== exposedSeqAtStart) || (this.#revisedSeq !== revisedSeqAtUnseal)) { return this }
     this.#exposed = opened
     this.settle()
     return this
@@ -173,6 +179,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   #replaceExposed(exposed: WhisperHolder | null): void {
     this.#exposed = exposed
     this.#exposedSeq += 1
+  }
+
+  /** Forget the exposed whisper for a record replaced, counted so an expose unsealing the record replaced keeps nothing. */
+  #forgetRevised(): void {
+    this.#exposed = null
+    this.#revisedSeq += 1
   }
 
   /** Seal this whisper, `{ val }`, with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
@@ -208,7 +220,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     const isOwnSend = central.revision_tok === this.staged?.revision_tok
     super.adopt(central, staged)
     if (central === prior) { return }
-    if (MSX.isTombstone(central) || (! isOwnSend && central.revision_seq > prior.revision_seq)) { this.#replaceExposed(null) }
+    if (MSX.isTombstone(central) || (! isOwnSend && central.revision_seq > prior.revision_seq)) { this.#forgetRevised() }
   }
   // --
 

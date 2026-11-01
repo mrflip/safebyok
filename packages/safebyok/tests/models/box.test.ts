@@ -337,6 +337,16 @@ describe("box.expose() overtaken while it unseals", () => {
     })
   }
 
+  it("keeps nothing where the host forgets before its hydrate answers, ahead of the unseal", async () => {
+    const { box, open } = await heldOpenBoxOf()
+    const exposing = box.expose()
+    box.whisper = null
+    open()
+    await exposing
+    expect(box.whisper).to.be.null
+    expect(box.getSnapshot().exposed).to.be.false
+  })
+
   it("keeps the whisper a host set while it unseals, not the one it opened", async () => {
     const { box, asked, open } = await heldOpenBoxOf()
     const exposing = box.expose()

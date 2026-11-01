@@ -156,6 +156,20 @@ describe("vault.getSnapshot().boxes: the snapshot of each box present", () => {
     expect(told).toHaveBeenCalled()
   })
 
+  it("shows a box gone stale exposing the newer revision its own fetch brings in, as nothing overtook it", async () => {
+    const { vault, anotherSession, demandStored, advance } = await makeBornVault()
+    const ours = await vault.ensureBox(dnaOf())
+    vault.goodbyeBoxes()
+    const theirVault = await anotherSession().build(demandStored())
+    await theirVault.takeUpCachedLease()
+    const theirs = await theirVault.getBox({ boxlabel: Boxlabel })
+    await theirs?.send({ whisper: whisperOf('sk-test-1111'), sidecar: {} })
+    advance((10 * 60_000) + 1)
+    await ours.expose()
+    expect(ours.whisper).to.deep.equal(whisperOf('sk-test-1111'))
+    expect(vault.getSnapshot().boxes[0]?.exposed).to.be.true
+  })
+
   it("carries no whisper", async () => {
     const { vault } = await makeBornVault()
     await vault.ensureBox(dnaOf('sk-test-secret-9999'))
