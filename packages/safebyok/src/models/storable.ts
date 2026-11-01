@@ -224,11 +224,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Guards]: demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToFetch, ensureReadyToEdit, demandReadyToEdit, ensureReadyToSend, demandReadyToSend, ensureReadyToDel, demandReadyToDel
 
-  demandUnlocked(): this { if (this.isLocked)    { throw RefusalFuncs.vaultLocked() }                               return this }
+  demandUnlocked(): this { if (this.isLocked)    { throw RefusalFuncs.vaultLocked() }                  return this }
 
   demandPresent():  this { if (! this.isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
 
-  demandFull():     this { if (! this.isFull)    { throw RefusalFuncs.partialLoad() }                          return this }
+  demandFull():     this { if (! this.isFull)    { throw RefusalFuncs.partialLoad() }                  return this }
 
   /** The full record in hand, or refuses 'bad_option' where it is sparse or a tombstone. */
   protected demandFullProps(): RecordT {

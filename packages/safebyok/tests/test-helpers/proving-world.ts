@@ -60,7 +60,7 @@ export type FakeDBFriend = LeaseDBFriend & {
   tryPutLease: Mock<LeaseDBFriend['tryPutLease']>
   tryDelLease: Mock<LeaseDBFriend['tryDelLease']>
   /** The record the slot keeps, null for none. Set it to seed one, whatever it is. */
-  cached:        unknown
+  cached:      unknown
   /** Every call the logger heard, oldest first. */
   logged:      LoggedCall[]
 }
@@ -76,7 +76,7 @@ export const fakeDBFriendOf = (): FakeDBFriend => {
   const friend: FakeDBFriend = {
     logger,
     logged:      calls,
-    cached:        null,
+    cached:      null,
     tryGetLease: vi.fn(() => Promise.resolve(good(friend.cached as LeaseRecord | null))),
     tryPutLease: vi.fn((record: LeaseRecord) => {
       friend.cached = record

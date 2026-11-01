@@ -48,8 +48,8 @@ export const useVaultWorlds = (): void => {
 const makeDeviceDB = () => {
   let cached: unknown = null
   return {
-    cachedNow:     () => cached,
-    cache:        (record: unknown) => { cached = record },
+    cachedNow:   () => cached,
+    cache:       (record: unknown) => { cached = record },
     tryGetLease: vi.fn((_scope: VaultScope) => ok(cached)),
     tryPutLease: vi.fn((record: unknown) => { cached = record; return ok(record) }),
     tryDelLease: vi.fn((_scope: VaultScope) => { cached = null; return ok(undefined) }),

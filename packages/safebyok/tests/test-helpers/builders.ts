@@ -16,7 +16,7 @@ import      { localVaultDB }                        from '../../src/local-vault-
 import type { VaultDB }                             from '../../src/vault-db'
 import      { good, valOf }                         from '../../src/outcome'
 import      { VaultError }                          from '../../src/errors'
-import * as RefusalFuncs                           from '../../src/helpers/refusal-funcs'
+import * as RefusalFuncs                            from '../../src/helpers/refusal-funcs'
 import      { Lease, sealLeaseRecord }              from '../../src/lease'
 import      { registerLeaseGetter }                 from '../../src/held-lease'
 import      { vaultRecordHeldBy }                   from '../../src/proving'
