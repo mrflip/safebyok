@@ -681,7 +681,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     const held = this.demandFullProps().gate
     if (! (patch instanceof GateStaging)) { return Promise.resolve({ ...base, gate: held }) }
     if (patch.ante !== held) { throw RefusalFuncs.gateMovedUnderChange({ stored_revision: MSX.revision.parse(this.central), staged_revision: MSX.revision.parse(base) }) }
-    return Promise.resolve({ ...base, gate_epoch: base.gate_epoch + 1, gate: patch.gate })
+    return Promise.resolve({ ...base, gate_epoch: this.gate_epoch + 1, gate: patch.gate })
   }
 
   /** A vault's life is its `vault_tok`. */

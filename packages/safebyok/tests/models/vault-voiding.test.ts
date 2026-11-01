@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import type { Gating } from '../../src/models/gating'
 import { type LeaseRecord, type VaultRecord, FirstGateEpoch } from '../../src/models/models-shapes'
@@ -44,6 +44,16 @@ describe("gate_epoch: where it starts and what moves it", () => {
     expect(demandStored().gate_epoch).to.eq(FirstGateEpoch)
     expect(vault.isUnlocked).to.be.true
     expect(lease.isInForce).to.be.true
+  })
+
+  it("moves by one, counted from the record stored, when a change refused at its put is followed by another", async () => {
+    const { vault, opts, demandStored } = await makeBornVault()
+    vi.spyOn(opts.store, 'put').mockImplementationOnce((record) => Promise.resolve({ scope: record, ok: false as const, err: new VaultError('unexpected_error', 'the vaultDB is gone'), world: null }))
+    await TH.expectRefusal(vault.replacePassphrase({ ...Replacing }), 'unexpected_error')
+    await vault.replacePassphrase({ passphrase: NewPassphrase, nextPassphrase: `${NewPassphrase} again` })
+    expect(demandStored().gate_epoch).to.eq(FirstGateEpoch + 1)
+    expect(vault.demandLease().gate_epoch).to.eq(FirstGateEpoch + 1)
+    expect(vault.demandLease().isInForce).to.be.true
   })
 })
 
