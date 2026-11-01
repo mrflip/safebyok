@@ -18,9 +18,10 @@
  * every agent at once.
  *
  * `scripts/ohai --hook` is the PreCompact hook in .claude/settings.json. Its input names only
- * the session, never the subagent compacting, so it logs the subagent whose transcript was
- * written last as its best guess, with that transcript's last context size. It always exits 0:
- * a hook that fails must not stand in a compaction's way.
+ * the session, never the subagent compacting, so it logs as its best guess the subagent with the
+ * largest context among those written to lately, with that context's size. A compaction by hand
+ * is the main session's, as is one with no such subagent. It always exits 0: a hook that fails
+ * must not stand in a compaction's way.
  *
  * Usage: scripts/ohai [--begin --role <role> [--sprint <s>] [--thread <n>] [--model <m>]
  *        [--effort <e>] [--branch <b>]] <what...>  |  scripts/ohai --hook
@@ -40,8 +41,10 @@ export type CompactGuess = { agentType: string | undefined, description: string 
 
 const Usage = 'Usage: scripts/ohai [--begin --role <role> [--sprint <s>] [--thread <n>] [--model <m>] [--effort <e>] [--branch <b>]] <what...>, eg scripts/ohai --begin --role thread-worker --sprint gripes --thread 3 --model claude-opus-5-5 building'
 const Unbegun: Singer = { role: 'an agent that did not --begin' }
-// A subagent transcript written this long before a compaction is taken to be the one compacting.
+// A subagent transcript written this long before a compaction may be the one compacting.
 const HookGuessWindowMs = 120_000
+// Compaction starts some 30k below a window of at least 100k, so a smaller context is not compacting.
+const HookGuessMinCtx = 70_000
 
 const pad2 = (num: number) => String(num).padStart(2, '0')
 
@@ -141,27 +144,32 @@ function subagentFilenames(dir: string): string[] | null {
   }
 }
 
-function guessCompacting(transcriptPath: string, sessionId: string, now: number): CompactGuess | null {
-  const dir = path.join(path.dirname(transcriptPath), sessionId, 'subagents')
-  const newest = subagentFilenames(dir)
-    ?.map((filename) => ({ filename, mtime: statSync(path.join(dir, filename)).mtimeMs }))
-    .toSorted((aa, bb) => bb.mtime - aa.mtime)[0]
-  if (!newest || now - newest.mtime > HookGuessWindowMs) { return null }
-  const where = path.join(dir, newest.filename)
-  const meta = (new Filer(where.replace(/\.jsonl$/, '.meta.json')).getJson() ?? {}) as { agentType?: string, description?: string }
-  let ctx: number | undefined
+function lastContext(where: string): number {
   const latestFirst = (new Filer(where).getText() ?? '').trimEnd().split('\n').toReversed()
   for (const line of latestFirst) {
     const usage = (JSON.parse(line) as { message?: { usage?: Record<string, number> } }).message?.usage
-    if (usage) { ctx = (usage['input_tokens'] ?? 0) + (usage['cache_read_input_tokens'] ?? 0) + (usage['cache_creation_input_tokens'] ?? 0); break }
+    if (usage) { return (usage['input_tokens'] ?? 0) + (usage['cache_read_input_tokens'] ?? 0) + (usage['cache_creation_input_tokens'] ?? 0) }
   }
-  return { agentType: meta.agentType, description: meta.description, ctx }
+  return 0
+}
+
+function guessCompacting(transcriptPath: string, sessionId: string, now: number): CompactGuess | null {
+  const dir = path.join(path.dirname(transcriptPath), sessionId, 'subagents')
+  const likeliest = subagentFilenames(dir)
+    ?.map((filename) => path.join(dir, filename))
+    .filter((where) => now - statSync(where).mtimeMs <= HookGuessWindowMs)
+    .map((where) => ({ where, ctx: lastContext(where) }))
+    .toSorted((aa, bb) => bb.ctx - aa.ctx)[0]
+  if (!likeliest || likeliest.ctx < HookGuessMinCtx) { return null }
+  const meta = (new Filer(likeliest.where.replace(/\.jsonl$/, '.meta.json')).getJson() ?? {}) as { agentType?: string, description?: string }
+  return { agentType: meta.agentType, description: meta.description, ctx: likeliest.ctx }
 }
 
 function runHook(now: number) {
   try {
     const input = JSON.parse(readFileSync(0, 'utf8')) as { session_id?: string, transcript_path?: string, trigger?: string }
-    const guess = input.transcript_path && input.session_id ? guessCompacting(input.transcript_path, input.session_id, now) : null
+    const byHand = input.trigger === 'manual'
+    const guess = !byHand && input.transcript_path && input.session_id ? guessCompacting(input.transcript_path, input.session_id, now) : null
     const [who, what] = hookBlurb(input, guess)
     logFiler().appendLine(ohaiLine(now, null, who, what))
   } catch {
