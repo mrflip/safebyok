@@ -1,6 +1,5 @@
-import { VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { decorate, tattoo } from '../helpers'
-import * as Phrases from '../phrases'
 import { type AttemptClosure, type GateProps, type PasskeyClosure, type PasskeyWayinRecord, type PassphraseClosure, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, gateProps, passkeyAddArgs, passkeyRevokeArgs, passphraseReplaceArgs, vaultStamp } from './models-shapes'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import { Wayin } from './wayin'
@@ -46,7 +45,7 @@ export class Gate {
   /** Ask the proof through `attemptProof` and answer the proving where it is the passphrase's: a change to the gate is proved by the passphrase alone, so a passkey's answer that opens refuses 'bad_option', spent. */
   async #provePassphrase(proofClosure: AttemptClosure, world: ProvingWorld): Promise<PassphraseProving> {
     const proved = await this.attemptProof(proofClosure, world)
-    if (! (proved instanceof PassphraseProving)) { throw changeNeedsPassphrase() }
+    if (! (proved instanceof PassphraseProving)) { throw RefusalFuncs.changeNeedsPassphrase() }
     return proved
   }
 
@@ -63,7 +62,7 @@ export class Gate {
   /** The props of the next gate, once `proofClosure` proves this one by its passphrase: a passkey wayin for the passkey whose answer `passkeyClosure` hands in, sealed from that proving. A gate that holds a passkey refuses 'bad_option' before asking anything. */
   async withPasskeyAdded(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure, world: ProvingWorld): Promise<GateProps> {
     passkeyAddArgs.parse({ proofClosure, passkeyClosure })
-    if (this.pkWayin !== null) { throw passkeyHeldAlready() }
+    if (this.pkWayin !== null) { throw RefusalFuncs.passkeyHeldAlready() }
     const proved = await this.#provePassphrase(proofClosure, world)
     const proving = await PasskeyProving.makeFromClosure(this.stamp, passkeyClosure, world)
     const passkey = await proving.makeWayin(proved)
@@ -73,7 +72,7 @@ export class Gate {
   /** The props of the next gate, once `proofClosure` proves this one by its passphrase: the passphrase wayin as stored, and no passkey wayin. A gate without a passkey refuses 'absent_wayin' before asking anything. */
   async withPasskeyRevoked(proofClosure: AttemptClosure, world: ProvingWorld): Promise<GateProps> {
     passkeyRevokeArgs.parse({ proofClosure })
-    if (this.pkWayin === null) { throw noPasskeyToRevoke() }
+    if (this.pkWayin === null) { throw RefusalFuncs.noPasskeyToRevoke() }
     await this.#provePassphrase(proofClosure, world)
     return gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: null })
   }
@@ -89,13 +88,4 @@ export class Gate {
     return { passphrase_wayin: this.ppWayin.toJSON(), passkey_wayin: this.pkWayin?.toJSON() ?? null }
   }
 }
-// --
-
-// == [Refusals]: changeNeedsPassphrase, passkeyHeldAlready, noPasskeyToRevoke
-
-const changeNeedsPassphrase = (): VaultError => new VaultError('bad_option', Phrases.GateChangeNeedsPassphrase)
-
-const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
-
-const noPasskeyToRevoke = (): VaultError => new VaultError('absent_wayin', Phrases.NoPasskeyToRevoke)
 // --

@@ -2,8 +2,7 @@
 
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
-import { alreadyHeldError } from '../helpers/throwers'
-import * as Phrases from '../phrases'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import { Listing, hasRevision } from './listing'
@@ -49,10 +48,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** Build the vault of `input`, hold it, and resolve it; stores nothing. A record is delivered as the base's `build` delivers one, and takes no `proofClosure`: its gate is the one it carries, and one handed with it refuses 'bad_option'. A dna takes the `proofClosure` its gate is built from, before the vault is born: a closure refused, or none, holds nothing, and a dna for a scope already held refuses 'bad_option' before the closure is asked anything. A vault born of a dna is born unlocked, under a lease its passphrase proving grants. */
   override async build(input: VaultDna | Fetched<VaultRecord, VaultSparse>, proofClosure?: ProofClosure): Promise<Vault> {
     if (hasRevision(input)) {
-      if (proofClosure !== undefined) { throw closureWithRecord() }
+      if (proofClosure !== undefined) { throw RefusalFuncs.closureWithRecord() }
       return super.build(input)
     }
-    if (this.at(input) !== null) { throw alreadyHeldError() }
+    if (this.at(input) !== null) { throw RefusalFuncs.alreadyHeld() }
     const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
     const vault = this.holdDraft(draft)
     vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
@@ -103,7 +102,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   absentRefusal(scope: VaultScope): VaultError {
-    return new VaultError('absent_vault', Phrases.vaultAbsent(scope.vaultlabel))
+    return RefusalFuncs.vaultAbsent(scope.vaultlabel)
   }
 
   /** The record `meta.vault_stored` carries, where it is a record of these forms; else null. */
@@ -114,9 +113,4 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 }
-// --
-
-// == [Refusals]: closureWithRecord
-
-const closureWithRecord = (): VaultError => new VaultError('bad_option', Phrases.ClosureWithRecord)
 // --

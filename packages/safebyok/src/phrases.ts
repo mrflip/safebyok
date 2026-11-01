@@ -371,7 +371,7 @@ export const ProofClosureThrew = "The proof closure threw rather than handing ba
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, NeedVaultUnlocked, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, boxAbsent, ClosureWithRecord
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
@@ -386,9 +386,9 @@ export const UndecodedWhisper = "That box opened, but what was inside is not a w
 export const LeaseNotInForce = "This lease is no longer in force -- its time ran out, or it was forgotten when the vault locked -- so nothing was read or written: unlock the vault again."
 
 /** Why a call that needs the vault unlocked is refused while it is locked. */
-export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
+export const NeedVaultUnlocked = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
 
-/** Why a locked vault with no lease kept is not unlocked without a proof. */
+/** Why a locked vault with no lease cached is not unlocked without a proof. */
 export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
 
 /** Why a vault takes up no lease of another vault, or granted to another Vault object. */
@@ -396,6 +396,9 @@ export const LeaseOfOtherHolder = "This lease was granted to another vault, or t
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
+
+/** Why a box absent from storage is refused, by its boxlabel. */
+export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
 
 /** Why a vault built of a record takes no proof closure. */
 export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."

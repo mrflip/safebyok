@@ -26,7 +26,7 @@ import * as Phrases from './phrases'
 import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type GuardedRequestCleartext, type VaultParts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
-import { lockedError } from './helpers/throwers'
+import * as RefusalFuncs from './helpers/refusal-funcs'
 import { type DeviceDB, deviceRecordOf } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { KeptLease, Lease } from './lease'
@@ -1194,13 +1194,13 @@ export class Vault implements VaultStamp {
   #leaseRefusal(): VaultError | null {
     if (this.#leaseInForce() !== null) { return null }
     if (this.#lease !== null) { this.#dropLease() }
-    return lockedError()
+    return RefusalFuncs.vaultLocked()
   }
 
   /** The lease in hand, for `call` about to use it, demanded consistent with the picture and in force: 'vault_locked' with none. */
   #demandLease(call: VaultCall): Lease {
     const lease = this.#lease
-    if (lease === null) { throw lockedError() }
+    if (lease === null) { throw RefusalFuncs.vaultLocked() }
     this.#demand(lease, { leaseBound: true, call })
     return lease
   }

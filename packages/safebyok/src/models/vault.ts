@@ -1,5 +1,5 @@
 import { consistent, verifyConsistent } from '../checks/validator'
-import { type RefusalMeta, VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
@@ -170,14 +170,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
 
   /** The lease the vault holds; a locked vault refuses 'vault_locked'. */
   demandLease(): Lease {
-    if (this.#isLocked || this.#lease === null) { throw unlockFirst() }
+    if (this.#isLocked || this.#lease === null) { throw RefusalFuncs.needVaultUnlocked() }
     return this.#lease
   }
 
   /** Hold `lease` as the vault's lease, letting go any it held: the vault reads unlocked. A lease of another vault, or granted another Vault object, refuses 'bad_option'; one not in force, 'vault_locked'. */
   takeUpLease(lease: Lease): Lease {
-    if (lease.vault !== this || ! consistent(MSX.vaultStamp.parse(lease), MSX.vaultStamp.parse(this))) { throw leaseOfOtherHolder() }
-    if (! lease.isInForce) { throw leaseNotInForce() }
+    if (lease.vault !== this || ! consistent(MSX.vaultStamp.parse(lease), MSX.vaultStamp.parse(this))) { throw RefusalFuncs.leaseOfOtherHolder() }
+    if (! lease.isInForce) { throw RefusalFuncs.leaseNotInForce() }
     return this.#setLease(lease)
   }
 
@@ -197,7 +197,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     const held = this.#lease
     if (held?.isInForce) { return held }
     if (proofClosure !== undefined) { this.#unlocking ??= this.#unlockAlone(proofClosure) }
-    if (this.#unlocking === null) { throw noProofToUnlock() }
+    if (this.#unlocking === null) { throw RefusalFuncs.noProofToUnlock() }
     return this.#unlocking
   }
 
@@ -335,7 +335,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     const { base } = this.makeStagedBase()
     const held = this.demandFullProps().gate
     if (! (patch instanceof GateStaging)) { return Promise.resolve({ ...base, gate: held }) }
-    if (patch.ante !== held) { throw gateMovedUnderChange({ stored_revision: MSX.revision.parse(this.central), staged_revision: MSX.revision.parse(base) }) }
+    if (patch.ante !== held) { throw RefusalFuncs.gateMovedUnderChange({ stored_revision: MSX.revision.parse(this.central), staged_revision: MSX.revision.parse(base) }) }
     return Promise.resolve({ ...base, gate: patch.gate })
   }
 
@@ -355,18 +355,4 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 }
-// --
-
-// == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce, gateMovedUnderChange
-
-const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
-
-const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
-
-const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
-
-const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
-
-/** The 'stale_write' of a gate change proved against a record that moved meanwhile, its `meta` the revisions `movedUnderEditError` carries. */
-const gateMovedUnderChange = (meta: RefusalMeta): VaultError => new VaultError('stale_write', Phrases.GateMovedUnderChange, { meta })
 // --

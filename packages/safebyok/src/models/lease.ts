@@ -1,11 +1,10 @@
 import { consistent } from '../checks/validator'
 import { FarFuture } from '../consts'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
-import { VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { adorn, tattoo } from '../helpers'
 import { type IntervalMillis, Trigger } from '../helpers/trigger'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
-import * as Phrases from '../phrases'
 import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type LeaseVault, type SealedWhisper, type VaultStamp, LeaseFormat, leaseGetArgs, leaseGrantArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, serializedBytes, vaultStamp } from './models-shapes'
 
 // == [Lease]
@@ -146,7 +145,7 @@ export class Lease implements LeaseStamp {
       const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, boxKeyCtx, { extractable: false, usage: ['decrypt'] })
       return await decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
     } catch {
-      throw unopenedWhisper()
+      throw RefusalFuncs.unopenedWhisper()
     }
   }
 
@@ -160,7 +159,7 @@ export class Lease implements LeaseStamp {
 
   /** The record, while the lease is in force: past `autolock_at`, or forgotten, refuses 'vault_locked'. */
   #demandRecord(): LeaseRecord {
-    if (this.#record === null || ! this.#autolock.isTimely) { throw leaseNotInForce() }
+    if (this.#record === null || ! this.#autolock.isTimely) { throw RefusalFuncs.leaseNotInForce() }
     return this.#record
   }
 
@@ -168,7 +167,7 @@ export class Lease implements LeaseStamp {
   async #vaultKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
     const { lease_key, vault_key_lease_wrapped } = this.#demandRecord()
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
-    const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), damagedLease)
+    const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), RefusalFuncs.damagedLease)
     if (! opened.ok) {
       // Locking drops the vault's lease and erases the kept one by scope; this one is evicted too, should the vault hold another.
       this.vault.lock()
@@ -189,13 +188,4 @@ const eraseKept = async (dbfriend: LeaseDBFriend, call: string): Promise<void> =
   const del = await dbfriend.tryDelLease()
   if (! del.ok) { dbfriend.logger.warn("This device's lease could not be erased: the next grant writes over it.", { call, refusalkind: del.err.refusalkind }) }
 }
-// --
-
-// == [Refusals]: damagedLease, unopenedWhisper, leaseNotInForce
-
-const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
-
-const unopenedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UnopenedWhisper)
-
-const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --

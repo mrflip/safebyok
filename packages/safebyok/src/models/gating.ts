@@ -1,9 +1,9 @@
 import { noop } from 'es-toolkit'
 import { VaultError } from '../errors'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { adorn, tattoo } from '../helpers'
 import type { VaultLogger } from '../logger'
 import { type Outcome, bad, good, outcomeOf, valOf } from '../outcome'
-import * as Phrases from '../phrases'
 import { type VaultScope, vaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
 import type { CleartextsForGatingkind, GatingKind, StrengthChecker } from './models-shapes'
@@ -79,7 +79,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   static replacePassphrase(vault: Vault, world: GatingWorld): Promise<Vault> {
     return this.#ask('replace_passphrase', vault.scope, vault, world, async (handed) => {
       const { passphrase, nextPassphrase } = MSX.passphraseReplaceCleartexts.parse(handed)
-      if (passphrase === nextPassphrase) { throw samePassphrase() }
+      if (passphrase === nextPassphrase) { throw RefusalFuncs.samePassphrase() }
       await checkStrength(world, nextPassphrase, vault.scope)
       return vault.replacePassphrase(() => ({ passphrase }), () => ({ passphrase: nextPassphrase }))
     })
@@ -107,20 +107,20 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 
   static async #ask(gatingkind: GatingKind, scope: VaultScope, vault: Vault | null, world: GatingWorld, run: Run): Promise<Vault> {
     const { requestCleartext } = MSX.gatingWorld.parse(world) as GatingWorld
-    if (requestCleartext === undefined) { throw noRequestCleartext() }
+    if (requestCleartext === undefined) { throw RefusalFuncs.noRequestCleartext() }
     let settle: (outcome: Outcome<Vault>) => void = noop
     const settled = new Promise<Outcome<Vault>>((resolve) => { settle = resolve })
     const gating = new Gating(gatingkind, scope, vault, run, settled, settle)
     const heard = await hearRequestCleartext(requestCleartext, gating)
     await gating.#attempting
-    gating.#settleOnce(heard.ok ? bad(gatingDeclined()) : heard)
+    gating.#settleOnce(heard.ok ? bad(RefusalFuncs.gatingDeclined()) : heard)
     return valOf(await gating.#settled)
   }
 
   get isOpen(): boolean { return this.#outcome === null }
 
   attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome<Vault>> {
-    if (this.#outcome !== null) { return Promise.resolve(bad(gatingSettled())) }
+    if (this.#outcome !== null) { return Promise.resolve(bad(RefusalFuncs.gatingSettled())) }
     const attempting = this.#attemptOnce(cleartexts)
     this.#attempting = attempting
     return attempting
@@ -133,7 +133,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
 
   decline(): void {
-    this.#settleOnce(bad(gatingDeclined()))
+    this.#settleOnce(bad(RefusalFuncs.gatingDeclined()))
   }
 
   #settleOnce(outcome: Outcome<Vault>): void {
@@ -156,42 +156,23 @@ const hearRequestCleartext = async (requestCleartext: RequestCleartext, gating: 
     await requestCleartext(gating)
     return good(undefined)
   } catch {
-    return bad(requestCleartextThrew())
+    return bad(RefusalFuncs.requestCleartextThrew())
   }
 }
 
 const checkStrength = async (world: GatingWorld, passphrase: string, scope: VaultScope): Promise<void> => {
   const verdict = await verdictOf(world.strengthChecker, passphrase, scope)
-  if (! verdict.success) { throw notAVerdict() }
-  if (! verdict.data.strong) { throw weakPassphrase(verdict.data.reason) }
+  if (! verdict.success) { throw RefusalFuncs.notAVerdict() }
+  if (! verdict.data.strong) { throw RefusalFuncs.weakPassphrase(verdict.data.reason) }
 }
 
 const verdictOf = async (strengthChecker: StrengthChecker, passphrase: string, scope: VaultScope): Promise<ReturnType<typeof VX.passphraseVerdict.safeParse>> => {
   try {
     return VX.passphraseVerdict.safeParse(await strengthChecker(passphrase, scope))
   } catch {
-    throw strengthCheckerThrew()
+    throw RefusalFuncs.strengthCheckerThrew()
   }
 }
 
 const isCorrectable = (err: VaultError): boolean => (MSX.correctableKindVals as readonly string[]).includes(err.refusalkind)
-// --
-
-// == [Refusals]: noRequestCleartext, requestCleartextThrew, gatingDeclined, gatingSettled, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
-
-const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrases.NoRequestCleartext)
-
-const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
-
-const gatingDeclined = (): VaultError => new VaultError('vault_locked', Phrases.GatingDeclined)
-
-const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)
-
-const strengthCheckerThrew = (): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerThrew)
-
-const notAVerdict = (): VaultError => new VaultError('bad_option', Phrases.NotAVerdict)
-
-const weakPassphrase = (reason: string): VaultError => new VaultError('weak_passphrase', reason)
-
-const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)
 // --

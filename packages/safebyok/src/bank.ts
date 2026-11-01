@@ -2,7 +2,7 @@ import type { BankBag, BankScope, VaultBag, VaultScope } from './shapes/scopes'
 import type { Lifecycled, Refused } from './types/type-aliases'
 import { VaultFormat, type VaultDraft } from './shapes/vault'
 import { VaultError, isVaultError } from './errors'
-import { goneError, otherStoresError, behindError } from './helpers/throwers'
+import * as RefusalFuncs from './helpers/refusal-funcs'
 import { type Outcome, good, outcomeOf, refusalOf, valOf } from './outcome'
 import { randomId } from './crypto'
 import * as Scopepath from './scopepath'
@@ -518,7 +518,7 @@ export class Bank {
     // Let go while it was born: the Vault object goes with it, and the caller hears so.
     if (this.#entries.get(vaultScopepath) !== entry) {
       if (born.ok) { born.val[letGo]() }
-      throw goneError()
+      throw RefusalFuncs.vaultGoneWhileOpening()
     }
     entry.birth = null
     if (born.ok) {
@@ -569,7 +569,7 @@ export class Bank {
     const [ensured, leaseKept] = await Promise.all([parts.vaultDB.tryEnsureVault(draftOf(scope, refreshedAt)), KeptLease.tryGet(deviceDB, scope, { logger: parts.logger, call: 'hello' })])
     this.#demandHeld(vaultScopepath, entry)
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
-    if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw behindError() }
+    if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw RefusalFuncs.vaultBehindWhileOpening() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
     const raising = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
@@ -581,7 +581,7 @@ export class Bank {
 
   /** Refuse 'vault_gone' once `entry` is no longer the one the bank holds for `vaultScopepath`: let go, or let go and asked for anew. What a birth asks after each wait. */
   #demandHeld(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry) {
-    if (this.#entries.get(vaultScopepath) !== entry) { throw goneError() }
+    if (this.#entries.get(vaultScopepath) !== entry) { throw RefusalFuncs.vaultGoneWhileOpening() }
   }
 
   /** Erase this device's lease of `parts`' scope, after a birth refused for storage it cannot trust: a device store that will not erase it is warned of, as the refusal is what the caller must hear. */
@@ -659,7 +659,7 @@ const refusedBankVault = (scope: VaultScope, err: VaultError): BankVault => Obje
  * is another store, even over the same backend.
  */
 const checkSameStores = (held: HeldEntry, parts: VaultParts) => {
-  if (parts.vaultDB !== held.vaultDB || parts.deviceDB !== held.deviceDB) { throw otherStoresError() }
+  if (parts.vaultDB !== held.vaultDB || parts.deviceDB !== held.deviceDB) { throw RefusalFuncs.otherStoresThanHeld() }
 }
 
 /** The novel vault record a birth hands `VaultDB.ensureVault`, built from `scope`'s parsed names: stored only where no vault is stored, as a new life with a fresh `vault_tok`. */
