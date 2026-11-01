@@ -9,7 +9,7 @@ on #426 (thread 1). Justify: green, 7029 passed, 220 skipped, every package.
       atomic read-and-swap of a row, which answers the row it read), `doFindRows`, and
       `doWatch` (a noop by default).
     * `vaultStore(bankScope)` and `boxStore(vaultScope)` answer a `FrontedStore`, which is a
-      models `Store` plus `delUnparsed`.
+      models `Store` plus `delDamaged`.
     * `localStoreFront({ store })` serves the front from a `StringStore`, with JSON rows.
   * The front does the work, so an adapter only moves rows:
     * It checks a put or del against the stored `revision_tok` and refuses a stale one with
@@ -19,7 +19,7 @@ on #426 (thread 1). Justify: green, 7029 passed, 220 skipped, every package.
       judged on what was stored.
   * `del(scope, priorRevisionTok)` is conditional on `revision_tok`, and stores a 'x'
     tombstone. Over no row, with a null tok, it lands nothing and answers null.
-  * `delUnparsed(scope)` is the unconditional seam for thread 8: inside the same swap, it
+  * `delDamaged(scope)` is the unconditional seam for thread 8: inside the same swap, it
     removes the row only while it still reads as damaged. It answers null where it removed the
     row, and what is stored where it did not.
   * Damaged rows: a row that reads as neither record nor tombstone, or whose scope disagrees with
@@ -65,6 +65,11 @@ on #426 (thread 1). Justify: green, 7029 passed, 220 skipped, every package.
     is what `hello` expects.
   * **The size budget is unchanged.** "everything" grows from 62.12 to 62.2 kB, and no rule
     moves. Every "raise" the script prints was already there on the base.
+* **Rework after review**: `delUnparsed` became `delDamaged`, to match `damaged_box`,
+  `damaged_vault` and thread 8's `delDamagedVault` (`DeviceDB`'s existing `doDelUnparsed` hook is
+  untouched: it is not this thread's, and a host-facing abstract method). The changeset is
+  trimmed to what ships: the two `Scopepath` exports, and a line that the store front is not yet
+  exported from any entry point (still `minor`).
 * **Deviations**:
   * **The del over no row now answers null**, per the Store doc I rewrote. The fake in
     `tests/test-helpers/models-world.ts` still lands a revision-0 tombstone there, and I left it
@@ -83,13 +88,14 @@ on #426 (thread 1). Justify: green, 7029 passed, 220 skipped, every package.
   * **The box store does no `vault_tok` gating**, which the old `putBox` did. Where that gating
     goes (thread 3a's gating, or the listing) is open.
   * **A local row written by the old `localVaultDB` reads as damaged** under the front, since its
-    shape differs. Pre-1.0 that is fail-safe, and the changeset says so.
+    shape differs. Pre-1.0 that is fail-safe. (The changeset no longer says so: the front ships
+    unexported, so no host can meet it yet. Thread 9's, or whichever exports the front, should.)
   * **Unverified**: a forced hydrate on a locked vault, after watch trouble, may tell
     `vault_locked` as bad news.
   * **Lib target**: it has no iterator helpers (`map.keys().some`), so a loop stands in.
 * **For the Coach**:
   * Rule on `identity_revoked` versus a new `signed_out`.
-  * Rule on `delUnparsed` as the unconditional delete. The alternative is `del(scope, null)`
+  * Rule on `delDamaged` as the unconditional delete. The alternative is `del(scope, null)`
     meaning "whatever is there", which would lose the guard against deleting a good row.
   * Rule on whether the models-world fake should follow the del-null doc now, or in the
     listing's thread.
