@@ -3,7 +3,6 @@ import { Bank, DefaultPesterMillis, DefaultRefreshMillis } from '../../src/model
 import { DefaultLeaseMillis } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
-import { testDeriver } from '../test-helpers/builders'
 import { Dna, T0, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
@@ -63,7 +62,7 @@ describe("Bank.hello and the bank's lifecycle", () => {
   it("awaits the key deriver's load bare: a load that fails refuses with its own error, the bank reads 'refused', and tryHello's Outcome carries it", async () => {
     const trouble = new Error("the wasm would not load")
     const load = vi.fn().mockRejectedValueOnce(trouble).mockRejectedValueOnce(trouble).mockResolvedValue(undefined)
-    const { bank } = makeBankWorld(null, { keyDeriver: { ...testDeriver, load } })
+    const { bank } = makeBankWorld(null, { keyDeriver: { ...TH.testDeriver, load } })
     await expect(bank.hello()).rejects.to.eq(trouble)
     expect(bank.snapshot.lifecycle).to.eq('refused')
     const answer = await bank.tryHello()
@@ -76,7 +75,7 @@ describe("Bank.hello and the bank's lifecycle", () => {
 
   it("joins a hello in flight, loading the deriver once, and stays 'ready' through another", async () => {
     const load = vi.fn(() => Promise.resolve())
-    const { bank } = makeBankWorld(null, { keyDeriver: { ...testDeriver, load } })
+    const { bank } = makeBankWorld(null, { keyDeriver: { ...TH.testDeriver, load } })
     const seen: string[] = []
     bank.subscribe(() => { seen.push(bank.snapshot.lifecycle) })
     await Promise.all([bank.hello(), bank.hello()])
