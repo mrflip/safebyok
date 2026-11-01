@@ -1,25 +1,35 @@
 import { Mutex } from 'es-toolkit'
+import { MinuteMillis } from '../consts'
 import { consistent, verifyConsistent } from '../checks/validator'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
+import type { BoxSnapshot } from './box'
 import type { BoxWorld } from './box-listing'
 import { Gate } from './gate'
 import { type AnyGating, type GatingWorld, Gating } from './gating'
 import { Lease } from './lease'
-import type { AttemptCleartexts, CleartextsForGatingkind, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { AttemptCleartexts, CleartextsForGatingkind, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse, VaultTrouble } from './models-shapes'
 import * as MSX from './models-shapes'
 import { spendAnswer, spendAnswerAfter } from './proving'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
 
-// == [Record forms]: DefaultLeaseMillis, VaultSnapshot, VaultPatch, GateStaging
+// == [Record forms]: DefaultLeaseMillis, DefaultPesterMillis, VaultSnapshot, VaultPatch, GateStaging
 
 /** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
-export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
+export const DefaultLeaseMillis = 14 * 24 * 60 * MinuteMillis
 
+/** How often the user is asked for the passphrase where the world names no `pesterMillis`: seven days. */
+export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
+
+/** A vault as a host renders it, frozen, and the same object until what it shows changes. It carries no secret material: no whisper, key or cleartext, and of the gate only whether it holds a passkey.
+ * `full`, and so `hasPasskey`, is false and null while the vault is held sparse; `autolock_at` is
+ * null while it is locked; `refreshedAt` is null until storage first confirms its record. `boxes`
+ * is empty: the vault holds no box listing yet.
+ */
 export type VaultSnapshot = VaultScope & Readonly<{
   vault_tok:     string
   revision_tok:  string
@@ -27,7 +37,20 @@ export type VaultSnapshot = VaultScope & Readonly<{
   registered_at: number
   written_at:    number
   present:       boolean
+  full:          boolean
+  lockState:     LockState
+  autolock_at:   number | null
+  hasPasskey:    boolean | null
+  boxes:         readonly BoxSnapshot[]
+  refreshedAt:   number | null
+  trouble:       VaultTrouble | null
 }>
+
+/** The snapshot's boxes while the vault holds no box listing. */
+const NoBoxes: readonly BoxSnapshot[] = Object.freeze([])
+
+/** The snapshot's trouble for a vault whose stored record is damaged. */
+const DamagedVaultTrouble: VaultTrouble = Object.freeze({ refusalkind: 'damaged_vault', message: Phrases.VaultStoredDamaged })
 
 /** A host's patch for `edit` and `send`: any prop of the vault's record, each checked and all ignored, the gate included, so `{}` or `{ ...record }` will do and a patch only moves the revision. `vaultPatch` checks it. */
 export type VaultPatch = { [Prop in keyof VaultRecord]?: VaultRecord[Prop] | undefined }
@@ -250,12 +273,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Unlocking]: isUnlocked, leaseMillis, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, unlock, joinUnlocking, attemptThrough, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
+  // == [Unlocking]: isUnlocked, leaseMillis, autolockMinutes, pesterMinutes, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, each host's verb with its try form, unlock, joinUnlocking, attemptThrough, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
   /** How long a lease granted this vault lasts: the world's `leaseMillis`, else {@link DefaultLeaseMillis}. */
   get leaseMillis(): number { return this.world.leaseMillis ?? DefaultLeaseMillis }
+
+  /** How long a lease granted this vault lasts, in minutes, as a host's settings show it. */
+  get autolockMinutes(): number { return this.leaseMillis / MinuteMillis }
+
+  /** How often the user is asked for the passphrase, in minutes: the world's `pesterMillis`, else {@link DefaultPesterMillis}. */
+  get pesterMinutes(): number { return (this.world.pesterMillis ?? DefaultPesterMillis) / MinuteMillis }
 
   /** The lease in force, unlocking first where there is none: through the lease this device keeps, else the unlock in flight, else `cleartexts`, else by asking the user through an 'unlock_vault' gating. A lease held past its time locks the vault first.
    * A caller that joins an unlock in flight shares its outcome, a refusal included. Where that
@@ -279,6 +308,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     })
   }
 
+  tryEnsureUnlocked(cleartexts?: AttemptCleartexts): Promise<Outcome<Lease>> { return outcomeOf(() => this.ensureUnlocked(cleartexts)) }
+
   /** The lease the vault holds; a locked vault refuses 'vault_locked'. */
   demandLease(): Lease {
     if (this.#isLocked || this.#lease === null) { throw RefusalFuncs.needVaultUnlocked() }
@@ -292,12 +323,16 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.#setLease(lease)
   }
 
+  tryTakeUpLease(lease: Lease): Promise<Outcome<Lease>> { return outcomeOf(() => this.takeUpLease(lease)) }
+
   /** Take up the lease this device keeps of the vault, where the vault holds none and the one cached is in force; a refused look is told as bad news. */
   takeUpCachedLease(): Promise<Lease | null> {
     if (this.#lease !== null) { return Promise.resolve(null) }
     this.#cachedLookup ??= this.#lookUpCached()
     return this.#cachedLookup
   }
+
+  tryTakeUpCachedLease(): Promise<Outcome<Lease | null>> { return outcomeOf(() => this.takeUpCachedLease()) }
 
   async #unlock(cleartexts?: AttemptCleartexts): Promise<Lease> {
     const inFlight = this.#unlocking
@@ -422,6 +457,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
+  tryLock(): Promise<Outcome<void>> { return outcomeOf(() => { this.lock() }) }
+
   /** Let the vault's lease go, the vault reading locked, a gating of it still asking declined, and the lease this device keeps left for the next load: the listing's goodbye, where `lock()` erases. */
   letLeaseGo(): void {
     this.#dropLease()?.evict()
@@ -507,7 +544,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** A vault's life is its `vault_tok`. */
   protected lifeTokPathOf({ vault_tok }: Fetched<VaultRecord, VaultSparse>): string { return vault_tok }
 
+  /** Builds no Gate, which checks the wayins: a wayin stored damaged leaves the snapshot whole. */
   protected makeSnapshot(): VaultSnapshot {
+    const full = this.isFull
     return Object.freeze({
       ...this.scope,
       vault_tok:     this.vault_tok,
@@ -516,6 +555,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
       registered_at: this.registered_at,
       written_at:    this.written_at,
       present:       this.isPresent,
+      full,
+      lockState:     this.lockState(),
+      autolock_at:   this.#lease?.autolock_at ?? null,
+      hasPasskey:    full ? this.demandFullProps().gate.passkey_wayin !== null : null,
+      boxes:         NoBoxes,
+      refreshedAt:   this.refreshedAt,
+      trouble:       this.am === 'd' ? DamagedVaultTrouble : null,
     })
   }
   // --

@@ -17,10 +17,11 @@ import { type VaultSnapshot, Vault } from './vault'
 
 /** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate, lease and gatings need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
 export type VaultWorld = ListingWorld & GateWorld & GatingWorld & {
-  scope:       BankScope
-  logger:      VaultLogger
-  leaseMillis?: LeaseGrantOpts['leaseMillis']
-  deviceDB:    LeaseDeviceDB
+  scope:         BankScope
+  logger:        VaultLogger
+  leaseMillis?:  LeaseGrantOpts['leaseMillis']
+  pesterMillis?: number
+  deviceDB:      LeaseDeviceDB
 }
 
 /** The vaultDB's vault verbs, as this listing calls them. */

@@ -17,12 +17,10 @@ import { Gating, type GatingWorld, type RequestCleartext } from './gating'
 import type { BankDeviceDB, Cleartexts, LockState, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
 import { spendAnswerAfter } from './proving'
-import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
+import { DefaultLeaseMillis, DefaultPesterMillis, type Vault, type VaultSnapshot } from './vault'
 import { type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultPesterMillis, DefaultRefreshMillis, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
-
-export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
+// == [Given to a bank]: DefaultRefreshMillis, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
 
@@ -69,7 +67,7 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly requestCleartext: RequestCleartext
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
-  // GAP: vault-listing.ts `VaultWorld` and models-shapes.ts `vaultListingOpts` name no `pesterMillis`; the vault's pester trigger would read it as `autolock` reads `leaseMillis`, and offer `pesterMinutes` as a getter.
+  // GAP: no pester trigger reads it yet; the vault offers it as `pesterMinutes`.
   readonly pesterMillis:     number
   // GAP: the box listing a vault makes would take `boxRefreshMillis` as its `maxMillisSinceRefresh`; no vault makes one yet.
   readonly boxRefreshMillis: number

@@ -141,9 +141,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   toJSON(): SparseT { return this.sparse }
   // --
 
-  // == [States]: isTimely, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, hasStaged, isWatchable
+  // == [States]: isTimely, refreshedAt, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, hasStaged, isWatchable
 
   get isTimely(): boolean { return this.#trigger.isTimely }
+
+  /** When storage last confirmed the record in hand, null before it first has: what a snapshot shows as its freshness. */
+  protected get refreshedAt(): number | null { return this.#trigger.timing.lastSucceededAt }
 
   get isLocked(): boolean { return this.listing.lockState() === 'locked' }
 
@@ -358,7 +361,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
-   * `reconcileCentral` judges it; on 'older', 'same' or 'skip' the receive ends there, but for a deletion at the revision
+   * `reconcileCentral` judges it; on 'older', 'same' or 'skip' nothing is adopted, and only the snapshot's freshness may move, but for a deletion at the revision
    * held met by the staged tombstone of a `del`, which is spent: the staged is dropped, and the thing settles. Otherwise
    * `reconcileStaged` judges the staged against the new central, both are adopted, and the thing settles. A record not
    * older than central notes success where, once it is taken in, the record in hand is whole, so a sparse one that only
@@ -378,7 +381,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       this.adopt(central, null)
     }
     if (! older && this.#isWhole) { this.#trigger.taskCompleted() }
-    return (delSpent || act.success) ? this.settle() : { badnews: [] }
+    if (delSpent || act.success) { return this.settle() }
+    // A receive that only confirms the record in hand moves the snapshot's freshness, where it shows one, and nothing the device cache keeps.
+    this.#replaceSnapshot()
+    return { badnews: [] }
   }
 
   // Every adopt is followed by a settle, which the snapshot and the device cache are made from: an adopt left unsettled would leave both behind.

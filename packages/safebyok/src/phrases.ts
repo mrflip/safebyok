@@ -266,13 +266,16 @@ export const VaultGoneWhileGettingBox = "The vault this device held was deleted,
 export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
 // --
 
-// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, BadNewsHandlerThrew
+// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, VaultStoredDamaged, BadNewsHandlerThrew
 
 /** Bad news of a box stored damaged, which its meta.box_listed names. */
 export const BoxStoredDamaged = "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it."
 
 /** Bad news of a wayin stored damaged, which its meta.wayin_listed names. */
 export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
+
+/** A vault's trouble where its stored record is damaged, as its snapshot shows it. */
+export const VaultStoredDamaged = "This vault's stored record is damaged, so no vault unlocker (passphrase or passkey) can be tried against it, and the vault can't be opened or changed. It was left as it is: restore it from a backup, or, if the user chooses to start over, delDamagedVault() clears it."
 
 /** Why the vault's trouble holds a throw from the host's onBadNews handler. */
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."

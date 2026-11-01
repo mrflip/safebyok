@@ -48,8 +48,8 @@ export type GatingOpts<KindT extends GatingKind = GatingKind> = {
   run:   (cleartexts: CleartextsForGatingkind[KindT]) => Promise<Vault>
 }
 
-/** A gating as the host's state wants it: its kind and the scope of its vault. */
-export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
+/** A gating as the host's state wants it: its kind, the scope of its vault, and whether that vault has a passkey to offer, as the vault's snapshot shows it. */
+export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind, hasPasskey: boolean }>
 
 /** Stays here: it names the class. */
 const Checks = Checkers('bad_option', ({ obj, fn, custom }) => ({
@@ -207,7 +207,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     return { applabel, user_id, vaultlabel }
   }
 
-  toJSON(): GatingSnapshot { return { gatingkind: this.gatingkind, ...this.#scope() } }
+  toJSON(): GatingSnapshot { return { gatingkind: this.gatingkind, ...this.#scope(), hasPasskey: this.passkeyHeader !== null } }
 }
 // --
 

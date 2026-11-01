@@ -75,13 +75,23 @@ describe("Gating.launch(gatingkind, opts): what the host is handed", () => {
     close()
   })
 
-  it("shows its kind and scope to JSON alone, never the vault, and is frozen", async () => {
+  it("shows its kind, its scope and whether the vault has a passkey to JSON alone, never the vault, and is frozen", async () => {
     const { vault } = await makeBornVault()
     const { gating, close } = launchHeld({ vault })
     const held = await gating
-    expect(held.toJSON()).to.deep.equal({ gatingkind: 'unlock_vault', ...Dna })
-    expect(JSON.stringify(held)).to.eq(JSON.stringify({ gatingkind: 'unlock_vault', ...Dna }))
+    expect(held.toJSON()).to.deep.equal({ gatingkind: 'unlock_vault', ...Dna, hasPasskey: false })
+    expect(JSON.stringify(held)).to.eq(JSON.stringify({ gatingkind: 'unlock_vault', ...Dna, hasPasskey: false }))
     expect(Object.isFrozen(held)).to.be.true
+    close()
+  })
+
+  it("shows to JSON that the vault has a passkey, as the vault's snapshot does, but not its header", async () => {
+    const { vault } = await makeBornVaultWithPasskey()
+    const { gating, close } = launchHeld({ vault })
+    const held = await gating
+    expect(held.toJSON()).to.deep.equal({ gatingkind: 'unlock_vault', ...Dna, hasPasskey: true })
+    expect(held.toJSON().hasPasskey).to.eq(vault.getSnapshot().hasPasskey)
+    expect(JSON.stringify(held)).not.to.contain('credential_id')
     close()
   })
 

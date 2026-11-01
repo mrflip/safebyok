@@ -588,7 +588,7 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse, VaultTrouble
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const VaultFormat = 6001
@@ -608,6 +608,9 @@ export const vaultPatch = Checker(() => vaultRecord.partial().strict(), 'bad_opt
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
+
+/** What is wrong with a vault, as its snapshot shows it: the kind of refusal a verb on it meets, and that refusal's sentence. */
+export type VaultTrouble = Readonly<{ refusalkind: RefusalKind, message: string }>
 // --
 
 // == [What a proving is handed]: cleartexts, attemptCleartexts, passphraseCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, provingWorld, gateWorld, provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, vaultBuildArgs, vaultUnlockArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs, Cleartexts, AttemptCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, ProvingWorld, GateWorld
@@ -725,7 +728,7 @@ export type LeaseDeviceDB = Z.infer<typeof leaseDeviceDB>
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate, lease and gatings need. Its `parse` refuses 'bad_option'. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn }) => ({
-  world: obj({ ...gateWorld.shape, requestCleartext: fn(), logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), deviceDB: leaseDeviceDB }),
+  world: obj({ ...gateWorld.shape, requestCleartext: fn(), logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), pesterMillis: leaseGrantOpts.shape.leaseMillis.optional(), deviceDB: leaseDeviceDB }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
 

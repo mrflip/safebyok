@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Bank, DefaultPesterMillis, DefaultRefreshMillis } from '../../src/models/bank'
-import { DefaultLeaseMillis } from '../../src/models/vault'
+import { Bank, DefaultRefreshMillis } from '../../src/models/bank'
+import { DefaultLeaseMillis, DefaultPesterMillis } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, T0, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
