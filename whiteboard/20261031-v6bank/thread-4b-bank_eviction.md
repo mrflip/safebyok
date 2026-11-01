@@ -1,6 +1,6 @@
 # Thread 4b: bank_eviction (2026-11-01)
 
-Branch `20261101-bank_eviction`, PR (draft, number in the PR list), stacked on
+Branch `20261101-bank_eviction`, PR [#434](https://github.com/mrflip/safebyok/pull/434), stacked on
 [#432](https://github.com/mrflip/safebyok/pull/432). Justify: green; safebyok 4872 passed, 37
 skipped; size budgets unmoved.
 
