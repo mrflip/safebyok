@@ -1,3 +1,14 @@
+# Sprint v6bank: paused again, 2026-11-01, for the Coach's assessment
+
+Paused on the Coach's word: "Pause new work addressing these race condition management -- adding, removing or aligning; wrap up anything under way until I can asssess the open matters and closer look", and "leave anything done, it's fine and I don't want churn confusing your context. This is a pause not a cancel."
+
+* **Filed, nothing running:** 5b (#438), 7c (#441, off #438), 7b (#442, off #438). No worktrees but the sprint's.
+* **Waiting:** a restack of 7b and 7c into one line (a trial merge is clean), then 8, 10, 12 side by side, then 11. 7d is held whole; so are thread 8's race carries.
+* **To read:** the sprint doc's *Closer Look* and *Open Matters* tabs, and `whiteboard/20261031-v6bank/closer-look-report.md`.
+* **Separate commits left in:** `9abb9007` and `8a7a7667` on #441; `939b7385` and `c94cba9c` on #442.
+
+---
+
 **Resumed 2026-11-01:** the Coach ruled on 5b's two gaps (won't fix, with a test; undefined, with a TODO) and allowed force-push with a lease; the line is on GitHub. What follows is where it stood when it paused.
 
 # Sprint v6bank: paused (2026-11-01)
