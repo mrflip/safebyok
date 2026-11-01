@@ -43,9 +43,9 @@ skipped; size budgets unmoved.
 * **Pulled forward from thread 3b** (PR [#431](https://github.com/mrflip/safebyok/pull/431)),
   verbatim, so the restack meets identical lines: `Gate.passkeyHeader` (declare, doc, the
   constructor's parse and `decorate`), `Gating.passkeyHeader` (declare, doc, `adorn` at launch),
-  and `#unlockByGating`'s `if (! this.isFull) { await this.fetch() }` (3b has it with a comment
-  line; mine adds one, which may conflict trivially). The orchestrator can expect the restack to
-  take 3b's side of each.
+  and `#unlockByGating`'s `if (! this.isFull) { await this.fetch() }` with 3b's doc sentence
+  (4b's `lockSeq` parameter differs from 3b's signature, so that hunk meets a trivial conflict:
+  keep `lockSeq`). The restack takes 3b's side of the rest; the lines are identical.
 
 * **Deviations**: `bank.ts`'s pester GAP now reads that no trigger reads it yet and the vault
   offers it as `pesterMinutes` (the GAP itself stays thread 10's).
