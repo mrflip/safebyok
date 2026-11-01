@@ -145,6 +145,7 @@ export const isBox = (candidate: unknown): candidate is BoxScopepath => CX.boxSc
 // == [Within a bank]: withinBankScopepathPrefix, withinBankScopepathPred
 
 /** The text that begins the scopepath of every vault record in the bank `scope` names, and of nothing else, for a store that reads by prefix or key range.
+ * It ends in the delimiter, so no other user whose user_id starts the same (`u12`) shares it.
  *
  * @example Scopepath.withinBankScopepathPrefix({ applabel: 'acme', user_id: 'u1' })   // 'vault^acme^u1^'
  */

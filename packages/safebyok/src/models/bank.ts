@@ -2,6 +2,7 @@ import { noop } from 'es-toolkit'
 import { verifyConsistent } from '../checks/validator'
 import { MinuteMillis } from '../consts'
 import { randomId } from '../crypto'
+import { deviceRecordOf } from '../devicedb/devicedb'
 import { type KeyDeriver, checkKeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError } from '../errors'
 import * as RefusalFuncs from '../helpers/refusal-funcs'
@@ -59,7 +60,6 @@ export class Bank implements VaultWorld, GatingWorld {
   declare readonly applabel: string
   declare readonly user_id:  string
   readonly scope:            BankScope
-  readonly device_id:        string
   readonly clock:            Clock
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         BankDeviceDB
@@ -73,6 +73,7 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly boxRefreshMillis: number
   readonly vaultListing:     VaultListing
 
+  #deviceId: string
   #stage:    BankStage = { lifecycle: 'starting' }
   #snapshot: BankSnapshot
   #helloing: Promise<void> | null = null
@@ -90,7 +91,7 @@ export class Bank implements VaultWorld, GatingWorld {
     this.scope = bankScope.parse({ applabel, user_id })
     checkKeyDeriver(keyDeriver)
     tattoo(this, this.scope, { writable: false })
-    this.device_id = device_id
+    this.#deviceId = device_id
     this.clock = MSX.cheatClock.parse(_cheat_clock) ?? wallClock
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
@@ -107,7 +108,10 @@ export class Bank implements VaultWorld, GatingWorld {
     Object.freeze(this)
   }
 
-  // == [The world of its vaults]: lockState, ensureTimely, takeWorld, autolockMinutes, pesterMinutes
+  // == [The world of its vaults]: device_id, lockState, ensureTimely, takeWorld, autolockMinutes, pesterMinutes
+
+  /** This device's id for the bank's scope, which each wayin it seals carries: the one the device record holds once a hello has kept it, the `device_id` option (or a fresh one) until then, and where the device record holds none. */
+  get device_id(): string { return this.#deviceId }
 
   lockState(): LockState { return 'unlocked' }
 
@@ -122,9 +126,9 @@ export class Bank implements VaultWorld, GatingWorld {
 
   // == [Starting and ending]: hello, goodbye, with hello's try form
 
-  /** Load the key deriver and the strength checker, then warm the vault listing from the device's cache and start its watch, as {@link VaultListing.hello} does; the bank then reads `ready`.
+  /** Load the key deriver and the strength checker, keep this device's record of the scope and take its `device_id`, then warm the vault listing from the device's cache and start its watch, as {@link VaultListing.hello} does; the bank then reads `ready`.
    * A hello in flight is joined, and a `ready` bank stays `ready` through another.
-   * A load that fails refuses with the deriver's or checker's own error, as thrown, and the bank reads `refused` until the next hello; {@link tryHello}'s Outcome carries that error.
+   * A load that fails refuses with the deriver's or checker's own error, as thrown, and one the deviceDB refuses with its refusal; the bank reads `refused` until the next hello, and {@link tryHello}'s Outcome carries that error.
    */
   hello(): Promise<void> {
     this.#helloing ??= this.#helloOnce()
@@ -151,6 +155,7 @@ export class Bank implements VaultWorld, GatingWorld {
     try {
       await this.keyDeriver.load?.()
       await this.strengthChecker.load?.()
+      await this.#keepDeviceRecord()
       await this.vaultListing.hello()
     } catch (err) {
       this.#setStage({ lifecycle: 'refused', err: refusalOf(err) })
@@ -158,9 +163,17 @@ export class Bank implements VaultWorld, GatingWorld {
     }
     if (this.#stage.lifecycle !== 'ready') { this.#setStage({ lifecycle: 'ready' }) }
   }
+
+  /** Advance this device's record of the scope by one holding the bank's `device_id`, and take the `device_id` it holds: a device keeps the first it stored. */
+  async #keepDeviceRecord(): Promise<void> {
+    const record = await this.deviceDB.advanceDeviceRecord(deviceRecordOf(this.scope, this.#deviceId))
+    if (record.device_id === this.#deviceId) { return }
+    this.#deviceId = record.device_id
+    this.#remakeSnapshot()
+  }
   // --
 
-  // == [Vaults]: vaultScopeOf, vaultOf, ensureVault, closeVault, closeVaults, with ensureVault's try form
+  // == [Vaults]: vaultScopeOf, vaultOf, ensureVault, closeVault, closeVaults, clearCachedVault, with ensureVault's and clearCachedVault's try forms
 
   vaultScopeOf(bag: VaultBag): VaultScope {
     const { vaultlabel } = verifyConsistent(vaultBag.parse(bag), this.scope, { kind: 'bad_scope', message: Phrases.otherScope })
@@ -210,6 +223,17 @@ export class Bank implements VaultWorld, GatingWorld {
   closeVaults(): void {
     for (const vault of this.vaultListing.things) { this.#closeVault(vault.scope) }
   }
+
+  /** Close the vault `bag` names, as {@link closeVault} does, then erase what this device keeps of it, sound or damaged: its lease and its cached copy. This device's record of the scope stays.
+   * Refuses as the deviceDB does where it fails the erase: call again to finish.
+   */
+  async clearCachedVault(bag: VaultBag): Promise<void> {
+    const scope = this.vaultScopeOf(bag)
+    this.#closeVault(scope)
+    await this.deviceDB.clearCachedVault(scope)
+  }
+
+  tryClearCachedVault(bag: VaultBag): Promise<Outcome<void>> { return outcomeOf(() => this.clearCachedVault(bag)) }
 
   #closeVault(scope: VaultScope): void {
     this.vaultListing.at(scope)?.lock()

@@ -38,10 +38,13 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 export const InstantNotWhole = "An instant is whole epoch milliseconds"
 // --
 
-// == [Records]: GateEpochAndGate
+// == [Records]: GateEpochAndGate, VaultlabelRepeated
 
 /** A vault record whose `gate_epoch` and `gate` disagree: a gate at epoch 0, or none at a later epoch. */
 export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
+
+/** A device record naming one vault twice among the epochs it has seen. */
+export const VaultlabelRepeated = "A device record names each vault at most once among the gate epochs it has seen"
 // --
 
 // == [Bags]: StoreInVaultBag
@@ -466,4 +469,36 @@ export const suppliedSpecChanged = (label: string): string => `A key deriver lab
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): string => `This key deriver takes a salt of ${String(expectedCount)} bytes, and was handed one of ${String(handedCount)}: a salt made by another deriver, or a stored salt that has been damaged.`
 
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."
+// --
+
+// == [Models: the device store]: DeviceStoreFailed, DeviceStoreSaid, deviceStoreBlocked, deviceStoreUnavailable
+
+/** For each verb of the models' device store, what its failure leaves undone, and what the user may do instead of trying again, if anything. */
+export const DeviceStoreFailed = Object.freeze({
+  getLease:            { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with the passphrase or a passkey" },
+  putLease:            { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
+  delLease:            { failed: "erasing the lease it keeps for this vault, so the next open on this device may still take it up" },
+  getDeviceRecord:     { failed: "reading its record of this user's vaults (the newest gate of each it has seen)" },
+  advanceDeviceRecord: { failed: "writing its record of this user's vaults (the newest gate of each it has seen), so it may not be kept" },
+  findCachedVaults:    { failed: "reading the copies of this user's vaults it keeps, so each loads from storage instead" },
+  putCachedVault:      { failed: "writing its copy of this vault, so the next open loads it from storage" },
+  clearCachedVault:    { failed: "erasing what it keeps of this vault, so some of it may remain" },
+  delAll:              { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
+})
+
+/** One entry of {@link DeviceStoreFailed}. */
+export type DeviceStoreSaid = Readonly<{ failed: string, instead?: string }>
+
+/** The device store's own `name` for what it threw, where it has one, closing the message. */
+const thrownNameSaid = (thrownName: string | null): string => (thrownName === null ? '' : ` The device store threw ${thrownName}.`)
+
+export const deviceStoreBlocked = ({ failed, instead }: DeviceStoreSaid, thrownName: string | null): string => {
+  const meanwhile = instead === undefined ? '' : `: ${instead} instead`
+  return `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes${meanwhile}.${thrownNameSaid(thrownName)}`
+}
+
+export const deviceStoreUnavailable = ({ failed, instead }: DeviceStoreSaid, thrownName: string | null): string => {
+  const retry = instead === undefined ? 'try again' : `try again, or ${instead}`
+  return `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window.${thrownNameSaid(thrownName)}`
+}
 // --

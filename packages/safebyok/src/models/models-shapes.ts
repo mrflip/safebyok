@@ -807,6 +807,38 @@ export type PasskeyGatingKind = { [KindT in GatingKind]: 'passkey' extends typeo
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 
+// == [The device's forms]: DeviceRecordFormat, gateEpochSeen, deviceRecord, vaultCacheable, GateEpochSeen, DeviceRecord, VaultCacheable
+
+/** The device record format these forms describe, as each record carries it in `fmt`. */
+export const DeviceRecordFormat = 8001
+
+/** True where no two entries name the same vault. */
+const hasEachVaultOnce = (seen: readonly { vaultlabel: string }[]): boolean => new Set(seen.map(({ vaultlabel }) => vaultlabel)).size === seen.length
+
+/** The checks of what a device keeps of a bank's scope, each refusing 'bad_record': `deviceRecord`, this device's `device_id` for the scope and the highest `gate_epoch` it has seen of each vault, strict and frozen; `gateEpochSeen`, one vault's entry. A vault appears at most once.
+ *
+ * @example deviceRecord.parse({ fmt: 8001, applabel: 'acme', user_id: 'u1', device_id: 'Zm9vYmFy', highest_gate_epochs: [{ vaultlabel: 'main', gate_epoch: 3 }] })
+ */
+export const { gateEpochSeen, deviceRecord } = Checkers('bad_record', ({ obj, arr, lit, uint, applabel, user_id, vaultlabel, device_id }) => {
+  const gateEpochSeen = obj({ vaultlabel, gate_epoch: uint }).strict().readonly()
+  const deviceRecord  = obj({
+    fmt:                 lit(DeviceRecordFormat),
+    applabel,
+    user_id,
+    device_id,
+    highest_gate_epochs: arr(gateEpochSeen).refine(hasEachVaultOnce, Phrases.VaultlabelRepeated).readonly(),
+  }).strict().readonly()
+  return { gateEpochSeen, deviceRecord }
+}, [FX])
+
+/** The check of a vault's copy as the deviceDB files it, refusing 'bad_record': the scope it is filed under, with `central` and `staged` beside it. The rest is the listing's to judge, as {@link buildableRecord} does at its hello. */
+export const vaultCacheable = Checker(({ obj, unk, applabel, user_id, vaultlabel }) => obj({ applabel, user_id, vaultlabel, central: unk, staged: unk }).loose(), 'bad_record')
+
+export type GateEpochSeen  = Z.infer<typeof gateEpochSeen>
+export type DeviceRecord   = Z.infer<typeof deviceRecord>
+export type VaultCacheable = Cacheable<VaultRecord, VaultSparse>
+// --
+
 // == [The bank's forms]: positiveMinutes, refreshMinutes, bankDeviceDB, bankOpts, cheatClock, BankDeviceDB
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
@@ -814,10 +846,12 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
-/** The check of the bank's deviceDB: the lease verbs a vault's world carries, as {@link leaseDeviceDB} checks them, and `vaultCache`, which hands the device cache of a bank's vaults. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of the bank's deviceDB: the lease verbs a vault's world carries, as {@link leaseDeviceDB} checks them; `vaultCache`, which hands the device cache of a bank's vaults; `advanceDeviceRecord`, which keeps the device record; and `clearCachedVault`, which drops what the device keeps of one vault. Its `parse` refuses 'bad_option'. Checks only. */
 export const bankDeviceDB = objCheck(({ fn }) => ({
   ...leaseDeviceDB.shape,
-  vaultCache: fn<(scope: BankScope) => Cache<VaultRecord, VaultSparse>>(),
+  vaultCache:          fn<(scope: BankScope) => Cache<VaultRecord, VaultSparse>>(),
+  advanceDeviceRecord: fn<(record: DeviceRecord) => Promise<DeviceRecord>>(),
+  clearCachedVault:    fn<(scope: VaultScope) => Promise<void>>(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 
 /** The deviceDB a bank is made with, as {@link bankDeviceDB} checks it. */
