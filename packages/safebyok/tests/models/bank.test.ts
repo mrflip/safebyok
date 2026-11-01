@@ -67,6 +67,10 @@ describe("Bank.make's names", () => {
     }
   })
 
+  it("refuses a bad name as bad_scope before it looks at the key deriver, as the core's Bank.make does", () => {
+    TH.expectSyncRefusal(() => makeBank({ user_id: '', keyDeriver: { ...TH.testDeriver, key_deriver_label: 'argon2id_web_v2' } }), 'bad_scope')
+  })
+
   it("refuses a call with no bag of options at all as bad_option", () => {
     for (const opts of [undefined, null, 'acme']) {
       TH.expectSyncRefusal(() => Bank.make(opts as unknown as BankOpts), 'bad_option')

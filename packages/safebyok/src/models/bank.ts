@@ -77,9 +77,9 @@ export class Bank implements VaultWorld, GatingWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
-    checkKeyDeriver(opts.keyDeriver)
     const { applabel, user_id, device_id = randomId(), vaultStore, vaultCache, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
+    checkKeyDeriver(keyDeriver)
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
     this.clock = clock
