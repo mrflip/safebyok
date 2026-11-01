@@ -13,17 +13,23 @@ import { type AnyGating, type GatingWorld, Gating } from './gating'
 import { Lease } from './lease'
 import type { AttemptCleartexts, BoxBag, CleartextsForGatingkind, EditOpts, Fetched, GateProps, GatingKind, LeaseDBFriend, LockState, PasskeyAddCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, TimelyOpts, VaultRecord, VaultSparse, VaultTrouble } from './models-shapes'
 import * as MSX from './models-shapes'
-import { spendAnswer, spendAnswerAfter } from './proving'
+import { type Proving, spendAnswer, spendAnswerAfter } from './proving'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
 
-// == [Record forms]: DefaultLeaseMillis, DefaultPesterMillis, VaultSnapshot, BoxDnaInVault, VaultPatch, GateStaging, UnkeptBoxCache
+// == [Record forms]: DefaultLeaseMillis, DefaultPesterMillis, UnlockAtBirth, VaultSnapshot, BoxDnaInVault, VaultPatch, GateStaging, UnkeptBoxCache
 
 /** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * MinuteMillis
 
 /** How often the user is asked for the passphrase where the world names no `pesterMillis`: seven days. */
 export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
+
+/** The key of `vault[UnlockAtBirth](proving)`, the vault listing's route to unlock a vault it has just stored: package-private, as no entry point exports it. */
+export const UnlockAtBirth: unique symbol = Symbol('safebyok.unlockAtBirth')
+
+/** The lock count of a vault no lock or let-go has reached since its birth. */
+const BirthLockSeq = 0
 
 /** A vault as a host renders it, frozen, and the same object until what it shows changes. It carries no secret material: no whisper, key or cleartext, and of the gate only whether it holds a passkey. */
 export type VaultSnapshot = VaultScope & Readonly<{
@@ -376,7 +382,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   }
   // --
 
-  // == [Unlocking]: isUnlocked, leaseMillis, autolockMinutes, pesterMinutes, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, each host's verb with its try form, unlock, joinUnlocking, attemptThrough, unlockAlone, unlockByGating, unlockByProof, lookUpCached, setLease
+  // == [Unlocking]: isUnlocked, leaseMillis, autolockMinutes, pesterMinutes, ensureUnlocked, demandLease, takeUpLease, takeUpCachedLease, UnlockAtBirth, each host's verb with its try form, unlock, joinUnlocking, attemptThrough, unlockAlone, unlockByGating, unlockByProof, unlockBy, lookUpCached, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
@@ -441,6 +447,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The cached lease taken up, or null, as an {@link Outcome}: the non-throwing form of {@link Vault.takeUpCachedLease}. */
   tryTakeUpCachedLease(): Promise<Outcome<Lease | null>> { return outcomeOf(() => this.takeUpCachedLease()) }
 
+  /** Unlock the vault the listing has just stored under a lease `proving` grants, as any unlock by proof does; null, granting nothing, where a lock or let-go has landed since the vault's birth (G4). */
+  [UnlockAtBirth](proving: Proving): Promise<Lease | null> {
+    return this.#unlockBy(proving, BirthLockSeq)
+  }
+
   async #unlock(cleartexts?: AttemptCleartexts): Promise<Lease> {
     const inFlight = this.#unlocking
     if (inFlight !== null) { return this.#joinUnlocking(inFlight, cleartexts) }
@@ -489,18 +500,25 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     return this.demandLease()
   }
 
-  /** Prove `cleartexts` against the gate storage holds, fetched first, and grant a lease, unless a lock or let-go has landed since the unlock began, at `lockSeq`: then refuse 'vault_locked'.
-   * A lease already put is evicted. A lock's erase, queued behind the put, removes its record; a let-go leaves it, as it leaves any.
-   */
+  /** Prove `cleartexts` against the gate storage holds, fetched first, and grant a lease, unless a lock or let-go has landed since the unlock began, at `lockSeq`: then refuse 'vault_locked'. */
   async #unlockByProof(cleartexts: AttemptCleartexts, lockSeq: number): Promise<Lease> {
     await this.fetch()
     const proving = await this.gate.attemptProof(cleartexts, this.world)
+    const lease = await this.#unlockBy(proving, lockSeq)
+    if (lease === null) { throw RefusalFuncs.lockedWhileUnlocking() }
+    return lease
+  }
+
+  /** Take up a lease `proving` grants, its put queued behind the deviceDB work on the lease begun before; null, where a lock or let-go has landed since `lockSeq`.
+   * A lease already put is evicted. A lock's erase, queued behind the put, removes its record; a let-go leaves it, as it leaves any.
+   */
+  #unlockBy(proving: Proving, lockSeq: number): Promise<Lease | null> {
     return this.#withLeaseDB(async () => {
-      if (this.#lockSeq !== lockSeq) { throw RefusalFuncs.lockedWhileUnlocking() }
+      if (this.#lockSeq !== lockSeq) { return null }
       const lease = await proving.makeLease(this, this.leaseDBFriend(), { leaseMillis: this.leaseMillis })
       if (this.#lockSeq !== lockSeq) {
         lease.evict()
-        throw RefusalFuncs.lockedWhileUnlocking()
+        return null
       }
       return this.#setLease(lease)
     })

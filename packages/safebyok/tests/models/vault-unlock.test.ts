@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey, randomBytes } from '../../src/crypto'
-import { memoryDeviceDB } from '../../src/device-db'
+import { memoryDeviceDB } from '../../src/devicedb/memory'
 import type { Gating } from '../../src/models/gating'
 import type { Lease } from '../../src/models/lease'
 import { NOVEL, Proving } from '../../src/models/proving'

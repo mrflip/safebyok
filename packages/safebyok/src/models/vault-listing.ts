@@ -10,9 +10,9 @@ import { Listing } from './listing'
 import { Gate } from './gate'
 import { type PassphraseProving, spendAnswerAfter } from './proving'
 import type { GatingWorld } from './gating'
-import { type Cache, type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type Cache, type Dna, type Fetched, type FetchOpts, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type Cleartexts, type GateWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-import { type VaultSnapshot, Vault } from './vault'
+import { type VaultSnapshot, UnlockAtBirth, Vault } from './vault'
 
 // == [Given to a vault listing]: BoxVaultDB, VaultWorld, VaultStore, VaultCache, VaultDna, VaultListingOpts
 
@@ -55,16 +55,24 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   /** Build a vault of `dna` gated by `cleartexts`, put it, and hold the vault as stored: unlocked under a lease its passphrase proving grants, where the put lands; where another device stored a vault under the scope first, that vault, as it stands.
-   * Nothing is held before storage takes the vault, so cleartexts refused hold nothing. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2).
+   * Nothing is held before storage takes the vault, so cleartexts refused hold nothing. A lock or let-go of the vault before its lease is taken up leaves it locked, no lease kept. A passkey's answer among them is spent unless refused as correctable, as a weak passphrase is (G2).
    */
   ensure(dna: VaultDna, cleartexts: Cleartexts): Promise<Vault> {
     return spendAnswerAfter(cleartexts, async () => {
       const { draft, proving } = await this.#buildDraft(this.stampDna(this.scopeOf(dna)), cleartexts)
       const vault = await this.putDraft(draft)
       if (vault.vault_tok !== draft.vault_tok) { return vault }
-      vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
+      await vault[UnlockAtBirth](proving)
       return vault
     })
+  }
+
+  /** The vault under `scope` as storage now holds it, as the base's `fetch` says; a vault this fetch gave birth to first takes up the lease this device keeps of it, as {@link Vault.takeUpCachedLease} does, so it is answered unlocked where one is kept. */
+  override async fetch(scope: VaultScope, opts: FetchOpts = {}): Promise<Vault | null> {
+    const held = this.at(scope)
+    const vault = await super.fetch(scope, opts)
+    if (vault !== null && vault !== held) { await vault.takeUpCachedLease() }
+    return vault
   }
 
   /** Take up each vault's cached lease, as {@link Vault.takeUpCachedLease} does, once the base's `hello` has revived and hydrated them. */

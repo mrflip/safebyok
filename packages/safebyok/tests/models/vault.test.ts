@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, byPassphrase, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, byPassphrase, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -57,6 +58,77 @@ describe("VaultListing.ensure: the gate is built before the vault is born, and t
     const stored = storedNow()
     expect(await listing.ensure(Dna, byPassphrase(Passphrase))).to.equal(vault)
     expect(storedNow()).to.deep.equal(stored)
+  })
+})
+
+/** A world whose next lease put lets `overtake` land first, then waits two ticks, so an erase nothing holds back lands before the put. */
+const worldOvertakenAtPut = (overtake: (vault: Vault) => void) => {
+  const world = makeVaultWorld()
+  const put = world.deviceDB.tryPutLease.getMockImplementation()!
+  world.deviceDB.tryPutLease.mockImplementationOnce(async (record) => {
+    overtake(world.listing.at(Dna)!)
+    await TH.wakeupAtNextTick()
+    await TH.wakeupAtNextTick()
+    return put(record)
+  })
+  return world
+}
+
+describe("VaultListing.ensure overtaken by the vault's lock or let-go before its birth lease is taken up (G4)", () => {
+  it("leaves the vault locked where vault.lock() lands as the birth lease is put, and the lock's erase, landing after the put, keeps no lease", async () => {
+    const { listing, deviceDB } = worldOvertakenAtPut((vault) => { vault.lock() })
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
+    expect(vault.isLocked).to.be.true
+    TH.expectSyncRefusal(() => vault.demandLease(), 'vault_locked')
+    await TH.eventually(() => deviceDB.tryDelLease.mock.calls.length > 0)
+    expect(deviceDB.cachedNow()).to.be.null
+    expect(deviceDB.tryDelLease.mock.invocationCallOrder.at(-1)).to.be.greaterThan(deviceDB.tryPutLease.mock.invocationCallOrder.at(-1) ?? Infinity)
+  })
+
+  it("leaves the vault locked where letLeaseGo lands as the birth lease is put, keeping the lease put for the next session, as a let-go keeps any", async () => {
+    const { listing, deviceDB } = worldOvertakenAtPut((vault) => { vault.letLeaseGo() })
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
+    expect(vault.isLocked).to.be.true
+    expect(deviceDB.cachedNow()).to.not.be.null
+    expect(deviceDB.tryDelLease).not.toHaveBeenCalled()
+  })
+
+  it("stores the vault all the same: the next ensure answers it, locked, storing nothing new", async () => {
+    const { listing, storedNow } = worldOvertakenAtPut((vault) => { vault.lock() })
+    const vault = await listing.ensure(Dna, byPassphrase(Passphrase))
+    const stored = storedNow()
+    expect(stored?.vault_tok).to.eq(vault.vault_tok)
+    expect(await listing.ensure(Dna, byPassphrase(Passphrase))).to.equal(vault)
+    expect(storedNow()).to.deep.equal(stored)
+  })
+})
+
+describe("VaultListing.fetch: a vault it gives birth to takes up the lease this device keeps", () => {
+  it("answers unlocked, asking nothing, a vault the fetch gives birth to whose lease the device keeps", async () => {
+    const { listing, demandStored, anotherSession, requestCleartext } = await makeBornVault()
+    const record = demandStored()
+    const later = anotherSession()
+    const vault = await later.fetch(Dna)
+    expect(vault?.vault_tok).to.eq(record.vault_tok)
+    expect(vault?.isLocked).to.be.false
+    expect(requestCleartext).not.toHaveBeenCalled()
+    expect(listing.at(Dna)).to.not.equal(vault)
+  })
+
+  it("answers locked a vault the fetch gives birth to where the device keeps no lease", async () => {
+    const { vault: born, deviceDB, anotherSession } = await makeBornVault()
+    born.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const vault = await anotherSession().fetch(Dna)
+    expect(vault?.isLocked).to.be.true
+  })
+
+  it("takes up nothing for a vault it already held: one locked stays locked", async () => {
+    const { listing, vault, deviceDB } = await makeBornVault()
+    vault.letLeaseGo()
+    expect(await listing.fetch(Dna)).to.equal(vault)
+    expect(vault.isLocked).to.be.true
+    expect(deviceDB.cachedNow()).to.not.be.null
   })
 })
 

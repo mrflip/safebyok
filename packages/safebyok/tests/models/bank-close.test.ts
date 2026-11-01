@@ -72,6 +72,24 @@ describe("bank.closeVault(bag): the vault locked, its kept lease erased, and evi
     expect(asked.gating?.isOpen).to.be.false
   })
 
+  it("leaves a vault closed as its birth lease is put locked and evicted, and the lock's erase, landing after the put, keeps no lease (G4)", async () => {
+    const { bank, deviceDB } = makeBankWorld()
+    const put = deviceDB.tryPutLease.getMockImplementation()!
+    deviceDB.tryPutLease.mockImplementationOnce(async (record) => {
+      bank.closeVault(Main)
+      // Two ticks: time enough for an erase nothing holds back to land before the put.
+      await TH.wakeupAtNextTick()
+      await TH.wakeupAtNextTick()
+      return put(record)
+    })
+    const vault = await bank.ensureVault(Main, byPassphrase(Passphrase))
+    expect(vault.isLocked).to.be.true
+    expect(bank.vaultOf(Main)).to.be.null
+    await TH.eventually(() => deviceDB.tryDelLease.mock.calls.length > 0)
+    expect(deviceDB.cachedNow()).to.be.null
+    expect(deviceDB.tryDelLease.mock.invocationCallOrder.at(-1)).to.be.greaterThan(deviceDB.tryPutLease.mock.invocationCallOrder.at(-1) ?? Infinity)
+  })
+
   it("does nothing for a vaultlabel the bank holds no vault of, and refuses 'bad_scope' a bag of another user", async () => {
     const { bank } = makeBankWorld()
     const vault = await bank.ensureVault(Main, byPassphrase(Passphrase))
