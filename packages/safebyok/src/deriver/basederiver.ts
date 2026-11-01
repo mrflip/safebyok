@@ -4,23 +4,23 @@ import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefi
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
 
-/** What turns a passphrase into passphraseKey bytes, the bank's `keyDeriver`: a label a vault stores, the salt length it takes, and the function that derives.
+/** The bank's `keyDeriver`, turning a passphrase into passphraseKey bytes: a label a vault stores, the salt length it takes, and the function that derives.
  * A vault opens only through a deriver wearing the `key_deriver_label` its wayin stores, so a
  * deriver of your own commits every user's vault to it. To substitute, use a vetted Argon2id
  * implementation under {@link Argon2idKeyDeriver}, never your own derivation.
- *
- * `deriveKeyBytes` hears the passphrase: it answers 32 fresh bytes from the passphrase and salt, and
- * refuses a salt of another length than `salt_bytes`. What it throws is replaced, as it heard the
- * passphrase. `load`, if the deriver has one (a WebAssembly module), runs in each `bank.hello()`.
  *
  * @example const wasmDeriver: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: deriveWithWasm }
  */
 export interface KeyDeriver {
   readonly key_deriver_label: string
   readonly salt_bytes:        number
-  /** What the deriver runs, in the host's own words: `argon2id` means the deriver carries a whole {@link KeyDeriverSpec}. */
+  /** The algorithm the deriver runs, in the host's own words: `argon2id` means the deriver carries a whole {@link KeyDeriverSpec}. */
   readonly algorithm?:        string | undefined
+  /** 32 fresh bytes from the passphrase and salt; refuses a salt of another length than `salt_bytes`.
+   * It hears the passphrase, so what it throws is replaced.
+   */
   deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
+  /** Readies the deriver (a WebAssembly module, say); runs in each `bank.hello()`. */
   load?:              (() => void | Promise<void>) | undefined
 }
 
