@@ -5,7 +5,7 @@ import * as Phrases from '../phrases'
 import { Checker, objCheck } from '../checks/validator'
 import * as FX from './fields'
 
-// == [Lease]: LeaseFormat, isLeaseKey, leaseRecord, ModelsLeaseFormat, keptLeaseRow, leaseStamp, LeaseSparse, leaseGrant
+// == [Lease]: LeaseFormat, isLeaseKey, leaseRecord, ModelsLeaseFormat, cachedLeaseRow, leaseStamp, LeaseSparse, leaseGrant
 
 /** The `format` a {@link LeaseRecord} carries, in its stamp. */
 export const LeaseFormat = 'safebyok-lease-v1'
@@ -50,7 +50,7 @@ export type LeaseRecord = Z.infer<typeof leaseRecord>
 export const ModelsLeaseFormat = 7001
 
 /** A lease row as `putLease` takes it and `getLease` answers it: a {@link LeaseRecord}, or a row of its vault's scope carrying `fmt` {@link ModelsLeaseFormat}, which only the models' `Lease.get` checks further. Its `parse` refuses 'bad_record'. */
-export const keptLeaseRow = Checker(({ obj, lit, custom, applabel, user_id, vaultlabel, vault_key_lease_wrapped }) => leaseRecord.or(obj({
+export const cachedLeaseRow = Checker(({ obj, lit, custom, applabel, user_id, vaultlabel, vault_key_lease_wrapped }) => leaseRecord.or(obj({
   fmt:       lit(ModelsLeaseFormat),
   applabel,
   user_id,
@@ -58,7 +58,7 @@ export const keptLeaseRow = Checker(({ obj, lit, custom, applabel, user_id, vaul
   lease_key: custom<CryptoKey>(isLeaseKey, Phrases.LeaseKeyExpected),
   vault_key_lease_wrapped,
 }).loose()), 'bad_record', [FX])
-export type KeptLeaseRow = Z.infer<typeof keptLeaseRow>
+export type CachedLeaseRow = Z.infer<typeof cachedLeaseRow>
 
 /** A lease's stamp: its record but for its key material, every field fixed for its life, as a lease is made once and never changed. Its `parse` takes it from a lease or its record, and refuses 'bad_record'.
  * A lease is granted under one `gate_epoch`, so its stamp holds that epoch, as a reference to the
@@ -83,7 +83,7 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
 
 /** What this device keeps of one scope, locked or not, across the vault's lives there: its own id, and the highest `vault_epoch` it has seen. Nothing in it is secret.
  * A vault served below `highest_vault_epoch` was rolled back, and the bank refuses it as
- * 'vault_behind'. The DeviceDB raises it, never lowers it: a write of a lower epoch keeps the
+ * 'vault_behind'. The DeviceDB advances it: a write of a lower epoch keeps the
  * higher, and the first `device_id` stored stays. `bank.clearCachedVault` erases it. Its `parse`
  * is strict, refuses 'bad_record', and hands back the record frozen. A record that fails it reads
  * as none. `deviceRecordOf` builds one from a parsed scope.
@@ -92,7 +92,7 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
  */
 // A field added here bumps the format: a device whose safebyok predates the field discards the
 // record, and with it the `highest_vault_epoch` that guards it against a rolled-back vault, until
-// its next read raises it again.
+// its next read advances it again.
 export const deviceRecord = Checker(({ obj, uint, lit, applabel, user_id, vaultlabel, device_id }) => obj({
   format:              lit(DeviceRecordFormat),
   applabel,

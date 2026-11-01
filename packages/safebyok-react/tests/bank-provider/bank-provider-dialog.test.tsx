@@ -410,13 +410,13 @@ describe("BankProvider", () => {
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 
-    it("hands the next user's requestCleartext no gating the last user's vault raises in the commit that brings the next user, before its passive effects", async () => {
+    it("hands the next user's requestCleartext no gating the last user's vault launches in the commit that brings the next user, before its passive effects", async () => {
       const world = await lockedWorld()
       const asked: string[] = []
       const answers: unknown[] = []
       const made = vi.spyOn(Bank, 'make')
       // Rendered after the provider, so its layout effect runs after the provider's in the same
-      // commit: it asks through the requestCleartext u1's bank was handed, as a gating raised then would.
+      // commit: it asks through the requestCleartext u1's bank was handed, as a gating launched then would.
       const LateGating = ({ user_id }: { user_id: string }) => {
         useLayoutEffect(() => {
           const [opts] = made.mock.calls[0] ?? []

@@ -110,7 +110,7 @@ describe("GatingModal, by kind", () => {
 describe("GatingModal, change_passphrase", () => {
   it("replaces the current passphrase with the next, answering unlocked, as TH.heldGatingOf's example shows", async () => {
     const vault = await vaultOf()
-    const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+    const { gating, launching } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={onDone} />)
     expect(screen.getByRole('dialog', { name: 'Change your vault passphrase' })).to.not.be.null
@@ -118,7 +118,7 @@ describe("GatingModal, change_passphrase", () => {
     TH.typeNewPassphrase('a new passphrase', { fieldlabel: 'new passphrase' })
     submit()
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
-    await TH.expectGood(raising)
+    await TH.expectGood(launching)
     await vault.lock()
     await TH.expectBad(TH.tryUnlock(vault, Passphrase), 'wrong_passphrase')
     await TH.unlock(vault, 'a new passphrase')
@@ -168,7 +168,7 @@ describe("GatingModal, change_passphrase", () => {
   it("refuses a next passphrase its confirmation does not match, in place, deriving no key and changing nothing, the passkey kept; once they match, it changes, as TH.typeNewPassphrase's example shows", async () => {
     const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
     const vault = await vaultOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }, true)
-    const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+    const { gating, launching } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
     const { heard, onDone } = answersOf()
     const before = vault.snapshot.gate?.passphrase
     const derivedBefore = deriveKeyBytes.mock.calls.length
@@ -191,7 +191,7 @@ describe("GatingModal, change_passphrase", () => {
     expect(screen.getByRole('alert').textContent).to.eq('')
     submit()
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
-    await TH.expectGood(raising)
+    await TH.expectGood(launching)
     await vault.lock()
     await TH.unlock(vault, 'a new passphrase')
   })
@@ -213,7 +213,7 @@ describe("GatingModal, change_passphrase", () => {
     render(<GatingModal gating={gating} onDone={() => undefined} />)
     expect(screen.getByText(/Your passkey goes with the old passphrase/)).to.not.be.null
     const plain = await vaultOf()
-    const held = await TH.heldGatingOf(plain, (raised) => raised.tryPutWayin('passphrase'), 'change_passphrase')
+    const held = await TH.heldGatingOf(plain, (made) => made.tryPutWayin('passphrase'), 'change_passphrase')
     render(<GatingModal gating={held.gating} onDone={() => undefined} />)
     expect(screen.getAllByText(/Your passkey goes with the old passphrase/)).to.have.lengthOf(1)
   })
@@ -230,12 +230,12 @@ describe("GatingModal, change_passphrase", () => {
 
   it("answers declined on Cancel, and putWayin refuses vault_locked, saying the passphrase is unchanged", async () => {
     const vault = await vaultOf()
-    const { gating, raising, close } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
+    const { gating, launching, close } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passphrase'), 'change_passphrase')
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={(answer) => { onDone(answer); close() }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(heard).to.deep.equal(['declined'])
-    const err = await TH.expectBad(raising, 'vault_locked')
+    const err = await TH.expectBad(launching, 'vault_locked')
     expect(err.message).to.match(/passphrase is unchanged/)
   })
 })
@@ -244,14 +244,14 @@ describe("GatingModal, put_passkey", () => {
   it("adds a passkey: the passphrase, then one the browser makes, answering unlocked, filed under the username for the vault's app", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const vault = await vaultOf()
-    const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passkey'), 'put_passkey')
+    const { gating, launching } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passkey'), 'put_passkey')
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={onDone} />)
     expect(screen.getByRole('dialog', { name: 'Add a passkey' })).to.not.be.null
     typeInto('vault passphrase', Passphrase)
     fireEvent.click(screen.getByRole('button', { name: 'Add passkey' }))
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
-    await TH.expectGood(raising)
+    await TH.expectGood(launching)
     expect(vault.snapshot.gate?.passkey?.credential_id).to.eq(authenticator.credentialIds()[0])
     const made = authenticator.calls.create[0]?.publicKey
     expect(made?.rp).to.deep.equal({ name: 'acme' })
@@ -315,9 +315,9 @@ describe("GatingModal, put_passkey", () => {
   it("never tries a passkey made while an Activity hides the dialog, zeroing its answer: once it shows again, the next submit makes another and adds it", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const vault = await vaultOf()
-    const { gating: raised, raising } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passkey'), 'put_passkey')
-    const attempt = vi.fn(raised.attempt)
-    const gating = { ...raised, attempt }
+    const { gating: launched, launching } = await TH.heldGatingOf(vault, (held) => held.tryPutWayin('passkey'), 'put_passkey')
+    const attempt = vi.fn(launched.attempt)
+    const gating = { ...launched, attempt }
     const touching = TH.held()
     const answered = TH.held()
     const fakeCreate = navigator.credentials.create.bind(navigator.credentials)
@@ -345,7 +345,7 @@ describe("GatingModal, put_passkey", () => {
     rerender(dialog('visible'))
     submit()
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
-    await TH.expectGood(raising)
+    await TH.expectGood(launching)
     expect(attempt).toHaveBeenCalledOnce()
     expect(authenticator.credentialIds()).to.have.lengthOf(2)
     expect(vault.snapshot.gate?.passkey?.credential_id).to.eq(authenticator.credentialIds()[1])
@@ -369,14 +369,14 @@ describe("GatingModal, put_passkey", () => {
 describe("GatingModal, del_passkey", () => {
   it("removes the passkey, proven by the passphrase, answering unlocked", async () => {
     const vault = await vaultOf({}, true)
-    const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryDelWayin('passkey'), 'del_passkey')
+    const { gating, launching } = await TH.heldGatingOf(vault, (held) => held.tryDelWayin('passkey'), 'del_passkey')
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={onDone} />)
     expect(screen.getByRole('dialog', { name: 'Remove your passkey' })).to.not.be.null
     typeInto('vault passphrase', Passphrase)
     fireEvent.click(screen.getByRole('button', { name: 'Remove passkey' }))
     await waitFor(() => { expect(heard).to.deep.equal(['unlocked']) })
-    await TH.expectGood(raising)
+    await TH.expectGood(launching)
     expect(vault.snapshot.gate?.passkey).to.be.null
   })
 
@@ -394,7 +394,7 @@ describe("GatingModal, del_passkey", () => {
 describe("GatingModal, del_vault", () => {
   it("deletes the vault, proven by the passphrase, answering deleted: the Vault object is gone", async () => {
     const vault = await vaultOf()
-    const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryDel(), 'del_vault')
+    const { gating, launching } = await TH.heldGatingOf(vault, (held) => held.tryDel(), 'del_vault')
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={onDone} />)
     expect(screen.getByRole('dialog', { name: 'Delete your vault' })).to.not.be.null
@@ -402,7 +402,7 @@ describe("GatingModal, del_vault", () => {
     typeInto('vault passphrase', Passphrase)
     fireEvent.click(screen.getByRole('button', { name: 'Delete vault' }))
     await waitFor(() => { expect(heard).to.deep.equal(['deleted']) })
-    await TH.expectGood(raising)
+    await TH.expectGood(launching)
     await TH.expectBad(vault.tryHello(), 'vault_gone')
   })
 
@@ -418,12 +418,12 @@ describe("GatingModal, del_vault", () => {
 
   it("answers declined on Escape, and del() refuses vault_locked, saying nothing was deleted", async () => {
     const vault = await vaultOf()
-    const { gating, raising, close } = await TH.heldGatingOf(vault, (held) => held.tryDel(), 'del_vault')
+    const { gating, launching, close } = await TH.heldGatingOf(vault, (held) => held.tryDel(), 'del_vault')
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={(answer) => { onDone(answer); close() }} />)
     fireEvent.keyDown(screen.getByPlaceholderText('vault passphrase'), { key: 'Escape' })
     expect(heard).to.deep.equal(['declined'])
-    const err = await TH.expectBad(raising, 'vault_locked')
+    const err = await TH.expectBad(launching, 'vault_locked')
     expect(err.message).to.match(/Nothing was deleted/)
   })
 })
@@ -431,12 +431,12 @@ describe("GatingModal, del_vault", () => {
 describe("GatingModal, whatever the kind", () => {
   it("closes, answering declined, as a lock lands while it asks", async () => {
     const vault = await vaultOf({}, true)
-    const { gating, raising } = await TH.heldGatingOf(vault, (held) => held.tryDelWayin('passkey'), 'del_passkey')
+    const { gating, launching } = await TH.heldGatingOf(vault, (held) => held.tryDelWayin('passkey'), 'del_passkey')
     const { heard, onDone } = answersOf()
     render(<GatingModal gating={gating} onDone={onDone} />)
     await act(async () => { await vault.lock() })
     expect(heard).to.deep.equal(['declined'])
-    await TH.expectBad(raising, 'vault_locked')
+    await TH.expectBad(launching, 'vault_locked')
   })
 
   it("meets misuse with the calm notice, saying what it could not do, and reports the vault's refusal to React, quoting nothing typed", async () => {
@@ -462,7 +462,7 @@ describe("GatingModal, whatever the kind", () => {
     const { rerender } = render(<GatingModal gating={first.gating} onDone={() => undefined} />)
     typeInto('vault passphrase', 'half typed')
     first.close()
-    await TH.expectBad(first.raising, 'vault_locked')
+    await TH.expectBad(first.launching, 'vault_locked')
     const second = await TH.heldGatingOf(vault, (held) => held.tryDelWayin('passkey'), 'del_passkey')
     rerender(<GatingModal gating={second.gating} onDone={() => undefined} />)
     expect(screen.getByPlaceholderText<HTMLInputElement>('vault passphrase').value).to.eq('')

@@ -153,6 +153,7 @@ const FamilyCases = [
   ["vault_remade",        "condition", 'a vault deleted and made anew while a call worked on it is a fact of syncing'],
   ["gate_moved",          "condition", 'a passphrase or passkey changed while a call worked under the old one is a fact of syncing'],
   ["gating_landed",       "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
+  ["declined",            "condition", 'a gating the user declined is the user saying no, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
   ["no_whisper",          "condition", 'a store keeping a whisper where none is stored is told to the caller, who hands one in'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],

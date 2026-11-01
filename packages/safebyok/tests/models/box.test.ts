@@ -3,6 +3,7 @@ import type { BoxProps, BoxSnapshot } from '../../src/models/box'
 import type { BoxLease, BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
+import { deferred } from '../../src/helpers/deferred'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -166,14 +167,88 @@ describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
   for (const [blurb, text] of OpenedCases) {
     it(`refuses 'damaged_box' for ${blurb}, quoting none of it, the opened bytes zeroed`, async () => {
       const opened = new TextEncoder().encode(text)
-      const lease: BoxLease = { sealWith: () => Promise.reject(new Error('nothing is sealed here')), unsealWith: () => Promise.resolve(opened) }
-      const { world } = held.mw
-      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (opts) => world.ensureTimely(opts), demandLease: () => lease }
-      const box = await boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
+      const box = await openingBoxOf(() => opened)
       const err = await TH.expectRefusal(box.unsealWhisper(), 'damaged_box')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
       expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')
       expect(opened.every((byte) => byte === 0)).to.be.true
+    })
+  }
+})
+// --
+
+/** A full box over the test world whose lease opens each whisper to what `openedOf` answers, and seals nothing. */
+const openingBoxOf = async (openedOf: () => Uint8Array | Promise<Uint8Array>): Promise<TestableBox> => {
+  const lease: BoxLease = { sealWith: () => Promise.reject(new Error('nothing is sealed here')), unsealWith: () => Promise.resolve(openedOf()) }
+  const { world } = held.mw
+  const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (opts) => world.ensureTimely(opts), demandLease: () => lease }
+  return boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
+}
+
+/** Fresh bytes of a whisper as the lease opens one, its JSON `{ val }`. */
+const openedWhisperOf = (): Uint8Array => new TextEncoder().encode('{"val":{"apiKey":"sk-test-0000","orgId":null}}')
+
+// == [The whisper verbs]: getWhisper, tryGetWhisper, useWhisper over a lease that opens a whisper
+
+describe("box.getWhisper(), tryGetWhisper() and useWhisper(handed): the stored whisper itself", () => {
+  it("getWhisper hands back the whisper itself, frozen, not its { val }, as its example shows", async () => {
+    const box = await openingBoxOf(openedWhisperOf)
+    const whisper = await box.getWhisper()
+    expect(whisper).to.deep.equal({ apiKey: 'sk-test-0000', orgId: null })
+    expect(Object.isFrozen(whisper)).to.be.true
+  })
+
+  it("getWhisper opens the stored whisper, never the exposed one, and exposes nothing", async () => {
+    const box = await openingBoxOf(openedWhisperOf)
+    box.whisper = { val: 'sk-test-1111' }
+    expect(await box.getWhisper()).to.deep.equal({ apiKey: 'sk-test-0000', orgId: null })
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-1111' })
+    box.whisper = null
+    await box.getWhisper()
+    expect(box.getSnapshot().exposed).to.be.false
+  })
+
+  it("tryGetWhisper resolves the whisper as a good outcome, and a refusal as a bad one", async () => {
+    const box = await openingBoxOf(openedWhisperOf)
+    expect(await box.tryGetWhisper()).to.deep.equal({ ok: true, val: { apiKey: 'sk-test-0000', orgId: null } })
+    held.mw.setLockState('locked')
+    await TH.expectBad(box.tryGetWhisper(), 'vault_locked')
+  })
+
+  it("useWhisper hands the whisper to its callback and resolves what the callback resolves, as its example shows", async () => {
+    const box = await openingBoxOf(openedWhisperOf)
+    const handed = vi.fn((whisper: unknown) => Promise.resolve(`called with ${JSON.stringify(whisper)}`))
+    expect(await box.useWhisper(handed)).to.eq('called with {"apiKey":"sk-test-0000","orgId":null}')
+    expect(handed).toHaveBeenCalledOnce()
+  })
+
+  it("useWhisper zeroes the opened bytes before the callback runs", async () => {
+    const opened = openedWhisperOf()
+    const box = await openingBoxOf(() => opened)
+    const zeroedWhenHanded = await box.useWhisper(() => opened.every((byte) => byte === 0))
+    expect(zeroedWhenHanded).to.be.true
+  })
+
+  it("useWhisper rejects with the callback's own throw, as it came", async () => {
+    const box = await openingBoxOf(openedWhisperOf)
+    const thrown = new Error('the host fumbled')
+    let caught: unknown
+    try { await box.useWhisper(() => { throw thrown }) } catch (err) { caught = err }
+    expect(caught).to.eq(thrown)
+  })
+
+  const RefusedCases = [
+    [() => tombstoneBoxRecord({ revision_seq: 2 }),      "unlocked", "absent_box",       'a deleted box'],
+    [() => fullBoxRecord(),                              "locked",   "vault_locked",     'a full box while the vault is locked'],
+  ] as const
+  for (const [recordOf, lockState, refusalkind, blurb] of RefusedCases) {
+    it(`refuses '${refusalkind}' for ${blurb} from getWhisper, and from useWhisper without calling its callback`, async () => {
+      const box = await boxListingOf(held.mw).build(recordOf())
+      held.mw.setLockState(lockState)
+      const handed = vi.fn()
+      await TH.expectRefusal(box.getWhisper(), refusalkind)
+      await TH.expectRefusal(box.useWhisper(handed), refusalkind)
+      expect(handed).not.toHaveBeenCalled()
     })
   }
 })
@@ -226,6 +301,84 @@ describe("box.edit(patch): rebirth over a tombstone", () => {
     expect(box._cheat_staged).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
     expect(box._cheat_staged?.box_tok).to.be.a('string').and.not.eq('box-tok-a')
     expect(box).to.include({ registered_at: T0 + 5000, box_tok: box._cheat_staged?.box_tok })
+  })
+})
+// --
+
+// == [Expose overtaken]: a forget or a whisper set while expose unseals
+
+/** A box over a lease whose unseal waits on the test: `asked` resolves once the box has asked the lease, and `open()` lets each unseal answer fresh bytes of the whisper. */
+const heldOpenBoxOf = async () => {
+  const opened = deferred<undefined>()
+  const asked = deferred<undefined>()
+  const box = await openingBoxOf(async () => { asked.resolve(undefined); await opened.promise; return openedWhisperOf() })
+  return { box, asked: asked.promise, open: () => { opened.resolve(undefined) } }
+}
+
+describe("box.expose() overtaken while it unseals", () => {
+  const ForgetCases = [
+    [(box: TestableBox) => { box.disarm() },                                                          'a disarm'],
+    [(box: TestableBox) => { box.evict() },                                                           'an eviction'],
+    [(box: TestableBox) => { box.whisper = null },                                                    'box.whisper set null'],
+    [(box: TestableBox) => { box.receive(tombstoneBoxRecord({ revision_seq: 2 })) },                  'a tombstone received'],
+    [(box: TestableBox) => { box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-2' })) }, 'a newer revision received'],
+  ] as const
+
+  for (const [overtake, blurb] of ForgetCases) {
+    it(`keeps nothing where ${blurb} lands before the unseal answers, and resolves all the same`, async () => {
+      const { box, asked, open } = await heldOpenBoxOf()
+      const exposing = box.expose()
+      await asked
+      overtake(box)
+      open()
+      expect(await exposing).to.eq(box)
+      expect(box.whisper).to.be.null
+      expect(box.getSnapshot().exposed).to.be.false
+    })
+  }
+
+  it("keeps nothing where the host forgets before its hydrate answers, ahead of the unseal", async () => {
+    const { box, open } = await heldOpenBoxOf()
+    const exposing = box.expose()
+    box.whisper = null
+    open()
+    await exposing
+    expect(box.whisper).to.be.null
+    expect(box.getSnapshot().exposed).to.be.false
+  })
+
+  it("keeps the whisper a host set while it unseals, not the one it opened", async () => {
+    const { box, asked, open } = await heldOpenBoxOf()
+    const exposing = box.expose()
+    await asked
+    box.whisper = { val: 'sk-test-1111' }
+    open()
+    await exposing
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-1111' })
+  })
+
+  it("keeps what it opened where the vault locks while it unseals, as locking forgets nothing, answering LOCKED until it unlocks", async () => {
+    const { box, asked, open } = await heldOpenBoxOf()
+    const exposing = box.expose()
+    await asked
+    held.mw.setLockState('locked')
+    open()
+    await exposing
+    expect(box.whisper).to.eq(LOCKED)
+    expect(box.getSnapshot().exposed).to.be.true
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000', orgId: null } })
+  })
+
+  it("keeps what it opened where nothing overtakes it, and a later expose keeps its own", async () => {
+    const first = await heldOpenBoxOf()
+    const exposing = first.box.expose()
+    first.open()
+    await exposing
+    expect(first.box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000', orgId: null } })
+    first.box.disarm()
+    await first.box.expose()
+    expect(first.box.getSnapshot().exposed).to.be.true
   })
 })
 // --
@@ -817,6 +970,9 @@ describe("Box and Storable entries: arguments checked first of all, before any g
     [(box: TestableBox) => box.del({ maxWorldMillis: -1 }),                                       'del with opts out of range'],
     [(box: TestableBox) => box.unsealWhisper({ maxWorldMillis: -1 }),                             'unsealWhisper with opts out of range'],
     [(box: TestableBox) => box.expose({ maxWorldMillis: -1 }),                                    'expose with opts out of range'],
+    [(box: TestableBox) => box.getWhisper({ maxWorldMillis: -1 }),                                'getWhisper with opts out of range'],
+    [(box: TestableBox) => box.useWhisper(() => 'called', { maxWorldMillis: -1 }),                'useWhisper with opts out of range'],
+    [(box: TestableBox) => box.useWhisper('call me' as never),                                    'useWhisper with a callback that is no function'],
   ] as const
 
   for (const [call, blurb] of BadArgCases) {
@@ -922,3 +1078,68 @@ describe("Storable.edit holds its patch to the concrete class's isFullPatch firs
     expect(box.sidecar).to.deep.equal({ note: 'new' })
   })
 })
+
+// == [Disarm]: disarm, evict, a tombstone or another device's revision received or fetched, this device's own send
+
+describe("box.disarm() and box.evict(): the exposed whisper forgotten", () => {
+  it("forgets the whisper exposed on disarm, telling the snapshot and its listeners", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    const listener = vi.fn()
+    box.subscribe(listener)
+    box.disarm()
+    expect(box.whisper).to.be.null
+    expect(box.getSnapshot().exposed).to.be.false
+    expect(listener).toHaveBeenCalled()
+  })
+
+  it("disarms on evict", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.evict()
+    expect(box.whisper).to.be.null
+    expect(box.getSnapshot().exposed).to.be.false
+  })
+})
+
+describe("box.receive(rcvd) and box.fetch(): what a record landing does to the whisper exposed", () => {
+  it("forgets it when a tombstone is received", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    expect(box.whisper).to.be.null
+  })
+
+  it("forgets it when another device's newer revision is received", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    expect(box.whisper).to.be.null
+  })
+
+  it("forgets it when a fetch finds another device's newer revision stored", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    held.mw.seedStore(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+    await box.fetch()
+    expect(box.revision_seq).to.eq(2)
+    expect(box.whisper).to.be.null
+  })
+
+  it("keeps it when the revision held is received again", async () => {
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    box.receive(fullBoxRecord())
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
+  })
+
+  it("keeps it when the answer to this device's own send lands", async () => {
+    held.mw.seedStore(fullBoxRecord())
+    const box = await boxOf()
+    box.whisper = { val: 'sk-test-0000' }
+    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} }, asBuilt)
+    expect(box.revision_seq).to.eq(2)
+    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
+  })
+})
+// --

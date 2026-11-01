@@ -54,8 +54,8 @@ export const capacityOf = (tally: Tally | null) => ({
  * The count is null when counting afresh stopped at a limit: the vault is past it by an unknown amount.
  */
 export type Reckoning = {
-  kept:  Doc<'safebyok_vault_tallies'> | null
-  tally: Tally | null
+  tallyRow: Doc<'safebyok_vault_tallies'> | null
+  tally:    Tally | null
 }
 
 /** What a box row weighs toward its vault's limit: its size as Convex counts the document.
@@ -78,17 +78,17 @@ export const weigh = (row: Record<string, Value>, rowId?: Id<'safebyok_boxes'>):
 export const reckon = async (
   db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>, boxRows: AsyncIterable<Doc<'safebyok_boxes'>>,
 ): Promise<Reckoning> => {
-  const kept = await findTallyRow(db, vaultRowId)
-  if (kept) { return { kept, tally: { box_count: kept.box_count, box_bytes: kept.box_bytes } } }
+  const tallyRow = await findTallyRow(db, vaultRowId)
+  if (tallyRow) { return { tallyRow, tally: { box_count: tallyRow.box_count, box_bytes: tallyRow.box_bytes } } }
   // A loop rather than a reduce: it reads the rows as it goes, and stops reading past a limit.
   let tally: Tally = { box_count: 0, box_bytes: 0 }
   for await (const row of boxRows) {
     tally = plus(tally, { box_count: 1, box_bytes: weigh(row) })
     if (tally.box_count > MaxVaultBoxes || tally.box_bytes > MaxVaultBoxBytes) {
-      return { kept: null, tally: null }
+      return { tallyRow: null, tally: null }
     }
   }
-  return { kept: null, tally }
+  return { tallyRow: null, tally }
 }
 
 /** True when a write that changes the vault by `growth` must be refused: it leaves the vault past a limit, and larger by that measure.
@@ -111,11 +111,11 @@ export const refuses = (tally: Tally | null, growth: Tally): boolean => {
 /** Keep the vault's tally in step with a box write that landed: moved by `growth`, or stored for the first time.
  * A vault whose count stopped at a limit keeps no tally: its next write counts it again.
  */
-export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
+export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, { tallyRow, tally }: Reckoning, growth: Tally): Promise<void> => {
   if (tally === null) { return }
   const moved = plus(tally, growth)
-  if (kept) {
-    await db.patch('safebyok_vault_tallies', kept._id, moved)
+  if (tallyRow) {
+    await db.patch('safebyok_vault_tallies', tallyRow._id, moved)
   } else {
     await db.insert('safebyok_vault_tallies', { vault_row_id: vaultRowId, ...moved })
   }
@@ -126,15 +126,15 @@ export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults
  * deletable, a box at a time.
  */
 export const forget = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, deleted: Doc<'safebyok_boxes'>): Promise<void> => {
-  const kept = await findTallyRow(db, vaultRowId)
-  if (! kept) { return }
-  await db.patch('safebyok_vault_tallies', kept._id, plus(kept, { box_count: -1, box_bytes: -weigh(deleted) }))
+  const tallyRow = await findTallyRow(db, vaultRowId)
+  if (! tallyRow) { return }
+  await db.patch('safebyok_vault_tallies', tallyRow._id, plus(tallyRow, { box_count: -1, box_bytes: -weigh(deleted) }))
 }
 
 /** Remove the vault's tally, when it has one: its vault is being deleted. */
 export const drop = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>): Promise<void> => {
-  const kept = await findTallyRow(db, vaultRowId)
-  if (kept) { await db.delete('safebyok_vault_tallies', kept._id) }
+  const tallyRow = await findTallyRow(db, vaultRowId)
+  if (tallyRow) { await db.delete('safebyok_vault_tallies', tallyRow._id) }
 }
 
 const plus = (tally: Tally, growth: Tally): Tally => ({

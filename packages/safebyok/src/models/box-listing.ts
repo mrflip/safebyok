@@ -2,13 +2,13 @@
 
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
-import { lockedError } from '../helpers/throwers'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
-import { type BoxSnapshot, Box, sealedRecordOf } from './box'
+import { type BoxPatch, type BoxSnapshot, Box, sealedRecordOf } from './box'
 import type { Lease } from './lease'
 import { Listing, hasRevision } from './listing'
-import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxDnaFilled, type BoxRecord, type BoxSparse, type Cache, type Dna, type EditOpts, type Fetched, type ListingOpts, type ListingWorld, type Revision, type Store, type Times, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Given to a box listing]: BoxLease, BoxWorld, BoxStore, BoxCache, BoxDna, BoxListingOpts
@@ -44,7 +44,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  // == [Building]: build, demandUnlocked
+  // == [Building]: build, ensure, rebirthOf, demandUnlocked
 
   /** {@link Listing.build}, a dna sealed at birth: the box staged is full, the dna's whisper sealed in with its sidecar. Stores nothing.
    * A record is told from a dna as `Listing.build` tells it, by its `revision_seq`, and keeps its
@@ -60,8 +60,38 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return super.build(dna)
   }
 
+  /** The box `dna` names, as the vaultDB holds it, whisper and sidecar untouched; where it holds none, `dna` sealed and stored.
+   * A box held deleted or damaged is sent `dna`, which brings it back, and so is a draft held, in place
+   * of what it staged. Where another device stores a box first, that box, as it stands.
+   * The dna is held to {@link boxDna} first, refusing 'bad_option', naming the field; sealing needs
+   * the vault unlocked, refusing 'vault_locked'.
+   */
+  async ensure(dna: BoxDna, opts: EditOpts = {}): Promise<Box> {
+    const filled = boxDna.parse(dna)
+    const timely = MSX.timelyOpts.parse(opts)
+    const scope = this.scopeOf(filled)
+    const fetched = await this.fetch(scope, { ...timely, ifAbsent: 'nil' })
+    if (fetched !== null) { return fetched }
+    const { whisper, sidecar } = filled
+    const held = this.at(scope)
+    if (held !== null) { return this.#rebirthOf(held, { whisper, sidecar }, timely) }
+    this.#demandUnlocked()
+    return this.putDraft(await this.draftOf({ ...this.stampDna(filled), ...filled }))
+  }
+
+  /** `held` sent `patch`; where another device's box has reached it, by a notice since the fetch or with the 'stale_write' that refuses the send, that box, as it stands. */
+  async #rebirthOf(held: Box, patch: BoxPatch, timely: EditOpts): Promise<Box> {
+    if (held.isPresent && ! held.hasStaged) { return held }
+    try {
+      return await held.send(patch, timely)
+    } catch (err) {
+      if ((err instanceof VaultError) && (err.refusalkind === 'stale_write') && held.isPresent && ! held.hasStaged) { return held }
+      throw err
+    }
+  }
+
   /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
-  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw lockedError() } }
+  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw RefusalFuncs.vaultLocked() } }
   // --
 
   // == [Defined by the box listing]
@@ -80,7 +110,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // Every dna reaches here through `build`, which holds it to `boxDna`: the defaults are filled there, not here. The whisper rides in the dna this far, and no further.
   /** The box a dna stages at birth: the dna as {@link boxDna} filled it, under the format, alive, in this vault, its birthday gift a `box_tok` fresh from {@link makeLifeTok}, its whisper and sidecar sealed through the vault's lease by {@link sealedRecordOf}. */
-  protected draftOf({ whisper, sidecar, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
+  protected override draftOf({ whisper, sidecar, ...dna }: BoxDnaFilled & Revision & Times): Promise<BoxRecord> {
     return sealedRecordOf(this.world.demandLease(), { ...dna, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
   }
 
@@ -89,7 +119,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   absentRefusal(scope: Boxscope): VaultError {
-    return new VaultError('absent_box', `No box is stored under the label ${this.scopeOf(scope).boxlabel}.`)
+    return RefusalFuncs.boxAbsent(this.scopeOf(scope).boxlabel)
   }
 
   /** The record `meta.box_stored` carries: the full record where it is one, else its sparse form, else null. */

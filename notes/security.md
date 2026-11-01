@@ -41,6 +41,14 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-01 (sprint v6bank, thread 3d, PR [#435](https://github.com/mrflip/safebyok/pull/435), branch `20261101-seams`; the Coach's decision): **revoking a
+  passkey rotates no vault key.** The vaultKey is static (G10 in `notes/guarantees.md`), so a device that kept a copy of the vault props and
+  still holds the revoked passkey's PRF answer can unwrap the vaultKey whatever the library does: revocation is enforced only on the honest
+  path. That path is the fetch-first rule of thread 3d: every unlock by proof fetches the gate from storage before it unlocks, so a revoked
+  passkey no longer unlocks through the library. Not changed, by decision: rotating the vaultKey on revocation would revoke every key and
+  need re-syndication (re-wrapping and re-distributing to every device and wayin); the Coach judges the risk of leaving it out less than the
+  risk of adding it. Related: with the fetch-first rule there is no passphrase unlock while offline (a cached lease still unlocks); the
+  Coach keeps that for now.
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
   value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,

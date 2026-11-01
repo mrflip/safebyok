@@ -157,6 +157,30 @@ describe("Scopepath's kind tests", () => {
   })
 })
 
+describe("Scopepath.withinBankScopepathPrefix and withinBankScopepathPred", () => {
+  const bank = { applabel: 'acme', user_id: 'u1' }
+
+  it("begin every vault record's scopepath of a bank with its prefix, ending in the delimiter, as the prefix's example shows", () => {
+    expect(Scopepath.withinBankScopepathPrefix(bank)).to.eq('vault^acme^u1^')
+    expect(Scopepath.vault(u1).startsWith(Scopepath.withinBankScopepathPrefix(bank))).to.be.true
+  })
+
+  it("pick the vault records of a bank out of a store, and nothing else, as the predicate's example shows", () => {
+    const store = memoryStore()
+    const others = [Scopepath.bank(bank), Scopepath.lease(u1), Scopepath.device(u1), Scopepath.box({ ...u1, boxlabel: 'anthropic' }), Scopepath.vault(TH.scopeOf('u12')), Scopepath.vault(TH.scopeOf('u2'))]
+    const vaults = [Scopepath.vault(u1), Scopepath.vault(TH.scopeOf('u1', 'work'))]
+    for (const scopepath of [...others, ...vaults]) { store.put(scopepath, '{}') }
+    expect(store.scopepaths().filter(Scopepath.withinBankScopepathPred(bank))).to.have.members(vaults)
+  })
+
+  it("pass over a key that is not text, and refuse a bank scope that fails its check", () => {
+    expect(Scopepath.withinBankScopepathPred(bank)(42)).to.be.false
+    for (const make of [Scopepath.withinBankScopepathPrefix, Scopepath.withinBankScopepathPred]) {
+      expect(TH.expectSyncRefusal(() => make({ applabel: 'acme', user_id: 'a^b' }), 'bad_scope').meta?.fieldnames).to.deep.equal(['user_id'])
+    }
+  })
+})
+
 describe("Scopepath.withinVaultScopepathPrefix and withinVaultScopepathPred", () => {
   it("begin every box's scopepath of a vault with its prefix, ending in the delimiter, as the prefix's example shows", () => {
     expect(Scopepath.withinVaultScopepathPrefix(u1)).to.eq('box^acme^u1^main^')

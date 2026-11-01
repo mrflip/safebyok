@@ -9,7 +9,7 @@
 import { deepFreeze, omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../checks/validator'
-import { type VaultError, isVaultError } from '../errors'
+import { type RefusalKind, type VaultError, isVaultError } from '../errors'
 import { type Outcome } from '../outcome'
 import * as Phrases from '../phrases'
 import * as HX from '../shapes/host-code'
@@ -17,7 +17,8 @@ import type { CipherCtxRecord } from '../crypto'
 import * as VX from '../shapes/vault'
 import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
 import type { Clock } from '../shapes/bank-opts'
-import type { VaultScope } from '../shapes/scopes'
+import type { StringStore } from '../string-store'
+import type { BankScope, VaultScope } from '../shapes/scopes'
 import { sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
 
@@ -88,10 +89,9 @@ export type Vaulted = Readonly<Z.infer<typeof vaulted>>
 export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
 
 /** The sparse form of a thing damaged or gone: every sparse prop stays on it, for the record; nothing the user put in the thing does. {@link tombstone} checks what the base knows of one.
- * A stored record that fails its check arrives as a tombstone, `am` 'd': the sparse props as far
- * as storage recovered them, and the kind's constants filled in by the adapter, so that the
- * concrete listing's `sparseOf` accepts it. Where that much cannot be recovered, the store
- * refuses 'corrupt_record' instead. For a box, see {@link boxSparse}.
+ * A store makes no tombstone of a row that reads as neither the kind's record nor its tombstone:
+ * it refuses it by name, 'damaged_box' or 'damaged_vault'. A row stored as a tombstone, `am` 'd'
+ * or 'x', is delivered as stored. For a box, see {@link boxSparse}.
  */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals[number] }>
 
@@ -139,13 +139,13 @@ export const { answer, notice } = Checkers('bad_record', ({ obj, union, lit, unk
 type AnswerBase<ScopeT> = Readonly<{ scope: ScopeT, world: unknown }>
 
 /** The outcome of a storage call about `scope`, as the concrete listing maps it: an {@link Outcome} whose `val` is the record stored (null for none), or whose `err` is the refusal, with the `scope` and the `world` it lies in as storage holds it now beside it.
- * Whatever an `Outcome` carries, an answer carries. A stored record that fails its check is
- * delivered as a damaged {@link Tombstone}, in the kind's sparse form, or refused 'corrupt_record'
- * by the store. {@link answer} checks what the base knows of one.
+ * Whatever an `Outcome` carries, an answer carries. A stored row that reads as neither the kind's
+ * record nor its tombstone is refused by name, 'damaged_box' or 'damaged_vault', and never delivered.
+ * {@link answer} checks what the base knows of one.
  */
 export type Answer<ScopeT, RecordT, SparseT> = Outcome<Fetched<RecordT, SparseT> | null> & AnswerBase<ScopeT>
 
-/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least; a damaged one arrives as {@link Answer} says, a {@link Tombstone}. {@link notice} checks what the base knows of one. */
+/** A notice from the watch: an answer nobody asked for, always naming a record, sparse at least. A row that does not read sends no notice: the watch rings its `onChange` instead. {@link notice} checks what the base knows of one. */
 export type Notice<RecordT, SparseT> = Readonly<{ record: Fetched<RecordT, SparseT>, world: unknown }>
 // --
 
@@ -440,14 +440,15 @@ export type ListingWorld = World & {
  * * Over a row under another `revision_tok` than `priorRevisionTok` (any row, where `priorRevisionTok` is null; a tombstone is a row), it refuses 'stale_write', carrying that row.
  * * Over the row under `priorRevisionTok`, it lands only at that row's `revision_seq` + 1, which storage computes or queries itself; any other `revision_seq` refuses 'bad_record'.
  * A put that lands keeps the record exactly as given, never renumbered or patched, and answers what storage then holds.
- * `del` follows the same `priorRevisionTok` rule and answers the tombstone it lands, at the row's `revision_seq` + 1 under a fresh `revision_tok`; over no row, with `priorRevisionTok` null, it lands a tombstone at revision 0.
- * `watch` pushes a notice for every change; `fullFor` names the scopes to push full records for, every other notice sparse at most.
+ * `del` follows the same `priorRevisionTok` rule and answers the tombstone it lands, at the row's `revision_seq` + 1 under a fresh `revision_tok`; over no row, with `priorRevisionTok` null, it lands nothing and answers null.
+ * A row that reads as neither the kind's record nor its tombstone is refused by name, 'damaged_box' or 'damaged_vault', by each verb that meets it, and nothing is stored over it.
+ * `watch` pushes a notice for every change since it began; `fullFor` names the scopes to push full records for, every other notice sparse at most. Where it cannot say what changed (its backend failed, a row does not read, or one vanished) it rings `onChange`, so each thing fetches again and meets the refusal itself.
  */
 export type Store<ScopeT, RecordT, SparseT> = {
   get(scope: ScopeT): Promise<Answer<ScopeT, RecordT, SparseT>>
   put(record: RecordT, priorRevisionTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
   del(scope: ScopeT, priorRevisionTok: string | null): Promise<Answer<ScopeT, RecordT, SparseT>>
-  watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
+  watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[], onChange: () => void): () => void
 }
 
 /** The deviceDB's cache of one kind of thing: loaded once, by the listing's `hello`; saved by each instance's settle, the listing handing it to each instance it makes.
@@ -486,6 +487,42 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
 export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
   world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, demandLease: fn() }),
 }), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
+// --
+
+// == [Store fronts]: storeFrontOpts, localStoreFrontOpts, storeWatchArgs, priorRevisionTok, storeRows, foundRows, StoreFrontOpts, LocalStoreFrontOpts, FoundRow
+
+/** The check of a `StoreFront`'s options: a `clock`, which stamps each tombstone it lands, `wallClock` where left out. Its `parse` refuses 'bad_option'. */
+export const storeFrontOpts = objCheck(() => ({ clock: HX.clockShape.optional() }), 'bad_option')
+
+/** The check of `localStoreFront`'s options: a `store` carrying a StringStore's five calls, and the `clock` {@link storeFrontOpts} takes. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
+export const localStoreFrontOpts = objCheck(({ obj, fn }) => {
+  const call = fn()
+  return {
+    store: obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape),
+    clock: HX.clockShape.optional(),
+  }
+}, 'bad_option')
+
+/** The check of what a store's `watch` is handed: its `onNotice`, `fullFor` and `onChange`, each a function. Its `parse` refuses 'bad_option'. */
+export const storeWatchArgs = objCheck(({ fn }) => ({ onNotice: fn(), fullFor: fn(), onChange: fn() }), 'bad_option')
+
+/** The check of a `put` or `del`'s `priorRevisionTok`: a `revision_tok`, or null for no record held. Its `parse` refuses 'bad_record'. */
+export const priorRevisionTok = Checker(({ revision_tok }) => revision_tok.nullable(), 'bad_record', [FX])
+
+/** The checks of what a store front's hooks answer, each refusing 'corrupt_record', a bug in the adapter: `storeRows`, `doGetRows`' list of rows, and `foundRows`, `doFindRows`' list of `{ scopepath, row }`. Checks only: each row is judged as the kind's. */
+export const { storeRows, foundRows } = Checkers('corrupt_record', ({ arr, obj, str, unk }) => ({
+  storeRows: arr(unk),
+  foundRows: arr(obj({ scopepath: str, row: unk })),
+}))
+
+/** The options of a `StoreFront`, as {@link storeFrontOpts} checks them. */
+export type StoreFrontOpts = { clock?: Clock | undefined }
+
+/** The options of `localStoreFront`, as {@link localStoreFrontOpts} checks them: where the rows live (`domStore(localStorage, prefix)`, `memoryStore()`, or a StringStore of your own), and the clock. */
+export type LocalStoreFrontOpts = StoreFrontOpts & { store: StringStore }
+
+/** A row `doFindRows` found: its `scopepath`, and the `row` as stored, unjudged. */
+export type FoundRow = Z.infer<typeof foundRows>[number]
 // --
 
 // == [Making a storable]: storableArgs
@@ -551,7 +588,7 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse, VaultTrouble
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const VaultFormat = 6001
@@ -571,42 +608,48 @@ export const vaultPatch = Checker(() => vaultRecord.partial().strict(), 'bad_opt
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
+
+/** What is wrong with a vault, as its snapshot shows it: the refusal kind that names it, and a sentence for the user. */
+export type VaultTrouble = Readonly<{ refusalkind: RefusalKind, message: string }>
 // --
 
-// == [What a proving is handed]: cleartexts, attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld, provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, passphraseClosureArgs, passkeyClosureArgs, vaultBuildArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs, Cleartexts, AttemptCleartexts, PassphraseCleartexts, PasskeyCleartexts, ProofClosure, AttemptClosure, PassphraseClosure, PasskeyClosure, ProvingWorld
+// == [What a proving is handed]: cleartexts, attemptCleartexts, passphraseCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, provingWorld, gateWorld, provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, vaultBuildArgs, vaultUnlockArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs, Cleartexts, AttemptCleartexts, PassphraseCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, ProvingWorld, GateWorld
 
-/** What a proof closure hands in: `cleartexts` at a vault's birth, a passphrase and perhaps a new passkey's answer; `attemptCleartexts` at an unlock, a passphrase or a passkey's answer; `passphraseCleartexts` and `passkeyCleartexts` for a gate's new wayin, a new passphrase or a new passkey's answer. */
-export const { cleartexts, attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id }) => ({
-  cleartexts:           obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
-  attemptCleartexts:    obj({ passphrase: passphraseCleartext.optional(), passkeyAnswer: passkeyAnswer.nullable().optional() }).strict()
-    .refine(({ passphrase, passkeyAnswer: answer = null }) => passphrase !== undefined || answer !== null, Phrases.ProofMissing),
-  passphraseCleartexts: obj({ passphrase: passphraseCleartext }).strict(),
-  passkeyCleartexts:    obj({ passkeyAnswer: freshPasskeyAnswer }).strict(),
-  provingWorld:         obj({ clock: clockShape, keyDeriver: keyDeriverShape, device_id }),
-}), [FX, HX, VX])
+/** The cleartexts the user hands in: `cleartexts` at a vault's birth, a passphrase and perhaps a new passkey's answer; `attemptCleartexts` at an unlock, a passphrase or a passkey's answer; the rest for a change to the gate, each proved by the passphrase. */
+export const { cleartexts, attemptCleartexts, passphraseCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, provingWorld, gateWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer, clockShape, keyDeriverShape, device_id, strengthChecker }) => {
+  const provingWorld = obj({ clock: clockShape, keyDeriver: keyDeriverShape, device_id })
+  return {
+    cleartexts:                  obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer.nullable().optional() }).strict(),
+    attemptCleartexts:           obj({ passphrase: passphraseCleartext.optional(), passkeyAnswer: passkeyAnswer.nullable().optional() }).strict()
+      .refine(({ passphrase, passkeyAnswer: answer = null }) => passphrase !== undefined || answer !== null, Phrases.ProofMissing),
+    passphraseCleartexts:        obj({ passphrase: passphraseCleartext }).strict(),
+    passphraseReplaceCleartexts: obj({ passphrase: passphraseCleartext, nextPassphrase: passphraseCleartext }).strict(),
+    passkeyAddCleartexts:        obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer }).strict(),
+    provingWorld,
+    gateWorld:                   obj({ ...provingWorld.shape, strengthChecker }),
+  }
+}, [FX, HX, VX])
 
-export type Cleartexts           = Z.input<typeof cleartexts>
-export type AttemptCleartexts    = Z.input<typeof attemptCleartexts>
-export type PassphraseCleartexts = Z.input<typeof passphraseCleartexts>
-export type PasskeyCleartexts    = Z.input<typeof passkeyCleartexts>
-export type ProofClosure         = () => Cleartexts | Promise<Cleartexts>
-export type AttemptClosure       = () => AttemptCleartexts | Promise<AttemptCleartexts>
-export type PassphraseClosure    = () => PassphraseCleartexts | Promise<PassphraseCleartexts>
-export type PasskeyClosure       = () => PasskeyCleartexts | Promise<PasskeyCleartexts>
-export type ProvingWorld         = Z.infer<typeof provingWorld>
+export type Cleartexts                  = Z.input<typeof cleartexts>
+export type AttemptCleartexts           = Z.input<typeof attemptCleartexts>
+export type PassphraseCleartexts        = Z.input<typeof passphraseCleartexts>
+export type PassphraseReplaceCleartexts = Z.input<typeof passphraseReplaceCleartexts>
+export type PasskeyAddCleartexts        = Z.input<typeof passkeyAddCleartexts>
+export type ProvingWorld                = Z.infer<typeof provingWorld>
+/** A {@link ProvingWorld} with the host's `strengthChecker`, which hears each new passphrase before a wayin is made for it. */
+export type GateWorld                   = Z.infer<typeof gateWorld>
 
-/** The arguments of the proving makers, of `VaultListing.build` of a dna, and of the gate's operations: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
-export const { provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, passphraseClosureArgs, passkeyClosureArgs, vaultBuildArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs } = Checkers('bad_option', ({ obj, fn, passphraseCleartext }) => ({
-  provingPairArgs:       obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
+/** The arguments of the proving makers, of `VaultListing.build` of a dna, and of the vault's gated verbs: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. A gated verb's cleartexts are optional: without them, it asks the user. */
+export const { provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, vaultBuildArgs, vaultUnlockArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs } = Checkers('bad_option', ({ obj, passphraseCleartext }) => ({
+  provingPairArgs:       obj({ stamp: vaultStamp, cleartexts, world: provingWorld }),
   provingMakeArgs:       obj({ stamp: vaultStamp, world: provingWorld }),
   passphraseMakeArgs:    obj({ stamp: vaultStamp, world: provingWorld, passphrase: passphraseCleartext }),
-  provingAttemptArgs:    obj({ stamp: vaultStamp, gate: gateProps, proofClosure: fn<AttemptClosure>(), world: provingWorld }),
-  passphraseClosureArgs: obj({ stamp: vaultStamp, passphraseClosure: fn<PassphraseClosure>(), world: provingWorld }),
-  passkeyClosureArgs:    obj({ stamp: vaultStamp, passkeyClosure: fn<PasskeyClosure>(), world: provingWorld }),
-  vaultBuildArgs:        obj({ proofClosure: fn<ProofClosure>() }),
-  passphraseReplaceArgs: obj({ proofClosure: fn<AttemptClosure>(), passphraseClosure: fn<PassphraseClosure>() }),
-  passkeyAddArgs:        obj({ proofClosure: fn<AttemptClosure>(), passkeyClosure: fn<PasskeyClosure>() }),
-  passkeyRevokeArgs:     obj({ proofClosure: fn<AttemptClosure>() }),
+  provingAttemptArgs:    obj({ stamp: vaultStamp, gate: gateProps, cleartexts: attemptCleartexts, world: provingWorld }),
+  vaultBuildArgs:        obj({ cleartexts }),
+  vaultUnlockArgs:       obj({ cleartexts: attemptCleartexts.optional() }),
+  passphraseReplaceArgs: obj({ cleartexts: passphraseReplaceCleartexts.optional() }),
+  passkeyAddArgs:        obj({ cleartexts: passkeyAddCleartexts.optional() }),
+  passkeyRevokeArgs:     obj({ cleartexts: passphraseCleartexts.optional() }),
 }), [VX])
 // --
 
@@ -672,7 +715,7 @@ export const { ctxStamp, serializedBytes, leaseGetArgs, leaseGrantArgs, leaseSea
 }, [FX])
 // --
 
-// == [The vault's world]: leaseDeviceDB, vaultListingOpts, LeaseDeviceDB
+// == [The vault's world]: leaseDeviceDB, boxVaultDB, vaultListingOpts, boxBag, LeaseDeviceDB, BoxBag
 
 /** The deviceDB's lease verbs, as the vault's world carries them: each by the vault's scope, which `vault.leaseDBFriend()` binds, so no verb of the dbfriend takes one. */
 export const leaseDeviceDB = objCheck(({ fn }) => ({
@@ -683,37 +726,87 @@ export const leaseDeviceDB = objCheck(({ fn }) => ({
 
 export type LeaseDeviceDB = Z.infer<typeof leaseDeviceDB>
 
-/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Its `parse` refuses 'bad_option'. Checks only. */
-export const vaultListingOpts = objCheck(({ obj }) => ({
-  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), deviceDB: leaseDeviceDB }),
+/** The check of the vaultDB as a vault's boxes reach it: `boxStore`, which hands the store of one vault's boxes, as a `StoreFront`'s does. Its `parse` refuses 'bad_option'. Checks only. */
+export const boxVaultDB = objCheck(({ fn }) => ({
+  boxStore: fn(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
+
+/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate, lease, gatings and box listing need. Its `parse` refuses 'bad_option'. Checks only. */
+export const vaultListingOpts = objCheck(({ obj, fn }) => ({
+  world: obj({
+    ...gateWorld.shape, requestCleartext: fn(), logger: HX.loggerShape,
+    leaseMillis: leaseGrantOpts.shape.leaseMillis.optional(), pesterMillis: leaseGrantOpts.shape.leaseMillis.optional(),
+    deviceDB: leaseDeviceDB, vaultDB: boxVaultDB, boxRefreshMillis: horizonMillis,
+  }),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+/** The check of the bag naming one of a vault's boxes, as the vault's box verbs are handed it: its `boxlabel`, and the vault's own scope fields if you like, each checked. It takes a box, its snapshot or a dna, and leaves the rest. Its `parse` refuses 'bad_scope'. */
+export const boxBag = Checker(({ obj, applabel, user_id, vaultlabel, boxlabel }) => obj({
+  applabel: applabel.optional(), user_id: user_id.optional(), vaultlabel: vaultlabel.optional(), boxlabel,
+}), 'bad_scope')
+
+/** The bag naming one of a vault's boxes, as {@link boxBag} checks it.
+ *
+ * @example vault.getBox({ boxlabel: 'anthropic' })
+ */
+export type BoxBag = Z.input<typeof boxBag>
 // --
 
-// == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, cleartextsForGatingkind, gatingWorld, GatingKind, CleartextsForGatingkind, StrengthChecker
+// == [Refusal kinds]: modelsRefusalKindVals, ModelsRefusalKind
+
+/** Every refusalkind the models throw, the gatings' and the vault verbs' alike, each meaning what errors.ts's `refusalKindVals` says: the list a host's messages map on.
+ * The list grows as the models do.
+ */
+export const modelsRefusalKindVals = [
+  // Misuse: the host developer's to fix.
+  'bad_option', 'bad_scope', 'bad_record', 'corrupt_record', 'unknown_key_deriver', 'insecure_context', 'unexpected_error',
+  // Correctable: an attempt refused so leaves its gating open (correctableKindVals).
+  'wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase',
+  // A gating ended, unlocking and changing nothing.
+  'declined', 'gating_landed', 'gate_made_elsewhere', 'gate_moved', 'absent_wayin',
+  // The vault and its boxes.
+  'vault_locked', 'absent_vault', 'absent_box', 'vault_gone', 'vault_remade',
+  // Storage's word, passed through.
+  'stale_write', 'record_conflict', 'not_permitted', 'storage_unavailable', 'storage_blocked', 'vault_full', 'box_too_large',
+  // Bad news.
+  'damaged_vault', 'damaged_wayin', 'damaged_box', 'damaged_lease', 'vault_behind', 'identity_revoked',
+] as const satisfies readonly RefusalKind[]
+
+export type ModelsRefusalKind = typeof modelsRefusalKindVals[number]
+// --
+
+// == [The gating's forms]: gatingKindVals, correctableKindVals, isCorrectable, gatingkind, cleartextsForGatingkind, ProvedByForGatingkind, gatingWorld, GatingKind, CleartextsForGatingkind, PasskeyGatingKind, StrengthChecker
 
 export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey'] as const
 
-export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
+/** The refusals of an attempt that leave its gating open, for the user to try again. */
+export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const satisfies readonly ModelsRefusalKind[]
 
-export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts } = Checkers('bad_option', ({ oneof, obj, passphraseCleartext, freshPasskeyAnswer }) => ({
-  gatingkind:                  oneof(gatingKindVals),
-  vaultBuildCleartexts:        cleartexts,
-  vaultUnlockCleartexts:       attemptCleartexts,
-  passphraseReplaceCleartexts: obj({ passphrase: passphraseCleartext, nextPassphrase: passphraseCleartext }).strict(),
-  passkeyAddCleartexts:        obj({ passphrase: passphraseCleartext, passkeyAnswer: freshPasskeyAnswer }).strict(),
-  passkeyRevokeCleartexts:     passphraseCleartexts,
-}), [VX])
+/** True for a refusal of a kind in {@link correctableKindVals}: one that leaves a gating open, and a passkey's answer unspent (G2). */
+export const isCorrectable = (err: unknown): boolean => isVaultError(err) && (correctableKindVals as readonly string[]).includes(err.refusalkind)
 
+export const gatingkind = Checker(({ oneof }) => oneof(gatingKindVals), 'bad_option')
+
+/** The cleartexts an attempt on each kind of gating hands in. */
 export const cleartextsForGatingkind = Object.freeze({
-  build_vault:        vaultBuildCleartexts,
-  unlock_vault:       vaultUnlockCleartexts,
+  build_vault:        cleartexts,
+  unlock_vault:       attemptCleartexts,
   replace_passphrase: passphraseReplaceCleartexts,
   add_passkey:        passkeyAddCleartexts,
-  revoke_passkey:     passkeyRevokeCleartexts,
+  revoke_passkey:     passphraseCleartexts,
 } as const)
 
+/** The wayins whose proof each kind of gating takes: none for a vault not yet built, either to unlock, and the passphrase alone to change the gate. */
+export const ProvedByForGatingkind = Object.freeze({
+  build_vault:        Object.freeze([] as const),
+  unlock_vault:       Object.freeze(['passphrase', 'passkey'] as const),
+  replace_passphrase: Object.freeze(['passphrase'] as const),
+  add_passkey:        Object.freeze(['passphrase'] as const),
+  revoke_passkey:     Object.freeze(['passphrase'] as const),
+} as const satisfies Readonly<Record<GatingKind, readonly WayinKind[]>>)
+
 export const gatingWorld = objCheck(({ fn }) => ({
-  requestCleartext: fn().optional(),
+  requestCleartext: fn(),
   strengthChecker:  VX.strengthChecker,
   logger:           HX.loggerShape,
 }), { refuseAs: 'bad_option', extras: 'strip' })
@@ -722,27 +815,91 @@ export type GatingKind = typeof gatingKindVals[number]
 
 export type CleartextsForGatingkind = { [KindT in GatingKind]: Z.input<typeof cleartextsForGatingkind[KindT]> }
 
+/** The kinds of gating a passkey's answer may prove, as {@link ProvedByForGatingkind} says: the kinds `attemptPasskey` is called on. */
+export type PasskeyGatingKind = { [KindT in GatingKind]: 'passkey' extends typeof ProvedByForGatingkind[KindT][number] ? KindT : never }[GatingKind]
+
+/** A function from a new passphrase and the vault's scope to a verdict, `{ strong: true }` or `{ strong: false, reason }`, where `reason` is the sentence the user sees.
+ * It may be async, and may carry a `load()` that `bank.hello()` awaits. It hears the passphrase:
+ * log nothing it is given. What it throws is replaced, so a bug in it cannot leak a passphrase.
+ *
+ * @example const strengthChecker: StrengthChecker = (passphrase) => (passphrase.length >= 16 ? { strong: true } : { strong: false, reason: 'Use at least 16 characters.' })
+ */
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 
-// == [The bank's forms]: positiveMinutes, refreshMinutes, bankOpts
+// == [The device's forms]: DeviceRecordFormat, gateEpochSeen, deviceRecord, onBadNews, vaultCacheable, GateEpochSeen, DeviceRecord, DeviceRecordAdvance, VaultCacheable, OnBadNews
+
+/** The device record format these forms describe, as each record carries it in `fmt`. */
+export const DeviceRecordFormat = 8001
+
+/** True where no two entries name the same vault. */
+const hasEachVaultOnce = (seen: readonly { vaultlabel: string }[]): boolean => new Set(seen.map(({ vaultlabel }) => vaultlabel)).size === seen.length
+
+/** The checks of what a device keeps of a bank's scope, each refusing 'bad_record': `deviceRecord`, this device's `device_id` for the scope and the highest `gate_epoch` it has seen of each vault, strict and frozen; `gateEpochSeen`, one vault's entry. A vault appears at most once.
+ *
+ * @example deviceRecord.parse({ fmt: 8001, applabel: 'acme', user_id: 'u1', device_id: 'Zm9vYmFy', highest_gate_epochs: [{ vaultlabel: 'main', gate_epoch: 3 }] })
+ */
+export const { gateEpochSeen, deviceRecord } = Checkers('bad_record', ({ obj, arr, lit, uint, applabel, user_id, vaultlabel, device_id }) => {
+  const gateEpochSeen = obj({ vaultlabel, gate_epoch: uint }).strict().readonly()
+  const deviceRecord  = obj({
+    fmt:                 lit(DeviceRecordFormat),
+    applabel,
+    user_id,
+    device_id,
+    highest_gate_epochs: arr(gateEpochSeen).refine(hasEachVaultOnce, Phrases.VaultlabelRepeated).readonly(),
+  }).strict().readonly()
+  return { gateEpochSeen, deviceRecord }
+}, [FX])
+
+/** The check of the `onBadNews` a deviceDB's cache verbs take, refusing 'bad_option': a function, or none. */
+export const onBadNews = Checker(({ fn }) => fn<(news: VaultError) => unknown>().optional(), 'bad_option')
+
+/** The check of a vault's copy as the deviceDB files it, refusing 'bad_record': the scope it is filed under, with `central` and `staged` beside it. The rest is the listing's to judge, as {@link buildableRecord} does at its hello. */
+export const vaultCacheable = Checker(({ obj, unk, applabel, user_id, vaultlabel }) => obj({ applabel, user_id, vaultlabel, central: unk, staged: unk }).loose(), 'bad_record')
+
+export type GateEpochSeen  = Z.infer<typeof gateEpochSeen>
+export type DeviceRecord   = Z.infer<typeof deviceRecord>
+/** What an advance of the device record stored: the `record`, and whether it wrote over a row that failed its check, losing what that row had seen. */
+export type DeviceRecordAdvance = Readonly<{ record: DeviceRecord, wroteOverDamaged: boolean }>
+export type VaultCacheable = Cacheable<VaultRecord, VaultSparse>
+/** Where a deviceDB's cache verbs tell of a damaged row they erased, as a bank's `onBadNews` hears it: never awaited, and one that throws fails the find with what it threw. */
+export type OnBadNews = NonNullable<Z.infer<typeof onBadNews>>
+// --
+
+// == [The bank's forms]: positiveMinutes, refreshMinutes, bankDeviceDB, bankVaultDB, bankOpts, cheatClock, BankDeviceDB
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
-export const bankOpts = objCheck(({ obj, fn, applabel, user_id, device_id }) => ({
-  applabel,
-  user_id,
+/** The check of the bank's deviceDB: the lease verbs a vault's world carries, as {@link leaseDeviceDB} checks them; `vaultCache`, which hands the device cache of a bank's vaults, telling `onBadNews` of each damaged copy it erases; `advanceDeviceRecord`, which keeps the device record; and `clearCachedVault`, which drops what the device keeps of one vault. Its `parse` refuses 'bad_option'. Checks only. */
+export const bankDeviceDB = objCheck(({ fn }) => ({
+  ...leaseDeviceDB.shape,
+  vaultCache:          fn<(scope: BankScope, onBadNews?: OnBadNews) => Cache<VaultRecord, VaultSparse>>(),
+  advanceDeviceRecord: fn<(record: DeviceRecord) => Promise<DeviceRecordAdvance>>(),
+  clearCachedVault:    fn<(scope: VaultScope) => Promise<void>>(),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+/** The deviceDB a bank is made with, as {@link bankDeviceDB} checks it. */
+export type BankDeviceDB = Z.infer<typeof bankDeviceDB>
+
+/** The check of the bank's vaultDB: `vaultStore`, which hands the store of a bank's vaults, and the `boxStore` {@link boxVaultDB} checks; a `StoreFront` answers both. Its `parse` refuses 'bad_option'. Checks only. */
+export const bankVaultDB = objCheck(({ fn }) => ({
+  ...boxVaultDB.shape,
+  vaultStore: fn(),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+export const bankOpts = objCheck(({ fn, unk, device_id }) => ({
+  // Judged by `bankScope` after, so a bad name refuses 'bad_scope', as `bank.vaultOf` refuses a bad vaultlabel.
+  applabel:            unk,
+  user_id:             unk,
   device_id:           device_id.optional(),
-  vaultStore:          obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
-  vaultCache:          obj({ load: fn(), save: fn() }),
-  deviceDB:            leaseDeviceDB,
+  vaultDB:             bankVaultDB,
+  deviceDB:            bankDeviceDB,
   keyDeriver:          HX.keyDeriverShape,
-  requestCleartext:    fn().optional(),
+  requestCleartext:    fn(),
   strengthChecker:     VX.strengthChecker.optional(),
-  clock:               HX.clockShape.optional(),
   logger:              HX.loggerShape.optional(),
   autolockMinutes:     positiveMinutes.optional(),
   pesterMinutes:       positiveMinutes.optional(),
@@ -750,4 +907,7 @@ export const bankOpts = objCheck(({ obj, fn, applabel, user_id, device_id }) => 
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn().optional(),
 }), { refuseAs: 'bad_option' }, [FX])
+
+/** The check of a test's `_cheat_clock`, the clock a bank is made with in place of the wall clock. Its `parse` refuses 'bad_option'. */
+export const cheatClock = Checker(() => HX.clockShape.optional(), 'bad_option')
 // --

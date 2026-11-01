@@ -1,14 +1,23 @@
 import { verifyConsistent } from '../checks/validator'
 import { type CipherCtxRecord, makeLifeTok } from '../crypto'
-import { VaultError } from '../errors'
+import { parseJsonOrNull } from '../helpers/parse-json'
+import * as RefusalFuncs from '../helpers/refusal-funcs'
+import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
-import type { Sidecar } from '../shapes/box'
+import type { Sidecar, Whisper } from '../shapes/box'
+import * as HX from '../shapes/host-code'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
 import type { BoxLease, BoxWorld } from './box-listing'
 import { type BoxRecord, type BoxSparse, type EditOpts, type Fetched, type LockedBag, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
+
+// == [Named by the box's verbs]: LOCKED, LockedBag, WhisperHolder, EditOpts, Sidecar, Whisper
+
+export { LOCKED, type EditOpts, type LockedBag, type WhisperHolder } from './models-shapes'
+export type { Sidecar, Whisper } from '../shapes/box'
+// --
 
 // == [Record forms]: BoxSnapshot, BoxProps, BoxPatch
 
@@ -42,8 +51,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 
   declare readonly world: BoxWorld
 
-  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: an update seals the whisper it is given. */
+  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, held in memory through `lock()` until the host sets `box.whisper` null or the box disarms. Nothing seals it: an update seals the whisper it is given. */
   #exposed: WhisperHolder | null = null
+
+  /** Counts each whisper the host sets or forgets on the box, and each eviction's forget, so an expose overtaken by one keeps nothing. */
+  #exposedSeq = 0
+
+  /** Counts each forget a tombstone or a newer revision makes, so an expose whose record is replaced while it unseals keeps nothing; one its own hydrate brings in is the record it opens. */
+  #revisedSeq = 0
 
   // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
 
@@ -81,9 +96,11 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
   demandReadyToSeal(): this { return this.demandUnlocked() }
   // --
 
-  // == [The whisper]: whisper, unsealWhisper, expose, seal
+  // == [The whisper]: whisper, getWhisper, tryGetWhisper, useWhisper, unsealWhisper, expose, disarm, seal
 
-  /** The exposed whisper, `{ val }`, while the vault is unlocked, or null where none is exposed; {@link LOCKED} while the vault is locked. Locking forgets nothing: the whisper answers again once the vault unlocks.
+  /** The exposed whisper, `{ val }`, while the vault is unlocked, or null where none is exposed; {@link LOCKED} while the vault is locked.
+   * Locking hides the whisper and does not forget it: the box holds it in memory through `lock()`,
+   * and the getter answers it again once the vault unlocks. Set `box.whisper` null, or {@link disarm}, to forget it.
    * Setting it exposes the whisper given, and no more: nothing seals it, as an update seals only the
    * whisper it is given. It needs the vault unlocked; a whisper that is not `{ val }` refuses
    * 'bad_option', naming the field, before the lock is looked at. The box keeps a frozen copy.
@@ -98,8 +115,33 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     const forgets = (whisper === null) || Storable.isLockedFUBag(whisper)
     const exposed = forgets ? null : whisperHolder.parse(whisper)
     if (! forgets) { this.demandUnlocked() }
-    this.#exposed = exposed
+    this.#replaceExposed(exposed)
     this.settle()
+  }
+
+  /** Open the stored whisper and hand back the whisper itself, frozen, keeping nothing on the box.
+   * It opens the stored record, never the exposed whisper, and refuses as {@link Box.unsealWhisper} does.
+   *
+   * @example const apiKey = await box.getWhisper()   // 'sk-ant-...'
+   */
+  async getWhisper(opts: EditOpts = {}): Promise<Whisper> {
+    const { val } = await this.unsealWhisper(opts)
+    return val
+  }
+
+  /** The stored whisper, as an {@link Outcome}: the non-throwing form of {@link Box.getWhisper}. */
+  tryGetWhisper(opts: EditOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.getWhisper(opts)) }
+
+  /** Open the stored whisper and hand it to `handed`, resolving what `handed` resolves: the shape that keeps a whisper out of the host's state.
+   * The opened bytes are zeroed before `handed` runs, and the box keeps no reference to the whisper;
+   * the whisper itself, a JavaScript value, cannot be zeroed. It refuses as {@link Box.getWhisper}
+   * does, and then `handed` is never called. A throw from `handed` rejects as it came.
+   *
+   * @example await box.useWhisper((apiKey) => callAnthropic(apiKey))
+   */
+  async useWhisper<ResultT>(handed: (whisper: Whisper) => ResultT | Promise<ResultT>, opts: EditOpts = {}): Promise<ResultT> {
+    HX.callback.parse(handed)
+    return await handed(await this.getWhisper(opts))
   }
 
   /** Open the stored whisper and hand it back, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
@@ -108,11 +150,41 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     return this.#unseal()
   }
 
-  /** Open the stored whisper and keep it on the instance, offered by `box.whisper`, which answers LOCKED in its place while the vault is locked. Keeping it is the host's decision, which a host would otherwise make for itself, without the guard; it lives on the instance until the host sets `box.whisper` null. */
+  /** Open the stored whisper and keep it on the instance, offered by `box.whisper`.
+   * Keeping it is the host's decision, which a host would otherwise make for itself, without the
+   * guard. The box holds it in memory until the host sets `box.whisper` null: `lock()` does not
+   * forget it, and while the vault is locked `box.whisper` answers LOCKED in its place.
+   * Where the box forgets or is handed a whisper while this unseals, as a disarm, an eviction, a
+   * tombstone or a newer revision makes it forget, this keeps nothing and resolves all the same.
+   * A newer revision its own fetch brings in, for a box gone stale, is the one it opens and keeps.
+   */
   async expose(opts: EditOpts = {}): Promise<this> {
-    this.#exposed = await this.unsealWhisper(opts)
+    const exposedSeqAtStart = this.#exposedSeq
+    await this.ensureReadyToUnsealWhisper(opts)
+    const revisedSeqAtUnseal = this.#revisedSeq
+    const opened = await this.#unseal()
+    if ((this.#exposedSeq !== exposedSeqAtStart) || (this.#revisedSeq !== revisedSeqAtUnseal)) { return this }
+    this.#exposed = opened
     this.settle()
     return this
+  }
+
+  /** Forget the exposed whisper, as setting `box.whisper` null does, once it no longer stands for the box. */
+  disarm(): void {
+    this.#replaceExposed(null)
+    this.settle()
+  }
+
+  /** Hold `exposed` in place of the exposed whisper, counted so an expose in flight keeps nothing. */
+  #replaceExposed(exposed: WhisperHolder | null): void {
+    this.#exposed = exposed
+    this.#exposedSeq += 1
+  }
+
+  /** Forget the exposed whisper for a record replaced, counted so an expose unsealing the record replaced keeps nothing. */
+  #forgetRevised(): void {
+    this.#exposed = null
+    this.#revisedSeq += 1
   }
 
   /** Seal this whisper, `{ val }`, with this sidecar under the next revision, as the staged: `edit({ whisper, sidecar }, opts)`. Nothing is stored until `send`. */
@@ -126,11 +198,29 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     const bytes = await this.world.demandLease().unsealWith({ box_key_wrapped, whisper_ciphered }, stamp, stamp)
     try {
       const held = whisperHolder.safeParse(parseJsonOrNull(new TextDecoder().decode(bytes)))
-      if (! held.success) { throw undecodedWhisper() }
+      if (! held.success) { throw RefusalFuncs.undecodedWhisper() }
       return held.data
     } finally {
       bytes.fill(0)
     }
+  }
+  // --
+
+  // == [Overridden from Storable]: evict, adopt
+
+  /** Forget the exposed whisper, as {@link disarm} does, and make no more fetches on schedule, for a box no listing holds any more. */
+  override evict(): void {
+    this.disarm()
+    super.evict()
+  }
+
+  /** Forget the exposed whisper where `central` is a tombstone, or a newer revision than this device staged: the whisper it opened no longer stands. The answer to this device's own `send` keeps it. */
+  protected override adopt(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null): void {
+    const prior = this.central
+    const isOwnSend = central.revision_tok === this.staged?.revision_tok
+    super.adopt(central, staged)
+    if (central === prior) { return }
+    if (MSX.isTombstone(central) || (! isOwnSend && central.revision_seq > prior.revision_seq)) { this.#forgetRevised() }
   }
   // --
 
@@ -179,7 +269,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 }
 // --
 
-// == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
+// == [The seal]: sealedRecordOf, boxStampOf
 
 /** The full record of `staged` with `sidecar`, `whisper` sealed through `lease`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `staged`, only its sparse fields are taken. */
 export const sealedRecordOf = async (lease: BoxLease, staged: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
@@ -191,18 +281,4 @@ export const sealedRecordOf = async (lease: BoxLease, staged: BoxSparse, sidecar
 
 /** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */
 const boxStampOf = (sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord => ({ ...sparse, sidecar: stableJsonify(sidecar) ?? '' })
-
-/** `text` parsed as JSON, or null where it is none: a SyntaxError can quote what it failed on. */
-const parseJsonOrNull = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
-// --
-
-// == [Refusals]: undecodedWhisper
-
-const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --

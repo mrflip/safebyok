@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MaxSaltBytes, PassphraseKeyBytes } from '../src/consts'
-import { Argon2idWebV1, ReservedLabelPrefix, TestDeriverNotice, TestLabelPrefix, checkSaltFits, checkSuppliedSpecKept, loadKeyDeriver, parseKeyDeriverSpec } from '../src/key-deriver-spec'
+import { Argon2idWebV1, ReservedLabelPrefix, TestDeriverNotice, TestLabelPrefix, checkSaltFits, checkSuppliedSpecUnchanged, loadKeyDeriver, parseKeyDeriverSpec } from '../src/key-deriver-spec'
 import { isVaultError } from '../src/errors'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import * as TH from './test-helpers'
@@ -36,15 +36,15 @@ describe("Argon2idWebV1", () => {
 /** A deriver's function, for the shape: it is never called. */
 const derive = () => Promise.resolve(new Uint8Array(32))
 
-describe("checkSuppliedSpecKept", () => {
+describe("checkSuppliedSpecUnchanged", () => {
   it("passes a deriver carrying a supplied spec whole", () => {
     const standIn = { ...Argon2idWebV1, deriveKeyBytes: derive }
-    expect(() => { checkSuppliedSpecKept(standIn) }).to.not.throw()
+    expect(() => { checkSuppliedSpecUnchanged(standIn) }).to.not.throw()
   })
 
   it("passes a deriver whose label is its own, whatever it carries", () => {
-    expect(() => { checkSuppliedSpecKept({ key_deriver_label: 'test_digest_v0', salt_bytes: 1 }) }).to.not.throw()
-    expect(() => { checkSuppliedSpecKept({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', iterations: 9 }) }).to.not.throw()
+    expect(() => { checkSuppliedSpecUnchanged({ key_deriver_label: 'test_digest_v0', salt_bytes: 1 }) }).to.not.throw()
+    expect(() => { checkSuppliedSpecUnchanged({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', iterations: 9 }) }).to.not.throw()
   })
 
   const Impostors = [
@@ -56,7 +56,7 @@ describe("checkSuppliedSpecKept", () => {
 
   for (const [impostor, blurb] of Impostors) {
     it(`refuses the supplied label with ${blurb}`, () => {
-      expect(() => { checkSuppliedSpecKept(impostor) })
+      expect(() => { checkSuppliedSpecUnchanged(impostor) })
         .to.throw(/argon2id_web_v1/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
     })
   }
@@ -73,7 +73,7 @@ describe("the reserved label namespace", () => {
 
   for (const [label, blurb] of Reserved) {
     it(`refuses ${blurb}, saying the prefix is reserved`, () => {
-      expect(() => { checkSuppliedSpecKept({ key_deriver_label: label }) })
+      expect(() => { checkSuppliedSpecUnchanged({ key_deriver_label: label }) })
         .to.throw(/reserved/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
     })
   }
@@ -87,12 +87,12 @@ describe("the reserved label namespace", () => {
 
   for (const [label, blurb] of Free) {
     it(`leaves ${blurb} alone`, () => {
-      expect(() => { checkSuppliedSpecKept({ key_deriver_label: label }) }).to.not.throw()
+      expect(() => { checkSuppliedSpecUnchanged({ key_deriver_label: label }) }).to.not.throw()
     })
   }
 
   it("still lets the supplied label itself through with its parameters", () => {
-    expect(() => { checkSuppliedSpecKept(Argon2idWebV1) }).to.not.throw()
+    expect(() => { checkSuppliedSpecUnchanged(Argon2idWebV1) }).to.not.throw()
   })
 
   it("is refused by parseKeyDeriverSpec too, a well-formed spec notwithstanding", () => {
