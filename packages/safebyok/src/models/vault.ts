@@ -428,7 +428,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
     this.settle()
   }
 
-  /** Let the lease go, as {@link letLeaseGo} does, and make no more fetches on schedule: `listing.evict` calls it, then holds this vault no more. */
+  /** Let the lease go, as {@link letLeaseGo} does, and make no more fetches on schedule, for a vault no listing holds any more. */
   override evict(): void {
     this.letLeaseGo()
     super.evict()

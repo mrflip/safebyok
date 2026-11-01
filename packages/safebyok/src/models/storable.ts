@@ -350,7 +350,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Eviction]: evict
 
-  /** Make no more fetches on schedule: `listing.evict` calls it, then holds this thing no more. A subclass that overrides it calls super. */
+  /** Make no more fetches on schedule, for a thing no listing holds any more. A subclass that overrides it calls super. */
   evict(): void { this.#trigger.disarm() }
   // --
 

@@ -122,7 +122,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.#buildOrReceive(this.scopeOf(draft), { flavor: 'drafted', draft })
   }
 
-  /** Let go the instance held under `scope`, if any: the listing holds it no more, nor hears it, nor watches it, nor shows it in its snapshot, and then it is evicted, as its own `evict` says, telling the listeners once whether or not that throws. The next answer for the scope builds a new instance. */
+  /** Let go the instance held under `scope`, if any, and evict it, as its own `evict` says. The next answer for the scope builds a new instance.
+   * The listing no longer holds, hears, watches or shows it. The listeners are told once, even if the instance's
+   * `evict` throws. A scope that fails {@link scopeOf} refuses as it does.
+   */
   evict(scope: ScopeT): void {
     const scopepath = this.scopepathOf(this.scopeOf(scope))
     const thing = this.#things.get(scopepath)

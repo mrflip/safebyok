@@ -155,7 +155,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     return this
   }
 
-  /** Forget the exposed whisper, as setting `box.whisper` null does: at eviction, and when a tombstone or another device's revision lands. */
+  /** Forget the exposed whisper, as setting `box.whisper` null does, once it no longer stands for the box. */
   disarm(): void {
     this.#exposed = null
     this.settle()
@@ -182,7 +182,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
 
   // == [Overridden from Storable]: evict, adopt
 
-  /** Disarm, then make no more fetches on schedule. */
+  /** Forget the exposed whisper, as {@link disarm} does, and make no more fetches on schedule, for a box no listing holds any more. */
   override evict(): void {
     this.disarm()
     super.evict()
