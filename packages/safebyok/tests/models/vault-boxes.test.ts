@@ -214,6 +214,25 @@ describe("vault.helloBoxes() and vault.goodbyeBoxes(): the box watch", () => {
     expect(watch).toHaveBeenCalledTimes(2)
   })
 
+  it("ends the watch a hello under way starts, where a goodbye overtakes it", async () => {
+    const { vault, watch, unwatch } = await makeWatchedVault()
+    const getting = vault.getBox({ boxlabel: Boxlabel })
+    vault.goodbyeBoxes()
+    await getting
+    expect(watch).toHaveBeenCalledOnce()
+    expect(unwatch).toHaveBeenCalledOnce()
+  })
+
+  it("keeps the watch a newer hello starts, where an older one a goodbye overtook answers after it", async () => {
+    const { vault, watch, unwatch } = await makeWatchedVault()
+    const older = vault.getBox({ boxlabel: Boxlabel })
+    vault.goodbyeBoxes()
+    const newer = vault.getBox({ boxlabel: Boxlabel })
+    await Promise.all([older, newer])
+    expect(watch).toHaveBeenCalledOnce()
+    expect(unwatch).not.toHaveBeenCalled()
+  })
+
   it("ends with the vault listing's goodbye", async () => {
     const { vault, listing, unwatch } = await makeWatchedVault()
     await vault.ensureBox(dnaOf())

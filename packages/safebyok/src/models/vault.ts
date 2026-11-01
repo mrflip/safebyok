@@ -128,6 +128,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   /** The box listing's hello, begun by the first box verb and joined by the rest; null until then, and again after `goodbyeBoxes`. */
   #boxesHello: Promise<void> | null = null
 
+  /** Counts each `goodbyeBoxes`, so a hello it overtook ends the watch that hello starts late. */
+  #boxesGoodbyes = 0
+
   // == [Props, as the record has them]: fmt
 
   get fmt(): number { return this.combined.fmt }
@@ -219,16 +222,19 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultP
   goodbyeBoxes(): void {
     this.#boxListing.goodbye()
     this.#boxesHello = null
+    this.#boxesGoodbyes += 1
   }
 
+  /** The box listing's hello, for `helloBoxes`. One refused leaves no hello to join, unless a goodbye has already cleared it; one a goodbye overtook, with no hello begun since, ends the watch it started. */
   async #helloBoxesOnce(): Promise<void> {
-    let isDone = false
+    const goodbyesAtStart = this.#boxesGoodbyes
     try {
       await this.#boxListing.hello()
-      isDone = true
-    } finally {
-      if (! isDone) { this.#boxesHello = null }
+    } catch (err) {
+      if (this.#boxesGoodbyes === goodbyesAtStart) { this.#boxesHello = null }
+      throw err
     }
+    if ((this.#boxesGoodbyes !== goodbyesAtStart) && (this.#boxesHello === null)) { this.#boxListing.goodbye() }
   }
 
   // Called by a field initializer, after Storable's constructor has adorned the world and tattooed the scope.
