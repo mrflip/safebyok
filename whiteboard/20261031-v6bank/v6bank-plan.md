@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 3a, 3b, 4a, 6, 9 filed; 3c and 4b building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
+* **Status:** 1, 2, 3a, 3b, 3c, 4a, 6, 9 filed; 4b in review; 3d building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
 
 ## Read first
 
@@ -204,6 +204,8 @@ reuses `identity_revoked` for signed-out (thread 6). **Levels:** review `high`.
 `vault_behind` (7b), `vault_gone`, `vault_remade` (8), damaged-wayin (12); declare those 3c can
 name now, and say in the doc block that the list grows. **Size:** M.
 
+*Review:* (#433, high, fixed) two doc fixes; `gate_moved` judged a fresh judgment, not a relabel; G2 holds. Left: a passkey revoked elsewhere still unlocks until a refresh (to 3d, YOLO, TOP), `absent_wayin` closing the unlock dialog (Coach), VOCABULARY rows half-moved (done note), doc nits.
+
 ### 3d. gating_concurrency
 
 > *(split from 3c by the orchestrator; YOLO calls from 3a's review)* What a second gating on a
@@ -211,7 +213,7 @@ name now, and say in the doc block that the list grows. **Size:** M.
 > attempts through an open gating rather than waiting on it; `Gating.#inTurn` onto es-toolkit's
 > `Mutex`.
 
-*Gloss.* `gating.ts`, `vault.ts`'s unlock join. **Levels:** review `high`. **Depends on:** 3c.
+*Orchestrator:* also: an unlock gating's run refreshes the gate first, so a passkey revoked elsewhere no longer unlocks (YOLO, #433 review); a lock's decline gets its own sentence (#434). *Gloss.* `gating.ts`, `vault.ts`'s unlock join. **Levels:** review `high`. **Depends on:** 3c.
 **Size:** S–M.
 
 
@@ -256,6 +258,8 @@ its exposed whisper; on `lock()` alone the whisper stays (the Coach's ruling, th
 both. **Levels:** worker medium effort. *Orchestrator:* a call to `ensureVault` that hands its own cleartexts does not join one in flight (YOLO, #432 review). Lock and eviction also settle an open gating; `Vault.#leaseChore` onto es-toolkit's `Mutex` (YOLO, #430 review). The disarm also clears a box's exposed whisper when a tombstone or a newer revision lands (YOLO, #428 review).
 **Depends on:** 4a. **Look-ahead:** 8 evicts on
 deletion and on a received tombstone. **Size:** S.
+
+*Orchestrator:* 4b found no thread gives a vault its `BoxListing`, so eviction cannot disarm boxes yet (Open Matters, TOP).
 
 ### 5. devicedb
 
