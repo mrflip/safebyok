@@ -54,7 +54,7 @@ export const checkSuppliedSpecUnchanged = (candidate: Pick<KeyDeriver, 'key_deri
     if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) { throw reservedLabel() }
     return
   }
-  const carried: Readonly<Record<string, unknown>> = { ...candidate }
+  const carried: Readonly<Record<string, unknown>> = candidate
   const unchanged = Object.entries(supplied).every(([fieldname, val]) => carried[fieldname] === val)
   if (! unchanged) { throw suppliedSpecChanged(supplied.key_deriver_label) }
 }
