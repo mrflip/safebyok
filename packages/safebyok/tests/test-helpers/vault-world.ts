@@ -128,7 +128,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     store: {
       get:   (scope) => Promise.resolve(answerOf(scope, stored)),
       put:   (record, priorRevisionTok) => {
-        if ((stored?.revision_tok ?? null) !== priorRevisionTok) { return Promise.resolve({ scope: record, ok: false as const, err: new VaultError('stale_write', 'stored under another revision', { meta: { vault_stored: stored } as unknown as RefusalMeta }), world: null }) }
+        if ((stored?.revision_tok ?? null) !== priorRevisionTok) { return Promise.resolve({ scope: record, ok: false as const, err: new VaultError('stale_write', "stored under another revision", { meta: { vault_stored: stored } as unknown as RefusalMeta }), world: null }) }
         stored = record
         return Promise.resolve(answerOf(record, record))
       },

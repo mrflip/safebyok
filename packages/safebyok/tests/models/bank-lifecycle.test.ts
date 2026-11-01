@@ -61,7 +61,7 @@ describe("Bank.hello and the bank's lifecycle", () => {
   })
 
   it("awaits the key deriver's load bare: a load that fails refuses with its own error, the bank reads 'refused', and tryHello's Outcome carries it", async () => {
-    const trouble = new Error('the wasm would not load')
+    const trouble = new Error("the wasm would not load")
     const load = vi.fn().mockRejectedValueOnce(trouble).mockRejectedValueOnce(trouble).mockResolvedValue(undefined)
     const { bank } = makeBankWorld(null, { keyDeriver: { ...testDeriver, load } })
     await expect(bank.hello()).rejects.to.eq(trouble)
@@ -112,7 +112,7 @@ describe("Bank's snapshot and subscription", () => {
   it("calls every listener though one throws", async () => {
     const { bank } = makeBankWorld()
     const after = vi.fn()
-    bank.subscribe(() => { throw new Error('a listener of the host') })
+    bank.subscribe(() => { throw new Error("a listener of the host") })
     bank.subscribe(after)
     await bank.hello()
     expect(after).toHaveBeenCalled()
