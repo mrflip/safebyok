@@ -1342,5 +1342,12 @@ describe("listing.evict(scope): the instance let go", () => {
     expect(told).to.eq(0)
     expect(listing.things).to.deep.equal([kept])
   })
+
+  it("refuses a scope that is no scope as 'bad_scope', letting nothing go", async () => {
+    const listing = boxListingOf(held.mw)
+    const kept = await listing.build(fullBoxRecord())
+    TH.expectSyncRefusal(() => { listing.evict({ ...scopeOf(), boxlabel: 'Not A Label!' }) }, 'bad_scope')
+    expect(listing.things).to.deep.equal([kept])
+  })
 })
 // --
