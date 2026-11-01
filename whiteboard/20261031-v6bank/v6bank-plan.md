@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** every thread up to 7a filed; the line restacked locally (`v6line/*`); 5b waits unfiled on the Coach (two G4 gaps after a second review); S building on the line; 7b and on wait on 5b's ruling and on force-push.
+* **Status:** **paused** (2026-11-01): all filed through S (on the local restacked line); 5b waits unfiled on the Coach after two flagged reviews; 7b, 8, 10, 12, 11 not started; force-push needed to land the line. See `human/20261101-sprint_v6bank_paused.md`.
 
 ## Read first
 
@@ -357,6 +357,8 @@ over `20261101-<label>` with a lease on the SHA recorded at the restack.
 
 *Gloss.* `vault.ts`, `gating.ts`, `gate.ts`, `basederiver.ts`, `refusal-funcs.ts`, notes/guarantees.md
 G2. **Levels:** review `medium`. **Depends on:** the restack and 5b. **Size:** S–M.
+
+*Review:* (#439, high, fixed) also reviewed the restack's four commits (they hold up); a doc fix on `lock()`/`letLeaseGo()`. Left: `declineAtLock` public (move behind a Symbol before export, to 11), `passkeyHeader` a denylist, an extra round trip for a queued unlock with a lease, `errors.ts`'s `declined` entry, doc gaps, a pre-existing in-flight non-unlock attempt committing after a lock.
 
 ### 7b. vault_guards
 
