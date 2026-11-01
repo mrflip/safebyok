@@ -1,3 +1,5 @@
+**Resumed 2026-11-01:** the Coach ruled on 5b's two gaps (won't fix, with a test; undefined, with a TODO) and allowed force-push with a lease; the line is on GitHub. What follows is where it stood when it paused.
+
 # Sprint v6bank: paused (2026-11-01)
 
 The sprint is paused, by the sprint skill's rule: a thread's second review left significant

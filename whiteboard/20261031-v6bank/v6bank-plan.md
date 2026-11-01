@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** paused on 5b (the Coach's ruling on two G4 gaps) and force-push; thread 13 vault_boxes added by the Coach and starting on S. See `human/20261101-sprint_v6bank_paused.md`.
+* **Status:** resumed 2026-11-01 on the Coach's rulings: the restacked line is on GitHub (with leases); 5b's final rework joins it on top of #440 (the two G4 gaps ruled won't-fix/undefined, with tests and a TODO); then 7b; then 8, 10, 12 side by side; then 11.
 
 ## Read first
 
