@@ -7,11 +7,11 @@ progress: `whiteboard/20261031-v6bank/` on the sprint PR, #425.
 
 ## Where things stand
 
-**Filed and reviewed (13 threads; PRs out of draft unless noted):**
+**Filed and reviewed (14 threads; PRs out of draft unless noted):**
 1 names_and_refusals #426 · 2 deriver_and_strength #427 (still draft: `gh pr ready` refused) ·
 9 whispers_and_names #428 · 6 store_fronting #429 · 3a gating #430 · 3b gating_passkey #431 ·
 3c gating_telling #433 · 3d gating_concurrency #435 · 4a bank #432 · 4b bank_eviction #434 ·
-7a vault_snapshot #436 · 5a devicedb #437 · S seams #439.
+7a vault_snapshot #436 · 5a devicedb #437 · S seams #439 · 13 vault_boxes #440 (added by the Coach; on S).
 
 **The line is restacked locally, not pushed.** The harness refuses force-push this session, so the
 restack was built non-destructively on local branches `v6line/<label>` in `/workspace/byok-v6line`:
@@ -30,6 +30,7 @@ and rewrite each PR's first line to "Stacked on #N, in the line main → …". E
   the Coach's ruling (Open Matters, TOP rows). 5b is not yet on the restacked line; it joins on
   top of `v6line/devicedb`, under S, or S is rebased onto it.
 * **Force-push permission**, to land the restacked line (Open Matters, TOP).
+* **Ruled 2026-11-01 (chat):** offline unlock kept; the rollback guard held from 7b (no counter); thread 13 added; `declined` kept; key rotation recorded in `notes/security.md`, out of scope.
 * **Not started:** 7b vault_guards, 8 vault_deletion, 10 pester, 12 damaged_wayins, 11 v06_entry.
   7b stands on 5b's close and lease work (sign-out → `closeVaults`, the rollback guard on the
   device record), and the rest stand on 7b.
@@ -45,7 +46,4 @@ restack built on local branches rather than wait for force-push.
 ## Open questions, gathered
 
 All in the doc's Open Matters tab; the ones that block or change a contract start with **TOP**:
-force-push; 5b's two G4 gaps; no passphrase unlock offline (3d); what the rollback guard counts
-(5a); no thread gives a vault its boxes (4b); a new exported refusal kind `declined` (3c); a
-passkey revoked elsewhere still unlocking until refresh (3c, done in 3d); `gh pr ready`
-permission. Cleanup lists what the sprint owes before it closes.
+force-push; 5b's two G4 gaps. Cleanup lists what the sprint owes before it closes.
