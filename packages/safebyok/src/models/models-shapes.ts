@@ -738,9 +738,10 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
-export const bankOpts = objCheck(({ obj, fn, applabel, user_id, device_id }) => ({
-  applabel,
-  user_id,
+export const bankOpts = objCheck(({ obj, fn, unk, device_id }) => ({
+  // Judged by `bankScope` after, so a bad name refuses 'bad_scope', as `bank.vaultOf` refuses a bad vaultlabel.
+  applabel:            unk,
+  user_id:             unk,
   device_id:           device_id.optional(),
   vaultStore:          obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
   vaultCache:          obj({ load: fn(), save: fn() }),
