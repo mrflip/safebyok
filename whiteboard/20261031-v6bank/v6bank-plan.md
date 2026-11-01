@@ -8,7 +8,7 @@
 * **At once:** 3 threads.
 * **Sprint branch:** `20261101-v6bank_sprint` (worktree `../byok-v6bank_sprint`), the sprint PR.
 * **Sprint doc:** https://claude.ai/artifact/J2B7dBt2L3GcMSSEc8MEMp (doc `89d55586-f408-4988-9eb2-2d10f024a7bb`; Open Matters body `4ed66ae5-ebfc`, Cleanup `8a78f636-2f9c`, Progress `440b40aa-8bd2`, Resolved `cfaec394-47f1`; State enum `0ab24e76-3ece`).
-* **Status:** 1, 2, 3a, 3b, 3c, 4a, 6, 9 filed; 4b in review; 3d building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
+* **Status:** 1, 2, 3a, 3b, 3c, 4a, 4b, 6, 9 filed; 3d, 5a, 7a building. Restacks need force-push, which the harness refuses until the Coach allows it (Open Matters, TOP).
 
 ## Read first
 
@@ -261,7 +261,9 @@ deletion and on a received tombstone. **Size:** S.
 
 *Orchestrator:* 4b found no thread gives a vault its `BoxListing`, so eviction cannot disarm boxes yet (Open Matters, TOP).
 
-### 5. devicedb
+*Review:* (#434, high, fixed) an `ensureUnlocked` after a lock joined the overtaken unlock (fixed, tested); doc fixes; `listing.evict`'s `bad_scope` pinned. Significant, pre-existing: the birth lease is taken outside the lease mutex and lock check, breaking G4 under a mid-birth lock (to 5b, YOLO, TOP). Left: `Box.expose` race (done note), an open `build_vault` gating beside a cleartexts run and answers in flight after a close (to 7b, YOLO), double listener tell on close, evicted objects still usable, style nits.
+
+### 5a. devicedb (5b lease_plumbing split off)
 
 > * `src/devicedb/`: the `DeviceDB` base class (the current one, moved there and typed against
 >   the models' lease record and device record, or a copy of it if much of it slims down on the
@@ -279,6 +281,21 @@ the old surface (ground rule 11). `takeUpKeptLease` is `takeUpCachedLease` after
 **Levels:** review `high` (guarantees: `lease.ts`). **Depends on:** 4b.
 **Look-ahead:** 7b's rollback guard reads and raises the highest epoch seen; 8 erases the cached
 lease and cache. **Size:** M.
+
+*Orchestrator:* split after 4b's review added the G4 fix (~9 items). 5a: the module, `memoryDeviceDB`, the idb adapter, the device record, `clearCachedVault`, the `advanceDeviceRecord` and `doDelDamaged` renames, the vault-cache seam. 5b below.
+
+### 5b. lease_plumbing
+
+> *(split from 5)* The `LeaseDBFriend` plumbing from the bank's deviceDB to each vault (exists:
+> `leaseDBFriend()` on the vault, `Lease.get`, `takeUpKeptLease`), so a reload takes up the kept
+> lease at birth and does not ask again.
+>
+> *(orchestrator, YOLO, from 4b's review)* The birth grant in `VaultListing.ensure` runs through
+> the vault's lease mutex (`#withLeaseDB`) and lock check, so a lock during a vault's birth erases
+> its kept lease and leaves it locked (G4).
+
+*Gloss.* `vault.ts`, `vault-listing.ts`, `models/lease.ts`. **Levels:** review `high`.
+**Depends on:** 5a. **Size:** S–M.
 
 ### 6. store_fronting
 
@@ -331,7 +348,7 @@ wayin damage as trouble. **Size:** M.
 
 *Gloss.* `lease.ts`, `proving.ts` (the stamp), `vault.ts`, `bank.ts`, the device record (5),
 `VOCABULARY.md`. Stands on the restacked line (all of 1–7a filed). *Orchestrator:* tell the host when a lost two-device build discarded the passphrase just chosen, with 3c's "set on another device" sentence (YOLO, #432 review). From thread 6: signed-out arrives as bad news of kind `identity_revoked` (no `signed_out` kind): key `closeVaults` on it; a bank holding no vault hears nothing (document, no probe). Add the box store's `vault_tok` gate (the old `putBox`'s), as the props-and-boxes inconsistency. Check whether watch trouble's forced refetch tells `vault_locked` as bad news, and quiet it if so. **Levels:** worker high
-effort; review `high` (guarantees). **Depends on:** 3d, 5, 6, 7a. **Size:** M.
+effort; review `high` (guarantees). **Depends on:** 3d, 5b, 6, 7a. **Size:** M.
 
 ### 8. vault_deletion
 
