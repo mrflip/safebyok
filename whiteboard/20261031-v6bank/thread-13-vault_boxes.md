@@ -1,6 +1,6 @@
 # Thread 13: vault_boxes (2026-11-01)
 
-Branch `20261101-vault_boxes`, PR #TBD, stacked on #439 (thread S, `20261101-seams`). Justify: green; safebyok 5187 passed, 37 skipped; scripts 290 passed.
+Branch `20261101-vault_boxes`, PR #440, stacked on #439 (thread S, `20261101-seams`). Justify: green; safebyok 5187 passed, 37 skipped; scripts 290 passed.
 
 * **Built**:
   * `Vault` holds a private `BoxListing` (`#boxListing`, made by a field initializer, `world: this`), and delegates to it: `boxes`, `boxscopeOf(bag)`, `boxOf(bag)`, `getBox`/`tryGetBox`, `makeBox`/`tryMakeBox`, `ensureBox`/`tryEnsureBox`, `helloBoxes`, `goodbyeBoxes` (`src/models/vault.ts`, section *Its boxes*). A bag naming another vault refuses 'bad_scope' with `Phrases.boxOfOtherVault`; `MSX.boxBag` checks it.
