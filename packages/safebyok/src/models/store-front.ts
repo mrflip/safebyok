@@ -230,6 +230,14 @@ class FrontedRows<ScopeT extends object, SparseT extends SparseBase<ScopeT>, Rec
         reportToPlatform(err)
       }
     }
+    const push = async (notice: Notice<RecordT, SparseT>): Promise<void> => {
+      if (! live) { return }
+      try {
+        await onNotice(notice)
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    }
     const sweep = async (announce: boolean): Promise<void> => {
       const swept = await outcomeOf(async () => ({ found: await this.#front.findRows(this.#prefix, this.#isWithin), world: await this.#worldNow() }))
       if (! live) { return }
@@ -240,8 +248,7 @@ class FrontedRows<ScopeT extends object, SparseT extends SparseBase<ScopeT>, Rec
       if (! announce) { return }
       const full = new Set(fullFor().map((scope) => this.#kind.scopepathOf(scope)))
       for (const record of changed) {
-        const pushed = full.has(this.#kind.scopepathOf(record)) ? record : this.#sparseOf(record)
-        await onNotice({ record: pushed, world })
+        await push({ record: full.has(this.#kind.scopepathOf(record)) ? record : this.#sparseOf(record), world })
       }
       if (troubled) { ring() }
     }

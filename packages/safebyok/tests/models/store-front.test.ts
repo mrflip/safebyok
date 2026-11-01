@@ -333,6 +333,51 @@ describe("StoreFront's watch", () => {
     expect(onChange).not.toHaveBeenCalled()
     expect(notices).to.deep.equal([])
   })
+
+  it("pushes each notice of a sweep, and rings onChange after them, where an onNotice throws, and reports what it threw", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const front = new ProbeFront()
+      front.rows.set(boxpath, fullBoxRecord())
+      const thrown = new Error("a notice handler that throws")
+      const notices: Notice<BoxRecord, BoxSparse>[] = []
+      const onChange = vi.fn()
+      const onNotice = (notice: Notice<BoxRecord, BoxSparse>): Promise<void> => {
+        notices.push(notice)
+        return Promise.reject(thrown)
+      }
+      front.boxStore(vaultScope).watch(onNotice, () => [], onChange)
+      await settle()
+      front.rows.set(boxpath, 'not a box')
+      front.rows.set(Scopepath.box(boxscope('openai_api_key')), fullBoxRecord({ boxlabel: 'openai_api_key', revision_seq: 0, revision_tok: 'rev-o0' }))
+      front.rows.set(Scopepath.box(boxscope('gemini_api_key')), fullBoxRecord({ boxlabel: 'gemini_api_key', revision_seq: 0, revision_tok: 'rev-g0' }))
+      front.onChange()
+      await settle()
+      expect(notices.map(({ record }) => record.boxlabel)).to.deep.equal(['openai_api_key', 'gemini_api_key'])
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(reported).to.deep.equal([thrown, thrown])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it("pushes no notice once unwatched, though the sweep under way has more to push", async () => {
+    const front = new ProbeFront()
+    const notices: Notice<BoxRecord, BoxSparse>[] = []
+    const onNotice = (notice: Notice<BoxRecord, BoxSparse>): Promise<void> => {
+      notices.push(notice)
+      unwatch()
+      return Promise.resolve()
+    }
+    const unwatch = front.boxStore(vaultScope).watch(onNotice, () => [], vi.fn())
+    await settle()
+    front.rows.set(Scopepath.box(boxscope('openai_api_key')), fullBoxRecord({ boxlabel: 'openai_api_key', revision_seq: 0, revision_tok: 'rev-o0' }))
+    front.rows.set(Scopepath.box(boxscope('gemini_api_key')), fullBoxRecord({ boxlabel: 'gemini_api_key', revision_seq: 0, revision_tok: 'rev-g0' }))
+    front.onChange()
+    await settle()
+    expect(notices.map(({ record }) => record.boxlabel)).to.deep.equal(['openai_api_key'])
+  })
 })
 
 describe("StoreFront behind a BoxListing", () => {
