@@ -450,13 +450,13 @@ describe("a hello that fails", () => {
 
   const DeviceVerbCases = [
     // what each verb's failure says it was doing:
-    ["getLease",            /reading the lease it keeps/,              'reading the lease'],
-    ["putLease",            /writing the lease it keeps/,              'writing the lease'],
-    ["delLease",            /erasing the lease it keeps/,              'erasing the lease'],
-    ["getDeviceRecord",     /reading its record of this vault/,        "reading the device's record"],
-    ["incrementDeviceRecord", /writing its record of this vault/,      "raising the device's record"],
-    ["delDeviceRecord",     /erasing its record of this vault/,        "erasing the device's record"],
-    ["delAll",              /erasing everything it keeps/,             'erasing everything'],
+    ["getLease",              /reading the lease it keeps/,              'reading the lease'],
+    ["putLease",              /writing the lease it keeps/,              'writing the lease'],
+    ["delLease",              /erasing the lease it keeps/,              'erasing the lease'],
+    ["getDeviceRecord",       /reading its record of this vault/,        "reading the device's record"],
+    ["incrementDeviceRecord", /writing its record of this vault/,        "raising the device's record"],
+    ["delDeviceRecord",       /erasing its record of this vault/,        "erasing the device's record"],
+    ["delAll",                /erasing everything it keeps/,             'erasing everything'],
   ] as const
 
   for (const [verb, said, blurb] of DeviceVerbCases) {
