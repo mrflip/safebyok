@@ -504,7 +504,7 @@ describe("a vault served behind this device's record", () => {
   it("accepts the vault storage holds once support confirms the restore, as clearCachedVault's example shows", async () => {
     const world = makeWorld()
     TH.closeVault(await world.openUnlocked('pw'))
-    await TH.expectGood(world.deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1', { highest_vault_epoch: 9 })))
+    await TH.expectGood(world.deviceDB.tryAdvanceDeviceRecord(TH.deviceRecordOf('u1', { highest_vault_epoch: 9 })))
     const bank = bankIn(world)
     const err = await TH.expectRefusal(bank.ensureVault(Main), 'vault_behind')
     if (isVaultError(err, 'vault_behind') && supportConfirmedTheRestore()) {
@@ -550,7 +550,7 @@ describe("bank.clearCachedVault", () => {
     const bank = bankIn(world)
     await bank.ensureVault(Main)
     const otherDeviceDB = memoryDeviceDB()
-    await TH.expectGood(otherDeviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1')))
+    await TH.expectGood(otherDeviceDB.tryAdvanceDeviceRecord(TH.deviceRecordOf('u1')))
     await bank.clearCachedVault(Main, { deviceDB: otherDeviceDB })
     expect(bank.bankVaultOf(Main)).to.be.null
     const otherRecord = await TH.expectGood(otherDeviceDB.tryGetDeviceRecord(TH.scopeOf('u1')))
@@ -679,10 +679,10 @@ describe("bank.delDamagedVault", () => {
 })
 // --
 
-// == [The device record]: raised at birth, at a refresh, at each own write, at del(), never lowered
+// == [The device record]: advanced at birth, at a refresh, at each own write, at del()
 
 describe("this device's record of the vault", () => {
-  it("is raised at birth: a device_id minted and kept by a later birth, highest_vault_epoch the vault's", async () => {
+  it("is advanced at birth: a device_id minted and kept by a later birth, highest_vault_epoch the vault's", async () => {
     const world = makeWorld()
     await world.open()
     const minted = await recordOf(world)
@@ -693,7 +693,7 @@ describe("this device's record of the vault", () => {
     expect(await recordOf(world)).to.deep.include({ device_id: minted?.device_id, highest_vault_epoch: 1 })
   })
 
-  it("is raised at a refresh: another device's passphrase change reaches this device's record at its next hello", async () => {
+  it("is advanced at a refresh: another device's passphrase change reaches this device's record at its next hello", async () => {
     const world = makeWorld()
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
@@ -704,7 +704,7 @@ describe("this device's record of the vault", () => {
     expect(await highestEpochOf(world)).to.eq(2)
   })
 
-  it("is raised by this device's own gate writes: the first unlock, putWayin and delWayin", async () => {
+  it("is advanced by this device's own gate writes: the first unlock, putWayin and delWayin", async () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     const seen: number[] = []
@@ -716,7 +716,7 @@ describe("this device's record of the vault", () => {
     expect(seen).to.deep.equal([1, 2, 3])
   })
 
-  it("is raised by del() to the tombstone's vault_epoch", async () => {
+  it("is advanced by del() to the tombstone's vault_epoch", async () => {
     const world = makeWorld()
     const vaultDB = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB })
@@ -738,7 +738,7 @@ describe("this device's record of the vault", () => {
     expect(vault.snapshot.gate?.passkey?.device_id).to.eq(deviceId)
   })
 
-  it("is never lowered by another tab's raise of a lower epoch: one whose read was served before this tab's change", async () => {
+  it("is never lowered by another tab's advance of a lower epoch: one whose read was served before this tab's change", async () => {
     const world = makeWorld()
     const tab = await world.openUnlocked('pw')
     const deaf = world.deafVaultDB()
@@ -912,33 +912,33 @@ describe("bank.closeVault", () => {
     expect(bank.bankVaultOf(Main)).to.be.null
   })
 
-  it("writes nothing more for a birth let go during its first read: no vault record ensured, no device record raised", async () => {
+  it("writes nothing more for a birth let go during its first read: no vault record ensured, no device record advanced", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const reading = TH.holdNextCall(world.deviceDB, 'getDeviceRecord')
     const ensuring = vi.spyOn(world.vaultDB, 'tryEnsureVault')
-    const incrementing = vi.spyOn(world.deviceDB, 'incrementDeviceRecord')
+    const advancing = vi.spyOn(world.deviceDB, 'advanceDeviceRecord')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
     bank.closeVault(Main)
     reading.release()
     await TH.expectBad(birth, 'vault_gone')
     expect(ensuring).not.toHaveBeenCalled()
-    expect(incrementing).not.toHaveBeenCalled()
+    expect(advancing).not.toHaveBeenCalled()
   })
 
-  it("raises no device record and births no Vault object for a birth let go during its read of storage", async () => {
+  it("advances no device record and births no Vault object for a birth let go during its read of storage", async () => {
     const world = makeWorld()
     const bank = bankIn(world)
     const reading = TH.holdNextCall(world.vaultDB, 'tryEnsureVault')
-    const incrementing = vi.spyOn(world.deviceDB, 'incrementDeviceRecord')
+    const advancing = vi.spyOn(world.deviceDB, 'advanceDeviceRecord')
     const subscribing = vi.spyOn(world.vaultDB, 'subscribe')
     const birth = bank.tryEnsureVault(Main)
     await reading.reached
     bank.closeVault(Main)
     reading.release()
     await TH.expectBad(birth, 'vault_gone')
-    expect(incrementing).not.toHaveBeenCalled()
+    expect(advancing).not.toHaveBeenCalled()
     expect(subscribing).not.toHaveBeenCalled()
   })
 })

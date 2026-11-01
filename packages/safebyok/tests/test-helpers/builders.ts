@@ -495,7 +495,7 @@ export const deleting = (revisionTok: string | null) => ({ vault_tok: 'vault-tok
 /** A shape-valid DeviceRecord for device-storage tests: `user_id`'s `main` vault, its device `device-one`, having seen `vault_epoch` 1.
  * Any field as `overrides` says otherwise.
  *
- * @example await deviceDB.tryIncrementDeviceRecord(TH.deviceRecordOf('u1'))
+ * @example await deviceDB.tryAdvanceDeviceRecord(TH.deviceRecordOf('u1'))
  * @example TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })    // a device that has seen the vault at epoch 3
  */
 export const deviceRecordOf = (user_id: string, overrides: Partial<DeviceRecord> = {}): DeviceRecord => ({

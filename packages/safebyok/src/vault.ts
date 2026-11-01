@@ -185,7 +185,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * not open under the lease in hand is 'damaged_box' at once, with no read of storage first.
  *
  * This device keeps a record of the highest `vault_epoch` it has seen in the scope, its device
- * record, raised at each read and at each write of its own, never lowered. A read below it refuses
+ * record, advanced at each read and at each write of its own. A read below it refuses
  * 'vault_behind', taking nothing and writing nothing, and locks the vault, as 'identity_revoked'
  * from storage does: an older vault could bring back a way in that was removed. A host that
  * restored storage from an older copy on purpose accepts it on this device with
@@ -739,7 +739,7 @@ export class Vault implements VaultStamp {
 
   /** Delete the vault, through a `del_vault` gating the user answers with the passphrase: every record it has in storage, and this device's lease of it, as the vault half of deleting an account.
    * Storage keeps a tombstone of the scope, which carries the vault's counter into any vault made
-   * there later, and this device raises its record of the vault to it. The gating's attempt writes
+   * there later, and this device advances its record of the vault to it. The gating's attempt writes
    * with `VaultDB.delVault`, expecting the vault and the ways in it proved; the gating settles, and
    * then the vault locks as `lock()` does. Once it resolves, this Vault object is gone, and the bank
    * hands out a new one, `novel`, when asked for the vault again. A device store that cannot erase
@@ -1006,7 +1006,7 @@ export class Vault implements VaultStamp {
     this.#logger.log('Storage reads again after the failures the vault warned of: what it shows has caught up with storage.', { call: 'refresh' })
   }
 
-  /** Read storage through `#loadFromStorage`, judge what it found against the picture in hand, take what is new, and raise this device's record to it.
+  /** Read storage through `#loadFromStorage`, judge what it found against the picture in hand, take what is new, and advance this device's record to it.
    * A refusal of the vault's storage meets `#onStorageRefusal` first. The vault deleted, or made anew
    * under another `vault_tok`, makes this Vault object gone, refusing 'vault_gone' or 'vault_remade'.
    * A vault below this device's record is storage it cannot trust: it locks, as `#onStorageRefusal`
@@ -1119,14 +1119,14 @@ export class Vault implements VaultStamp {
 
   // == [Device record]: noteEpochSeen
 
-  /** Raise this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryIncrementDeviceRecord}: never a refusal.
-   * A device store that fails to keep it is warned of: a missed raise only weakens the check for a
-   * vault served behind what this device has seen, until a later read raises it.
+  /** Advance this device's record of the scope to `vaultEpoch`, what a read or a write of its own just took, with {@link DeviceDB.tryAdvanceDeviceRecord}: never a refusal.
+   * A device store that fails to keep it is warned of: a missed advance only weakens the check for a
+   * vault served behind what this device has seen, until a later read advances it.
    */
   async #noteEpochSeen(vaultEpoch: number, call: VaultCall): Promise<void> {
-    const incremented = await this.#deviceDB.tryIncrementDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
-    if (incremented.ok) { return }
-    this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, incremented.err)
+    const advanced = await this.#deviceDB.tryAdvanceDeviceRecord(deviceRecordOf(this.#scope, this.#deviceId, vaultEpoch))
+    if (advanced.ok) { return }
+    this.#logger.warn("This device could not note the newest copy of the vault it has seen in its record of the vault: what it did stands, and the record catches up at a later read.", { call }, advanced.err)
   }
   // --
 
@@ -1318,7 +1318,7 @@ export class Vault implements VaultStamp {
     return deleted.val.vault_epoch
   }
 
-  /** Lock as `lock()` does, let this Vault object go, and raise this device's record to `vaultEpoch`, the tombstone's: call it once the gating that deleted the vault settles. An erase that fails is only logged. */
+  /** Lock as `lock()` does, let this Vault object go, and advance this device's record to `vaultEpoch`, the tombstone's: call it once the gating that deleted the vault settles. An erase that fails is only logged. */
   async #afterDel(vaultEpoch: number): Promise<void> {
     const erased = this.#lockNow()
     // The bank hears it, and births the next life when asked.
@@ -1335,7 +1335,7 @@ export class Vault implements VaultStamp {
 
   /** Store `gate` over its base, the gate in hand, with `VaultDB.putVaultRecord` expecting its `vault_tok` and base epoch, resolving the gate as stored.
    * The picture takes what was stored, unless a refresh has already taken a later copy, and this
-   * device's record is raised to its `vault_epoch`. A refused put refuses as `#gatePutRefusal`
+   * device's record is advanced to its `vault_epoch`. A refused put refuses as `#gatePutRefusal`
    * says.
    */
   async #putGate(gate: Gate, call: GatingCall): Promise<Gate> {
@@ -1353,7 +1353,7 @@ export class Vault implements VaultStamp {
     const next = frozenVaultRecord(put.val) as GatedVaultRecord
     const stored = Gate.of(next, { keyDeriver: this.#keyDeriver })
     this.#demand(stored, { call })
-    // The picture takes it first, so the record raised after never outruns the picture.
+    // The picture takes it first, so the record advanced after never outruns the picture.
     this.#takeOwnPut(next)
     await this.#noteEpochSeen(next.vault_epoch, call)
     this.#demand(stored, { call })
@@ -1901,7 +1901,7 @@ export type Birth = Readonly<{
   listing:     BoxListing
   /** The lease record {@link DeviceDB.tryGetLease} found, or null. */
   cachedLease: CachedLease | null
-  /** This device's record of the scope, as raised at birth. */
+  /** This device's record of the scope, as advanced at birth. */
   record:      DeviceRecord
   /** When the bank's `ensureVault` began, by its clock: the vault's first `refreshedAt`. */
   refreshedAt: number

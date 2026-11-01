@@ -100,7 +100,7 @@ describe("delBox and del()", () => {
     expect(reborn.getSnapshot().boxes).to.have.lengthOf(0)
   })
 
-  it("del() raises this device's record of the vault to the tombstone's epoch, never erasing it", async () => {
+  it("del() advances this device's record of the vault to the tombstone's epoch, never erasing it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await TH.del(vault, 'pw')

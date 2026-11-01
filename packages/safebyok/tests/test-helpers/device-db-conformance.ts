@@ -8,7 +8,7 @@ import { expectBad, expectingGood } from './refusals'
 /**
  * The behaviour every DeviceDB owes, written once: every verb answering a good Outcome; no lease
  * until one is written, then that record back, its leaseKey still a non-extractable CryptoKey;
- * a device record, raised and never lowered, the first `device_id` kept; each scope kept to
+ * a device record, advanced, the first `device_id` kept; each scope kept to
  * itself, and records apart from leases; an erase of one, or of all; one scope's calls landing
  * in the order they were made, awaited or not; and a record that fails its check read as none and
  * discarded, but never one written after the read that found it. Given a second factory, an
@@ -43,7 +43,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
         await expectBad(deviceDB.tryPutLease(lease), 'storage_blocked')
         await expectBad(deviceDB.tryDelLease(scopeOf('u1')), 'storage_blocked')
         await expectBad(deviceDB.tryGetDeviceRecord(scopeOf('u1')), 'storage_blocked')
-        await expectBad(deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1')), 'storage_blocked')
         await expectBad(deviceDB.tryDelDeviceRecord(scopeOf('u1')), 'storage_blocked')
         await expectBad(deviceDB.tryDelAll(), 'storage_blocked')
       })
@@ -54,7 +54,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       const lease = await leaseOf('u1')
       expect(await deviceDB.tryPutLease(lease)).to.deep.equal({ ok: true, val: lease })
       expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
-      expect(await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
+      expect(await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: deviceRecordOf('u1') })
       expect(await deviceDB.tryDelLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
       expect(await deviceDB.tryDelDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: undefined })
@@ -99,7 +99,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
     })
 
     // Each of these plants a record that fails its check through the verb that writes it: no verb
-    // checks what it is handed, and a raise over nothing stores what it came with.
+    // checks what it is handed, and an advance over nothing stores what it came with.
     it("never discards a lease written after the unreadable row a getLease found: a putLease made as the getLease began is kept", async () => {
       const deviceDB = await makeDeviceDB()
       const lease = await leaseOf('u1')
@@ -110,24 +110,24 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
     })
 
-    it("never discards a device record raised after the unreadable row a getDeviceRecord found: an incrementDeviceRecord made as the getDeviceRecord began is kept", async () => {
+    it("never discards a device record advanced after the unreadable row a getDeviceRecord found: an advanceDeviceRecord made as the getDeviceRecord began is kept", async () => {
       const deviceDB = await makeDeviceDB()
-      const incrementing = deviceRecordOf('u1', { highest_vault_epoch: 3 })
-      await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
-      const [found, incremented] = await Promise.all([deviceDB.tryGetDeviceRecord(scopeOf('u1')), deviceDB.tryIncrementDeviceRecord(incrementing)])
+      const advancing = deviceRecordOf('u1', { highest_vault_epoch: 3 })
+      await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
+      const [found, advanced] = await Promise.all([deviceDB.tryGetDeviceRecord(scopeOf('u1')), deviceDB.tryAdvanceDeviceRecord(advancing)])
       expect(found).to.deep.equal({ ok: true, val: null })
-      expect(incremented).to.deep.equal({ ok: true, val: incrementing })
-      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: incrementing })
+      expect(advanced).to.deep.equal({ ok: true, val: advancing })
+      expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal({ ok: true, val: advancing })
     })
 
     it("discards a row that fails its check, of either kind, and reads it as none", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
       await deviceDB.tryPutLease({ ...(await leaseOf('u1')), ask_passphrase_at: 'soon' } as unknown as LeaseRecord)
-      await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
+      await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { device_id: '' }))
       expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.be.null
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
-      // A sound record raised now starts afresh: nothing of the discarded one is kept.
-      expect(await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two' }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-two' }))
+      // A sound record advanced now starts afresh: nothing of the discarded one is kept.
+      expect(await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two' }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-two' }))
     })
 
     it("keeps leases per user: erasing one leaves the other", async () => {
@@ -143,38 +143,38 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       const deviceDB = expectingGood(await makeDeviceDB())
       await deviceDB.tryPutLease(await leaseOf('u1'))
       await deviceDB.tryPutLease(await leaseOf('u2'))
-      await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1'))
+      await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1'))
       await deviceDB.tryDelAll()
       expect(await deviceDB.tryGetLease(scopeOf('u1'))).to.be.null
       expect(await deviceDB.tryGetLease(scopeOf('u2'))).to.be.null
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
     })
 
-    it("has no device record until one is raised, then keeps it whole, raised to a higher vault_epoch", async () => {
+    it("has no device record until one is advanced, then keeps it whole, advanced to a higher vault_epoch", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
+      expect(await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1'))
-      expect(await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 4 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
+      expect(await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 4 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 4 }))
     })
 
     it("never lowers a device record: a lower vault_epoch keeps the higher, and resolves the record as stored", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
-      expect(await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 3 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+      await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
+      expect(await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 3 }))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.deep.equal(deviceRecordOf('u1', { highest_vault_epoch: 5 }))
     })
 
-    it("keeps the first device_id raised: a later raise under another id keeps it, and raises the epoch", async () => {
+    it("keeps the first device_id advanced: a later advance under another id keeps it, and advances the epoch", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { device_id: 'device-one' }))
-      expect(await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 2 }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 }))
+      await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { device_id: 'device-one' }))
+      expect(await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { device_id: 'device-two', highest_vault_epoch: 2 }))).to.deep.equal(deviceRecordOf('u1', { device_id: 'device-one', highest_vault_epoch: 2 }))
     })
 
-    it("raises two at once to the higher, in whichever order they land", async () => {
+    it("advances two at once to the higher, in whichever order they land", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
-      await Promise.all([deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 7 })), deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 6 }))])
+      await Promise.all([deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 7 })), deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1', { highest_vault_epoch: 6 }))])
       const found = await deviceDB.tryGetDeviceRecord(scopeOf('u1'))
       expect(found?.highest_vault_epoch).to.eq(7)
     })
@@ -182,8 +182,8 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
     it("keeps device records per vault, and apart from leases: erasing one leaves the rest", async () => {
       const deviceDB = expectingGood(await makeDeviceDB())
       await deviceDB.tryPutLease(await leaseOf('u1'))
-      await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u1'))
-      await deviceDB.tryIncrementDeviceRecord(deviceRecordOf('u2'))
+      await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u1'))
+      await deviceDB.tryAdvanceDeviceRecord(deviceRecordOf('u2'))
       await deviceDB.tryDelDeviceRecord(scopeOf('u1'))
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u1'))).to.be.null
       expect(await deviceDB.tryGetDeviceRecord(scopeOf('u2'))).to.deep.equal(deviceRecordOf('u2'))

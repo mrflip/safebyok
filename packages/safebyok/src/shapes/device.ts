@@ -83,7 +83,7 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
 
 /** What this device keeps of one scope, locked or not, across the vault's lives there: its own id, and the highest `vault_epoch` it has seen. Nothing in it is secret.
  * A vault served below `highest_vault_epoch` was rolled back, and the bank refuses it as
- * 'vault_behind'. The DeviceDB raises it, never lowers it: a write of a lower epoch keeps the
+ * 'vault_behind'. The DeviceDB advances it: a write of a lower epoch keeps the
  * higher, and the first `device_id` stored stays. `bank.clearCachedVault` erases it. Its `parse`
  * is strict, refuses 'bad_record', and hands back the record frozen. A record that fails it reads
  * as none. `deviceRecordOf` builds one from a parsed scope.
@@ -92,7 +92,7 @@ export const DeviceRecordFormat = 'safebyok-device-v1'
  */
 // A field added here bumps the format: a device whose safebyok predates the field discards the
 // record, and with it the `highest_vault_epoch` that guards it against a rolled-back vault, until
-// its next read raises it again.
+// its next read advances it again.
 export const deviceRecord = Checker(({ obj, uint, lit, applabel, user_id, vaultlabel, device_id }) => obj({
   format:              lit(DeviceRecordFormat),
   applabel,

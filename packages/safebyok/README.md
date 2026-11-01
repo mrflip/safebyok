@@ -391,9 +391,9 @@ keep records by structured clone, never as JSON.
   that fails its check reads as none, and the base class has `doDelUnparsed` discard it. That
   deletes the row only if `isSound` is still false of it as read in the same transaction, so
   a record written since the read is never lost.
-* **The device record is raised, never lowered.** `doIncrementDeviceRecord(scopepath, incrementedFrom)`
-  reads the row, hands it to `incrementedFrom` and writes what comes back, all in one transaction, so
-  two tabs raising at once never lower each other's record.
+* **The device record is advanced.** `doAdvanceDeviceRecord(scopepath, advancedFrom)`
+  reads the row, hands it to `advancedFrom` and writes what comes back, all in one transaction, so
+  two tabs advancing at once never lower each other's record.
 * **Calls land in the order they were made.** Each verb calls its `do*` method before awaiting
   anything, so a store that starts each call's work in the order it is called keeps that order,
   awaited or not: a lock's `tryDelLease`, made after a grant's `tryPutLease`, must erase it.
@@ -422,9 +422,9 @@ class AcmeDeviceDB extends DeviceDB {
   protected async doDelDeviceRecord(deviceScopepath: string) { await (await appDB).delete('safebyok_device', deviceScopepath) }
   protected async doDelAll() { await (await appDB).clear('safebyok_device') }
 
-  protected async doIncrementDeviceRecord(deviceScopepath: string, incrementedFrom: (stored: unknown) => DeviceRecord) {
+  protected async doAdvanceDeviceRecord(deviceScopepath: string, advancedFrom: (stored: unknown) => DeviceRecord) {
     const tx = (await appDB).transaction('safebyok_device', 'readwrite')   // the read and the write, in one transaction
-    await tx.store.put(incrementedFrom(await tx.store.get(deviceScopepath)), deviceScopepath)
+    await tx.store.put(advancedFrom(await tx.store.get(deviceScopepath)), deviceScopepath)
     await tx.done
   }
 
@@ -443,7 +443,7 @@ a `deviceDB` that does not extend `DeviceDB`. `deviceRecordOf(scope, device_id,
 highest_vault_epoch)` builds a device record from a scope's names alone. The device record is
 strict, and one that fails its check reads as none: so a field added to it moves its `format`
 on, and a device whose safebyok predates the field discards the record, its watermark with it,
-until its next read raises it again. `describeDeviceDB` from `safebyok/testing` checks all of
+until its next read advances it again. `describeDeviceDB` from `safebyok/testing` checks all of
 this; hand it a second factory, an adapter over a store the browser withholds, and it checks
 each verb answers `storage_blocked`.
 
@@ -786,7 +786,7 @@ says these things:
   revoked.
 * `warn`: a change to the ways in landed in storage, but this device could not grant its lease
   afresh. The change is kept, and the call resolves.
-* `warn`: this device could not raise its device record to what a read, or a write of its own,
+* `warn`: this device could not advance its device record to what a read, or a write of its own,
   just took. What it did stands, and the record catches up at a later read.
 * `warn`: a `delBox()` removed another revision than the one the snapshot showed, because another
   device or tab wrote over the box meanwhile (`{ call: 'delBox' }`). The call carries on.
@@ -1130,7 +1130,7 @@ refuse with `damaged_vault`, and with no Vault object born there is no `del()` t
 `delDamagedVault` is the way to clear such a vault and start over. It takes the options
 `Bank.make` took beside the vault's `vaultlabel` (only the vault's names and its two stores
 matter) and deletes that vault's stored record and boxes through the `VaultDB`, and this
-device's lease of it through the `DeviceDB`, raising its device record to the tombstone: what
+device's lease of it through the `DeviceDB`, advancing its device record to the tombstone: what
 `del()` does, for this one case. Whatever the vault held is gone for good, so ask the user first.
 
 ```ts
@@ -1196,8 +1196,8 @@ Two things this asks of a host that handles its storage itself:
 ### A vault behind this device
 
 Each device keeps a record of each vault's scope (its device record, in the `DeviceDB`): its own
-id there, and the highest `vault_epoch` it has seen the vault at, raised at every read and every
-write of its own, and never lowered, whichever tab writes it. A vault storage serves below that
+id there, and the highest `vault_epoch` it has seen the vault at, advanced at every read and every
+write of its own, whichever tab writes it. A vault storage serves below that
 epoch is refused with `vault_behind`: a birth births nothing, and a Vault object already born
 takes nothing from it, writes nothing, and locks, as for a user signed out (*When the user signs
 out*). That holds for a Vault object that itself holds the newer copy too: it refuses the older,

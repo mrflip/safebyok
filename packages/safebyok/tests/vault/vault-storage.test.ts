@@ -472,10 +472,10 @@ describe("the logger", () => {
     const passphrase = 'FAKESECRET passphrase'
     const vault = await world.openUnlocked(passphrase, { deviceDB: device.deviceDB })
     await vault.putBox({ boxlabel: 'anthropic', sidecar: { note: 'FAKESECRET note' } }, whisper)
-    // every call site: a change whose record could not be raised (the device store's own error
+    // every call site: a change whose record could not be advanced (the device store's own error
     // kept nowhere, as it may quote the record), a lease that reads but is another scope's, its
     // wrap and all, a background refresh refused
-    TH.spyOnDeviceHook(device.deviceDB, 'incrementDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
+    TH.spyOnDeviceHook(device.deviceDB, 'advanceDeviceRecord').mockRejectedValueOnce(new Error('the device store broke: disk full'))
     await TH.putWayin(vault, passphrase, `${passphrase} two`)
     const secrets = storedSecrets(world)
     device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
@@ -718,7 +718,7 @@ describe("this device's record of the vault", () => {
     expect(after?.['salt_b64']).to.not.eq(before?.['salt_b64'])
   })
 
-  it("survives lock(), and del() raises it to the tombstone's vault_epoch, erasing nothing", async () => {
+  it("survives lock(), and del() advances it to the tombstone's vault_epoch, erasing nothing", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const { device_id: deviceId } = await recordIn(world) ?? {}
@@ -771,9 +771,9 @@ describe("this device's record of the vault", () => {
     expect(storedWayinOf(world, 'passphrase')?.['device_id']).to.eq(record?.device_id)
   })
 
-  it("gives way to the record it handed over when the birth's raise resolves none: the first way in carries that record's device_id", async () => {
+  it("gives way to the record it handed over when the birth's advance resolves none: the first way in carries that record's device_id", async () => {
     const world = makeWorld()
-    vi.spyOn(world.deviceDB, 'incrementDeviceRecord').mockResolvedValueOnce(null)
+    vi.spyOn(world.deviceDB, 'advanceDeviceRecord').mockResolvedValueOnce(null)
     const vault = await world.open()
     await TH.unlock(vault, 'pw')
     expect(storedWayinOf(world, 'passphrase')?.['device_id']).to.be.a('string').and.not.be.empty
@@ -789,7 +789,7 @@ describe("this device's record of the vault", () => {
     expect(vault.snapshot.trouble).to.be.null
   })
 
-  it("is raised by delDamagedVault to the tombstone's vault_epoch, never erased", async () => {
+  it("is advanced by delDamagedVault to the tombstone's vault_epoch, never erased", async () => {
     const world = await damagedVaultWorld()
     expect(await recordEpochIn(world)).to.eq(1)
     await delDamagedVault(world.optsWith())
@@ -849,7 +849,7 @@ describe("vault record behind this device's record", () => {
     await TH.expectRefusal(world.open(), 'vault_behind')
   })
 
-  it("refuses no copy that was the newest when storage handed it back, though another tab of this device raised the record meanwhile", async () => {
+  it("refuses no copy that was the newest when storage handed it back, though another tab of this device advanced the record meanwhile", async () => {
     const world = makeWorld()
     const here = await world.openUnlocked('pw')
     // Locked, so there is born locked, and its unlock reads storage.
@@ -881,7 +881,7 @@ describe("vault record behind this device's record", () => {
     expect(reopened.getSnapshot().gate?.passkey).to.be.null
   })
 
-  it("takes an older copy under a raised vault_epoch as it is, its removed way in opening again", async () => {
+  it("takes an older copy under a advanced vault_epoch as it is, its removed way in opening again", async () => {
     const { world, vault, older } = await rolledBackWorld()
     TH.closeVault(vault)
     world.dbStore.put(u1VaultScopepath, JSON.stringify({ ...(JSON.parse(older) as object), vault_epoch: 9 }))

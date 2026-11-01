@@ -146,22 +146,22 @@ describe("putWayin, with a new passphrase", () => {
     expect(TH.stateOf(vault.getSnapshot())).to.eq('locked')
   })
 
-  it("lands though the bank lets the vault go as the device record is raised after it, but writes no lease, and refuses vault_gone", async () => {
+  it("lands though the bank lets the vault go as the device record is advanced after it, but writes no lease, and refuses vault_gone", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const leaseBefore = await world.getLease()
     const putLease = vi.spyOn(world.deviceDB, 'tryPutLease')
-    let raising: ReturnType<typeof TH.holdNextCall> | null = null
-    // Past the read putWayin makes first, which raises the record too: the raise after its own write.
+    let advancing: ReturnType<typeof TH.holdNextCall> | null = null
+    // Past the read putWayin makes first, which advances the record too: the advance after its own write.
     TH.beforeNextCall(world.vaultDB, 'tryPutVaultRecord', () => {
-      raising = TH.holdNextCall(world.deviceDB, 'tryIncrementDeviceRecord')
+      advancing = TH.holdNextCall(world.deviceDB, 'tryAdvanceDeviceRecord')
       return Promise.resolve()
     })
     const putting = TH.tryPutWayin(vault, 'pw', 'pw two')
-    await TH.eventually(() => raising !== null)
-    await raising!.reached
+    await TH.eventually(() => advancing !== null)
+    await advancing!.reached
     TH.closeVault(vault)
-    raising!.release()
+    advancing!.release()
     await TH.expectBad(putting, 'vault_gone')
     expect(storedVaultRecordOf(world)['gate_epoch']).to.eq(2)
     expect(putLease).not.toHaveBeenCalled()

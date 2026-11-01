@@ -234,7 +234,7 @@ export class Bank {
 
   /** The Vault object for the vault `bag` names, born now from one read of storage, or the one the bank holds: never absent, `novel` until its passphrase is set.
    * It says hello first. A birth reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.ensureVault`
-   * beside {@link DeviceDB.tryGetLease}, then raises the record with {@link DeviceDB.incrementDeviceRecord}.
+   * beside {@link DeviceDB.tryGetLease}, then advances the record with {@link DeviceDB.advanceDeviceRecord}.
    * `VaultDB.ensureVault` resolves the vault as stored, or stores a new, gateless one in one
    * transaction; past a tombstone, a new life, its counter carried on. A lease of the vault's ways
    * in that has not ended, and ends no later than `leaseHours` from now, is taken up: the vault is
@@ -537,7 +537,7 @@ export class Bank {
     throw born.err
   }
 
-  /** One birth of `entry`: the libraries loaded, one read of storage and this device's store, the judgment, the device record raised, and the Vault object born of it all.
+  /** One birth of `entry`: the libraries loaded, one read of storage and this device's store, the judgment, the device record advanced, and the Vault object born of it all.
    * A birth refused for storage this device cannot trust ('identity_revoked', 'vault_behind': the
    * refusal policy's `lock`) revokes this device's lease of the scope, as a lock does, so the next
    * birth asks for cleartext. After each wait it demands the entry is still held, so an entry let go
@@ -554,8 +554,8 @@ export class Bank {
     }
   }
 
-  /** `#bear`'s read, judgment and raise, from `parts`' stores.
-   * The device record is read first, so a raise another tab's own write made is never held against
+  /** `#bear`'s read, judgment and advance, from `parts`' stores.
+   * The device record is read first, so an advance another tab's own write made is never held against
    * a read served before that write landed. A record that fails its check reads as none, as
    * {@link DeviceDB.getDeviceRecord} hands it back. Nothing is born below the record: 'vault_behind'.
    */
@@ -571,9 +571,9 @@ export class Bank {
     const { boxes, damagedBoxes, ...vaultRecord } = valOf(ensured)
     if (recordBefore !== null && vaultRecord.vault_epoch < recordBefore.highest_vault_epoch) { throw RefusalFuncs.vaultBehindWhileOpening() }
     // Minted at first need: the record keeps the first device_id stored, whichever tab wrote it.
-    const incrementing = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
+    const advancing = deviceRecordOf(scope, recordBefore?.device_id ?? randomId(), vaultRecord.vault_epoch)
     // An answer that fails its check gives way to the record handed over, so no malformed device_id reaches a way in.
-    const record = await deviceDB.incrementDeviceRecord(incrementing) ?? incrementing
+    const record = await deviceDB.advanceDeviceRecord(advancing) ?? advancing
     this.#demandHeld(vaultScopepath, entry)
     const vault: Vault = Vault[bear](parts, { vaultRecord, listing: { boxes, damagedBoxes }, cachedLease: valOf(cachedLease), record, refreshedAt }, (refusal) => { this.#heardGone(vaultScopepath, vault, refusal) })
     return vault

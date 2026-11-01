@@ -146,7 +146,7 @@ export type GatingTools = VaultPrivateTools & {
   putGate:      (gate: Gate, call: GatingCall) => Promise<Gate>
   /** Delete the vault `proving` proved, once a demand on it holds, expecting the `vault_tok` and `gate_epoch` of the vault record held, resolving the tombstone's `vault_epoch`. */
   delVault:     (proving: PassphraseProving) => Promise<number>
-  /** Once the gating that deleted the vault settled: lock, let the Vault object go, and raise the device record to `vaultEpoch`. */
+  /** Once the gating that deleted the vault settled: lock, let the Vault object go, and advance the device record to `vaultEpoch`. */
   afterDel:     (vaultEpoch: number) => Promise<void>
   /** Consult this device's store for a lease that fits, ending past `renewMillis` from now, and take it up: true when taken. */
   takeUp:       (gating: LaunchedGating, renewMillis: number) => Promise<boolean>

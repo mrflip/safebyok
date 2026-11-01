@@ -82,7 +82,7 @@ describe("VaultDashboard, opening", () => {
     const scope = TH.scopeOf('u1')
     const record = await TH.expectGood(world.deviceDB.tryGetDeviceRecord(scope))
     if (record === null) { throw new Error('the birth kept no device record') }
-    await TH.expectGood(world.deviceDB.tryIncrementDeviceRecord({ ...record, highest_vault_epoch: 9 }))
+    await TH.expectGood(world.deviceDB.tryAdvanceDeviceRecord({ ...record, highest_vault_epoch: 9 }))
     const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Accept this copy' }))
