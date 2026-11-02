@@ -5,6 +5,10 @@ promise, test or design for, each with the ruling that put it here and what happ
 reviewer reads `notes/security.md` for what we decided; this file is for what we decided not to
 decide. Add an entry at the end of the list, dated, with the ruling or the row it came from.
 
+**This file is in flux (November 2026).** The vault is being redesigned, and many entries describe the
+design as it stood in late October. Read each one as what we expected to leave alone under that design,
+not as a settled ruling, and check it against the current design before relying on it.
+
 * 2026-10-16 (G129, the Coach: "make a file WONTFIX"): **one device, one setting.** Opening the
   same vault on one device with different settings -- a different `leaseHours`,
   `maxWhisperBytes`, `maxBoxes`, `validators` or `keyDeriver` -- is
@@ -53,3 +57,9 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
   cache, and the next session asks for the passphrase. Pinned by
   `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
   retrying a refused erase.
+* 2026-11-02 (the Coach, unrace, `whiteboard/20261102-unrace/unrace-new_vault.md`; not yet built):
+  **a failed delete still locks the vault on this device.** `del_vault` locks first, as a lock is
+  synchronous and safe, then removes the vault from the vaultDB and the deviceDB, then vacates. So a
+  delete the vaultDB refuses still logs the user out of this device, and they log back in to try the
+  delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
+  devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."

@@ -193,7 +193,8 @@ is named for the act.
 | `putFoo` | Stores foo, resolving it as stored. |
 | `delFoo` | Deletes foo. |
 | `ensureFoo` | Has foo or makes it so, idempotently, and hands it back. |
-| `makeFoo`, `Foo.make` | Builds foo in memory. Stores nothing. |
+| `makeThing`, `Thing.make` | Synchronous: gives the thing, in memory. Stores nothing. |
+| `buildThing`, `Thing.build` | The same, asynchronous. |
 | `checkFoo` | Refuses a bad foo. Returns nothing. |
 | `checkedFoo` | Refuses a bad foo, else returns it, typed. What `optionsCheck` makes. |
 | `parseFoo` | Refuses a bad foo, else returns it cleaned or converted (*Validation*). |
@@ -201,6 +202,16 @@ is named for the act.
 | `isFoo`, or the condition (`consistentWith`) | Synchronous yes or no. Never throws. |
 | `fooOf(thing)` | Pure: the foo derived from `thing`. |
 | `tryFoo` | `foo`, resolving an `Outcome` instead of throwing. |
+
+**`make` and `build` say whether to await; the suffix says what comes back** (the Coach,
+2026-11-02). With no suffix, the name is the thing itself; a suffix says you get something else:
+
+| Name | Gives you |
+| --- | --- |
+| `makeVault`, `buildVault` | The vault is the thing: a `Vault` instance. |
+| `makeVaultRecord` | A database row, as a plain object. |
+| `makeVaultDna` | A dna: it has no controlled fields. |
+| `makeVaultProps` | Field values: strictly, neither a record nor a dna. |
 
 **`ensure` acquires or constructs, idempotently.** `bank.ensureVault({ vaultlabel })`,
 `vault.ensureUnlocked()`: have one, or make it so, and hand it back, so a second call costs
