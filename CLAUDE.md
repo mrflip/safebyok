@@ -60,12 +60,10 @@ govern how code is changed:
   1.0.0, neither binds backward**: no compatibility shims, no migrations, no reading of older
   stored shapes. An old record that fails today's validation fails safe (it reads as absent or
   corrupt), and the changeset says what a host will see.
-* **The vaultDB is the ground truth; what the vault holds is a cache.** A fundamentally
-  inconsistent vault state (a `vault_tok` drifted from its scope, props and boxes naming different
-  vaults) means a reload of the vault from storage. A data-integrity failure met in a consistent
-  state is reported by throwing. Insert no retry logic, abort controllers or other whizbangs into
-  the critical path of a primitive operation: the customer, or orchestration code we provide, can
-  add them as warranted.
+* **The vaultDB is the ground truth; what the local instance holds is a cache.** A
+  data-integrity failure met in a consistent state is reported by throwing. Insert no
+  retry logic, abort controllers or other whizbangs into the critical path of a primitive
+  operation: the customer, or orchestration code we provide, can add them as warranted.
 
 ## Commands
 
