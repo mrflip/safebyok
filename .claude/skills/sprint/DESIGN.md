@@ -33,11 +33,42 @@ sprinting or not, which is why those are one sentence of when to use it.
 * **Agents sing out, and compactions are logged** (`scripts/ohai`, and its PreCompact hook in
   `.claude/settings.json`). A background worker is otherwise silent until it reports, and its
   transcript is too large to read. A hook's input names the session but not the subagent, and a
-  subagent's shell knows only its parent's session, so the hook guesses the agent from the
-  transcript written last, and the worker confirms with its own `compacted` line. A probe on
-  2026-10-28 showed both: three compactions logged by the hook, and an agent that saw the
+  subagent's shell knows only its parent's session, so the hook guesses the agent with the largest
+  context among those written to lately, and the worker confirms with its own `compacted` line.
+  (Guessing the transcript written last named the wrong agent twice in sprint v6bank: a worker
+  just compacted, at 64k, in place of the one compacting beside it, and the 5b worker in place of
+  the orchestrator's own compaction by hand, which is now always logged as the main session's.)
+  A probe on 2026-10-28 showed both: three compactions logged by the hook, and an agent that saw the
   summary heading its conversation. The harness itself stops a subagent that refills its context
   within three turns of a compaction, three times running.
+* **A compacted orchestrator recovers from the record** (`post-compaction.md`). Only `/compact
+  <instructions>` steers a summary; an automatic compaction takes no instructions. But a skill body
+  comes back after either kind, so SKILL.md carries the pointer. The routine sits beside it, like
+  `wrapup.md`: it is needed rarely, and a body comes back only up to 5,000 tokens, where SKILL.md
+  already sits close at about 18.7k characters. It
+  says *Read beside its question* of a ruling because the Coach's chat answers are replies to a
+  row: v6bank's "Not sure I want a counter" answered one question on the rollback guard, and
+  thread 13 built an unrelated forget counter soon after. A bare quote in a summary could have
+  turned on it.
+  Sprint v6bank compacted by hand from 617k: its first call after was at 62k, and reading *Open
+  Matters* and the Docs guides took it to 120k a minute later. Replaying its growth from there, at
+  list price, compaction included: no compaction $32.72, a window of 400k $27.76, 300k $25.79, 200k
+  $32.20, where 11 compactions eat the saving. So the window suits the orchestrator far above a
+  worker's: `/autocompact 400k`, a backstop for a sprint left alone, is about 15% of the
+  orchestrator's bill and 3% of the sprint's. The better compaction is by hand at a quiet moment
+  past about 250k, once told "finish §3 for every report you hold, update the plan's status line,
+  commit and push", since the summarizing call runs no tools. The message that worked, as amended:
+
+  ```
+  /compact You are a /sprint orchestrator. The plan, progress document, thread files, PRs and sprint doc are the record: point to them, don't restate them. Keep only:
+  - Sprint: name, mode, default levels, worktree, sprint directory, sprint PR, sprint doc id and tab ids.
+  - A row for every thread not yet filed: label, step (building, reviewing, style pass, filing, blocked, waiting on), worktree, branch, PR, the live agent's id and description, its compactions and whether they fell before its first justify.
+  - The frontier and the cap on threads running at once.
+  - Any Coach message not yet carried back: the question it answered, your reading of it, how firm it was, and what it leaves open.
+  - Anything received but not yet carried over: report items with no Open Matters row, rulings not carried back, reviewer comments not posted, reviewer worktrees not removed.
+  - Your own calls not yet written down, with their reasons.
+  Drop worker reports, handoff text, diffs, test and git output, Docs results and guide text.
+  ```
 * **Rework goes to a fresh worker; the builder is resumed only to answer it.** A worker reports
   `ready` at its largest context (300--400k tokens was typical in October 2026), and a
   subagent's prompt cache lasts five minutes, so a builder resumed after a review first rewrites

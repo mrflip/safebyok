@@ -127,6 +127,35 @@ describe('scripts/ohai', () => {
     expect(logged().at(-1)).to.match(/^OHAI \S+ \+-:--:-- \[hook session=df710b96 likely=thread-worker "Thread 3: vault_record"\] compacting \(auto, at ~172k\)$/)
   })
 
+  /** Leaves a subagent's transcript, last written just now, at a context of `ctx` tokens */
+  const plantAgent = (agentId: string, description: string, ctx: number) => {
+    const subagents = path.join(scratch, 'project', Session, 'subagents')
+    mkdirSync(subagents, { recursive: true })
+    writeFileSync(path.join(subagents, `agent-${agentId}.jsonl`), `${JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: ctx } } })}\n`)
+    writeFileSync(path.join(subagents, `agent-${agentId}.meta.json`), JSON.stringify({ agentType: 'thread-worker', description }))
+  }
+  const hook = (trigger: string) => {
+    const input = JSON.stringify({ session_id: Session, transcript_path: path.join(scratch, 'project', `${Session}.jsonl`), trigger })
+    ohai(['--hook'], { input, after: (Date.now() - Began) / 1000 })
+    return logged().at(-1)
+  }
+
+  it('takes the largest context, not a sibling written later that has just compacted', () => {
+    plantAgent('a1', 'Restack', 166_000)
+    plantAgent('a2', 'Thread 5b', 64_000)
+    expect(hook('auto')).to.include('likely=thread-worker "Restack"] compacting (auto, at ~166k)')
+  })
+
+  it('names no subagent whose context is too small to be compacting', () => {
+    plantAgent('a1', 'Thread 5b', 64_000)
+    expect(hook('auto')).to.include('main session or unknown] compacting (auto)')
+  })
+
+  it('takes a compaction by hand as the main session\'s, whatever subagents are busy', () => {
+    plantAgent('a1', 'Finish 5b', 166_000)
+    expect(hook('manual')).to.include('main session or unknown] compacting (manual)')
+  })
+
   it('exits 0 from the hook whatever it is given, so a compaction is never held up', () => {
     const ran = spawnSync(Script, ['--hook'], { cwd: main, encoding: 'utf8', env: isolatedEnv(scratch, Began), input: 'not json' })
     expect(ran.status).to.equal(0)
