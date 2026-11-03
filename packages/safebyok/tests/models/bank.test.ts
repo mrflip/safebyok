@@ -422,6 +422,15 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(world.leaseRows()).to.deep.equal([])
   })
 
+  it("shows no listener 'ready' while it sweeps", async () => {
+    const { bank } = await makeBankWithVault(makeBankWorld())
+    const stages: string[] = []
+    bank.subscribe(() => { stages.push(bank.snapshot.stage) })
+    bank.sweep()
+    expect(stages).to.not.be.empty
+    expect(stages).to.not.include('ready')
+  })
+
   it("sweeps its vaults and leaves their cached leases; refuses until the next hello, which builds a fresh listing and picks the lease up, nobody asked", async () => {
     const world = makeBankWorld()
     const { bank, vault } = await makeBankWithVault(world)

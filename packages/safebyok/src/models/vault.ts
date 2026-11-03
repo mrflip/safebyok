@@ -79,7 +79,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   takeWorld(world: unknown): void {
-    const row = VS.vaultRow.parse(world)
+    const row = MSX.vaultRow.parse(world)
     if (row.vault_tok === this.vault_tok) { this.receive(row) }
   }
   // --
