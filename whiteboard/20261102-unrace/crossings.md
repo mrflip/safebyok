@@ -40,3 +40,11 @@ is the current `packages/safebyok/src`, so it uses today's verbs, not the design
 * **Names:** the design's `buildStored`, `buildLease`, `tryCacheLease`, `peekLease` and `tryUncacheLease` are
   today's `Proving.attempt` (through `gate.attemptProof`), `makeLease`, `tryPutLease`, `tryGetLease` and
   `tryDelLease`.
+
+## Crossings raised
+
+One sentence each. The goal is that when lock is called, nothing crosses it, and we get there with simple code analyzed in
+context, not by fine-tuning each of these.
+
+* A `lock()` landing during `lease.peek` (0.5 to 5 ms) loses: the vault ends unlocked with its cached row erased, until the
+  next `lock()`.

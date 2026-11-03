@@ -12,7 +12,6 @@
 * **`vault_tok`/`gate_epoch` match**: only rows that equal the given value match (?? what is the gate epoch guarantee and where is it bumped)
 * **consistent** wherever records share a field, their values are equal
 * **transactional**: simultaneous and either every step of it succeeded or no change took place.
-  - every call is transactional *except* that some backing stores may not support transactional removal of boxes. For such stores, success only means the vault is tombstoned.
 
 This shorthands the items that must be consistent and limit queries (according to the call's semantics)
 
@@ -48,7 +47,7 @@ This shorthands the items that must be consistent and limit queries (according t
 | `getCapacity`                           | Scope, `vault_tok`                 |                       |      |
 
 * **`vault_empty` means "nothing of this life", not "nothing in this scope".** An old `vault_tok` finds no row. So
-  the refusal itself moves the Vault's Trigger up, and the Trigger's `getVault`, by scope, shows what is there.
+  a `getVault`, by scope, shows what is there.
 * **`gate_epoch` limits no query.** A matched revision already pins the row, and only a gate verb moves it.
 * **`prior` is a plain `Revision`**, `{ revision_tok, revision_seq }`, so it needs no new field names.
 
@@ -81,6 +80,8 @@ For every return value,
 | VPA7 | all   | newer_format     | 🌀   | `req_params` holds scope, vault_tok, other safe metadata                                      |
 
 * ifAbsent: 'fail': void or gone refuse; 'nil': void/gone succeed (val = null and dbhas null or tombstone)
+* Gate verbs: params are shaped exactly like a vault record holding a gate that holds the wayin: `{ ...vaultRecord, gate: { passphrase_wayin } }`, `{ ...vaultRecord, gate: { passkey_wayin } }`, or `{ ...vaultRecord, gate: { passkey_wayin: null } }` for a revoke. Each calls `putVault` internally
+* `tidyGone` is for hosts: nothing in the package calls it
 * ifPresent, over a live row: 'repl' saves. 'fail' refuses, act `camped`, with the corpse: `dbhas` the stored record, `req_params` the request. It is not a `stale_write`, and not every write is a versioned update (`putPasskey`). 'get' saves nothing and returns the live row as `val` in place of the request, act `declined`
 
 * Given call, params, ok and act, everything to the right is guaranteed.
@@ -142,7 +143,7 @@ For every return value,
   | V7  | `delVault`        |       | ok            | 👍   | 📌   | 💾 🪦  | db row = request = `val` = world -- equal tombstone                                                    | 3.5        |
   |     | `delVault`        |       | void          | 👍   | 🔲   | 🟰 🔲  | db row = void    ; `val` = world -- sentinel tombstones                                                | 3.4        |
   | V5  | `delVault`        |       | gone          | 👍   | 🪦   | 🟰 🪦  | db row = same    = `val` = world -- tombstone equal, request discarded                                 | 3.4        |
-  | V7  | `delVault`        |       | _any_         | 👍   | *️⃣   | *️⃣ *️⃣  | all boxes for that vault_tok are tombstoned (¡May be Non-Transactional!)                               | 3.5        |
+  | V7  | `delVault`        |       | _any_         | 👍   | *️⃣   | *️⃣ *️⃣  | all boxes for that vault_tok are tombstoned, transactionally                               | 3.5        |
   | ..  |                   |       |               | ◽️   | ◽️   | ◽️ ◽️  |                                                                                                        |
   | V9  | ~~`getCapacity`~~ |       | ok            | 👍   | ➖   | 🟰 *️⃣  | capacity count estimates +/- 20% boxes sharing request scope+vault_tok                                 | 4          |
   | V10 | `tidyGone`        |       | tidied        | 👍   | *️⃣   | 💾 🔲  | Removes rows for boxes whose vault scope and vault_tok match no vault or a tombstoned vault            |

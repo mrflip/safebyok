@@ -3,9 +3,8 @@
 Rulings and their reasons, where `unrace-gating.md` and `models-invariants.md` draw the result and not the why.
 
 * **`bank.hello` is a forced reset** (the Coach, 2026-11-02, as the system is too hard to reason about otherwise). It
-  loads every vault of the bank from the vaultDB and refuses with no network. It does not load the cached vault for now:
-  the code that saves and loads it stays, the second with no caller. It comes back after the rework, when hosts may also
-  specify a timeliness for `hello`. Called twice, it just runs twice, with no join.
+  loads every vault of the bank from the vaultDB and refuses with no network. Vault and box records are not cached on the device for this
+  sprint. A cache comes back after the rework, when hosts may also specify a timeliness for `hello`. Called twice, it just runs twice, with no join.
 * **A gate change locks no session anywhere**, as the vaultKey never changes. Another device's session runs to its lock or
   its next `bank.tidy`. Its cached lease is of the older `gate_epoch`, which `lease.peek` forgets next session. That is
   `gate_epoch`'s one job, so nothing tells a vault's own gate change from another device's, and `adopt` never locks on a
@@ -35,6 +34,10 @@ Rulings and their reasons, where `unrace-gating.md` and `models-invariants.md` d
   Vault or the Bank, and never hears a clear. A gate is made from wayins, so a clear passphrase never goes through one.
 * **A cached lease is taken up in `ensureUnlocked` alone.** `hello` and `fetch` take up nothing.
 * **Nothing is committed until `vaultListing.ensureVault`, or a gate change's put.** `send` does not hydrate.
+* **A vault has no `send`** (the Coach, 2026-11-03), provided its tests go with it: tests kept for something nobody wants
+  would go on constraining the design. Nothing about a vault record changes but its gate, which has its own verbs.
+* **A gate change is its params, with no client-side next gate** (the Coach, 2026-11-03). `gate.with*` and `adoptWayins` go.
+  The params spread the record the attempt read, as a next gate no longer carries that revision.
 * **A damaged record is set aside, and nothing acts on it** (the Coach, 2026-11-02). The likeliest cause of damage is our
   own code, so our code never decides to delete or examine one. Beyond the one check that finds it, nothing looks at it. An
   answer lists it in `damaged_records`, a side channel of tombstones in the one shape, with sentinel values where the row
