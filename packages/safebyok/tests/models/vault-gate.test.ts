@@ -99,6 +99,24 @@ describe("vault.replacePassphrase()", () => {
     await proveBy(born, Passphrase)
   })
 
+  it("renews the lease under the epoch it landed, not a newer one delivered before its answer, so the next session asks a proof", async () => {
+    const born = await makeBornVault()
+    const { vault, deviceDB, demandStored, storeBehindOurBack, opts: { vaultDB } } = born
+    const landedEpoch = demandStored().gate.gate_epoch + 1
+    const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
+      const answer = await commit(params)
+      const stored = demandStored()
+      storeBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: landedEpoch + 1 } })
+      await vault.fetch()
+      return answer
+    })
+    await replaceTyping(vault, Passphrase, NewPassphrase)
+    expect(vault.gate.gate_epoch).to.eq(landedEpoch + 1)
+    expect(vault.isUnlocked).to.be.true
+    expect(deviceDB.cachedNow()).to.include({ gate_epoch: landedEpoch })
+  })
+
   it("the try form answers the refusal", async () => {
     const born = await makeBornVault()
     born.opts.world.requestCleartext = (gating) => { gating.decline() }
