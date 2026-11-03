@@ -3,12 +3,12 @@
 import { type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, type VaultFetched, VaultDB } from './vault-db-new'
 import * as Refuse from './vault-db-refusals'
 import * as VS from './vault-db-shapes'
-import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, Revision, VaultDBOpts, VaultRecord, VaultScope, VaultTombstone, WatchScope } from './vault-db-shapes'
+import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultRecord, VaultScope, VaultTombstone, WatchScope } from './vault-db-shapes'
+
+export type { MemoryVaultDBOpts } from './vault-db-shapes'
 
 type BoxLife = { scope: VaultScope, vault_tok: string, boxrows: Map<string, unknown> }
 type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
-
-export type MemoryVaultDBOpts = VaultDBOpts & { maxBoxes?: number }
 
 const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 
@@ -18,8 +18,9 @@ export class MemoryVaultDB extends VaultDB {
   readonly #heeders = new Set<Heeder>()
   readonly #maxBoxes: number
 
-  constructor({ maxBoxes = Infinity, ...opts }: MemoryVaultDBOpts = {}) {
-    super(opts)
+  constructor(opts: MemoryVaultDBOpts = {}) {
+    const { maxBoxes = Infinity, ...vaultDBOpts } = VS.memoryVaultDBOpts.parse(opts)
+    super(vaultDBOpts)
     this.#maxBoxes = maxBoxes
   }
 

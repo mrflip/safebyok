@@ -481,6 +481,14 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("the constructor", () => {
+    it("refuses bad_option for a maxBoxes or maxRecordBytes it cannot use", () => {
+      for (const opts of [{ maxBoxes: NaN }, { maxBoxes: -1 }, { maxRecordBytes: -1 }]) {
+        expect(() => new MemoryVaultDB(opts)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+      }
+    })
+  })
+
   describe("a store's own failure", () => {
     class FailingVaultDB extends MemoryVaultDB {
       protected override doGetBank(): never { throw new Error('socket closed') }
