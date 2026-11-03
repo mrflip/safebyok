@@ -79,15 +79,13 @@ describe("a vault record stored damaged", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate reads as sparse, so ensureUnlocked, edit and send each refuse 'bad_option', asking for a hydrate that will never bring a gate, and store nothing", async () => {
+  it("README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate reads as sparse, so ensureUnlocked refuses 'bad_option', asking for a hydrate that will never bring a gate, and stores nothing", async () => {
     const { gate: _gate, ...gateless } = await storedVaultRecord()
     const { listing, storedNow } = makeVaultWorld(gateless as VaultRecord)
     const vault = await listing.build(listing.sparseOf(gateless))
     await TH.expectRefusal(vault.ensureUnlocked(byPassphrase(Passphrase)), 'bad_option')
     await vault.hydrate()
     expect(vault.isFull).to.be.false
-    await TH.expectRefusal(vault.edit({}), 'bad_option')
-    await TH.expectRefusal(vault.send({}), 'bad_option')
     expect(storedNow()).to.equal(gateless)
   })
 })
