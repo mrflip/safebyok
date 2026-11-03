@@ -449,6 +449,47 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("a damaged row named as damaged_records lists it", () => {
+    it("delVault deletes rubble at the sentinels and cascades over nothing else; any other prior refuses as a get does", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      const rows = vaultDB._cheat_vaultRowsOf(bankScope)
+      rows.set('main', { garbage: true })
+      const tombstone = VS.vaultTombstone.parse({ ...VS.sentinelVaultOf(vaultScope), ...VS.nextRevisionOf(VS.NeverStored, Now) })
+      const missed = await vaultDB.tryDelVault(tombstone, { prior: { ...VS.NeverStored, revision_tok: 'nope' } })
+      expect(missed).to.deep.include({ ok: false, act: 'damaged_record' })
+      const named = await vaultDB.tryDelVault(tombstone, { prior: VS.NeverStored })
+      expect(named).to.deep.include({ ok: true, act: 'deleted' })
+      expect(rows.get('main')).to.include({ am: 'x', revision_seq: 0 })
+      expect(vaultDB._cheat_boxRowsOf(vaultScope, 'life1').get('openai')).to.deep.equal(box)
+    })
+
+    it("delVault at the row's own revision and vault_tok deletes it, and this life's boxes; another vault_tok does not", async () => {
+      const { vaultDB, vault } = await storeWith({ box: true })
+      const rows = vaultDB._cheat_vaultRowsOf(bankScope)
+      rows.set('main', { ...vault, am: 'x', gate: 'rubble' })
+      const tombstone = vaultTombstoneOf(vault)
+      const prior = priorOf(vault)
+      const missed = await vaultDB.tryDelVault({ ...tombstone, vault_tok: 'otherlife' }, { prior })
+      expect(missed).to.deep.include({ ok: false, act: 'damaged_record' })
+      const named = await vaultDB.tryDelVault(tombstone, { prior })
+      expect(named).to.deep.include({ ok: true, act: 'deleted' })
+      expect(rows.get('main')).to.include({ am: 'x', revision_seq: 1 })
+      expect(vaultDB._cheat_boxRowsOf(vaultScope, 'life1').get('openai')).to.include({ am: 'x' })
+    })
+
+    it("delBox deletes rubble at the sentinels, and refuses any other prior", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      const rows = vaultDB._cheat_boxRowsOf(vaultScope, 'life1')
+      rows.set('openai', { garbage: true })
+      const tombstone = VS.boxTombstone.parse({ ...VS.sentinelBoxOf(boxscope, 'life1'), ...VS.nextRevisionOf(VS.NeverStored, Now) })
+      const missed = await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })
+      expect(missed).to.deep.include({ ok: false, act: 'damaged_record' })
+      const named = await vaultDB.tryDelBox(tombstone, { prior: VS.NeverStored })
+      expect(named).to.deep.include({ ok: true, act: 'deleted' })
+      expect(rows.get('openai')).to.include({ am: 'x', revision_seq: 0 })
+    })
+  })
+
   describe("tidyGone", () => {
     it("removes the box rows of a tombstoned or vanished life, and counts the rows left in the bank", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })

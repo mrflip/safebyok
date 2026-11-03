@@ -33,7 +33,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, putAnte, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, NeverStoredSeq, isTombstone
 
-/** Whether a record is alive (`a`), damaged (`d`: it failed its check or its seal, and reads as gone) or gone (`x`: deleted). */
+/** Whether a record is alive (`a`), damaged (`d`: it failed its check, and is set aside in `damaged_records`) or gone (`x`: deleted). */
 export const { amVals } = VS
 
 /** The `am` a tombstone carries: damaged or gone, never alive. */
@@ -77,10 +77,7 @@ export type Vaulted = Readonly<Z.infer<typeof vaulted>>
 export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
 
 /** The sparse form of a thing damaged or gone: every sparse prop stays on it, for the record; nothing the user put in the thing does. {@link tombstone} checks what the base knows of one.
- * A stored record that fails its check arrives as a tombstone, `am` 'd': the sparse props as far
- * as storage recovered them, and the kind's constants filled in by the adapter, so that the
- * concrete listing's `sparseOf` accepts it. Where that much cannot be recovered, the store
- * refuses 'corrupt_record' instead. For a box, see {@link boxSparse}.
+ * A row that fails its check is listed in `damaged_records` as a tombstone, `am` 'd', with sentinels for what cannot be read. It is never delivered: it leaves the vaultDB only when the customer names it to `del`. For a box, see {@link boxSparse}.
  */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals[number] }>
 
@@ -99,14 +96,14 @@ export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched
 
 // == [Reconciling]: recordShapeVals, ageVals, centralPolicyVals, recordShape, age, centralPolicy, reconciled, settled, RecordShape, Age, CentralPolicy, Reconciled, Settled
 
-/** The shapes of a record as `classifyRecordShape` tells them: `sparse`, `full`, `gone` (a tombstone, `am` 'x') or `ouch` (a damaged one's tombstone, `am` 'd'). */
-export const recordShapeVals = ['sparse', 'full', 'gone', 'ouch'] as const
+/** The shapes of a record as `classifyRecordShape` tells them: `sparse`, `full` or `gone` (a tombstone). */
+export const recordShapeVals = ['sparse', 'full', 'gone'] as const
 
 /** How a revision `post` compares to an `ante`, as `cmpRevisions` tells it. */
 export const ageVals = ['older', 'same', 'newer'] as const
 
-/** Every policy `reconcileCentral` may choose: `older`, `same` and `skip` end the receive with central as it was; `fill` takes the record over the one in hand; `adopt` takes the one received; `gone` and `ouch` take it as deleted or damaged. */
-export const centralPolicyVals = ['older', 'same', 'skip', 'fill', 'adopt', 'gone', 'ouch'] as const
+/** Every policy `reconcileCentral` may choose: `older` and `same` end the receive with central as it was; `fill` takes the record over the one in hand; `adopt` takes the one received; `gone` takes it as deleted. */
+export const centralPolicyVals = ['older', 'same', 'fill', 'adopt', 'gone'] as const
 
 /** The checks of what reconciling passes, each refusing 'unexpected_error': the kinds above, each by its list; `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
 export const { recordShape, age, centralPolicy, reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
@@ -227,7 +224,7 @@ export type BoxPatchGiven = Z.output<typeof boxPatch>
 /** The policies when sending a record to a place that already holds a live one: `repl`, the default, replaces it; `fail` refuses `camped`; `get` saves nothing and takes up the live record. Storage decides, atomically. */
 export const { ifPresentVals } = VS
 
-/** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
+/** The policies when fetching a thing that is absent, never stored or deleted: `fail` with the absent refusal, or resolve `nil`. */
 export const { ifAbsentVals } = VS
 
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */

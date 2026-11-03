@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
-import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 import { Dna, Passphrase, makeVaultWorld, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 const held = useModelsWorld()
@@ -24,14 +24,6 @@ describe("registered_at over a rebirth", () => {
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
 
-  it("README.md:1282 (a record that will not decipher is written over with sidecar {} and its first-stored time now): a damaged box reborn is registered now, its sidecar the {} given", async () => {
-    held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
-    const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }, 'd'))
-    held.mw.setNow(T0 + 5000)
-    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
-    expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000, sidecar: {} })
-  })
-
   it("VOCABULARY.md:155 (registered_at is when this life of a box began, kept by every later revision of that life): a store that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted quietly, and the box's registered_at follows it, the rebirth's own time lost with the staged copy that carried it", async () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
     held.mw.setNow(T0 + 5000)
@@ -43,13 +35,6 @@ describe("registered_at over a rebirth", () => {
   })
 })
 
-describe("the tombstone's registered_at", () => {
-  it("VOCABULARY.md:153 (registered_at is when a box was first stored): the ouchstone made of a newer damaged record keeps the held record's registered_at, never the damaged record's", async () => {
-    const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    box.receive(tombstoneBoxRecord({ revision_seq: 2, registered_at: T0 + 3 }, 'd'))
-    expect(box._cheat_central).to.deep.include({ am: 'd', revision_seq: 2, registered_at: T0 })
-  })
-})
 // --
 
 // == [Changing the gate]: the passkey stays, other devices stay unlocked, no strength check

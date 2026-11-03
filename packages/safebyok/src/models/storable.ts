@@ -136,18 +136,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The record in hand is not a tombstone: the thing is not gone. */
   get isPresent(): boolean { return ! MSX.isTombstone(this.#central) }
 
-  /** True where the record in hand has every field filled; false for a sparse view, as a listing's query hands back, or for a tombstone over a deleted or damaged record. */
+  /** True where the record in hand has every field filled; false for a sparse view, as a listing's query hands back, or for a tombstone. */
   get isFull(): boolean { return this.isFullRecord(this.#central) }
 
   /** True where the record in hand is whole: {@link isFull}, or a tombstone; only a sparse record is not. */
   get #isWhole(): boolean { return this.isWholeRecord(this.#central) }
 
-  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone, deleted or damaged. A sparse record is not. */
+  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone. A sparse record is not. */
   protected isWholeRecord(record: Fetched<RecordT, SparseT>): record is RecordT | Tombstone<SparseT> {
     return this.isTombstoneRecord(record) || this.isFullRecord(record)
   }
 
-  /** Whether `record` is a tombstone, deleted or damaged. */
+  /** Whether `record` is a tombstone. */
   protected isTombstoneRecord(record: Fetched<RecordT, SparseT>): record is Tombstone<SparseT> {
     return MSX.isTombstone(record)
   }
@@ -226,7 +226,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this.demandReadyToDel()
   }
 
-  /** A delete needs the vault unlocked, and no more: a thing gone or damaged is deleted again. */
+  /** A delete needs the vault unlocked, and no more: a thing gone is deleted again. */
   demandReadyToDel(): this { return this.demandUnlocked() }
   // --
 
@@ -261,7 +261,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone or damaged is deleted again, over its tombstone's revision. */
+  /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureReadyToDel(MSX.timelyOpts.parse(opts))
     await this.listing.del(this)
@@ -303,8 +303,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Receiving]: receive, adopt, settle, tombstoneFor
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
-   * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
-   * `reconcileCentral` judges it; on 'older', 'same' or 'skip' central stays, and otherwise the record is adopted and the
+   * revision held. A record storage could not validate never arrives: it is set aside in `damaged_records`.
+   * `reconcileCentral` judges it; on 'older' or 'same' central stays, and otherwise the record is adopted and the
    * thing settles. A record not older than central notes success where, once it is taken in, the record in hand is whole,
    * so a sparse one that only confirms the revision held counts; an older one notes nothing. Past a discard, it takes nothing.
    */
@@ -332,10 +332,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return { badnews: [] }
   }
 
-  /** A tombstone made here, from the sparse props held, under `revision`, written now: `am` 'x' for a deletion, 'd' for damage. */
-  protected tombstoneFor(revision: Revision, am: 'd' | 'x' = 'x'): Tombstone<SparseT> {
+  /** A tombstone made here, from the sparse props held, under `revision`, written now. */
+  protected tombstoneFor(revision: Revision): Tombstone<SparseT> {
     const { revision_tok, revision_seq } = revision
-    return { ...this.sparse, revision_tok, revision_seq, written_at: this.world.clock.now(), am }
+    return { ...this.sparse, revision_tok, revision_seq, written_at: this.world.clock.now(), am: 'x' }
   }
   // --
 
@@ -343,12 +343,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The central that results from `rcvd` meeting the central held, and the policy that names the row taken.
    *
-   * NOTE, damage at one revision (the Coach, 2026-10-30). Alive here is `am` 'a', as `amVals` has it: a full or sparse
-   * record, never a damaged one. At the same revision, damage is not a fate that conflicts with deletion:
-   * * A damaged record delivered skips, whatever central is, a deletion included: what storage holds failed its checks
-   *   here, so it tells this device nothing to weigh against its own copy.
-   * * A deletion delivered over a copy held damaged takes 'gone': the deletion is the one healthy word on that
-   *   revision, so central becomes it. This includes nothing stored (`receive(null)`) for a thing held damaged.
    * Of the shapes, only a deletion against a living record, either way round, refuses 'record_conflict'; `cmpRevisions`
    * refuses another tok at the same seq before any row is weighed.
    *
@@ -358,65 +352,51 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * of its own:
    * * Under another `vault_tok` than this thing's ('other vault'), it throws 'unexpected_error', whatever its age or shape,
    *   over a central never stored included: this thing's `vault_tok`, tattooed at birth, never moves. A vault's life is its
-   *   `vault_tok`, so every record of another life of a vault takes this row. Not yet: flushing and remaking every instance
-   *   of a vault made anew.
-   * * At the revision held, it throws 'record_conflict': one revision cannot begin a life and continue another. A damaged
-   *   record skips first, as the damage NOTE rules: its `box_tok` is no more to be trusted than the rest of it.
+   *   `vault_tok`, so a record of another life of a vault takes this row where it reaches a held instance: the vault listing
+   *   routes one past it, to a new instance.
+   * * At the revision held, it throws 'record_conflict': one revision cannot begin a life and continue another.
    * Past those, a newer record of another life is the thing born anew elsewhere, after a deletion this device may not have
    * received: a birthday, taken by the newer rows like any other. An older one is a past life's, and is older.
    *
    * | life        | age   | rcvd   | central | policy                   | central after |
    * | ----------- | ----- | ------ | ------- | ------------------------ | ------------- |
    * | other vault | any   | any    | any     | throw 'unexpected_error' | -             |
-   * | any         | older | ouch   | any     | 'skip'                   | central       |
-   * | any         | same  | ouch   | any     | 'skip'                   | central       |
    * | other       | same  | any    | any     | throw 'record_conflict'  | -             |
    * |             |       |        |         |                          |               |
    * | any         | older | any    | any     | 'older'                  | central       |
    * | any         | older | gone   | any     | 'older'                  | central       |
    * |             |       |        |         |                          |               |
-   * | same        | same  | gone   | ouch    | 'gone'                   | rcvd          |
    * | same        | same  | gone   | alive   | throw 'record_conflict'  | -             |
    * | same        | same  | alive  | gone    | throw 'record_conflict'  | -             |
    * | same        | same  | sparse | any     | 'same'                   | central       |
    * | same        | same  | gone   | gone    | 'same'                   | central       |
    * | same        | same  | full   | full    | 'same'                   | central       |
    * | same        | same  | full   | sparse  | 'fill'                   | rcvd          |
-   * | same        | same  | full   | ouch    | 'fill'                   | rcvd          |
    * |             |       |        |         |                          |               |
    * | any         | newer | sparse | any     | 'adopt'                  | rcvd          |
    * | any         | newer | full   | any     | 'adopt'                  | rcvd          |
    * | any         | newer | gone   | any     | 'gone'                   | rcvd          |
-   * | any         | newer | ouch   | any     | 'ouch'                   | ouchstone     |
    * |             |       |        |         |                          |               |
    *
-   * The age is `cmpRevisions(central, rcvd)`, which refuses the same seq under another tok. An ouchstone is a tombstone
-   * made here, 'd' under the damaged record's revision, of the sparse props held. For a thing already held, nothing else of
-   * the delivered record is kept; for a thing not yet held, the listing makes its never-stored central of the delivered
-   * record's sparse form, so the props held are the damaged record's own.
+   * The age is `cmpRevisions(central, rcvd)`, which refuses the same seq under another tok.
    */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
     // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
     if ((rcvd.vault_tok !== this.vault_tok))                     { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
     const central = this.#central
     const age = cmpRevisions(central, rcvd)
-    // Damage before life: a damaged record's box_tok is no more to be trusted than the rest of it.
-    if ((age !== 'newer') && (rcvdShape === 'ouch'))             { return { central, policy: 'skip' } }
     if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
     const centralShape = this.classifyRecordShape(central)
     if ((age === 'older'))                                       { return { central, policy: 'older' } }
     if ((age === 'same')) {
-      if ((rcvdShape === 'gone') && (centralShape === 'ouch'))   { return { central: rcvd, policy: 'gone' } }
       if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
       if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
       if ((rcvdShape === 'gone') && (centralShape === 'gone'))   { return { central, policy: 'same' } }
       if ((rcvdShape === 'sparse'))                              { return { central, policy: 'same' } }
       if ((rcvdShape === 'full') && (centralShape === 'full'))   { return { central, policy: 'same' } }
       if ((rcvdShape === 'full') && (centralShape === 'sparse')) { return { central: rcvd, policy: 'fill' } }
-      if ((rcvdShape === 'full') && (centralShape === 'ouch'))   { return { central: rcvd, policy: 'fill' } }
     } else {
       if (rcvdShape === 'gone') { return { central: rcvd, policy: 'gone' } }
-      if (rcvdShape === 'ouch') { return { central: this.tombstoneFor(rcvd, 'd'), policy: 'ouch' } }
       return { central: rcvd, policy: 'adopt' }
     }
     throw new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
@@ -427,10 +407,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this.lifeTokPathOf(record) === this.lifeTokPathOf(this.#central)
   }
 
-  /** The shape of `record`, by its `am` first: 'ouch' for a damaged one's tombstone, 'gone' for a deletion's, then 'full' for a record `isFullRecord` accepts, 'sparse' for any other. */
+  /** The shape of `record`: 'gone' for a tombstone, 'full' for a record `isFullRecord` accepts, 'sparse' for any other. */
   protected classifyRecordShape(record: Fetched<RecordT, SparseT>): RecordShape {
-    if (record.am === 'd')             { return 'ouch' }
-    if (record.am === 'x')             { return 'gone' }
+    if (this.isTombstoneRecord(record)) { return 'gone' }
     if (this.isFullRecord(record))     { return 'full' }
     return 'sparse'
   }
@@ -438,7 +417,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Concrete Subclass Required Methods]: isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Whether `fetched` is a full record, alive: a tombstone, deleted or damaged, never is. */
+  /** Whether `fetched` is a full record, alive: a tombstone never is. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
   /** The life of the thing `record` is of: the life toks that a birthday mints, joined. Two records of one scope with different paths are of different lives of it. */
   protected abstract lifeTokPathOf(record: Fetched<RecordT, SparseT>): string
