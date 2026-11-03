@@ -103,6 +103,15 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box?.isFull).to.be.true
     })
 
+    for (const [label, ante] of [['missing', undefined], ['with no revision', {}], ['with only a seq', { revision_seq: 3 }]] as const) {
+      it(`refuses an ante ${label} as 'bad_option' before storage is called`, async () => {
+        const { listing, next } = await putable()
+        held.mw.clearCalls()
+        await TH.expectRefusal(listing.put(next, ante as never), 'bad_option')
+        expect(held.mw.callsOf('put')).to.deep.equal([])
+      })
+    }
+
     it("refuses a box not full as 'bad_record' before storage is called", async () => {
       const listing = boxListingOf(held.mw)
       const sparse = await listing.build(sparseBoxRecord())
