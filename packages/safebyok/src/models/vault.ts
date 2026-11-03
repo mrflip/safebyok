@@ -145,7 +145,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   get isUnlocked(): boolean { return this.#lease !== null }
 
-  /** This vault, unlocked: as it stands, else by the lease this device has cached, else by the proof `proofClosure` answers; with no proof, refuses 'vault_locked'. A refused look at the cache is told as bad news, and asks for the proof. A `lock()` crossing an unlock before its attach ends unlocked, as the proof shows this user may have it so; the next `lock()` ends that. */
+  /** This vault, unlocked: as it stands, else by the lease this device has cached, else by the proof `proofClosure` answers; with no proof, refuses 'vault_locked'. A refused look at the cache is told as bad news, and asks for the proof. A `lock()` crossing an unlock before its attach ends unlocked; the next `lock()` ends that. */
   async ensureUnlocked(proofClosure?: AttemptClosure): Promise<this> {
     await this.ensureTimely()
     if (this.isUnlocked) { return this }
@@ -218,7 +218,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! cached.ok) { this.listing.tellBadNews([cached.err]) }
   }
 
-  /** The lease `heldLease` was, under `gate_epoch`, where it is still in force: a vault locked at the start stays locked, and a lock crossing the change wins, the new lease vacated. */
+  /** Attach a new lease under `gate_epoch`, where `heldLease` is still in force: a vault locked at the start stays locked, and a lock crossing the change wins, the new lease vacated. */
   async #renewLease(proved: Proving, gate_epoch: number, heldLease: Lease | null): Promise<void> {
     if (heldLease === null) { return }
     const lease = await proved.buildLease(this.leaseFriend(), gate_epoch)
@@ -245,7 +245,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! vacated.ok) { this.listing.tellBadNews([vacated.err]) }
   }
 
-  /** The cached lease survived a lock. The host's `onPanic` hears it, and a rejection goes no further than the platform; with none, the refusal goes to the platform and this vault is vacated, so this tab stops reopening it. */
+  /** Tell of a cached lease that survived a lock: the host's `onPanic` hears it, and a rejection goes no further than the platform; with none, the refusal goes to the platform and this vault is vacated. */
   async #panic(refusal: VaultError): Promise<void> {
     const { onPanic } = this.world
     if (onPanic === undefined) {

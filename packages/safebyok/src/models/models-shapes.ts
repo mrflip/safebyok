@@ -496,7 +496,7 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
-/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life: its stamp, clock and logger, `attachLease`, `lock`, and the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
+/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
   clock:           HX.clockShape,
