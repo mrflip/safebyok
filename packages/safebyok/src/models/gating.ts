@@ -92,7 +92,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   get whenSettled(): Promise<Outcome<Vault>> { return this.#settled }
 
   /** The verdict on a passphrase, as the user types it. Nothing changes. */
-  checkStrength(passphraseClear: string): Promise<VX.PassphraseVerdict> {
+  async checkStrength(passphraseClear: string): Promise<VX.PassphraseVerdict> {
     return Proving.checkStrength(VX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
   }
 

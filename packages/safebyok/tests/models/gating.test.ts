@@ -106,6 +106,14 @@ describe("a birth through a gating", () => {
     gating.decline()
   })
 
+  it("rejects, never throws, a live check of what is no passphrase", async () => {
+    const { listing, gatingAt } = birthWorld({ strengthChecker })
+    void listing.tryBuildVault(Dna)
+    const gating = await gatingAt<'build_vault'>()
+    await TH.expectRefusal(gating.checkStrength(null as never), 'bad_option')
+    gating.decline()
+  })
+
   it("holds nothing where the put is refused: the gating settles the refusal, nothing stored, held or cached", async () => {
     const { listing, opts, gatingAt, storedNow, deviceDB } = birthWorld()
     const refusal = new VaultError('storage_blocked', "the disk is full")
