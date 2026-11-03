@@ -59,7 +59,7 @@ export class Lease implements LeaseStamp {
     return outcomeOf(() => this.peek(friend, gate_epoch))
   }
 
-  /** A new lease over `vaultKey`, under a fresh leaseKey, stamped with the time of this proof and what `opts` records of it. It is cached by {@link Lease.tryCache}, not here. */
+  /** A new lease under a fresh leaseKey. It is cached by {@link Lease.tryCache}, not here. */
   static async grant(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate_epoch, wayinkind } } = leaseGrantArgs.parse({ friend, vaultKey, opts })
     const held     = vaultStamp.parse(friend)

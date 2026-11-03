@@ -477,7 +477,7 @@ export type StampedGate = Z.infer<typeof stampedGate>
 
 export const LeaseFormat = ModelsLeaseFormat
 
-/** The lease's forms: `leaseStamp`, what the wrap of its vaultKey is bound to, the vault's stamp, the `gate_epoch` it is good for, when it was proved and the kind of proving; `leaseRecord`, those and its keys. */
+/** `leaseStamp` is what the wrap of a lease's vaultKey is bound to; `leaseRecord` adds its keys. */
 export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, custom, epochMillis, vault_key_lease_wrapped }) => {
   const leaseStamp  = obj({ fmt: lit(LeaseFormat), ...vaultStamp.shape, gate_epoch: gateEpoch, proved_at: epochMillis, wayinkind: VX.wayinkind })
   const leaseRecord = leaseStamp.extend({
@@ -510,7 +510,6 @@ export const leaseFriend = objCheck(({ fn }) => ({
 
 export type LeaseFriend = Z.infer<typeof leaseFriend>
 
-/** What a grant records of its proving: the `gate_epoch` the lease is good for and the kind of proving. */
 export const leaseGrantOpts = objCheck(() => ({
   gate_epoch: gateEpoch,
   wayinkind:  VX.wayinkind,

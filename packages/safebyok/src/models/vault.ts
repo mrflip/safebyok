@@ -143,7 +143,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Unlocking]: isUnlocked, ensureUnlocked, demandLease, takeUpLease, takeUpKeptLease, unlock, unlockAlone, unlockByProof, lookUpKept, setLease
+  // == [Unlocking]: isUnlocked, ensureUnlocked, demandLease, takeUpLease, takeUpKeptLease, unlock, unlockAlone, unlockByProof, leaseCachedOf, lookUpKept, peekLease, setLease
 
   get isUnlocked(): boolean { return ! this.#isLocked }
 
@@ -257,7 +257,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [The lease]: leaseFriend, lock, letLeaseGo, leaseChore
 
-  /** All a lease or a proving hears of this vault: its stamp, clock and logger, `lock`, and the world's lease verbs bound to its scope. */
+  /** All a lease or a proving hears of this vault. */
   leaseFriend(): LeaseFriend {
     const { scope, world: { clock, logger, deviceDB } } = this
     return {

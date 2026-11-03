@@ -54,7 +54,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     Object.freeze(this)
   }
 
-  /** The strengthChecker's verdict on `passphraseClear`; nothing changes. What it throws is replaced, as it heard the passphrase ('unexpected_error'); an answer that is no verdict refuses 'bad_option'. */
+  /** The strengthChecker's verdict. What it throws is replaced, as it heard the passphrase ('unexpected_error'); an answer that is no verdict refuses 'bad_option'. */
   static async checkStrength(passphraseClear: VX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<VX.PassphraseVerdict> {
     strengthArgs.parse({ passphraseClear, scope, world })
     const verdict = VX.passphraseVerdict.safeParse(await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope))
@@ -110,7 +110,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 // == [PassphraseProving]: buildNovel, buildStored
 
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
-  /** A proving for a new wayin of the vault `stamp` names, under `passphraseClear`, of the first gate's epoch. A passphrase the world's strengthChecker finds weak refuses 'weak_passphrase', with its reason. */
+  /** A proving for a new wayin, of the first gate's epoch. A passphrase the world's strengthChecker finds weak refuses 'weak_passphrase', with its reason. */
   static async buildNovel(stamp: VaultStamp, passphraseClear: VX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { stamp: checked, passphraseClear: typed } = passphraseNovelArgs.parse({ stamp, passphraseClear, world })
     const verdict = await super.checkStrength(typed, vaultScope.parse(checked), world)
@@ -136,7 +136,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 // == [PasskeyProving]: buildNovel, buildStored
 
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
-  /** A proving for a new wayin of the vault `stamp` names, under `passkeyClear`, of the first gate's epoch. */
+  /** A proving for a new wayin, of the first gate's epoch. */
   static async buildNovel(stamp: VaultStamp, passkeyClear: VX.PasskeyAnswer, world: ProvingWorld): Promise<PasskeyProving> {
     const { stamp: checked, passkeyClear: answer } = passkeyNovelArgs.parse({ stamp, passkeyClear, world })
     const header = mintPasskeyHeader(world, answer)

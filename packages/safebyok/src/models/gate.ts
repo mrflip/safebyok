@@ -23,7 +23,6 @@ export class Gate {
   declare readonly pkWayin:          Wayin | null
   declare readonly stamp:            VaultStamp
 
-  /** The gate of the vault `stamp` names, its epoch and wayins as `props` pickles them. */
   constructor(stamp: VaultStamp, props: unknown) {
     const checked = vaultStamp.parse(stamp)
     const { gate_epoch, passphrase_wayin, passkey_wayin } = gateProps.parse(props)
