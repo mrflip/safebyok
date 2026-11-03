@@ -376,6 +376,15 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     await expect(next.getBox(boxlabel)).resolves.to.have.property('boxlabel', boxlabel)
   })
 
+  it("lists a row under a label that fails its check, the boxes beside it still answering", async () => {
+    const { openNextSession, boxrows } = await makeWorldWithBox()
+    boxrows.set('Not A Label', { garbage: true })
+    const next = await openNextSession()
+    const box = await next.getBox(boxlabel)
+    expect(await box?.extractWhisper()).to.deep.equal(Whisper)
+    expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['Not A Label'])
+  })
+
   it("drops an instance held under it from the list, disabled", async () => {
     const { vault, box: held, boxrows } = await makeWorldWithBox()
     boxrows.set(boxlabel, { garbage: true })
