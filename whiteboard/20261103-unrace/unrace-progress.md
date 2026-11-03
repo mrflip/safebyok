@@ -18,6 +18,8 @@ it. Threads 1, 6 and 7 all ran so; a thread file is enough to hand over on.
 * A live row under another `vault_tok` refuses `vault_mismatch`; `vault_empty` is no row of that life.
 * `Promptly` is 2,000 ms. An idempotent `revoked` moves nothing ("we can switch if it's an issue").
 * The refusal for a locked vault is `vault_locked`, the kind that exists (the orchestrator's call, on the Rec's "clash").
+* `tidy` touches only its own bank's leases. A lock whose erase is refused, and a host getter forging a `VaultError`, are wontfix.
+  `leaseFriend` narrows before the sprint ends (thread 15). The Coach reviews the whisper-as-a-string amendment at thread 14.
 
 ## What the threads built
 
@@ -64,6 +66,8 @@ small conflict where threads 1 and 3 meet, at the restack before thread 7.
 
 **Thread 10, `gating`.** `tests/models/gating.test.ts`. Kinds go in `gatingKindVals`, `ProvingsForGatingkind`, `VaultForGatingkind`, `ProveForGatingkind` and the clears in `models-shapes.ts`. One flag, `#isLastAttempt`. A birth's `run` is `#runBirth` in `VaultListing`; a refused lease leaves the vault stored and held, locked; a rebirth mints a fresh `vault_tok`. `bank.ensureVault(bag)` calls `tryBuildVault(scope)`, and the bank hands on `world.requestCleartext`. Test helpers `buildTyping` and `unlockTyping`.
 
+**Thread 11, `gate_changes`.** `Vault.replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, each with a try form, on `Gating.launch`; `Vault.del()` is `delVault()`, the one door. `#landGate(proved, commit)` lays the lease under the epoch of the record stored. `Vault.fullRecord` is public for `gating.ts`. `declineAtLock()` settles every kind but `del_vault`; `declineAtDiscard()` settles any kind as the vault leaves. `Gate` is read-only: `make`, `demandPasskeyAddable`, `pickle`, `toJSON`. `listing.del(ante)` takes the record. Tombstones are made real in a test with `delTyping` from another session; `vault.fetch()` of one throws `vault_gone`. Helpers `replaceTyping`, `addPasskeyTyping`, `revokeTyping`, `delTyping`.
+
 ## Crossings raised
 
 To go into `whiteboard/20261102-unrace/crossings.md`:
@@ -83,3 +87,6 @@ To go into `whiteboard/20261102-unrace/crossings.md`:
 * An instance arriving during `putBox`'s `ensureTimely` sends the birth into `demandNotHeld`, refusing `bad_option` (thread 9's review).
 * A second `attempt` with the same answer while the first runs zeroes the bytes in use, so the first answers `bad_option` (thread 10's review).
 * A tombstone or sparse record landing during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
+* A `del_vault`'s `lock()` with a refused erase and no `onPanic` vacates the vault during the delete, and `listing.del` still lands (thread 11).
+* A tombstone or discard between the commit and the lease in `#landGate` settles the gating as failed though the row moved (thread 11's review).
+* A gate verb refused `vault_gone` or `vault_mismatch` doesn't deliver, so the Vault reads present until its next fetch, box answer or notice (thread 11's review).

@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 10 filed; thread 11 building. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458.
+* **Status:** threads 1 to 11 filed; thread 12 building. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459.
 
 ## The goal
 
@@ -274,6 +274,16 @@ The Gating half of the text in thread 3.
   the attempt read, not the live vault. Rewrite `vault-gate.test.ts` to the spec's rows; don't port it.
 * **Size:** medium. **Depends on:** 10.
 
+*Orchestrator:* raised to a `high` review after thread 10's findings, as it handles the same clears.
+
+*Review:* `fixed` at high. G1, G2, G3 and G8 hold, and the first commit closes thread 10's verdict getter. Fixed: a gate change's
+lease read its epoch off the live vault, not the record stored (a crossing, kept as it put a key on the wrong epoch and adds no
+state); a test now pins params to the record the attempt read; `addPasskey` and `revokePasskey` refresh within `Promptly` before
+their nobody-asked check; `putVault`'s doc block. Left: refused `vault_gone` undelivered (Coach's row); a failure past the commit
+in `#landGate` (Coach's row); end-of-method checks exist nowhere (Coach's row, thread 16); the `tryPutRow` cast, `Vault`'s dead
+`ensureReadyToDel` and `tryDel(opts)`, `listing.del` beside security.md's wording, `timelyAnte`'s name, `putVaultOpts`' second list,
+VOCABULARY lines 19 and 21 (thread 14).
+
 ### 12. `bank` (pre-plan 11's first half)
 
 The Bank half of the text in thread 3.
@@ -283,6 +293,8 @@ The Bank half of the text in thread 3.
 * **Items:** `bank.hello`, `tidy`, the discards, `identity_revoked` vacating, and the snapshot fields.
 * **Look-ahead:** what thread 13 drives is `subscribe` and `getSnapshot` on this. A `hello` that runs on real stores is what
   matters; leave the proof's path clear and don't start it.
+* *Orchestrator:* the Coach: "At your convenience make it only tidy that banks leases, and test for that". Keep
+  `leasesProvedBefore`'s scan; `tidy` vacates only its own bank's rows.
 * **Size:** medium. **Depends on:** 9, 11.
 
 ### 13. `proof` (pre-plan 11's second half)
@@ -306,8 +318,31 @@ Earlier threads do this for what they rewrite, as they go. This thread takes wha
 
 * **Touches:** `models/*`.
 * **Also:** `unrace-gating.md` *Guarantees to amend* and *Rows for `notes/wontfix.md`*.
+* **The Coach's note:** *"relocate the checks and types at the top of models files into the shapes directory or model-shapes ?
+  Anything with a good reason can stick around, but it saves token ussage to not have them there, and agents will write better
+  ones. Types are best made from checks"*.
 * **Levels:** `sonnet` worker, `low` review; an `opus` worker for the guarantees, if they turn out to be more than wording.
-  **Size:** small. **Depends on:** 13.
+  **Size:** small. **Depends on:** 13, 15, 16; it runs last.
+
+### 15. `lease_narrow` (the Coach's ruling, 2026-11-03)
+
+*"Let's fix before end of sprint, important, record to security,md"*, on `vault.leaseFriend()` and `lease.friend` being public,
+with `friend.peekLease()` answering the cached row and its lease key handle (G9).
+
+* **Touches:** `models/vault.ts`, `lease.ts`, whoever calls them; `notes/security.md` through its `sonnet` subagent.
+* **Levels:** `high` review, as G9 covers it.
+* *Orchestrator:* cut from thread 12's tip, beside thread 13; a new thread, so the numbers no longer run in order. **Size:** small.
+  **Depends on:** 12.
+
+### 16. `method_ends` (the spec's, unbuilt; the Coach's row is open)
+
+`unrace-gating.md` *End-of-method invariants*: "Each method states what holds when it ends, whatever crossed it, and checks it: a
+private check at the method's end, throwing as any data-integrity failure does and naming no secret, with a test for each row. A
+check that cannot be written marks an invariant that is not one."
+
+* *Orchestrator:* no thread's items named these, as thread 11's review found. After the proof, as the proof is what the sprint is
+  for; before the sweep, so it sweeps them. Holds to the no-machinery rule: a check reads what is there, and adds no state.
+* **Levels:** `high` review. **Size:** medium. **Depends on:** 13, and the Coach's row.
 
 ## Bent from the pre-plan
 
