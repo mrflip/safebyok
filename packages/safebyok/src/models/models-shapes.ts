@@ -291,7 +291,7 @@ export const ifPresentVals = ['replace'] as const
 /** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
 export const ifAbsentVals = ['fail', 'nil'] as const
 
-/** How old a vault's record a gating attempt or a gate change will act on, in milliseconds. A caller wanting the record as stored right now asks `ensureTimely(0)`. */
+/** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
 
 /** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.

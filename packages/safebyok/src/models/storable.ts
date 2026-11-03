@@ -223,7 +223,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
 
-  /** Get the record storage holds, through the listing, which delivers it to `receive`: one fetch at a time, a call made while one is under way joining it and settling as it settles. Where nothing is stored, or a tombstone, `opts.ifAbsent` says, for each call, joined or not: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent. */
+  /** Get the record storage holds, through the listing, which delivers it to `receive`. A call made while a fetch is under way joins it, and settles as it settles.
+   * Where nothing is stored, or a tombstone, each call's `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent.
+   */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
@@ -236,7 +238,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return outcomeOf(() => this.fetch(opts))
   }
 
-  /** The world timely first, as its answer may lock the vault or take the thing away. Then the record in hand, where it is whole and refreshed within `opts.maxMillisSinceRefresh`, by default the thing's horizon; otherwise fetched, a thing found absent being no refusal. */
+  /** Make the world timely, as its answer may lock the vault or take the thing away, and fetch the record unless it is timely within `opts.maxMillisSinceRefresh`, by default the thing's horizon.
+   * A thing found absent is no refusal.
+   */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
