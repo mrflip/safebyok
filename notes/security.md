@@ -41,6 +41,17 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (vault_slot, branch `20261103-vault_slot`): **A tombstone taken in by a vault leaves the cached lease row standing if the
+  erase is refused.** A tombstone a vault takes in (from `vault.del()`, or found by a fetch or notice) lands the end state: lock, erase
+  the row this device has cached of the lease, box listing vacated, the vault staying in its slot. An erase refused on this path goes to
+  `onBadNews` and is not a panic, as the tombstone stands, so the cached row can outlive the vault's deletion on this device until a
+  later erase. It is bound to the old `vault_tok`, which a new life of the vault reads as none, and it remains usable only by a holder
+  of the old vault's stamp. (Models are not yet exported from the package.)
+* 2026-11-03 (vault_slot, branch `20261103-vault_slot`): **A stored row that fails its checks is removed only by the customer naming
+  it.** Such a row is never delivered to an instance and nothing acts on it. `delVault` / `delBox` land only where the tombstone's
+  `prior` matches the row as `damaged_records` lists it (its revision and `vault_tok`, or the sentinels where the row cannot be read);
+  any other prior refuses as a get does, and a `put` cannot overwrite a damaged row. The check is `VS.isDamagedVaultAt` /
+  `VS.isDamagedBoxAt` (`packages/safebyok/src/storage/vault-db-shapes.ts`), used in `memory-vault-db.ts`.
 * 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **A whisper crosses the seal seam as a string.**
   `vault.sealStampedString(whisperText, stamp)` and `unsealStampedString` hand a whisper between `Box` and `Lease` as a JavaScript
   string, which cannot be zeroed; `Lease.sealWith` and `unsealWith` zero only the bytes they encode or decipher themselves. Before
@@ -53,7 +64,10 @@ added or folded into through the subagent, and no other entry changes.
   `lock()` is a panic.** `vault.#vacateLease` reads locked at once, but where the deviceDB refuses the erase the row stands: with a host
   `onPanic` the vault stays locked and enabled, the row in place, and the next `ensureUnlocked` on this device takes it up with no proof;
   with none, the refusal goes to the platform's `reportError` where there is one, and the vault is vacated, which tries the erase once
-  more.
+  more. Amended 2026-11-03 (vault_slot, branch `20261103-vault_slot`): `#vacateLease`
+  (`packages/safebyok/src/models/vault.ts`) evicts and nulls the lease before it calls the deviceDB's erase, and turns a synchronous
+  throw from a duck's `tryVacate` into a refusal, so `lock()` cannot fail open: it reads locked and does not throw, and the refused
+  erase goes to the panic path above.
 * 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`; ruled by the Coach):
   **A `lock()` crossing an unlock before its attach ends unlocked.** This includes a `lock()` during `Lease.peek` or during the proof:
   the erase lands, then the attach holds a lease and caches its row afresh, so the row and the unlocked state stand after a `lock()`
