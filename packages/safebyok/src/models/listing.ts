@@ -5,7 +5,7 @@ import { VaultError } from '../errors'
 import type { Answer, BadAnswer, GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { alreadyHeldError } from '../helpers/throwers'
+import { alreadyHeldError, disabledError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
@@ -44,6 +44,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   readonly #onBadNews: ((news: VaultError) => unknown) | null
   #snapshot: readonly SnapshotT[] = Object.freeze([])
   #unwatch:  (() => void) | null = null
+  /** Set by a sweep or a vacate, and never cleared. */
+  #isDisabled = false
 
   constructor(opts: ListingOpts) {
     MSX.listingOpts.parse(opts)
@@ -63,10 +65,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The world refreshed within `maxMillis`, by default its own horizon. */
   async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(MSX.maxMillis.parse(maxMillis)) }
 
-  // == [Starting and ending]: hello, goodbye
+  // == [Starting and ending]: hello, goodbye, lock, sweep, vacate, unlist, demandEnabled
 
   /** Start the watch. */
   async hello(): Promise<void> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
+    this.demandEnabled()
     this.#unwatch ??= this.watchRows(this.#onNotice)
   }
 
@@ -74,6 +77,40 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   goodbye(): void {
     this.#unwatch?.()
     this.#unwatch = null
+  }
+
+  /** Lock each thing held. */
+  lock(): this {
+    for (const thing of this.things) { thing.lock() }
+    return this
+  }
+
+  /** End the watch, sweep each thing, and take no further calls. A repeat is a no-op. Never throws. */
+  sweep(): this { return this.#disable((thing) => { thing.sweep() }) }
+
+  /** End the watch, vacate each thing, and take no further calls. A repeat is a no-op. Never throws. */
+  vacate(): this { return this.#disable((thing) => { thing.vacate() }) }
+
+  #disable(discard: (thing: ThingT) => void): this {
+    if (this.#isDisabled) { return this }
+    this.#isDisabled = true
+    this.goodbye()
+    for (const thing of this.things) { discard(thing) }
+    return this
+  }
+
+  /** Stop holding `thing`, as its own discard asks: the slot empties only for this very instance. */
+  unlist(thing: Thing<ScopeT, RecordT, SparseT>): void {
+    const scopepath = this.scopepathOf(this.scopeOf(thing))
+    if (this.#things.get(scopepath) !== thing) { return }
+    this.#things.delete(scopepath)
+    this.#remakeSnapshot()
+  }
+
+  /** Refuses past a sweep or a vacate. */
+  demandEnabled(): this {
+    if (this.#isDisabled) { throw disabledError() }
+    return this
   }
   // --
 
@@ -88,12 +125,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** The instance of `record`, sparse, full or a tombstone, once it is delivered as a fetch's answer would be, and held; a thing already held under its scope receives it, and a refusal its `receive` throws is thrown. Stores nothing. */
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
+    this.demandEnabled()
     this.sparseOf(record)
     return this.#buildOrReceive(this.scopeOf(record), record)
   }
 
   /** Refuses 'bad_option' a birth under a `scope` already held. A box's `send` brings one deleted or damaged back to life. */
   protected demandNotHeld(scope: ScopeT): void {
+    this.demandEnabled()
     if (this.at(scope) !== null) { throw alreadyHeldError() }
   }
   // --
@@ -107,6 +146,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
+    this.demandEnabled()
     await this.ensureTimelyWorld(maxWorldMillis)
     return this.#deliver(await this.tryGetRow(asked), ifAbsent)
   }
@@ -120,6 +160,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const record = this.recordOf(duck)
     const { ifPresent = 'repl' } = MSX.putListingOpts.parse(opts)
     const prior = priorOf(MSX.putAnte.parse(ante))
+    this.demandEnabled()
     return this.#deliver(await this.tryPutRow(record, { prior, ifPresent }))
   }
 
@@ -134,6 +175,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Delete the thing `duck` names, a sparse record or a thing, over the revision of the instance held, or else `duck`'s own, and deliver the answer: its tombstone, or nothing for nothing stored. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
+    this.demandEnabled()
     const sparse = this.at(this.scopeOf(duck))?.sparse ?? this.sparseOf(duck)
     const prior = priorOf(sparse)
     const tombstone = { ...sparse, ...VS.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
@@ -168,10 +210,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   // The one place an instance is made and held: `#makeThingOf` is called from here alone, and only where no instance is held.
-  /** The instance under `scope` once `record` meets it: the instance held, or, where none is, one born of `record` and held once it has taken it. A refusal `receive` throws is thrown, nothing held. The listing then makes its snapshot again. Null for nothing stored and nothing held. */
+  /** The instance under `scope` once `record` meets it: the instance held, or, where none is, one born of `record` and held once it has taken it. A refusal `receive` throws is thrown, nothing held. The listing then makes its snapshot again. Null for nothing stored and nothing held. A late answer past a sweep or a vacate refuses, building nothing. */
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT>): ThingT
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null {
+    this.demandEnabled()
     const held = this.at(scope)
     if (record !== null) { this.#demandRecordOfScope(record, scope) }
     const thing = held ?? this.#makeThingOf(record)
@@ -214,7 +257,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Deliver a notice of a row of this listing's kind as a good answer's record. Any refusal met on the way, the world's or one `receive` throws, is bad news, as nobody asked: told to `onBadNews`, never thrown into the vaultDB's watch. */
   readonly #onNotice = (notice: VaultDBNotice): void => {
     const { val, world } = notice
-    if (! this.isOwnRow(val)) { return }
+    if (this.#isDisabled || ! this.isOwnRow(val)) { return }
     void (async () => {
       const { ok, err } = await outcomeOf(() => {
         this.world.takeWorld(world)
@@ -245,7 +288,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const isSame = next.length === this.#snapshot.length && next.every((snapshot, idx) => snapshot === this.#snapshot[idx])
     if (isSame) { return }
     this.#snapshot = Object.freeze(next)
-    for (const listener of this.#listeners) { listener() }
+    for (const listener of this.#listeners) {
+      try {
+        listener()
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    }
   }
   // --
 

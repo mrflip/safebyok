@@ -356,10 +356,10 @@ export const ProofClosureThrew = "The proof closure threw rather than handing ba
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, LetGoInstance, vaultAbsent
 
-/** Why a lease that will not open locks its vault. */
-export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
+/** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
+export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
 /** Why a whisper that will not open under the vault's key is refused. */
 export const UnopenedWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
@@ -367,8 +367,8 @@ export const UnopenedWhisper = "That whisper would not open under this vault's k
 /** Why a whisper that opened but is no whisper this package knows is refused. */
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
 
-/** Why a lease past its autolock_at, or forgotten, opens nothing. */
-export const LeaseNotInForce = "This lease is no longer in force -- its time ran out, or it was forgotten when the vault locked -- so nothing was read or written: unlock the vault again."
+/** Why a lease dropped opens nothing. */
+export const LeaseNotInForce = "This lease is out of force, as the vault locked or the lease would not open, so nothing was read or written: unlock the vault again."
 
 /** Why a call that needs the vault unlocked is refused while it is locked. */
 export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
@@ -376,8 +376,11 @@ export const UnlockFirst = "The vault is locked, so nothing was read or written:
 /** Why a locked vault with no lease kept is not unlocked without a proof. */
 export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
 
-/** Why a vault takes up no lease of another vault, or granted to another Vault object. */
-export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."
+/** Why a vault attaches no lease made for another vault, or for another Vault object. */
+export const LeaseOfOtherHolder = "This lease was made for another vault, or another Vault object of this one, so this one did not attach it: a bug in the caller."
+
+/** Why an instance past a sweep, a vacate or a delete answers nothing. */
+export const LetGoInstance = "This object was let go, by a sweep, a vacate or a delete, so it answers nothing more: ask the bank for the vault again."
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`

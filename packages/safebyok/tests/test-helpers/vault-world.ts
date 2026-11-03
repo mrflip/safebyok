@@ -1,7 +1,6 @@
-/** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a device cache that keeps nothing, a deviceDB that keeps one lease, and a clock the test moves. */
+/** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a device cache that keeps nothing, a {@link MemoryDeviceDB} with its lease verbs spied on, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
-import type { VaultScope } from '../../src/shapes/scopes'
 import type { BoxWorld } from '../../src/models/box-listing'
 import type { Lease } from '../../src/models/lease'
 import type { ProofClosure, VaultRecord } from '../../src/models/models-shapes'
@@ -10,6 +9,7 @@ import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { quietLogger } from './logging'
 import { anyStrengthChecker, passkeyOf, testDeriver } from './builders'
@@ -34,7 +34,6 @@ export const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await pa
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
 
-const ok = <ValT>(val: ValT) => Promise.resolve({ ok: true as const, val, err: null })
 const nothing = (): void => undefined
 
 /** Every listing made since the last test. */
@@ -47,16 +46,17 @@ export const useVaultWorlds = (): void => {
   })
 }
 
-/** A deviceDB that keeps the one lease last put, and logs each lease verb. */
+/** The real deviceDB, each verb a friend binds spied on, and the one row these worlds hold, to read or lay over. */
 const makeDeviceDB = () => {
-  let kept: unknown = null
-  return {
-    keptNow:     () => kept,
-    keep:        (record: unknown) => { kept = record },
-    tryGetLease: vi.fn((_scope: VaultScope) => ok(kept)),
-    tryPutLease: vi.fn((record: unknown) => { kept = record; return ok(record) }),
-    tryDelLease: vi.fn((_scope: VaultScope) => { kept = null; return ok(undefined) }),
-  }
+  const deviceDB = new MemoryDeviceDB()
+  const rows = deviceDB._cheat_leaseRows()
+  return Object.assign(deviceDB, {
+    peek:      vi.spyOn(deviceDB, 'peek'),
+    tryCache:  vi.spyOn(deviceDB, 'tryCache'),
+    tryVacate: vi.spyOn(deviceDB, 'tryVacate'),
+    keptNow:   (): unknown => [...rows.values()][0] ?? null,
+    keep:      (record: unknown) => { rows.set([...rows.keys()][0] ?? 'no-row', record) },
+  })
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
@@ -75,7 +75,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     strengthChecker: anyStrengthChecker,
     device_id:    'device-1',
     leaseMillis:  LeaseMillis,
-    deviceDB:     deviceDB as unknown as VaultWorld['deviceDB'],
+    deviceDB,
     ...worldOverrides,
   }
   const vaultDB = new MemoryVaultDB({ clock: world.clock })
@@ -132,14 +132,13 @@ export const makeBornVaultWithPasskey = async () => {
   return makeBornVault(() => ({ passphrase: Passphrase, passkeyAnswer }))
 }
 
-const RoundTripBoxKeyStamp  = Object.freeze({ boxlabel: 'anthropic_api_key' })
-const RoundTripWhisperStamp = Object.freeze({ revision_seq: 1 })
+const RoundTripStamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
 /** What `opener` unseals of a whisper `sealer` seals: the two hold one vaultKey only if it comes back. */
-export const roundTrip = async (sealer: Lease, opener: Lease): Promise<string> => {
-  const sealed = await sealer.sealWith(new TextEncoder().encode('sk-test'), RoundTripBoxKeyStamp, RoundTripWhisperStamp)
-  return new TextDecoder().decode(await opener.unsealWith(sealed, RoundTripBoxKeyStamp, RoundTripWhisperStamp))
-}
+export const roundTrip = async (sealer: Lease, opener: Lease): Promise<string> => opener.unsealWith(await sealer.sealWith('sk-test', RoundTripStamp), RoundTripStamp)
+
+/** {@link roundTrip} through the vaults' own seal verbs. */
+export const vaultRoundTrip = async (sealer: Vault, opener: Vault): Promise<string> => opener.unsealStampedString(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp)
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
 export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
@@ -156,5 +155,6 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   lockState:    () => vault.lockState(),
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
-  demandLease:  () => vault.demandLease(),
+  sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
+  unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
 })

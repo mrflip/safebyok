@@ -63,7 +63,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 
   static tryBuildVault(listing: VaultListing, dna: VaultDna, world: GatingWorld): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(listing, dna, world)) }
 
-  // GAP: vault.ts `ensureUnlocked(proofClosure?)` throws noProofToUnlock() where none is handed; with a world that carries `requestCleartext`, it would `await Gating.unlockVault(this, this.world)` and answer `this.demandLease()`.
+  // GAP: vault.ts `ensureUnlocked(proofClosure?)` throws noProofToUnlock() where none is handed; with a world that carries `requestCleartext`, it would `await Gating.unlockVault(this, this.world)`.
   static unlockVault(vault: Vault, world: GatingWorld): Promise<Vault> {
     return this.#ask('unlock_vault', vault.scope, vault, world, async (handed) => {
       const checked = MSX.vaultUnlockCleartexts.parse(handed)

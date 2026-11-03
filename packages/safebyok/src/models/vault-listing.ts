@@ -7,23 +7,27 @@ import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
+import type { DeviceDB } from '../storage/device-db-new'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
+import { BoxListing } from './box-listing'
 import { type DelTombstone, Listing } from './listing'
 import { Gate } from './gate'
 import type { PassphraseProving } from './proving'
-import { type Dna, type Fetched, type LeaseDeviceDB, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type Dna, type Fetched, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseFriend()` binds it. */
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. `vault.leaseFriend()` binds its deviceDB's lease verbs to each vault. `onPanic` hears a refused erase of the cached lease, and no secret material. `boxRefreshMillis` is the horizon of a vault's boxes, by default the vault's own. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
   leaseMillis?: number
-  deviceDB:    LeaseDeviceDB
+  deviceDB:    DeviceDB
+  onPanic?:    ((refusal: VaultError) => unknown) | undefined
+  boxRefreshMillis?: number
 }
 
 /** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `create` makes from its `proofClosure`. */
@@ -49,22 +53,17 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     this.demandNotHeld(input)
     const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
     const vault = await this.putDraft(draft)
-    vault.takeUpLease(await vault.leaseCachedOf(proving))
+    const lease = await proving.buildLease(vault.leaseFriend())
+    await lease.attach()
     return vault
   }
 
   tryCreate(input: VaultDna, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.create(input, proofClosure)) }
 
-  /** Start the watch, and take up each vault's cached lease, as {@link Vault.takeUpKeptLease} does. */
-  override async hello(): Promise<void> {
-    await super.hello()
-    await Promise.all(this.things.map((vault) => vault.takeUpKeptLease()))
-  }
-
-  /** End the watch, and let every vault's lease go, leaving the lease this device keeps for the next load; erasing it is `vault.lock()`'s. */
-  override goodbye(): void {
-    super.goodbye()
-    for (const vault of this.things) { vault.letLeaseGo() }
+  /** The listing of `vault`'s boxes, its watch not started. Bad news of a box goes where this listing's goes. */
+  boxListingOf(vault: Vault): BoxListing {
+    const { boxRefreshMillis = this.maxMillisSinceRefresh } = this.world
+    return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis, onBadNews: (news) => { this.tellBadNews([news]) } })
   }
 
   // == [Defined by the vault listing]

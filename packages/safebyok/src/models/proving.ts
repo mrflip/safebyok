@@ -71,7 +71,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return this.#wrapVaultKey(vaultKey)
   }
 
-  /** A lease on `friend`'s vault under the vaultKey this proving's wayin holds, good for the epoch proved or the one passed, recording when and how it was proved. A friend whose stamp is not this proving's refuses 'bad_option', before any key is touched. It is not yet cached: {@link Lease.tryCache}. */
+  /** A lease on `friend`'s vault under the vaultKey this proving's wayin holds, good for the epoch proved or the one passed, recording when and how it was proved. A friend whose stamp is not this proving's refuses 'bad_option', before any key is touched. It is neither held nor cached until {@link Lease.attach}. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     provingLeaseArgs.parse({ friend, gate_epoch })
     if (! consistent(vaultStamp.parse(friend), this.stamp)) { throw leaseOfOtherVault() }

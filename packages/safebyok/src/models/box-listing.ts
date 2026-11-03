@@ -1,6 +1,6 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
-import { makeLifeTok } from '../crypto'
+import { type CipherCtxRecord, makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import { lockedError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
@@ -9,18 +9,19 @@ import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import { type BoxSnapshot, Box, sealedRecordOf } from './box'
-import type { Lease } from './lease'
 import { type DelTombstone, Listing } from './listing'
-import { type BoxRecord, type BoxSparse, type Dna, type Fetched, type ListingOpts, type ListingWorld, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxRecord, type BoxSparse, type Dna, type Fetched, type ListingOpts, type ListingWorld, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 
-// == [Given to a box listing]: BoxLease, BoxWorld, BoxDna, BoxListingOpts
+// == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
 
-/** The vault's lease, as far as its boxes need it: the seal and the unseal. */
-export type BoxLease = Pick<Lease, 'sealWith' | 'unsealWith'>
-
-/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope and token, and its lease, taken at each seal and unseal and never kept, which refuses 'vault_locked' while the vault is locked. */
-export type BoxWorld = ListingWorld & { scope: VaultScope, vault_tok: string, demandLease(): BoxLease }
+/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope and token, and its seal verbs, which refuse 'vault_locked' while the vault is locked. */
+export type BoxWorld = ListingWorld & {
+  scope:     VaultScope
+  vault_tok: string
+  sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
+  unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
+}
 
 /** The dna of a box, with the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar `create` seals, both required: what a caller hands `create`, which holds it to {@link boxDna}. It carries no sealed parts, which only the seal makes. */
 export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper: WhisperHolder, sidecar: Sidecar }
@@ -49,7 +50,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     this.#demandUnlocked()
     this.demandNotHeld(dna)
     const { whisper, sidecar, ...sparse } = this.stampDna(dna)
-    const draft = await sealedRecordOf(this.world.demandLease(), { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
+    const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
     this.#demandUnlocked()
     return this.putDraft(draft)
   }

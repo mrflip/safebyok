@@ -2,8 +2,9 @@ import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
 import { type Outcome, outcomeOf } from '../outcome'
 import { oneAtATime } from '../one-at-a-time'
+import { reportToPlatform } from '../report-error'
 import { stableJsonify } from '../stable-jsonify'
-import { lockedError, partialLoadError } from '../helpers/throwers'
+import { disabledError, lockedError, partialLoadError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
 import type { Listing } from './listing'
 import type { Age, Am, Fetched, FetchOpts, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
@@ -45,6 +46,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare revision_seq:  number
   declare registered_at: number
   declare written_at:    number
+
+  /** Set by a sweep, a vacate or a delete, and never cleared. */
+  #isDisabled = false
 
   /** The latest record this device knows storage holds: full, sparse, or a tombstone. A thing never stored is born with a tombstone at NeverStoredSeq. */
   #central: Fetched<RecordT, SparseT>
@@ -183,7 +187,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const nextSnapshot = this.makeSnapshot()
     if (this.sameSnapshot(nextSnapshot, this.#snapshot)) { return }
     this.#snapshot = nextSnapshot
-    this.#listeners.forEach((listener) => { listener() })
+    this.#listeners.forEach((listener) => {
+      try {
+        listener()
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    })
   }
   /** Compare two snapshots for equality: notifications are not sent if old and new are the same */
   protected sameSnapshot(next: SnapshotT, current: SnapshotT): boolean {
@@ -191,17 +201,22 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToDel, demandReadyToDel
+  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToDel, demandReadyToDel
 
-  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
+  /** True past a sweep, a vacate or a delete, and from then on. */
+  get isDisabled(): boolean { return this.#isDisabled }
 
-  demandPresent():  this { if (! this.isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
+  demandEnabled():  this { if (this.#isDisabled) { throw disabledError() }                             return this }
 
-  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
+  demandUnlocked(): this { if (this.demandEnabled().isLocked)    { throw lockedError() }                               return this }
+
+  demandPresent():  this { if (! this.demandEnabled().isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
+
+  demandFull():     this { if (! this.demandEnabled().isFull)    { throw partialLoadError() }                          return this }
 
   /** The full record in hand, or refuses 'bad_option' where it is sparse or a tombstone. */
   protected demandFullProps(): RecordT {
-    const { full } = this
+    const { full } = this.demandEnabled()
     if (full === null) { throw partialLoadError() }
     return full
   }
@@ -222,6 +237,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
+    this.demandEnabled()
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     const isStored = await this.#oneFetchAtATime()
     if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
@@ -237,6 +253,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
+    this.demandEnabled()
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
     return this.fetch({ ifAbsent: 'nil' })
@@ -254,15 +271,45 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
+  // == [Discards]: lock, sweep, vacate, sweepContents, vacateContents, disable
+
+  /** Tell listeners the lock has moved: past a discard, a no-op. Never throws. */
+  lock(): this {
+    if (! this.#isDisabled) { this.settle() }
+    return this
+  }
+
+  /** Drop what this instance holds of secrets, leave what this device has cached, and answer nothing from here on, unlisted. A repeat is a no-op. Never throws. */
+  sweep(): this { return this.#disable(() => { this.sweepContents() }) }
+
+  /** As `sweep`, and what this device has cached of it goes too. Storage is untouched. A repeat is a no-op. Never throws. */
+  vacate(): this { return this.#disable(() => { this.vacateContents() }) }
+
+  protected sweepContents(): void {}
+
+  protected vacateContents(): void {}
+
+  /** Marked first, so that a repeat met on the way finds the work done. */
+  #disable(dropContents: () => void): this {
+    if (this.#isDisabled) { return this }
+    this.#isDisabled = true
+    dropContents()
+    this.listing.unlist(this)
+    this.settle()
+    return this
+  }
+  // --
+
   // == [Receiving]: receive, adopt, settle, tombstoneFor
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
    * `reconcileCentral` judges it; on 'older', 'same' or 'skip' central stays, and otherwise the record is adopted and the
    * thing settles. A record not older than central notes success where, once it is taken in, the record in hand is whole,
-   * so a sparse one that only confirms the revision held counts; an older one notes nothing.
+   * so a sparse one that only confirms the revision held counts; an older one notes nothing. Past a discard, it takes nothing.
    */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
+    if (this.#isDisabled) { return { badnews: [] } }
     const answer = rcvd ?? this.tombstoneFor(this.#central)
     const { central } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
     const older = cmpRevisions(this.#central, answer) === 'older'

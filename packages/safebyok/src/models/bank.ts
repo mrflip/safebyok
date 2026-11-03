@@ -10,9 +10,10 @@ import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
+import type { DeviceDB } from '../storage/device-db-new'
 import type { VaultDB } from '../storage/vault-db-new'
 import { Gating, type GatingWorld, type RequestCleartext } from './gating'
-import type { LeaseDeviceDB, LockState, ProofClosure, StrengthChecker } from './models-shapes'
+import type { LockState, ProofClosure, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
 import { type VaultWorld, VaultListing } from './vault-listing'
@@ -26,7 +27,7 @@ export type BankOpts = {
   user_id:              string
   device_id?:           string | undefined
   vaultDB:              VaultDB
-  deviceDB:             LeaseDeviceDB
+  deviceDB:             DeviceDB
   keyDeriver:           KeyDeriver
   requestCleartext?:    RequestCleartext | undefined
   strengthChecker?:     StrengthChecker | undefined
@@ -36,6 +37,8 @@ export type BankOpts = {
   vaultRefreshMinutes?: number | undefined
   boxRefreshMinutes?:   number | undefined
   onBadNews?:           ((news: VaultError) => unknown) | undefined
+  /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
+  onPanic?:             ((refusal: VaultError) => unknown) | undefined
 }
 
 export type BankSnapshot = BankScope & Readonly<{ device_id: string, vaults: readonly VaultSnapshot[] }>
@@ -52,12 +55,12 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly device_id:        string
   readonly clock:            Clock
   readonly keyDeriver:       KeyDeriver
-  readonly deviceDB:         LeaseDeviceDB
+  readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
   readonly requestCleartext: RequestCleartext | undefined
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
-  // GAP: the box listing a vault makes would take `boxRefreshMillis` as its `maxMillisSinceRefresh`; no vault makes one yet.
+  readonly onPanic:          ((refusal: VaultError) => unknown) | undefined
   readonly boxRefreshMillis: number
   readonly vaultListing:     VaultListing
 
@@ -68,13 +71,14 @@ export class Bank implements VaultWorld, GatingWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
+    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
     this.clock = clock
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
+    this.onPanic = onPanic
     this.logger = logger
     this.requestCleartext = requestCleartext
     this.strengthChecker = strengthChecker
@@ -106,7 +110,7 @@ export class Bank implements VaultWorld, GatingWorld {
 
   tryHello(): Promise<Outcome<void>> { return outcomeOf(() => this.hello()) }
 
-  goodbye(): void { this.vaultListing.goodbye() }
+  goodbye(): void { this.vaultListing.sweep() }
   // --
 
   // == [Vaults]: vaultScopeOf, vaultOf, ensureVault, closeVault, closeVaults, with ensureVault's try form

@@ -12,6 +12,12 @@ const Checks = Checkers('bad_option', ({ obj, custom }) => {
   return { gateMakeArgs: obj({ passphraseWayin: wayin, passkeyWayin: wayin.nullable() }) }
 })
 
+// == [Gate forms]: GateChange
+
+/** The props of a next gate, and the proving of the gate it follows: what renews a lease under the next epoch. */
+export type GateChange = { gate: GateProps, proved: PassphraseProving }
+// --
+
 // == [Gate]: make, build, attemptProof, provePassphrase, demandPasskeyAddable, withPassphraseReplaced, withPasskeyAdded, withPasskeyRevoked, pickle, toJSON
 
 /** The wayins of a vault's record as of one `gate_epoch`, a read-only view: a change to them is made and landed elsewhere, and a new `Gate` read from the record that lands. */
@@ -74,31 +80,31 @@ export class Gate {
     if (this.pkWayin !== null) { throw passkeyHeldAlready() }
   }
 
-  /** The props of the next gate, once `proofClosure` proves this one by its passphrase: a passphrase wayin for the passphrase `passphraseClosure` answers, sealed from that proving, and the passkey wayin as stored, as the vaultKey does not change. */
-  async withPassphraseReplaced(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure, world: ProvingWorld): Promise<GateProps> {
+  /** The props of the next gate and the proof of this one, once `proofClosure` proves it by its passphrase: a passphrase wayin for the passphrase `passphraseClosure` answers, sealed from that proving, and the passkey wayin as stored, as the vaultKey does not change. */
+  async withPassphraseReplaced(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure, world: ProvingWorld): Promise<GateChange> {
     passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
     const proved = await this.#provePassphrase(proofClosure, world)
     const proving = await hearing(passphraseClosure, (handed) => PassphraseProving.buildNovel(this.stamp, passphraseCleartexts.parse(handed).passphrase, world))
     const passphrase = await proving.buildWayin(proved)
-    return gateProps.parse({ gate_epoch: this.gate_epoch + 1, passphrase_wayin: passphrase.pickle(), passkey_wayin: this.passkey_wayin })
+    return { gate: gateProps.parse({ gate_epoch: this.gate_epoch + 1, passphrase_wayin: passphrase.pickle(), passkey_wayin: this.passkey_wayin }), proved }
   }
 
-  /** The props of the next gate, once `proofClosure` proves this one by its passphrase: a passkey wayin for the passkey whose answer `passkeyClosure` hands in, sealed from that proving. A gate that holds a passkey refuses 'bad_option' before asking anything. */
-  async withPasskeyAdded(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure, world: ProvingWorld): Promise<GateProps> {
+  /** The props of the next gate and the proof of this one, once `proofClosure` proves it by its passphrase: a passkey wayin for the passkey whose answer `passkeyClosure` hands in, sealed from that proving. A gate that holds a passkey refuses 'bad_option' before asking anything. */
+  async withPasskeyAdded(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure, world: ProvingWorld): Promise<GateChange> {
     passkeyAddArgs.parse({ proofClosure, passkeyClosure })
     this.demandPasskeyAddable()
     const proved = await this.#provePassphrase(proofClosure, world)
     const proving = await hearing(passkeyClosure, (handed) => PasskeyProving.buildNovel(this.stamp, passkeyCleartexts.parse(handed).passkeyAnswer, world))
     const passkey = await proving.buildWayin(proved)
-    return gateProps.parse({ gate_epoch: this.gate_epoch + 1, passphrase_wayin: this.passphrase_wayin, passkey_wayin: passkey.pickle() })
+    return { gate: gateProps.parse({ gate_epoch: this.gate_epoch + 1, passphrase_wayin: this.passphrase_wayin, passkey_wayin: passkey.pickle() }), proved }
   }
 
-  /** The props of the next gate, once `proofClosure` proves this one by its passphrase: the passphrase wayin as stored, and no passkey wayin. A gate without a passkey refuses 'absent_wayin' before asking anything. */
-  async withPasskeyRevoked(proofClosure: AttemptClosure, world: ProvingWorld): Promise<GateProps> {
+  /** The props of the next gate and the proof of this one, once `proofClosure` proves it by its passphrase: the passphrase wayin as stored, and no passkey wayin. A gate without a passkey refuses 'absent_wayin' before asking anything. */
+  async withPasskeyRevoked(proofClosure: AttemptClosure, world: ProvingWorld): Promise<GateChange> {
     passkeyRevokeArgs.parse({ proofClosure })
     if (this.pkWayin === null) { throw noPasskeyToRevoke() }
-    await this.#provePassphrase(proofClosure, world)
-    return gateProps.parse({ gate_epoch: this.gate_epoch + 1, passphrase_wayin: this.passphrase_wayin, passkey_wayin: null })
+    const proved = await this.#provePassphrase(proofClosure, world)
+    return { gate: gateProps.parse({ gate_epoch: this.gate_epoch + 1, passphrase_wayin: this.passphrase_wayin, passkey_wayin: null }), proved }
   }
 
   pickle(): GateProps {
