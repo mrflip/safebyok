@@ -80,7 +80,7 @@ small conflict where threads 1 and 3 meet, at the restack before thread 7.
 
 ## Crossings raised
 
-To go into `whiteboard/20261102-unrace/crossings.md`:
+To go into `whiteboard/20261102-newdesign/reference-timings.md`:
 
 * A lock during `listing.put` loses: the put lands anyway (thread 1).
 * A `box.del` checks the lock only at entry (thread 1).

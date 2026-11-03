@@ -1,11 +1,11 @@
 # Sprint unrace: plan
 
 * **Date:** 2026-11-03. **Mode:** YOLO (the invocation; the pre-plan's "normal" is overruled).
-* **Issued by:** the Coach, from `whiteboard/20261102-unrace/unrace-preplan.md`, "partially written by an agent: use
+* **Issued by:** the Coach, from `whiteboard/20261103-unrace/unrace-preplan.md`, "partially written by an agent: use
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." 16 is cancelled; 21, 22, 14 and then 23 finish this sprint. The Coach agreed to close after those, so 18, 19 and 20 move to a new sprint, seeded in `unrace-next.md`. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." 16 is cancelled; 21, 22, 14 and then 23 finish this sprint. The Coach agreed to close after those, so 18, 19 and 20 move to a new sprint, seeded in `unrace-nextplan.md`. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
@@ -35,15 +35,15 @@ polishing.
 
 ## Read first
 
-In `whiteboard/20261102-unrace/`, by section (`rg -n '^#' <file>`). A design draft. The Coach, 2026-11-03: "it was wrong of me to
+In `whiteboard/20261102-newdesign/`, by section (`rg -n '^#' <file>`). A design draft. The Coach, 2026-11-03: "it was wrong of me to
 state that those code paths were "authoritative", they are pseudo code as a design artifact." Common sense and good practice win.
 
-* `models-invariants.md`: the seams, as tables. Its legend and *Preconditions* first.
-* `unrace-gating.md`: each operation's steps and their order. *Notable Changes* first.
-* `vaultdb-invariants.md`: the vaultDB's verbs, refusals and postconditions.
+* `newdesign-models.md`: the seams, as tables. Its legend and *Preconditions* first.
+* `newdesign-proof.md`: each operation's steps and their order. *Notable Changes* first.
+* `newdesign-vaultdb.md`: the vaultDB's verbs, refusals and postconditions.
 
 Below them, the code in `src/models/`. A disagreement you had to settle goes in your thread file. `noted.md` has the reasons
-behind the rulings, `crossings.md` the timings.
+behind the rulings, `reference-timings.md` the timings.
 
 ## Ground rules
 
@@ -57,7 +57,7 @@ Quoted into every handoff.
 > the cross section of if-then's to analyze. those then multiply the branching analysis until another one creeps in.
 
 * The goal: when lock is called, nothing crosses it. We get there with simple code analyzed in context.
-* Raise a crossing in one sentence, in the thread file, for `crossings.md`. It blocks nothing. If it exposes information or
+* Raise a crossing in one sentence, in the thread file, for `reference-timings.md`. It blocks nothing. If it exposes information or
   keeps a lease that should drop, say so first, and fix it if that adds no machinery. If trivially easy, show the behaviour
   with one passing test in `tests/models/halpimonfire.test.ts`.
 * Not guaranteed, and a reviewer does not ask: the ordering of simultaneous gets, puts and dels of a box, or how many succeed.
@@ -109,7 +109,7 @@ direct `send({ whisper?, sidecar? }, opts)`"*
 
 *"drop caches for this sprint yes"*
 
-* **Read:** `unrace-gating.md` *`send`*; `models-invariants.md` *Box*.
+* **Read:** `newdesign-proof.md` *`send`*; `newdesign-models.md` *Box*.
 * **Touches:** `models/storable.ts`, `box.ts`, `vault.ts`, `listing.ts`, `vault-listing.ts`, `box-listing.ts`, their tests,
   `tests/test-helpers/models-world.ts`.
 * **Also:** the device cache of vault and box records goes (`Cache`, `cacheOnDevice`). Leases and the device record stay cached.
@@ -127,7 +127,7 @@ direct `send({ whisper?, sidecar? }, opts)`"*
 our -vaultdb file. It should delegate down to generic methods: i.e. although the new vault-db offers addPasskey, the
 subclass layer will do putVault, getVault, etc. Only implement the in-memory one."*
 
-* **Read:** `vaultdb-invariants.md`, whole.
+* **Read:** `newdesign-vaultdb.md`, whole.
 * **Touches:** new `src/storage/vault-db-new.ts`, `src/storage/memory-vault-db.ts`, a test. The source is the single file
   `src/vault-db.ts`, read once to copy; leave it and its tests alone.
 * **Names:** the spec's lower table's `putWayins`, `putPasskey` and `delPasskey` are the upper table's `replacePassphrase`,
@@ -141,7 +141,7 @@ subclass layer will do putVault, getVault, etc. Only implement the in-memory one
 * **Tests:** the rows the end-to-end run depends on, against the in-memory store.
 * *Orchestrator:* stay out of `models-shapes.ts`: it is threads 1 and 3's this round. Keep this thread's checkers beside it in
   `src/storage/`, importing nothing from `models/`; thread 6 reconciles the two. The refusal names are the spec's, so 6 has
-  nothing to translate. `gate_epoch` lives where `unrace-gating.md` *Changing the gate* reads it, `stored.gate.gate_epoch`,
+  nothing to translate. `gate_epoch` lives where `newdesign-proof.md` *Changing the gate* reads it, `stored.gate.gate_epoch`,
   unless the record's shape says better.
 * **Size:** medium. **Depends on:** nothing.
 * *Review:* fixed at medium, 9 fixes (a live row under another `vault_tok` refuses `vault_mismatch`, by the Coach; a void row
@@ -155,7 +155,7 @@ obsoleted."* This thread takes Gate, Wayin and Proving.
 
 *"Lease.grant wants the pojo vaultFriend."*
 
-* **Read:** `unrace-gating.md` *The provings*; `models-invariants.md` *Proving*, *Gate*; G1 to G3, G8 and G9 in
+* **Read:** `newdesign-proof.md` *The provings*; `newdesign-models.md` *Proving*, *Gate*; G1 to G3, G8 and G9 in
   `notes/guarantees.md`.
 * **Touches:** `models/gate.ts`, `wayin.ts`, `proving.ts`, `lease.ts`, `models-shapes.ts`, the lines of `vault.ts` that call the
   lease factory, their tests, `tests/test-helpers/proving-world.ts`.
@@ -166,7 +166,7 @@ obsoleted."* This thread takes Gate, Wayin and Proving.
 * *Orchestrator:* **pulled in from `timerless`,** as both would rewrite the same lines of `lease.ts` (its constructor, `get`
   and `grant`): the lease loses its `Trigger`; it records `proved_at` and the kind of proving in place of `autolock_at`;
   `lease.peek` makes no autolock check. The friend offers `peekLease`, `tryCacheLease` and `tryUncacheLease` (the names in
-  `crossings.md`), bound to the vault's scope; thread 4 builds the deviceDB under them, and until thread 7 the vault adapts
+  `reference-timings.md`), bound to the vault's scope; thread 4 builds the deviceDB under them, and until thread 7 the vault adapts
   today's `tryGetLease`, `tryPutLease` and `tryDelLease` to them.
 * **Levels:** `high` review: this is the key handling. **Size:** medium, the top of it. **Depends on:** nothing.
 * *Review:* fixed at high, G1 to G3, G8, G9 hold, none significant. A tombstone no longer tells bad news at every hello;
@@ -175,7 +175,7 @@ obsoleted."* This thread takes Gate, Wayin and Proving.
 
 ### 4. `device_db` (from pre-plan 7's item 2)
 
-* **Read:** `unrace-gating.md` *Notable Changes*, *Required of the parts not yet drawn*; `models-invariants.md` *Bank*'s
+* **Read:** `newdesign-proof.md` *Notable Changes*, *Required of the parts not yet drawn*; `newdesign-models.md` *Bank*'s
   `#keepDeviceRecord` and `tidy` rows.
 * **Touches:** new files in `src/storage/` beside `vault-db-new`, a test; nothing in `models/`.
 * **Items:** the deviceDB's `cache`, `peek`, `vacate` by scope and `vault_tok`, `leasesProvedBefore(cutoff)` and the device
@@ -193,7 +193,7 @@ is feckless. Storables should lose their timer, handing it instead to listing or
 *"bank.hello calls tidy and that's it. the host can handle crashes and retries and calling tidy if their hello doesn't run
 on pageload for some reason."*
 
-* **Read:** `unrace-gating.md` *Notable Changes*; `models-invariants.md` *Vault*.
+* **Read:** `newdesign-proof.md` *Notable Changes*; `newdesign-models.md` *Vault*.
 * **Touches:** `models/storable.ts`, `vault.ts`, `bank.ts`, `listing.ts`, `models-shapes.ts`.
 * **Items:**
   1. The Storable loses its `Trigger`. The refresh timer is deferred, so nothing replaces it for now.
@@ -217,7 +217,7 @@ stuff was debrided"*
 
 *"yes Lease, Vault and Listing too."*
 
-* **Read:** `models-invariants.md` *Vault*, *Lease*; `unrace-gating.md` *The lease*, *The discards*.
+* **Read:** `newdesign-models.md` *Vault*, *Lease*; `newdesign-proof.md` *The lease*, *The discards*.
 * **Touches:** `models/vault.ts`, `lease.ts`, `box.ts`, `box-listing.ts`.
 * **Items:** `leaseFriend`, `#attachLease`, `#renewLease`, `#vacateLease`, the seal verbs, and the discards down the chain.
   The vault's seal verbs lock on `damaged_lease`.
@@ -231,7 +231,7 @@ stuff was debrided"*
 
 ### 8. `vault_slot` (pre-plan 7's item 1)
 
-* **Read:** `models-invariants.md` *Vault listing*.
+* **Read:** `newdesign-models.md` *Vault listing*.
 * **Touches:** `models/vault-listing.ts`, `listing.ts`.
 * **Items:** the slot: `#deliver`, the tombstone a delete leaves, `ensureVault` replacing the object over gone or void. A newer
   record over a tombstone replaces it. A record of another `vault_tok` over a live vault does as `bank.getBank`'s row does. A
@@ -242,7 +242,7 @@ stuff was debrided"*
 
 *"vault_boxes yes."*
 
-* **Read:** `models-invariants.md` *Box*, *Box listing*, *Public*; `unrace-gating.md` *Notable Changes* for the box birth.
+* **Read:** `newdesign-models.md` *Box*, *Box listing*, *Public*; `newdesign-proof.md` *Notable Changes* for the box birth.
 * **Touches:** `models/vault.ts`, `box.ts`, `box-listing.ts`.
 * **Items:** `vault.hello` and `boxListing.hello`, run on the first box call, as a host wanting them sooner can run a task
   queue; `getBox`, `putBox`, `delBox`, `extractWhisper`; the box birth; the sidecar-only `send`.
@@ -253,7 +253,7 @@ stuff was debrided"*
 
 The Gating half of the text in thread 3.
 
-* **Read:** `unrace-gating.md` *`build_vault`*, *`unlock_vault`*; `models-invariants.md` *Gating*.
+* **Read:** `newdesign-proof.md` *`build_vault`*, *`unlock_vault`*; `newdesign-models.md` *Gating*.
 * **Touches:** `models/gating.ts`, a new `tests/models/gating.test.ts`, `vault-listing.ts`, the verbs that launch one.
 * **Items:** `launch`, `attempt`, `build_vault`, `unlock_vault`.
 * *Orchestrator:* when `repl` leaves the public `putVault`, say whether a rebirth must carry a fresh `vault_tok`.
@@ -267,7 +267,7 @@ The Gating half of the text in thread 3.
 
 ### 11. `gate_changes` (pre-plan 10)
 
-* **Read:** `unrace-gating.md` *Changing the gate* through *`del_vault`*; `models-invariants.md` *The runs*.
+* **Read:** `newdesign-proof.md` *Changing the gate* through *`del_vault`*; `newdesign-models.md` *The runs*.
 * **Touches:** `models/gating.ts`, `vault.ts`, `vault-listing.ts`, `gate.ts`.
 * **Items:** `replace_passphrase`, `add_passkey`, `revoke_passkey`, `del_vault`, and `vaultListing`'s verbs for them.
 * **Gate:** it ends as a read-only view plus `demandPasskeyAddable`; its `with*` and `#sendGate` go. Params spread the record
@@ -288,7 +288,7 @@ VOCABULARY lines 19 and 21 (thread 14).
 
 The Bank half of the text in thread 3.
 
-* **Read:** `unrace-gating.md` *`bank.hello`*; `models-invariants.md` *Bank*, *Public*.
+* **Read:** `newdesign-proof.md` *`bank.hello`*; `newdesign-models.md` *Bank*, *Public*.
 * **Touches:** `models/bank.ts`, a new `tests/models/bank.test.ts`.
 * **Items:** `bank.hello`, `tidy`, the discards, `identity_revoked` vacating, and the snapshot fields.
 * **Look-ahead:** what thread 13 drives is `subscribe` and `getSnapshot` on this. A `hello` that runs on real stores is what
@@ -322,7 +322,7 @@ the gate passed it. Fixed: the proof now fails on any bad news and on a whisper 
 replaced whisper tells nobody; `bank.sweep`'s order; a lock's mixed lists over several boxes; `takeWorld`'s refusal kind; `ensureUnlocked`'s doc
 block; dialog casts.
 
-*Orchestrator, 2026-11-03:* the Coach: "the thread to consolidate refusals and typechecks sounds standalone". So this thread is now the sprint's cleanup, on sonnet at a low review: the notes, the spec's corrections, the `wontfix.md` rows, STYLE.md's brief note, and stripping refusal lists from short doc blocks. Moving checkers, types and refusals goes to `unrace-next.md`.
+*Orchestrator, 2026-11-03:* the Coach: "the thread to consolidate refusals and typechecks sounds standalone". So this thread is now the sprint's cleanup, on sonnet at a low review: the notes, the spec's corrections, the `wontfix.md` rows, STYLE.md's brief note, and stripping refusal lists from short doc blocks. Moving checkers, types and refusals goes to `unrace-nextplan.md`.
 
 ### 14. `cleanup, was shapes_sweep` (pre-plan 12)
 
@@ -332,7 +332,7 @@ directory but don't modify them in a way that would fail their tests, just copy 
 Earlier threads do this for what they rewrite, as they go. This thread takes what's left.
 
 * **Touches:** `models/*`.
-* **Also:** `unrace-gating.md` *Guarantees to amend* and *Rows for `notes/wontfix.md`*.
+* **Also:** `newdesign-proof.md` *Guarantees to amend* and *Rows for `notes/wontfix.md`*.
 * **The Coach, on Closer Look:** the tree for `ensureUnlocked` says why it asks `ensureTimely` first: *"ensure timely is to make sure
   the vault is recent enough to know if it deserves a lease, the tree would be better off to say so"*.
 * **The Coach's rows:** *"Yes strip we can add back"*: blocks under the bound that still name a `Refuses`, and lines pointing at a block

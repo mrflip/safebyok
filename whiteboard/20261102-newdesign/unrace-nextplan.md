@@ -1,4 +1,14 @@
-# Seed for the sprint after unrace
+# Next sprint: what the planner starts from
+
+The core resources, all but the last in this directory unless named:
+
+1. This file: what the Coach has ruled, and what's left to them.
+2. `whiteboard/20261103-unrace/unrace-resolutions.md`: every ruling word for word, and the orchestrator's calls.
+3. The Coach's design docs: `newdesign-proof.md`, `newdesign-vaultdb.md`, `newdesign-models.md`, each with its *Areas of Concern*, and `reference-timings.md`.
+4. `whiteboard/20261103-unrace/unrace-closerlook.md`: the cold read, with the Coach's replies.
+5. `e2e-milestones.md`: what the demo needs next. `sus-paranoiacs.md`: methods whose purpose wouldn't go in a line. `unrace-docblocks.md`: the doc blocks that were stripped.
+6. `unrace-gating-prompt.md`, and what the Coach's own sessions conclude on the gating family and on the vaultDB work: ask them.
+
 
 The Coach, 2026-11-03, on closing unrace after threads 21 and 14 and running the rest as a new sprint from a fresh session: "Agree". The source is
 the sprint doc's *Closer Look* tab, *Draft for triage*, and its *Open Matters*, which keep getting rows ruled: read those first, as this file is only what had been ruled when it was written. Their words are the Coach's.
