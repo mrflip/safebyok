@@ -122,7 +122,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Add a passkey through an add_passkey gating, as {@link replacePassphrase} does. A passkey held refuses 'bad_option', nobody asked; one added since the ask refuses 'camped' or 'stale_write'. */
   async addPasskey(): Promise<this> {
-    await this.ensureTimely()
+    await this.ensureTimely(MSX.Promptly)
     this.gate.demandPasskeyAddable()
     await Gating.launch('add_passkey', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runAddPasskey(provings) })
     return this
@@ -137,7 +137,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Revoke the passkey through a revoke_passkey gating, as {@link replacePassphrase} does. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
   async revokePasskey(): Promise<this> {
-    await this.ensureTimely()
+    await this.ensureTimely(MSX.Promptly)
     if (this.gate.pkWayin === null) { return this }
     await Gating.launch('revoke_passkey', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante, proved }) => this.#landGate(proved, () => this.listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })) })
     return this
