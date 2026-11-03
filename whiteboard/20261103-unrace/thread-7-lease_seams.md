@@ -1,6 +1,6 @@
 # Thread 7: lease_seams (2026-11-03)
 
-Branch `20261103-lease_seams`, stacked on #451. Justify: **red, and never yet run whole**. `src/` typechecks. `tests/models` + `tests/loosened`: 996 pass, 52 fail. 41 type errors and 55 lint errors, 4 of the lint errors in `src/`. Stopped by the handoff's rule: two compactions before first green. The source is done as far as it has been tested; what remains is below.
+Branch `20261103-lease_seams`, PR #455, stacked on #451. Justify: **red, and never yet run whole**. `src/` typechecks. `tests/models` + `tests/loosened`: 996 pass, 52 fail. 65 type errors, all in tests, and 55 lint errors, 4 of the lint errors in `src/`. Stopped by the handoff's rule: two compactions before first green. The source is done as far as it has been tested; what remains is below.
 
 ## What remains, for the agent who finishes this
 
@@ -14,8 +14,8 @@ Branch `20261103-lease_seams`, stacked on #451. Justify: **red, and never yet ru
 2. **Lint in `src/`**: `listing.ts:105` (`!==` always true: look, it may be a real slip), `storable.ts:288,290` (empty no-op hooks: give them `{ /* … */ }` or report a suppression), `vault.ts:207` (catch parameter must be `err`).
 3. **Then** `pnpm justify`, all packages. Nothing outside `tests/models`, `tests/loosened` has been run.
 4. **Check against `notes/guarantees.md`** G1 to G9 on the final diff, and send what a security reviewer should see through a `sonnet` subagent into `notes/security.md`. `notes/wontfix.md:46,54` still say `tryDelLease`.
-5. **The sprint's test for this thread** is in `vault-unlock.test.ts`, against `MemoryDeviceDB` and `MemoryVaultDB`: it passes for proving, cache, seal and unseal. Unverified: the rows listed as failing there. Rows of `#renewLease` through a gate change are not yet written: renewed under the new epoch; was locked, nothing; lock crossed, forgotten and no row.
-6. Remove the misnamed section banner in `vault.ts:272` if the style reviewer would (it lists private `demandLease`). Finish the PR body and take it out of draft.
+5. **The sprint's test for this thread** is in `vault-unlock.test.ts`, against `MemoryDeviceDB` and `MemoryVaultDB`: it passes for proving, cache, seal and unseal. **Unproven**: the panic rows and the listener-throw row have not yet run to an assertion (they die on `reportError`), so the panic path is untested. Rows of `#renewLease` through a gate change are not yet written: renewed under the new epoch; was locked, nothing; lock crossed, forgotten and no row.
+6. Bring the PR's body up to date. PROCESS.md has it out of draft for this report, red as it is: its first line says so.
 
 ## The thread
 
