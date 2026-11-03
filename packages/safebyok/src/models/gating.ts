@@ -163,7 +163,7 @@ type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatin
 
 type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
 
-/** Past the enter key: everything that ends up in the record is made here, one stamp and one clock reading per attempt. These hear the clears, and hand on provings. */
+/** Past the enter key, the last to hear the clears. A birth's stamp is minted here, one per attempt. */
 const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   build_vault: async ({ scope, world }, clears) => {
     const { passphraseClear, passkeyClear } = MSX.vaultBuildClears.parse(clears)

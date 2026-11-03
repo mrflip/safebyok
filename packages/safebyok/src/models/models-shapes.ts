@@ -456,7 +456,7 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [What a proving is handed]: attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld, gateAttemptArgs, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs, Cleartexts, AttemptCleartexts, PassphraseCleartexts, PasskeyCleartexts, ProofClosure, AttemptClosure, PassphraseClosure, PasskeyClosure, ProvingWorld, StampedGate
+// == [What a proving is handed]: attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld, gateAttemptArgs, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs, AttemptCleartexts, PassphraseCleartexts, PasskeyCleartexts, AttemptClosure, PassphraseClosure, PasskeyClosure, ProvingWorld, StampedGate
 
 /** What a proof closure hands in: `attemptCleartexts` at a gate change's proof, a passphrase or a passkey's answer; `passphraseCleartexts` and `passkeyCleartexts` for a gate's new wayin, a new passphrase or a new passkey's answer. */
 export const { attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer, clockShape, keyDeriverShape, strengthChecker, device_id }) => ({
