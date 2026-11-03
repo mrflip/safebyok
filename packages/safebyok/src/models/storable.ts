@@ -289,7 +289,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   protected vacateContents(): void { /* a thing of no contents has none to drop */ }
 
-  /** Marked first, so that a repeat met on the way finds the work done. */
+  // Marked first, so that a repeat met on the way finds the work done.
   #disable(dropContents: () => void): this {
     if (this.#isDisabled) { return this }
     this.#isDisabled = true

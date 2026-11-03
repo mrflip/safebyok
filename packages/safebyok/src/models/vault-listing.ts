@@ -20,13 +20,15 @@ import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. `vault.leaseFriend()` binds its deviceDB's lease verbs to each vault. `onPanic` hears a refused erase of the cached lease, and no secret material. `boxRefreshMillis` is the horizon of a vault's boxes, by default the vault's own. */
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. `vault.leaseFriend()` binds its deviceDB's lease verbs to each vault. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
   leaseMillis?: number
   deviceDB:    DeviceDB
+  /** Hears a refused erase of the cached lease, and no secret material. */
   onPanic?:    ((refusal: VaultError) => unknown) | undefined
+  /** The horizon of a vault's boxes, by default the vault's own. */
   boxRefreshMillis?: number
 }
 
