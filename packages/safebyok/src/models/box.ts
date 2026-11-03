@@ -6,7 +6,7 @@ import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
-import type { BoxLease, BoxWorld } from './box-listing'
+import type { BoxWorld } from './box-listing'
 import { type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type SendOpts, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
@@ -116,19 +116,15 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** The whisper of the record in hand, opened through the vault's lease and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_box'. */
+  /** The whisper of the record in hand, opened through the vault's seal verbs and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_box'. */
   async #unseal(): Promise<WhisperHolder> {
     const record = this.demandFullProps()
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(MSX.boxSparse.parse(record), sidecar)
-    const bytes = await this.world.demandLease().unsealWith({ box_key_wrapped, whisper_ciphered }, stamp, stamp)
-    try {
-      const held = whisperHolder.safeParse(parseJsonOrNull(new TextDecoder().decode(bytes)))
-      if (! held.success) { throw undecodedWhisper() }
-      return held.data
-    } finally {
-      bytes.fill(0)
-    }
+    const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
+    const held = whisperHolder.safeParse(parseJsonOrNull(whisperText))
+    if (! held.success) { throw undecodedWhisper() }
+    return held.data
   }
   // --
 
@@ -150,11 +146,11 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   trySend(patch: BoxPatch, opts: SendOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.send(patch, opts)) }
 
-  /** The record `patch` makes of `ante`, returned and held nowhere: under the revision after `ante`'s, written now, its whisper and sidecar sealed through the vault's lease, and only those taken of it. Over a tombstone it is a birthday: registered now, under a `box_tok` fresh from {@link makeLifeTok}. */
+  /** The record `patch` makes of `ante`, returned and held nowhere: under the revision after `ante`'s, written now, its whisper and sidecar sealed through the vault, and only those taken of it. Over a tombstone it is a birthday: registered now, under a `box_tok` fresh from {@link makeLifeTok}. */
   #edit({ whisper, sidecar }: BoxPatch, ante: Fetched<BoxRecord, BoxSparse>): Promise<BoxRecord> {
     const isBirthday = this.isTombstoneRecord(ante)
     const written_at = this.world.clock.now()
-    return sealedRecordOf(this.world.demandLease(), {
+    return sealedRecordOf(this.world, {
       ...ante,
       revision_tok:  randomId(),
       revision_seq:  ante.revision_seq + 1,
@@ -164,6 +160,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       am:            'a',
     }, sidecar, whisper)
   }
+  // --
+
+  // == [Discards]: sweepContents, vacateContents
+
+  protected override sweepContents(): void { this.#exposed = null }
+
+  protected override vacateContents(): void { this.#exposed = null }
   // --
 
   // == [Required by Storable]: isFullRecord, lifeTokPathOf, makeSnapshot
@@ -195,11 +198,11 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
 // == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
 
-/** The full record of `base` with `sidecar`, `whisper` sealed through `lease`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
-export const sealedRecordOf = async (lease: BoxLease, base: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
+/** The full record of `base` with `sidecar`, `whisper` sealed through `world`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
+export const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
   const sparse = MSX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
-  const { box_key_wrapped, whisper_ciphered } = await lease.sealWith(new TextEncoder().encode(stableJsonify(whisper)), stamp, stamp)
+  const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper) ?? '', stamp)
   return MSX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
 }
 

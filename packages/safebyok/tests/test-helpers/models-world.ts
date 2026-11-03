@@ -10,17 +10,17 @@
  * in `afterEach`, as vitest's `restoreMocks` does not put real timers back: {@link useModelsWorld}
  * makes a new world before each test and disposes it after.
  *
- * The seal. The fake vault's `demandLease` refuses 'vault_locked' while it reads locked, and
- * otherwise answers a fake lease, which keeps each whisper's bytes by the stamp it was sealed under
- * and gives them back for that stamp alone: its sealed parts are the constants
+ * The seal. The fake vault's seal verbs refuse 'vault_locked' while it reads locked, and
+ * otherwise keep each whisper's text by the stamp it was sealed under and give it back for that
+ * stamp alone: its sealed parts are the constants
  * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
- * builders make, opens to a 'damaged_box', as under the real lease.
+ * builders make, opens to a 'damaged_box', as under the real vault.
  */
 
 import { afterEach, beforeEach, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
-import { BoxListing, type BoxDna, type BoxLease, type BoxListingOpts, type BoxWorld } from '../../src/models/box-listing'
+import { BoxListing, type BoxDna, type BoxListingOpts, type BoxWorld } from '../../src/models/box-listing'
 import type { ListingAnswer } from '../../src/models/listing'
 import { type BoxRecord, type BoxSparse, type Fetched, type LockState, type Tombstone, BoxFormat } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
@@ -124,7 +124,7 @@ export type ModelsWatch = { onNotice: (notice: Notice) => void, active: boolean 
 
 // == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
 
-/** The sealed parts of every record the fake lease seals: constants that wrap no key and open under none. */
+/** The sealed parts of every record the fake seal seals: constants that wrap no key and open under none. */
 export const FakeBoxKeyWrapped   = fakeCiphered('fake-box-key-wrapped')
 export const FakeWhisperCiphered = fakeCiphered('fake-whisper-ciphered')
 
@@ -299,19 +299,10 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
   const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.refusalkind, ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
 
-  // The fake lease: the bytes sealed, by the stamp they were sealed under.
-  const sealedBytes = new Map<string, Uint8Array>()
-  const lease: BoxLease = {
-    sealWith: (serializedWhisper, _boxKeyStamp, whisperStamp) => {
-      sealedBytes.set(String(stableJsonify(whisperStamp)), new Uint8Array(serializedWhisper))
-      serializedWhisper.fill(0)
-      return Promise.resolve({ box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered })
-    },
-    unsealWith: (_sealed, _boxKeyStamp, whisperStamp) => {
-      const bytes = sealedBytes.get(String(stableJsonify(whisperStamp)))
-      if (bytes === undefined) { return Promise.reject(new VaultError('damaged_box', Phrases.UnopenedWhisper)) }
-      return Promise.resolve(new Uint8Array(bytes))
-    },
+  // The fake seal: the text sealed, by the stamp it was sealed under.
+  const sealedTexts = new Map<string, string>()
+  const demandFakeUnlocked = (): void => {
+    if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.UnlockFirst) }
   }
 
   const world: BoxWorld = {
@@ -319,9 +310,16 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
-    demandLease:  () => {
-      if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.UnlockFirst) }
-      return lease
+    sealStampedString: async (whisperText, stamp) => {
+      demandFakeUnlocked()
+      sealedTexts.set(String(stableJsonify(stamp)), whisperText)
+      return Promise.resolve({ box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered })
+    },
+    unsealStampedString: async (_sealed, stamp) => {
+      demandFakeUnlocked()
+      const whisperText = sealedTexts.get(String(stableJsonify(stamp)))
+      if (whisperText === undefined) { throw new VaultError('damaged_box', Phrases.UnopenedWhisper) }
+      return Promise.resolve(whisperText)
     },
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
     ensureTimely: async (maxMillis) => {
@@ -464,24 +462,18 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose lease fakes the seal, for a test that wants sealed parts it can tell apart by revision, or acts while a `send` is sealing: the whisper given to `send` comes out as the fake ciphered bags named for the revision it is sealed under, and `duringSeal` runs once the real seal is done.
+/** A {@link boxListingOf} whose world fakes the seal further, for a test that wants sealed parts it can tell apart by revision, or acts while a `send` is sealing: the whisper given to `send` comes out as the fake ciphered bags named for the revision it is sealed under, and `duringSeal` runs once the real seal is done.
  *
  * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.send({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
-  const demandLease = (): BoxLease => {
-    const lease = mw.world.demandLease()
-    return {
-      unsealWith: (...args) => lease.unsealWith(...args),
-      sealWith:   async (serializedWhisper, boxKeyStamp, whisperStamp) => {
-        await lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp)
-        duringSeal()
-        return { box_key_wrapped: fakeCiphered(`boxkey-${String(whisperStamp['revision_tok'])}`), whisper_ciphered: fakeCiphered(`whisper-${String(whisperStamp['revision_tok'])}`) }
-      },
-    }
+  const sealStampedString: BoxWorld['sealStampedString'] = async (whisperText, stamp) => {
+    await mw.world.sealStampedString(whisperText, stamp)
+    duringSeal()
+    return { box_key_wrapped: fakeCiphered(`boxkey-${String(stamp['revision_tok'])}`), whisper_ciphered: fakeCiphered(`whisper-${String(stamp['revision_tok'])}`) }
   }
-  return boxListingOf(mw, { world: { ...mw.world, demandLease }, ...overrides })
+  return boxListingOf(mw, { world: { ...mw.world, sealStampedString }, ...overrides })
 }
 // --
 

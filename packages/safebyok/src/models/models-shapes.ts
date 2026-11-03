@@ -14,9 +14,10 @@ import type { Outcome } from '../outcome'
 import * as Phrases from '../phrases'
 import * as HX from '../shapes/host-code'
 import type { CipherCtxRecord } from '../crypto'
+import type { Lease } from './lease'
 import * as VX from '../shapes/vault'
 import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
-import { type VaultScope, vaultScope } from '../shapes/scopes'
+import { vaultScope } from '../shapes/scopes'
 import { sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
 import type { VaultDB } from '../storage/vault-db-new'
@@ -345,9 +346,9 @@ export const putListingOpts = objCheck(() => ({ ifPresent: ifPresent.optional() 
 
 export type PutListingOpts = Z.infer<typeof putListingOpts>
 
-/** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers `demandLease`. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers the seal verbs. Its `parse` refuses 'bad_option'. Checks only. */
 export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
-  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, demandLease: fn() }),
+  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, sealStampedString: fn(), unsealStampedString: fn() }),
 }), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
 // --
 
@@ -473,7 +474,7 @@ export const { stampedGate, gateBuildArgs, gateAttemptArgs, passphraseNovelArgs,
 export type StampedGate = Z.infer<typeof stampedGate>
 // --
 
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, serializedBytes, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
+// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
 export const LeaseFormat = ModelsLeaseFormat
 
@@ -495,13 +496,15 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
-/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life: its stamp, clock and logger, `lock`, and the deviceDB's lease verbs bound to its scope. It holds no key, and reaches neither the record nor the boxes. */
+/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life: its stamp, clock and logger, `attachLease`, `lock`, and the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
   clock:           HX.clockShape,
   logger:          HX.loggerShape,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
   lock:            fn<() => unknown>(),
+  /** Hold a lease as the vault's: what `lease.attach()` calls. */
+  attachLease:     fn<(lease: Lease) => Promise<void>>(),
   /** The record this device has cached, or null for none. */
   peekLease:       fn<() => Promise<unknown>>(),
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
@@ -523,36 +526,29 @@ const isCtxStamp = (val: unknown): boolean => (
     && Object.values(val).every((field) => typeof field === 'string' || Number.isFinite(field))
 )
 
-/** The arguments of each lease verb. A stamp is the caller's own fields fixed for its record's life, flat; the lease binds each under the vault's stamp and its own purpose (`box_key_wrapped`, `whisper_ciphered`), so the purposes never leave it. */
-export const { ctxStamp, serializedBytes, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, bytes }) => {
+/** The arguments of each lease verb. A stamp is the caller's own fields fixed for its record's life, flat; the lease binds it under the vault's stamp and each of its own purposes (`box_key_wrapped`, `whisper_ciphered`), so the purposes never leave it. */
+export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
   return {
     ctxStamp,
-    serializedBytes:  bytes(),
     leasePeekArgs:    obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
     leaseGrantArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
     provingLeaseArgs: obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
-    leaseSealArgs:    obj({ boxKeyStamp: ctxStamp, whisperStamp: ctxStamp }),
-    leaseUnsealArgs:  obj({ sealed: sealedWhisper, boxKeyStamp: ctxStamp, whisperStamp: ctxStamp }),
+    leaseSealArgs:    obj({ whisperText: str, stamp: ctxStamp }),
+    leaseUnsealArgs:  obj({ sealed: sealedWhisper, stamp: ctxStamp }),
   }
 }, [FX])
 // --
 
-// == [The vault's world]: leaseDeviceDB, vaultListingOpts, LeaseDeviceDB
+// == [The vault's world]: deviceDBDuck, vaultListingOpts
 
-/** The deviceDB's lease verbs, as the vault's world carries them: each by the vault's scope, which `vault.leaseFriend()` binds, so no verb of the friend takes one. */
-export const leaseDeviceDB = objCheck(({ fn }) => ({
-  tryGetLease: fn<(scope: VaultScope) => Promise<Outcome<unknown>>>(),
-  tryPutLease: fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
-  tryDelLease: fn<(scope: VaultScope) => Promise<Outcome<void>>>(),
-}), { refuseAs: 'bad_option', extras: 'strip' })
-
-export type LeaseDeviceDB = Z.infer<typeof leaseDeviceDB>
+/** A deviceDB, as far as a duck can tell: the verbs `vault.leaseFriend()` binds. */
+export const deviceDBDuck = Checker(({ obj, fn }) => obj({ peek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Its `parse` refuses 'bad_option'. Checks only. */
-export const vaultListingOpts = objCheck(({ obj, int, lit, union }) => ({
-  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: union([int.positive(), lit(Infinity)]).optional(), deviceDB: leaseDeviceDB }),
+export const vaultListingOpts = objCheck(({ obj, fn, int, lit, union }) => ({
+  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: union([int.positive(), lit(Infinity)]).optional(), deviceDB: deviceDBDuck, onPanic: fn().optional() }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
 
@@ -604,7 +600,7 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   user_id,
   device_id:           device_id.optional(),
   vaultDB:             vaultDBDuck,
-  deviceDB:            leaseDeviceDB,
+  deviceDB:            deviceDBDuck,
   keyDeriver:          HX.keyDeriverShape,
   requestCleartext:    fn().optional(),
   strengthChecker:     VX.strengthChecker.optional(),
@@ -614,5 +610,6 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   vaultRefreshMinutes: refreshMinutes.optional(),
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn().optional(),
+  onPanic:             fn().optional(),
 }), { refuseAs: 'bad_option' }, [FX])
 // --
