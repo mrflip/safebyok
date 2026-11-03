@@ -125,16 +125,20 @@ export class Bank implements VaultWorld {
 
   // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord, demandReady
 
-  /** A forced reset, and a host may call it again: every vault and tombstone the vaultDB holds is listed, the device record cached, and the watch started. Old leases are tidied once the vaultDB has answered or refused, so an offline `hello` tidies too. Refused, it leaves the bank not ready, and its refusal is what `ensureVault` and `vaultOf` throw. */
+  /** A forced reset, and a host may call it again: every vault and tombstone the vaultDB holds is listed, the device record cached, and the watch started. Old leases are tidied once the vaultDB has answered or refused, so an offline `hello` tidies too. Refused, it leaves the bank not ready, and its refusal is what `ensureVault` and `vaultOf` throw. One a sweep crossed refuses its own caller and leaves the bank to the next `hello`. */
   async hello(): Promise<void> {
-    this.#lastHello = await outcomeOf(() => this.#bringUp(this.#vaultListing))
-    this.#remakeSnapshot()
-    valOf(this.#lastHello)
+    const listing = this.#vaultListing
+    const hello = await outcomeOf(() => this.#bringUp(listing))
+    if (listing === this.#vaultListing) {
+      this.#lastHello = hello
+      this.#remakeSnapshot()
+    }
+    valOf(hello)
   }
 
   tryHello(): Promise<Outcome<void>> { return outcomeOf(() => this.hello()) }
 
-  /** A sweep crossing it leaves `listing` disabled, which refuses: the `hello` is for a listing no longer the bank's. */
+  /** A sweep crossing it leaves `listing` disabled, which refuses. */
   async #bringUp(listing: VaultListing): Promise<void> {
     try {
       await this.keyDeriver.load?.()
