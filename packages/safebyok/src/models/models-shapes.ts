@@ -228,7 +228,7 @@ export type BoxPatchGiven = Z.output<typeof boxPatch>
 export const { ifPresentVals } = VS
 
 /** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
-export const ifAbsentVals = ['fail', 'nil'] as const
+export const { ifAbsentVals } = VS
 
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
