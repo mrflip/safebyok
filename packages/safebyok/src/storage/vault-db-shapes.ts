@@ -1,4 +1,4 @@
-/** The one place each stored thing's shape is drawn: the vaultDB's records, its verbs' params and their checkers, imported as `VS`. Every `parse` refuses 'invalid_input', quoting none of it; a stored row is judged by `safeParse`. The models take these same shapes, refusing 'bad_record'. */
+/** SLOPDOC: The one place each stored thing's shape is drawn: records, verbs' params and checkers, imported as `VS`. */
 
 import type * as Z from 'zod'
 import { Checkers, objCheck } from '../checks/validator'
