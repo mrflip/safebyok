@@ -264,14 +264,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [The watch]: onNotice
 
-  /** Deliver a notice of a row of this listing's kind as a good answer's record. Any refusal met on the way, the world's or one `receive` throws, is bad news, as nobody asked: told to `onBadNews`, never thrown into the vaultDB's watch. */
+  /** Deliver a notice of a row of this listing's kind as a good answer's record. Any refusal met on the way, the world's or one `receive` throws, is bad news, as nobody asked: told to `onBadNews`, never thrown into the vaultDB's watch. A world found gone ends the listing, which is no refusal. */
   readonly #onNotice = (notice: VaultDBNotice): void => {
     const { val, world } = notice
     if (this.#isDisabled || ! this.isOwnRow(val)) { return }
     void (async () => {
       const { ok, err } = await outcomeOf(() => {
         this.world.takeWorld(world)
-        return this.#buildOrReceive(this.scopeOf(val), val)
+        return this.#isDisabled ? null : this.#buildOrReceive(this.scopeOf(val), val)
       })
       if (! ok) { this.tellBadNews([err]) }
     })()
