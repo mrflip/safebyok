@@ -78,7 +78,7 @@ export const refusalKindVals = [
   'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a vaultDB put told not to replace a live row found one there
-  'vault_empty',         // a vaultDB call named a vault_tok no row holds: nothing of this life, whatever else the scope holds
+  'vault_empty',         // a vaultDB call named a vault_tok no row holds, and no live row stands there: nothing of this life
   'storage_error',       // a vaultDB's store failed: its own error is the cause
   'damaged_record',      // a vaultDB row read alone failed its checks, and is set aside
   'invalid_input',       // an argument to a vaultDB verb failed its check

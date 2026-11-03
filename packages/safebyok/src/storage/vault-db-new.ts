@@ -132,7 +132,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null and 'fail' refuses `absent_box`; a vault row of no such life refuses `vault_empty` or `vault_gone`. */
+  /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null and 'fail' refuses `absent_box`; a vault row of no such life refuses `vault_mismatch`, `vault_empty` or `vault_gone`. */
   async getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>> {
     return this.#call<BoxRecord | null, GotAct, VaultRow>('getBox', { ...asked, ...opts }, async () => {
       const boxQuery = VS.boxQuery.parse(asked)
@@ -163,7 +163,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Stores `record` under a vault live at its `vault_tok`, with the answers of {@link VaultDB.putVault}; a vault row of no such life refuses `vault_empty` or `vault_gone`, and an overweight box `box_too_large`. */
+  /** Stores `record` under a vault live at its `vault_tok`, with the answers of {@link VaultDB.putVault}; a vault row of no such life refuses `vault_mismatch`, `vault_empty` or `vault_gone`, and an overweight box `box_too_large`. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
     return this.#call<BoxRow, PutAct, VaultRow>('putBox', { ...record, ...opts }, async () => {
       const boxRecord = VS.boxRecord.parse(record)
@@ -372,8 +372,9 @@ const listedBoxesOf = (scope: VaultScope, vault_tok: string, rows: { boxlabel: s
   return listed
 }
 
-/** The vault row when it is live in this life; otherwise refuses `vault_gone` for this life's tombstone, and `vault_empty` for nothing of this life. */
+/** The vault row when it is live in this life; otherwise refuses `vault_mismatch` for a live row of another, `vault_gone` for this life's tombstone, and `vault_empty` for nothing of this life. */
 const demandVaultLife = (stored: VaultRow | null, scope: VaultScope, vault_tok: string): VaultRecord => {
+  if ((stored?.am === 'a') && (stored.vault_tok !== vault_tok)) { throw Refuse.vaultMismatch(stored) }
   if (stored?.vault_tok !== vault_tok) { throw Refuse.vaultEmpty(VS.sentinelVaultOf(scope, vault_tok)) }
   if (stored.am === 'x') { throw Refuse.vaultGone(stored) }
   return stored
