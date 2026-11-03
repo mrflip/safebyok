@@ -71,7 +71,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return this.#wrapVaultKey(vaultKey)
   }
 
-  /** SLOPDOC: A lease on `friend`'s vault under the vaultKey this proving holds; held and cached only once attached. */
+  /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     provingLeaseArgs.parse({ friend, gate_epoch })
     if (! consistent(vaultStamp.parse(friend), this.stamp)) { throw leaseOfOtherVault() }
