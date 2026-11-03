@@ -83,10 +83,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.demandPresent()
   }
 
-  /** The vault record a box's answer carries, received as any record of this vault is. What `receive` hands back goes nowhere: the box listing takes its world synchronously, where the vault listing delivers asynchronously. */
+  /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   takeWorld(world: unknown): void {
-    const sparse = this.listing.sparseOf(world)
-    if (sparse.vault_tok === this.vault_tok) { this.receive(sparse) }
+    const row = VS.vaultRow.parse(world)
+    if (row.vault_tok === this.vault_tok) { this.receive(row) }
   }
   // --
 
@@ -253,6 +253,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease = lease
     if (displaced !== null && displaced !== lease) { displaced.evict() }
     this.settle()
+    this.#boxListing?.settleThings()
     const cached = await caching
     if (! cached.ok) { this.listing.tellBadNews([cached.err]) }
   }

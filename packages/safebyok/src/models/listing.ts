@@ -68,7 +68,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The world refreshed within `maxMillis`, by default its own horizon. */
   async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(MSX.maxMillis.parse(maxMillis)) }
 
-  // == [Starting and ending]: hello, goodbye, lock, sweep, vacate, unlist, demandEnabled
+  // == [Starting and ending]: hello, goodbye, lock, settleThings, sweep, vacate, unlist, demandEnabled
 
   /** Start the watch. */
   async hello(): Promise<void> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
@@ -86,6 +86,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   lock(): this {
     for (const thing of this.things) { thing.lock() }
     return this
+  }
+
+  /** Bring each thing's snapshot up to the lock just moved, telling its listeners. */
+  settleThings(): void {
+    for (const thing of this.things) { thing.settle() }
   }
 
   /** End the watch, sweep each thing, and take no further calls. A repeat is a no-op. Never throws. */

@@ -142,6 +142,16 @@ describe("the box verbs refuse a vault locked, or gone, before they touch storag
 })
 
 describe("vault.getBox", () => {
+  it("takes the gate a box's answer brings: a row moved elsewhere, no notice heard, leaves the vault full with the new gate", async () => {
+    const { vault, storeBehindOurBack, demandStored } = await makeWorldWithBox()
+    const stored = demandStored()
+    const moved = storeBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: stored.gate.gate_epoch + 1 } })
+    await vault.fetchBox(boxlabel)
+    expect(vault.isFull).to.be.true
+    expect(vault.revision_tok).to.eq(moved.revision_tok)
+    expect(vault.gate.toJSON().gate_epoch).to.eq(moved.gate.gate_epoch)
+  })
+
   const AbsentCases = [
     [{},                    'absent_box', 'refuses a box never stored as absent_box, by default'],
     [{ ifAbsent: 'fail' },  'absent_box', "refuses it so under ifAbsent 'fail'"],

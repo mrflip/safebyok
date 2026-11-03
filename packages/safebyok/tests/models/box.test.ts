@@ -231,10 +231,10 @@ const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord(
   return box.getSnapshot()
 }
 
-const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'full', 'present', 'exposed']
+const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'full', 'present', 'exposed', 'lockState']
 
 describe("Box snapshot", () => {
-  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present and exposed, and no more", async () => {
+  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present, exposed and lockState, and no more", async () => {
     const box = await boxOf()
     expect(box.getSnapshot()).to.deep.equal({
       ...held.mw.boxscope('anthropic_api_key'),
@@ -246,6 +246,7 @@ describe("Box snapshot", () => {
       full:          true,
       present:       true,
       exposed:       false,
+      lockState:     'unlocked',
     })
     expect(Object.keys(box.getSnapshot())).to.have.members(SnapshotKeys)
   })
@@ -294,6 +295,7 @@ describe("Box snapshot", () => {
         full:          true,
         present:       true,
         exposed:       false,
+        lockState:     'unlocked',
       })
     })
 
@@ -346,20 +348,18 @@ describe("Box sidecar, locked or not", () => {
     }
   })
 
-  it("is the snapshot's sidecar too, and a lock leaves the snapshot and its listeners alone", async () => {
+  it("is the snapshot's sidecar too, and a lock moves only the snapshot's lockState, telling its listeners, as a component reading box.whisper must repaint", async () => {
     const box = await boxOf()
-    const unlocked = box.getSnapshot()
     const listener = vi.fn()
     box.subscribe(listener)
     held.mw.setLockState('locked')
     box.settle()
-    expect(box.getSnapshot()).to.eq(unlocked)
-    expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'a test box' })
-    expect(box.getSnapshot()).to.deep.include({ full: true, present: true, revision_seq: 1 })
+    expect(box.getSnapshot()).to.deep.include({ lockState: 'locked', sidecar: { note: 'a test box' }, full: true, present: true, revision_seq: 1 })
+    expect(listener.mock.calls).to.have.lengthOf(1)
     held.mw.setLockState('unlocked')
     box.settle()
-    expect(box.getSnapshot()).to.eq(unlocked)
-    expect(listener.mock.calls).to.have.lengthOf(0)
+    expect(box.getSnapshot().lockState).to.eq('unlocked')
+    expect(listener.mock.calls).to.have.lengthOf(2)
   })
 
   it("tells an empty sidecar from an absent one in the snapshot, locked or not", async () => {

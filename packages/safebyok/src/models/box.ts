@@ -7,7 +7,7 @@ import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
 import type { BoxWorld } from './box-listing'
-import { type BoxPatchGiven, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type SendOpts, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import { type BoxPatchGiven, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type LockState, type SendOpts, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 
@@ -22,6 +22,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
   full:          boolean
   present:       boolean
   exposed:       boolean
+  lockState:     LockState
 }>
 
 /** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
@@ -202,6 +203,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       full:          this.isFull,
       present:       this.isPresent,
       exposed:       this.#exposed !== null,
+      lockState:     this.listing.lockState(),
     })
   }
   // --
