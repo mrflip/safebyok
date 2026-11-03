@@ -1,7 +1,9 @@
+import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
+import * as MSX from '../../src/models/models-shapes'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -97,5 +99,74 @@ describe("Vault.leaseDBFriend", () => {
     await dbfriend.tryDelLease()
     expect(deviceDB.tryGetLease).toHaveBeenCalledWith(vault.scope)
     expect(deviceDB.tryDelLease).toHaveBeenCalledWith(vault.scope)
+  })
+})
+
+const Horizon = 10 * 60_000
+
+const bornWithGets = async () => {
+  const born = await makeBornVault()
+  return { ...born, gets: vi.spyOn(born.opts.store, 'get') }
+}
+
+describe("vault.ensureTimely(maxMillis)", () => {
+  it("answers itself with no fetch while the record in hand is younger than maxMillis, and fetches once it is not", async () => {
+    const { vault, advance, gets } = await bornWithGets()
+    advance(999)
+    await expect(vault.ensureTimely(1000)).resolves.to.equal(vault)
+    expect(gets).not.toHaveBeenCalled()
+    advance(1)
+    await expect(vault.ensureTimely(1000)).resolves.to.equal(vault)
+    expect(gets).toHaveBeenCalledOnce()
+  })
+
+  it("goes by the vault's own horizon when given no maxMillis", async () => {
+    const { vault, advance, gets } = await bornWithGets()
+    advance(Horizon - 1)
+    await vault.ensureTimely()
+    expect(gets).not.toHaveBeenCalled()
+    advance(1)
+    await vault.ensureTimely()
+    expect(gets).toHaveBeenCalledOnce()
+  })
+
+  it("always fetches under a maxMillis of zero", async () => {
+    const { vault, gets } = await bornWithGets()
+    await vault.ensureTimely(0)
+    expect(gets).toHaveBeenCalledOnce()
+  })
+
+  it("lands what it fetches on the instance", async () => {
+    const { vault, demandStored, storeBehindOurBack } = await bornWithGets()
+    const landed = storeBehindOurBack(demandStored())
+    await vault.ensureTimely(0)
+    expect(vault.revision_tok).to.eq(landed.revision_tok)
+  })
+
+  it("refuses 'absent_vault' a vault its fetch finds gone", async () => {
+    const { vault, demandStored, gets } = await bornWithGets()
+    const stored = demandStored()
+    const tombstone = { ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' }
+    gets.mockImplementation((scope) => Promise.resolve({ scope, ok: true as const, val: tombstone, world: null }))
+    await TH.expectRefusal(vault.ensureTimely(0), 'absent_vault')
+  })
+
+  it("refuses a maxMillis out of range as 'bad_option'", async () => {
+    const { vault } = await bornWithGets()
+    await TH.expectRefusal(vault.ensureTimely(-1), 'bad_option')
+  })
+})
+
+describe("vault.ensureReadyToChangeGate(): a gate is changed over a record fetched within Promptly", () => {
+  it("fetches nothing under 2,000 ms since the last fetch, and fetches at 2,000 ms", async () => {
+    expect(MSX.Promptly).to.eq(2000)
+    const { vault, opts, advance } = await makeBornVault()
+    const gets = vi.spyOn(opts.store, 'get')
+    advance(MSX.Promptly - 1)
+    await vault.ensureReadyToChangeGate()
+    expect(gets).not.toHaveBeenCalled()
+    advance(1)
+    await vault.ensureReadyToChangeGate()
+    expect(gets).toHaveBeenCalledOnce()
   })
 })

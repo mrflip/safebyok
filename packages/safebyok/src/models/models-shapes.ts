@@ -30,7 +30,7 @@ const Checks = Checkers('bad_record', ({ unk, custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, putAnte, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, NeverStoredSeq, MinRefreshMillis, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, putAnte, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, NeverStoredSeq, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check or its seal, and reads as gone) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
@@ -101,9 +101,6 @@ export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[
 
 /** The `revision_seq` of a central never stored: a thing is born with a tombstone here as its central, so that any record received is newer, and nothing stored is what it expects. */
 export const NeverStoredSeq = -1
-
-/** The shortest horizon, in milliseconds, of a fetch made whatever the record's age: a call made within it of the last fetch that succeeded shares that fetch, so none forces a fetch at a horizon of 0. */
-export const MinRefreshMillis = 50
 
 /** True for a record whose `am` says damaged or gone. */
 export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
@@ -286,13 +283,16 @@ export type BoxDnaFilled = Z.output<typeof boxDna>
 export type BoxPatchGiven = Z.output<typeof boxPatch>
 // --
 
-// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, EditOpts, StorableOpts
+// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, Promptly, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, StorableOpts
 
 /** The policies when sending a record to a place that already holds one: the one value, `replace`, the versioned replace (compare-and-swap) every put is, and the default. `fetch` is not implemented. */
 export const ifPresentVals = ['replace'] as const
 
 /** The policies when fetching a thing that is absent, never stored, deleted or damaged: `fail` with the absent refusal, or resolve `nil`. */
 export const ifAbsentVals = ['fail', 'nil'] as const
+
+/** How old a vault's record a gating attempt or a gate change will act on, in milliseconds. A caller wanting the record as stored right now asks `ensureTimely(0)`. */
+export const Promptly = 2000
 
 /** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.
  * `ifPresent` is optional, and only ever {@link ifPresentVals}' `'replace'`, which names what every put already is and changes nothing; `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
@@ -312,8 +312,6 @@ export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOp
   const storableOpts  = obj({
     /** The refresh horizon: how long after its last refresh the record in hand stays timely. */
     maxMillisSinceRefresh: horizonMillis,
-    /** The fraction of the horizon after which the trigger schedules the next refresh. */
-    eagerFrac:             num.positive().max(1).optional(),
   })
   const watchable     = bool
   const listener      = fn<() => void>()
@@ -335,7 +333,7 @@ export type FetchOpts = Z.infer<typeof fetchOpts>
 /** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional: `'replace'`, the default and only policy, the versioned replace. */
 export type SendOpts = Z.infer<typeof sendOpts>
 
-/** The options a storable is made with, after its world, listing and records: its refresh horizon, and the trigger's `eagerFrac`. */
+/** The options a storable is made with, after its world, listing and records: its refresh horizon. */
 export type StorableOpts = Z.infer<typeof storableOpts>
 // --
 
@@ -380,7 +378,7 @@ export type World = Z.infer<typeof world>
 /** The world as a listing needs it beyond the clock: its lock, its own timeliness, and the taking of the world an answer carries. */
 export type ListingWorld = World & {
   lockState(): LockState
-  ensureTimely(opts: TimelyOpts): Promise<void>
+  ensureTimely(maxMillis?: number): Promise<unknown>
   takeWorld(world: unknown): void
 }
 
@@ -672,7 +670,6 @@ export const bankOpts = objCheck(({ obj, fn, applabel, user_id, device_id }) => 
   clock:               HX.clockShape.optional(),
   logger:              HX.loggerShape.optional(),
   autolockMinutes:     positiveMinutes.optional(),
-  pesterMinutes:       positiveMinutes.optional(),
   vaultRefreshMinutes: refreshMinutes.optional(),
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn().optional(),

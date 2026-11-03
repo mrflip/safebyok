@@ -376,11 +376,7 @@ describe("The checks of options", () => {
   describe("MSX.storableOpts", () => {
     holdsCases(MSX.storableOpts, 'bad_option', [
       [{ maxMillisSinceRefresh: 60_000 },                    true,  'passes the horizon alone'],
-      [{ maxMillisSinceRefresh: Infinity, eagerFrac: 1 },    true,  'passes an eagerFrac of one'],
-      [{ maxMillisSinceRefresh: 60_000, eagerFrac: 0.5 },    true,  'passes a fraction'],
       [{},                                                   false, 'refuses a missing horizon'],
-      [{ maxMillisSinceRefresh: 60_000, eagerFrac: 0 },      false, 'refuses an eagerFrac of zero'],
-      [{ maxMillisSinceRefresh: 60_000, eagerFrac: 1.1 },    false, 'refuses an eagerFrac above one'],
       [{ maxMillisSinceRefresh: -5 },                        false, 'refuses a negative horizon'],
     ])
 

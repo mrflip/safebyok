@@ -168,7 +168,7 @@ describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
       const opened = new TextEncoder().encode(text)
       const lease: BoxLease = { sealWith: () => Promise.reject(new Error('nothing is sealed here')), unsealWith: () => Promise.resolve(opened) }
       const { world } = held.mw
-      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (opts) => world.ensureTimely(opts), demandLease: () => lease }
+      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (maxMillis) => world.ensureTimely(maxMillis), demandLease: () => lease }
       const box = await boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
       const err = await TH.expectRefusal(box.unsealWhisper(), 'damaged_box')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
@@ -558,10 +558,10 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2 })
   })
 
-  it("takes the timely options beside ifPresent, handing the timely ones on", async () => {
+  it("takes the timely options beside ifPresent, handing the world its maxWorldMillis", async () => {
     const box = await builtOf(fullBoxRecord())
     await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
-    expect(held.mw.callsOf('ensureTimely')[0]?.opts).to.deep.equal({ maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })
+    expect(held.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
   })
 
   it("refuses 'bad_option' an ifPresent that is not 'replace', before putting anything", async () => {

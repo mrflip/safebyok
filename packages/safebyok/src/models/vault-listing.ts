@@ -55,7 +55,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   tryCreate(input: VaultDna, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.create(input, proofClosure)) }
 
-  /** Take up each vault's kept lease, as {@link Vault.takeUpKeptLease} does, once the base's `hello` has hydrated them. */
+  /** Start the watch, and take up each vault's cached lease, as {@link Vault.takeUpKeptLease} does. */
   override async hello(): Promise<void> {
     await super.hello()
     await Promise.all(this.things.map((vault) => vault.takeUpKeptLease()))

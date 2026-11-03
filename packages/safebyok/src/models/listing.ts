@@ -7,7 +7,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Answer, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type TimelyOpts, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
+import { type Answer, type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type Notice, type Revision, type SparseBase, type Store, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -17,7 +17,7 @@ type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends Spars
 // == [Listing]
 
 /** The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone.
- * `hello` starts the watch and hydrates everything held. Every answer storage gives, to `fetch`,
+ * `hello` starts the watch. Every answer storage gives, to `fetch`,
  * `put`, `del` or the watch, goes through `#deliver`, and every instance is made and held through
  * `#buildOrReceive`, so no scope is built twice; the listing then makes its snapshot again. A call
  * is refused when it cannot give what it asked for: a refusal from storage, or a record its
@@ -33,8 +33,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()
   readonly #onBadNews: ((news: VaultError) => unknown) | null
-  /** The news already told, so one refusal that several callers share, a timer's launch and a `hydrateAll` joined to it, is told once. */
-  readonly #told = new WeakSet<VaultError>()
   #snapshot: readonly SnapshotT[] = Object.freeze([])
   #unwatch:  (() => void) | null = null
 
@@ -53,14 +51,15 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   lockState(): LockState { return this.world.lockState() }
 
-  ensureTimelyWorld(opts: TimelyOpts): Promise<void> { return this.world.ensureTimely(MSX.timelyOpts.parse(opts)) }
+  /** The world refreshed within `maxMillis`, by default its own horizon. */
+  async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(MSX.horizonMillis.optional().parse(maxMillis)) }
 
   // == [Starting and ending]: hello, goodbye
 
-  /** Start the watch, and hydrate every instance held. */
-  async hello(): Promise<void> {
+  /** Start the watch. */
+  hello(): Promise<void> {
     this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope))
-    await this.hydrateAll()
+    return Promise.resolve()
   }
 
   /** End the watch. The instances stay as they are. */
@@ -70,7 +69,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Listing verbs]: at, things, watchableThings, build, hydrateAll, demandNotHeld
+  // == [Listing verbs]: at, things, watchableThings, build, demandNotHeld
 
   /** The instance held under `scope`, or null. Calls nothing. A scope that fails {@link scopeOf} refuses as it does. */
   at(scope: ScopeT): ThingT | null {
@@ -88,13 +87,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.#buildOrReceive(this.scopeOf(record), record)
   }
 
-  /** Hydrate every instance held. A hydrate that is refused is told as bad news, and the others go on; `opts` that fail {@link MSX.timelyOpts} refuse 'bad_option' first, hydrating none. */
-  async hydrateAll(opts: TimelyOpts = {}): Promise<void> {
-    const timely = MSX.timelyOpts.parse(opts)
-    const outcomes = await Promise.all(this.things.map((thing) => thing.tryHydrate(timely)))
-    for (const { ok, err } of outcomes) { if (! ok) { this.tellBadNews([err]) } }
-  }
-
   /** Refuses 'bad_option' a birth under a `scope` already held. A box's `send` brings one deleted or damaged back to life. */
   protected demandNotHeld(scope: ScopeT): void {
     if (this.at(scope) !== null) { throw alreadyHeldError() }
@@ -108,9 +100,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * and settled, and then `opts.ifAbsent` says: 'fail', the default, throws {@link absentRefusal}; 'nil' resolves null.
    */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
-    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
+    const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
-    await this.ensureTimelyWorld(timely)
+    await this.ensureTimelyWorld(maxWorldMillis)
     const answer = await this.#store.get(asked)
     return this.#deliver(answer, asked, ifAbsent)
   }
@@ -260,13 +252,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Bad news]: tellBadNews
 
-  /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into a timer's callback or the store's watch. Each item is told once, however many callers meet it. Call it for bad news no caller waits on, such as a refusal of a refresh a timer launched. */
+  /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into the store's watch. Call it for bad news no caller waits on. */
   tellBadNews(badnews: readonly VaultError[]): void {
     const onBadNews = this.#onBadNews
     if (onBadNews === null) { return }
     for (const news of badnews) {
-      if (this.#told.has(news)) { continue }
-      this.#told.add(news)
       // Any answer is heard out, a thenable among them: none is awaited.
       void (async () => {
         try {

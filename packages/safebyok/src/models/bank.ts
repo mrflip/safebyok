@@ -16,9 +16,7 @@ import * as MSX from './models-shapes'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
 import { type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultPesterMillis, DefaultRefreshMillis, BankOpts, BankSnapshot, RefusingStrengthChecker
-
-export const DefaultPesterMillis = 7 * 24 * 60 * MinuteMillis
+// == [Given to a bank]: DefaultRefreshMillis, BankOpts, BankSnapshot, RefusingStrengthChecker
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
 
@@ -34,7 +32,6 @@ export type BankOpts = {
   clock?:               Clock | undefined
   logger?:              VaultLogger | undefined
   autolockMinutes?:     number | undefined
-  pesterMinutes?:       number | undefined
   vaultRefreshMinutes?: number | undefined
   boxRefreshMinutes?:   number | undefined
   onBadNews?:           ((news: VaultError) => unknown) | undefined
@@ -59,8 +56,6 @@ export class Bank implements VaultWorld, GatingWorld {
   readonly requestCleartext: RequestCleartext | undefined
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
-  // GAP: vault-listing.ts `VaultWorld` and models-shapes.ts `vaultListingOpts` name no `pesterMillis`; the vault's pester trigger would read it as `autolock` reads `leaseMillis`, and offer `pesterMinutes` as a getter.
-  readonly pesterMillis:     number
   // GAP: the box listing a vault makes would take `boxRefreshMillis` as its `maxMillisSinceRefresh`; no vault makes one yet.
   readonly boxRefreshMillis: number
   readonly vaultListing:     VaultListing
@@ -72,7 +67,7 @@ export class Bank implements VaultWorld, GatingWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultStore, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
+    const { applabel, user_id, device_id = randomId(), vaultStore, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
@@ -83,14 +78,13 @@ export class Bank implements VaultWorld, GatingWorld {
     this.requestCleartext = requestCleartext
     this.strengthChecker = strengthChecker
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
-    this.pesterMillis = millisOf(pesterMinutes, DefaultPesterMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
     this.vaultListing = new VaultListing({ world: this, store: vaultStore, maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
     if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
     Object.freeze(this)
   }
 
-  // == [The world of its vaults]: lockState, ensureTimely, takeWorld, autolockMinutes, pesterMinutes
+  // == [The world of its vaults]: lockState, ensureTimely, takeWorld, autolockMinutes
 
   lockState(): LockState { return 'unlocked' }
 
@@ -99,8 +93,6 @@ export class Bank implements VaultWorld, GatingWorld {
   takeWorld(): void { noop() }
 
   get autolockMinutes(): number { return this.leaseMillis / MinuteMillis }
-
-  get pesterMinutes(): number { return this.pesterMillis / MinuteMillis }
   // --
 
   // == [Starting and ending]: hello, goodbye
