@@ -1,4 +1,4 @@
-/** A vault's life end to end, through real vaults, a real lease and real boxes, over the fake stores and deviceDB of `vault-world.ts`: each `describe` a chapter, each test a sentence of the story. */
+/** A vault's life end to end, through real vaults, a real lease and real boxes, over the MemoryVaultDB and the fake deviceDB of `vault-world.ts`: each `describe` a chapter, each test a sentence of the story. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LOCKED, type VaultRecord } from '../../src/models/models-shapes'
@@ -17,7 +17,7 @@ const NewWhisper = Object.freeze({ val: 'sk-test-1111' })
 const Sidecar    = Object.freeze({ account: 'work' })
 const BoxDna     = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: Sidecar }
 
-/** A vault as `born` makes it, with a box created in it, stored in a box store every session and device here shares: `boxIn(vault)` fetches that box as `vault`'s world sees it. */
+/** A vault as `born` makes it, with a box created in it, stored in the vaultDB every session and device here shares: `boxIn(vault)` fetches that box as `vault`'s world sees it. */
 const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBornVault()) => {
   const world = await born
   const mw = makeModelsWorld({ fakeTimers: false })
