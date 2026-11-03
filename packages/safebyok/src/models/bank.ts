@@ -125,8 +125,7 @@ export class Bank implements VaultWorld {
 
   // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord, demandReady
 
-  /** A forced reset a host may repeat: lists what the vaultDB holds, tidies old leases, and starts the watch.
-   * Refused, the bank is not ready; one a sweep crossed refuses only its own caller. */
+  /** SLOPDOC: Brings the bank up from the vaultDB, and again whenever the host calls it to force a reset. */
   async hello(): Promise<void> {
     const listing = this.#vaultListing
     const hello = await outcomeOf(() => this.#bringUp(listing))
@@ -247,7 +246,7 @@ export class Bank implements VaultWorld {
     return this.#vaultListing.at(this.vaultScopeOf(bag))
   }
 
-  /** The vault listed for `bag`, nobody asked, locked unless the host unlocks it; else one built by asking the user through a build_vault gating, or another's that won the slot, locked. Refuses before ready, and 'already_asking' while a gating is open. */
+  /** SLOPDOC: The vault for `bag`, whether already listed or built now by asking the user. */
   async ensureVault(bag: VaultBag): Promise<Vault> {
     const scope = this.vaultScopeOf(bag)
     this.#demandReady()

@@ -84,14 +84,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     Object.seal(this)
   }
 
-  /** Inscribe the own props, before the seal: the scope and `vault_tok`, tattooed immutably, and `registered_at`, here; through `assign`, the ones that follow the record in hand. A concrete class with props of its own overrides it, calls super first, and inscribes them the same way: as own props, assigned, tattooed or adorned, never as #fields, which do not exist while the base constructor runs. */
+  /** SLOPDOC: Inscribes the own props before the seal; a subclass adds its own the same way, never as #fields. */
   protected assignInitialProps(central: Fetched<RecordT, SparseT>): void {
     tattoo(this, { ...this.scope, vault_tok: central.vault_tok }, { writable: false, configurable: false })
     this.registered_at = central.registered_at
     this.assign(central)
   }
 
-  /** Assign the mutable own props from `record`, the record about to be in hand: for the base, its revision and `written_at` always, and its `registered_at`, which dates a life of the thing, only where `record` is of another life than the record in hand until now, as at a birthday made here or received. `adopt` calls it before it replaces central, so that is the record judged; `assignInitialProps` sets `registered_at` at birth itself. Never `vault_tok`, fixed at birth. A concrete class with mutable props of its own overrides it, calls super first, and takes them from `record` alone. */
+  /** SLOPDOC: Assigns the mutable own props from the record about to be in hand; a subclass adds its own from it. */
   protected assign(record: Fetched<RecordT, SparseT>): void {
     const { revision_tok, revision_seq, written_at, registered_at } = record
     if (! this.#sameLife(record)) { this.registered_at = registered_at }
@@ -232,10 +232,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
 
-  /** Get the record storage holds, through the listing, which delivers it to `receive`. A call made while a fetch is under way joins it, and settles as it settles.
-   * Where nothing is stored, or a tombstone, each call's `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent.
-   * A thing the answer let go, a new instance in its slot, refuses 'disabled'.
-   */
+  /** SLOPDOC: Refreshes this thing from storage through the listing, joining any fetch under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     this.demandEnabled()
@@ -304,12 +301,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Receiving]: receive, adopt, settle, tombstoneFor
 
-  /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
-   * revision held. A record storage could not validate never arrives: it is set aside in `damaged_records`.
-   * `reconcileCentral` judges it; on 'older' or 'same' central stays, and otherwise the record is adopted and the
-   * thing settles. A record not older than central notes success where, once it is taken in, the record in hand is whole,
-   * so a sparse one that only confirms the revision held counts; an older one notes nothing. Past a discard, it takes nothing.
-   */
+  /** SLOPDOC: Takes in what storage said: judges it against the record in hand, adopts and settles what it takes. */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
     if (this.#isDisabled) { return { badnews: [] } }
     const answer = rcvd ?? this.tombstoneFor(this.#central)
@@ -328,7 +320,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#central = Object.freeze(central)
   }
 
-  /** Bring the snapshot up to the state just adopted, notifying the subscribers where it changed. Calling it again changes nothing. The base answers no bad news. A subclass that overrides it calls super last, so that the snapshot sees what the subclass set. */
+  /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
   settle(): Settled {
     this.#replaceSnapshot()
     return { badnews: [] }
@@ -343,45 +335,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Reconcile]: reconcileCentral, sameLife, classifyRecordShape
 
-  /** The central that results from `rcvd` meeting the central held, and the policy that names the row taken.
-   *
-   * Of the shapes, only a deletion against a living record, either way round, refuses 'record_conflict'; `cmpRevisions`
-   * refuses another tok at the same seq before any row is weighed.
-   *
-   * NOTE, another life (the Coach, 2026-10-31). A record's life is its {@link lifeTokPathOf}, compared with central's by
-   * `#sameLife`. A put lands at the stored row's `revision_seq` + 1, and seqs continue over tombstones, so revisions order
-   * the records of every life of a scope alike. A record of another life is weighed by its age as any other, past two rows
-   * of its own:
-   * * Under another `vault_tok` than this thing's ('other vault'), it throws 'unexpected_error', whatever its age or shape,
-   *   over a central never stored included: this thing's `vault_tok`, tattooed at birth, never moves. A vault's life is its
-   *   `vault_tok`, so a record of another life of a vault takes this row where it reaches a held instance: the vault listing
-   *   routes one past it, to a new instance.
-   * * At the revision held, it throws 'record_conflict': one revision cannot begin a life and continue another.
-   * Past those, a newer record of another life is the thing born anew elsewhere, after a deletion this device may not have
-   * received: a birthday, taken by the newer rows like any other. An older one is a past life's, and is older.
-   *
-   * | life        | age   | rcvd   | central | policy                   | central after |
-   * | ----------- | ----- | ------ | ------- | ------------------------ | ------------- |
-   * | other vault | any   | any    | any     | throw 'unexpected_error' | -             |
-   * | other       | same  | any    | any     | throw 'record_conflict'  | -             |
-   * |             |       |        |         |                          |               |
-   * | any         | older | any    | any     | 'older'                  | central       |
-   * | any         | older | gone   | any     | 'older'                  | central       |
-   * |             |       |        |         |                          |               |
-   * | same        | same  | gone   | alive   | throw 'record_conflict'  | -             |
-   * | same        | same  | alive  | gone    | throw 'record_conflict'  | -             |
-   * | same        | same  | sparse | any     | 'same'                   | central       |
-   * | same        | same  | gone   | gone    | 'same'                   | central       |
-   * | same        | same  | full   | full    | 'same'                   | central       |
-   * | same        | same  | full   | sparse  | 'fill'                   | rcvd          |
-   * |             |       |        |         |                          |               |
-   * | any         | newer | sparse | any     | 'adopt'                  | rcvd          |
-   * | any         | newer | full   | any     | 'adopt'                  | rcvd          |
-   * | any         | newer | gone   | any     | 'gone'                   | rcvd          |
-   * |             |       |        |         |                          |               |
-   *
-   * The age is `cmpRevisions(central, rcvd)`, which refuses the same seq under another tok.
-   */
+  /** SLOPDOC: Judges `rcvd` against the central held, answering the central that results and the policy applied. */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
     // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
     if ((rcvd.vault_tok !== this.vault_tok))                     { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }

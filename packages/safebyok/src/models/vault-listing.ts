@@ -21,7 +21,7 @@ import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Each vault's lease friend binds its deviceDB's lease verbs. */
+/** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
@@ -52,19 +52,19 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** A new vault under `scope`, asked of the user through a gating, stored, held, and unlocked under its passphrase's lease; where another vault won the slot meanwhile, that one, locked. Refuses 'bad_option' a vault present in the slot, nobody asked. A refused put holds nothing; a lease refused past the put leaves the vault stored and held, locked. */
+  /** SLOPDOC: A new vault for `scope`, asked of the user, stored and unlocked; or, locked, the slot's winner. */
   buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope) }
 
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
 
-  /** Put `record`, a birth, over `prior`, the tombstone's revision or never stored, and resolve the vault held. Landed, a new vault of it replaces the slot's tombstone or void, locked. Where another vault stands stored, a vault of that one is held and answered, locked, a success: the caller tells by `vault_tok`. Refused, it stores nothing and holds nothing of `record`; a 'stale_write' delivers the record stored. */
+  /** SLOPDOC: Stores `record` as a birth over `prior`, resolving the vault held: its own, or the slot's winner. */
   ensureVault(record: VaultRecord, prior: Revision): Promise<Vault> {
     return this.putDraft(record, prior, { ifPresent: 'get' })
   }
 
   tryEnsureVault(record: VaultRecord, prior: Revision): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(record, prior)) }
 
-  /** The tombstone a birth under `scope` goes over, or null over none held; refuses 'bad_option' a vault present in the slot. */
+  /** SLOPDOC: The tombstone a birth under `scope` goes over, or null where the slot holds none. */
   demandBirthSlot(scope: VaultScope): Vault | null {
     this.demandEnabled()
     const held = this.at(scope)
@@ -111,7 +111,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return valOf(answer)
   }
 
-  /** Delete the vault `ante` names, over its own revision and not the slot's, its answer delivered; its boxes cascade in the vaultDB. A row moved since refuses 'stale_write', delivered first; `ante` of another life than the slot's refuses 'stale_write', nothing asked of the vaultDB. An entry of a `damaged_records` names that very row, whatever is held. */
+  /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
   override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
     this.demandEnabled()
     const held = this.at(this.scopeOf(ante))

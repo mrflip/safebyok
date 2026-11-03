@@ -86,7 +86,7 @@ export abstract class VaultDB {
   protected abstract doPutVault(record: VaultRecord, terms: PutTerms): Awaitable<Landing>
   /** Writes `record` when the box row meets `terms` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
   protected abstract doPutBox(record: BoxRecord, terms: PutTerms): Awaitable<BoxLanding>
-  /** In one transaction: stops, writing nothing, at a live row under this `vault_tok` not at `prior`, or at any other row failing its checks. Otherwise writes `tombstone` over a live row of this life, and tombstones the box rows under this `vault_tok`, as {@link VS.boxTombstoneOf} does. */
+  /** SLOPDOC: In one transaction, tombstones a live row at `prior` and this life's boxes; a repeat sweeps them. */
   protected abstract doDelVault(tombstone: VaultTombstone, prior: Revision): Awaitable<Landing>
   /** Writes `tombstone` when the box row is live at `prior` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
   protected abstract doDelBox(tombstone: BoxTombstone, prior: Revision): Awaitable<BoxLanding>
@@ -153,7 +153,7 @@ export abstract class VaultDB {
 
   // == [Puts]: putVault, putBox, tryPutVault, tryPutBox
 
-  /** Stores `record` when the row stands at `prior`: `born` over void, `reborn` over a tombstone. Over a live row, at `prior` or not, `ifPresent: 'fail'`, the default, refuses `camped` and 'get' answers it as `declined`; a tombstone or void that is not `prior` refuses `stale_write`. A live row moves only by a gate verb. */
+  /** SLOPDOC: Stores a vault's birth or rebirth; once live, its row moves only by a gate verb. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     return this.#call<VaultRow, PutAct, VaultRow>('putVault', { ...record, ...opts }, async () => {
       const vaultRecord = VS.vaultRecord.parse(record)
@@ -258,7 +258,7 @@ export abstract class VaultDB {
 
   // == [Dels]: delBox, delVault, tidyGone, tryDelBox, tryDelVault, tryTidyGone
 
-  /** Writes the tombstone over a live row at `prior`: `deleted`. A row already `gone` or `void` answers so, the request discarded. A row moved past `prior` refuses `stale_write`. A row failing its checks is deleted only as `damaged_records` lists it, sentinels and all; otherwise it refuses as a get does. */
+  /** SLOPDOC: Writes a box's tombstone over its live row at `prior`, or the damaged row `damaged_records` lists. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
     return this.#call<BoxTombstone, DelAct, VaultRow>('delBox', { ...tombstone, ...opts }, async () => {
       const boxTombstone = VS.boxTombstone.parse(tombstone)
@@ -274,7 +274,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Writes the tombstone over the live row at `prior` and tombstones this life's boxes in one transaction: `deleted`. A repeat writes no vault row, whatever its revision, still tombstones the boxes, and answers `gone`, or `void` for a row that is nothing of this life. A row moved past `prior` refuses `stale_write`, and tombstones nothing. A row failing its checks is deleted only as `damaged_records` lists it, sentinels and all; otherwise it refuses as a get does. */
+  /** SLOPDOC: Tombstones a vault at `prior` and its life's boxes in one transaction; a repeat sweeps the boxes. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> {
     return this.#call<VaultTombstone, DelAct, VaultRow>('delVault', { ...tombstone, ...opts }, async () => {
       const vaultTombstone = VS.vaultTombstone.parse(tombstone)

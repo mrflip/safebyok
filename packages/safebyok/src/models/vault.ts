@@ -36,13 +36,7 @@ export type VaultSnapshot = VaultScope & Readonly<{
 
 // == [Vault]
 
-/** A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in.
- * Its `vault_tok` is the life of the vault in its scope, fixed at birth: a birth's is minted
- * by the listing, a received record's is its own, and a record under another `vault_tok` throws
- * 'unexpected_error'. Its record carries its gate, the wayins, and nothing else stores them. Its
- * guards take no lock: its record holds no secret. A vault deleted is not sent back to life, as a
- * box is: a new life is a new `vault_tok`, so a new instance, created by the listing.
- */
+/** SLOPDOC: A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> implements BoxWorld {
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -106,7 +100,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, delVault, del, each with its try form, landGate
 
-  /** Replace the passphrase through a replace_passphrase gating, answering as {@link Gating.launch}. The passkey stays. A lease held is renewed under the new epoch, unless a lock crossed it, and no other device is locked. A record moved since the attempt read it refuses 'stale_write', storing nothing. */
+  /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrase(): Promise<this> {
     await this.ensureTimely()
     await Gating.launch('replace_passphrase', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runReplacePassphrase(provings) })
@@ -153,7 +147,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  /** Delete this vault through a del_vault gating, answering as {@link Gating.launch}: the vault locked, a tombstone stored, its boxes gone from the vaultDB, nothing of it on this device, and the Vault staying in its slot, tombstoned. A lock does not stop it. A record moved since the attempt read it refuses 'stale_write', the vault left locked. */
+  /** SLOPDOC: Deletes this vault through a gating, leaving a tombstone in its slot and nothing of it on this device. */
   async delVault(): Promise<this> {
     await this.ensureTimely()
     await Gating.launch('del_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante }) => this.#runDelVault(ante) })
@@ -175,8 +169,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Birth]: launchBirth, runBirth
 
-  /** Build a vault under `scope` through a gating, whose own proving alone is handed the friend.
-   * A vault present in the slot refuses 'bad_option', nobody asked. */
+  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
     if (! MSX.isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
@@ -184,7 +177,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return Gating.launch('build_vault', { listing, scope: checked, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
   }
 
-  /** Past the enter key: the put is the commit, and a vault_tok not the record's is another's vault, left locked. */
+  /** SLOPDOC: Stores the birth record, and unlocks under its passphrase's lease if the vault stored is its own. */
   static async #runBirth(listing: VaultListing, { passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: MSX.Revision): Promise<Vault> {
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null
@@ -199,7 +192,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   get isUnlocked(): boolean { return this.#lease !== null }
 
-  /** This vault, unlocked: as it stands, else by the lease this device has cached, else by asking the user through an unlock_vault gating, which answers as {@link Gating.launch}. With no dialog in the world, refuses 'vault_locked'. A refused look at the cache is told as bad news, and asks. */
+  /** SLOPDOC: This vault, unlocked: as it stands, else by the lease cached on this device, else by asking the user. */
   async ensureUnlocked(): Promise<this> {
     await this.ensureTimely()
     if (this.isUnlocked) { return this }
@@ -262,7 +255,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** An attach needs the vault enabled and present. */
   demandReadyToAttach(): this { return this.demandEnabled().demandPresent() }
 
-  /** Hold `lease` as the vault's, dropping any it displaces, and cache it. A lease of another holder refuses 'bad_option', left alone, as its row is another's; one out of force refuses 'vault_locked'; on a vault not ready, the lease is vacated and the refusal thrown. A refused cache costs the next session a proof, not this one its lease, so it is told as bad news. */
+  /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
     if (! lease.isMadeFor(this.#leaseFriend())) { throw leaseOfOtherHolder() }
     if (lease.isForgotten) { throw leaseNotInForce() }
@@ -299,8 +292,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease = null
   }
 
-  /** Drop any lease held and erase the row cached. The lease goes first, so an erase that throws leaves none; the erase is called before the first await, so it lands in call order against any cache. Refused, `onRefused` hears it, by default a panic. */
+  /** SLOPDOC: Drops any lease held and erases the row cached on this device. */
   async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#panic(refusal)): Promise<void> {
+    // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
     this.#dropLease()
     const vacating = outcomeOf(async () => { valOf(await this.#leaseFriend().tryUncacheLease()) })
     this.settle()
@@ -374,7 +368,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
 
-  /** The timely full box under `boxlabel`. Where none is present, `opts.ifAbsent` says: 'fail', the default, refuses 'absent_box'; 'nil' resolves null. A damaged row refuses 'damaged_record'. A vault gone refuses 'vault_gone', and a vault locked, at the start or by the end, 'vault_locked'. */
+  /** SLOPDOC: Finds the full box under `boxlabel`, as fresh as the caller asked. */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
     const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
     const scope = this.#boxscopeOf(boxlabel)
@@ -393,7 +387,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Seal and store the box `patch` names. With a box listed, a tombstone included, this is its `send`. With none, it is a birth over no record, its sidecar `{}` where left out; a whisper left out fetches first, and refuses 'no_whisper' only where no box is stored. Over a live record, `opts.ifPresent` says, as `send` has it: `get` resolves the box as stored, `patch` discarded. Refuses as `send` does; a vault gone refuses 'vault_gone'. */
+  /** SLOPDOC: Seals and stores the box `patch` names: by its `send` where one is listed, as a birth where none is. */
   async putBox(patch: BoxPut, opts: SendOpts = {}): Promise<Box> {
     const { whisper, sidecar, ...named } = MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
@@ -409,7 +403,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryPutBox(patch: BoxPut, opts: SendOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** Delete the box under `boxlabel`, a damaged row set aside there included: the box in its tombstone, or null for nothing stored. Refuses 'stale_write' where the row moved, delivered first; a vault gone refuses 'vault_gone', and a vault locked 'vault_locked'. */
+  /** SLOPDOC: Deletes the box under `boxlabel`, a damaged row included, answering its tombstone if one was stored. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const timely = MSX.timelyOpts.parse(opts)
     const scope = this.#boxscopeOf(boxlabel)
