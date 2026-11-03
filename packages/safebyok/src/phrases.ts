@@ -50,7 +50,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, ErrorExpected
+// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -69,9 +69,6 @@ export const ListingExpected = "Expected a Listing"
 
 /** Anything but a VaultError, where bad news is told. */
 export const VaultErrorExpected = "Expected a VaultError"
-
-/** The `err` of a task a trigger is told failed. */
-export const ErrorExpected = "Expected an Error"
 // --
 
 // == [Passphrases]: PassphraseNotText
