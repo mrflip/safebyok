@@ -153,14 +153,14 @@ export const isTombstoneRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'x
 
 const sentinelTimes = { registered_at: FarPast, written_at: FarPast }
 
-/** The tombstone of a vault row nothing holds. */
-export const sentinelVaultOf = (scope: VaultScope, vault_tok: string = NeverStoredTok): VaultTombstone => ({
-  ...vaultScope.parse(scope), fmt: VaultFormat, ...NeverStored, ...sentinelTimes, am: 'x', vault_tok,
+/** The tombstone of a vault row nothing holds. A damaged listing's label comes from storage, and is not checked here: it is part of what is reported. */
+export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = NeverStoredTok): VaultTombstone => ({
+  applabel, user_id, vaultlabel, fmt: VaultFormat, ...NeverStored, ...sentinelTimes, am: 'x', vault_tok,
 })
 
 /** The tombstone of a box row nothing holds. */
-export const sentinelBoxOf = (scope: Boxscope, vault_tok: string): BoxTombstone => ({
-  ...boxscope.parse(scope), fmt: BoxFormat, ...NeverStored, ...sentinelTimes, am: 'x', vault_tok, box_tok: NeverStoredTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
+export const sentinelBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone => ({
+  applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...NeverStored, ...sentinelTimes, am: 'x', vault_tok, box_tok: NeverStoredTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
 })
 
 /** A vault row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */

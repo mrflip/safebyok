@@ -72,6 +72,14 @@ describe("MemoryVaultDB", () => {
       ])
       for (const damaged of val.damaged_records) { expect(VS.vaultSparse.safeParse(damaged).success).to.be.true }
     })
+
+    it("lists a row under a label failing its check among the damaged, and the rest as ever", async () => {
+      const { vaultDB, vault } = await storeWith()
+      vaultDB._cheat_vaultRowsOf(bankScope).set('Not A Label', { garbage: true })
+      const { val } = await vaultDB.getBank(bankScope)
+      expect(val.vaults).to.deep.equal([vault])
+      expect(val.damaged_records.map(({ vaultlabel, am }) => ({ vaultlabel, am }))).to.deep.equal([{ vaultlabel: 'Not A Label', am: 'd' }])
+    })
   })
 
   describe("getVault", () => {
@@ -87,6 +95,14 @@ describe("MemoryVaultDB", () => {
       expect(val?.gate).to.deep.equal(vault.gate)
       expect(val?.boxes).to.deep.equal([VS.boxSparse.parse(box), VS.boxSparse.parse(boxTombstoneOf(other))])
       expect(val?.damaged_records.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
+    })
+
+    it("lists a box under a label failing its check among the damaged", async () => {
+      const { vaultDB } = await storeWith({ box: true })
+      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('Not A Label', { garbage: true })
+      const { val } = await vaultDB.getVault(vaultScope)
+      expect(val?.boxes.map(({ boxlabel }) => boxlabel)).to.deep.equal(['openai'])
+      expect(val?.damaged_records.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
     })
 
     it("over a void row, refuses vault_empty with no row, and answers null with ifAbsent nil", async () => {
