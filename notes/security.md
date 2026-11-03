@@ -55,9 +55,10 @@ added or folded into through the subagent, and no other entry changes.
   proof; now `Lease.peek` (`packages/safebyok/src/models/lease.ts`) uncaches, without throwing, a row whose `proved_at` is longer ago than
   the autolock duration (`Bank.leaseMillis`, carried on the lease friend) and answers as if no row were there, so `ensureUnlocked` asks
   for a proof. The comparison reads the host-pluggable `clock` against a `proved_at` stored in the deviceDB, and a refused erase there
-  leaves the row, with only a logger warning. A lease already held in a page stays held until something locks it, however old.
+  leaves the row, with only a logger warning. `bank.autolock` locks a held lease by its cached row, so it misses only a lease with no row of its own: one the deviceDB refused to cache, or whose row another page erased or wrote over. When another page's `Lease.peek` erases a row past autolock, this page's `bank.autolock` has nothing to find and its held lease stays held.
   `autolock` locks only listed vaults of the row's own `vault_tok`: a row whose vault is not listed, or of another life, stays on the
-  device until a lease is cached over it, `Lease.peek` meets it with its own vault listed, or `bank.vacate` erases it. (Models are not yet exported from
+  device: `deviceDB.peek` answers null for another `vault_tok`, so `Lease.peek` never erases it, and `deviceDB.vacate` leaves it. It stays until a lease of that life is cached over it, or nothing; clearing rows of no listed vault is a task not yet designed.
+  A row past autolock is erased at `Lease.peek` with no throw and reads as no row, so the vault asks for a proof, and both go by the host's clock: an honest row with a clock set back opens until the clock catches up. Autolock is a best-effort reminder process, not a guarantee, and `bank.autolock` is called by the host, not by `hello`. (Models are not yet exported from
   `src/index.ts`.)
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change does not rotate the vaultKey, so it ends no session.**
   `Vault.replacePassphrase`, `addPasskey` and `revokePasskey` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
