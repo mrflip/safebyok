@@ -1,6 +1,6 @@
 # Thread 9: vault_boxes (2026-11-03)
 
-Branch `20261103-vault_boxes`, PR #TBD, stacked on #456. Justify: **green**. Root scripts 302; safebyok 4695 | 37 skipped; indexeddb 167 | 11; postgres 322 | 15; fastkey 49; react 326; demo-react 230 | 17; convex 375 | 9; graphql 345 | 15; e2e 107 | 116 skipped. Size budgets unmoved. No `eslint-disable`, no `ts-expect-error`.
+Branch `20261103-vault_boxes`, PR #457, stacked on #456. Justify: **green**. Root scripts 302; safebyok 4695 | 37 skipped; indexeddb 167 | 11; postgres 322 | 15; fastkey 49; react 326; demo-react 230 | 17; convex 375 | 9; graphql 345 | 15; e2e 107 | 116 skipped. Size budgets unmoved. No `eslint-disable`, no `ts-expect-error`.
 
 * **Built**:
   * `vault.ts`, a new section, *Box verbs*: `hello`; `getBox`, `fetchBox`, `putBox`, `delBox`, each with its `try` form; `demandReadyForBoxes`. The first box call runs `hello`, once it has succeeded no more.
@@ -27,4 +27,4 @@ Branch `20261103-vault_boxes`, PR #TBD, stacked on #456. Justify: **green**. Roo
   * `TH.eventually` takes a check returning a boolean; a check that `expect`s never passes.
   * The world's helper now hands back `vaultDB`, typed as the memory DB, for `_cheat_boxRowsOf`.
 * **For the Coach**:
-  * **The whisper is cleartext in a local during a sidecar-only send**, as a JS string that cannot be zeroed, from unseal to reseal. Security entry written.
+  * **The whisper is cleartext in a local during a sidecar-only send**, as a JS string that cannot be zeroed, from unseal to reseal. Security entries amended: this, and `delBox` over a damaged row by its label alone.

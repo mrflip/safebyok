@@ -51,11 +51,17 @@ added or folded into through the subagent, and no other entry changes.
   it.** Such a row is never delivered to an instance and nothing acts on it. `delVault` / `delBox` land only where the tombstone's
   `prior` matches the row as `damaged_records` lists it (its revision and `vault_tok`, or the sentinels where the row cannot be read);
   any other prior refuses as a get does, and a `put` cannot overwrite a damaged row. The check is `VS.isDamagedVaultAt` /
-  `VS.isDamagedBoxAt` (`packages/safebyok/src/storage/vault-db-shapes.ts`), used in `memory-vault-db.ts`.
+  `VS.isDamagedBoxAt` (`packages/safebyok/src/storage/vault-db-shapes.ts`), used in `memory-vault-db.ts`. Amended 2026-11-03
+  (vault_boxes, branch `20261103-vault_boxes`): `vault.delBox(boxlabel)` (`src/models/vault.ts`) over a row that fails its checks
+  takes that row's own revision (`boxes.damagedAt`) as the tombstone's `prior` and lays the tombstone over it, on the customer's
+  naming the label alone.
 * 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **A whisper crosses the seal seam as a string.**
   `vault.sealStampedString(whisperText, stamp)` and `unsealStampedString` hand a whisper between `Box` and `Lease` as a JavaScript
   string, which cannot be zeroed; `Lease.sealWith` and `unsealWith` zero only the bytes they encode or decipher themselves. Before
-  this, the caller's serialized bytes were zeroed by the lease. (Models are not yet exported from the package.)
+  this, the caller's serialized bytes were zeroed by the lease. Amended 2026-11-03 (vault_boxes, branch `20261103-vault_boxes`):
+  `box.send({ sidecar })` with no whisper (`Box.#edit`, `#keptWhisper`, `#unseal`) unseals the stored whisper and seals it again
+  under the new stamp, as the stamp binds the sidecar, so a metadata-only update opens the whisper; its value is held as a string,
+  not zeroable, from the unseal to the seal. (Models are not yet exported from the package.)
 * 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **The friend is a public
   route to a lease row.** `vault.leaseFriend()` and `lease.friend` are public, and `friend.peekLease()` answers the row this device
   caches, including the `lease_key` handle and `vault_key_lease_wrapped`, to whoever holds a Vault or a Lease. (Models are not yet
