@@ -333,14 +333,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Seal and store the box `patch` names. With a box listed, a tombstone included, this is its `send`. With none, it is a birth over no record, its sidecar `{}` where left out, and a whisper left out refuses 'no_whisper'. Over a live record, `opts.ifPresent` says, as `send` has it: `get` resolves the box as stored, `patch` discarded. Refuses as `send` does; a vault gone refuses 'vault_gone'. */
+  /** Seal and store the box `patch` names. With a box listed, a tombstone included, this is its `send`. With none, it is a birth over no record, its sidecar `{}` where left out; a whisper left out fetches first, and refuses 'no_whisper' only where no box is stored. Over a live record, `opts.ifPresent` says, as `send` has it: `get` resolves the box as stored, `patch` discarded. Refuses as `send` does; a vault gone refuses 'vault_gone'. */
   async putBox(patch: BoxPut, opts: SendOpts = {}): Promise<Box> {
     const { whisper, sidecar, ...named } = MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     verifyConsistent(named, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     const scope = this.#boxscopeOf(named.boxlabel)
     const boxes = await this.#ensureReadyForBoxes()
-    const held = boxes.at(scope)
+    const held = boxes.at(scope) ?? ((whisper === undefined) ? await boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }) : null)
     if (held !== null) { return held.send({ whisper, sidecar }, opts) }
     if (whisper === undefined) { throw noWhisperToKeep() }
     await this.ensureTimely(timely.maxWorldMillis)
