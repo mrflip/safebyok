@@ -67,7 +67,7 @@ export const CtxStampExpected = "Expected a flat object of strings and numbers, 
 /** The listing a storable is made in. */
 export const ListingExpected = "Expected a Listing"
 
-/** The `err` of a storage call's answer. */
+/** Anything but a VaultError, where bad news is told. */
 export const VaultErrorExpected = "Expected a VaultError"
 
 /** The `err` of a task a trigger is told failed. */

@@ -113,8 +113,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
-  /** Put `duck`, a record or a thing ducking as its record, over `ante`'s revision, not whatever is held by then, and deliver the answer: `ante` is the record it was made from, null or one never stored for no record, and anything else refuses 'bad_option'.
-   * Over a live record, `opts.ifPresent` says, and storage decides: `repl`, the default, replaces it; `fail` refuses 'camped'; `get` saves nothing, and delivers the live record. A 'stale_write' or 'camped' refusal delivers the record storage holds before it is thrown. A `revision_seq` not one past `ante`'s refuses 'invalid_input'.
+  /** Put `duck` over `ante`'s revision, not whatever is held by then, and deliver the answer: `ante` is the record it was made from, null or one never stored for no record.
+   * Over a live record, storage decides by {@link MSX.ifPresentVals}. A 'stale_write' or 'camped' refusal delivers the record storage holds before it is thrown. A `revision_seq` not one past `ante`'s refuses 'invalid_input'.
    */
   async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ante: Revision | null, opts: PutListingOpts = {}): Promise<ThingT | null> {
     const record = this.recordOf(duck)
@@ -147,7 +147,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** The pipeline every answer takes. Take the world, where the answer has one; hand the record, or none stored, to `#buildOrReceive` under the scope its `req_params` name; a refusal answer is thrown, after the record a 'stale_write' or 'camped' carries is delivered.
    * The answer's own refusals are thrown: its world's, its `err`, or the absent refusal. A refusal `receive` throws is thrown too, as the instance cannot become what storage holds; but where the answer is itself a refusal, that one is thrown, and the carried record's is told to `onBadNews`.
-   * Only a fetch judges, by passing its `ifAbsent`: an answer of nothing stored, or of a tombstone, is then absent, once delivered, and throws {@link absentRefusal} under 'fail' and resolves null under 'nil'. A `put` and a `del` pass none, and have the instance back, a tombstone or not.
+   * Only to a fetch is an answer of nothing stored, or of a tombstone, absent, once delivered: a `put` and a `del` have the instance back, a tombstone or not.
    */
   async #deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
