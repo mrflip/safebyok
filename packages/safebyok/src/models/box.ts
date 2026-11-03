@@ -11,7 +11,7 @@ import { type BoxPatchGiven, type BoxRecord, type BoxSparse, type Fetched, type 
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 
-// == [Record forms]: BoxSnapshot, BoxProps, BoxPatch
+// == [Record forms]: BoxSnapshot, BoxProps, BoxPatch, BoxPut
 
 export type BoxSnapshot = Boxscope & Readonly<{
   revision_tok:  string
