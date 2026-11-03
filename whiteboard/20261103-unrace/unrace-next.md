@@ -22,7 +22,15 @@ The plan's threads 18 `plain_seam`, 19 `world_whole` and 20 `test_teeth` carry t
 * **Cached rows of no listed vault.** "removing rows that are not in the listing seems like another but different and async task." `bank.autolock` (thread 22, was `tidy`) leaves them; a task of its own, not yet designed.
 
 * **The `badnews` return and `policy`** go, and the watch tells the host when it drops a row ("yes"). The rest of reporting in `deliver` waits for the Coach's design: "the bad news and other reporting during deliver is poorly conceived, but I don't know yet what the right thing is".
-* **Open Matters rows still at `drafting` when this was written:** a rule for `try` forms; `getBoxes`; whether a box answer keeps the vault row, where the Coach has begun "yes I intended no change to the `world` field, that's working great"; the box's rebirth machinery; the memory store's notice order; fate; undergrowth; the gating family.
+
+* **Try and throw forms.** "Nothing that strident. It's not uniformly the case that one of them is natural. A try form that only calls other try forms builds an outcome with grace, that the throw form gives the val of. A try form riddled with catches and if statements should just be a throw form. It's usually not ambiguous, and if it is my next question is should it be broken up, calling out to service methods it sits next to".
+* **`vaultBoxes(vault)`:** "call it vaultBoxes(vault)". `getVault` answers the row alone, and `vaultBoxes` the list and its `damaged_records`, from one path in the box listing; `fetchListed`, `NothingListed` and `BoxListing.hello(listed?)` go.
+* **`world` stays on box answers and refusals.** "yes I intended no change to the `world` field, that's working great. I was pointing out the stink of calling getVault, earning vault twice directly (as val and world), plus the secret update to vault done by deliver, in a method that is attending to vault's startup. So it's a little simpler with vaultBoxes".
+* **The box's rebirth machinery:** thread 19 removes what has no reader and lists what stays and why, with no redesign of the rule.
+* **The memory store's notices:** keep `queueMicrotask`, and add a test option delivering the notice after the answer, so thread 20 runs both orders. No randomness.
+* **Fate:** "yes work around it; it's working code that is mostly dangerous because agents may learn from it".
+* **An undergrowth thread, after 20:** the nine lease-erasing names down to the design's three, the `lease.attach` hop, `gate_issue`'s loosened checker, the late attach that erases what a sweep kept, refusal kinds taken from a table's word, and one-caller wrappers.
+* **The gating family:** "make a prompt I can use for an interactive session with an opus to just investigate this": `unrace-gating-prompt.md`. A thread waits on that.
 
 ## A standalone thread: refusals and typechecks
 

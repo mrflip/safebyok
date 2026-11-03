@@ -441,6 +441,7 @@ a newer row from a box answer; `MemoryVaultDB` tells watchers by microtask, so t
 
 *"it should remove the lease no-throw, and return whatever it would have if the lease was gone. autolock is not a guarantee, it's a process, and a lease past autolock is due for locking, not an attack."*
 
+* *The Coach, in the row:* "yes. It is the only intervention besides bank.autolock, and we make firmly clear that the autolock is a best-effort reminder process, not a guarantee".
 * **Touches:** `Lease.peek`, whatever hands it the autolock duration; tests. It erases and answers null as it does for a lease of another epoch.
 * *Orchestrator:* in this sprint, as moving `autolock` out of `hello` opened this gap on the line the Coach merges. **Levels:** `medium` review, G9. **Size:** small. **Depends on:** 14.
 
