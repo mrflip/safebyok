@@ -1,6 +1,6 @@
 # Thread 14: cleanup (2026-11-03)
 
-Branch `20261103-cleanup`, stacked on #465 (thread 22, `20261103-tidy_host`). Justify: see the PR. Empty changeset.
+Branch `20261103-cleanup`, stacked on #465 (thread 22, `20261103-tidy_host`). Justify: green (scripts 302; safebyok 4783 passed, 37 skipped; indexeddb 167; postgres 322; react 326; fastkey 49). Empty changeset.
 
 No behaviour changes. One commit per kind.
 
