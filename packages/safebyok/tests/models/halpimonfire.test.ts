@@ -99,7 +99,7 @@ describe("A gate change after its record is stored", () => {
 
   it("a crypto failure in buildLease rejects, the row stored, the vault on its new gate under the lease it held", async () => {
     const { vault, demandStored, deviceDB } = await makeBornVault()
-    const failure = new VaultError('unexpected_error', 'the platform said no')
+    const failure = new VaultError('unexpected_error', "the platform said no")
     vi.spyOn(Proving.prototype, 'buildLease').mockRejectedValueOnce(failure)
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).rejects.to.eq(failure)
     expect(demandStored().gate.gate_epoch).to.eq(2)
@@ -144,7 +144,7 @@ describe("A gate change after its record is stored", () => {
     const { opts, deviceDB, demandStored } = await makeBornVault()
     const vault = await new VaultListing({ ...opts, onBadNews }).build(demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
-    const refusal = new VaultError('storage_blocked', 'the disk is full')
+    const refusal = new VaultError('storage_blocked', "the disk is full")
     deviceDB.tryCache.mockResolvedValueOnce(TH.bad(refusal))
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
     expect(vault.isUnlocked).to.be.true
