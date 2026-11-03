@@ -152,6 +152,13 @@ describe("Lease.peek(friend, gate_epoch) and Lease.tryPeek", () => {
     expect(friend.logged.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'Lease.peek', refusalkind: 'unexpected_error' }]])
   })
 
+  it("carries a clock that throws to Lease.tryPeek's bad Outcome, and uncaches nothing", async () => {
+    const { friend } = await grantedWorld()
+    const got = await Lease.tryPeek({ ...friend, clock: { now: () => { throw new Error('the clock broke') } } }, GrantedAs.gate_epoch)
+    expect(got.ok).to.be.false
+    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
+  })
+
   it("finds nothing past an autolock of Infinity: a lease cached long ago is in force", async () => {
     const friend = fakeLeaseFriendOf({ leaseMillis: Infinity })
     const lease = await makeGrantedLease(friend)
