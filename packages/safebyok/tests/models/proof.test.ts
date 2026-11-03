@@ -1,7 +1,7 @@
 /** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over real in-memory stores,
  * and every step asserts what its components render. */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { VaultError } from '../../src/errors'
 import type { BankSnapshot } from '../../src/models/bank'
 import type { Box, BoxSnapshot } from '../../src/models/box'
@@ -16,28 +16,33 @@ import { NewPassphrase, Passphrase, byPasskey, byPassphrase } from '../test-help
 
 useBankWorlds()
 
+/** What nobody asked to hear, which a host's `onBadNews` is told: a proof that left it to the logger would pass over it. */
+const badNews: VaultError[] = []
+const onBadNews = (news: VaultError): void => { badNews.push(news) }
+const expectNoBadNews = (): void => { expect(badNews.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal([]) }
+afterEach(expectNoBadNews)
+
 // == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, whisperReveal, makeDialog
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
-/** A component over `useSyncExternalStore(store.subscribe, store.getSnapshot)`, painting `view` of each snapshot.
+/** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React takes them, painting `view`.
  * A listener told with nothing new, or a snapshot that changed with no listener told, fails the next `expectRenders`.
  */
-const mountComponent = <SnapshotT>(store: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) => {
-  let rendered = store.getSnapshot()
+const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) => {
+  let rendered = getSnapshot()
   let idleTells = 0
   const painted = [view(rendered)]
-  const unmount = store.subscribe(() => {
-    const next = store.getSnapshot()
+  subscribe(() => {
+    const next = getSnapshot()
     if (next === rendered) { idleTells += 1 }
     rendered = next
     painted.push(view(next))
   })
   return {
-    unmount,
-    /** Everything painted since the last call is exactly `paints`, the snapshot's identity moving exactly when a listener was told. */
+    /** Everything painted since the last call is exactly `paints`, the snapshot moving exactly when a listener was told. */
     expectRenders: (paints: string[]) => {
-      expect(store.getSnapshot(), 'a snapshot changed with no listener told').to.eq(rendered)
+      expect(getSnapshot(), 'a snapshot changed with no listener told').to.eq(rendered)
       expect(idleTells, 'a listener told with no new snapshot').to.eq(0)
       expect(painted.splice(0)).to.deep.equal(paints)
     },
@@ -84,7 +89,7 @@ const makeDialog = () => {
 const buildHost = async () => {
   const world = makeBankWorld()
   const dialog = makeDialog()
-  const bank = world.bankOn({ requestCleartext: dialog.requestCleartext })
+  const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
   await bank.hello()
   const vault = await bank.ensureVault(VaultBag)
   dialog.shown.length = 0
@@ -104,7 +109,7 @@ describe("the proof", () => {
     const dialog = makeDialog()
 
     // The page opens: the bank is made, and renders before its hello lands.
-    const bank = world.bankOn({ requestCleartext: dialog.requestCleartext })
+    const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['made: no vaults'])
 
@@ -127,7 +132,9 @@ describe("the proof", () => {
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} unlocked'])
     const revealUi = mountComponent(box, whisperReveal(box))
     revealUi.expectRenders(['hidden'])
-    expect(JSON.stringify([...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()])).not.to.include(ApiKey.whisper.val)
+    const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
+    expect(boxRows).to.have.lengthOf(1)
+    expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper.val)
 
     // Unseal it: extractWhisper hands over the whisper and keeps nothing; expose keeps it for the component.
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
@@ -136,6 +143,8 @@ describe("the proof", () => {
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} unlocked'])
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
+    const snapshots = [bank.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
+    expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.val)
 
     // Lock: every component is told before lock() returns, the whisper leaves the screen, and the box refuses.
     vault.lock()
@@ -174,6 +183,7 @@ describe("the proof", () => {
     await TH.expectRefusal(vault.fetch(), 'vault_gone')
     expect(bank.vaultOf(VaultBag)).to.eq(vault)
     boxesUi.expectRenders(['anthropic_api_key', 'no boxes'])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} locked', 'anthropic_api_key {"nickname":"work"} locked'])
     revealUi.expectRenders(['locked', 'locked'])
     await TH.expectRefusal(box.extractWhisper(), 'disabled')
 
@@ -189,7 +199,7 @@ describe("the proof", () => {
     await reborn.putBox(ApiKey)
 
     // A fresh Bank on the same stores: it lists the vault locked, and picks up the cached lease with nobody asked.
-    const nextPage = world.bankOn({ requestCleartext: dialog.requestCleartext })
+    const nextPage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
     const nextPageUi = mountComponent(nextPage, bankStatus)
     nextPageUi.expectRenders(['made: no vaults'])
     await nextPage.hello()
@@ -285,7 +295,7 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
     world.advance(AutolockMillis + 1)
-    const latePage = world.bankOn({ requestCleartext: dialog.requestCleartext })
+    const latePage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
     await latePage.hello()
     expect(world.leaseRows()).to.have.lengthOf(0)
     await latePage.vaultOf(VaultBag)?.ensureUnlocked()
@@ -343,7 +353,7 @@ describe("the proof", () => {
 
     // The second device has no lease cached, so its unlock asks; it then opens the box this one sealed.
     const phone = makeDialog()
-    const phoneBank = world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext })
+    const phoneBank = world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
     await phoneBank.hello()
     const phoneVault = await phoneBank.ensureVault(VaultBag)
     await phoneVault.ensureUnlocked()
@@ -391,7 +401,7 @@ describe("the proof", () => {
 
   it("React StrictMode: effect, cleanup, effect paints no refusal", async () => {
     const world = makeBankWorld()
-    const bank = world.bankOn()
+    const bank = world.bankOn({ onBadNews })
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['made: no vaults'])
 
@@ -402,13 +412,14 @@ describe("the proof", () => {
     await Promise.all([firstEffect, secondEffect])
 
     bankUi.expectRenders(['made: no vaults', 'ready: no vaults'])
-    expect(await firstEffect).to.include({ ok: false })
+    const { err } = await firstEffect
+    expect(err?.refusalkind).to.eq('disabled')
     expect(await secondEffect).to.include({ ok: true })
   })
 
   it("React StrictMode over a vault already cached: the second effect's listing holds it, and picks up the lease with nobody asked", async () => {
     const { world, dialog } = await buildHost()
-    const bank = world.bankOn({ requestCleartext: dialog.requestCleartext })
+    const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['made: no vaults'])
 
