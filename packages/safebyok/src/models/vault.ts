@@ -175,7 +175,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Birth]: launchBirth, runBirth
 
-  /** A new vault under `scope`, by a gating; it takes no proving, so the friend goes only to the gating's own. */
+  /** Build a vault under `scope` over `prior` through a gating, whose own proving alone is handed the friend.
+   * It checks no slot, and a vault present costs the user a dialog for nothing: a host wants `listing.buildVault`. */
   static async launchBirth(listing: VaultListing, scope: VaultScope, prior: MSX.Revision): Promise<Vault> {
     MSX.revision.parse(prior)
     return Gating.launch('build_vault', { listing, scope, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
