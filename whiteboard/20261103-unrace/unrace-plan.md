@@ -322,7 +322,9 @@ the gate passed it. Fixed: the proof now fails on any bad news and on a whisper 
 replaced whisper tells nobody; `bank.sweep`'s order; a lock's mixed lists over several boxes; `takeWorld`'s refusal kind; `ensureUnlocked`'s doc
 block; dialog casts.
 
-### 14. `shapes_sweep` (pre-plan 12)
+*Orchestrator, 2026-11-03:* the Coach: "the thread to consolidate refusals and typechecks sounds standalone". So this thread is now the sprint's cleanup, on sonnet at a low review: the notes, the spec's corrections, the `wontfix.md` rows, STYLE.md's brief note, and stripping refusal lists from short doc blocks. Moving checkers, types and refusals goes to `unrace-next.md`.
+
+### 14. `cleanup, was shapes_sweep` (pre-plan 12)
 
 *"move checkers to the models' shapes files and define types from them. It's good to reuse shapes defined in the src/
 directory but don't modify them in a way that would fail their tests, just copy instead."*
