@@ -41,6 +41,13 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (cleanup, branch `20261103-cleanup`): **The key that gets a thing out of storage is entered into the data with an enter-key
+  step, and no verb of the models layer returns a vaultKey, wayinKey or leaseKey.** In `packages/safebyok/src/models/`, a vaultKey is
+  unwrapped under the wayinKey (`Proving.#unwrapVaultKey`, extractable only to be wrapped again, dropped when the method ends) or under
+  the leaseKey (`Lease.#vaultKey`, non-extractable, one usage, one call); each is private, and every other `CryptoKey` in the layer is a
+  parameter or a local. `Lease.grant` takes a vaultKey from `Proving.buildLease`, in the layer. The whisper is the one secret that crosses
+  from `Box` to `Lease` (`sealWith`, `unsealWith`, through the Vault's `sealStampedString` and `unsealStampedString`), as its JSON text, a
+  JavaScript string that cannot be zeroed: guarantees G6 and G7 name it. (Models are not yet exported from `src/index.ts`.)
 * 2026-11-03 (tidy_host, branch `20261103-tidy_host`): **`bank.hello` does not call `bank.autolock`; only a host does, so a lease row
   cached past its autolock duration stands until then.** `bank.autolock()` (`packages/safebyok/src/models/bank.ts`; the verb was
   `bank.tidy`) is the only caller of the autolock check, and `Lease.peek` does not judge a row's age, so `vault.ensureUnlocked` on a
@@ -65,7 +72,10 @@ added or folded into through the subagent, and no other entry changes.
   proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). `Vault.#runDelVault` locks first,
   so no box opens under a lease while the tombstone goes out; a refused delete leaves the vault locked. A `lock()` does not settle a
   `del_vault` asking, as a lock does not stop a delete (`declineAtLock` skips that kind), but a goodbye or vacate does
-  (`declineAtDiscard`). `Vault.del()` is `delVault()`, so there is no unguarded delete through the Vault. `vaultListing.del(ante)`
+  (`declineAtDiscard`). `Vault.del()` is `delVault()`, and `revokePasskey` runs through its own gating, so each is guarded by a Gating (the user proves the
+  passphrase) (amended 2026-11-03 (cleanup): this said there was no unguarded delete through the Vault; the listing's is not guarded). `listing.del(vault)`
+  (`VaultListing.del`, `models/vault-listing.ts`) has no gating of its own: it is the call a gated `vault.del()` ends in
+  (`#runDelVault`), and a host holding the listing can call it directly, with no proof asked. `vaultListing.del(ante)`
   refuses `stale_write`, asking nothing of the vaultDB, for an instance of another life than the slot's vault, as a delivered answer
   would tombstone the live vault locally.
 * 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
@@ -859,7 +869,7 @@ added or folded into through the subagent, and no other entry changes.
   checker is a contract to answer.** (1) `putWayin` proves with the current passphrase only (a passkey's
   answer as the proof is refused `bad_option`), as `changePassphrase` and `addPasskey` did. A new
   passphrase as text replaces the passphrase (amended 2026-10-21 (wayin_rules): and removes the
-  passkey, writing vault props with `passkey: null`, so a passkey added under the old passphrase no
+  passkey, writing vault props with `passkey: null`; amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; in `src/models/` `replacePassphrase` leaves the passkey wayin alone, and the vaultDB refuses one carrying a `passkey_wayin` (`storage/vault-db-new.ts`), so a passkey added under the old passphrase no
   longer opens the current vault props; the user adds a passkey again by proving the new passphrase;
   removal, not revocation: a copy of older vault props still opens with it, as before); a passkey's
   answer (`PasskeyAnswer`) puts the passkey, replacing any. The passkey is now made by the host before the call and its answer handed in, so a
@@ -932,7 +942,7 @@ added or folded into through the subagent, and no other entry changes.
   read or derived. Before, any wayin proved any change, so a passkey holder could reset the passphrase;
   now a passkey opens the vault but cannot change who may. `addPassphrase` is gone. Consequence: a
   forgotten passphrase can no longer be reset with the passkey, and a passphrase stored damaged cannot
-  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the current one (amended 2026-10-21 (wayin_rules): so does `putWayin` of a new passphrase, which removes it; the old
+  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the current one (amended 2026-10-21 (wayin_rules): so does `putWayin` of a new passphrase, which removes it (amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; `models/` `replacePassphrase` keeps the passkey); the old
   credential no longer opens; the same credential again mends a damaged one, with a fresh wrap), and
   `delWayin(passphrase)` removes the passkey, refusing `absent_wayin` when there is none; the passphrase
   can never be removed. Removal is still not revocation. Every change still moves `unlock_epoch`,
@@ -1794,7 +1804,7 @@ added or folded into through the subagent, and no other entry changes.
   wayin open, and the mark refuses one at a lower `vault_key_epoch` whatever its `unlock_epoch`:
   vault props from before a rotation, and with it the vaultKey the rotation replaced, are caught even
   so. What still passes is older vault props at the same `vault_key_epoch` under a forged higher
-  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `putWayin` replaced (amended 2026-10-21 (wayin_rules): or removed by a new passphrase), or a passphrase
+  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `putWayin` replaced (amended 2026-10-21 (wayin_rules): or removed by a new passphrase; amended 2026-11-03 (cleanup): in the shipped core, `src/vault.ts`; not in `models/`), or a passphrase
   `putWayin` replaced, which still opens only the vaultKey the vault is under, never a
   replaced one. (A device that opens such vault props through its lease opens no wayin:
   it takes the vaultKey it already held, and shows the older copy's wayin summaries.) The way out of a
