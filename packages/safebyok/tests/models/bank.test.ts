@@ -235,6 +235,20 @@ describe("bank.tidy", () => {
     expect(fresh.vaultOf(VaultBag)?.isLocked).to.be.true
   })
 
+  it("runs before anything hello can refuse, so a hello refused offline still erases an old lease and locks its listed vault", async () => {
+    const { world, bank, vault } = await makeBankWithVault()
+    world.advance(AutolockMillis + 1)
+    world.vaultDB._cheat_refuseGets('storage_error')
+    await TH.expectRefusal(bank.hello(), 'storage_error')
+    expect(vault.isLocked).to.be.true
+    await TH.eventually(() => world.leaseRows().length === 0)
+    const { world: freshWorld } = await makeBankWithVault()
+    freshWorld.advance(AutolockMillis + 1)
+    freshWorld.vaultDB._cheat_refuseGets('storage_error')
+    await TH.expectRefusal(freshWorld.bankOn().hello(), 'storage_error')
+    expect(freshWorld.leaseRows()).to.have.lengthOf(0)
+  })
+
   it("erases only its own bank's leases: another user's and another app's old leases on this device survive", async () => {
     const world = makeBankWorld()
     const { bank: ours } = await makeBankWithVault(world)
