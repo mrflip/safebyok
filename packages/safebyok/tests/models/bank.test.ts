@@ -122,6 +122,16 @@ describe("bank.hello", () => {
     expect((onBadNews.mock.calls[0]?.[0] as VaultError).message).to.include('broken')
   })
 
+  it("tells of a damaged vault row even where another row's delivery refuses the hello", async () => {
+    const onBadNews = vi.fn()
+    const { world, bank } = await makeBankWithVault(makeBankWorld(), { onBadNews })
+    const rows = world.vaultDB._cheat_vaultRowsOf(BankBag)
+    rows.set(Dna.vaultlabel, { ...(rows.get(Dna.vaultlabel) as object), revision_tok: 'rev-other' })
+    rows.set('broken', { am: 'a', nonsense: true })
+    await TH.expectRefusal(bank.hello(), 'record_conflict')
+    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_record'])
+  })
+
   it("adopts the first device_id cached for the bank, whatever it was handed, and is told of a damaged record written over", async () => {
     const world = makeBankWorld()
     const first = world.bankOn({ device_id: 'device-first' })
