@@ -1,6 +1,7 @@
 import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
 import { type Outcome, outcomeOf } from '../outcome'
+import { oneAtATime } from '../one-at-a-time'
 import { stableJsonify } from '../stable-jsonify'
 import { lockedError, partialLoadError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
@@ -53,6 +54,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   readonly #horizonMillis: number
   /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
   #refreshedAt: number | null = null
+  /** The fetch under way, which every `fetch` made meanwhile joins, resolving whether storage held a record. */
+  readonly #oneFetchAtATime = oneAtATime(async () => (await this.listing.fetch(this.scope, { ifAbsent: 'nil' })) !== null)
   readonly #listeners = new Set<() => void>()
   /** Whether the listing's watch should push full records for this thing: true until set otherwise. */
   #watchable = true
@@ -220,9 +223,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
 
-  /** Get the record storage holds, through the listing, which delivers it to `receive`. Where nothing is stored, or a tombstone, `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent. */
+  /** Get the record storage holds, through the listing, which delivers it to `receive`: one fetch at a time, a call made while one is under way joining it and settling as it settles. Where nothing is stored, or a tombstone, `opts.ifAbsent` says, for each call, joined or not: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
-    await this.listing.fetch(this.scope, opts)
+    const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
+    await this.listing.ensureTimelyWorld(maxWorldMillis)
+    const isStored = await this.#oneFetchAtATime()
+    if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
     return this
   }
 

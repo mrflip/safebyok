@@ -121,23 +121,33 @@ describe("storable.hydrate(opts): the world first", () => {
     await expect(box.hydrate()).rejects.toThrow(/could not be fetched/)
     expect(held.mw.callsOf('get')).to.deep.equal([])
   })
-
-  it("joins nothing: each call that finds the record untimely makes a get of its own, landing on the one instance", async () => {
-    const { listing, box } = await timelyBoxOf(1000)
-    held.mw.setNow(T0 + 1000)
-    await Promise.all([box.hydrate(), box.hydrate()])
-    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
-    expect(listing.things).to.deep.equal([box])
-  })
 })
 
-describe("storable.fetch(opts)", () => {
-  it("makes a get of its own each time, whatever is under way", async () => {
+describe("storable.fetch(opts): one fetch at a time", () => {
+  it("joins the fetch under way: overlapping calls make one get and share its answer", async () => {
     const { box } = await timelyBoxOf(1000)
-    await Promise.all([box.fetch(), box.fetch()])
-    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
+    const hold = holdOf()
+    const { scope } = box
+    held.mw.willGet(async () => {
+      await hold.promise
+      return held.mw.answerOf(scope, held.mw.fullBoxRecord())
+    })
+    const first = box.fetch()
+    await vi.advanceTimersByTimeAsync(0)
+    const second = box.fetch()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    hold.open()
+    expect(await Promise.all([first, second])).to.deep.equal([box, box])
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
   })
 
+  it("starts a fetch of its own once the one under way has ended", async () => {
+    const { box } = await timelyBoxOf(1000)
+    await box.fetch()
+    await box.fetch()
+    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
+  })
 })
 
 describe("storable.hydrate(opts): after a failed fetch", () => {
