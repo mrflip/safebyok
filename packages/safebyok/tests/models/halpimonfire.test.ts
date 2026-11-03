@@ -44,7 +44,7 @@ describe("A lock that lands while an unlock proves", () => {
     }
     await vault.ensureUnlocked(lockingAnswer)
     expect(vault.isUnlocked).to.be.true
-    expect(deviceDB.tryPutLease).toHaveBeenCalledTimes(2)
+    expect(deviceDB.tryCache).toHaveBeenCalledTimes(2)
     vault.lock()
     expect(vault.isUnlocked).to.be.false
   })

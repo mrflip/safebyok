@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
 import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
-import { Dna, Passphrase, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, makeVaultWorld, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 const held = useModelsWorld()
 useVaultWorlds()
@@ -52,22 +52,6 @@ describe("the tombstone's registered_at", () => {
 })
 // --
 
-// == [Locking]: a lease handed out before lock()
-
-describe("a lease a caller holds across lock()", () => {
-  it("README.md:616, 'The key is dropped at once, and every call that needs it throws kind vault_locked': the vault reads locked at once, but a Lease taken from it before lock() seals until the forget lock() queued lands", async () => {
-    const { listing } = makeVaultWorld()
-    const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
-    const lease = vault.demandLease()
-    vault.lock()
-    expect(vault.isLocked).to.be.true
-    expect(lease.isInForce).to.be.true
-    const sealed = await lease.sealWith(new TextEncoder().encode('sk-test'), { boxlabel: 'b' }, { revision_seq: 1 })
-    expect(sealed.box_key_wrapped).to.be.ok
-  })
-})
-// --
-
 // == [Changing the gate]: the passkey stays, other devices stay unlocked, no strength check
 
 const NewPassphrase = 'a new passphrase for the vault'
@@ -106,7 +90,7 @@ describe("the gate changes the vault sends", () => {
     await theirs.fetch()
     expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
     expect(theirs.isUnlocked).to.be.true
-    expect(theirs.demandLease().isInForce).to.be.true
+    expect(await vaultRoundTrip(theirs, theirs)).to.eq('sk-test')
   })
 
   it("README.md:853, 'each change_passphrase sets -- is put to the vault's strengthChecker first': a one-letter new passphrase is set, as the world carries no checker", async () => {

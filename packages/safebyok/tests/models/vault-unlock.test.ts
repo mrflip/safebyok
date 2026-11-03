@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { LOCKED } from '../../src/models/models-shapes'
@@ -6,7 +6,7 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, roundTrip, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -15,13 +15,22 @@ const deriveNothing = (): never => { throw new Error('derived') }
 
 const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
+/** Node has no `reportError`, so a test hands the platform one. */
+const stubReportError = () => {
+  const reported = vi.fn()
+  vi.stubGlobal('reportError', reported)
+  return reported
+}
+
+afterEach(() => { vi.unstubAllGlobals() })
+
 describe("Gate.attemptProof: the proving of a stored wayin that the proof opens", () => {
   it("answers the passphrase proving of the gate, which holds the vaultKey the vault was born under", async () => {
     const { vault, opts: { world } } = await makeBornVault()
     const proving = await vault.gate.attemptProof(() => ({ passphrase: Passphrase }), world)
     expect(proving.wayinkind).to.eq('passphrase')
     const lease = await proving.buildLease(vault.leaseFriend())
-    expect(await roundTrip(vault.demandLease(), lease)).to.eq('sk-test')
+    expect(await roundTrip(vault, lease)).to.eq('sk-test')
     lease.evict()
   })
 
@@ -41,7 +50,7 @@ describe("Gate.attemptProof: the proving of a stored wayin that the proof opens"
     const proving = await vault.gate.attemptProof(async () => ({ passkeyAnswer: await TH.passkeyOf('laptop') }), world)
     expect(proving.wayinkind).to.eq('passkey')
     const lease = await proving.buildLease(vault.leaseFriend())
-    expect(await roundTrip(vault.demandLease(), lease)).to.eq('sk-test')
+    expect(await roundTrip(vault, lease)).to.eq('sk-test')
     lease.evict()
     await TH.expectRefusal(vault.gate.attemptProof(async () => ({ passkeyAnswer: await TH.passkeyOf('phone') }), world), 'wrong_passkey')
     const { prf_salt_b64: otherSalt } = await TH.passkeyOf('elsewhere')
@@ -73,7 +82,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.isUnlocked).to.be.true
     expect(vault.lockState()).to.eq('unlocked')
     expect(deviceDB.tryCache).toHaveBeenCalledOnce()
-    expect(deviceDB.keptNow()).to.deep.include({ gate_epoch: vault.gate.gate_epoch, wayinkind: 'passphrase' })
+    expect(deviceDB.cachedNow()).to.deep.include({ gate_epoch: vault.gate.gate_epoch, wayinkind: 'passphrase' })
     expect(await vault.ensureUnlocked()).to.equal(vault)
     expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
   })
@@ -92,7 +101,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.lockState()).to.eq('locked')
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'vault_locked')
     await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'vault_locked')
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
     await TH.expectRefusal(vault.ensureUnlocked(byPassphrase('not the passphrase')), 'wrong_passphrase')
     expect(vault.isLocked).to.be.true
@@ -101,7 +110,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
     expect(deviceDB.tryVacate).toHaveBeenCalledOnce()
     expect(deviceDB.tryCache).toHaveBeenCalledTimes(2)
-    expect(deviceDB.keptNow()).not.to.be.null
+    expect(deviceDB.cachedNow()).not.to.be.null
   })
 
   it("tells listeners the lock moved, as the snapshot shows it", async () => {
@@ -132,8 +141,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const sealing = vault.sealStampedString('sk-test', Stamp)
     const unsealing = vault.unsealStampedString(sealed, Stamp)
     vault.lock()
-    await TH.expectRefusal(sealing, 'vault_locked')
-    await TH.expectRefusal(unsealing, 'vault_locked')
+    await Promise.all([TH.expectRefusal(sealing, 'vault_locked'), TH.expectRefusal(unsealing, 'vault_locked')])
   })
 
   it("seals nothing another vault opens: the vaultKey and the vault's stamp are bound in", async () => {
@@ -159,7 +167,7 @@ describe("lease.attach: the one way a vault comes to hold a lease", () => {
     expect(first.isForgotten).to.be.true
     expect(second.isInForce).to.be.true
     expect(vault.isUnlocked).to.be.true
-    expect(deviceDB.keptNow()).to.deep.include({ proved_at: second.proved_at })
+    expect(deviceDB.cachedNow()).to.deep.include({ proved_at: second.proved_at })
   })
 
   it("refuses 'bad_option' a lease built on another Vault object of the same stamp, and leaves its row", async () => {
@@ -185,11 +193,11 @@ describe("lease.attach: the one way a vault comes to hold a lease", () => {
     const { vault, deviceDB } = born
     const lease = await makeFreshLease(born)
     vault.sweep()
-    expect(deviceDB.keptNow()).not.to.be.null
-    await TH.expectRefusal(lease.attach(), 'bad_option')
+    expect(deviceDB.cachedNow()).not.to.be.null
+    await TH.expectRefusal(lease.attach(), 'disabled')
     expect(lease.isForgotten).to.be.true
     expect(vault.isLocked).to.be.true
-    expect(deviceDB.keptNow()).to.be.null
+    expect(deviceDB.cachedNow()).to.be.null
     expect(deviceDB.tryCache).toHaveBeenCalledOnce()
   })
 
@@ -233,12 +241,12 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const { vault, demandStored, anotherSession, deviceDB } = await makeBornVault()
     vault.lock()
     await vault.ensureUnlocked(byPassphrase(Passphrase))
-    const stale = deviceDB.keptNow()
+    const stale = deviceDB.cachedNow()
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
-    deviceDB.keep(stale)
+    deviceDB.layCached(stale)
     const again = await anotherSession().build(demandStored())
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
-    expect(deviceDB.keptNow()).to.be.null
+    expect(deviceDB.cachedNow()).to.be.null
     await again.ensureUnlocked(byPassphrase(NewPassphrase))
     expect(again.isUnlocked).to.be.true
   })
@@ -251,10 +259,10 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     await vault.revokePasskey(byPassphrase(Passphrase))
     other.storeBehindOurBack(demandStored())
     const again = await other.anotherSession().build(other.demandStored())
-    expect(other.deviceDB.keptNow()).not.to.be.null
+    expect(other.deviceDB.cachedNow()).not.to.be.null
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
     expect(again.gate.pkWayin).to.be.null
-    expect(other.deviceDB.keptNow()).to.be.null
+    expect(other.deviceDB.cachedNow()).to.be.null
   })
 
   it("makes no check of a cached lease's age: taken up however long ago it was proved", async () => {
@@ -267,21 +275,21 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
 
   it("locks the vault where a cached lease will not open at its first seal: 'damaged_lease', and the row erased", async () => {
     const { demandStored, anotherSession, deviceDB } = await makeBornVault()
-    const kept = deviceDB.keptNow() as Record<string, unknown>
-    deviceDB.keep({ ...kept, lease_key: await makeLeaseKey() })
+    const cached = deviceDB.cachedNow() as Record<string, unknown>
+    deviceDB.layCached({ ...cached, lease_key: await makeLeaseKey() })
     const again = await anotherSession().build(demandStored())
     await again.ensureUnlocked()
     await TH.expectRefusal(again.sealStampedString('sk-test', Stamp), 'damaged_lease')
     expect(again.isLocked).to.be.true
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(deviceDB.tryVacate).toHaveBeenCalledOnce()
   })
 
   it("tells a row that is no lease as bad news and asks for the proof, leaving it to be cached over", async () => {
     const onBadNews = vi.fn()
     const { opts, demandStored, deviceDB } = await makeBornVault()
-    const kept = deviceDB.keptNow() as Record<string, unknown>
-    deviceDB.keep({ ...kept, lease_key: 'no key at all' })
+    const cached = deviceDB.cachedNow() as Record<string, unknown>
+    deviceDB.layCached({ ...cached, lease_key: 'no key at all' })
     const listing = new VaultListing({ ...opts, onBadNews })
     const again = await listing.build(demandStored())
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
@@ -295,7 +303,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const { vault, demandStored, anotherSession, deviceDB } = await makeBornVault()
     const record = demandStored()
     vault.lock()
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     const again = await anotherSession().build(record)
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
     await vault.ensureUnlocked(byPassphrase(Passphrase))
@@ -309,9 +317,72 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const idle = await anotherSession().build(record)
     expect(idle.isLocked).to.be.true
     idle.lock()
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     const again = await anotherSession().build(record)
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+  })
+})
+
+describe("A lease renewed through a gate change", () => {
+  it("renewed: a lease held is attached under the epoch that landed, its row cached, and the vault never reads locked on the way", async () => {
+    const { vault, deviceDB, demandStored } = await makeBornVault()
+    const sealed = await vault.sealStampedString('sk-test', Stamp)
+    const epoch0 = vault.gate.gate_epoch
+    vault.becomeNotifiable()
+    const states: string[] = []
+    vault.subscribe(() => { states.push(vault.lockState()) })
+    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    expect(vault.isUnlocked).to.be.true
+    expect(states).to.not.include('locked')
+    expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
+    expect(deviceDB.cachedNow()).to.deep.include({ gate_epoch: epoch0 + 1 })
+    expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
+  })
+
+  it("was locked: a vault locked at the start lands the change and stays locked, caching no row", async () => {
+    const { vault, deviceDB, demandStored } = await makeBornVault()
+    const epoch0 = vault.gate.gate_epoch
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    deviceDB.tryCache.mockClear()
+    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    expect(vault.isLocked).to.be.true
+    expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
+    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.cachedNow()).to.be.null
+  })
+
+  const expectLockWon = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
+    expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
+    expect(vault.isLocked).to.be.true
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+  }
+
+  it("lock crossed: a lock() during the proof wins: the change lands, the new lease goes unattached, and no row stands", async () => {
+    const born = await makeBornVault()
+    const { vault } = born
+    const epoch0 = vault.gate.gate_epoch
+    const lockingProof = () => {
+      vault.lock()
+      return { passphrase: Passphrase }
+    }
+    await vault.replacePassphrase(lockingProof, byPassphrase(NewPassphrase))
+    await expectLockWon(born, epoch0)
+  })
+
+  it("lock crossed: a lock() as the put lands wins too", async () => {
+    const born = await makeBornVault()
+    const { vault, opts: { vaultDB } } = born
+    const epoch0 = vault.gate.gate_epoch
+    const put = vaultDB.tryPutVault.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryPutVault').mockImplementationOnce(async (...args) => {
+      const landed = await put(...args)
+      vault.lock()
+      return landed
+    })
+    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await expectLockWon(born, epoch0)
   })
 })
 
@@ -319,7 +390,7 @@ describe("A refused erase of the row: the panic", () => {
   const Refusal = new VaultError('storage_blocked', 'the disk is full')
 
   it("hears the host's onPanic, leaving the vault locked and enabled; a rejection of it goes to the platform and no further", async () => {
-    const reported = vi.spyOn(globalThis, 'reportError').mockImplementation(() => undefined)
+    const reported = stubReportError()
     const onPanic = vi.fn(() => Promise.reject(new Error('the host panicked')))
     const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onPanic })
     deviceDB.tryVacate.mockResolvedValueOnce(TH.bad(Refusal))
@@ -328,11 +399,19 @@ describe("A refused erase of the row: the panic", () => {
     await TH.eventually(() => reported.mock.calls.length === 1)
     expect(onPanic).toHaveBeenCalledWith(Refusal)
     expect(vault.isDisabled).to.be.false
-    expect(deviceDB.keptNow()).not.to.be.null
+    expect(deviceDB.cachedNow()).not.to.be.null
+  })
+
+  it("with no onPanic, on a platform with no reportError, still vacates the vault", async () => {
+    const { vault, deviceDB } = await makeBornVault()
+    deviceDB.tryVacate.mockResolvedValue(TH.bad(Refusal))
+    vault.lock()
+    await TH.eventually(() => vault.isDisabled)
+    expect(deviceDB.tryVacate).toHaveBeenCalledTimes(2)
   })
 
   it("with no onPanic reports it and vacates the vault; the vacate's own refusal finds that done", async () => {
-    const reported = vi.spyOn(globalThis, 'reportError').mockImplementation(() => undefined)
+    const reported = stubReportError()
     const { vault, listing, deviceDB } = await makeBornVault()
     deviceDB.tryVacate.mockResolvedValue(TH.bad(Refusal))
     vault.lock()
@@ -368,7 +447,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(listing.at(vault.scope)).to.be.null
     expect(boxListing.at(box.scope)).to.be.null
     expect(box.whisper).to.equal(LOCKED)
-    expect(deviceDB.keptNow()).not.to.be.null
+    expect(deviceDB.cachedNow()).not.to.be.null
     expect(deviceDB.tryVacate).not.toHaveBeenCalled()
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
@@ -380,19 +459,19 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(vault.isLocked).to.be.true
     expect(box.isDisabled).to.be.true
     expect(listing.at(vault.scope)).to.be.null
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(demandStored()).to.eq(stored)
   })
 
   it("past a discard every guard refuses, what would take a call refuses, and lock, sweep and vacate are no-ops", async () => {
     const { vault, box, deviceDB } = await makeVaultWithBox()
     vault.sweep()
-    TH.expectSyncRefusal(() => vault.demandEnabled(), 'bad_option')
-    TH.expectSyncRefusal(() => vault.demandPresent(), 'bad_option')
-    TH.expectSyncRefusal(() => box.demandUnlocked(), 'bad_option')
-    await TH.expectRefusal(vault.ensureUnlocked(byPassphrase(Passphrase)), 'bad_option')
-    await TH.expectRefusal(vault.fetch(), 'bad_option')
-    await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'bad_option')
+    TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandPresent(), 'disabled')
+    TH.expectSyncRefusal(() => box.demandUnlocked(), 'disabled')
+    await TH.expectRefusal(vault.ensureUnlocked(byPassphrase(Passphrase)), 'disabled')
+    await TH.expectRefusal(vault.fetch(), 'disabled')
+    await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'disabled')
     expect(vault.lock().sweep().vacate()).to.equal(vault)
     expect(box.lock().sweep().vacate()).to.equal(box)
     expect(deviceDB.tryVacate).not.toHaveBeenCalled()
@@ -405,15 +484,15 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(listing.sweep()).to.equal(listing)
     expect(vault.isDisabled).to.be.true
     expect(listing.things).to.have.lengthOf(0)
-    await TH.expectRefusal(listing.hello(), 'bad_option')
-    await TH.expectRefusal(listing.fetch(vault.scope), 'bad_option')
-    await TH.expectRefusal(listing.build(record), 'bad_option')
+    await TH.expectRefusal(listing.hello(), 'disabled')
+    await TH.expectRefusal(listing.fetch(vault.scope), 'disabled')
+    await TH.expectRefusal(listing.build(record), 'disabled')
     expect(listing.vacate()).to.equal(listing)
     expect(listing.things).to.have.lengthOf(0)
   })
 
   it("a listener's throw at a discard goes to the platform, and the discard goes on", async () => {
-    const reported = vi.spyOn(globalThis, 'reportError').mockImplementation(() => undefined)
+    const reported = stubReportError()
     const { vault, listing } = await makeBornVault()
     vault.becomeNotifiable()
     const thrown = new Error('the listener threw')

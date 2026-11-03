@@ -79,10 +79,10 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
     const proving = await makeProving(vault)
-    deviceDB.tryPutLease.mockClear()
+    deviceDB.tryCache.mockClear()
     const lease = await proving.buildLease(vault.leaseFriend())
     expect(lease.isInForce).to.be.true
-    expect(deviceDB.tryPutLease).not.toHaveBeenCalled()
+    expect(deviceDB.tryCache).not.toHaveBeenCalled()
     lease.evict()
   })
 
@@ -90,9 +90,9 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
-    deviceDB.tryPutLease.mockClear()
+    deviceDB.tryCache.mockClear()
     await TH.expectRefusal(proving.buildLease(vault.leaseFriend()), 'bad_option')
-    expect(deviceDB.tryPutLease).not.toHaveBeenCalled()
+    expect(deviceDB.tryCache).not.toHaveBeenCalled()
   })
 })
 
@@ -103,8 +103,9 @@ describe("vault.leaseFriend()", () => {
     const friend = vault.leaseFriend()
     await friend.peekLease()
     await friend.tryUncacheLease()
-    expect(deviceDB.tryGetLease).toHaveBeenCalledWith(vault.scope)
-    expect(deviceDB.tryDelLease).toHaveBeenCalledWith(vault.scope)
+    const asked = { ...vault.scope, vault_tok: vault.vault_tok }
+    expect(deviceDB.peek).toHaveBeenCalledWith(asked)
+    expect(deviceDB.tryVacate).toHaveBeenCalledWith(asked)
   })
 })
 
