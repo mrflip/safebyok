@@ -1,6 +1,6 @@
 # Thread 6: store_switch (2026-11-03)
 
-Branch `20261103-store_switch`, PR: see the branch; stacked on #450. Justify: **red, by design of the stopping point.** `src/` typechecks and lints; `tests/storage` passes (52). `tests/test-helpers/models-world.ts`, `vault-world.ts` and the tests over them still speak of the `Store` that is gone (49 type errors, listed below). Stopped under the handoff's rule: two compactions before a first green means commit, write this file, report `blocked`.
+Branch `20261103-store_switch`, PR #454, stacked on #450. Justify: **red, by design of the stopping point.** `src/` typechecks and lints; `tests/storage` passes (52). `tests/test-helpers/models-world.ts`, `vault-world.ts` and the tests over them still speak of the `Store` that is gone (49 type errors, listed below). So the rewritten `src/models/` typechecks but **has never run**: expect the test rework to find bugs in it, not only in the tests. Stopped under the handoff's rule: two compactions before a first green means commit, write this file, report `blocked`.
 
 * **Built** (all in `packages/safebyok/src/`):
   * `storage/vault-db-shapes.ts` is the one place for the stored shapes. `models/models-shapes.ts` rewraps its schemas under `bad_record` through `Checkers` (`am, revision, times, vaulted, sparseBase, tombstone, boxRecord, boxSparse, vaultRecord, vaultSparse`, the wayin forms, `gateProps`) and re-exports its constants.
