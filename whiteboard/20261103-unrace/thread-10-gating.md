@@ -1,6 +1,6 @@
 # Thread 10: gating (2026-11-03)
 
-Branch `20261103-gating`, PR #458, stacked on #456. Justify: green (core 4653 passed, 37 skipped).
+Branch `20261103-gating`, PR #458, stacked on #457 (restacked 2026-11-03 onto thread 9, #457, from #456; conflicts in vault-listing.ts, halpimonfire.test.ts and vault-life.test.ts kept both sides, and vault-boxes.test.ts unlocks through unlockTyping). Justify: green (core 4716 passed, 37 skipped).
 
 * **Built**: `Gating.launch(kind, { listing, scope, vault, run })`, `attempt(clears)` answering an Outcome, `whenSettled`, `decline`, `declineAtLock`, `checkStrength`, `isOpen`, `passkeyHeader`, `toJSON`, for `build_vault` and `unlock_vault`. `vaultListing.buildVault(scope)`, `tryBuildVault`, `#runBirth`, and the one gating open: `openGating`, `holdGating`, `releaseGating`, `declineGatingAtLock`. `vault.ensureUnlocked()` launches, `#unlockByProof` is its `run`. `tests/models/gating.test.ts` drives real provings against the in-memory stores: 31 rows.
 * **Rework after review**, both shown by a row in `tests/models/gating.test.ts`, and each row red without the fix:
