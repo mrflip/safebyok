@@ -54,7 +54,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     Object.freeze(this)
   }
 
-  /** The strengthChecker's verdict. What it throws is replaced, as it heard the passphrase ('unexpected_error'); an answer that is no verdict refuses 'bad_option'. */
+  /** The strengthChecker's verdict. What it throws is replaced, as it heard the passphrase. */
   static async checkStrength(passphraseClear: VX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<VX.PassphraseVerdict> {
     strengthArgs.parse({ passphraseClear, scope, world })
     const verdict = await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope)
@@ -62,7 +62,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return verdict.data
   }
 
-  /** The wayin this proving holds, made under a vaultKey new (`NOVEL`) or held by the `source` proving of the same vault. A proving holds one wayin: one that holds one already refuses. */
+  /** The wayin this proving holds, made under a vaultKey new (`NOVEL`) or held by the `source` proving of the same vault. A proving holds one wayin. */
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
@@ -79,7 +79,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return Lease.grant(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
   }
 
-  /** Unwrap the stored wayin's vaultKey and drop it, or refuse as `wrongProof`: the ctx is built before the catch, so a refusal means only that the key did not open the wrap (guarantees.md, G3). */
+  /** Unwrap the stored wayin's vaultKey and drop it, to learn that the key opens the wrap (guarantees.md, G3). */
   protected async checkOpens(wrongProof: () => VaultError): Promise<void> {
     const { vault_key_wayin_wrapped } = this.#demandWayin()
     const ctx = this.#wayinCtx()
@@ -110,7 +110,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 // == [PassphraseProving]: buildNovel, buildStored
 
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
-  /** A proving for a new wayin, of the first gate's epoch. A passphrase the world's strengthChecker finds weak refuses 'weak_passphrase', with its reason. */
+  /** A proving for a new wayin, of the first gate's epoch. */
   static async buildNovel(stamp: VaultStamp, passphraseClear: VX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { stamp: checked, passphraseClear: typed } = passphraseNovelArgs.parse({ stamp, passphraseClear, world })
     const verdict = await super.checkStrength(typed, vaultScope.parse(checked), world)
@@ -120,7 +120,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     return new PassphraseProving(checked, FirstGateEpoch, header, passphraseKey)
   }
 
-  /** The proving of `gate`'s passphrase wayin, proved against the gate in hand: one made under another key deriver refuses 'unknown_key_deriver', and a passphrase that does not open it 'wrong_passphrase'. */
+  /** The proving of `gate`'s passphrase wayin, proved against the gate in hand. */
   static async buildStored(gate: StampedGate, passphraseClear: VX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { gate: { stamp, gate_epoch, passphrase_wayin }, passphraseClear: typed } = passphraseStoredArgs.parse({ gate, passphraseClear, world })
     const { vault_key_wayin_wrapped: _wrapped, ...header } = passphrase_wayin
@@ -144,7 +144,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
     return new PasskeyProving(checked, FirstGateEpoch, header, passkeyKey)
   }
 
-  /** The proving of `gate`'s passkey wayin, proved against the gate in hand: a gate with none refuses 'absent_wayin', and an answer of another credential or salt, or one that does not open it, 'wrong_passkey'. */
+  /** The proving of `gate`'s passkey wayin, proved against the gate in hand. */
   static async buildStored(gate: StampedGate, passkeyClear: VX.PasskeyAnswer): Promise<PasskeyProving> {
     const { gate: { stamp, gate_epoch, passkey_wayin }, passkeyClear: { credential_id, prf_salt_b64, prfBytes } } = passkeyStoredArgs.parse({ gate, passkeyClear })
     if (passkey_wayin === null) { throw noPasskeyWayin() }

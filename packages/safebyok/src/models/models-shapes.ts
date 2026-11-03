@@ -44,7 +44,7 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } =
   tombstone:  VS.sparseBase.extend({ am: oneof(tombstoneAmVals) }),
 }))
 
-/** The check of the revision `listing.put` lays a record over, refusing 'bad_option': a revision, or null for no record. */
+/** The check of the revision `listing.put` lays a record over: a revision, or null for no record. */
 export const putAnte = Checker(() => revision.nullable(), 'bad_option')
 
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
@@ -92,7 +92,7 @@ export const ageVals = ['older', 'same', 'newer'] as const
 /** Every policy `reconcileCentral` may choose: `older` and `same` end the receive with central as it was; `fill` takes the record over the one in hand; `adopt` takes the one received; `gone` takes it as deleted. */
 export const centralPolicyVals = ['older', 'same', 'fill', 'adopt', 'gone'] as const
 
-/** The checks of what reconciling passes, each refusing 'unexpected_error': the kinds above, each by its list; `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
+/** The checks of what reconciling passes: the kinds above, each by its list; `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
 export const { recordShape, age, centralPolicy, reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
   recordShape:   oneof(recordShapeVals),
   age:           oneof(ageVals),
@@ -165,7 +165,7 @@ export type BoxPatchGiven = Z.output<typeof boxPatch>
 /** What `vault.putBox` is told, as {@link boxPut} hands it back: a {@link BoxPatchGiven} under its `boxlabel`. */
 export type BoxPutGiven = Z.output<typeof boxPut>
 
-/** The check of what a vault's get lists of its boxes, refusing 'bad_record': `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check, whose boxlabel is whatever storage has it under. */
+/** The check of what a vault's get lists of its boxes: `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check, whose boxlabel is whatever storage has it under. */
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
   const damaged = boxSparse.extend({ boxlabel: str }).and(obj({ damagekind: oneof(VS.damagekindVals) }))
   return { boxes: arr(boxSparse), damaged_records: arr(damaged) }
@@ -174,7 +174,7 @@ export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
 /** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */
 export type BoxesListed = Z.output<typeof boxesListed>
 
-/** The check of a boxlabel a box verb is handed, refusing 'bad_option'. */
+/** The check of a boxlabel a box verb is handed. */
 export const boxlabelArg = Checker(({ boxlabel }) => boxlabel, 'bad_option')
 // --
 
@@ -247,10 +247,10 @@ export const isListing = (val: unknown): val is { [IsListing]: true } => (
   typeof val === 'object' && val !== null && (val as { [IsListing]?: unknown })[IsListing] === true
 )
 
-/** The check of whether the world a listing lives in is unlocked or locked: one of {@link lockStateVals}. Its `parse` refuses 'unexpected_error', as a world that answers otherwise is a bug. */
+/** The check of whether the world a listing lives in is unlocked or locked: one of {@link lockStateVals}. */
 export const lockState = Checker(({ oneof }) => oneof(lockStateVals), 'unexpected_error')
 
-/** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: the one `clock`. Its `parse` takes the clock from whatever carries it, strips the rest, and refuses 'bad_option'. */
+/** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: the one `clock`. */
 export const world = objCheck(() => ({ clock: HX.clockShape }), { refuseAs: 'bad_option', extras: 'strip' })
 
 /** Whether the world a listing lives in is unlocked or locked, as {@link lockState} checks it: one of {@link lockStateVals}. */
@@ -275,10 +275,10 @@ export type ListingOpts = {
   onBadNews?:            ((news: VaultError) => unknown) | undefined
 }
 
-/** The check of a vaultDB as a model is handed one: the verbs the listings call. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a vaultDB as a model is handed one: the verbs the listings call. Checks only. */
 export const vaultDBDuck = Checker(({ obj, fn }) => obj({ tryGetVault: fn(), tryPutVault: fn(), tryDelVault: fn(), tryGetBox: fn(), tryPutBox: fn(), tryDelBox: fn(), watch: fn() }), 'bad_option')
 
-/** The check of a listing's constructor arguments, as far as the base can tell. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a listing's constructor arguments, as far as the base can tell. Checks only. */
 export const listingOpts = objCheck(({ obj, fn }) => ({
   world:                 obj({ clock: HX.clockShape, lockState: fn(), ensureTimely: fn(), takeWorld: fn() }),
   vaultDB:               vaultDBDuck,
@@ -286,12 +286,12 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
   onBadNews:             fn().optional(),
 }), 'bad_option')
 
-/** The check of what `listing.put` is told of a live record storage may hold, refusing 'bad_option': `ifPresent`, `repl` where left out. */
+/** The check of what `listing.put` is told of a live record storage may hold: `ifPresent`, `repl` where left out. */
 export const putListingOpts = objCheck(() => ({ ifPresent: ifPresent.optional() }), 'bad_option')
 
 export type PutListingOpts = Z.infer<typeof putListingOpts>
 
-/** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers the seal verbs. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers the seal verbs. Checks only. */
 export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
   world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, sealStampedString: fn(), unsealStampedString: fn() }),
 }), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
@@ -299,7 +299,7 @@ export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel
 
 // == [Making a storable]: storableArgs
 
-/** The check of a storable's constructor arguments, as far as the base can tell. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a storable's constructor arguments, as far as the base can tell. Checks only. */
 export const storableArgs = objCheck(({ custom }) => ({
   world,
   listing: custom<object>(isListing, Phrases.ListingExpected),
@@ -310,7 +310,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // == [The vault's stamp]: vaultStamp, VaultStamp
 
-/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, strips the rest, and refuses 'bad_option'. */
+/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, and strips the rest. */
 export const vaultStamp = objCheck(({ applabel, user_id, vaultlabel, vault_tok, epochMillis }) => ({
   applabel,
   user_id,
@@ -471,7 +471,7 @@ export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseS
 /** A deviceDB, as far as a duck can tell: the verbs a vault's lease friend binds. */
 export const deviceDBDuck = Checker(({ obj, fn }) => obj({ peek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
 
-/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn, int, lit, union }) => ({
   world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: union([int.positive(), lit(Infinity)]).optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn().optional() }),
 }), { refuseAs: 'bad_option', extras: 'strip' })

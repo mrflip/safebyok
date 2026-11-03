@@ -1,4 +1,4 @@
-/** What the deviceDB stores and takes, and their checkers, imported as `DS`. A scope or query refuses 'bad_scope'; a row or record, 'bad_record'; a cutoff, 'bad_option'. */
+/** What the deviceDB stores and takes, and their checkers, imported as `DS`. */
 
 import type * as Z from 'zod'
 import { Checker, Checkers } from '../checks/validator'

@@ -109,7 +109,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#remakeSnapshot()
   }
 
-  /** Refuses past a sweep or a vacate. */
+  /** Demands that this listing be enabled: not past a sweep or a vacate. */
   demandEnabled(): this {
     if (this.#isDisabled) { throw disabledError() }
     return this
@@ -118,21 +118,21 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Listing verbs]: at, things, build, demandNotHeld
 
-  /** The instance held under `scope`, or null. Calls nothing. A scope that fails {@link scopeOf} refuses as it does. */
+  /** The instance held under `scope`, or null. Calls nothing. */
   at(scope: ScopeT): ThingT | null {
     return this.#things.get(this.scopepathOf(this.scopeOf(scope))) ?? null
   }
 
   get things(): readonly ThingT[] { return [...this.#things.values()] }
 
-  /** The instance of `record`, sparse, full or a tombstone, once it is delivered as a fetch's answer would be, and held; a thing already held under its scope receives it, and a refusal its `receive` throws is thrown. Stores nothing. */
+  /** The instance of `record`, sparse, full or a tombstone, once it is delivered as a fetch's answer would be, and held; a thing already held under its scope receives it. Stores nothing. */
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     this.demandEnabled()
     this.sparseOf(record)
     return this.#buildOrReceive(this.scopeOf(record), record)
   }
 
-  /** Refuses 'bad_option' a birth under a `scope` already held. A box's `send` brings one deleted back to life. */
+  /** Demands that no instance be held under `scope`, for a birth. A box's `send` brings one deleted back to life. */
   protected demandNotHeld(scope: ScopeT): void {
     this.demandEnabled()
     if (this.at(scope) !== null) { throw alreadyHeldError() }
@@ -231,7 +231,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return thing
   }
 
-  /** Refuse 'bad_record' a `record` whose scope is not `scope`, the one the answer that carries it names. */
+  /** Demands a `record` whose scope is `scope`, the one the answer that carries it names. */
   #demandRecordOfScope(record: Fetched<RecordT, SparseT>, scope: ScopeT): void {
     if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw new VaultError('bad_record', Phrases.RecordOfOtherScope) }
   }
@@ -347,11 +347,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null
   protected abstract scopepathOf(scope: ScopeT): string
-  /** The scope of `duck`, a record in any form or a thing ducking as one; refuses anything else. */
+  /** The scope of `duck`, a record in any form or a thing ducking as one. */
   abstract scopeOf(duck: unknown): ScopeT
-  /** The sparse form of `duck`, a record in any form or a thing ducking as one, as a plain copy with the payload left out; refuses anything else. */
+  /** The sparse form of `duck`, a record in any form or a thing ducking as one, as a plain copy with the payload left out. */
   abstract sparseOf(duck: unknown): SparseT
-  /** The full record `duck` is, as a plain copy; refuses a duck that is not full. */
+  /** The full record `duck` is, as a plain copy. */
   abstract recordOf(duck: unknown): RecordT
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError

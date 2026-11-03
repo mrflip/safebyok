@@ -15,7 +15,7 @@ import * as MSX from './models-shapes'
 
 // == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
 
-/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope and token, and its seal verbs, which refuse 'vault_locked' while the vault is locked. */
+/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope and token, and its seal verbs. */
 export type BoxWorld = ListingWorld & {
   scope:     VaultScope
   vault_tok: string
@@ -38,7 +38,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** The rows the vault's get set aside as damaged. */
   #damagedRecords: readonly DamagedBox[] = Object.freeze([])
 
-  /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check; each refuses 'bad_option'. */
+  /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check. */
   constructor(opts: BoxListingOpts) {
     MSX.boxListingOpts.parse(opts)
     super(opts)
@@ -90,7 +90,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   tryCreate(input: BoxDna, opts: PutListingOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
+  /** Demands that the vault be unlocked. */
   #demandUnlocked(): void { if (this.lockState() === 'locked') { throw lockedError() } }
   // --
 

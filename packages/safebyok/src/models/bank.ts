@@ -244,7 +244,7 @@ export class Bank implements VaultWorld {
     return { ...this.scope, vaultlabel }
   }
 
-  /** The vault listed for `bag`, a tombstone among them, or null. Refuses before ready. */
+  /** The vault listed for `bag`, a tombstone among them, or null. */
   vaultOf(bag: VaultBag): Vault | null {
     this.#demandReady()
     return this.#vaultListing.at(this.vaultScopeOf(bag))

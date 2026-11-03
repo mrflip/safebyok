@@ -112,7 +112,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** The vault by scope alone, whatever its life, with its sparse boxes and `damaged_records`. Over a void or gone row, `ifAbsent: 'nil'` answers null and 'fail' refuses `vault_empty` or `vault_gone`. */
+  /** The vault by scope alone, whatever its life, with its sparse boxes and `damaged_records`. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
   async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultListed | null, GotAct>> {
     return this.#call<VaultListed | null, GotAct, VaultRow>('getVault', { ...scope, ...opts }, async () => {
       const vaultScope = VS.vaultScope.parse(scope)
@@ -132,7 +132,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null and 'fail' refuses `absent_box`; a vault row of no such life refuses `vault_mismatch`, `vault_empty` or `vault_gone`. */
+  /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null. */
   async getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>> {
     return this.#call<BoxRecord | null, GotAct, VaultRow>('getBox', { ...asked, ...opts }, async () => {
       const boxQuery = VS.boxQuery.parse(asked)
@@ -163,7 +163,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Stores `record` under a vault live at its `vault_tok`, with the answers of {@link VaultDB.putVault}; a vault row of no such life refuses `vault_mismatch`, `vault_empty` or `vault_gone`, and an overweight box `box_too_large`. */
+  /** Stores `record` under a vault live at its `vault_tok`, with the answers of {@link VaultDB.putVault}. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
     return this.#call<BoxRow, PutAct, VaultRow>('putBox', { ...record, ...opts }, async () => {
       const boxRecord = VS.boxRecord.parse(record)
@@ -200,7 +200,7 @@ export abstract class VaultDB {
 
   // == [Gate verbs]: replacePassphrase, addPasskey, revokePasskey, tryReplacePassphrase, tryAddPasskey, tryRevokePasskey
 
-  /** Lays the new passphrase wayin on the row at this revision, moving `gate_epoch` and the revision up; `passkey_wayin` is left as stored. A moved row refuses `stale_write`. */
+  /** Lays the new passphrase wayin on the row at this revision, moving `gate_epoch` and the revision up; `passkey_wayin` is left as stored. */
   async replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>> {
     return this.#call<VaultRecord, 'replaced', VaultRow>('replacePassphrase', params, async () => {
       const { gate, ...ante } = VS.replacePassphraseParams.parse(params)
@@ -211,7 +211,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Lays a passkey wayin on a row holding none, as {@link VaultDB.replacePassphrase} does; a passkey held refuses `camped`. */
+  /** Lays a passkey wayin on a row holding none. */
   async addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>> {
     return this.#call<VaultRecord, 'added', VaultRow>('addPasskey', params, async () => {
       const { gate, ...ante } = VS.passkeyAddParams.parse(params)
@@ -223,7 +223,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Nulls the row's passkey wayin, as {@link VaultDB.replacePassphrase} does. A row holding none answers `revoked` as stored, nothing moved. */
+  /** Nulls the row's passkey wayin. A row holding none answers `revoked` as stored, nothing moved. */
   async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
     return this.#call<VaultRecord, 'revoked', VaultRow>('revokePasskey', params, async () => {
       const { gate, ...ante } = VS.revokePasskeyParams.parse(params)
@@ -369,7 +369,7 @@ const listedBoxesOf = (scope: VaultScope, vault_tok: string, rows: { boxlabel: s
   return listed
 }
 
-/** The vault row when it is live in this life; otherwise refuses `vault_mismatch` for a live row of another, `vault_gone` for this life's tombstone, and `vault_empty` for nothing of this life. */
+/** The vault row, where it is live in this life. */
 const checkedVaultLife = (stored: VaultRow | null, scope: VaultScope, vault_tok: string): VaultRecord => {
   if ((stored?.am === 'a') && (stored.vault_tok !== vault_tok)) { throw Refuse.vaultMismatch(stored) }
   if (stored?.vault_tok !== vault_tok) { throw Refuse.vaultEmpty(VS.sentinelVaultOf(scope, vault_tok)) }

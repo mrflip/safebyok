@@ -38,7 +38,7 @@ export class Gate {
     return new Gate(stamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passphraseWayin.pickle(), passkey_wayin: passkeyWayin?.pickle() ?? null })
   }
 
-  /** Refuses 'bad_option' where this gate holds a passkey: the one check before anyone is asked for one. */
+  /** Demands that this gate hold no passkey: the one check before anyone is asked for one. */
   demandPasskeyAddable(): void {
     if (this.pkWayin !== null) { throw passkeyHeldAlready() }
   }
