@@ -173,7 +173,7 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
 
   it("looks for no lease of a vault deleted, as it has no gate, and tells no bad news of it", async () => {
     const { gate: _gate, ...sparse } = await storedVaultRecord()
-    const tombstone = { ...sparse, am: 'd' as const }
+    const tombstone = { ...sparse, am: 'x' as const }
     const { opts, deviceDB } = makeVaultWorld(tombstone as never)
     const onBadNews = vi.fn()
     const listing = new VaultListing({ ...opts, onBadNews })

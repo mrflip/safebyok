@@ -4,7 +4,7 @@ import { afterEach, vi } from 'vitest'
 import type { VaultScope } from '../../src/shapes/scopes'
 import type { BoxWorld } from '../../src/models/box-listing'
 import type { Lease } from '../../src/models/lease'
-import type { GateProps, ProofClosure, VaultRecord } from '../../src/models/models-shapes'
+import type { ProofClosure, VaultRecord } from '../../src/models/models-shapes'
 import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
@@ -30,9 +30,6 @@ export const byPassphrase = (passphrase: string) => () => ({ passphrase })
 
 /** The proof closure of a user who touches the passkey `tag` names, its answer as `passkeyOf` makes it. */
 export const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await passkeyOf(tag) })
-
-/** The wayins of a stored gate, as `gate.pickle()` gives them: a `Gate` carries no `gate_epoch`. */
-export const wayinsOf = ({ passphrase_wayin, passkey_wayin }: GateProps): GateProps => ({ passphrase_wayin, passkey_wayin })
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000

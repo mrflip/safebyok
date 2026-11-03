@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as MSX from '../../src/models/models-shapes'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -47,8 +47,15 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(record)
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(record.gate))
+    expect(vault.gate.pickle()).to.deep.equal(record.gate)
     expect(vault.gate).to.equal(vault.gate)
+  })
+
+  it("ducks as its record, the gate_epoch riding on the Gate: listing.recordOf(vault) answers the record it holds", async () => {
+    const record = await storedVaultRecord()
+    const { listing } = makeVaultWorld(record)
+    const vault = await listing.build(record)
+    expect(listing.recordOf(vault)).to.deep.equal(record)
   })
 
   it("has no gate in hand while it holds a sparse record, and refuses 'bad_option' until it is hydrated", async () => {
@@ -57,7 +64,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const vault = await listing.build(listing.sparseOf(record))
     TH.expectSyncRefusal(() => vault.gate, 'bad_option')
     await vault.hydrate()
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(record.gate))
+    expect(vault.gate.pickle()).to.deep.equal(record.gate)
   })
 
   it("refuses 'bad_option' a world without what a vault's gate and lease need", () => {

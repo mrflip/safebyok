@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, roundTrip, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -13,7 +13,7 @@ describe("Vault.replacePassphrase", () => {
     const post = demandStored().gate
     expect(post.passphrase_wayin).not.to.deep.equal(ante.passphrase_wayin)
     expect(post.passkey_wayin).to.deep.equal(ante.passkey_wayin)
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(post))
+    expect(vault.gate.pickle()).to.deep.equal(post)
     await TH.expectRefusal(vault.gate.attemptProof(byPassphrase(Passphrase), world), 'wrong_passphrase')
     const byKey = await vault.gate.attemptProof(byPasskey('laptop'), world)
     expect(byKey.wayinkind).to.eq('passkey')

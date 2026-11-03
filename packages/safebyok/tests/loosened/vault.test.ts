@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { PrfSalt } from '../../src/shapes/fields'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, roundTrip, storedVaultRecord, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, roundTrip, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -20,7 +20,7 @@ describe("the ways in changing under a vault unlocked", () => {
     await theirs.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     const received = storeBehindOurBack(other.demandStored())
     vault.receive(received)
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(received.gate))
+    expect(vault.gate.pickle()).to.deep.equal(received.gate)
     expect(received.gate.passphrase_wayin).not.to.deep.equal(record.gate.passphrase_wayin)
     expect(vault.isUnlocked).to.be.true
     expect(vault.demandLease()).to.equal(held)
@@ -42,7 +42,7 @@ describe("an older copy of the vault record", () => {
     await later.hello()
     expect(restored.isLocked).to.be.true
     expect(restored.revision_seq).to.eq(ante.revision_seq)
-    expect(restored.gate.pickle()).to.deep.equal(wayinsOf(ante.gate))
+    expect(restored.gate.pickle()).to.deep.equal(ante.gate)
     await restored.ensureUnlocked(byPassphrase(Passphrase))
     expect(restored.isUnlocked).to.be.true
   })
