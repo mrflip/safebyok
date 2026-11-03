@@ -1,5 +1,6 @@
 /** A real gating, real provings, and the in-memory stores: `build_vault` and `unlock_vault` from the dialog's first sight of a gating to its settling. */
 
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import type { AnyGating, Gating } from '../../src/models/gating'
@@ -283,6 +284,30 @@ describe("gating.attempt", () => {
     expect(gating.isOpen).to.be.false
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
     expect(storedNow()).to.be.null
+  })
+
+  it("spends an answer from another realm, whose bytes are no instance of this realm's Uint8Array (G2)", async () => {
+    const { listing, gatingAt } = birthWorld()
+    const launched = listing.buildVault(Dna)
+    const gating = await gatingAt<'build_vault'>()
+    const prfBytes = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
+    expect(prfBytes).to.not.be.instanceOf(Uint8Array)
+    await TH.expectGood(gating.attempt({ passphraseClear, passkeyClear: { ...await TH.passkeyOf('laptop'), prfBytes } }))
+    await launched
+    expect(prfBytes.every((byte) => byte === 0)).to.be.true
+  })
+
+  it("replaces what a getter on the clears throws, so the passphrase it quotes appears nowhere in the refusal (G8)", async () => {
+    const { listing, gatingAt } = birthWorld()
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'unexpected_error')
+    const gating = await gatingAt<'build_vault'>()
+    const clears = { get passphraseClear(): string { throw new Error(Passphrase) } }
+    const err = await TH.expectBad(gating.attempt(clears), 'unexpected_error')
+    await launched
+    expect(err.cause).to.be.undefined
+    expect(err.message).to.not.include(Passphrase)
+    expect(err.stack).to.not.include(Passphrase)
+    expect(JSON.stringify(err)).to.not.include(Passphrase)
   })
 })
 

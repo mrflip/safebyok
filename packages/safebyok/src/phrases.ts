@@ -424,6 +424,8 @@ export const GatingSettled = "This prompt has ended -- it was answered, declined
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
+export const ClearsThrew = "Reading what was handed to this attempt threw, so nothing was tried. What it threw is left out, as it may quote the passphrase: hand attempt a plain object."
+
 export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: give Bank.make a requestCleartext."
 
 export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."

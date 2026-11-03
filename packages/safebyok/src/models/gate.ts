@@ -125,12 +125,12 @@ const invokeClosure = async (closure: AttemptClosure | PassphraseClosure | Passk
   }
 }
 
-/** Zero a passkey answer's PRF bytes wherever the closure's answer carries them, checked or not: an answer is single-use (G2). */
+/** Zero a passkey answer's PRF bytes wherever the closure's answer carries them, checked or not and of any realm: an answer is single-use (G2). */
 const spendAnswer = (handed: unknown): void => {
   // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the refusal or the proving it follows.
   try {
     const prfBytes: unknown = (handed as { passkeyAnswer?: { prfBytes?: unknown } | null } | null)?.passkeyAnswer?.prfBytes
-    if (prfBytes instanceof Uint8Array) { prfBytes.fill(0) }
+    if (ArrayBuffer.isView(prfBytes)) { new Uint8Array(prfBytes.buffer, prfBytes.byteOffset, prfBytes.byteLength).fill(0) }
   } catch { /* nothing left to spend */ }
 }
 // --
