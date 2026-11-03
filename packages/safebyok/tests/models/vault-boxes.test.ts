@@ -261,6 +261,25 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const delivered = await next.getBox(boxlabel)
     expect(await delivered?.extractWhisper()).to.deep.equal(Whisper)
   })
+
+  it("asks storage before refusing a sidecar alone: another session's box landed since hello takes the sidecar, the whisper kept", async () => {
+    const { boxrows, openNextSession } = await makeWorldWithBox()
+    const row = boxrows.get(boxlabel)
+    boxrows.delete(boxlabel)
+    const next = await openNextSession()
+    await next.hello()
+    boxrows.set(boxlabel, row)
+    const box = await next.putBox({ boxlabel, sidecar: { note: 'home' } })
+    expect(box.sidecar).to.deep.equal({ note: 'home' })
+    expect(await box.extractWhisper()).to.deep.equal(Whisper)
+  })
+
+  it("refuses a sidecar alone over a damaged row as 'damaged_record', not as no box stored", async () => {
+    const { boxrows, openNextSession } = await makeWorldWithRubble()
+    const next = await openNextSession()
+    await TH.expectRefusal(next.putBox({ boxlabel: 'rubble', sidecar: Sidecar }), 'damaged_record')
+    expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
+  })
 })
 
 describe("vault.putBox over a live box", () => {
