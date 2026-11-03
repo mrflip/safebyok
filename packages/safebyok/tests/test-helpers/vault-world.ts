@@ -29,24 +29,23 @@ export const Passphrase = 'correct horse battery staple'
 /** The passphrase a gate change sets in place of {@link Passphrase}. */
 export const NewPassphrase = 'a new passphrase for the vault'
 
-/** The proof closure of a user who types `passphrase`. */
-export const byPassphrase = (passphrase: string) => () => ({ passphrase })
+/** What a user who types `passphrase` hands the gating. */
+export const byPassphrase = (passphrase: string): Typed => ({ passphraseClear: passphrase })
 
-/** The proof closure of a user who touches the passkey `tag` names, its answer as `passkeyOf` makes it. */
-export const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await passkeyOf(tag) })
+/** What a user who touches the passkey `tag` names hands the gating, its answer as `passkeyOf` makes it. */
+export const byPasskey = async (tag: string): Promise<Typed> => ({ passkeyClear: await passkeyOf(tag) })
 
-/** What the user does at the dialog, in a proof closure's words: a passphrase, a passkey's answer, or both. */
-export type Typing = () => Promise<Typed> | Typed
+/** What the user hands a gating's attempt at the dialog, whatever its kind, or what is about to make it. */
+export type Typing = Typed | Promise<Typed>
 
-type Typed = { passphrase?: string, passkeyAnswer?: VX.PasskeyAnswer | null }
+type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: VX.PasskeyAnswer | null }
 
-/** What `ask` answers under a dialog shown once: it attempts what `typing` answers and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
+/** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
 const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
   const { requestCleartext: asBefore } = world
   let heard: Outcome<unknown> | null = null
   const dialog: RequestCleartext = async (gating) => {
-    const { passphrase, passkeyAnswer } = await typing()
-    heard = await gating.attempt({ ...(passphrase !== undefined && { passphraseClear: passphrase }), ...(passkeyAnswer && { passkeyClear: passkeyAnswer }) } as never)
+    heard = await gating.attempt(await typing as never)
   }
   world.requestCleartext = dialog
   try {
@@ -64,6 +63,18 @@ export const buildTyping = (listing: VaultListing, scope: VaultScope, typing: Ty
 
 /** `vault.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
 export const unlockTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.ensureUnlocked())
+
+/** `vault.replacePassphrase()`, the user typing the passphrase and the next at the dialog. */
+export const replaceTyping = (vault: Vault, ante: string, next: string): Promise<Vault> => askTyping(vault.world, { antePassphraseClear: ante, nextPassphraseClear: next }, () => vault.replacePassphrase())
+
+/** `vault.addPasskey()`, the user typing the passphrase and touching the passkey `tag` names at the dialog. */
+export const addPasskeyTyping = async (vault: Vault, passphrase: string, tag: string): Promise<Vault> => askTyping(vault.world, { passphraseClear: passphrase, passkeyClear: await passkeyOf(tag) }, () => vault.addPasskey())
+
+/** `vault.revokePasskey()`, the user typing `passphrase` at the dialog, should it be shown. */
+export const revokeTyping = (vault: Vault, passphrase: string): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.revokePasskey())
+
+/** `vault.delVault()`, the user typing `passphrase` at the dialog. */
+export const delTyping = (vault: Vault, passphrase: string = Passphrase): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.delVault())
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
@@ -163,8 +174,7 @@ export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), w
 
 /** A vault born as {@link makeBornVault} makes it, with the passkey of the `laptop` beside the passphrase. */
 export const makeBornVaultWithPasskey = async () => {
-  const passkeyAnswer = await passkeyOf('laptop')
-  return makeBornVault(() => ({ passphrase: Passphrase, passkeyAnswer }))
+  return makeBornVault({ passphraseClear: Passphrase, passkeyClear: await passkeyOf('laptop') })
 }
 
 const RoundTripStamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })

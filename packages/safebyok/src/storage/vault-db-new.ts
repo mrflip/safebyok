@@ -5,7 +5,7 @@ import { type BadOutcome, type GoodOutcome, outcomeOf } from '../outcome'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import * as Refuse from './vault-db-refusals'
 import * as VS from './vault-db-shapes'
-import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, IfPresent, PutOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
+import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, IfPresent, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
 
 // == [Answers]: AnswerFacts, GoodAnswer, BadAnswer, Answer, Said, BankListed, VaultListed, Tidied, Notice, answerOf
 
@@ -153,11 +153,11 @@ export abstract class VaultDB {
 
   // == [Puts]: putVault, putBox, tryPutVault, tryPutBox
 
-  /** Stores `record` when the row stands at `prior`: `born` over void, `reborn` over a tombstone, `replaced` over a live row. Over a live row, `ifPresent: 'fail'` refuses `camped` and 'get' answers it as `declined`; a row moved past `prior` refuses `stale_write`. */
-  async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
+  /** Stores `record` when the row stands at `prior`: `born` over void, `reborn` over a tombstone. Over a live row, `ifPresent: 'fail'`, the default, refuses `camped` and 'get' answers it as `declined`; a row moved past `prior` refuses `stale_write`. A live row moves only by a gate verb. */
+  async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     return this.#call<VaultRow, PutAct, VaultRow>('putVault', { ...record, ...opts }, async () => {
       const vaultRecord = VS.vaultRecord.parse(record)
-      const { prior, ifPresent } = VS.putOpts.parse(opts)
+      const { prior, ifPresent } = VS.putVaultOpts.parse(opts)
       demandNextSeq(vaultRecord, prior)
       return this.#landVault(vaultRecord, prior, ifPresent)
     })
@@ -183,7 +183,7 @@ export abstract class VaultDB {
     })
   }
 
-  async tryPutVault(record: VaultRecord, opts: PutOpts) { return answerOf(() => this.putVault(record, opts)) }
+  async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
   async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
 
   async #landVault(record: VaultRecord, prior: Revision, ifPresent: IfPresent): Promise<Said<VaultRow, PutAct, VaultRow>> {

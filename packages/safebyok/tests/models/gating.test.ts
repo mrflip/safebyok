@@ -379,7 +379,7 @@ describe("an unlock through a gating", () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'vault_gone')
     const gating = await gatingAt<'unlock_vault'>()
-    await vault.del()
+    await vault.listing.del(vault.fullRecord)
     await TH.expectBad(gating.attempt({ passphraseClear }), 'vault_gone')
     await unlocking
     expect(vault.isUnlocked).to.be.false

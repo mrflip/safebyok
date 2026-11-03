@@ -12,7 +12,7 @@ import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyByte
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
-import { type AttemptClosure, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/outcome'
 import type { KeyDeriver } from '../../src/key-deriver'
@@ -98,7 +98,7 @@ export const makeGrantedLease = async (friend: FakeLeaseFriend, opts: LeaseGrant
 export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord => ({ boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides })
 // --
 
-// == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, proofClosureOf, builtGateOf
+// == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, builtGateOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = VX.passphraseCleartext.parse('correct horse battery staple')
@@ -122,11 +122,6 @@ export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.P
   prfBytes:      randomBytes(32),
   ...overrides,
 })
-
-/** A synchronous proof closure; a test of an async one, or one that throws, writes its own. */
-export const proofClosureOf = (passphrase: string = TestPassphrase, passkeyAnswer?: VX.PasskeyAnswer): AttemptClosure => () => (
-  passkeyAnswer === undefined ? { passphrase } : { passphrase, passkeyAnswer }
-)
 
 /** A first gate of {@link WorldStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving. */
 export const builtGateOf = async (answer?: VX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> => {

@@ -209,10 +209,11 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.putVault(reborn, { prior: priorOf(tombstone) })).to.deep.include({ act: 'reborn', val: reborn, world: reborn })
     })
 
-    it("replaces a live row at its revision", async () => {
+    it("refuses a live row at its revision: a vault row moves only by a gate verb", async () => {
       const { vaultDB, vault } = await storeWith()
       const next = vaultAt(1)
-      expect(await vaultDB.putVault(next, { prior: priorOf(vault) })).to.deep.include({ act: 'replaced', val: next, world: next })
+      await expect(vaultDB.putVault(next, { prior: priorOf(vault) })).rejects.toSatisfy((err) => isVaultError(err, 'camped'))
+      await expect(vaultDB.putVault(next, { prior: priorOf(vault), ifPresent: 'repl' } as never)).rejects.toSatisfy((err) => isVaultError(err, 'invalid_input'))
     })
 
     it("over a live row, ifPresent get answers it as declined, and fail refuses camped, neither saving", async () => {
@@ -224,10 +225,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
 
-    it("refuses stale_write over a row moved past its prior, holding the row", async () => {
+    it("refuses camped over a live row whatever its revision, holding the row", async () => {
       const { vaultDB, vault } = await storeWith()
       const next = vaultAt(8)
-      expect(await vaultDB.tryPutVault(next, { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: vault, world: vault })
+      expect(await vaultDB.tryPutVault(next, { prior: stale })).to.deep.include({ ok: false, act: 'camped', dbhas: vault, world: vault })
     })
 
     it("refuses stale_write when the prior names a row that is void", async () => {

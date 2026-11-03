@@ -5,7 +5,7 @@ import { LOCKED, type VaultRecord } from '../../src/models/models-shapes'
 import type { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
-import { Dna, NewPassphrase, Passphrase, boxWorldOf, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
+import { Dna, NewPassphrase, Passphrase, addPasskeyTyping, boxWorldOf, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, revokeTyping, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -130,7 +130,7 @@ describe("The lock, with a box in hand", () => {
 describe("Changing the gate, with a box sealed before the change", () => {
   it("replaces the passphrase: the vault stays unlocked through the change and still seals; the next session's old passphrase refuses 'wrong_passphrase', and the new one opens the box, as does the passkey, whose wayin the change kept", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     expect(vault.isUnlocked).to.be.true
     await box.send({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()
@@ -148,7 +148,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
 
   it("adds a passkey: the next session unlocks by the passkey alone, and opens the box sealed under the passphrase's lease before the passkey was added", async () => {
     const { vault, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox()
-    await vault.addPasskey(byPassphrase(Passphrase), byPasskey('laptop'))
+    await addPasskeyTyping(vault, Passphrase, 'laptop')
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
@@ -161,7 +161,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     vault.lock()
     await unlockTyping(vault, byPasskey('laptop'))
-    await vault.revokePasskey(byPassphrase(Passphrase))
+    await revokeTyping(vault, Passphrase)
     expect(vault.isUnlocked).to.be.true
     await box.send({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { PrfSalt } from '../../src/shapes/fields'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, vaultRoundTrip, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, storedVaultRecord, vaultRoundTrip, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -17,7 +17,7 @@ describe("the ways in changing under a vault unlocked", () => {
     const other = makeVaultWorld(record, { device_id: 'device-2' })
     const theirs = await other.listing.build(record)
     await unlockTyping(theirs, byPassphrase(Passphrase))
-    await theirs.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(theirs, Passphrase, NewPassphrase)
     const received = storeBehindOurBack(other.demandStored())
     vault.receive(received)
     expect(vault.gate.pickle()).to.deep.equal(received.gate)
@@ -32,7 +32,7 @@ describe("an older copy of the vault record", () => {
   it("README.md:1204, 'Storage handing back an older copy could otherwise bring back a way in that was removed': the next session on this device holds a vault record restored from before a passphrase change, and the passphrase replaced opens it again", async () => {
     const { vault, restoreRow, demandStored, anotherSession, deviceDB } = await makeBornVault()
     const ante = demandStored()
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     restoreRow(ante)

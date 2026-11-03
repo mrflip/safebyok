@@ -9,7 +9,7 @@ import { VaultListing } from '../../src/models/vault-listing'
 import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as VS from '../../src/storage/vault-db-shapes'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, byPassphrase, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -27,7 +27,7 @@ const erased = () => new Promise((yes) => { setTimeout(yes, 0) })
 /** A born vault deleted, past its erase, and the revision of its tombstone. */
 const deleted = async () => {
   const world = await makeBornVault()
-  await world.vault.del()
+  await delTyping(world.vault)
   await erased()
   return { ...world, tombstone: VS.revisionOf(world.demandStored()) }
 }
@@ -89,7 +89,7 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
     const vault = await listing.build(demandStored())
     const boxes = vault.boxListing
     await boxes.hello()
-    await bornVault.del()
+    await delTyping(bornVault)
     await erased()
     expect(vault.isPresent).to.be.false
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
@@ -101,7 +101,7 @@ describe("vault.del()", () => {
   it("lands on that same end state, the tombstone stored", async () => {
     const world = await makeBornVault()
     const boxes = world.vault.boxListing
-    await world.vault.del()
+    await delTyping(world.vault)
     await expectLandedGone(world.vault, world)
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
@@ -150,7 +150,8 @@ describe("an old instance, replaced by the very call it made", () => {
     const { vault, restoreRow, storedNow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
-    await TH.expectRefusal(vault.del({ maxMillisSinceRefresh: 0 }), 'disabled')
+    await TH.expectRefusal(vault.fetch(), 'disabled')
+    await TH.expectRefusal(vault.del(), 'disabled')
     expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
     TH.expectSyncRefusal(() => vault.demandReadyToDel(), 'disabled')
   })
@@ -171,7 +172,7 @@ describe("an older record", () => {
   it("loses to a tombstone, of this vault_tok or another: the vault stays gone", async () => {
     const { vault, listing, demandStored, restoreRow } = await makeBornVault()
     const born = demandStored()
-    await vault.del()
+    await delTyping(vault)
     const { revision_tok } = vault
     for (const older of [born, await otherLifeAt(0)]) {
       restoreRow(older)
@@ -195,11 +196,12 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.include({ am: 'a', vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
-  it("listing.buildVault refuses 'bad_option' a vault present in the slot, asking the closure nothing", async () => {
+  it("listing.buildVault refuses 'bad_option' a vault present in the slot, the dialog not shown", async () => {
     const { listing } = await makeBornVault()
-    const closure = vi.fn(byPassphrase(Passphrase))
-    await TH.expectRefusal(buildTyping(listing, Dna, closure), 'bad_option')
-    expect(closure).not.toHaveBeenCalled()
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
+    expect(dialog).not.toHaveBeenCalled()
   })
 
   it("a session that fetched only the tombstone builds over it", async () => {

@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import * as TH from '../test-helpers'
-import { Passphrase, byPassphrase, makeBornVault, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import { Passphrase, byPassphrase, delTyping, makeBornVault, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -87,7 +87,7 @@ describe("vault.hello: the first box call lists the boxes", () => {
   it("delivers the vault's get, so a vault deleted elsewhere refuses 'vault_gone', listing nothing", async () => {
     const { openNextSession, vault } = await makeWorldWithBox()
     const next = await openNextSession()
-    await vault.del()
+    await delTyping(vault)
     await TH.expectRefusal(next.hello(), 'vault_gone')
     await TH.expectRefusal(next.getBox(boxlabel), 'vault_gone')
   })
@@ -127,7 +127,7 @@ describe("the box verbs refuse a vault locked, or gone, before they touch storag
 
     it(`${verb} refuses 'vault_gone' on a vault deleted, as gone beats locked`, async () => {
       const { vault } = await makeWorld()
-      await vault.del()
+      await delTyping(vault)
       await TH.expectRefusal(call(vault), 'vault_gone')
     })
   }

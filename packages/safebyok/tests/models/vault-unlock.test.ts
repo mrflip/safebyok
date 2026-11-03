@@ -6,12 +6,9 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, roundTrip, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockTyping } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
-
-/** A key deriver that must never be called. */
-const deriveNothing = (): never => { throw new Error('derived') }
 
 const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
@@ -24,50 +21,10 @@ const stubReportError = () => {
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-describe("Gate.attemptProof: the proving of a stored wayin that the proof opens", () => {
-  it("answers the passphrase proving of the gate, which holds the vaultKey the vault was born under", async () => {
-    const { vault, opts: { world } } = await makeBornVault()
-    const proving = await vault.gate.attemptProof(() => ({ passphrase: Passphrase }), world)
-    expect(proving.wayinkind).to.eq('passphrase')
-    const lease = await proving.buildLease(vault.leaseFriend())
-    expect(await roundTrip(vault, lease)).to.eq('sk-test')
-    lease.evict()
-  })
-
-  it("refuses 'wrong_passphrase' a passphrase the wayin will not open under", async () => {
-    const { vault, opts: { world } } = await makeBornVault()
-    await TH.expectRefusal(vault.gate.attemptProof(() => ({ passphrase: 'not the passphrase' }), world), 'wrong_passphrase')
-  })
-
-  it("refuses 'unknown_key_deriver' a world whose key deriver is not the one the wayin names, before deriving anything", async () => {
-    const { vault, opts: { world } } = await makeBornVault()
-    await TH.expectRefusal(vault.gate.attemptProof(() => ({ passphrase: Passphrase }), { ...world, keyDeriver: { ...TH.testDeriver, key_deriver_label: 'other_digest_v0', deriveKeyBytes: deriveNothing } }), 'unknown_key_deriver')
-  })
-
-  it("answers the passkey proving where the proof hands a passkey alone, and refuses 'wrong_passkey' another credential or another salt", async () => {
-    const passkeyAnswer = await TH.passkeyOf('laptop')
-    const { vault, opts: { world } } = await makeBornVault(() => ({ passphrase: Passphrase, passkeyAnswer }))
-    const proving = await vault.gate.attemptProof(async () => ({ passkeyAnswer: await TH.passkeyOf('laptop') }), world)
-    expect(proving.wayinkind).to.eq('passkey')
-    const lease = await proving.buildLease(vault.leaseFriend())
-    expect(await roundTrip(vault, lease)).to.eq('sk-test')
-    lease.evict()
-    await TH.expectRefusal(vault.gate.attemptProof(async () => ({ passkeyAnswer: await TH.passkeyOf('phone') }), world), 'wrong_passkey')
-    const { prf_salt_b64: otherSalt } = await TH.passkeyOf('elsewhere')
-    await TH.expectRefusal(vault.gate.attemptProof(async () => ({ passkeyAnswer: await TH.passkeyOf('laptop', otherSalt) }), world), 'wrong_passkey')
-  })
-
-  it("refuses 'absent_wayin' a passkey where the gate has no passkey wayin, and 'bad_option' a proof that hands neither", async () => {
-    const { vault, opts: { world } } = await makeBornVault()
-    await TH.expectRefusal(vault.gate.attemptProof(async () => ({ passkeyAnswer: await TH.passkeyOf('laptop') }), world), 'absent_wayin')
-    await TH.expectRefusal(vault.gate.attemptProof(() => ({}), world), 'bad_option')
-  })
-})
-
 describe("proving.buildWayin: one wayin per proving, of its own vault", () => {
   it("refuses a second wayin of a proving that holds one, and a source proving of another vault", async () => {
     const { vault, opts: { world } } = await makeBornVault()
-    const mine = await vault.gate.attemptProof(() => ({ passphrase: Passphrase }), world)
+    const mine = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
     await TH.expectRefusal(mine.buildWayin(NOVEL), 'unexpected_error')
     const novel = await PassphraseProving.buildNovel(vault.gate.stamp, passphraseCleartext.parse('a new passphrase'), world)
     await TH.expectRefusal(novel.buildWayin(await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })), 'bad_option')
@@ -152,7 +109,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
 })
 
 const makeFreshLease = async ({ vault, opts: { world } }: Awaited<ReturnType<typeof makeBornVault>>) => {
-  const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
+  const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
   return proving.buildLease(vault.leaseFriend())
 }
 
@@ -174,7 +131,7 @@ describe("lease.attach: the one way a vault comes to hold a lease", () => {
     const born = await makeBornVault()
     const later = born.anotherSession()
     const other = await later.build(born.demandStored())
-    const proving = await born.vault.gate.attemptProof(byPassphrase(Passphrase), born.opts.world)
+    const proving = await PassphraseProving.buildStored(born.vault.gate, passphraseCleartext.parse(Passphrase), born.opts.world)
     const lease = await proving.buildLease(other.leaseFriend())
     await TH.expectRefusal(born.vault.leaseFriend().attachLease(lease), 'bad_option')
     expect(lease.isInForce).to.be.true
@@ -242,7 +199,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     vault.lock()
     await unlockTyping(vault, byPassphrase(Passphrase))
     const stale = deviceDB.cachedNow()
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     deviceDB.layCached(stale)
     const again = await anotherSession().build(demandStored())
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
@@ -256,7 +213,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
     const theirs = await other.listing.build(other.demandStored())
     await unlockTyping(theirs, byPasskey('laptop'))
-    await vault.revokePasskey(byPassphrase(Passphrase))
+    await revokeTyping(vault, Passphrase)
     other.storeBehindOurBack(demandStored())
     const again = await other.anotherSession().build(other.demandStored())
     expect(other.deviceDB.cachedNow()).not.to.be.null
@@ -338,7 +295,7 @@ describe("A lease renewed through a gate change", () => {
     vault.becomeNotifiable()
     const states: string[] = []
     vault.subscribe(() => { states.push(vault.lockState()) })
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     expect(vault.isUnlocked).to.be.true
     expect(states).to.not.include('locked')
     expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
@@ -352,36 +309,40 @@ describe("A lease renewed through a gate change", () => {
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     deviceDB.tryCache.mockClear()
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     expect(vault.isLocked).to.be.true
     expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("lock crossed: a lock() during the proof wins: the change lands, the new lease goes unattached, and no row stands", async () => {
+  it("lock crossed: a lock() past the enter key wins: the change lands, the new lease goes unattached, and no row stands", async () => {
     const born = await makeBornVault()
     const { vault } = born
     const epoch0 = vault.gate.gate_epoch
-    const lockingProof = () => {
+    const { world } = born.opts
+    const { requestCleartext: asBefore } = world
+    world.requestCleartext = async (gating) => {
+      const attempting = gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase } as never)
       vault.lock()
-      return { passphrase: Passphrase }
+      await attempting
     }
-    await vault.replacePassphrase(lockingProof, byPassphrase(NewPassphrase))
+    await vault.replacePassphrase()
+    world.requestCleartext = asBefore
     await expectLockWon(born, epoch0)
   })
 
-  it("lock crossed: a lock() as the put lands wins too", async () => {
+  it("lock crossed: a lock() as the commit lands wins too", async () => {
     const born = await makeBornVault()
     const { vault, opts: { vaultDB } } = born
     const epoch0 = vault.gate.gate_epoch
-    const put = vaultDB.tryPutVault.bind(vaultDB)
-    vi.spyOn(vaultDB, 'tryPutVault').mockImplementationOnce(async (...args) => {
-      const landed = await put(...args)
+    const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
+      const landed = await commit(params)
       vault.lock()
       return landed
     })
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     await expectLockWon(born, epoch0)
   })
 })

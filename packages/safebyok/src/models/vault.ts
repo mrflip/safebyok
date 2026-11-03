@@ -1,5 +1,5 @@
 import { verifyConsistent } from '../checks/validator'
-import { type CipherCtxRecord, randomId } from '../crypto'
+import type { CipherCtxRecord } from '../crypto'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
@@ -9,10 +9,10 @@ import type { Boxscope, VaultScope } from '../shapes/scopes'
 import * as VS from '../storage/vault-db-shapes'
 import { type Box, type BoxPut, noWhisperToKeep } from './box'
 import type { BoxListing, BoxWorld } from './box-listing'
-import { type GateChange, Gate } from './gate'
-import { Gating } from './gating'
+import { Gate } from './gate'
+import { type ProvingsForGatingkind, Gating } from './gating'
 import { Lease } from './lease'
-import type { AttemptClosure, Fetched, FetchOpts, GateProps, LeaseFriend, LockState, PasskeyClosure, PassphraseClosure, Revision, SealedWhisper, SendOpts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { Fetched, FetchOpts, GateProps, LeaseFriend, LockState, SealedWhisper, SendOpts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Proving } from './proving'
 import { Storable } from './storable'
@@ -90,7 +90,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The gate]: gate
+  // == [The gate]: fullRecord, gate
+
+  /** The full record in hand, what a gate change spreads into its params. A vault held sparse, or a tombstone, refuses 'bad_option': hydrate first. */
+  get fullRecord(): VaultRecord { return this.demandFullProps() }
 
   // Made on first read, not at settle: the base constructor settles before this class's fields exist.
   /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. A vault held sparse, or a tombstone, has none in hand and refuses 'bad_option': hydrate first. */
@@ -101,51 +104,73 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, sendGate, each with its try form
+  // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, delVault, del, each with its try form, landGate
 
-  /** Replace the passphrase with the one `passphraseClosure` answers, once `proofClosure` proves the gate by the passphrase, and send. The passkey stays, and must be revoked separately if unwanted; the vaultKey does not change, so a lease held is renewed under the new epoch. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
-  async replacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<this> {
-    MSX.passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
-    await this.ensureReadyToChangeGate()
-    const ante = this.demandFullProps().gate
-    const heldLease = this.#lease
-    return this.#sendGate(ante, heldLease, await this.gate.withPassphraseReplaced(proofClosure, passphraseClosure, this.world))
-  }
-
-  tryReplacePassphrase(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase(proofClosure, passphraseClosure)) }
-
-  /** Add the passkey whose answer `passkeyClosure` hands in, once `proofClosure` proves the gate by the passphrase, and send. A vault with a passkey refuses 'bad_option', asking nothing. The vaultKey does not change, so a lease held is renewed under the new epoch. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
-  async addPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<this> {
-    MSX.passkeyAddArgs.parse({ proofClosure, passkeyClosure })
-    await this.ensureReadyToChangeGate()
-    const ante = this.demandFullProps().gate
-    const heldLease = this.#lease
-    return this.#sendGate(ante, heldLease, await this.gate.withPasskeyAdded(proofClosure, passkeyClosure, this.world))
-  }
-
-  tryAddPasskey(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey(proofClosure, passkeyClosure)) }
-
-  /** Revoke the passkey, once `proofClosure` proves the gate by the passphrase, and send. A vault without one refuses 'absent_wayin', asking nothing. Removal is not revocation of the vaultKey, which does not change: a lease held is renewed under the new epoch. A record changed elsewhere while the proof ran refuses 'stale_write', storing nothing. */
-  async revokePasskey(proofClosure: AttemptClosure): Promise<this> {
-    MSX.passkeyRevokeArgs.parse({ proofClosure })
-    await this.ensureReadyToChangeGate()
-    const ante = this.demandFullProps().gate
-    const heldLease = this.#lease
-    return this.#sendGate(ante, heldLease, await this.gate.withPasskeyRevoked(proofClosure, this.world))
-  }
-
-  tryRevokePasskey(proofClosure: AttemptClosure): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey(proofClosure)) }
-
-  /** Put `gate` over the record in hand, under the next revision: the vault's one path to a new gate. Where a hydrate shows the record's gate is no longer `ante`, the one proved against, it refuses 'stale_write', storing nothing. Once it lands, `heldLease` is renewed. */
-  async #sendGate(ante: GateProps, heldLease: Lease | null, { gate, proved }: GateChange): Promise<this> {
-    await this.hydrate()
-    const held = this.demandFullProps()
-    if (held.gate !== ante) { throw gateMovedUnderChange(held) }
-    const record = { ...held, revision_tok: randomId(), revision_seq: held.revision_seq + 1, written_at: this.world.clock.now(), gate }
-    await this.listing.put(record, held)
-    await this.#renewLease(proved, gate.gate_epoch, heldLease)
+  /** Replace the passphrase through a replace_passphrase gating, answering as {@link Gating.launch}. The passkey stays. A lease held is renewed under the new epoch, unless a lock crossed it, and no other device is locked. A record moved since the attempt read it refuses 'stale_write', storing nothing. */
+  async replacePassphrase(): Promise<this> {
+    await this.ensureTimely()
+    await Gating.launch('replace_passphrase', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runReplacePassphrase(provings) })
     return this
   }
+
+  tryReplacePassphrase(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase()) }
+
+  async #runReplacePassphrase({ ante, anteProving, nextProving }: ProvingsForGatingkind['replace_passphrase']): Promise<this> {
+    const nextWayin = await nextProving.buildWayin(anteProving)
+    return this.#landGate(anteProving, () => this.listing.replacePassphrase({ ...ante, gate: { passphrase_wayin: MSX.passphraseWayinRecord.parse(nextWayin.pickle()) } }))
+  }
+
+  /** Add a passkey through an add_passkey gating, as {@link replacePassphrase} does. A passkey held refuses 'bad_option', nobody asked; one added since the ask refuses 'camped' or 'stale_write'. */
+  async addPasskey(): Promise<this> {
+    await this.ensureTimely()
+    this.gate.demandPasskeyAddable()
+    await Gating.launch('add_passkey', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runAddPasskey(provings) })
+    return this
+  }
+
+  tryAddPasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey()) }
+
+  async #runAddPasskey({ ante, proved, passkeyProving }: ProvingsForGatingkind['add_passkey']): Promise<this> {
+    const passkeyWayin = await passkeyProving.buildWayin(proved)
+    return this.#landGate(proved, () => this.listing.addPasskey({ ...ante, gate: { passkey_wayin: MSX.passkeyWayinRecord.parse(passkeyWayin.pickle()) } }))
+  }
+
+  /** Revoke the passkey through a revoke_passkey gating, as {@link replacePassphrase} does. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
+  async revokePasskey(): Promise<this> {
+    await this.ensureTimely()
+    if (this.gate.pkWayin === null) { return this }
+    await Gating.launch('revoke_passkey', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante, proved }) => this.#landGate(proved, () => this.listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })) })
+    return this
+  }
+
+  tryRevokePasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey()) }
+
+  /** The commit, then a lease under the epoch it landed. The old lease stays in force for the moments between, safely, as the vaultKey did not change. */
+  async #landGate(proved: Proving, commit: () => Promise<void>): Promise<this> {
+    const heldLease = this.#lease
+    await commit()
+    await this.#renewLease(proved, this.gate.gate_epoch, heldLease)
+    return this
+  }
+
+  /** Delete this vault through a del_vault gating, answering as {@link Gating.launch}: the vault locked, a tombstone stored, its boxes gone from the vaultDB, nothing of it on this device, and the Vault staying in its slot, tombstoned. A lock does not stop it. A record moved since the attempt read it refuses 'stale_write', the vault left locked. */
+  async delVault(): Promise<this> {
+    await this.ensureTimely()
+    await Gating.launch('del_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante }) => this.#runDelVault(ante) })
+    return this
+  }
+
+  tryDelVault(): Promise<Outcome<this>> { return outcomeOf(() => this.delVault()) }
+
+  /** The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. */
+  async #runDelVault(ante: VaultRecord): Promise<this> {
+    this.lock()
+    await this.listing.del(ante)
+    return this
+  }
+
+  /** As {@link delVault}: a vault's delete takes the passphrase's proof, so the base's has no way past it. */
+  override del(): Promise<this> { return this.delVault() }
   // --
 
   // == [Unlocking]: isUnlocked, ensureUnlocked, tryEnsureUnlocked, unlockByProof, attachCachedLease
@@ -408,24 +433,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   protected override sweepContents(): void {
     this.#dropLease()
     this.#boxListing?.sweep()
-    this.listing.declineGatingAtLock(this)
+    this.listing.declineGatingAtDiscard(this)
   }
 
   /** Locked, the row cached erased, and the boxes vacated. */
   protected override vacateContents(): void {
     void this.#vacateLease()
     this.#boxListing?.vacate()
-    this.listing.declineGatingAtLock(this)
+    this.listing.declineGatingAtDiscard(this)
   }
-  // --
-
-  // == [Guards]: ensureReadyToChangeGate, demandReadyToDel
-
-  /** A gate change keeps the rest of the record in hand and needs the vault present and refreshed {@link MSX.Promptly}; no lock, as its record holds no secret. */
-  ensureReadyToChangeGate(): Promise<this> { return this.ensureTimely(MSX.Promptly) }
-
-  /** A vault deleted has no life left to delete. Not yet: the passphrase's proof the old `vault.del` took. */
-  override demandReadyToDel(): this { return this.demandPresent() }
   // --
 
   // == [Required by Storable]: isFullRecord, lifeTokPathOf, makeSnapshot
@@ -454,7 +470,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 }
 // --
 
-// == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce, gateMovedUnderChange
+// == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce
 
 const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
@@ -463,7 +479,4 @@ const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases
 const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
 
 const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
-
-/** The 'stale_write' of a gate change proved against a record that moved meanwhile, its `meta` the revision now held. */
-const gateMovedUnderChange = (held: Revision): VaultError => new VaultError('stale_write', Phrases.GateMovedUnderChange, { meta: { stored_revision: MSX.revision.parse(held) } })
 // --
