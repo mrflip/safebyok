@@ -211,6 +211,15 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("a birth", () => {
+    it("names the whole sentinel as its prior, so a void row takes no record past revision_seq 0", async () => {
+      const vaultDB = new MemoryVaultDB()
+      const answer = await vaultDB.tryPutVault(vaultAt(6), { prior: { revision_tok: VS.NeverStoredTok, revision_seq: 5 } })
+      expect(answer).to.deep.include({ ok: false, act: 'stale_write', dbhas: null })
+      expect(vaultDB._cheat_vaultRowsOf(bankScope).size).to.eq(0)
+    })
+  })
+
   describe("putBox", () => {
     it("is born, replaced and reborn by the row it lands on, with the vault row as world", async () => {
       const { vaultDB, vault, box } = await storeWith()

@@ -126,7 +126,7 @@ const peekOf = (raw: unknown) => {
 
 /** True when `raw`, a stored row or null for a void one, stands at `prior`. A store's conditional put is atomic on this. */
 export const isRowAt = (raw: unknown, prior: Revision): boolean => {
-  if (raw === null) { return prior.revision_tok === NeverStoredTok }
+  if (raw === null) { return (prior.revision_tok === NeverStoredTok) && (prior.revision_seq === NeverStoredSeq) }
   const peek = peekOf(raw)
   return (peek?.revision_tok === prior.revision_tok) && (peek.revision_seq === prior.revision_seq)
 }
