@@ -453,6 +453,18 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("watch over a cascade", () => {
+    it("hears its box under the vault row stored, not the request's tombstone", async () => {
+      const { vaultDB, vault } = await storeWith()
+      const oldLife = vaultAt(0, 'oldlife')
+      vaultDB._cheat_boxRowsOf(vaultScope, 'oldlife').set('openai', boxAt(0, 'oldlife'))
+      const notices: { world: unknown }[] = []
+      vaultDB.watch(vaultScope, (notice) => { notices.push(notice) })
+      await vaultDB.delVault(vaultTombstoneOf(oldLife), { prior: priorOf(oldLife) })
+      expect(notices.map(({ world }) => world)).to.deep.equal([vault])
+    })
+  })
+
   describe("a store's own failure", () => {
     class FailingVaultDB extends MemoryVaultDB {
       protected override doGetBank(): never { throw new Error('socket closed') }

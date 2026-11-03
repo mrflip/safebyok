@@ -70,7 +70,7 @@ export class MemoryVaultDB extends VaultDB {
       const boxTombstone = VS.boxTombstoneOf(box, tombstone.written_at)
       if (boxTombstone === null) { continue }
       boxrows.set(boxlabel, boxTombstone)
-      this.#tell(tombstone, { vault: tombstone, box: boxTombstone })
+      this.#tell(tombstone, { vault: this.#vaultRowOf(tombstone), box: boxTombstone })
     }
     return { landed: isOurs, ante: structuredClone(ante) }
   }
