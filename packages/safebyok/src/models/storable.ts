@@ -234,12 +234,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Get the record storage holds, through the listing, which delivers it to `receive`. A call made while a fetch is under way joins it, and settles as it settles.
    * Where nothing is stored, or a tombstone, each call's `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent.
+   * A thing the answer let go, a new instance in its slot, refuses 'disabled'.
    */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     this.demandEnabled()
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     const isStored = await this.#oneFetchAtATime()
+    this.demandEnabled()
     if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
     return this
   }

@@ -92,6 +92,15 @@ describe("vault.del()", () => {
 })
 
 describe("a newer record of another vault_tok over a live vault", () => {
+  it("refuses 'disabled' the old vault's own fetch and hydrate that met it, resolving no vault let go", async () => {
+    const fetching = await makeBornVault()
+    fetching.restoreRow(await otherLifeAt(5))
+    await TH.expectRefusal(fetching.vault.fetch(), 'disabled')
+    const hydrating = await makeBornVault()
+    hydrating.restoreRow(await otherLifeAt(5))
+    await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+  })
+
   it("replaces it: the old vacated and unlisted, its row erased, a new vault in the slot, locked", async () => {
     const { vault, listing, deviceDB, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
