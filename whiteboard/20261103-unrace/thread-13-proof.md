@@ -1,6 +1,6 @@
 # Thread 13: proof (2026-11-03)
 
-Branch `20261103-proof`, PR #PRNUM, stacked on #460. Justify: green; safebyok 4765 passed, 37 skipped; `proof.test.ts` 9.
+Branch `20261103-proof`, PR #462, stacked on #460. Justify: green; safebyok 4765 passed, 37 skipped; `proof.test.ts` 9.
 
 * **Built**: `packages/safebyok/tests/models/proof.test.ts`, every step asserting what components paint.
   `mountComponent` is `useSyncExternalStore` in miniature: `expectRenders` takes the exact paints since the last
@@ -52,7 +52,8 @@ Branch `20261103-proof`, PR #PRNUM, stacked on #460. Justify: green; safebyok 47
   * A fresh hello paints `made: main locked` before `ready: main locked`: the list fills before the stage moves, so a
     host gates on `stage`.
   * After a revoke, a passkey touch refuses `absent_wayin`, which is not correctable, so the dialog settles.
-    `gating.passkeyHeader` is null by then, so a dialog should not offer it.
+    A dialog offers the passkey only if `gating.passkeyHeader` is set; it reads the vault's gate (from the code; the
+    proof does not assert it).
   * A passkey's answer is spent by an attempt, its bytes zeroed: ask again for each one.
 
 * **Crossings, for `crossings.md`** (read from the code, not run):
