@@ -124,7 +124,7 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
 
 // == [The absent contract]: a box gone or damaged has no whisper to open
 
-describe("box.unsealWhisper(): refused from its guard", () => {
+describe("box.extractWhisper(): refused from its guard", () => {
   const RefusedCases = [
     // absent, refused ahead of the seal:
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      "unlocked", "absent_box",       'a deleted box'],
@@ -138,7 +138,7 @@ describe("box.unsealWhisper(): refused from its guard", () => {
     it(`refuses '${refusalkind}' for ${blurb}`, async () => {
       const box = await boxListingOf(held.mw).build(recordOf())
       held.mw.setLockState(lockState)
-      await TH.expectRefusal(box.unsealWhisper(), refusalkind)
+      await TH.expectRefusal(box.extractWhisper(), refusalkind)
     })
   }
 })
@@ -146,7 +146,7 @@ describe("box.unsealWhisper(): refused from its guard", () => {
 
 // == [What the lease opens]: a whisper that opens to no whisper
 
-describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
+describe("box.extractWhisper(): what the lease opens that is no whisper", () => {
   const OpenedCases = [
     ['text that is no JSON',            'sk-test-SECRET {'],
     ['JSON that is no { val } holder',  '{"value":"sk-test-SECRET"}'],
@@ -156,7 +156,7 @@ describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
       const { world } = held.mw
       const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (maxMillis) => world.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text) }
       const box = await boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
-      const err = await TH.expectRefusal(box.unsealWhisper(), 'damaged_box')
+      const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_box')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
       expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')
     })
@@ -184,10 +184,10 @@ describe("box.send(patch): rebirth over a tombstone", () => {
       expect(box._cheat_central).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, box_tok: box.box_tok })
     })
 
-    it(`refuses a sidecar send with no whisper over ${blurb} as 'bad_option', putting nothing`, async () => {
+    it(`refuses a sidecar send with no whisper over ${blurb} as 'no_whisper', putting nothing`, async () => {
       const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am), fakeSealBoxListingOf(held.mw))
       held.mw.clearCalls()
-      await TH.expectRefusal(box.send({ sidecar: { note: 'no whisper' } } as unknown as BoxProps), 'bad_option')
+      await TH.expectRefusal(box.send({ sidecar: { note: 'no whisper' } }), 'no_whisper')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
   }
@@ -570,13 +570,9 @@ describe("box.send: the versioned replace, with or without ifPresent 'repl'", ()
 
 // == [A whisper and a sidecar on every update]: send, the whisper setter
 
-describe("box.send(patch): a whisper and a sidecar on every update", () => {
+describe("box.send(patch): a patch naming a half", () => {
   const PatchCases = [
-    [{ whisper: { val: 'sk-test-0000' } },                     'a whisper with no sidecar'],
-    [{ sidecar: { note: 'x' } },                               'a sidecar with no whisper'],
     [{},                                                       'neither'],
-    [{ whisper: undefined, sidecar: { note: 'x' } },           'a whisper given as undefined'],
-    [{ whisper: { val: 'sk-test-0000' }, sidecar: undefined }, 'a sidecar given as undefined'],
     [{ whisper: null, sidecar: { note: 'x' } },                'a whisper given as null'],
     [{ whisper: { val: 'sk-test-0000' }, sidecar: null },      'a sidecar given as null'],
   ] as const
@@ -590,16 +586,10 @@ describe("box.send(patch): a whisper and a sidecar on every update", () => {
     })
   }
 
-  it("refuses 'bad_option' before its guards: a patch lacking a whisper refuses so while the vault is locked, too", async () => {
+  it("refuses 'bad_option' before its guards: a patch naming neither refuses so while the vault is locked, too", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
-    await TH.expectRefusal(box.send({ sidecar: {} } as unknown as BoxProps), 'bad_option')
-  })
-
-  it("takes no whisper from the one exposed: a send giving none refuses 'bad_option', though one is exposed", async () => {
-    const box = await builtOf(fullBoxRecord())
-    box.whisper = { val: 'sk-test-0000' }
-    await TH.expectRefusal(box.send({ sidecar: { note: 'x' } } as unknown as BoxProps), 'bad_option')
+    await TH.expectRefusal(box.send({}), 'bad_option')
   })
 
   it("seals nothing when the whisper is set: the setter only exposes it", async () => {
@@ -744,7 +734,7 @@ describe("Box and Storable entries: arguments checked first of all, before any g
     [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not take'],
     [(box: TestableBox) => box.hydrate({ maxMillisSinceRefresh: -1 }),                            'hydrate with opts out of range'],
     [(box: TestableBox) => box.del({ maxWorldMillis: -1 }),                                       'del with opts out of range'],
-    [(box: TestableBox) => box.unsealWhisper({ maxWorldMillis: -1 }),                             'unsealWhisper with opts out of range'],
+    [(box: TestableBox) => box.extractWhisper({ maxWorldMillis: -1 }),                             'extractWhisper with opts out of range'],
     [(box: TestableBox) => box.expose({ maxWorldMillis: -1 }),                                    'expose with opts out of range'],
   ] as const
 
@@ -816,12 +806,11 @@ describe("Box and Storable entries: arguments checked first of all, before any g
 // --
 
 describe("box.send holds its patch to boxPatch first of all (the Coach, 2026-10-31)", () => {
-  it("refuses a patch that is not full, named for its field, before it looks at the lock", async () => {
+  it("refuses a patch that names neither half before it looks at the lock", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
     held.mw.clearCalls()
-    const err = await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' } } as never), 'bad_option')
-    expect(err.meta?.fieldnames).to.deep.equal(['sidecar'])
+    await TH.expectRefusal(box.send({}), 'bad_option')
     expect(held.mw.calls).to.deep.equal([])
   })
 

@@ -1,14 +1,17 @@
+import { verifyConsistent } from '../checks/validator'
 import { type CipherCtxRecord, randomId } from '../crypto'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import type { VaultScope } from '../shapes/scopes'
+import type { Boxscope, VaultScope } from '../shapes/scopes'
+import * as VS from '../storage/vault-db-shapes'
+import { type Box, type BoxPut, noWhisperToKeep } from './box'
 import type { BoxListing, BoxWorld } from './box-listing'
 import { type GateChange, Gate } from './gate'
 import { Lease } from './lease'
-import type { AttemptClosure, Fetched, GateProps, LeaseFriend, LockState, PasskeyClosure, PassphraseClosure, Revision, SealedWhisper, VaultRecord, VaultSparse } from './models-shapes'
+import type { AttemptClosure, Fetched, FetchOpts, GateProps, LeaseFriend, LockState, PasskeyClosure, PassphraseClosure, Revision, SealedWhisper, SendOpts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Proving } from './proving'
 import { Storable } from './storable'
@@ -55,6 +58,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #boxListing: BoxListing | null = null
 
   #gate: { props: GateProps, gate: Gate } | null = null
+
+  /** Set once a `hello` has listed the boxes. */
+  #isGreeted = false
 
   // == [Props, as the record has them]: fmt
 
@@ -292,6 +298,84 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }
+  // --
+
+  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form, demandReadyForBoxes, ensureReadyForBoxes
+
+  /** Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. The first box call runs it; a host may run it sooner. A vault found gone refuses 'vault_gone'. */
+  async hello(): Promise<this> {
+    this.demandEnabled()
+    const listed = await this.listing.fetchListed(this)
+    this.demandPresent()
+    await this.boxListing.hello(listed)
+    this.#isGreeted = true
+    return this
+  }
+
+  tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
+
+  /** The timely full box under `boxlabel`. Where none is present, `opts.ifAbsent` says: 'fail', the default, refuses 'absent_box'; 'nil' resolves null. A damaged row refuses 'damaged_record'. A vault gone refuses 'vault_gone', and a vault locked, at the start or by the end, 'vault_locked'. */
+  async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
+    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
+    const scope = this.#boxscopeOf(boxlabel)
+    const boxes = await this.#ensureReadyForBoxes()
+    const box = await (boxes.at(scope)?.hydrate(timely) ?? boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
+    this.demandReadyForBoxes()
+    if (box?.isPresent === true) { return box }
+    if (ifAbsent === 'nil') { return null }
+    throw boxes.absentRefusal(scope)
+  }
+
+  tryGetBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(boxlabel, opts)) }
+
+  /** As {@link getBox}, the box's record fetched whatever its age. */
+  fetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> { return this.getBox(boxlabel, { ...opts, maxMillisSinceRefresh: 0 }) }
+
+  tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
+
+  /** Seal and store the box `patch` names. With a box listed, a tombstone included, this is its `send`. With none, it is a birth over no record, its sidecar `{}` where left out, and a whisper left out refuses 'no_whisper'. Over a live record, `opts.ifPresent` says, as `send` has it: `get` resolves the box as stored, `patch` discarded. Refuses as `send` does; a vault gone refuses 'vault_gone'. */
+  async putBox(patch: BoxPut, opts: SendOpts = {}): Promise<Box> {
+    const { whisper, sidecar, ...named } = MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
+    const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
+    verifyConsistent(named, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    const scope = this.#boxscopeOf(named.boxlabel)
+    const boxes = await this.#ensureReadyForBoxes()
+    const held = boxes.at(scope)
+    if (held !== null) { return held.send({ whisper, sidecar }, opts) }
+    if (whisper === undefined) { throw noWhisperToKeep() }
+    await this.ensureTimely(timely.maxWorldMillis)
+    return boxes.create({ ...scope, whisper, sidecar: sidecar ?? {} }, { ifPresent })
+  }
+
+  tryPutBox(patch: BoxPut, opts: SendOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
+
+  /** Delete the box under `boxlabel`, a damaged row set aside there included: the box in its tombstone, or null for nothing stored. Refuses 'stale_write' where the row moved, delivered first; a vault gone refuses 'vault_gone', and a vault locked 'vault_locked'. */
+  async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
+    const timely = MSX.timelyOpts.parse(opts)
+    const scope = this.#boxscopeOf(boxlabel)
+    const boxes = await this.#ensureReadyForBoxes()
+    const held = boxes.at(scope)
+    if (held !== null) { return held.del(timely) }
+    await this.ensureTimely(timely.maxWorldMillis)
+    return boxes.del(boxes.damagedAt(scope) ?? VS.sentinelBoxOf(scope, this.vault_tok))
+  }
+
+  tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
+
+  /** A box verb needs the vault present and unlocked. */
+  demandReadyForBoxes(): this { return this.demandPresent().demandUnlocked() }
+
+  /** The box listing, this vault having said hello, refusing as `demandReadyForBoxes` does at each end. */
+  async #ensureReadyForBoxes(): Promise<BoxListing> {
+    this.demandReadyForBoxes()
+    if (! this.#isGreeted) {
+      await this.hello()
+      this.demandReadyForBoxes()
+    }
+    return this.boxListing
+  }
+
+  #boxscopeOf(boxlabel: string): Boxscope { return { ...this.scope, boxlabel: MSX.boxlabelArg.parse(boxlabel) } }
   // --
 
   // == [Children and discards]: boxListing, adopt, sweepContents, vacateContents

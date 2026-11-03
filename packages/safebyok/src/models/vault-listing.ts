@@ -8,7 +8,7 @@ import * as Phrases from '../phrases'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import type { DeviceDB } from '../storage/device-db-new'
-import type { Notice } from '../storage/vault-db-new'
+import type { Notice, VaultDB } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
 import { alreadyHeldError } from '../helpers/throwers'
@@ -16,7 +16,7 @@ import { BoxListing } from './box-listing'
 import { type DelTombstone, type SlotFate, Listing } from './listing'
 import { Gate } from './gate'
 import type { PassphraseProving } from './proving'
-import { type Dna, type Fetched, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type BoxesListed, type Dna, type Fetched, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { cmpRevisions } from './storable'
 import { type VaultSnapshot, Vault } from './vault'
@@ -86,6 +86,15 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis, onBadNews: (news) => { this.tellBadNews([news]) } })
   }
 
+  /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. A damaged row refuses 'damaged_record'. */
+  async fetchListed(vault: Vault): Promise<BoxesListed> {
+    this.demandEnabled()
+    await this.ensureTimelyWorld()
+    const answer = await this.vaultDB.tryGetVault(vault.scope, { ifAbsent: 'nil' })
+    await this.deliver(vaultRowOf(answer), 'nil')
+    return MSX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
+  }
+
   // == [Defined by the vault listing]
 
   protected vaultTokOfWorld(): null { return null }
@@ -127,10 +136,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   /** The vault row alone: the boxes `getVault` lists with it are the vault's box listing's to take. */
-  protected async tryGetRow(scope: VaultScope) {
-    const answer = await this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' })
-    return (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_records']) } : answer
-  }
+  protected async tryGetRow(scope: VaultScope) { return vaultRowOf(await this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' })) }
 
   protected tryPutRow(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts) }
 
@@ -141,6 +147,16 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected isOwnRow(row: VaultRow | BoxRow): row is VaultRow { return ! ('boxlabel' in row) }
   // --
 }
+// --
+
+// == [The vault's get]: NothingListed, vaultRowOf
+
+const NothingListed: BoxesListed = Object.freeze({ boxes: [], damaged_records: [] })
+
+/** `answer` with its `val` the vault row alone, as a listing delivers it. */
+const vaultRowOf = (answer: Awaited<ReturnType<VaultDB['tryGetVault']>>) => (
+  (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_records']) } : answer
+)
 // --
 
 // == [Refusals]: vaultAbsent, vaultGone

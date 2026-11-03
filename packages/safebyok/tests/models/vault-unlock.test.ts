@@ -433,7 +433,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
 
   it("seals a box through the vault and opens it, end to end", async () => {
     const { box } = await makeVaultWithBox()
-    expect(await box.unsealWhisper()).to.deep.eq({ val: 'sk-test' })
+    expect(await box.extractWhisper()).to.deep.eq({ val: 'sk-test' })
   })
 
   it("sweep leaves the row, drops the lease, disables and unlists all the way down", async () => {

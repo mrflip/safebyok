@@ -7,10 +7,10 @@ import { type Outcome, outcomeOf } from '../outcome'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
-import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
+import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import { type BoxSnapshot, Box, sealedRecordOf } from './box'
 import { type DelTombstone, Listing } from './listing'
-import { type BoxRecord, type BoxSparse, type Dna, type Fetched, type ListingOpts, type ListingWorld, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxesListed, type BoxRecord, type BoxSparse, type Dna, type Fetched, type ListingOpts, type ListingWorld, type PutListingOpts, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
@@ -35,6 +35,9 @@ export type BoxListingOpts = ListingOpts & { world: BoxWorld }
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box> {
   declare readonly world: BoxWorld
 
+  /** The rows the vault's get set aside as damaged. */
+  #damagedRecords: readonly DamagedBox[] = Object.freeze([])
+
   /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check; each refuses 'bad_option'. */
   constructor(opts: BoxListingOpts) {
     MSX.boxListingOpts.parse(opts)
@@ -42,20 +45,50 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
+  // == [Starting]: hello, damaged_records, damagedAt, del
+
+  /** Start the watch, and take what the vault's get listed, if given: each box built sparse, a tombstone among them, each damaged row set aside, and any instance held under a damaged row vacated, as nothing acts on one. */
+  override async hello(listed?: BoxesListed): Promise<void> {
+    await super.hello()
+    if (listed === undefined) { return }
+    const { boxes, damaged_records } = MSX.boxesListed.parse(listed)
+    this.#damagedRecords = Object.freeze(damaged_records)
+    for (const damaged of damaged_records) { this.at(this.scopeOf(damaged))?.vacate() }
+    await Promise.all(boxes.map((box) => this.build(box)))
+  }
+
+  /** The rows of this vault found damaged, set aside until `del` names one. */
+  get damaged_records(): readonly DamagedBox[] { return this.#damagedRecords }
+
+  /** The entry of {@link damaged_records} under `scope`, or null. */
+  damagedAt(scope: Boxscope): DamagedBox | null {
+    const { boxlabel } = this.scopeOf(scope)
+    return this.#damagedRecords.find((damaged) => damaged.boxlabel === boxlabel) ?? null
+  }
+
+  /** As the base's `del`; landed, the row is no longer set aside as damaged. */
+  override async del(duck: BoxSparse | Box): Promise<Box | null> {
+    const thing = await super.del(duck)
+    const { boxlabel } = this.scopeOf(duck)
+    this.#damagedRecords = Object.freeze(this.#damagedRecords.filter((damaged) => damaged.boxlabel !== boxlabel))
+    return thing
+  }
+  // --
+
   // == [Birth]: create, tryCreate, demandUnlocked
 
-  /** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'vault_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first. */
-  async create(input: BoxDna): Promise<Box> {
+  /** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'vault_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
+  async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
     const dna = boxDna.parse(input)
     this.#demandUnlocked()
     this.demandNotHeld(dna)
     const { whisper, sidecar, ...sparse } = this.stampDna(dna)
     const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
     this.#demandUnlocked()
-    return this.putDraft(draft)
+    return this.putDraft(draft, null, opts)
   }
 
-  tryCreate(input: BoxDna): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input)) }
+  tryCreate(input: BoxDna, opts: PutListingOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
   #demandUnlocked(): void { if (this.lockState() === 'locked') { throw lockedError() } }
