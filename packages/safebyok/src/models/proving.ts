@@ -57,7 +57,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** The strengthChecker's verdict. What it throws is replaced, as it heard the passphrase ('unexpected_error'); an answer that is no verdict refuses 'bad_option'. */
   static async checkStrength(passphraseClear: VX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<VX.PassphraseVerdict> {
     strengthArgs.parse({ passphraseClear, scope, world })
-    const verdict = VX.passphraseVerdict.safeParse(await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope))
+    const verdict = await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope)
     if (! verdict.success) { throw notAVerdict() }
     return verdict.data
   }
@@ -180,10 +180,10 @@ const mintPasskeyHeader = ({ clock, device_id }: ProvingWorld, { credential_id, 
 
 // == [Host calls]: invokeStrengthChecker, deriveKeyBytes
 
-// The two host functions that hear the passphrase here (guarantees.md, G1 and G8): what they throw may quote it, so it is replaced, not kept as a cause.
-const invokeStrengthChecker = async (strengthChecker: ProvingWorld['strengthChecker'], passphraseClear: VX.PassphraseCleartext, scope: VaultScope): Promise<unknown> => {
+// The two host functions that hear the passphrase here (guarantees.md, G1 and G8): what they throw may quote it, so it is replaced, not kept as a cause. The verdict is parsed inside the catch, as a getter on what the strengthChecker answered may throw the same.
+const invokeStrengthChecker = async (strengthChecker: ProvingWorld['strengthChecker'], passphraseClear: VX.PassphraseCleartext, scope: VaultScope) => {
   try {
-    return await strengthChecker(passphraseClear, scope)
+    return VX.passphraseVerdict.safeParse(await strengthChecker(passphraseClear, scope))
   } catch {
     throw strengthCheckerThrew()
   }

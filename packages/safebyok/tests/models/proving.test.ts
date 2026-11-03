@@ -62,6 +62,9 @@ const expectOneVaultKey = async (one: Proving, other: Proving): Promise<void> =>
   expect(await opener.unsealWith(sealed, stamp)).to.eq('{"val":"sk-test-5678"}')
 }
 
+/** A checker whose answer throws the passphrase it heard, when its verdict is read. */
+const answersThrowingGetter = (passphrase: string) => ({ get strong(): true { throw new Error(passphrase) } })
+
 describe("Proving.checkStrength(passphraseClear, scope, world)", () => {
   it("answers the strengthChecker's verdict, hearing the passphrase and the scope", async () => {
     const strengthChecker = vi.fn(() => ({ strong: false as const, reason: 'too short' }))
@@ -72,6 +75,12 @@ describe("Proving.checkStrength(passphraseClear, scope, world)", () => {
 
   it("awaits a checker that answers a promise", async () => {
     expect(await Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker: findsStrongAsync }))).to.deep.equal({ strong: true })
+  })
+
+  it("replaces a throw from a getter on what the checker answered with 'unexpected_error': the passphrase it quotes appears nowhere in the refusal (G8)", async () => {
+    const err = await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker: answersThrowingGetter })), 'unexpected_error')
+    expect(err.cause).to.be.undefined
+    expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
 
   it("replaces what a throwing checker threw with 'unexpected_error', quoting none of it and keeping no cause", async () => {
