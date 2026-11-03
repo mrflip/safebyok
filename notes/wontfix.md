@@ -42,7 +42,7 @@ not as a settled ruling, and check it against the current design before relying 
   `revision_tok`) prevents a lost update, not a reordering: a host that needs an order awaits each
   call before making the next.
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused erase of a cached lease is not
-  retried.** `Lease.peek` meeting a row of another `vault_tok` or epoch erases the deviceDB's record
+  retried.** `Lease.peek` meeting a row of another epoch erases the deviceDB's record
   once (`tryUncacheLease`); a refusal is warned of and left. The record is unusable either way, and
   the next grant writes over it. A `lock()`'s own refused erase is told as a panic (`vault.#panic`).
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **no autolock timer past the Trigger's cap.**
@@ -63,3 +63,6 @@ not as a settled ruling, and check it against the current design before relying 
   delete the vaultDB refuses still logs the user out of this device, and they log back in to try the
   delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
+* 2026-11-03 (unrace, `whiteboard/20261102-unrace/unrace-gating.md`, *The lease*): **a `lock()` during
+  the cache's `lease.peek` loses.** The vault reads unlocked on the lease peeked, the lock's erase
+  stands, and the next session asks for a proof. The next `lock()` ends that session.
