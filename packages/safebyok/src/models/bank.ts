@@ -159,14 +159,14 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, ownLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
+  // == [Ending]: autolock, lock, vacate, sweep, scanOwnLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
 
   /** A host calls this after each `hello` and on a timer of its own, as nothing else autolocks: each listed vault whose
    * lease cached on this device is past autolock is locked, which erases that lease.
    */
   async autolock(): Promise<void> {
     const cutoff = Math.floor(this.clock.now() - this.leaseMillis)
-    const oldRows = await this.#ownLeasesProvedBefore(Math.max(FarPast, cutoff))
+    const oldRows = await this.#scanOwnLeasesProvedBefore(Math.max(FarPast, cutoff))
     for (const row of oldRows) {
       const listed = this.#vaultListing.at(row)
       if (listed?.vault_tok === row.vault_tok) { listed.lock() }
@@ -199,7 +199,7 @@ export class Bank implements VaultWorld {
   }
 
   /** This bank's rows among the cached leases proved before `cutoff`; a refused scan is bad news, and finds none. */
-  async #ownLeasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
+  async #scanOwnLeasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
     const scan = await this.deviceDB.tryLeasesProvedBefore(cutoff)
     if (! scan.ok) {
       this.#vaultListing.tellBadNews([scan.err])
@@ -214,7 +214,7 @@ export class Bank implements VaultWorld {
    * none.
    */
   async #eraseOwnLeases(): Promise<void> {
-    const rows = await this.#ownLeasesProvedBefore(FarFuture)
+    const rows = await this.#scanOwnLeasesProvedBefore(FarFuture)
     await Promise.all(rows.map((row) => this.#eraseLease(row)))
   }
 
