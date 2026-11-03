@@ -1,6 +1,6 @@
 # Thread 5: timerless (2026-11-03)
 
-Branch `20261103-timerless`, PR pending, stacked on #449. Justify: green: `safebyok` 4584 passed, 37 skipped (84 files); root 302; no size budget moved.
+Branch `20261103-timerless`, PR #453, stacked on #449. Justify: green: `safebyok` 4584 passed, 37 skipped (84 files); root 302; no size budget moved.
 
 * **Built**: a Storable's timeliness is a timestamp, `#refreshedAt` against a horizon (`maxMillisSinceRefresh` at construction). No timer, no join: every fetch makes its own `get`. `vault.ensureTimely(maxMillis?)` hydrates and demands present: recent answers itself with no fetch, older fetches, `0` always fetches, a vault found gone refuses `absent_vault`. `MSX.Promptly` (2,000 ms) is what `ensureReadyToChangeGate` passes.
 * **Removed**: Storable's `Trigger`, `oneAtATime` join, `doFetch`, `ensureReadyToFetch`; `listing.hydrateAll`, `#told` (the dedupe that only served a join); `MinRefreshMillis`, `eagerFrac` from `models-shapes.ts`; `DefaultPesterMillis`, `pesterMinutes`, `pesterMillis` on the bank. Tests of all of these are deleted, not ported. `listing.hello` now only starts the watch; `VaultListing.hello` also takes up cached leases.
