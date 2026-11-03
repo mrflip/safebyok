@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 6 filed; thread 7 building. Line: main → #449 → #453 → #450 → #454 → #452 → #451.
+* **Status:** threads 1 to 7 filed; thread 8 building. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455.
 
 ## The goal
 

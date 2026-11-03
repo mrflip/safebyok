@@ -8,6 +8,9 @@ Newer than the plan wherever they disagree. Kept by the orchestrator.
 within 6 to 8 minutes. Thread 1 did so three times with nothing committed. Every handoff now says to search and edit by
 script, keep test output short, commit at each green, and push a draft PR early.
 
+The shape that works: one worker writes `src/` and stops on the two-compaction rule, and a fresh one moves the tests and proves
+it. Threads 1, 6 and 7 all ran so; a thread file is enough to hand over on.
+
 ## The Coach's rulings
 
 * `send` hydrates, "because it might be sparse". `noted.md`'s "`send` does not hydrate" is wrong (thread 14 corrects it).
@@ -47,6 +50,14 @@ until thread 12.
 Thread 1 moved `proving.makeLease(...)` from `vault.ts` to `vault-listing.ts`'s `create`, and thread 3 changed it: expect a
 small conflict where threads 1 and 3 meet, at the restack before thread 7.
 
+**Thread 4, `device_db`.** `src/storage/device-db-new.ts`, abstract `DeviceDB`: `cache(row)`, `peek(asked)`, `vacate(asked)`, `leasesProvedBefore(cutoff)`, `cacheDeviceRecord(record)`, each with a `try*`; a store writes `do*`. `peek` answers the raw row or null: another `vault_tok` or a row failing its check is null. `vacate` erases only a row under the asked `vault_tok`. `leasesProvedBefore` spans every bank and answers `{applabel, user_id, vaultlabel, vault_tok, proved_at}`, oldest first, never a key. `cacheDeviceRecord` answers `{ act, record }`: `born`, `held` or `rewrote`, the last being the bank's bad news.
+
+**Thread 5, `timerless`.** A Storable's timeliness is the timestamp `#refreshedAt` against a horizon. `vault.ensureTimely(maxMillis?)`, `MSX.Promptly`. Overlapping `fetch` calls join on `#oneFetchAtATime`, as the spec draws (my handoff first said the join goes; it was put back). `Listing.hello` only starts the watch. The gating attempt must still pass `Promptly`.
+
+**Thread 6, `store_switch`.** Listings call `vaultDB.try*` and `watch` directly; `Store` is gone. `tests/test-helpers/models-world.ts` holds `TestableVaultDB extends MemoryVaultDB`, logging calls and taking `will*` scripts; `ModelsWorld` keeps its names. A seeded sparse or `am:'d'` row refuses `damaged_record` at the real verbs. Gate verbs stay over `putVault`/`repl` until thread 11. `damaged_records` entries carry `damagekind`, `format_mismatch` for a newer row.
+
+**Thread 7, `lease_seams`.** `vault.leaseFriend()` over the real deviceDB; `lease.attach()`, `#attachLease`, `#renewLease(proved, gate_epoch, heldLease)`, `#vacateLease`, `#panic`; `sweep`, `vacate` and the `disabled` refusal; `vault.sealStampedString`, `unsealStampedString`; `vault.boxListing` and `listing.boxListingOf`, with no watch started. `with*` answers `{ gate, proved }`. `Bank.goodbye` sweeps, so a `hello` after it refuses until thread 12. `vault.del()` doesn't yet reach the spec's end state.
+
 ## Crossings raised
 
 To go into `whiteboard/20261102-unrace/crossings.md`:
@@ -57,3 +68,7 @@ To go into `whiteboard/20261102-unrace/crossings.md`:
 * A `lock()` landing while `vault.ensureUnlocked` proves ends unlocked, with its lease cached; ruled in `noted.md` (thread 3).
 * `uncacheForgotten` deletes by scope outside the lease's chores, so it can land after an unlock's put and cost the next session
   a proof (thread 3's review).
+* `ensureTimely(0)` can join a `get` begun before the call and resolve with the older record, which is what the spec's join
+  draws (thread 5's review).
+* `box.expose` assigns `#exposed` after its await, so a sweep of that box alone leaves a whisper on a swept box; `expose` is
+  postponed this sprint (thread 7's review).
