@@ -1,6 +1,6 @@
 # Thread 1: storable_send (2026-11-03)
 
-Branch `20261103-storable_send`, PR: see the branch. **Justify: RED, a checkpoint.** `src/` typechecks;
+Branch `20261103-storable_send`, PR #449. **Justify: RED, a checkpoint.** `src/` typechecks;
 `tsc` has 316 errors, all in tests; `vitest tests/models tests/loosened`: 299 failed, 861 passed.
 Stopped on the orchestrator's order after three compactions: a fresh worker finishes from here.
 
