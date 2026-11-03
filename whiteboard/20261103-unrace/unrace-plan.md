@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. Paused on the Coach: what a row failing its check does, the rest of their Undergrowth replies, `gh pr ready` on #461 and #463. Then 18, 19, 20, 16, 14. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." So 18, 19 and 20 are held for triage; 16 and then 14 go ahead on the restacked line. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
@@ -367,7 +367,7 @@ check that cannot be written marks an invariant that is not one."
   change rejecting after its record is stored: "I can't see at a glance that the ones you named are wontfix, so document them and if
   it's straightforward test in halpimonfire". So `crossings.md`, not `wontfix.md`, and a test that a refused `tryCache` during
   `replacePassphrase` resolves and fires `onBadNews`.
-* **Levels:** `high` review. **Size:** medium. **Depends on:** 20.
+* **Levels:** `high` review. **Size:** medium. **Depends on:** 13, 15, 17, restacked.
 
 ### 17. `doc_strip` (the Coach, on Closer Look, 2026-11-03)
 
@@ -385,6 +385,8 @@ smell. Flag all methods with logorrheic "SLOPDOC" in the replacement"*
 
 ### 18. `plain_seam` (the Coach, on Closer Look, 2026-11-03)
 
+*Orchestrator:* held until the Coach has triaged Closer Look.
+
 *"Nothing has been contemplated that involved running zod inside a transaction, I think the "its checks" may have been loose
 language."* *"world and dbhas have the full record by design. Refusals should use error factories that determine by selection what
 goes into the error and its meta"*
@@ -398,6 +400,8 @@ goes into the error and its meta"*
 
 ### 19. `world_whole` (the Coach, on Closer Look, 2026-11-03)
 
+*Orchestrator:* held until the Coach has triaged Closer Look.
+
 *"this sounds like someone worked around the typechecker by eviscerating the code. fix"*. *"vault hello should not be involved in
 populating box listings by anything more than triggering the one code path that does"*. *"box being durable is useful and important
 for the non react user. Replacing a vault is epochal in a way that replacing a box is not,. Still, some of that machinery is a little
@@ -410,6 +414,8 @@ sus"*
   **Depends on:** 18.
 
 ### 20. `test_teeth` (the Coach, on Closer Look, 2026-11-03)
+
+*Orchestrator:* held until the Coach has triaged Closer Look.
 
 *"Fix the weak tests great catch"*: the "a lock() landing during a send" crossings run no real `vault.lock()`; no test has a real Vault hear
 a newer row from a box answer; `MemoryVaultDB` tells watchers by microtask, so the other order runs only where a test forces it;
