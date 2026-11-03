@@ -2,12 +2,12 @@
 
 import { omit } from 'es-toolkit'
 import { VaultError } from '../errors'
-import { type Outcome, outcomeOf } from '../outcome'
+import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import type { DeviceDB } from '../storage/device-db-new'
-import type { Notice, VaultDB } from '../storage/vault-db-new'
+import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
 import { alreadyHeldError } from '../helpers/throwers'
@@ -93,22 +93,28 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
 
-  /** Lay a new passphrase wayin on the row, and deliver what it stores to the vault held. `params` spread the record the attempt read, so a row moved since refuses 'stale_write', the row stored delivered first. Nothing locks: the vaultKey does not change. */
-  async replacePassphrase(params: ReplacePassphraseParams): Promise<void> {
+  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault held, and answer that record. A row moved since refuses 'stale_write', the row stored delivered first. Nothing locks: the vaultKey does not change. */
+  async replacePassphrase(params: ReplacePassphraseParams): Promise<VS.VaultRecord> {
     this.demandEnabled()
-    await this.deliver(await this.vaultDB.tryReplacePassphrase(params))
+    return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
   }
 
   /** Lay a passkey wayin on the row, as {@link replacePassphrase} does; one held refuses 'camped'. */
-  async addPasskey(params: AddPasskeyParams): Promise<void> {
+  async addPasskey(params: AddPasskeyParams): Promise<VS.VaultRecord> {
     this.demandEnabled()
-    await this.deliver(await this.vaultDB.tryAddPasskey(params))
+    return this.#deliverStored(await this.vaultDB.tryAddPasskey(params))
   }
 
   /** Null the row's passkey wayin, as {@link replacePassphrase} does; with none held, nothing moves. */
-  async revokePasskey(params: RevokePasskeyParams): Promise<void> {
+  async revokePasskey(params: RevokePasskeyParams): Promise<VS.VaultRecord> {
     this.demandEnabled()
-    await this.deliver(await this.vaultDB.tryRevokePasskey(params))
+    return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
+  }
+
+  /** The record a gate verb stored: the vault held may hold a newer one by the time its answer is delivered. */
+  async #deliverStored(answer: Answer<VS.VaultRecord, string>): Promise<VS.VaultRecord> {
+    await this.deliver(answer)
+    return valOf(answer)
   }
 
   /** Delete the vault `ante` names, over its own revision and not the slot's, its answer delivered; its boxes cascade in the vaultDB. A row moved since refuses 'stale_write', delivered first; `ante` of another life than the slot's refuses 'stale_write', nothing asked of the vaultDB. An entry of a `damaged_records` names that very row, whatever is held. */

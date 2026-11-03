@@ -145,11 +145,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryRevokePasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey()) }
 
-  /** The commit, then a lease under the epoch it landed. The old lease stays in force for the moments between, safely, as the vaultKey did not change. */
-  async #landGate(proved: Proving, commit: () => Promise<void>): Promise<this> {
+  /** The commit, then a lease under the epoch it landed, whatever record has arrived since. The old lease stays in force for the moments between, safely, as the vaultKey did not change. */
+  async #landGate(proved: Proving, commit: () => Promise<VS.VaultRecord>): Promise<this> {
     const heldLease = this.#lease
-    await commit()
-    await this.#renewLease(proved, this.gate.gate_epoch, heldLease)
+    const stored = await commit()
+    await this.#renewLease(proved, stored.gate.gate_epoch, heldLease)
     return this
   }
 
