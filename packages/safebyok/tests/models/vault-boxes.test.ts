@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import * as TH from '../test-helpers'
-import { Passphrase, byPassphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
+import { Passphrase, byPassphrase, makeBornVault, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -20,7 +20,7 @@ const makeWorld = async () => {
   /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first holds. */
   const openNextSession = async () => {
     const vault = await world.anotherSession().build(world.demandStored())
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     return vault
   }
   return { ...world, boxrows, tryGetVault, tryPutBox, tryGetBox, openNextSession }
