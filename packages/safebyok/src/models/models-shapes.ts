@@ -283,7 +283,7 @@ export type BoxDnaFilled = Z.output<typeof boxDna>
 export type BoxPatchGiven = Z.output<typeof boxPatch>
 // --
 
-// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, Promptly, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, StorableOpts
+// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, StorableOpts
 
 /** The policies when sending a record to a place that already holds one: the one value, `replace`, the versioned replace (compare-and-swap) every put is, and the default. `fetch` is not implemented. */
 export const ifPresentVals = ['replace'] as const
@@ -296,17 +296,18 @@ export const Promptly = 2000
 
 /** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.
  * `ifPresent` is optional, and only ever {@link ifPresentVals}' `'replace'`, which names what every put already is and changes nothing; `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
- * is a span of milliseconds, 0 or more, or `Infinity` for never. `timelyOpts` says how fresh the
+ * is a span of milliseconds, 0 or more, or `Infinity` for never; `maxMillis` is one or none. `timelyOpts` says how fresh the
  * record in hand (`maxMillisSinceRefresh`) and the world (`maxWorldMillis`) must be before a verb
  * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` adds `ifPresent`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
  * strips the rest. `watchable` is the flag `isWatchable` is set to, a boolean; `listener` is what
  * `subscribe` enrolls, a function.
  */
-export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, bool, fn }) => {
+export const { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, bool, fn }) => {
   const ifPresent     = oneof(ifPresentVals)
   const ifAbsent      = oneof(ifAbsentVals)
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
-  const timelyOpts    = obj({ maxMillisSinceRefresh: horizonMillis.optional(), maxWorldMillis: horizonMillis.optional() })
+  const maxMillis     = horizonMillis.optional()
+  const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
   const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.optional() })
   const sendOpts      = timelyOpts.extend({ ifPresent: ifPresent.optional() })
   const storableOpts  = obj({
@@ -315,7 +316,7 @@ export const { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOp
   })
   const watchable     = bool
   const listener      = fn<() => void>()
-  return { ifPresent, ifAbsent, horizonMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener }
+  return { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, watchable, listener }
 })
 
 /** How `send` meets what storage holds, as {@link ifPresent} checks it: `'replace'`, the default and only policy, is the versioned replace (compare-and-swap). Nothing hands it to storage. `'fetch'` is not implemented. */

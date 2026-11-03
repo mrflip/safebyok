@@ -20,6 +20,14 @@ describe("listing.fetch(scope): nothing stored for a thing held alive", () => {
   })
 })
 
+describe("listing.ensureTimelyWorld(maxMillis)", () => {
+  it("refuses 'bad_option' a span out of range, asking the world nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.ensureTimelyWorld(-1), 'bad_option')
+    expect(held.mw.callsOf('ensureTimely')).to.deep.equal([])
+  })
+})
+
 describe("Listing's pipeline: what every answer takes", () => {
   describe("listing.hello()", () => {
     it("starts the watch, with fullFor naming every box, until one is set otherwise", async () => {

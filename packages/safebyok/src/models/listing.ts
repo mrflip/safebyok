@@ -52,7 +52,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   lockState(): LockState { return this.world.lockState() }
 
   /** The world refreshed within `maxMillis`, by default its own horizon. */
-  async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(MSX.horizonMillis.optional().parse(maxMillis)) }
+  async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(MSX.maxMillis.parse(maxMillis)) }
 
   // == [Starting and ending]: hello, goodbye
 
