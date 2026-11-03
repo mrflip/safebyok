@@ -272,34 +272,66 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
   })
 
-  it("tidy locks a vault past its autolock, and the next hello's tidy leaves the next page asking", async () => {
+  it("a host calling autolock locks a vault past its autolock, and a late page asks for a proof whether its host calls it or not", async () => {
     const { world, bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
-    // Inside the autolock, tidy changes nothing.
+    // Inside the autolock duration, autolock changes nothing.
     world.advance(AutolockMillis - 1)
-    await bank.tidy()
+    await bank.autolock()
     bankUi.expectRenders([])
     expect(world.leaseRows()).to.have.lengthOf(1)
 
     // Past it, the lease is erased and the vault reads locked; the bank stays ready.
     world.advance(2)
-    await bank.tidy()
+    await bank.autolock()
     bankUi.expectRenders(['ready: main locked'])
-    expect(world.leaseRows()).to.have.lengthOf(0)
+    await TH.eventually(() => world.leaseRows().length === 0)
     expect(vault.isUnlocked).to.be.false
 
-    // And a page opened late finds nothing cached: its unlock asks.
+    // A page opened late whose host never calls autolock asks all the same: Lease.peek leaves the row and reads as no row.
     await vault.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
     world.advance(AutolockMillis + 1)
     const latePage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    const lateUi = mountComponent(latePage, bankStatus)
     await latePage.hello()
-    expect(world.leaseRows()).to.have.lengthOf(0)
+    lateUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    const expiredRow = world.leaseRows()[0]
     await latePage.vaultOf(VaultBag)?.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
+    lateUi.expectRenders(['ready: main unlocked'])
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    expect(world.leaseRows()[0]).to.not.deep.equal(expiredRow)
+
+    // Its host calling autolock after hello erases the row before anyone asks.
+    world.advance(AutolockMillis + 1)
+    const laterPage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    const laterUi = mountComponent(laterPage, bankStatus)
+    await laterPage.hello()
+    laterUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
+    await laterPage.autolock()
+    laterUi.expectRenders([])
+    await TH.eventually(() => world.leaseRows().length === 0)
+  })
+
+  it("a row past autolock outlives a late page with no dialog, and the first page's bank.autolock finds it and locks", async () => {
+    const { world, bank, vault } = await buildHost()
+    const bankUi = mountComponent(bank, bankStatus)
+    bankUi.expectRenders(['ready: main unlocked'])
+    world.advance(AutolockMillis + 1)
+    const latePage = world.bankOn({ requestCleartext: undefined, onBadNews })
+    await latePage.hello()
+    await TH.expectRefusal(latePage.vaultOf(VaultBag)!.ensureUnlocked(), 'vault_locked')
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    bankUi.expectRenders([])
+    await bank.autolock()
+    bankUi.expectRenders(['ready: main locked'])
+    expect(vault.isLocked).to.be.true
+    await TH.eventually(() => world.leaseRows().length === 0)
   })
 
   it("signing out: bank.vacate empties the screen and this device, and the next hello lists the vault again, locked", async () => {

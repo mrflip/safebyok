@@ -1,8 +1,10 @@
 /** A vault's box verbs, from the host's side, on real seals: `hello`, `getBox`, `putBox`, `delBox`, a box's `extractWhisper`, and the sidecar-only `send`. */
 
+import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
+import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Passphrase, byPassphrase, delTyping, makeBornVault, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import { Passphrase, byPassphrase, delTyping, makeBornVault, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -138,6 +140,29 @@ describe("the box verbs refuse a vault locked, or gone, before they touch storag
     const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'vault_locked')
     expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper.val)
     expect(err.message).not.to.include(Whisper.val)
+  })
+})
+
+describe("a box verb the vaultDB refuses over its vault's row", () => {
+  it("'vault_gone' delivers no box, as its dbhas is the vault's: the tombstone reaches the vault as its world, and no bad news is told", async () => {
+    const { vault, restoreRow, demandStored, tryGetBox } = await makeWorldWithBox()
+    restoreRow({ ...omit(demandStored(), ['gate']), am: 'x', revision_seq: 5, revision_tok: 'rev-gone-5' })
+    const tellBadNews = vi.spyOn(VaultListing.prototype, 'tellBadNews')
+    tryGetBox.mockClear()
+    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_gone')
+    expect(tryGetBox).toHaveBeenCalledOnce()
+    expect(vault.isPresent).to.be.false
+    expect(tellBadNews).not.toHaveBeenCalled()
+  })
+
+  it("'vault_mismatch' delivers no box, as its dbhas is the vault's, and no bad news is told", async () => {
+    const { vault, restoreRow, tryGetBox } = await makeWorldWithBox()
+    restoreRow({ ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' })
+    const tellBadNews = vi.spyOn(VaultListing.prototype, 'tellBadNews')
+    tryGetBox.mockClear()
+    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_mismatch')
+    expect(tryGetBox).toHaveBeenCalledOnce()
+    expect(tellBadNews).not.toHaveBeenCalled()
   })
 })
 

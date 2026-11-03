@@ -1,15 +1,13 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { LOCKED } from '../../src/models/models-shapes'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
+import { DefaultLeaseMillis } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockTyping } from '../test-helpers/vault-world'
+import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultAndFriend, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -111,14 +109,14 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   })
 })
 
-const makeFreshLease = async ({ vault, opts: { world } }: Awaited<ReturnType<typeof makeBornVault>>) => {
+const makeFreshLease = async ({ vault, friend, opts: { world } }: Awaited<ReturnType<typeof makeBornVaultAndFriend>>) => {
   const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
-  return proving.buildLease(vault._cheat_leaseFriend())
+  return proving.buildLease(friend)
 }
 
 describe("lease.attach: the one way a vault comes to hold a lease", () => {
   it("holds the lease, reading unlocked, and caches its row: the lease it displaces is dropped", async () => {
-    const born = await makeBornVault()
+    const born = await makeBornVaultAndFriend()
     const { vault, deviceDB } = born
     const first = await makeFreshLease(born)
     const second = await makeFreshLease(born)
@@ -130,26 +128,15 @@ describe("lease.attach: the one way a vault comes to hold a lease", () => {
     expect(deviceDB.cachedNow()).to.deep.include({ proved_at: second.proved_at })
   })
 
-  it("refuses 'bad_option' a lease built on another Vault object of the same stamp, and leaves its row", async () => {
-    const born = await makeBornVault()
-    const later = born.anotherSession()
-    const other = await later.build(born.demandStored())
-    const proving = await PassphraseProving.buildStored(born.vault.gate, passphraseCleartext.parse(Passphrase), born.opts.world)
-    const lease = await proving.buildLease(other._cheat_leaseFriend())
-    await TH.expectRefusal(born.vault._cheat_leaseFriend().attachLease(lease), 'bad_option')
-    expect(lease.isInForce).to.be.true
-    expect(born.deviceDB.tryVacate).not.toHaveBeenCalled()
-  })
-
   it("refuses 'vault_locked' a lease out of force", async () => {
-    const born = await makeBornVault()
+    const born = await makeBornVaultAndFriend()
     const lease = await makeFreshLease(born)
     lease.evict()
     await TH.expectRefusal(lease.attach(), 'vault_locked')
   })
 
   it("past a sweep refuses, the lease vacated, no row cached, and the row the sweep left erased", async () => {
-    const born = await makeBornVault()
+    const born = await makeBornVaultAndFriend()
     const { vault, deviceDB } = born
     const lease = await makeFreshLease(born)
     vault.sweep()
@@ -225,12 +212,30 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(other.deviceDB.cachedNow()).to.be.null
   })
 
-  it("makes no check of a cached lease's age: taken up however long ago it was proved", async () => {
-    const { demandStored, anotherSession, advance } = await makeBornVault()
-    advance(400 * 24 * 60 * 60_000)
-    const again = await anotherSession().build(demandStored())
-    await again.ensureUnlocked()
-    expect(again.isUnlocked).to.be.true
+  it("takes up a cached lease as old as the world's leaseMillis, and leaves one any older not loaded, which reads as no row", async () => {
+    const { demandStored, anotherSession, advance, deviceDB } = await makeBornVault()
+    advance(LeaseMillis)
+    const within = await anotherSession().build(demandStored())
+    await within.ensureUnlocked()
+    expect(within.isUnlocked).to.be.true
+    advance(1)
+    const past = await anotherSession().build(demandStored())
+    await TH.expectRefusal(past.ensureUnlocked(), 'vault_locked')
+    expect(past.isLocked).to.be.true
+    expect(deviceDB.cachedNow()).to.not.be.null
+  })
+
+  it("judges by DefaultLeaseMillis where the world names no leaseMillis", async () => {
+    const { demandStored, anotherSession, advance, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { leaseMillis: undefined as never })
+    advance(DefaultLeaseMillis)
+    const within = await anotherSession().build(demandStored())
+    await within.ensureUnlocked()
+    expect(within.isUnlocked).to.be.true
+    advance(1)
+    const past = await anotherSession().build(demandStored())
+    await TH.expectRefusal(past.ensureUnlocked(), 'vault_locked')
+    expect(past.isLocked).to.be.true
+    expect(deviceDB.cachedNow()).to.not.be.null
   })
 
   it("locks the vault where a cached lease will not open at its first seal: 'damaged_lease', and the row erased", async () => {
@@ -481,11 +486,10 @@ const valuesShownBy = (holder: object): unknown[] => {
 
 describe("a vault and a lease show neither the lease friend nor the lease key handle, one level deep, by identity", () => {
   it("no field or getter of a vault or its lease shows either, nor Object.keys or JSON.stringify", async () => {
-    const born = await makeBornVault()
-    const { vault, deviceDB } = born
+    const born = await makeBornVaultAndFriend()
+    const { vault, deviceDB, friend } = born
     const lease = await makeFreshLease(born)
     await lease.attach()
-    const friend = vault._cheat_leaseFriend()
     const row = deviceDB.cachedNow() as Record<string, unknown>
     expect(row['lease_key']).to.be.an.instanceof(CryptoKey)
     for (const holder of [vault, lease]) {
@@ -501,13 +505,5 @@ describe("a vault and a lease show neither the lease friend nor the lease key ha
     }
     expect('leaseFriend' in vault).to.be.false
     expect('friend' in lease).to.be.false
-  })
-
-  it("nothing in src/ calls _cheat_leaseFriend, which vault.ts alone defines", () => {
-    const srcDir = fileURLToPath(new URL('../../src/', import.meta.url))
-    const callers = readdirSync(srcDir, { recursive: true, encoding: 'utf8' })
-      .filter((relpath) => relpath.endsWith('.ts'))
-      .flatMap((relpath) => (readFileSync(path.join(srcDir, relpath), 'utf8').match(/_cheat_leaseFriend\(/g) ?? []).map(() => relpath))
-    expect(callers).to.deep.equal([path.join('models', 'vault.ts')])
   })
 })

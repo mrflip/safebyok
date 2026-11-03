@@ -42,7 +42,9 @@ export class Lease implements LeaseStamp {
 
   // == [Making one]: peek, tryPeek, grant
 
-  /** SLOPDOC: The lease cached for `gate_epoch`, or null so the vault asks for a proof; a stale one is uncached. */
+  /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is uncached;
+   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
+   */
   static async peek(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
     leasePeekArgs.parse({ friend, gate_epoch })
     const cached = await friend.peekLease()
@@ -54,6 +56,7 @@ export class Lease implements LeaseStamp {
       await uncacheForgotten(friend)
       return null
     }
+    if (isPastAutolock(checked.data, friend)) { return null }
     return new Lease(friend, checked.data, true)
   }
 
@@ -72,13 +75,10 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Taking hold]: attach, isMadeFor, cache, tryCache
+  // == [Taking hold]: attach, cache, tryCache
 
-  /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. A vault past a sweep, a vacate or a delete refuses, the lease vacated; one this lease was not made for refuses 'bad_option'. */
+  /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. */
   async attach(): Promise<void> { await this.#friend.attachLease(this) }
-
-  /** True where this lease was made for `friend`. */
-  isMadeFor(friend: LeaseFriend): boolean { return this.#friend === friend }
 
   /** Put this lease in the deviceDB's cache; one peeked from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
   async cache(): Promise<void> {
@@ -91,7 +91,7 @@ export class Lease implements LeaseStamp {
 
   // == [Ending one]: vacate, tryVacate, evict, isForgotten, isInForce
 
-  /** Drop the keys and uncache the record, so this device is locked. Nothing here has bytes to zero: the leaseKey is a non-extractable handle, and the wrap is ciphertext. A refused uncache leaves the lease out of force and the record cached. */
+  /** Drop the keys and uncache the record, so this device is locked. */
   async vacate(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
@@ -115,7 +115,7 @@ export class Lease implements LeaseStamp {
 
   // == [Whispers under the vaultKey]: sealWith, unsealWith, ctxOf
 
-  /** `whisperText` sealed under a fresh boxKey, both bound to `stamp`. The lease going out of force meanwhile refuses 'vault_locked' and hands nothing back. */
+  /** `whisperText` sealed under a fresh boxKey, both bound to `stamp`. */
   async sealWith(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
     leaseSealArgs.parse({ whisperText, stamp })
     const vaultKey = await this.#vaultKey('wrapKey')
@@ -131,7 +131,7 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** The text `sealed` holds, bound to `stamp`: what `sealWith` sealed. It refuses 'damaged_box' where it will not open, and 'vault_locked', handing nothing back, where the lease went out of force meanwhile. */
+  /** The text `sealed` holds, bound to `stamp`: what `sealWith` sealed. */
   async unsealWith(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     leaseUnsealArgs.parse({ sealed, stamp })
     const vaultKey = await this.#vaultKey('unwrapKey')
@@ -164,13 +164,13 @@ export class Lease implements LeaseStamp {
 
   // == [The vaultKey]: demandRecord, vaultKey, leaseStamp
 
-  /** The record, while the lease is in force: out of force refuses 'vault_locked'. */
+  /** The record, while the lease is in force. */
   #demandRecord(): LeaseRecord {
     if (this.#record === null) { throw leaseNotInForce() }
     return this.#record
   }
 
-  /** The vaultKey for this one call, non-extractable, with the one usage. A lease out of force refuses 'vault_locked'; one that will not open locks its vault, is dropped, and refuses 'damaged_lease'. Nothing keeps the key between calls. */
+  /** The vaultKey for this one call, non-extractable, with the one usage. Nothing keeps the key between calls. */
   async #vaultKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
     const { lease_key, vault_key_lease_wrapped } = this.#demandRecord()
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
@@ -188,7 +188,10 @@ export class Lease implements LeaseStamp {
 }
 // --
 
-// == [Forgetting the cached record]: uncacheForgotten
+// == [Judging the cached record]: isPastAutolock, uncacheForgotten
+
+/** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
+const isPastAutolock = ({ proved_at }: LeaseStamp, { clock, leaseMillis }: LeaseFriend): boolean => clock.now() - proved_at > leaseMillis
 
 /** Uncache a record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
 const uncacheForgotten = async (friend: LeaseFriend): Promise<void> => {

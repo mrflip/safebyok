@@ -48,3 +48,51 @@ context, not by fine-tuning each of these.
 
 * A `lock()` landing during `lease.peek` (0.5 to 5 ms) loses: the vault ends unlocked with its cached row erased, until the
   next `lock()`.
+
+## A gate change rejecting after its record is stored
+
+The vaultDB is the ground truth: in each of these the verb's caller hears a refusal though the record landed, the next fetch
+brings this device up to it, and nothing guards against them. Each is pinned in `tests/models/halpimonfire.test.ts`.
+
+* A `sweep` or `vacate` of the listing while the store's answer comes back: delivering it refuses `disabled`. The new
+  passphrase opens the vault from then on, and the next `hello` lists the row.
+* A crypto failure in `proved.buildLease`, staged by a mock: the failure rejects, the vault holds the new gate and the old
+  lease, unlocked and sealing, and its cached row is of the old epoch, so the next session asks for a proof.
+* `demandReadyToAttach` refusing after a tombstone or a sweep crosses is **a birth's alone**: `vault_gone` or `disabled`, the new
+  lease vacated. A gate change can't meet it: the tombstone or sweep drops the lease held, `#renewLease` sees it forgotten
+  and vacates the new one, and the verb *resolves*, over a vault now gone or let go.
+* A refused `tryCache` is no rejection: the verb resolves, unlocked, and `onBadNews` hears it.
+
+## Crossings the sprint's threads raised
+
+Copied from `unrace-progress.md` at the sprint's end; names as they stood when raised (`tidy` is now `bank.autolock`).
+
+* A lock during `listing.put` loses: the put lands anyway (thread 1).
+* A `box.del` checks the lock only at entry (thread 1).
+* A vaultDB watch stopped in the same tick still hears a queued notice (thread 2).
+* A `lock()` landing while `vault.ensureUnlocked` proves ends unlocked, with its lease cached; ruled in `noted.md` (thread 3).
+* `uncacheForgotten` deletes by scope outside the lease's chores, so it can land after an unlock's put and cost the next session
+  a proof (thread 3's review).
+* `ensureTimely(0)` can join a `get` begun before the call and resolve with the older record, which is what the spec's join
+  draws (thread 5's review).
+* `box.expose` assigns `#exposed` after its await, so a sweep of that box alone leaves a whisper on a swept box; `expose` is
+  postponed this sprint (thread 7's review).
+* `create`'s put answer that loses to a delete and a new life hands back another vault; thread 10's `#runBirth` ended this.
+* A `lock()` during the `ensureTimely` in `delBox`'s no-box-held path lets the tombstone land on a vault now locked (thread 9's review).
+* An instance arriving during `putBox`'s `ensureTimely` sends the birth into `demandNotHeld`, refusing `bad_option` (thread 9's review).
+* A second `attempt` with the same answer while the first runs zeroes the bytes in use, so the first answers `bad_option` (thread 10's review).
+* A tombstone or sparse record landing during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
+* A `del_vault`'s `lock()` with a refused erase and no `onPanic` vacates the vault during the delete, and `listing.del` still lands (thread 11).
+* A tombstone or discard between the commit and the lease in `#landGate` settles the gating as failed though the row moved (thread 11's review).
+* A gate verb refused `vault_gone` or `vault_mismatch` doesn't deliver, so the Vault reads present until its next fetch, box answer or notice (thread 11's review).
+* Crossing `hello`s: the last to answer sets the stage (thread 12).
+* A record changed between `getBank` and the watch's start isn't heard until the next fetch (thread 12).
+* A listed live vault whose row is void in `getBank` stays listed until its next fetch (thread 12).
+* A held lease whose cache row never landed, or that another page's `tidy` erased, isn't found by `tidy`, leaving the vault unlocked past autolock; this keeps a lease that should drop (thread 12 and its review; a Coach's row).
+* A birth past the enter key finishes and caches its lease after `bank.vacate`; this keeps a lease that should drop (thread 12's review).
+* A swept `hello` landing late marks a fresh listing `refused` (thread 12).
+* A `getBank` or plugin load that never answers holds `tidy` back; this keeps a lease that should drop (thread 12's rework).
+* A `hello` crossing `bank.vacate` lands `ready` on the emptied listing, which reopens the false prompt, by reading (thread 12's rework and second review).
+* The watch stays on past a vacate, so a notice can list a vault on a bank not ready, by reading (thread 12's rework).
+* A `hello` in flight crossing `bank.vacate` lands on the same listing, so it can mark the bank `ready` and list the vaults, locked, after a sign-out; it holds no lease (thread 13, by reading).
+* `demandBirthSlot` sees only what this session holds, so a birth over a vault stored but not yet fetched still asks and runs the KDF, then answers that vault locked (thread 15's second review).

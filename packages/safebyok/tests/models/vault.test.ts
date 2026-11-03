@@ -2,7 +2,7 @@ import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, buildTyping, byPassphrase } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, makeBornVault, makeBornVaultAndFriend, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, buildTyping, byPassphrase } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -85,31 +85,34 @@ describe("VaultListing.build of a record, and its constructor", () => {
 
 describe("proving.buildLease(friend): the vault is taken at the grant", () => {
   it("grants the vault whose stamp the proving is of a lease, caching nothing of itself", async () => {
-    const { listing, deviceDB } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
+    const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving(vault)
     deviceDB.tryCache.mockClear()
-    const lease = await proving.buildLease(vault._cheat_leaseFriend())
+    const lease = await proving.buildLease(friend)
     expect(lease.isInForce).to.be.true
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
     lease.evict()
   })
 
   it("refuses 'bad_option' a vault of another stamp, before any key is touched", async () => {
-    const { listing, deviceDB } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
+    const { deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryCache.mockClear()
-    await TH.expectRefusal(proving.buildLease(vault._cheat_leaseFriend()), 'bad_option')
+    await TH.expectRefusal(proving.buildLease(friend), 'bad_option')
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
   })
 })
 
-describe("vault._cheat_leaseFriend()", () => {
+describe("vault.takeWorld(world)", () => {
+  it("refuses 'bad_record' a world that is no vault row", async () => {
+    const { vault } = await makeBornVault()
+    TH.expectSyncRefusal(() => { vault.takeWorld({ am: 'nope' }) }, 'bad_record')
+  })
+})
+
+describe("the friend a vault hands its leases", () => {
   it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
-    const { listing, deviceDB } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
-    const friend = vault._cheat_leaseFriend()
+    const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
     await friend.peekLease()
     await friend.tryUncacheLease()
     const asked = { ...vault.scope, vault_tok: vault.vault_tok }

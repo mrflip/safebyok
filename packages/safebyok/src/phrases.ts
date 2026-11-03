@@ -356,7 +356,7 @@ export const LeaseOfOtherVault = "This proving is of another vault: a lease is g
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, LetGoInstance, vaultAbsent, VaultDeleted
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LetGoInstance, vaultAbsent, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
@@ -375,9 +375,6 @@ export const UnlockFirst = "The vault is locked, so nothing was read or written:
 
 /** Why a locked vault with no lease kept is not unlocked without a proof. */
 export const NoProofToUnlock = "The vault is locked, this device has no lease of it cached, and this bank was made without a requestCleartext, so nothing can ask the user for a proof: give Bank.make a requestCleartext."
-
-/** Why a vault attaches no lease made for another vault, or for another Vault object. */
-export const LeaseOfOtherHolder = "This lease was made for another vault, or another Vault object of this one, so this one did not attach it: a bug in the caller."
 
 /** Why an instance past a sweep, a vacate or a delete answers nothing. */
 export const LetGoInstance = "This object was let go, by a sweep, a vacate or a delete, so it answers nothing more: ask the bank for the vault again."

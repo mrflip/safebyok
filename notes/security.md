@@ -41,6 +41,27 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (cleanup, branch `20261103-cleanup`): **The key that gets a thing out of storage is entered into the data with an enter-key
+  step, and no verb of the models layer returns a vaultKey, wayinKey or leaseKey.** In `packages/safebyok/src/models/`, a vaultKey is
+  unwrapped under the wayinKey (`Proving.#unwrapVaultKey`, extractable only to be wrapped again, dropped when the method ends) or under
+  the leaseKey (`Lease.#vaultKey`, non-extractable, one usage, one call); each is private, and every other `CryptoKey` in the layer is a
+  parameter or a local. `Lease.grant` takes a vaultKey from `Proving.buildLease`, in the layer. The whisper is the one secret that crosses
+  from `Box` to `Lease` (`sealWith`, `unsealWith`, through the Vault's `sealStampedString` and `unsealStampedString`), as its JSON text, a
+  JavaScript string that cannot be zeroed: guarantees G6 and G7 name it. (Models are not yet exported from `src/index.ts`.)
+* 2026-11-03 (tidy_host, branch `20261103-tidy_host`; amended 2026-11-03 (peek_autolock), branch `20261103-peek_autolock`; amended 2026-11-03 (unrace thread 24), reversing thread 23's erase): **Autolock is a
+  best-effort reminder, not a guarantee: `bank.hello` does not call `bank.autolock`, and only a host does.** `bank.autolock()`
+  (`packages/safebyok/src/models/bank.ts`; the verb was `bank.tidy`) and `Lease.peek` at the door are the only two interventions. It was
+  once so that `Lease.peek` did not judge a row's age, and `vault.ensureUnlocked` on a fresh page attached a row of any age with no
+  proof; now `Lease.peek` (`packages/safebyok/src/models/lease.ts`), meeting a row whose `proved_at` is longer ago than
+  the autolock duration (`Bank.leaseMillis`, carried on the lease friend), answers null without touching the row and without throwing
+  (amended 2026-11-03, unrace thread 24: thread 23 had `peek` erase such a row; thread 24 reverses that, so `peek` no longer uncaches
+  it and no refused-erase path remains past autolock), and the vault's caller sees what it sees with no row: `ensureUnlocked` asks for
+  a proof, or refuses `vault_locked` with no dialog. A row of another epoch or stamp is still uncached by `peek`. The comparison reads
+  the host-pluggable `clock` against a `proved_at` stored in the deviceDB. `bank.autolock` locks a held lease by its cached row, so it misses only a lease with no row of its own: one the deviceDB refused to cache, or whose row another page's `lock()` erased or wrote over. Another page's `bank.autolock` still finds a row past autolock and locks by it, and `lock()` is the one eraser.
+  `autolock` locks only listed vaults of the row's own `vault_tok`: a row whose vault is not listed, or of another life, stays on the
+  device: `deviceDB.peek` answers null for another `vault_tok`, so `Lease.peek` never erases it, and `deviceDB.vacate` leaves it. It stays until a lease of that life is cached over it, or nothing; clearing rows of no listed vault is a task not yet designed.
+  A row past autolock stays on the deviceDB, with its leaseKey handle and the wrapped vaultKey, though `Lease.peek` reads it as no row and the vault asks for a proof; it stays until the next proof's lease is written over it or a host's `bank.autolock` locks it and so erases it, and a host that never calls `bank.autolock` keeps it until then. Both go by the host's clock: a clock jumping forward destroys nothing, and setting the clock back reopens the row until the clock catches up. `notes/guarantees.md` G4 says the same. Autolock is a best-effort reminder process, not a guarantee, and `bank.autolock` is called by the host, not by `hello`. (Models are not yet exported from
+  `src/index.ts`.)
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change does not rotate the vaultKey, so it ends no session.**
   `Vault.replacePassphrase`, `addPasskey` and `revokePasskey` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
   and a device that holds the vaultKey keeps it to its lock. Revoking a passkey or replacing a passphrase stops new unlocks through the
@@ -59,7 +80,10 @@ added or folded into through the subagent, and no other entry changes.
   proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). `Vault.#runDelVault` locks first,
   so no box opens under a lease while the tombstone goes out; a refused delete leaves the vault locked. A `lock()` does not settle a
   `del_vault` asking, as a lock does not stop a delete (`declineAtLock` skips that kind), but a goodbye or vacate does
-  (`declineAtDiscard`). `Vault.del()` is `delVault()`, so there is no unguarded delete through the Vault. `vaultListing.del(ante)`
+  (`declineAtDiscard`). `Vault.del()` is `delVault()`, and `revokePasskey` runs through its own gating, so each is guarded by a Gating (the user proves the
+  passphrase) (amended 2026-11-03 (cleanup): this said there was no unguarded delete through the Vault; the listing's is not guarded). `listing.del(vault)`
+  (`VaultListing.del`, `models/vault-listing.ts`) has no gating of its own: it is the call a gated `vault.del()` ends in
+  (`#runDelVault`), and a host holding the listing can call it directly, with no proof asked. `vaultListing.del(ante)`
   refuses `stale_write`, asking nothing of the vaultDB, for an instance of another life than the slot's vault, as a delivered answer
   would tombstone the live vault locally.
 * 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
@@ -94,15 +118,16 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-11-03 (lease_narrow, branch `20261103-lease_narrow`; the Coach: "Let's fix before end of sprint, important, record to
   security.md"): the friend's `peekLease()` (the cached row, with its non-extractable `lease_key` handle), `tryUncacheLease()` (erases the
   row), `attachLease(lease)` (holds a lease as the vault's) and `tryCacheLease(record)` (overwrites the row) were all reachable from a Vault
-  or a Lease. Now `Lease` holds the friend in `#friend` and offers `lease.isMadeFor(friend)`, a boolean over a friend the caller already
-  holds, and `Vault` makes it in a private `#leaseFriend()`. A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
+  or a Lease. Now `Lease` holds the friend in `#friend`, and `Vault` makes it in a private `#leaseFriend()`, the only way to the friend (amended
+  2026-11-03 (small_rulings): `lease.isMadeFor` and the refusal built on it are gone; a lease reaches only the vault whose friend it was built
+  on, as `lease.attach` calls its own friend's `attachLease`). A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
   from `VaultListing`; its run now lives in the Vault class as the public static `Vault.launchBirth(listing, scope)` with a private
   static `#runBirth`, which reaches the private `vault.#unlockByProof`. `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
   itself and refuses 'bad_option' over a vault present, with no gating opened and no KDF run. It takes no proving: the proving comes from the
   gating it launches. A public `vault.unlockByProof(proving)` was set aside, as whatever is passed as a proving is handed the friend
-  (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) `vault._cheat_leaseFriend()` is a public
-  method, named loudly, for tests; it is a door at runtime, and the guarantee is only that nothing in `src/` calls it (a test row checks
-  this), which does not stop a host calling it. (2) A script that patches `Proving.prototype.buildLease`, `Lease.grant` or `Lease.peek`
+  (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) (amended 2026-11-03 (small_rulings): `vault._cheat_leaseFriend()`, a public
+  method for tests, is removed, and no door to the friend is left in `src/`; tests catch the friend with a spy on
+  `Proving.prototype.buildLease`, which is open (2) below.) (2) A script that patches `Proving.prototype.buildLease`, `Lease.grant` or `Lease.peek`
   (the friend is their parameter) can capture the friend from the vault's own calls, as can anything else running in the page.
   (3) The friend was not the only route to the row: `vault.world.deviceDB.peek({ ...vault.scope, vault_tok: vault.vault_tok })` answers the
   same row with the same handle, as do `bank.deviceDB` and `listing.world.deviceDB`. The host supplies the deviceDB and a same-origin
@@ -852,7 +877,7 @@ added or folded into through the subagent, and no other entry changes.
   checker is a contract to answer.** (1) `putWayin` proves with the current passphrase only (a passkey's
   answer as the proof is refused `bad_option`), as `changePassphrase` and `addPasskey` did. A new
   passphrase as text replaces the passphrase (amended 2026-10-21 (wayin_rules): and removes the
-  passkey, writing vault props with `passkey: null`, so a passkey added under the old passphrase no
+  passkey, writing vault props with `passkey: null`; amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; in `src/models/` `replacePassphrase` leaves the passkey wayin alone, and the vaultDB refuses one carrying a `passkey_wayin` (`storage/vault-db-new.ts`), so a passkey added under the old passphrase no
   longer opens the current vault props; the user adds a passkey again by proving the new passphrase;
   removal, not revocation: a copy of older vault props still opens with it, as before); a passkey's
   answer (`PasskeyAnswer`) puts the passkey, replacing any. The passkey is now made by the host before the call and its answer handed in, so a
@@ -925,7 +950,7 @@ added or folded into through the subagent, and no other entry changes.
   read or derived. Before, any wayin proved any change, so a passkey holder could reset the passphrase;
   now a passkey opens the vault but cannot change who may. `addPassphrase` is gone. Consequence: a
   forgotten passphrase can no longer be reset with the passkey, and a passphrase stored damaged cannot
-  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the current one (amended 2026-10-21 (wayin_rules): so does `putWayin` of a new passphrase, which removes it; the old
+  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the current one (amended 2026-10-21 (wayin_rules): so does `putWayin` of a new passphrase, which removes it (amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; `models/` `replacePassphrase` keeps the passkey); the old
   credential no longer opens; the same credential again mends a damaged one, with a fresh wrap), and
   `delWayin(passphrase)` removes the passkey, refusing `absent_wayin` when there is none; the passphrase
   can never be removed. Removal is still not revocation. Every change still moves `unlock_epoch`,
@@ -1787,7 +1812,7 @@ added or folded into through the subagent, and no other entry changes.
   wayin open, and the mark refuses one at a lower `vault_key_epoch` whatever its `unlock_epoch`:
   vault props from before a rotation, and with it the vaultKey the rotation replaced, are caught even
   so. What still passes is older vault props at the same `vault_key_epoch` under a forged higher
-  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `putWayin` replaced (amended 2026-10-21 (wayin_rules): or removed by a new passphrase), or a passphrase
+  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `putWayin` replaced (amended 2026-10-21 (wayin_rules): or removed by a new passphrase; amended 2026-11-03 (cleanup): in the shipped core, `src/vault.ts`; not in `models/`), or a passphrase
   `putWayin` replaced, which still opens only the vaultKey the vault is under, never a
   replaced one. (A device that opens such vault props through its lease opens no wayin:
   it takes the vaultKey it already held, and shows the older copy's wayin summaries.) The way out of a

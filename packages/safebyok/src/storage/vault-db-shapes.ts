@@ -175,7 +175,7 @@ export const isLiveRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'a')
 /** True when `raw` is a live row of the life `vault_tok`. */
 export const isLiveRowUnder = (raw: unknown, vault_tok: string): boolean => (isLiveRow(raw) && (peekOf(raw)?.vault_tok === vault_tok))
 
-/** True when `raw` passes a vault row's checks, live in the life `vault_tok`: a box write lands only under one, as the base refuses any other. */
+/** True when `raw` passes a vault row's checks, live in the life `vault_tok`. */
 export const isCheckedLiveVault = (raw: unknown, vault_tok: string): boolean => {
   const parsed = vaultRow.safeParse(raw)
   return parsed.success && (parsed.data.am === 'a') && (parsed.data.vault_tok === vault_tok)

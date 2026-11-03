@@ -24,7 +24,7 @@ Every worker and reviewer reads this section. The Coach:
 
 * **The goal: when lock is called, nothing crosses it.** We get there with simple code that can be analyzed in context, not
   by fine-tuning each crossing around a library that can't yet run end to end.
-* **Raise a crossing in one sentence,** in the thread file, for `crossings.md`. It doesn't block the thread. If it exposes
+* **Raise a crossing in one sentence,** in the thread file, for `reference-timings.md`. It doesn't block the thread. If it exposes
   information or keeps a lease that should drop, say so first, and fix it if that adds no machinery. If it's trivially easy,
   demonstrate the behaviour with one passing test in `tests/models/halpimonfire.test.ts`; if not, the sentence is enough.
 * **Some things we don't and won't guarantee,** such as the ordering of simultaneous gets, puts and dels of a box, or even
@@ -36,16 +36,16 @@ Every worker and reviewer reads this section. The Coach:
 
 ## Read first
 
-In `whiteboard/20261102-unrace/`, by section: `rg -n '^#' <file>`, then the sections your thread names. **These three are
+In `whiteboard/20261102-newdesign/`, by section: `rg -n '^#' <file>`, then the sections your thread names. **These three are
 authoritative for the interface, governed by common sense and a recognition that they are a design draft.** The Coach:
 "Don't drive yourself off a cliff following a typo by me."
 
-* `models-invariants.md`: the seams, as tables. Read its legend and *Preconditions* first.
-* `unrace-gating.md`: each operation's steps and their order. Read *Notable Changes* first.
-* `vaultdb-invariants.md`: the vaultDB's verbs, refusals and postconditions.
+* `newdesign-models.md`: the seams, as tables. Read its legend and *Preconditions* first.
+* `newdesign-proof.md`: each operation's steps and their order. Read *Notable Changes* first.
+* `newdesign-vaultdb.md`: the vaultDB's verbs, refusals and postconditions.
 
-Below them, fall back to the code in `src/models/`. A disagreement you had to settle goes in your thread file. `noted.md`
-has the reasons behind the rulings, and `crossings.md` the timings.
+Below them, fall back to the code in `src/models/`. A disagreement you had to settle goes in your thread file. `noted.md`,
+beside this file, has the reasons behind the rulings, and `reference-timings.md` the timings.
 
 ## Ground rules
 
@@ -95,7 +95,7 @@ direct `send({ whisper?, sidecar? }, opts)`"*
 
 *"drop caches for this sprint yes"*
 
-* **Read:** `unrace-gating.md` *`send`*; `models-invariants.md` *Box*.
+* **Read:** `newdesign-proof.md` *`send`*; `newdesign-models.md` *Box*.
 * **Touches:** `models/storable.ts`, `box.ts`, `vault.ts`, `listing.ts`, `vault-listing.ts`, `box-listing.ts`, their tests,
   `tests/test-helpers/models-world.ts`.
 * **Also:** the device cache of vault and box records goes (`Cache`, `cacheOnDevice`). Leases and the device record stay cached.
@@ -113,7 +113,7 @@ direct `send({ whisper?, sidecar? }, opts)`"*
 our -vaultdb file. It should delegate down to generic methods: i.e. although the new vault-db offers addPasskey, the
 subclass layer will do putVault, getVault, etc. Only implement the in-memory one."*
 
-* **Read:** `vaultdb-invariants.md`, whole.
+* **Read:** `newdesign-vaultdb.md`, whole.
 * **Touches:** new `src/storage/vault-db-new.ts`, `src/storage/memory-vault-db.ts`, a test. The source is the single file
   `src/vault-db.ts`, read once to copy; leave it and its tests alone.
 * **Names:** the spec's lower table's `putWayins`, `putPasskey` and `delPasskey` are the upper table's `replacePassphrase`,
@@ -135,7 +135,7 @@ is feckless. Storables should lose their timer, handing it instead to listing or
 *"bank.hello calls tidy and that's it. the host can handle crashes and retries and calling tidy if their hello doesn't run
 on pageload for some reason."*
 
-* **Read:** `unrace-gating.md` *Notable Changes*; `models-invariants.md` *Vault*, *Lease*.
+* **Read:** `newdesign-proof.md` *Notable Changes*; `newdesign-models.md` *Vault*, *Lease*.
 * **Touches:** `models/storable.ts`, `lease.ts`, `vault.ts`, `bank.ts`, `listing.ts`, `models-shapes.ts`.
 * **Items:**
   1. The Storable and the lease lose their `Trigger`s. The refresh timer is deferred, so nothing replaces it for now.
@@ -151,7 +151,7 @@ obsoleted."* This thread takes Gate, Wayin and Proving.
 
 *"Lease.grant wants the pojo vaultFriend."*
 
-* **Read:** `unrace-gating.md` *The provings*; `models-invariants.md` *Proving*, *Gate*; G1 to G3, G8 and G9 in
+* **Read:** `newdesign-proof.md` *The provings*; `newdesign-models.md` *Proving*, *Gate*; G1 to G3, G8 and G9 in
   `notes/guarantees.md`.
 * **Touches:** `models/gate.ts`, `wayin.ts`, `proving.ts`, `lease.ts`'s factory, `models-shapes.ts`, their tests,
   `tests/test-helpers/proving-world.ts`.
@@ -176,7 +176,7 @@ stuff was debrided"*
 
 *"yes Lease, Vault and Listing too."*
 
-* **Read:** `models-invariants.md` *Vault*, *Lease*; `unrace-gating.md` *The lease*, *The discards*.
+* **Read:** `newdesign-models.md` *Vault*, *Lease*; `newdesign-proof.md` *The lease*, *The discards*.
 * **Touches:** `models/vault.ts`, `lease.ts`, `box.ts`, `box-listing.ts`.
 * **Items:** `leaseFriend`, `#attachLease`, `#renewLease`, `#vacateLease`, the seal verbs, and the discards down the chain.
   The vault's seal verbs lock on `damaged_lease`.
@@ -186,7 +186,7 @@ stuff was debrided"*
 
 ### 7. `vault_slot`
 
-* **Read:** `models-invariants.md` *Vault listing*.
+* **Read:** `newdesign-models.md` *Vault listing*.
 * **Touches:** `models/vault-listing.ts`, `listing.ts`, a deviceDB.
 * **Items:**
   1. The slot: `#deliver`, the tombstone a delete leaves, `ensureVault` replacing the object over gone or void. A newer record
@@ -199,7 +199,7 @@ stuff was debrided"*
 
 *"vault_boxes yes."*
 
-* **Read:** `models-invariants.md` *Box*, *Box listing*, *Public*; `unrace-gating.md` *Notable Changes* for the box birth.
+* **Read:** `newdesign-models.md` *Box*, *Box listing*, *Public*; `newdesign-proof.md` *Notable Changes* for the box birth.
 * **Touches:** `models/vault.ts`, `box.ts`, `box-listing.ts`.
 * **Items:** `vault.hello` and `boxListing.hello`, run on the first box call, as a host wanting them sooner can run a task
   queue; `getBox`, `putBox`, `delBox`, `extractWhisper`; the box
@@ -211,7 +211,7 @@ stuff was debrided"*
 
 The Gating half of the text in thread 4.
 
-* **Read:** `unrace-gating.md` *`build_vault`*, *`unlock_vault`*; `models-invariants.md` *Gating*.
+* **Read:** `newdesign-proof.md` *`build_vault`*, *`unlock_vault`*; `newdesign-models.md` *Gating*.
 * **Touches:** `models/gating.ts`, a new `tests/models/gating.test.ts`, `vault-listing.ts`, the verbs that launch one.
 * **Items:** `launch`, `attempt`, `build_vault`, `unlock_vault`.
 * **`gating.decline` crossing an attempt:** the system is being asked to lock and unlock at the same time, and we have no
@@ -221,7 +221,7 @@ The Gating half of the text in thread 4.
 
 ### 10. `gate_changes`
 
-* **Read:** `unrace-gating.md` *Changing the gate* through *`del_vault`*; `models-invariants.md` *The runs*.
+* **Read:** `newdesign-proof.md` *Changing the gate* through *`del_vault`*; `newdesign-models.md` *The runs*.
 * **Touches:** `models/gating.ts`, `vault.ts`, `vault-listing.ts`, `gate.ts`.
 * **Items:** `replace_passphrase`, `add_passkey`, `revoke_passkey`, `del_vault`, and `vaultListing`'s verbs for them.
 * **Gate:** it ends as a read-only view plus `demandPasskeyAddable`; its `with*` and `#sendGate` go. Params spread the record
@@ -232,12 +232,12 @@ The Gating half of the text in thread 4.
 
 The Bank half of the text in thread 4.
 
-* **Read:** `unrace-gating.md` *`bank.hello`*; `models-invariants.md` *Bank*, *Public*.
+* **Read:** `newdesign-proof.md` *`bank.hello`*; `newdesign-models.md` *Bank*, *Public*.
 * **Touches:** `models/bank.ts`, a new `tests/models/bank.test.ts`.
-* **Items:** `bank.hello`, `tidy`, the discards, `identity_revoked` vacating, and the snapshot fields.
+* **Items:** `bank.hello`, `bank.autolock`, the discards, `identity_revoked` vacating, and the snapshot fields.
 * **The sprint's proof, one end-to-end test driving `subscribe` and `getSnapshot`:** hello, build, seal and unseal a box, lock,
   unlock, delete, rebuild over the tombstone, and a fresh Bank on the same stores picking up the lease. Replacing the
-  passphrase, adding and revoking a passkey, and `tidy` locking one past autolock follow it; if one of those sticks, file the
+  passphrase, adding and revoking a passkey, and `bank.autolock` locking one past autolock follow it; if one of those sticks, file the
   rest and say so.
 * **Levels:** `opus` worker. **Size:** large: this is where the threads first meet. **Depends on:** 8, 10.
 
@@ -249,7 +249,7 @@ directory but don't modify them in a way that would fail their tests, just copy 
 Earlier threads do this for what they rewrite, as they go. This thread takes what's left.
 
 * **Touches:** `models/*`.
-* **Also:** `unrace-gating.md` *Guarantees to amend* and *Rows for `notes/wontfix.md`*.
+* **Also:** `newdesign-proof.md` *Guarantees to amend* and *Rows for `notes/wontfix.md`*.
 * **Levels:** `sonnet`, `low` review, except the guarantees. **Size:** small. **Depends on:** 11.
 
 ## For the Coach

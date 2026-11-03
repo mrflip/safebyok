@@ -138,13 +138,9 @@ export class Bank implements VaultWorld {
 
   /** A sweep crossing it leaves `listing` disabled, which refuses. */
   async #bringUp(listing: VaultListing): Promise<void> {
-    try {
-      await this.keyDeriver.load?.()
-      await this.strengthChecker.load?.()
-      await listing.fetchBank()
-    } finally {
-      await this.tidy()
-    }
+    await this.keyDeriver.load?.()
+    await this.strengthChecker.load?.()
+    await listing.fetchBank()
     await this.#cacheDeviceRecord()
     await listing.hello()
     listing.demandEnabled()
@@ -163,12 +159,18 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Ending]: tidy, lock, vacate, sweep, panic
+  // == [Ending]: autolock, lock, vacate, sweep, scanOwnLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
 
-  /** Erase each lease of this bank cached on this device past its autolock duration, locking its listed vault. Never throws, and needs no `hello`: a refused scan is bad news, and a lease that will not erase panics. Another bank's leases stay. */
-  async tidy(): Promise<void> {
+  /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
+   * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.peek` leaves such a row for it.
+   */
+  async autolock(): Promise<void> {
     const cutoff = Math.floor(this.clock.now() - this.leaseMillis)
-    await this.#vacateLeasesProvedBefore(Math.max(FarPast, cutoff))
+    const oldRows = await this.#scanOwnLeasesProvedBefore(Math.max(FarPast, cutoff))
+    for (const row of oldRows) {
+      const listed = this.#vaultListing.at(row)
+      if (listed?.vault_tok === row.vault_tok) { listed.lock() }
+    }
   }
 
   /** Every listed vault locked; the bank stays ready. Never throws. */
@@ -182,39 +184,41 @@ export class Bank implements VaultWorld {
     this.#lastHello = null
     this.#vaultListing.openGating?.declineAtDiscard()
     for (const vault of this.#vaultListing.things) { vault.vacate() }
-    void this.#vacateLeasesProvedBefore(FarFuture)
+    void this.#eraseOwnLeases()
     this.#remakeSnapshot()
     return this
   }
 
   /** Cleanup while the page lives: the watch ended and each vault swept, its cached lease left for the next session. Not ready until the next `hello`, which starts a fresh listing. Never throws. */
   sweep(): this {
+    this.#lastHello = null
     this.#vaultListing.sweep()
     this.#vaultListing = this.#makeListing()
-    this.#lastHello = null
     this.#remakeSnapshot()
     return this
   }
 
-  async #vacateLeasesProvedBefore(cutoff: number): Promise<void> {
+  /** This bank's rows among the cached leases proved before `cutoff`; a refused scan is bad news, and finds none. */
+  async #scanOwnLeasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
     const scan = await this.deviceDB.tryLeasesProvedBefore(cutoff)
     if (! scan.ok) {
       this.#vaultListing.tellBadNews([scan.err])
-      return
+      return []
     }
-    const ownRows = scan.val.filter((row) => this.#isOwnLease(row))
-    await Promise.all(ownRows.map((row) => this.#vacateLease(row)))
+    return scan.val.filter((row) => this.#isOwnLease(row))
   }
 
   #isOwnLease({ applabel, user_id }: LeaseSparse): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
 
-  /** The listed vault of that life locks, which erases the row or panics; a row with no such vault is erased here. */
-  async #vacateLease(row: LeaseSparse): Promise<void> {
-    const listed = this.#vaultListing.at(row)
-    if (listed?.vault_tok === row.vault_tok) {
-      listed.lock()
-      return
-    }
+  /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
+   * none.
+   */
+  async #eraseOwnLeases(): Promise<void> {
+    const rows = await this.#scanOwnLeasesProvedBefore(FarFuture)
+    await Promise.all(rows.map((row) => this.#eraseLease(row)))
+  }
+
+  async #eraseLease(row: LeaseSparse): Promise<void> {
     const vacated = await this.deviceDB.tryVacate(row)
     if (! vacated.ok) { await this.#panic(vacated.err) }
   }
@@ -240,7 +244,7 @@ export class Bank implements VaultWorld {
     return { ...this.scope, vaultlabel }
   }
 
-  /** The vault listed for `bag`, a tombstone among them, or null. Refuses before ready. */
+  /** The vault listed for `bag`, a tombstone among them, or null. */
   vaultOf(bag: VaultBag): Vault | null {
     this.#demandReady()
     return this.#vaultListing.at(this.vaultScopeOf(bag))

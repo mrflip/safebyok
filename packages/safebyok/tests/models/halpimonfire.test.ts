@@ -1,10 +1,14 @@
-/** Crossings of `lock()`, pinned as the code meets them: one landing in the middle of a send, one while an unlock proves, and one during a box verb. */
+/** Crossings pinned as the code meets them: a `lock()` in a send, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
 
 import { describe, expect, it, vi } from 'vitest'
+import { VaultError } from '../../src/errors'
 import type { Gating } from '../../src/models/gating'
+import { Lease } from '../../src/models/lease'
+import { Proving } from '../../src/models/proving'
+import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
-import { Passphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 const held = useModelsWorld()
 useVaultWorlds()
@@ -66,5 +70,84 @@ describe("A lock that lands during a box verb", () => {
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
     await TH.expectRefusal(vault.fetchBox('anthropic_api_key'), 'vault_locked')
+  })
+})
+
+/** The next `Lease.grant` runs `crossing` once its lease is made, as a slow wrap would let it. */
+const crossingGrant = (crossing: () => unknown) => {
+  const grant = Lease.grant.bind(Lease)
+  vi.spyOn(Lease, 'grant').mockImplementationOnce(async (...args) => {
+    const lease = await grant(...args)
+    await crossing()
+    return lease
+  })
+}
+
+describe("A gate change after its record is stored", () => {
+  it.each(['sweep', 'vacate'] as const)("a %s as the answer comes back refuses 'disabled', the row stored all the same", async (ending) => {
+    const { vault, listing, demandStored, opts: { vaultDB } } = await makeBornVault()
+    const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
+      const answer = await commit(params)
+      listing[ending]()
+      return answer
+    })
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'disabled')
+    expect(demandStored().gate.gate_epoch).to.eq(2)
+    expect(vault.isUnlocked).to.be.false
+  })
+
+  it("a crypto failure in buildLease rejects, the row stored, the vault on its new gate under the lease it held", async () => {
+    const { vault, demandStored, deviceDB } = await makeBornVault()
+    const failure = new VaultError('unexpected_error', "the platform said no")
+    vi.spyOn(Proving.prototype, 'buildLease').mockRejectedValueOnce(failure)
+    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).rejects.to.eq(failure)
+    expect(demandStored().gate.gate_epoch).to.eq(2)
+    expect(vault.gate.gate_epoch).to.eq(2)
+    expect(vault.isUnlocked).to.be.true
+    expect(deviceDB.cachedNow()).to.include({ gate_epoch: 1 })
+  })
+
+  it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is vacated unattached, and demandReadyToAttach is never met", async () => {
+    const { vault, demandStored, deviceDB, anotherSession } = await makeBornVault()
+    crossingGrant(async () => {
+      await delTyping(await anotherSession().build(demandStored()), NewPassphrase)
+      await TH.expectRefusal(vault.fetch(), 'vault_gone')
+    })
+    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
+    expect(vault.isPresent).to.be.false
+    expect(vault.isUnlocked).to.be.false
+    expect(deviceDB.cachedNow()).to.be.null
+  })
+
+  it("a tombstone crossing a birth's lease refuses 'vault_gone' at demandReadyToAttach, the lease vacated", async () => {
+    const { listing, demandStored, deviceDB, anotherSession } = makeVaultWorld()
+    crossingGrant(async () => {
+      await delTyping(await anotherSession().build(demandStored()))
+      await TH.expectRefusal(listing.at(Dna)!.fetch(), 'vault_gone')
+    })
+    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)), 'vault_gone')
+    expect(listing.at(Dna)?.isPresent).to.be.false
+    expect(deviceDB.cachedNow()).to.be.null
+  })
+
+  it("a sweep crossing a birth's lease refuses 'disabled' at demandReadyToAttach, the row stored, no lease cached", async () => {
+    const { listing, storedNow, deviceDB } = makeVaultWorld()
+    crossingGrant(() => listing.sweep())
+    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)), 'disabled')
+    expect(storedNow()).to.include({ am: 'a' })
+    expect(deviceDB.cachedNow()).to.be.null
+  })
+
+  it("a refused tryCache during replacePassphrase resolves, unlocked, and tells onBadNews", async () => {
+    const onBadNews = vi.fn()
+    const { opts, deviceDB, demandStored } = await makeBornVault()
+    const vault = await new VaultListing({ ...opts, onBadNews }).build(demandStored())
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    const refusal = new VaultError('storage_blocked', "the disk is full")
+    deviceDB.tryCache.mockResolvedValueOnce(TH.bad(refusal))
+    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
+    expect(vault.isUnlocked).to.be.true
+    expect(onBadNews.mock.calls).to.deep.equal([[refusal]])
   })
 })

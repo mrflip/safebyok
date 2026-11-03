@@ -6,7 +6,7 @@ import { type LeaseGrantOpts, type LeaseRecord, LeaseFormat } from '../../src/mo
 import { bad } from '../../src/outcome'
 import { isLeaseKey } from '../../src/shapes/device'
 import * as TH from '../test-helpers'
-import { type FakeLeaseFriend, GrantedAs, fakeLeaseFriendOf, makeGrantedLease, sealStampOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { type FakeLeaseFriend, FriendLeaseMillis, GrantedAs, fakeLeaseFriendOf, makeGrantedLease, sealStampOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -126,8 +126,54 @@ describe("Lease.peek(friend, gate_epoch) and Lease.tryPeek", () => {
     expect(await got!.unsealWith(sealed, stamp)).to.eq('{"val":"cached"}')
   })
 
-  it("makes no check of the lease's age: a lease cached long ago is in force", async () => {
+  it("answers a lease proved exactly the autolock duration ago, which still opens what the granted lease sealed", async () => {
+    const { friend, lease: granted } = await grantedWorld()
+    const stamp = sealStampOf('b1')
+    const sealed = await granted.sealWith('{"val":"cached"}', stamp)
+    vi.setSystemTime(T0 + FriendLeaseMillis)
+    const got = await Lease.peek(friend, GrantedAs.gate_epoch)
+    expect(await got?.unsealWith(sealed, stamp)).to.eq('{"val":"cached"}')
+    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
+  })
+
+  it("answers null past autolock, so the vault asks for a proof, and leaves the row untouched, warning of nothing", async () => {
     const { friend } = await grantedWorld()
+    const row = friend.cached
+    vi.setSystemTime(T0 + FriendLeaseMillis + 1)
+    expect(await Lease.peek(friend, GrantedAs.gate_epoch)).to.be.null
+    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
+    expect(friend.cached).to.eq(row)
+    expect(friend.logged).to.deep.equal([])
+  })
+
+  it("opens a row past autolock again once the clock is set back, as the row was left", async () => {
+    const { friend } = await grantedWorld()
+    vi.setSystemTime(T0 + FriendLeaseMillis + 1)
+    expect(await Lease.peek(friend, GrantedAs.gate_epoch)).to.be.null
+    vi.setSystemTime(T0)
+    const got = await Lease.peek(friend, GrantedAs.gate_epoch)
+    expect(got?.isInForce).to.be.true
+  })
+
+  it("uncaches a row of another epoch even past autolock: the epoch is judged first", async () => {
+    const { friend } = await grantedWorld()
+    vi.setSystemTime(T0 + FriendLeaseMillis + 1)
+    expect(await Lease.peek(friend, GrantedAs.gate_epoch + 1)).to.be.null
+    expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
+    expect(friend.cached).to.be.null
+  })
+
+  it("carries a clock that throws to Lease.tryPeek's bad Outcome, and uncaches nothing", async () => {
+    const { friend } = await grantedWorld()
+    const got = await Lease.tryPeek({ ...friend, clock: { now: () => { throw new Error('the clock broke') } } }, GrantedAs.gate_epoch)
+    expect(got.ok).to.be.false
+    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
+  })
+
+  it("finds nothing past an autolock of Infinity: a lease cached long ago is in force", async () => {
+    const friend = fakeLeaseFriendOf({ leaseMillis: Infinity })
+    const lease = await makeGrantedLease(friend)
+    await lease.cache()
     vi.setSystemTime(T0 + (400 * 24 * 60 * 60_000))
     const got = await Lease.peek(friend, GrantedAs.gate_epoch)
     expect(got?.isInForce).to.be.true
@@ -379,12 +425,6 @@ describe("a tampered lease record", () => {
 })
 
 describe("what a lease shows", () => {
-  it("isMadeFor knows the friend it was made for, and no other", async () => {
-    const { friend, lease } = await grantedWorld()
-    expect(lease.isMadeFor(friend)).to.be.true
-    expect(lease.isMadeFor(fakeLeaseFriendOf())).to.be.false
-  })
-
   it("Object.keys shows its stamp alone: no leaseKey, no wrapped vaultKey, no friend", async () => {
     const { lease } = await grantedWorld()
     expect(Object.keys(lease)).to.have.members(StampFieldnames)

@@ -57,12 +57,43 @@ not as a settled ruling, and check it against the current design before relying 
   a cache, and the next session asks for the passphrase. Pinned by
   `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
   retrying a refused erase.
-* 2026-11-02 (the Coach, unrace, `whiteboard/20261102-unrace/unrace-new_vault.md`; not yet built):
+* 2026-11-02 (the Coach, unrace, `unrace-new_vault.md` at commit e135d0352, since deleted; not yet built):
   **a failed delete still locks the vault on this device.** `del_vault` locks first, as a lock is
   synchronous and safe, then removes the vault from the vaultDB and the deviceDB, then vacates. So a
   delete the vaultDB refuses still logs the user out of this device, and they log back in to try the
   delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
-* 2026-11-03 (unrace, `whiteboard/20261102-unrace/unrace-gating.md`, *The lease*): **a `lock()` during
+* 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
   the cache's `lease.peek` loses.** The vault reads unlocked on the lease peeked, the lock's erase
   stands, and the next session asks for a proof. The next `lock()` ends that session.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here):
+  **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
+  the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
+  gets it from `lease.peek` and attaches it, asking nothing, so a vault the user locked reopens with no
+  passphrase. With no `onPanic`, the panic's vacate stops that in the tab that locked; with one, stopping it is the
+  host's. Either way the row can survive for other tabs and later sessions. The Coach, 2026-11-02: won't fix, but
+  "one I worry about"; and, 2026-11-03: "This is why the panic button exists, there is no fix we can apply if the
+  system somehow is operational enough to read leases, decrypt data and everything else but delete data."
+* 2026-11-03 (the Coach, unrace): **a refused erase with no `onPanic` can bring a false prompt.** `Vault.#panic`
+  unlists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
+  host has no on panic they've given their opinion, wontfix."
+* 2026-11-03 (the Coach, unrace): **a delete whose erase is refused, with no `onPanic`, still lands.** The vault
+  is tombstoned in the vaultDB and the delete is answered, whatever the erase of the cached lease did. The same
+  ruling: a host with no `onPanic` has given its opinion.
+* 2026-11-03 (the Coach, unrace): **a host's own getter that throws a `VaultError` quoting the passphrase passes
+  the gating's check whole.** The gating replaces a foreign throw from a getter with `unexpected_error`, keeping nothing of it, but passes a
+  `VaultError` as it came and does not inspect its text; one a host's getter throws with the passphrase in its
+  message reaches the caller whole. The Coach: "Wontfix agreed".
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Changing the gate*, and *Rows for
+  `notes/wontfix.md`*, since moved here): **a gate change leaves another device's session lease to run.** No device
+  locks on it: another device's session keeps its lease to its `lock()` or next `bank.autolock`, and its cached lease, of the
+  older `gate_epoch`, is forgotten at its next session.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here): **a damaged row stays until the customer names it for
+  deletion.** It still counts toward `maxBoxes`. Ruled: the customer clears it with their own store's tools; not built yet.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here): **cross-tab complications, all of them.** Tab A's `lock()` or
+  vacate leaves tab B unlocked, and nothing tells it.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here): **a put can land though its answer is lost.**

@@ -29,7 +29,7 @@ export type VaultWorld = ListingWorld & ProvingWorld & {
   deviceDB:    DeviceDB
   /** Hears a refused erase of the cached lease, and no secret material. */
   onPanic?:    ((refusal: VaultError) => unknown) | undefined
-  /** The host's dialog. With none, a vault that needs asking for refuses. */
+  /** The host's dialog, if the host gave one. */
   requestCleartext?: RequestCleartext | undefined
   /** The horizon of a vault's boxes, by default the vault's own. */
   boxRefreshMillis?: number
@@ -72,7 +72,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return held
   }
 
-  /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news; a refused get refuses, taking nothing in. */
+  /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
   async fetchBank(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryGetBank(this.world.scope)
@@ -87,19 +87,19 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
 
-  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault held, and answer that record. A row moved since refuses 'stale_write', the row stored delivered first. Nothing locks: the vaultKey does not change. */
+  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault held, and answer that record. Nothing locks: the vaultKey does not change. */
   async replacePassphrase(params: ReplacePassphraseParams): Promise<VS.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
   }
 
-  /** Lay a passkey wayin on the row, as {@link replacePassphrase} does; one held refuses 'camped'. */
+  /** Lay a passkey wayin on the row. */
   async addPasskey(params: AddPasskeyParams): Promise<VS.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryAddPasskey(params))
   }
 
-  /** Null the row's passkey wayin, as {@link replacePassphrase} does; with none held, nothing moves. */
+  /** Null the row's passkey wayin. */
   async revokePasskey(params: RevokePasskeyParams): Promise<VS.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
@@ -124,7 +124,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   get openGating(): AnyGating | null { return this.#openGating }
 
-  /** Claims the one gating this bank may have open; refuses 'already_asking' while one is. */
+  /** Claims the one gating this bank may have open. */
   holdGating(gating: AnyGating): void {
     if (this.#openGating !== null) { throw alreadyAsking() }
     this.#openGating = gating
@@ -161,7 +161,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis, onBadNews: (news) => { this.tellBadNews([news]) } })
   }
 
-  /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. A damaged row refuses 'damaged_record'. */
+  /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. */
   async fetchListed(vault: Vault): Promise<BoxesListed> {
     const asked = this.scopeOf(vault)
     this.demandEnabled()
@@ -182,6 +182,11 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     const isOtherLife = record.vault_tok !== held.vault_tok
     const isRebirth = (! held.isPresent) && (! MSX.isTombstone(record))
     return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
+  }
+
+  /** A vault verb refused over a tombstone or another life carries the row itself, where a box verb's `dbhas` is its vault's. */
+  protected override isRefusalOfRow(err: VaultError): boolean {
+    return super.isRefusalOfRow(err) || (err.refusalkind === 'vault_gone') || (err.refusalkind === 'vault_mismatch')
   }
 
   protected scopepathOf(scope: VaultScope): string {

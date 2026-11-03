@@ -12,7 +12,7 @@ import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
 
-/** How `post` compares to `ante`: the later `revision_seq` is newer. The same seq under another `revision_tok` is two puts landed as one revision, refused 'record_conflict'. */
+/** How `post` compares to `ante`: the later `revision_seq` is newer. The same seq under another `revision_tok` is two puts landed as one revision. */
 export const cmpRevisions = (ante: Revision, post: Revision): Age => {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
@@ -39,7 +39,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare readonly world:   World
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
-  /** The vault this thing lies in, inscribed once by `assignInitialProps` and never moved: a record under another `vault_tok` is refused, not taken. */
+  /** The vault this thing lies in, inscribed once by `assignInitialProps` and never moved. */
   declare readonly vault_tok: string
   /** The revision and times of the record in hand, as plain own props, assigned before the seal by `assignInitialProps` and again by `assign` at each adopt: `registered_at` only at birth and for a record of another life. */
   declare revision_tok:  string
@@ -214,7 +214,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   demandFull():     this { if (! this.demandEnabled().isFull)    { throw partialLoadError() }                          return this }
 
-  /** The full record in hand, or refuses 'bad_option' where it is sparse or a tombstone. */
+  /** The full record in hand. */
   protected demandFullProps(): RecordT {
     const { full } = this.demandEnabled()
     if (full === null) { throw partialLoadError() }
@@ -247,9 +247,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return outcomeOf(() => this.fetch(opts))
   }
 
-  /** Make the world timely, as its answer may lock the vault or take the thing away, and fetch the record unless it is timely within `opts.maxMillisSinceRefresh`, by default the thing's horizon.
-   * A thing found absent is no refusal.
-   */
+  /** Make the world timely, as its answer may lock the vault or take the thing away, and fetch the record unless it is timely within `opts.maxMillisSinceRefresh`, by default the thing's horizon. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
     this.demandEnabled()

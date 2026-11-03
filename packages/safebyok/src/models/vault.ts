@@ -71,7 +71,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The vault's own lock, not its world's: the bank has none. */
   override get isLocked(): boolean { return this.lockState() === 'locked' }
 
-  /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. A vault found gone refuses 'vault_gone', and a row found damaged 'damaged_record'. */
+  /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. */
   async ensureTimely(maxMillis?: number): Promise<this> {
     await this.hydrate({ maxMillisSinceRefresh: maxMillis })
     return this.demandPresent()
@@ -79,18 +79,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   takeWorld(world: unknown): void {
-    const row = VS.vaultRow.parse(world)
+    const row = MSX.vaultRow.parse(world)
     if (row.vault_tok === this.vault_tok) { this.receive(row) }
   }
   // --
 
   // == [The gate]: fullRecord, gate
 
-  /** The full record in hand, what a gate change spreads into its params. A vault held sparse, or a tombstone, refuses 'bad_option': hydrate first. */
+  /** The full record in hand, what a gate change spreads into its params. */
   get fullRecord(): VaultRecord { return this.demandFullProps() }
 
   // Made on first read, not at settle: the base constructor settles before this class's fields exist.
-  /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. A vault held sparse, or a tombstone, has none in hand and refuses 'bad_option': hydrate first. */
+  /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. */
   get gate(): Gate {
     const full = this.demandFullProps()
     if (this.#gate?.props !== full.gate) { this.#gate = { props: full.gate, gate: new Gate(full, full.gate) } }
@@ -114,7 +114,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#landGate(anteProving, () => this.listing.replacePassphrase({ ...ante, gate: { passphrase_wayin: MSX.passphraseWayinRecord.parse(nextWayin.pickle()) } }))
   }
 
-  /** Add a passkey through an add_passkey gating, as {@link replacePassphrase} does. A passkey held refuses 'bad_option', nobody asked; one added since the ask refuses 'camped' or 'stale_write'. */
+  /** Add a passkey through an add_passkey gating. */
   async addPasskey(): Promise<this> {
     await this.ensureTimely(MSX.Promptly)
     this.gate.demandPasskeyAddable()
@@ -129,7 +129,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#landGate(proved, () => this.listing.addPasskey({ ...ante, gate: { passkey_wayin: MSX.passkeyWayinRecord.parse(passkeyWayin.pickle()) } }))
   }
 
-  /** Revoke the passkey through a revoke_passkey gating, as {@link replacePassphrase} does. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
+  /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
   async revokePasskey(): Promise<this> {
     await this.ensureTimely(MSX.Promptly)
     if (this.gate.pkWayin === null) { return this }
@@ -225,25 +225,23 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lease]: leaseFriend, _cheat_leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
+  // == [The lease]: leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
 
-  /** All a lease or a proving hears of this vault: one friend for its life, so an attach knows its own lease. */
+  /** All a lease or a proving hears of this vault, made once. */
   #leaseFriend(): LeaseFriend {
     this.#friend ??= this.#makeFriend()
     return this.#friend
   }
 
-  /** For tests alone: the friend, whose `peekLease` answers the cached row. Nothing in `src/` calls it. */
-  _cheat_leaseFriend(): LeaseFriend { return this.#leaseFriend() } // eslint-disable-line unicorn/prefer-private-class-fields
-
   #makeFriend(): LeaseFriend {
-    const { world: { clock, logger, deviceDB } } = this
+    const { world: { clock, logger, deviceDB, leaseMillis = DefaultLeaseMillis } } = this
     const stamp = MSX.vaultStamp.parse(this)
     const asked = { ...this.scope, vault_tok: this.vault_tok }
     return {
       ...stamp,
       clock,
       logger,
+      leaseMillis,
       lock:            () => { this.lock() },
       attachLease:     (lease) => this.#attachLease(lease),
       peekLease:       () => deviceDB.peek(asked),
@@ -257,7 +255,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
-    if (! lease.isMadeFor(this.#leaseFriend())) { throw leaseOfOtherHolder() }
     if (lease.isForgotten) { throw leaseNotInForce() }
     try {
       this.demandReadyToAttach()
@@ -335,13 +332,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Seal verbs]: sealStampedString, unsealStampedString, demandLease
 
-  /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. A locked vault refuses 'vault_locked', as does a lock crossing it; a lease that will not open locks the vault and refuses 'damaged_lease'. */
+  /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
     MSX.leaseSealArgs.parse({ whisperText, stamp })
     return this.#demandLease().sealWith(whisperText, stamp)
   }
 
-  /** The text `sealed` holds, bound to `stamp`. It refuses as `sealStampedString` does, and 'damaged_box' where `sealed` will not open. */
+  /** The text `sealed` holds, bound to `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     MSX.leaseUnsealArgs.parse({ sealed, stamp })
     return this.#demandLease().unsealWith(sealed, stamp)
@@ -356,7 +353,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form, demandReadyForBoxes, ensureReadyForBoxes
 
-  /** Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. The first box call runs it; a host may run it sooner. A vault found gone refuses 'vault_gone'. */
+  /** Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. The first box call runs it; a host may run it sooner. */
   async hello(): Promise<this> {
     this.demandEnabled()
     const listed = await this.listing.fetchListed(this)
@@ -419,7 +416,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** A box verb needs the vault present and unlocked. */
   demandReadyForBoxes(): this { return this.demandPresent().demandUnlocked() }
 
-  /** The box listing, this vault having said hello, refusing as `demandReadyForBoxes` does at each end. */
+  /** The box listing, this vault having said hello. */
   async #ensureReadyForBoxes(): Promise<BoxListing> {
     this.demandReadyForBoxes()
     if (! this.#isGreeted) {
@@ -434,7 +431,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Children and discards]: boxListing, adopt, sweepContents, vacateContents
 
-  /** The listing of this vault's boxes, made once, on first asking. A vault gone refuses 'vault_gone'. */
+  /** The listing of this vault's boxes, made once, on first asking. */
   get boxListing(): BoxListing {
     this.demandPresent()
     this.#boxListing ??= this.listing.boxListingOf(this)
@@ -498,15 +495,13 @@ const recordOfBirth = (gate: Gate, prior: MSX.Revision, now: number): VaultRecor
 )
 // --
 
-// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce
+// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock, leaseNotInForce
 
 const listingExpected = (): VaultError => new VaultError('bad_option', Phrases.ListingExpected)
 
 const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
 const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
-
-const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
 
 const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --

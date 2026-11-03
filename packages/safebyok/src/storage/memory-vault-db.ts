@@ -138,7 +138,7 @@ export class MemoryVaultDB extends VaultDB {
     this.#tell(record, { vault, box: row })
   }
 
-  /** A new live box in a vault already holding its `maxBoxes` refuses `vault_full`. */
+  /** Demands room in the vault for a new live box, under its `maxBoxes`. */
   #demandRoom(boxrows: Map<string, unknown>, ante: unknown): void {
     if (VS.isLiveRow(ante)) { return }
     const used = [...boxrows.values()].filter((box) => VS.isLiveRow(box)).length

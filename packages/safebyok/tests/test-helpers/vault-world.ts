@@ -7,7 +7,7 @@ import type { RequestCleartext } from '../../src/models/gating'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
-import { NOVEL, PassphraseProving } from '../../src/models/proving'
+import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/outcome'
 import type { VaultScope } from '../../src/shapes/scopes'
 import type * as VX from '../../src/shapes/vault'
@@ -170,6 +170,15 @@ export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), w
   const world = makeVaultWorld(null, worldOverrides)
   const vault = await buildTyping(world.listing, Dna, typing)
   return { ...world, vault }
+}
+
+/** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on, caught by a spy, as nothing of a vault hands it out. */
+export const makeBornVaultAndFriend = async () => {
+  const buildLease = vi.spyOn(Proving.prototype, 'buildLease')
+  const born = await makeBornVault()
+  const [friend] = buildLease.mock.calls[0]!
+  buildLease.mockRestore()
+  return { ...born, friend }
 }
 
 /** A vault born as {@link makeBornVault} makes it, with the passkey of the `laptop` beside the passphrase. */

@@ -1,12 +1,12 @@
 ## Decided
 
-Rulings and their reasons, where `unrace-gating.md` and `models-invariants.md` draw the result and not the why.
+Rulings and their reasons, where `whiteboard/20261102-newdesign/newdesign-proof.md` and `newdesign-models.md` beside it draw the result and not the why.
 
 * **`bank.hello` is a forced reset** (the Coach, 2026-11-02, as the system is too hard to reason about otherwise). It
   loads every vault of the bank from the vaultDB and refuses with no network. Vault and box records are not cached on the device for this
   sprint. A cache comes back after the rework, when hosts may also specify a timeliness for `hello`. Called twice, it just runs twice, with no join.
 * **A gate change locks no session anywhere**, as the vaultKey never changes. Another device's session runs to its lock or
-  its next `bank.tidy`. Its cached lease is of the older `gate_epoch`, which `lease.peek` forgets next session. That is
+  its next `bank.autolock`. Its cached lease is of the older `gate_epoch`, which `lease.peek` forgets next session. That is
   `gate_epoch`'s one job, so nothing tells a vault's own gate change from another device's, and `adopt` never locks on a
   move. Revoking is a refusal by honest code. A row for `notes/wontfix.md`.
 * **One gating open per bank, one attempt at a time on it.** The host owns the one dialog, dedupes, and disables its button
@@ -33,7 +33,7 @@ Rulings and their reasons, where `unrace-gating.md` and `models-invariants.md` d
 * **The gating holds the clears.** It calls the provings' statics, then hands `run` the provings. `run` is written in the
   Vault or the Bank, and never hears a clear. A gate is made from wayins, so a clear passphrase never goes through one.
 * **A cached lease is taken up in `ensureUnlocked` alone.** `hello` and `fetch` take up nothing.
-* **Nothing is committed until `vaultListing.ensureVault`, or a gate change's put.** `send` does not hydrate.
+* **Nothing is committed until `vaultListing.ensureVault`, or a gate change's put.** `send` hydrates, "because it might be sparse" (the Coach).
 * **A vault has no `send`** (the Coach, 2026-11-03), provided its tests go with it: tests kept for something nobody wants
   would go on constraining the design. Nothing about a vault record changes but its gate, which has its own verbs.
 * **A gate change is its params, with no client-side next gate** (the Coach, 2026-11-03). `gate.with*` and `adoptWayins` go.

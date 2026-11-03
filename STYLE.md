@@ -124,7 +124,7 @@ scopepath is a `boxScopepath` (`BoxScopepath`), like every other `fooScopepath`.
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
 a menu choice is a `kind` (`scopepathkind`) or a `flavor`. **`state` names nothing public**: a
 React app already means its own component state by it. Name a status for what it is about: a
-thing's stage in its life is its `lifecycle`.
+thing's stage in its life is its `stage`.
 
 **`isFoo` is a boolean. A function returning a predicate ends in `Pred`**:
 `withinVaultScopepathPred(scope)`.
@@ -692,6 +692,10 @@ rows with it.
   who will see it.
 
 ## Comments and doc blocks
+
+**For now, a doc block is one or two 120-character lines giving the purpose: no refusal lists and no narrated
+parameters. Where the rest of this section disagrees, this note wins.** (The Coach, 2026-11-03: the guidance on
+comments is inconsistent, and a reform is coming.)
 
 * `/** */` for doc blocks, `//` for a running clarification or commented-out code.
 * Bulleted lists use `*` at the top level and `-` below, indented two spaces per level.

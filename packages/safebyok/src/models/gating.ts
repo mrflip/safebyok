@@ -210,7 +210,7 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   del_vault:      ({ vault, world }, clears) => provePassphrase(vault, checkedClears(MSX.vaultDelClears, clears), world),
 }
 
-/** The attempt's one record and the gate it holds, read once, after its timeliness request: a vault found gone refuses here. */
+/** The attempt's one record and the gate it holds, read once, after its timeliness request. */
 const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
   await vault.ensureTimely(MSX.Promptly)
   return { ante: vault.fullRecord, gate: vault.gate }

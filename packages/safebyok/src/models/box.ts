@@ -74,7 +74,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this.demandReadyToUnsealWhisper()
   }
 
-  /** Throws unless unlocked with a full, healthy record: refuses 'vault_locked', 'absent_box' for a box gone, or 'bad_option' for a sparse record not yet filled, which `ensureReadyToUnsealWhisper` fetches first. */
+  /** Demands that the vault be unlocked and the box present, with a full record. */
   demandReadyToUnsealWhisper(): this { return this.demandUnlocked().demandPresent().demandFull() }
 
   async ensureReadyToSend(opts: TimelyOpts = {}): Promise<this> {
@@ -102,7 +102,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     this.settle()
   }
 
-  /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. Refuses as `demandReadyToUnsealWhisper` does. */
+  /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
     await this.ensureReadyToUnsealWhisper(opts)
     return this.#unseal(this.demandFullProps())
@@ -117,7 +117,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_box'. */
+  /** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}. */
   async #unseal(record: BoxRecord): Promise<WhisperHolder> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(MSX.boxSparse.parse(record), sidecar)
