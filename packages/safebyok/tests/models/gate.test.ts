@@ -90,14 +90,14 @@ describe("Gate.build(stamp, proofClosure, world)", () => {
   })
 
   const AnswerCases = [
-    [() => ({ passphrase: 42 }),                                                                  'a passphrase that is no string'],
-    [() => ({}),                                                                                  'no passphrase'],
-    [() => null,                                                                                  'null'],
-    [() => ({ passphrase: TestPassphrase, passcode: '1234' }),                                    'a field no closure hands back'],
-    [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: new Uint8Array(32) }) }),                     'a spent passkey answer, its PRF bytes all zero (G2)'],
-    [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: randomBytes(31) }) }),                        'PRF bytes one short'],
+    [() => ({ passphrase: 42 }),                                                                                                         'a passphrase that is no string'],
+    [() => ({}),                                                                                                                         'no passphrase'],
+    [() => null,                                                                                                                         'null'],
+    [() => ({ passphrase: TestPassphrase, passcode: '1234' }),                                                                           'a field no closure hands back'],
+    [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: new Uint8Array(32) }) }),                           'a spent passkey answer, its PRF bytes all zero (G2)'],
+    [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: randomBytes(31) }) }),                              'PRF bytes one short'],
     [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prf_salt_b64: toB64(randomBytes(PasskeySaltBytes - 1)) }) }), 'a passkey salt one byte short'],
-    [() => ({ passphrase: TestPassphrase, passkeyAnswer: TH.omitting(passkeyAnswerOf(), 'credential_id') }),                      'a passkey answer with no credential_id'],
+    [() => ({ passphrase: TestPassphrase, passkeyAnswer: TH.omitting(passkeyAnswerOf(), 'credential_id') }),                             'a passkey answer with no credential_id'],
   ] as const
 
   for (const [answerOf, blurb] of AnswerCases) {

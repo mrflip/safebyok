@@ -71,6 +71,7 @@ export class Lease implements LeaseStamp {
   // --
 
   // == [The cache]: cache, tryCache
+
   /** Put this lease in the deviceDB's cache; one peeked from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
   async cache(): Promise<void> {
     if (this.#isPeeked) { return }
