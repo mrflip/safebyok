@@ -278,22 +278,19 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: PartialLoad, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
-/** Why an edit laid over a central that moved while it was being made stages nothing. */
-export const MovedUnderEdit = "Storage delivered a newer record while this edit was being made, so the edit was laid over a record storage no longer holds, and nothing was staged. The record in hand is now the one delivered: call again to edit it."
-
-/** Why `build` makes nothing of a dna for a scope the listing already holds. */
-export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
+/** Why `create` makes nothing of a dna for a scope the listing already holds. */
+export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so create made nothing of the dna: send the instance that listing.at(scope) answers, which also brings a deleted or damaged box back to life."
 
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
-export const BoxPatchAdvice = "Nothing was staged. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
+export const BoxPatchAdvice = "Nothing was stored. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
 
-/** Why an update of a box or a vault whose patch names another's scope stages nothing. */
-export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was staged: update the one it names, which listing.at(scope) answers.`
+/** Why an update of a box whose patch names another's scope stores nothing. */
+export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`
 
 /** Why LOCKED, which a locked box answers for its whisper, is refused where a whisper is wanted. */
 export const LockedIsNoWhisper = "LOCKED is not a whisper: unseal or expose one first"
@@ -317,7 +314,7 @@ export const OtherVaultTokAtBirth = "Storage gave a record under another vault_t
 export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
 
 /** Why a put whose `revision_seq` does not fit the `revision_tok` it is laid over is refused, by this device before it is sent or by storage. */
-export const PutUnfitForPrior = "A put's revision_seq does not fit the record it is laid over, so nothing was stored: revision 0 goes over no record, and each later revision over the record at the revision before it, named by its revision_tok. An edit mints the revision that fits: put the record an edit staged, not one as it was received or made elsewhere."
+export const PutUnfitForPrior = "A put's revision_seq does not fit the record it is laid over, so nothing was stored: revision 0 goes over no record, and each later revision over the record at the revision before it, named by its revision_tok. A send mints the revision that fits: send the change, not a record as it was received or made elsewhere."
 
 /** Why an answer for one scope that was asked for another is not taken in. */
 export const AnswerOfOtherScope = "Storage answered for a scope other than the one asked, so nothing was made or changed of the answer: a bug in the storage adapter, which should answer each call about the scope it is given."
@@ -371,7 +368,7 @@ export const ProofClosureThrew = "The proof closure threw rather than handing ba
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent
 
 /** Why a lease that will not open locks its vault. */
 export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
@@ -396,9 +393,6 @@ export const LeaseOfOtherHolder = "This lease was granted to another vault, or t
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
-
-/** Why a vault built of a record takes no proof closure. */
-export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."
 // --
 
 // == [Models: gates]: GateChangeNeedsPassphrase, GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke

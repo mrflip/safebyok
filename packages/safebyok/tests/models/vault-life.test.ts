@@ -17,13 +17,12 @@ const NewWhisper = Object.freeze({ val: 'sk-test-1111' })
 const Sidecar    = Object.freeze({ account: 'work' })
 const BoxDna     = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: Sidecar }
 
-/** A vault as `born` makes it, with a box built in it and sent to a box store every session and device here shares: `boxIn(vault)` fetches that box as `vault`'s world sees it. */
+/** A vault as `born` makes it, with a box created in it, stored in a box store every session and device here shares: `boxIn(vault)` fetches that box as `vault`'s world sees it. */
 const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBornVault()) => {
   const world = await born
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
-  const box = await boxListingOf(mw, { world: boxWorldOf(world.vault) }).build(BoxDna)
-  await box.send({ whisper: Whisper, sidecar: Sidecar })
+  const box = await boxListingOf(mw, { world: boxWorldOf(world.vault) }).create(BoxDna)
   const boxIn = async (vault: Vault) => {
     const found = await boxListingOf(mw, { world: boxWorldOf(vault) }).fetch(box.scope)
     if (found === null) { throw new Error('no box stored') }

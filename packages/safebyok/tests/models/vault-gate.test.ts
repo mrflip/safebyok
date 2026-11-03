@@ -45,7 +45,7 @@ describe("Vault.replacePassphrase", () => {
     expect(storedNow()).to.equal(ante)
   })
 
-  it("refuses 'stale_write' where the gate changes elsewhere while it proves, storing nothing, its meta naming the revision stored and the one it had staged: a passkey revoked meanwhile stays revoked", async () => {
+  it("refuses 'stale_write' where the gate changes elsewhere while it proves, storing nothing, its meta naming the revision stored: a passkey revoked meanwhile stays revoked", async () => {
     const { vault, storedNow, demandStored, storeBehindOurBack, advance } = await makeBornVaultWithPasskey()
     let revokedSeq = 0
     const proofClosure = () => {
@@ -56,7 +56,6 @@ describe("Vault.replacePassphrase", () => {
     }
     const err = await TH.expectRefusal(vault.replacePassphrase(proofClosure, byPassphrase(NewPassphrase)), 'stale_write')
     expect(err.meta?.stored_revision?.revision_seq).to.eq(revokedSeq)
-    expect(err.meta?.staged_revision?.revision_seq).to.eq(revokedSeq + 1)
     expect(storedNow()?.revision_seq).to.eq(revokedSeq)
     expect(demandStored().gate.passkey_wayin).to.be.null
     expect(vault.gate.pkWayin).to.be.null

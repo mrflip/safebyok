@@ -298,8 +298,7 @@ describe("The real deviceDB as the vault's world's", () => {
   it("keeps the lease an unlock grants in memoryDeviceDB, and the next session's vault takes it up", async () => {
     const deviceDB: VaultWorld['deviceDB'] = memoryDeviceDB()
     const { listing, demandStored, anotherSession } = makeVaultWorld(null, { deviceDB })
-    const vault = await listing.build(Dna, () => ({ passphrase: Passphrase }))
-    await vault.send({})
+    const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
     const record = demandStored()
     vault.lock()
     const lease = await vault.ensureUnlocked(() => ({ passphrase: Passphrase }))

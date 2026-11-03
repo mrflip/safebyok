@@ -14,10 +14,10 @@ afterEach(() => { for (const mw of modelsWorlds.splice(0)) { mw.dispose() } })
 const Whisper = { val: { apiKey: 'sk-test-0000', orgId: null } }
 const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: { account: 'work' } }
 
-/** Box listings whose world is a real vault, born unlocked under `Passphrase`, over the models world's fake store and cache. */
+/** Box listings whose world is a real vault, born unlocked under `Passphrase`, over the models world's fake store. */
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
-  const vault = await vaultWorld.listing.build(Dna, () => ({ passphrase: Passphrase }))
+  const vault = await vaultWorld.listing.create(Dna, () => ({ passphrase: Passphrase }))
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
   const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault) })
@@ -25,20 +25,19 @@ const sealWorld = async () => {
 }
 
 describe("a box sealed and unsealed through the vault's lease", () => {
-  it("opens the whisper build sealed, and the one a later seal sealed, each as its { val }; the sealed parts carry none of it", async () => {
+  it("opens the whisper create sealed, and the one a later send sealed, each as its { val }; the sealed parts carry none of it", async () => {
     const { boxes } = await sealWorld()
-    const box = await boxes.build(BoxDna)
+    const box = await boxes.create(BoxDna)
     expect(await box.unsealWhisper()).to.deep.equal(Whisper)
-    expect(JSON.stringify(box._cheat_staged)).to.not.include('sk-test-0000')
-    await box.seal({ val: 'sk-test-1111' }, { account: 'home' })
+    expect(JSON.stringify(box._cheat_central)).to.not.include('sk-test-0000')
+    await box.send({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } })
     expect(await box.unsealWhisper()).to.deep.equal({ val: 'sk-test-1111' })
   })
 
   it("opens the sealed record in another listing, and refuses 'damaged_box' for it with its sidecar altered, as the seal binds it", async () => {
     const { boxes, boxesOf } = await sealWorld()
-    const built = await boxes.build(BoxDna)
-    const sealed = built._cheat_staged
-    if (sealed === null) { throw new Error('nothing staged') }
+    const built = await boxes.create(BoxDna)
+    const sealed = built._cheat_central
     const intact = await boxesOf().build(sealed)
     expect(await intact.unsealWhisper()).to.deep.equal(Whisper)
     const altered = await boxesOf().build({ ...sealed, sidecar: { account: 'home' } })
@@ -47,9 +46,9 @@ describe("a box sealed and unsealed through the vault's lease", () => {
 
   it("refuses 'vault_locked' from the lease, at the seal and the unseal, once the clock passes its autolock_at", async () => {
     const { boxes, advance } = await sealWorld()
-    const box = await boxes.build(BoxDna)
+    const box = await boxes.create(BoxDna)
     advance(LeaseMillis)
     await TH.expectRefusal(box.unsealWhisper(), 'vault_locked')
-    await TH.expectRefusal(box.seal({ val: 'sk-test-1111' }, { account: 'home' }), 'vault_locked')
+    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } }), 'vault_locked')
   })
 })
