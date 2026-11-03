@@ -273,7 +273,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Discards]: lock, sweep, vacate, sweepContents, vacateContents, disable
 
-  /** Tell listeners the lock has moved: past a discard, a no-op. Never throws. */
+  /** Settle, as the lock has moved, which a snapshot showing the lock tells its listeners: past a discard, a no-op. Never throws. */
   lock(): this {
     if (! this.#isDisabled) { this.settle() }
     return this
