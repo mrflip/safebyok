@@ -27,11 +27,11 @@ This shorthands the items that must be consistent and limit queries (according t
 | VG2 | `addPasskey`        | ok            | scope, vault_tok, and prior vault revision                           | 3.2 |
 | VG3 | `revokePasskey`     | ok            | scope, vault_tok, and prior vault revision                           | 3.2 |
 | V10 | creates             | born          | scope; prior revision is NeverStoredTok/Seq, staged revision_seq = 0 |     |
-| V7  | `delVault`          | ok            | scope, vault_tok, gate_epoch, and prior vault revision               | 3.5 |
+| V7  | `delVault`          | deleted       | scope, vault_tok, gate_epoch, and prior vault revision               | 3.5 |
 | V10 | `getBank`           | ok            | scope                                                                |     |
 | V10 | writes              | `stale_write` | scope, vault_tok                                                     |     |
 
-#### Proposal: which coordinates find the row
+#### Which coordinates find the row
 
 *Ver?* marks a versioned call.
 
@@ -48,6 +48,7 @@ This shorthands the items that must be consistent and limit queries (according t
 
 * **`vault_empty` means "nothing of this life", not "nothing in this scope".** An old `vault_tok` finds no row. So
   a `getVault`, by scope, shows what is there.
+* **A live row of another life is refused `vault_mismatch`**, where a call finds the vault row by scope and `vault_tok`: nothing is read or written, and `world` and `dbhas` are that row.
 * **`gate_epoch` limits no query.** A matched revision already pins the row, and only a gate verb moves it.
 * **`prior` is a plain `Revision`**, `{ revision_tok, revision_seq }`, so it needs no new field names.
 
@@ -120,7 +121,7 @@ For every return value,
   | V4  | `putBox`          | _any_ | reborn        | 👍   | 🪦   | 💾 📥  | db row = `val`                     equal                                                               | 3.3        |
   | ..  |                   |       |               | ◽️   | ◽️   | ◽️ ◽️  |                                                                                                        |
   | V4  | ~~`putVault`~~    | repl  | replaced      | 👍   | 📌   | 💾 📥  | db row = `val`   = request = world equal                                                               | 3.3        |
-  | V4  | ~~`putVault`~~    | fail  | camped        | 💣   | 📌   | 🟰 📌  | db row = `dbhas`           = world equal; `req_params` has request metadata                            | 3.3        |
+  | V4  | `putVault`        | fail  | camped        | 💣   | 📌   | 🟰 📌  | db row = `dbhas`           = world equal; `req_params` has request metadata                            | 3.3        |
   | V4  | `putVault`        | get   | declined      | 👍   | 📌   | 🟰 📌  | db row = `val`             = world equal; `req_params` has request metadata                            | 3.3        |
   | V4  | `putVault`        | _any_ | born          | 👍   | 🔲   | 💾 📥  | db row = `val`             = world equal, revision_seq=0                                               | 3.3        |
   | V4  | `putVault`        | _any_ | reborn        | 👍   | 🪦   | 💾 📥  | db row = `val`             = world equal                                                               | 3.3        |
@@ -140,7 +141,7 @@ For every return value,
   | V5  | `delBox`          |       | deleted       | 👍   | 📌   | 💾 🪦  | db row = request = `val`         -- equal tombstone                                                    | 3.4        |
   | V5  | `delBox`          |       | void          | 👍   | 🔲   | 🟰 🔲  | db row = void    ; `val`         -- sentinel tombstone, db vault and world are equal                   | 3.4        |
   | V5  | `delBox`          |       | gone          | 👍   | 🪦   | 🟰 🪦  | db row = same    = `val`         -- tombstone equal. request discarded                                 |
-  | V7  | `delVault`        |       | ok            | 👍   | 📌   | 💾 🪦  | db row = request = `val` = world -- equal tombstone                                                    | 3.5        |
+  | V7  | `delVault`        |       | deleted       | 👍   | 📌   | 💾 🪦  | db row = request = `val` = world -- equal tombstone                                                    | 3.5        |
   |     | `delVault`        |       | void          | 👍   | 🔲   | 🟰 🔲  | db row = void    ; `val` = world -- sentinel tombstones                                                | 3.4        |
   | V5  | `delVault`        |       | gone          | 👍   | 🪦   | 🟰 🪦  | db row = same    = `val` = world -- tombstone equal, request discarded                                 | 3.4        |
   | V7  | `delVault`        |       | _any_         | 👍   | *️⃣   | *️⃣ *️⃣  | all boxes for that vault_tok are tombstoned, transactionally                               | 3.5        |

@@ -16,10 +16,9 @@ bank.hello()                                         a forced reset; a host may 
   │    same life      → vault.receive(record)
   │    new vault_tok  → old_vault.vacate, unlist; add build(vault)
   ├─ listing: each gone_vault by scope
-  │    a tombstone    → old_vault.vacate, unlist; add build(tombstone)
+  │    a tombstone    → a vault listed stays in its slot and takes it in (locked, row erased, boxes vacated); else add build(tombstone)
   ├─ bank.#keepDeviceRecord
-  ├─ subscribe to VaultDB
-  └─ bank.tidy()                                     vacate each cached lease past its autolock duration, lock its listed vault
+  └─ subscribe to VaultDB                              no autolock here: the host calls bank.autolock() after hello, and on its own timer
 
 ```
 
@@ -128,9 +127,10 @@ shows a change only once it has landed.
   separate entrypoint because it replaces the object; only a deleted vault stays in its slot, tombstoned, so a late
   fetch answer loses to it; its box listing and boxes are deleted
 * No timers on a Storable or a lease: a JS timer on a page that may be suspended at any moment says nothing. Refresh
-  timers belong to the listing or the bank. Autolock is `bank.tidy`, called by hello and by a host as it likes
-* A lease records `proved_at` and the kind of proving. `bank.tidy` finds cached leases through a deviceDB index range
-  scan, so a fresh page needs no instance. It shouts: a refused scan is bad news, and a lease it cannot vacate panics
+  timers belong to the listing or the bank. Autolock is `bank.autolock`, called by a host as it likes, after hello and on its own timer
+* A lease records `proved_at` and the kind of proving. `bank.autolock` finds cached leases through a deviceDB index range
+  scan, so a fresh page needs no instance, and locks each listed vault of the row's own `vault_tok`, which erases the row.
+  It shouts: a refused scan is bad news, and a lock whose erase is refused panics
 * For this sprint the device caches only leases and the device record, not vault or box records, and no refresh timer runs
 * The goal: when lock is called, nothing crosses it. We get there with simple code that can be analyzed in context, so a
   crossing is raised in one sentence (`crossings.md`), not fine-tuned
@@ -203,7 +203,7 @@ lock     vacate the lease; lock children; settle
 sweep    drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; unlist children
 vacate   lock; vacate children (disables, unlists them); vacate cached lease; disable
 delete   lock; vaultDB.del(vault; the store cascades its boxes, transactionally); vacate cached lease; box listing vacates (boxes disable, unlist); only the vault stays, tombstoned
-tidy     bank: deviceDB.leasesProvedBefore(cutoff), an index range scan; vacate each, lock its listed vault
+autolock bank: deviceDB.leasesProvedBefore(cutoff), an index range scan; lock each listed vault of the row, which erases it
 ```
 
 **A `lock()` whose vacate is refused panics**: it is not bad news. The call
@@ -219,7 +219,8 @@ done before it calls `lock()`.
 
 ```text
 no attempt under way    settles it 'locked_while_asking'. On attempt, the verb refuses, the dialog closes
-an attempt under way    sets the variable: the attempt runs through, and a re-entry refuses
+an attempt under way    sets the variable: the attempt runs through and its outcome settles the gating, so a wrong
+                        passphrase crossed by a lock answers 'wrong_passphrase'; a re-entry refuses
 a birth vault gating    nothing
 a del_vault gating      nothing
 ```
@@ -272,7 +273,7 @@ gating.attempt({ passphraseClear, passkeyClear? })           a second while one 
    │    ├─ store.put(vaultRecord, prior)             ← the commit
    │    └─ new Vault(what is stored), held           locked
    ├─ vault's vault_tok is not the record's → another won: locked, still a success
-   ├─ lease = passphraseProving.buildLease(vault.leaseFriend())
+   ├─ lease = passphraseProving.buildLease(vault.leaseFriend())    refused → the vault stays stored and held, locked
    └─ lease.attach()                                 cached after it
 
 run returns → gating settles ok → bank.ensureVault resolves    provings dropped with their keys
@@ -292,6 +293,7 @@ the enter key, so the birth runs through, unlocked.
 
 ```text
 vault.ensureUnlocked()
+├─ await ensureTimely                                asked first: it makes the vault recent enough to know if it deserves a lease
 ├─ a lease in force → done
 ├─ lease.peek → lease.attach → done, where one is cached; of this vault_tok and gate_epoch
 ├─ a gating open on this bank → refuses already_asking
@@ -300,7 +302,6 @@ vault.ensureUnlocked()
    └─ await #settled
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear }) or attempt({ passkeyClear })
-├─ a lock since launch → 'locked_while_asking'        checked here once, never again
 ├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here
 ├─ gate = vault.gate                                 this attempt's, from here on
 ├─ PassphraseProving.buildStored(gate, passphraseClear, world)
@@ -342,7 +343,7 @@ vault.#renewLease(proved, stored.gate.gate_epoch, heldLease)    a lock() crossin
 * **A write landing after the timeliness request.** The put refuses 'stale_write'. The gating settles with
   that refusal, and the vault has by then taken in the stored record. Nothing retries; a host may call
   the verb again.
-* **No device locks on it.** Another device's session keeps its lease to its lock or next `bank.tidy`; its cached
+* **No device locks on it.** Another device's session keeps its lease to its lock or next `bank.autolock`; its cached
   lease, of the older `gate_epoch`, is forgotten at its next session (Decided).
 * **The vaultDB checks what it can see, and no more.** It refuses a verb that would touch the other wayin, and an
   `addPasskey` over a passkey held. It cannot tell whether a wrap opens, so a bad `vault_key_wayin_wrapped` still lands.
@@ -354,7 +355,6 @@ vault.replacePassphrase()
 └─ Gating.launch('replace_passphrase', { vault, run })
    →→→ user hits enter key →→→
 gating.attempt({ antePassphraseClear, nextPassphraseClear })
-├─ a lock since launch → 'locked_while_asking'        checked here once, never again
 ├─ the two clears equal → 'same_passphrase', may re-enter
 ├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here
 ├─ ante = the vault's record, gate = vault.gate       this attempt's, from here on
@@ -376,12 +376,12 @@ passphrase only from someone who proved the current one. The PR tip checks stren
 
 ```text
 vault.addPasskey()
+├─ await ensureTimely(Promptly)                      the gate in hand is refreshed first
 ├─ gate.demandPasskeyAddable                         one held already → refused, nobody asked
 └─ Gating.launch('add_passkey', { vault, run })
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear, passkeyClear })
 │                                                    passkeyClear spent after, unless correctable (G2)
-├─ a lock since launch → 'locked_while_asking'        checked here once, never again
 ├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here
 ├─ ante = the vault's record, gate = vault.gate       this attempt's, from here on
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, world)
@@ -399,11 +399,11 @@ gating.attempt({ passphraseClear, passkeyClear })
 
 ```text
 vault.revokePasskey()
+├─ await ensureTimely(Promptly)                      the gate in hand is refreshed first
 ├─ the gate holds no passkey                         answers 'revoked', nobody asked
 └─ Gating.launch('revoke_passkey', { vault, run })
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear })
-├─ a lock since launch → 'locked_while_asking'        checked here once, never again
 ├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here
 ├─ ante = the vault's record, gate = vault.gate       this attempt's, from here on
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, world)
@@ -428,7 +428,7 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
 │    wrong → may re-enter
 └─ run({ gate, proved })                             ── no clear goes past here ──
    ├─ vault.lock()                                   sync, no throw: the lease vacated, the children locked
-   ├─ vaultListing.del(scope, vault_tok), over the revision gate was read at
+   ├─ vaultListing.del(ante), over the revision gate was read at
    │  ├─ vaultDB: a tombstone, its boxes cascading   ← the commit
    │  │    moved → 'stale_write', nothing stored
    │  └─ deviceDB.vacate(scope, vault_tok)           refused → bad news; the tombstone stands
@@ -469,7 +469,7 @@ them, as `vault_mismatch`; every VaultDB already does (`vaultdb-invariants.md`, 
 Read so far: G1 to G4 and G9. Read the whole of *The guarantees* before changing `proving.ts`,
 `lease.ts` or `gating.ts`.
 
-* **G4:** a held lease is no longer dropped at a time: it runs to its lock or the next `bank.tidy`.
+* **G4:** a held lease is no longer dropped at a time: it runs to its lock or the next `bank.autolock`.
 * **G1:** the chain is the gating's `attempt` and the provings' statics, as function arguments and
   locals. No gate, vault or `run` hears a passphrase.
 * **Passkey on a new passphrase:** VOCABULARY.md's *passphrase* and the core README's change-passphrase
@@ -488,14 +488,11 @@ Those drawn above: a gate change leaving another device's session lease to run (
 * A failed delete still locks the vault on this device, as `del_vault` locks first. So it logs the user
   out here, and they log back in to try again. That is unpleasant, and could leave them thinking the vault
   is gone from their other devices. The verb does refuse, so a host can say so. Already in `notes/wontfix.md`.
-* A vault too damaged to prove is deleted by hand, in the vaultDB's own tools (psql, say). The package
-  offers no verb for it.
 * A `lock()` whose vacate is refused panics, and the cached lease survives. The next `ensureUnlocked`
   gets it from `lease.peek` and attaches it, asking nothing, so a vault the user locked reopens with no
   passphrase. A panic's vacate stops that in the tab that locked, but the row can survive for other tabs and
   later sessions. The Coach, 2026-11-02: won't fix, but "one I worry about".
-* A damaged row stays until the customer names it for deletion. It still counts toward `maxBoxes`, and a damaged box
-  blocks its boxlabel, as no `prior` can name a revision nobody may read.
+* A damaged row stays until the customer names it for deletion. It still counts toward `maxBoxes`.
 * Cross-tab complications, all of them: tab A's `lock()` or vacate leaves tab B unlocked, and nothing tells it.
 * A put can land though its answer is lost.
 
@@ -509,7 +506,7 @@ Those drawn above: a gate change leaving another device's session lease to run (
 * Every put validates `prior_rev_tok` and `prior_rev_seq` against the row, and that the record's `revision_seq`
   is `prior_rev_seq` plus one. A birth over no row sends a known `birth_rev_tok` and a `prior_rev_seq` of -1: a
   value and not a null as its sentinel, so the invariant holds for it too.
-* The deviceDB also gains `leasesProvedBefore(cutoff)`, an index range scan over its cached leases, for `bank.tidy`.
+* The deviceDB also gains `leasesProvedBefore(cutoff)`, an index range scan over its cached leases, for `bank.autolock`.
 * `adopt` ignores a record older by `revision_seq`.
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an
   override from the inside is one the customer cannot.

@@ -234,10 +234,10 @@ The Bank half of the text in thread 4.
 
 * **Read:** `unrace-gating.md` *`bank.hello`*; `models-invariants.md` *Bank*, *Public*.
 * **Touches:** `models/bank.ts`, a new `tests/models/bank.test.ts`.
-* **Items:** `bank.hello`, `tidy`, the discards, `identity_revoked` vacating, and the snapshot fields.
+* **Items:** `bank.hello`, `bank.autolock`, the discards, `identity_revoked` vacating, and the snapshot fields.
 * **The sprint's proof, one end-to-end test driving `subscribe` and `getSnapshot`:** hello, build, seal and unseal a box, lock,
   unlock, delete, rebuild over the tombstone, and a fresh Bank on the same stores picking up the lease. Replacing the
-  passphrase, adding and revoking a passkey, and `tidy` locking one past autolock follow it; if one of those sticks, file the
+  passphrase, adding and revoking a passkey, and `bank.autolock` locking one past autolock follow it; if one of those sticks, file the
   rest and say so.
 * **Levels:** `opus` worker. **Size:** large: this is where the threads first meet. **Depends on:** 8, 10.
 
