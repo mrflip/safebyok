@@ -246,7 +246,7 @@ export class Bank implements VaultWorld {
     return this.#vaultListing.at(this.vaultScopeOf(bag))
   }
 
-  /** The vault listed for `bag`, nobody asked, locked unless the host unlocks it; else one built by asking the user through a build_vault gating, or another's that won the slot, locked. Refuses before ready, and 'already_asking' while a gating is open. */
+  /** SLOPDOC: The vault for `bag`, whether already listed or built now by asking the user. */
   async ensureVault(bag: VaultBag): Promise<Vault> {
     const scope = this.vaultScopeOf(bag)
     this.#demandReady()

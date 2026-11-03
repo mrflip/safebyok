@@ -42,12 +42,13 @@ export class Lease implements LeaseStamp {
 
   // == [Making one]: peek, tryPeek, grant
 
-  /** The lease this device has cached of the vault for `gate_epoch`, or null for none. One of another epoch or stamp is uncached and answers null, so the vault asks for a proof. The deviceDB answers none for a row of another `vault_tok`, or one failing its own check, and that row stands until the next lease is cached over it. A record that is no lease refuses 'damaged_lease', quoting nothing, and stays in place until the next lease is cached over it. */
+  /** SLOPDOC: The lease cached for `gate_epoch`, or null so the vault asks for a proof; a stale one is uncached. */
   static async peek(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
     leasePeekArgs.parse({ friend, gate_epoch })
     const cached = await friend.peekLease()
     if (cached === null) { return null }
     const checked = leaseRecord.safeParse(cached)
+    // The damaged row stands until the next lease is cached over it.
     if (! checked.success) { throw damagedLease() }
     if (checked.data.gate_epoch !== gate_epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
       await uncacheForgotten(friend)

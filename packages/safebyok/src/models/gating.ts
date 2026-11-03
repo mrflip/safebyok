@@ -71,7 +71,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     Object.freeze(this)
   }
 
-  /** The dialog shown with a new gating, resolving what `run` answers once it settles. Refuses 'already_asking' a gating open on this bank, with no join; 'bad_option' a world with no dialog; 'declined' or 'locked_while_asking' an ask that ended with no attempt. */
+  /** SLOPDOC: Opens a new gating's dialog on this bank and resolves with the vault its `run` answers. */
   static async launch<KindT extends GatingKind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
     const { scope } = MSX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, run: args.run })
     const { requestCleartext } = args.listing.world
@@ -106,10 +106,11 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     return { applabel, user_id, vaultlabel }
   }
 
-  /** The one door for a clear: what the user typed tried once, answered as an Outcome. Done, or refused for good, it settles the gating; a correctable refusal ({@link MSX.correctableKindVals}) leaves it open, and a passkey's answer unspent, to go again. Refuses 'attempt_in_flight' while one runs, and 'gating_landed' once settled, spending what it was handed. */
+  /** SLOPDOC: The one door for a clear: tries what the user typed once, and answers how it went as an Outcome. */
   attempt(clears: ClearsForGatingkind[KindT]): Promise<Outcome<Vault>> {
     const refusal = this.#refusalOfAttempt()
     if (refusal !== null) {
+      // A clear is spent even when refused at the door.
       spendClears(clears)
       return Promise.resolve(bad(refusal))
     }
@@ -126,6 +127,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     const asked = { scope: this.#scope, vault: this.vault, world: this.#listing.world }
     const outcome = await outcomeOf(async () => this.#run(await this.#prove(asked, clears)))
     this.#isAttempting = false
+    // A correctable refusal, short of the last attempt, leaves the clears unspent for the next.
     if (outcome.ok || (! isCorrectable(outcome.err)) || this.#isLastAttempt) {
       spendClears(clears)
       this.#settleOnce(outcome)
