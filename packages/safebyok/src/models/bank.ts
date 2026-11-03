@@ -172,8 +172,9 @@ export class Bank implements VaultWorld {
     return this
   }
 
-  /** Every listed vault vacated, and every lease of this bank cached on this device erased, the vaultDB untouched. The bank stays ready. Never throws. */
+  /** Every listed vault vacated, the open gating declined, a birth's too, and every lease of this bank cached on this device erased, the vaultDB untouched. The bank stays ready. Never throws. */
   vacate(): this {
+    this.#vaultListing.openGating?.declineAtDiscard()
     for (const vault of this.#vaultListing.things) { vault.vacate() }
     void this.#vacateLeasesProvedBefore(FarFuture)
     return this
