@@ -433,6 +433,7 @@ a newer row from a box answer; `MemoryVaultDB` tells watchers by microtask, so t
 
 *"tidy is supposed to call lock() on them not fiddle with the devicedb, I have a feeling I misled someone. remove it from hello, we can instruct the host to call it on their own."*
 
+* *The Coach:* "Rename this tidy to bank.autolock". "removing rows that are not in the listing seems like another but different and async task".
 * **Touches:** `bank.ts`, its tests, the proof. Supersedes thread 12's `finally`. `bank.vacate` keeps its unconditional erase.
 * **Levels:** `low` review. **Size:** small. **Depends on:** 21.
 
