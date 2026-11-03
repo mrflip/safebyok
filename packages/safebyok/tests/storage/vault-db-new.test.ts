@@ -29,7 +29,6 @@ const tombstoneFieldsOf = ({ revision_tok, revision_seq }: Revision) => ({ revis
 const vaultTombstoneOf = (record: VaultRecord): VaultTombstone => VS.vaultTombstone.parse({ ...VS.vaultSparse.parse(record), ...tombstoneFieldsOf(record) })
 const boxTombstoneOf = (record: BoxRecord): BoxTombstone => VS.boxTombstone.parse({ ...VS.boxSparse.parse(record), ...tombstoneFieldsOf(record) })
 
-/** What `thunk` throws. */
 const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
   try { await thunk() } catch (err) { return err }
   return null
