@@ -435,3 +435,14 @@ export const saltDoesNotFit = (expectedCount: number, handedCount: number): stri
 
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."
 // --
+
+// == [The models' bank]: BankHelloFirst, DeviceRecordRewritten, vaultStoredDamaged
+
+export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait for it first."
+
+/** Bad news of a device record that failed its checks and was replaced. */
+export const DeviceRecordRewritten = "This device's record for the bank was damaged, so it was written over: the device now has a new device_id."
+
+/** Bad news of a vault row `getBank` set aside. */
+export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
+// --

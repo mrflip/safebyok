@@ -1,7 +1,7 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the watch on storage, and every storage call made for that kind of thing. */
 
 import { randomId } from '../crypto'
-import { VaultError } from '../errors'
+import { VaultError, isVaultError } from '../errors'
 import type { Answer, BadAnswer, GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
@@ -216,6 +216,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       const delivered = await outcomeOf(() => this.#buildOrReceive(this.scopeOf(answer.req_params), stored))
       if (! delivered.ok) { this.tellBadNews([delivered.err]) }
     }
+    this.tellIfRevoked(answer.err)
     throw answer.err
   }
 
@@ -313,7 +314,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Bad news]: tellBadNews
+  // == [Bad news]: tellBadNews, tellIfRevoked
 
   /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into the vaultDB's watch. Call it for bad news no caller waits on. */
   tellBadNews(badnews: readonly VaultError[]): void {
@@ -329,6 +330,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
         }
       })()
     }
+  }
+
+  /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is news to the bank as well, heard before the caller hears it. */
+  protected tellIfRevoked(refusal: VaultError): void {
+    if (isVaultError(refusal, 'identity_revoked')) { this.tellBadNews([refusal]) }
   }
   // --
 

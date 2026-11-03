@@ -91,6 +91,19 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return held
   }
 
+  /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news; a refused get refuses, taking nothing in. */
+  async fetchBank(): Promise<void> {
+    this.demandEnabled()
+    const answer = await this.vaultDB.tryGetBank(this.world.scope)
+    if (! answer.ok) {
+      this.tellIfRevoked(answer.err)
+      throw answer.err
+    }
+    const { vaults, damaged_records } = answer.val
+    await Promise.all(vaults.map((record) => this.build(record)))
+    this.tellBadNews(damaged_records.map((damaged) => vaultStoredDamaged(damaged)))
+  }
+
   // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
 
   /** Lay a new passphrase wayin on the row, deliver what it stores to the vault held, and answer that record. A row moved since refuses 'stale_write', the row stored delivered first. Nothing locks: the vaultKey does not change. */
@@ -242,11 +255,13 @@ const recordOfBirth = (gate: Gate, prior: Revision, now: number): VaultRecord =>
 )
 // --
 
-// == [Refusals]: vaultAbsent, vaultGone, delOfOtherLife
+// == [Refusals]: vaultAbsent, vaultGone, delOfOtherLife, vaultStoredDamaged
 
 const vaultAbsent = ({ vaultlabel }: VaultScope): VaultError => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
 
 const vaultGone = (): VaultError => new VaultError('vault_gone', Phrases.VaultDeleted)
 
 const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
+
+const vaultStoredDamaged = ({ vaultlabel }: VS.DamagedVault): VaultError => new VaultError('damaged_record', Phrases.vaultStoredDamaged(vaultlabel))
 // --
