@@ -402,6 +402,19 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("delVault over a row past reading", () => {
+    it("refuses as a read does, and tombstones no box", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      const tombstone = vaultTombstoneOf(vaultAt())
+      const prior = priorOf(vaultAt())
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { garbage: true })
+      expect(await vaultDB.tryDelVault(tombstone, { prior })).to.deep.include({ ok: false, act: 'damaged_record' })
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { fmt: VS.VaultFormat + 1 })
+      expect(await vaultDB.tryDelVault(tombstone, { prior })).to.deep.include({ ok: false, act: 'newer_format' })
+      expect(vaultDB._cheat_boxRowsOf(vaultScope, 'life1').get('openai')).to.deep.equal(box)
+    })
+  })
+
   describe("tidyGone", () => {
     it("removes the box rows of a tombstoned or vanished life, and counts the rows left in the bank", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
