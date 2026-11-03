@@ -22,7 +22,7 @@ export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> |
 /** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
-/** What a record does to the thing in its slot: its `receive` takes it in, it is dropped unheard, or a new instance of it takes the slot. */
+/** The fate of a record meeting the thing in its slot: `receive` takes it in, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */
 export type SlotFate = 'receive' | 'lose' | 'replace'
 // --
 
@@ -339,7 +339,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Defined by the concrete listing]: fateOver, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, absentRefusal, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
 
-  /** What `record` does to `held`, the thing in its slot: by default its `receive` takes it in. */
+  /** The fate of `record` meeting `held`, the thing in its slot: by default its `receive` takes it in. */
   protected fateOver(_held: ThingT, _record: Fetched<RecordT, SparseT>): SlotFate { return 'receive' }
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null

@@ -55,7 +55,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** Build the gate of a vault under a `vault_tok` fresh from {@link makeLifeTok}, from what `proofClosure` answers, and store it over no record; resolves the vault held once it lands, unlocked under the lease its passphrase proving grants. A tombstone in the slot is the revision it goes over, and it replaces that. Refuses 'bad_option' with no closure, or a vault present in the slot, before the closure is asked anything; 'stale_write' where storage holds a newer record, delivered first. A refusal before the put lands holds nothing of the dna; a lease refused after it leaves the vault stored and held, locked. */
   async create(input: VaultDna, proofClosure?: ProofClosure): Promise<Vault> {
-    const prior = this.#priorOfBirth(input)
+    const prior = this.#demandBirthSlot(input)
     const { draft, proving } = await this.#draftWithProving({ ...this.stampDna(input), ...VS.nextRevisionOf(prior ?? VS.NeverStored, this.clock.now()) }, proofClosure)
     const vault = await this.putDraft(draft, prior)
     const lease = await proving.buildLease(vault.leaseFriend())
@@ -65,7 +65,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   tryCreate(input: VaultDna, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.create(input, proofClosure)) }
 
-  /** The commit of a birth: `record` put over `prior`, the tombstone's revision or never stored. Landed, a new vault of it replaces the slot's tombstone or void, locked. Where another vault stands stored, a vault of that one is held and answered, locked, a success: the caller tells by `vault_tok`. Refused, it stores nothing and holds nothing of `record`; a 'stale_write' delivers the record stored. */
+  /** Put `record`, a birth, over `prior`, the tombstone's revision or never stored, and resolve the vault held. Landed, a new vault of it replaces the slot's tombstone or void, locked. Where another vault stands stored, a vault of that one is held and answered, locked, a success: the caller tells by `vault_tok`. Refused, it stores nothing and holds nothing of `record`; a 'stale_write' delivers the record stored. */
   ensureVault(record: VaultRecord, prior: Revision): Promise<Vault> {
     return this.putDraft(record, prior, { ifPresent: 'get' })
   }
@@ -73,7 +73,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   tryEnsureVault(record: VaultRecord, prior: Revision): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(record, prior)) }
 
   /** The tombstone a birth under `scope` goes over, or null over none held; refuses 'bad_option' a vault present in the slot. */
-  #priorOfBirth(scope: VaultScope): Vault | null {
+  #demandBirthSlot(scope: VaultScope): Vault | null {
     this.demandEnabled()
     const held = this.at(scope)
     if (held?.isPresent === true) { throw alreadyHeldError() }
