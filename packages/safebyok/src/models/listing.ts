@@ -134,7 +134,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Delete the thing `duck` names, a sparse record or a thing, over the revision of the instance held, or else `duck`'s own, and deliver the answer: its tombstone, or nothing for nothing stored. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
-    const sparse = this.sparseOf(this.at(this.scopeOf(duck)) ?? duck)
+    const sparse = this.at(this.scopeOf(duck))?.sparse ?? this.sparseOf(duck)
     const prior = priorOf(sparse)
     const tombstone = { ...sparse, ...VS.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
     return this.#deliver(await this.tryDelRow(tombstone, { prior }))

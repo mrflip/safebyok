@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as MSX from '../../src/models/models-shapes'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -15,7 +15,7 @@ describe("VaultListing.create: the gate is built before the vault is born, and s
     expect(vault.gate.passkey_wayin).to.be.null
     expect(vault.gate.stamp).to.deep.equal({ ...Dna, vault_tok: vault.vault_tok, registered_at: T0 })
     expect(vault.revision_seq).to.eq(0)
-    expect(storedNow()?.gate).to.deep.equal(vault.gate.pickle())
+    expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
   it("refuses a dna without a closure as 'bad_option', holding no vault", async () => {
@@ -29,7 +29,7 @@ describe("VaultListing.create: the gate is built before the vault is born, and s
     await TH.expectRefusal(listing.create(Dna, () => { throw new Error('the user closed the dialog') }), 'unexpected_error')
     expect(listing.things).to.have.lengthOf(0)
     const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
-    expect(storedNow()?.gate).to.deep.equal(vault.gate.pickle())
+    expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
   it("refuses 'bad_option' a dna for a scope already held, before the closure is asked anything", async () => {
@@ -47,7 +47,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(record)
-    expect(vault.gate.pickle()).to.deep.equal(record.gate)
+    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(record.gate))
     expect(vault.gate).to.equal(vault.gate)
   })
 
@@ -57,7 +57,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const vault = await listing.build(listing.sparseOf(record))
     TH.expectSyncRefusal(() => vault.gate, 'bad_option')
     await vault.hydrate()
-    expect(vault.gate.pickle()).to.deep.equal(record.gate)
+    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(record.gate))
   })
 
   it("refuses 'bad_option' a world without what a vault's gate and lease need", () => {
@@ -106,7 +106,7 @@ const Horizon = 10 * 60_000
 
 const bornWithGets = async () => {
   const born = await makeBornVault()
-  return { ...born, gets: vi.spyOn(born.opts.store, 'get') }
+  return { ...born, gets: vi.spyOn(born.opts.vaultDB, 'tryGetVault') }
 }
 
 describe("vault.ensureTimely(maxMillis)", () => {
@@ -150,10 +150,9 @@ describe("vault.ensureTimely(maxMillis)", () => {
   })
 
   it("refuses 'absent_vault' a vault its fetch finds gone", async () => {
-    const { vault, demandStored, gets } = await bornWithGets()
+    const { vault, demandStored, restoreRow } = await bornWithGets()
     const stored = demandStored()
-    const tombstone = { ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' }
-    gets.mockImplementation((scope) => Promise.resolve({ scope, ok: true as const, val: tombstone, world: null }))
+    restoreRow({ ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' })
     await TH.expectRefusal(vault.ensureTimely(0), 'absent_vault')
   })
 
@@ -167,7 +166,7 @@ describe("vault.ensureReadyToChangeGate(): a gate is changed over a record fetch
   it("fetches nothing under 2,000 ms since the last fetch, and fetches at 2,000 ms", async () => {
     expect(MSX.Promptly).to.eq(2000)
     const { vault, opts, advance } = await makeBornVault()
-    const gets = vi.spyOn(opts.store, 'get')
+    const gets = vi.spyOn(opts.vaultDB, 'tryGetVault')
     advance(MSX.Promptly - 1)
     await vault.ensureReadyToChangeGate()
     expect(gets).not.toHaveBeenCalled()

@@ -7,7 +7,7 @@ import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBox
 
 const held = useModelsWorld()
 
-const good = (): BoxListingOpts => ({ world: held.mw.world, store: held.mw.store, maxMillisSinceRefresh: 1000 })
+const good = (): BoxListingOpts => ({ world: held.mw.world, vaultDB: held.mw.vaultDB, maxMillisSinceRefresh: 1000 })
 
 const dna = (boxlabel = 'anthropic_api_key') => boxDnaOf(held.mw.boxscope(boxlabel))
 
@@ -24,8 +24,8 @@ describe("BoxListing", () => {
     const bads: readonly (readonly [blurb: string, patch: () => object])[] = [
       ['no world',                    () => ({ world: undefined })],
       ['a world without a clock',     () => ({ world: { ...held.mw.world, clock: undefined } })],
-      ['no store',                    () => ({ store: undefined })],
-      ['a store without a watch',     () => ({ store: { ...held.mw.store, watch: undefined } })],
+      ['no vaultDB',                  () => ({ vaultDB: undefined })],
+      ['a vaultDB without its verbs', () => ({ vaultDB: { watch: () => null } })],
       ['no horizon',                  () => ({ maxMillisSinceRefresh: undefined })],
       ['a negative horizon',          () => ({ maxMillisSinceRefresh: -1 })],
       ['an onBadNews not a function', () => ({ onBadNews: 'tell me' })],
@@ -130,8 +130,8 @@ describe("BoxListing", () => {
 
     for (const [form, record] of Object.entries(records)) {
       it(`equals a fetch delivering the same ${form} record`, async () => {
-        held.mw.seedStore(record)
         const scope = held.mw.boxscope(record.boxlabel)
+        held.mw.willGet(held.mw.answerOf(scope, record))
         const fetchingListing = boxListingOf(held.mw)
         await fetchingListing.fetch(scope, { ifAbsent: 'nil' })
         const fetched = fetchingListing.at(scope)
@@ -147,7 +147,6 @@ describe("BoxListing", () => {
       const box = await listing.build(fullBoxRecord())
       expect(listing.at(box.scope)).to.eq(box)
       expect(box.isFull).to.be.true
-      expect(box.priorRevisionTok()).to.equal('rev-a1')
       expect(listing.snapshot).to.have.lengthOf(1)
     })
 
@@ -191,14 +190,12 @@ describe("BoxListing", () => {
       expect(box?._cheat_central).to.deep.equal(damaged)
     })
 
-    it("refuses a tombstone of only the scope, vault_tok, revision and times as 'bad_record' at the box's sparse form, though the base's answer check passes it", async () => {
+    it("refuses a tombstone of only the scope, vault_tok, revision and times as 'bad_record' at the box's sparse form", async () => {
       const listing = boxListingOf(held.mw)
       const scope = held.mw.boxscope('anthropic_api_key')
       const { vault_tok, revision_tok, registered_at, written_at } = fullBoxRecord()
       const bare = { ...scope, vault_tok, am: 'd', revision_tok, revision_seq: 2, registered_at, written_at }
-      const answer = { scope, ok: true, val: bare, world: null }
-      expect(() => MSX.answer.parse(answer)).to.not.throw()
-      held.mw.willGet(answer)
+      held.mw.willGet(held.mw.answerOf(scope, bare as never))
       await TH.expectRefusal(listing.fetch(scope), 'bad_record')
       expect(listing.at(scope)).to.be.null
     })
@@ -228,7 +225,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
 
   it("ignores the props the factory controls: the box is born alive, in the world's vault, at revision 0, under the clock's time", async () => {
     held.mw.setNow(T0 + 5000)
-    const box = await boxListingOf(held.mw).create({ ...dna(), am: 'x', vault_tok: 'vault-tok-other', box_tok: 'box-tok-given', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
+    const box = await boxListingOf(held.mw).create({ ...dna(), am: 'x' as never, vault_tok: 'vault-tok-other', box_tok: 'box-tok-given', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
     expect(box.am).to.eq('a')
     expect(box.box_tok).to.be.a('string').and.not.eq('box-tok-given')
     expect(box.isPresent).to.be.true
@@ -315,8 +312,13 @@ describe("BoxListing: an absent box", () => {
 
   describe("listing.fetch(scope) of a stored tombstone", () => {
     for (const [form, tombstone, am] of [['deleted', gone, 'x'], ['damaged', damaged, 'd']] as const) {
+      /** A damaged row reaches a fetch by script, until `tryGetBox` delivers one (thread 8). */
+      const storeTombstone = () => {
+        if (am === 'x') { held.mw.seedStore(tombstone()) } else { held.mw.willGet(held.mw.answerOf(scope(), tombstone())) }
+      }
+
       it(`refuses 'absent_box' for a ${form} box, built and held as its tombstone`, async () => {
-        held.mw.seedStore(tombstone())
+        storeTombstone()
         const listing = boxListingOf(held.mw)
         await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
         const box = listing.at(scope())
@@ -327,7 +329,7 @@ describe("BoxListing: an absent box", () => {
       })
 
       it(`resolves null for a ${form} box under 'nil', held all the same`, async () => {
-        held.mw.seedStore(tombstone())
+        storeTombstone()
         const listing = boxListingOf(held.mw)
         expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
         expect(listing.at(scope())?.am).to.eq(am)
@@ -336,7 +338,7 @@ describe("BoxListing: an absent box", () => {
       it(`takes a ${form} box held alive away, then refuses 'absent_box'`, async () => {
         const listing = boxListingOf(held.mw)
         const box = await listing.build(fullBoxRecord())
-        held.mw.seedStore(tombstone())
+        storeTombstone()
         await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
         expect(listing.at(scope())).to.eq(box)
         expect(box.am).to.eq(am)
@@ -353,7 +355,7 @@ describe("BoxListing: an absent box", () => {
     })
 
     it("resolves the box for a stored sparse record", async () => {
-      held.mw.seedStore(sparseBoxRecord())
+      held.mw.willGet(held.mw.answerOf(scope(), sparseBoxRecord()))
       const fetched = await boxListingOf(held.mw).fetch(scope())
       expect(fetched?.isFull).to.be.false
     })

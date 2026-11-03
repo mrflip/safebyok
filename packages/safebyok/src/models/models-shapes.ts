@@ -201,7 +201,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
  * @example boxPatch.parse({ ...record, whisper: { val: 'sk-ant-...' }, sidecar: {} })                              // { whisper: { val: 'sk-ant-...' }, sidecar: {}, ...scope }
  * @example boxPatch.parse({ whisper: LOCKED, sidecar: {} })                                                        // throws 'bad_option', naming whisper: LOCKED is not a whisper
  */
-export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, applabel, user_id, vaultlabel, boxlabel }) => {
+export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
   const halves  = { whisper: whisperHolder, sidecar }
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
@@ -210,7 +210,7 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, applabel, use
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend(halves).strict()
+  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(amVals).optional(), ...halves }).strict()
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
   return { boxDna, boxPatch }
 })

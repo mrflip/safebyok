@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { PrfSalt } from '../../src/shapes/fields'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, roundTrip, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, roundTrip, storedVaultRecord, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -20,7 +20,7 @@ describe("the ways in changing under a vault unlocked", () => {
     await theirs.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     const received = storeBehindOurBack(other.demandStored())
     vault.receive(received)
-    expect(vault.gate.pickle()).to.deep.equal(received.gate)
+    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(received.gate))
     expect(received.gate.passphrase_wayin).not.to.deep.equal(record.gate.passphrase_wayin)
     expect(vault.isUnlocked).to.be.true
     expect(vault.demandLease()).to.equal(held)
@@ -48,18 +48,18 @@ describe("the ways in changing under a vault unlocked", () => {
 
 describe("an older copy of the vault record", () => {
   it("README.md:1204, 'Storage handing back an older copy could otherwise bring back a way in that was removed': the next session on this device holds a vault record restored from before a passphrase change, and the passphrase replaced opens it again", async () => {
-    const { vault, opts, demandStored, anotherSession, deviceDB } = await makeBornVault()
+    const { vault, restoreRow, demandStored, anotherSession, deviceDB } = await makeBornVault()
     const ante = demandStored()
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     vault.lock()
     await TH.eventually(() => deviceDB.keptNow() === null)
-    await opts.store.put(ante, null)
+    restoreRow(ante)
     const later = anotherSession()
     const restored = await later.build(demandStored())
     await later.hello()
     expect(restored.isLocked).to.be.true
     expect(restored.revision_seq).to.eq(ante.revision_seq)
-    expect(restored.gate.pickle()).to.deep.equal(ante.gate)
+    expect(restored.gate.pickle()).to.deep.equal(wayinsOf(ante.gate))
     await restored.ensureUnlocked(byPassphrase(Passphrase))
     expect(restored.isUnlocked).to.be.true
   })
@@ -79,12 +79,11 @@ describe("a vault record stored damaged", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate reads as sparse, so ensureUnlocked refuses 'bad_option', asking for a hydrate that will never bring a gate, and stores nothing", async () => {
+  it("README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate refuses 'damaged_record' at ensureUnlocked's hydrate, and stores nothing", async () => {
     const { gate: _gate, ...gateless } = await storedVaultRecord()
     const { listing, storedNow } = makeVaultWorld(gateless as VaultRecord)
     const vault = await listing.build(listing.sparseOf(gateless))
-    await TH.expectRefusal(vault.ensureUnlocked(byPassphrase(Passphrase)), 'bad_option')
-    await vault.hydrate()
+    await TH.expectRefusal(vault.hydrate(), 'damaged_record')
     expect(vault.isFull).to.be.false
     expect(storedNow()).to.equal(gateless)
   })

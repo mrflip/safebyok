@@ -155,60 +155,6 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
   })
 })
 
-describe("MSX.answer", () => {
-  const good = { scope, ok: true, val: full, world: null }
-  holdsCases(MSX.answer, 'bad_record', [
-    // a good answer, whatever it delivers:
-    [good,                                                       true,  'passes a full record'],
-    [{ ...good, val: sparse },                                   true,  'passes a sparse record'],
-    [{ ...good, val: gone },                                     true,  'passes a deletion tombstone'],
-    [{ ...good, val: ouch },                                     true,  'passes a damaged one\'s tombstone'],
-    [{ ...good, val: null },                                     true,  'passes nothing stored, as null'],
-    [{ ...good, world: { epoch: 4 } },                           true,  'passes any world'],
-    // a refused answer:
-    [{ scope, ok: false, err: new VaultError('stale_write', 'x'), world: null }, true, 'passes a refusal carrying a VaultError'],
-    // bad:
-    [{ ...good, ok: false },                                     false, 'refuses a refusal with no err'],
-    [{ scope, ok: false, err: new VaultError('stale_write', 'x'), val: full, world: null }, false, 'refuses a refusal that also carries a val'],
-    [{ ...good, err: new VaultError('stale_write', 'x') },       false, 'refuses a good answer that also carries an err'],
-    [{ scope, ok: false, err: new Error('plain'), world: null }, false, 'refuses an err that is no VaultError'],
-    [{ scope, ok: false, err: { refusalkind: 'stale_write' }, world: null }, false, 'refuses an err that only looks like one'],
-    [{ ok: true, val: full, world: null },                       false, 'refuses an answer missing its scope'],
-    [{ scope, ok: true, val: full },                             false, 'refuses an answer missing its world'],
-    [{ ...good, val: undefined },                                false, 'refuses a val left undefined: none stored is null'],
-    [{ ...good, val: { ...full, vault_tok: '' } },               false, 'refuses a val that fails sparseBase'],
-    [{ ...good, ok: 'yes' },                                     false, 'refuses an ok that is no boolean'],
-    [{ ...good, scope: 'anthropic_api_key' },                    false, 'refuses a scope that is no object'],
-    [null,                                                       false, 'refuses null'],
-    [[],                                                         false, 'refuses an array'],
-  ])
-
-  it("accepts a val the listing's store made, not a copy", () => {
-    expect(mw.answerOf(scope, full).ok).to.be.true
-    expect(() => MSX.answer.parse(mw.answerOf(scope, full))).to.not.throw()
-    expect(() => MSX.answer.parse(mw.staleWriteOf(scope, full))).to.not.throw()
-  })
-
-  it("refuses without quoting its input", () => {
-    const err = TH.expectSyncRefusal(() => MSX.answer.parse({ ...good, val: { ...full, vault_tok: 'SECRET-TOK', am: 'SECRET' } }), 'bad_record')
-    expect(err.message).to.not.include('SECRET')
-  })
-})
-
-describe("MSX.notice", () => {
-  holdsCases(MSX.notice, 'bad_record', [
-    [{ world: null, record: full },       true,  'passes a full record'],
-    [{ world: null, record: sparse },     true,  'passes a sparse record'],
-    [{ world: null, record: gone },       true,  'passes a tombstone'],
-    [{ world: null, record: ouch },       true,  'passes a damaged one\'s tombstone'],
-    [{ world: null },                     false, 'refuses a notice with no record'],
-    [{ record: full },                    false, 'refuses a notice with no world'],
-    [{ world: null, record: null },       false, 'refuses a null record: a notice always names one'],
-    [{ world: null, record: {} },         false, 'refuses a record that fails sparseBase'],
-    [full,                                false, 'refuses a record handed in place of a notice'],
-  ])
-})
-
 describe("The checks of what reconciling passes", () => {
   const checkSet = (check: { parse: (val: unknown) => unknown }, goods: readonly string[], bads: readonly unknown[]): void => {
     for (const val of goods) { it(`passes '${val}'`, () => { expect(check.parse(val)).to.eq(val) }) }
@@ -426,9 +372,9 @@ describe("The checks of the world and the listing", () => {
   })
 
   describe("MSX.listingOpts", () => {
-    const opts = { world: mw.world, store: mw.store, maxMillisSinceRefresh: 1000, onBadNews: mw.onBadNews }
+    const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, onBadNews: mw.onBadNews }
     holdsCases(MSX.listingOpts, 'bad_option', [
-      [opts,                                                     true,  'passes the test world and store'],
+      [opts,                                                     true,  'passes the test world and vaultDB'],
       [{ ...opts, onBadNews: undefined },                        true,  'passes no onBadNews'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
       [{ ...opts, world: undefined },                            false, 'refuses a missing world'],
@@ -436,8 +382,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...opts, world: { ...mw.world, ensureTimely: 5 } },     false, 'refuses a world whose ensureTimely is no function'],
       [{ ...opts, world: { ...mw.world, lockState: undefined } }, false, 'refuses a world with no lockState'],
       [{ ...opts, world: { ...mw.world, clock: {} } },           false, 'refuses a world with no clock'],
-      [{ ...opts, store: { ...mw.store, put: undefined } },      false, 'refuses a store with no put'],
-      [{ ...opts, store: { ...mw.store, watch: undefined } },      false, 'refuses a store with no watch'],
+      [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
       [{ ...opts, onBadNews: 'tell me' },                        false, 'refuses an onBadNews that is no function'],
@@ -578,28 +523,29 @@ describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
 })
 
 describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
-  it("name the one policy, replace", () => {
-    expect(MSX.ifPresentVals).to.deep.equal(['replace'])
+  it("name the three policies", () => {
+    expect(MSX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
   })
 
   holdsCases(MSX.ifPresent, 'bad_option', [
-    ["replace",  true,  'passes replace'],
-    ["fail",     false, 'refuses fail, which send does not offer'],
-    ["fetch",    false, 'refuses fetch, which send does not offer'],
+    ["repl",     true,  'passes repl'],
+    ["fail",     true,  'passes fail'],
+    ["get",      true,  'passes get'],
+    ["replace",  false, 'refuses replace, which it does not spell'],
     [undefined,  false, 'refuses undefined: sendOpts makes it optional, not the check'],
   ])
 
   holdsCases(MSX.sendOpts, 'bad_option', [
     [{},                                                    true,  'passes no options'],
-    [{ ifPresent: 'replace' },                              true,  'passes ifPresent replace'],
+    [{ ifPresent: 'repl' },                              true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                              true,  'passes ifPresent undefined'],
-    [{ ifPresent: 'replace', maxWorldMillis: 5 },           true,  'passes ifPresent beside the timely options'],
-    [{ ifPresent: 'fail' },                                 false, 'refuses an ifPresent that is not replace'],
-    [{ maxMillisSinceRefresh: -1, ifPresent: 'replace' },   false, 'refuses a negative horizon, as timelyOpts does'],
+    [{ ifPresent: 'repl', maxWorldMillis: 5 },           true,  'passes ifPresent beside the timely options'],
+    [{ ifPresent: 'replace' },                              false, 'refuses an ifPresent it does not offer'],
+    [{ maxMillisSinceRefresh: -1, ifPresent: 'repl' },   false, 'refuses a negative horizon, as timelyOpts does'],
   ])
 
   it("keeps ifPresent and the timely options and strips the rest", () => {
-    expect(MSX.sendOpts.parse({ ifPresent: 'replace', maxWorldMillis: 5, ifAbsent: 'nil', reseal: true })).to.deep.equal({ ifPresent: 'replace', maxWorldMillis: 5 })
+    expect(MSX.sendOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'nil', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5 })
   })
 
   it("name the failing field", () => {
@@ -730,7 +676,7 @@ describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault recor
   const { boxlabel: _boxlabel, ...vaultscope } = scope
   const sparseVault = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps }
 
-  const gate = { passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
+  const gate = { gate_epoch: MSX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
   holdsCases(MSX.vaultRecord, 'bad_record', [
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],

@@ -1,6 +1,7 @@
 /** The box's seal through a real vault's lease, the one place a box meets real cryptography in `tests/models/`. */
 
 import { afterEach, describe, expect, it } from 'vitest'
+import type { BoxRecord } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
 import { Dna, LeaseMillis, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
@@ -14,13 +15,13 @@ afterEach(() => { for (const mw of modelsWorlds.splice(0)) { mw.dispose() } })
 const Whisper = { val: { apiKey: 'sk-test-0000', orgId: null } }
 const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: { account: 'work' } }
 
-/** Box listings whose world is a real vault, born unlocked under `Passphrase`, over the models world's fake store. */
+/** Box listings whose world is a real vault, born unlocked under `Passphrase`, over its vaultDB. */
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
   const vault = await vaultWorld.listing.create(Dna, () => ({ passphrase: Passphrase }))
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
-  const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault) })
+  const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault), vaultDB: vaultWorld.opts.vaultDB })
   return { ...vaultWorld, vault, boxesOf, boxes: boxesOf() }
 }
 
@@ -40,7 +41,7 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     const sealed = built._cheat_central
     const intact = await boxesOf().build(sealed)
     expect(await intact.unsealWhisper()).to.deep.equal(Whisper)
-    const altered = await boxesOf().build({ ...sealed, sidecar: { account: 'home' } })
+    const altered = await boxesOf().build({ ...sealed, sidecar: { account: 'home' } } as BoxRecord)
     await TH.expectRefusal(altered.unsealWhisper(), 'damaged_box')
   })
 
