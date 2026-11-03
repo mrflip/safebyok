@@ -72,7 +72,6 @@ export const VaultErrorExpected = "Expected a VaultError"
 
 /** The `err` of a task a trigger is told failed. */
 export const ErrorExpected = "Expected an Error"
-
 // --
 
 // == [Passphrases]: PassphraseNotText
