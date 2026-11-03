@@ -24,6 +24,7 @@ the sprint doc's *Closer Look* tab, *Draft for triage*, and its *Open Matters*, 
 * **What a refusal's error may carry.** "a standard `loggableRowOf` helper that does a simple safeParse to know it's getting a row-like thing and keeps only safe fields would be helpful if it's not overthought." The error's `meta` holds what it selects; `world` and `dbhas` live on the `try` answer.
 * **`vault.hello`** is called by the host, after unlock; a box verb before it refuses hello-first. "if we have made it inconvenient for the react side we will adjust or sugar to their tastes once we're e2e".
 * **A vacated or swept bank is done:** "no hello afterward, so a host makes a new Bank YES". That removes the hello-after paths and their crossings, and `hello`'s identity comparison.
+* **A passkey answer's PRF bytes.** "handing a clear to attempt gives it away, and it's zeroed before attempt answers, always" <-- agree. So a `wrong_passkey` no longer leaves them for the same bytes to go in again, the dialog abandons and redoes, and the spec's "unspent" and `#attemptOnce` change with it.
 
 ## Plain instructions from Closer Look, not yet shaped into threads
 
