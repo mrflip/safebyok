@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." So 18, 19 and 20 are held for triage; 16 and then 14 go ahead on the restacked line. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." So 18, 19 and 20 are held for triage; 16 is cancelled; 21 and then 14 go ahead on the restacked line. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
@@ -333,11 +333,15 @@ Earlier threads do this for what they rewrite, as they go. This thread takes wha
 * **Also:** `unrace-gating.md` *Guarantees to amend* and *Rows for `notes/wontfix.md`*.
 * **The Coach, on Closer Look:** the tree for `ensureUnlocked` says why it asks `ensureTimely` first: *"ensure timely is to make sure
   the vault is recent enough to know if it deserves a lease, the tree would be better off to say so"*.
+* **The Coach's rows:** *"Yes strip we can add back"*: blocks under the bound that still name a `Refuses`, and lines pointing at a block
+  that no longer says it, go. STYLE.md: *"You are getting very inconsistent guidance right now on comments, I have only recently learned how
+  dangerous they are for agents. I will reform that soon, but a brief note would help"*. `wontfix.md`: *"If the host has no on panic they've given
+  their opinion, wontfix."*
 * **The Coach's note:** *"relocate the checks and types at the top of models files into the shapes directory or model-shapes ?
   Anything with a good reason can stick around, but it saves token ussage to not have them there, and agents will write better
   ones. Types are best made from checks"*.
 * **Levels:** `sonnet` worker, `low` review; an `opus` worker for the guarantees, if they turn out to be more than wording.
-  **Size:** small. **Depends on:** 16; it runs last.
+  **Size:** small. **Depends on:** 21; it runs last.
 
 ### 15. `lease_narrow` (the Coach's ruling, 2026-11-03)
 
@@ -353,21 +357,10 @@ with `friend.peekLease()` answering the cached row and its lease key handle (G9)
 and check the slot itself. Second review `clean` at low. Left: `demandBirthSlot`'s name; `_cheat_leaseFriend` and `isMadeFor`, and `world.deviceDB`,
 in rows with the Coach; a birth's synchronous claim unpinned (thread 20). #461 stays a draft, as `gh pr ready` was denied.
 
-### 16. `method_ends` (the spec's, unbuilt; the Coach's row is open)
+### 16. `method_ends`: cancelled
 
-`unrace-gating.md` *End-of-method invariants*: "Each method states what holds when it ends, whatever crossed it, and checks it: a
-private check at the method's end, throwing as any data-integrity failure does and naming no secret, with a test for each row. A
-check that cannot be written marks an invariant that is not one."
-
-* *Orchestrator:* no thread's items named these, as thread 11's review found. After the proof, as the proof is what the sprint is
-  for; before the sweep, so it sweeps them. Holds to the no-machinery rule: a check reads what is there, and adds no state.
-* *The Coach:* "Have each check, then the empty invariant is obvious": every row gets a check, and none is dropped for lack of one.
-* **Also, the Coach's rulings:** a gate verb refused `vault_gone` or `vault_mismatch` delivers its row to the Vault, through a
-  protected `isRefusalOfRow` on `Listing`, overridden in `VaultListing`, as a box verb's `dbhas` is the vault row; one test. And a gate
-  change rejecting after its record is stored: "I can't see at a glance that the ones you named are wontfix, so document them and if
-  it's straightforward test in halpimonfire". So `crossings.md`, not `wontfix.md`, and a test that a refused `tryCache` during
-  `replacePassphrase` resolves and fires `onBadNews`.
-* **Levels:** `high` review. **Size:** medium. **Depends on:** 13, 15, 17, restacked.
+The Coach, 2026-11-03: *"Can I pull a reverse card and cancel the post condition adding thread, this sounds like it could get theatrical."*
+Stopped mid-build, nothing committed or filed. Its other items moved to thread 21.
 
 ### 17. `doc_strip` (the Coach, on Closer Look, 2026-11-03)
 
@@ -422,6 +415,16 @@ a newer row from a box answer; `MemoryVaultDB` tells watchers by microtask, so t
 `_cheat_boxRowsOf` is the store's own accessor and creates a row on a read.
 
 * **Levels:** `low` review. **Size:** small. **Depends on:** 19.
+
+### 21. `small_rulings` (the Coach's rows, 2026-11-03)
+
+* A gate verb refused `vault_gone` or `vault_mismatch` delivers its row to the Vault, by a protected `isRefusalOfRow`.
+* A gate change rejecting after it stored: *"I can't see at a glance that the ones you named are wontfix, so document them and if it's
+  straightforward test in halpimonfire"*; a refused `tryCache` during `replacePassphrase` gets a test.
+* `_cheat_leaseFriend`, `lease.isMadeFor` and `leaseOfOtherHolder` go: *"The point is to be unreachable right? Will we still have good
+  coverage?"*
+* `bank.sweep` nulls `#lastHello` first; `takeWorld`'s `bad_record`.
+* **Levels:** `medium` review. **Size:** small. **Depends on:** 17.
 
 ## Bent from the pre-plan
 
