@@ -57,9 +57,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Starting and ending]: hello, goodbye
 
   /** Start the watch. */
-  hello(): Promise<void> {
+  async hello(): Promise<void> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     this.#unwatch ??= this.#store.watch(this.#onNotice, () => this.watchableThings.map((thing) => thing.scope))
-    return Promise.resolve()
   }
 
   /** End the watch. The instances stay as they are. */
