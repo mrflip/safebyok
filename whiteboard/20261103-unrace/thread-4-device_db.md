@@ -1,6 +1,6 @@
 # Thread 4: device_db (2026-11-03)
 
-Branch `20261103-device_db`, PR #TBD, off main. Justify: green; 26 tests in `tests/storage/device-db-new.test.ts`.
+Branch `20261103-device_db`, PR #452, off main. Justify: green; 26 tests in `tests/storage/device-db-new.test.ts`.
 
 * **Built**, in `packages/safebyok/src/storage/`, beside thread 2's vaultDB (not in this base; same layering):
   * `device-db-new.ts`: abstract `DeviceDB`. Lease verbs `cache(row)`, `peek(asked)`, `vacate(asked)`, `leasesProvedBefore(cutoff)`; device record verb `cacheDeviceRecord(record)`; a `try*` of each answering an Outcome. Generic calls: `doCache`, `doPeek`, `doVacate`, `doLeasesProvedBefore`, `doCacheDeviceRecord`.
