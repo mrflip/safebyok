@@ -1,23 +1,21 @@
-/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a duck vault, a fake deviceDB friend with a spy on each verb, a proving world over a fast key deriver, passkey answers, and the loudly named backdoor that opens a wayin from outside.
+/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a fake lease friend with a spy on each verb, a proving world over a fast key deriver, passkey answers, and the loudly named backdoor that opens a wayin from outside.
  * Import it directly, not through `TH`, as `models-world.ts` is: `src/models/` is not exported.
  *
- * Time. A lease's autolock is a Trigger, which arms a `setTimeout` at `autolock_at`. Call
- * {@link useFakeClock} at the top of a test file: it installs vitest's fake timers at {@link T0}
- * before each test and puts real ones back after, so no autolock keeps the process alive and the
- * duck vault's clock (`Date.now()`) moves with them. `await vi.advanceTimersByTimeAsync(ms)` moves
- * the clock and fires what falls due; `vi.setSystemTime(ms)` jumps it, firing nothing.
+ * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving or a lease
+ * records: it installs vitest's fake timers at {@link T0} before each test and puts real ones back
+ * after, so the fake friend's and the proving world's clock (`Date.now()`) reads what the test says.
  */
 
 import { afterEach, beforeEach, type Mock, vi } from 'vitest'
-import { MinuteMillis, PasskeySaltBytes } from '../../src/consts'
+import { PasskeySaltBytes } from '../../src/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/crypto'
 import { Lease } from '../../src/models/lease'
-import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type ProofClosure, type ProvingWorld, type VaultStamp, vaultStamp } from '../../src/models/models-shapes'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProofClosure, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/outcome'
 import type { KeyDeriver } from '../../src/key-deriver'
 import * as VX from '../../src/shapes/vault'
-import { testDeriver } from './builders'
+import { anyStrengthChecker, testDeriver } from './builders'
 import { type LoggedCall, spyLogger } from './logging'
 import { T0 } from './models-world'
 
@@ -32,58 +30,49 @@ export const useFakeClock = (): void => {
 }
 // --
 
-// == [The vault]: WorldStamp, DuckVault, duckVaultOf
+// == [The vault]: WorldStamp
 
 /** The stamp of the vault every builder here makes things in: `u1`'s `main` vault of the app `acme`, registered at {@link T0}. */
 export const WorldStamp: VaultStamp = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
-
-/** A plain stand-in for a vault, as a lease is handed one: its stamp, a clock on `Date.now()`, and `lock`, a spy. A proving and a gate take its stamp alone, {@link WorldStamp}. */
-export type DuckVault = VaultStamp & { clock: { now: () => number }, lock: Mock<() => void> }
-
-/** A {@link DuckVault} of {@link WorldStamp}, with a fresh `lock` spy.
- *
- * @example const vault = duckVaultOf({ vault_tok: 'vault-tok-other' })
- */
-export const duckVaultOf = (overrides: Partial<VaultStamp> = {}): DuckVault => ({
-  ...WorldStamp,
-  ...overrides,
-  clock: { now: () => Date.now() },
-  lock:  vi.fn<() => void>(),
-})
 // --
 
-// == [The deviceDB friend]: FakeDBFriend, fakeDBFriendOf
+// == [The friend]: FakeLeaseFriend, fakeLeaseFriendOf
 
-/** A fake of the deviceDB as a lease reaches it: its {@link LeaseDBFriend} verbs, each a spy. */
-export type FakeDBFriend = LeaseDBFriend & {
-  tryGetLease: Mock<LeaseDBFriend['tryGetLease']>
-  tryPutLease: Mock<LeaseDBFriend['tryPutLease']>
-  tryDelLease: Mock<LeaseDBFriend['tryDelLease']>
-  /** The record the slot keeps, null for none. Set it to seed one, whatever it is. */
-  kept:        unknown
+/** A fake of a vault as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one slot. */
+export type FakeLeaseFriend = LeaseFriend & {
+  lock:            Mock<() => void>
+  peekLease:       Mock<LeaseFriend['peekLease']>
+  tryCacheLease:   Mock<LeaseFriend['tryCacheLease']>
+  tryUncacheLease: Mock<LeaseFriend['tryUncacheLease']>
+  /** The record the slot holds, null for none. Set it to seed one, whatever it is. */
+  cached:          unknown
   /** Every call the logger heard, oldest first. */
-  logged:      LoggedCall[]
+  logged:          LoggedCall[]
 }
 
-/** A {@link FakeDBFriend} keeping nothing, its verbs answering good. Script a refusal with the spy's `mockResolvedValueOnce(bad(err))`.
+/** A {@link FakeLeaseFriend} of {@link WorldStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockResolvedValueOnce(bad(err))`.
  *
  * @example
- *   const friend = fakeDBFriendOf()
- *   friend.tryPutLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the disk is full')))
+ *   const friend = fakeLeaseFriendOf({ vault_tok: 'vault-tok-other' })
+ *   friend.tryCacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the disk is full')))
  */
-export const fakeDBFriendOf = (): FakeDBFriend => {
+export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp> = {}): FakeLeaseFriend => {
   const { logger, calls } = spyLogger()
-  const friend: FakeDBFriend = {
+  const friend: FakeLeaseFriend = {
+    ...WorldStamp,
+    ...overrides,
+    clock:           { now: () => Date.now() },
     logger,
-    logged:      calls,
-    kept:        null,
-    tryGetLease: vi.fn(() => Promise.resolve(good(friend.kept as LeaseRecord | null))),
-    tryPutLease: vi.fn((record: LeaseRecord) => {
-      friend.kept = record
+    logged:          calls,
+    cached:          null,
+    lock:            vi.fn<() => void>(),
+    peekLease:       vi.fn(() => Promise.resolve(friend.cached)),
+    tryCacheLease:   vi.fn((record: LeaseRecord) => {
+      friend.cached = record
       return Promise.resolve(good(record))
     }),
-    tryDelLease: vi.fn(() => {
-      friend.kept = null
+    tryUncacheLease: vi.fn(() => {
+      friend.cached = null
       return Promise.resolve(good(undefined))
     }),
   }
@@ -91,14 +80,14 @@ export const fakeDBFriendOf = (): FakeDBFriend => {
 }
 // --
 
-// == [Leases]: WeekMillis, makeGrantedLease, sealStampsOf
+// == [Leases]: GrantedAs, makeGrantedLease, sealStampsOf
 
-/** A week, the lease {@link makeGrantedLease} grants unless told otherwise. */
-export const WeekMillis = 7 * 24 * 60 * MinuteMillis
+/** What {@link makeGrantedLease} records of a proving, unless told otherwise: the first gate, proved by passphrase. */
+export const GrantedAs: LeaseGrantOpts = Object.freeze({ gate_epoch: FirstGateEpoch, wayinkind: 'passphrase' })
 
-/** A lease under a fresh vaultKey: no two share a key. A {@link WeekMillis week} long unless `opts` says otherwise. */
-export const makeGrantedLease = async (vault: DuckVault, friend: FakeDBFriend, opts?: LeaseGrantOpts): Promise<Lease> => (
-  Lease.grant(vault, friend, await makeVaultKey(), opts ?? { leaseMillis: WeekMillis })
+/** A lease under a fresh vaultKey: no two share a key. Not cached. */
+export const makeGrantedLease = async (friend: FakeLeaseFriend, opts: LeaseGrantOpts = GrantedAs): Promise<Lease> => (
+  Lease.grant(friend, await makeVaultKey(), opts)
 )
 
 /** The two stamps a box hands the lease to seal its whisper under, its own fields, flat: `boxlabel` and `box_tok` for the boxKey's wrap, the same and `revision_seq` for the whisper's cipher. `overrides` lays fields over both. */
@@ -116,11 +105,12 @@ export const TestPassphrase = VX.passphraseCleartext.parse('correct horse batter
 /** The `device_id` a {@link provingWorldOf} world carries. */
 export const DeviceId = 'device-laptop'
 
-/** A proving's world: a clock on `Date.now()`, the one-SHA-256 `testDeriver`, and {@link DeviceId}. */
+/** A proving's world: a clock on `Date.now()`, the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}. */
 export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWorld => ({
-  clock:      { now: () => Date.now() },
-  keyDeriver: testDeriver,
-  device_id:  DeviceId,
+  clock:           { now: () => Date.now() },
+  keyDeriver:      testDeriver,
+  strengthChecker: anyStrengthChecker,
+  device_id:       DeviceId,
   ...overrides,
 })
 

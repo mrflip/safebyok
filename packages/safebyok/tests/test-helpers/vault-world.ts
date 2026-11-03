@@ -7,11 +7,12 @@ import type { Lease } from '../../src/models/lease'
 import type { GateProps, ProofClosure, VaultRecord } from '../../src/models/models-shapes'
 import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
-import { NOVEL, Proving } from '../../src/models/proving'
+import { NOVEL, PassphraseProving } from '../../src/models/proving'
+import { passphraseCleartext } from '../../src/shapes/vault'
 import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { quietLogger } from './logging'
-import { passkeyOf, testDeriver } from './builders'
+import { anyStrengthChecker, passkeyOf, testDeriver } from './builders'
 
 /** The clock's first reading: 31 October 2026. */
 export const T0 = Date.UTC(2026, 9, 31)
@@ -42,7 +43,7 @@ const nothing = (): void => undefined
 /** Every listing made since the last test. */
 const madeListings: VaultListing[] = []
 
-/** Say goodbye to every listing a test made, after it, so no autolock timer outlives its test: call it once at the top of a test file. */
+/** Say goodbye to every listing a test made, after it, so nothing outlives its test: call it once at the top of a test file. */
 export const useVaultWorlds = (): void => {
   afterEach(() => {
     for (const listing of madeListings.splice(0)) { listing.goodbye() }
@@ -74,6 +75,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
     logger:       quietLogger,
     keyDeriver:   testDeriver,
+    strengthChecker: anyStrengthChecker,
     device_id:    'device-1',
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB as unknown as VaultWorld['deviceDB'],
@@ -144,9 +146,9 @@ export const roundTrip = async (sealer: Lease, opener: Lease): Promise<string> =
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
 export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
-  const { passphraseProving } = await Proving.makeProvingPair({ ...Dna, vault_tok, registered_at }, () => ({ passphrase: Passphrase }), makeVaultWorld().opts.world)
-  await passphraseProving.makeWayin(NOVEL)
-  return passphraseProving
+  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), makeVaultWorld().opts.world)
+  await proving.buildWayin(NOVEL)
+  return proving
 }
 
 /** `vault` as its boxes see it, but that it takes no world. */
