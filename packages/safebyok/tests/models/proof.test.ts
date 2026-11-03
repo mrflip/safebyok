@@ -7,7 +7,7 @@ import type { Box, BoxSnapshot } from '../../src/models/box'
 import type { RequestCleartext } from '../../src/models/gating'
 import type { GatingKind } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
-import type { Vault, VaultSnapshot } from '../../src/models/vault'
+import type { VaultSnapshot } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultBag, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { ticks } from '../test-helpers/timing'
@@ -15,7 +15,7 @@ import { NewPassphrase, Passphrase, byPasskey, byPassphrase } from '../test-help
 
 useBankWorlds()
 
-// == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, makeDialog
+// == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, whisperReveal, makeDialog
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
@@ -62,7 +62,7 @@ const whisperReveal = (box: Box) => (): string => {
   return Storable.isLockedFUBag(whisper) ? 'locked' : JSON.stringify(whisper.val)
 }
 
-/** The host's dialog: it records what it was shown for, and hands over what the user will type. */
+/** The host's dialog: it records what it was shown for, and attempts what the user types, in turn; typing nothing closes it. */
 const makeDialog = () => {
   const dialog = {
     typing: byPassphrase(Passphrase) as object,
@@ -79,14 +79,6 @@ const makeDialog = () => {
   return dialog
 }
 // --
-
-/** `vault.ensureUnlocked()` with the user mistyping once, and getting it right: answers the refusal the dialog showed. */
-const unlockAfterAWrongPassphrase = async (vault: Vault, dialog: ReturnType<typeof makeDialog>): Promise<unknown> => {
-  dialog.typing = [byPassphrase('not the passphrase'), byPassphrase(Passphrase)]
-  await vault.ensureUnlocked()
-  dialog.typing = byPassphrase(Passphrase)
-  return dialog.refusals.shift()
-}
 
 /** A bank past its `hello` with the vault of `VaultBag` built and unlocked, and the dialog that did it, cleared. */
 const makeHost = async () => {
@@ -135,7 +127,7 @@ describe("the proof", () => {
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} unlocked'])
     const revealUi = mountComponent(box, whisperReveal(box))
     revealUi.expectRenders(['hidden'])
-    expect(JSON.stringify(box.toJSON())).not.to.include(ApiKey.whisper.val)
+    expect(JSON.stringify([...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()])).not.to.include(ApiKey.whisper.val)
 
     // == Unseal it: extractWhisper hands over the whisper and keeps nothing; expose keeps it for the component.
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
@@ -145,7 +137,7 @@ describe("the proof", () => {
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
 
-    // == Lock: everything reads locked before lock() returns, nobody is asked, and the box refuses.
+    // == Lock: every component is told before lock() returns, the whisper leaves the screen, and the box refuses.
     vault.lock()
     bankUi.expectRenders(['ready: main locked'])
     vaultUi.expectRenders(['main locked'])
@@ -162,8 +154,9 @@ describe("the proof", () => {
     bankUi.expectRenders([])
 
     // == Unlock: the lock erased the cached lease, so the user is asked, and the wrong passphrase leaves the dialog open.
-    const wrongThenRight = await unlockAfterAWrongPassphrase(vault, dialog)
-    expect(wrongThenRight).to.include({ refusalkind: 'wrong_passphrase' })
+    dialog.typing = [byPassphrase('not the passphrase'), byPassphrase(Passphrase)]
+    await vault.ensureUnlocked()
+    expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
     vaultUi.expectRenders(['main unlocked'])
@@ -173,6 +166,7 @@ describe("the proof", () => {
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
     // == Delete: the user proves it, the list empties, and the vault says it is gone.
+    dialog.typing = byPassphrase(Passphrase)
     await vault.delVault()
     expect(dialog.shown.splice(0)).to.deep.equal(['del_vault'])
     bankUi.expectRenders(['ready: main locked', 'ready: no vaults'])
@@ -230,7 +224,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main locked'])
     dialog.typing = [byPassphrase(Passphrase), byPassphrase(NewPassphrase)]
     await vault.ensureUnlocked()
-    expect(dialog.refusals.splice(0)).to.satisfy(([refusal]: VaultError[]) => refusal?.refusalkind === 'wrong_passphrase')
+    expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
     bankUi.expectRenders(['ready: main unlocked'])
   })
 
@@ -318,14 +312,16 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
   })
 
-  it("the network goes: an unlocked vault stays unlocked and says so, a refused hello paints refused, and the next one recovers", async () => {
+  it("the store goes out of reach: an unlocked vault keeps its lease, a refused hello paints refused, and the next one recovers", async () => {
     const { world, bank, vault } = await makeHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
     world.advance(StaleMillis)
     world.vaultDB._cheat_refuseGets('storage_error')
-    expect(await vault.ensureUnlocked()).to.eq(vault)
+    // A vault too stale to know whether it deserves its lease refuses the ask, and keeps the lease it has.
+    await TH.expectRefusal(vault.ensureUnlocked(), 'storage_error')
+    expect(vault.isUnlocked).to.be.true
     await TH.expectRefusal(bank.hello(), 'storage_error')
     bankUi.expectRenders(['refused: main unlocked'])
     expect(bank.snapshot.err?.refusalkind).to.eq('storage_error')

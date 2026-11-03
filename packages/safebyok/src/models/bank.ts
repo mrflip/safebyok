@@ -125,7 +125,8 @@ export class Bank implements VaultWorld {
 
   // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord, demandReady
 
-  /** A forced reset, and a host may call it again: every vault and tombstone the vaultDB holds is listed, the device record cached, and the watch started. Old leases are tidied once the vaultDB has answered or refused, so an offline `hello` tidies too. Refused, it leaves the bank not ready, and its refusal is what `ensureVault` and `vaultOf` throw. One a sweep crossed refuses its own caller and leaves the bank to the next `hello`. */
+  /** A forced reset a host may repeat: lists what the vaultDB holds, tidies old leases, and starts the watch.
+   * Refused, the bank is not ready; one a sweep crossed refuses only its own caller. */
   async hello(): Promise<void> {
     const listing = this.#vaultListing
     const hello = await outcomeOf(() => this.#bringUp(listing))
