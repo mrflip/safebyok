@@ -127,14 +127,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** The instance of `record`, sparse, full or a tombstone, once it is delivered as a fetch's answer would be, and held; a thing already held under its scope receives it. Stores nothing. */
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
-    this.demandEnabled()
     this.sparseOf(record)
     return this.#buildOrReceive(this.scopeOf(record), record)
   }
 
   /** Demands that no instance be held under `scope`, for a birth. A box's `send` brings one deleted back to life. */
   protected demandNotHeld(scope: ScopeT): void {
-    this.demandEnabled()
     if (this.at(scope) !== null) { throw alreadyHeldError() }
   }
   // --
@@ -145,7 +143,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
-    this.demandEnabled()
     await this.ensureTimelyWorld(maxWorldMillis)
     return this.deliver(await this.tryGetRow(asked), ifAbsent)
   }
@@ -172,7 +169,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** SLOPDOC: Deletes the thing `duck` names and delivers storage's answer: its tombstone, if anything was stored. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
-    this.demandEnabled()
     const scope = this.scopeOf(duck)
     const held = (duck.am === 'd') ? null : this.at(scope)
     return this.delOver(held?.sparse ?? this.sparseOf(duck))
@@ -180,6 +176,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** A tombstone over `sparse`'s own revision, and its answer delivered. */
   protected async delOver(sparse: SparseT): Promise<ThingT | null> {
+    this.demandEnabled()
     const prior = priorOf(sparse)
     const tombstone = { ...sparse, ...VS.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
     return this.deliver(await this.tryDelRow(tombstone, { prior }))

@@ -75,23 +75,26 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
   // --
 
-  // == [Birth]: create, tryCreate, demandUnlocked
+  // == [Birth]: create, tryCreate, demandReadyToCreate
 
   /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
   async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
     const dna = boxDna.parse(input)
-    this.#demandUnlocked()
+    this.#demandReadyToCreate()
     this.demandNotHeld(dna)
     const { whisper, sidecar, ...sparse } = this.stampDna(dna)
     const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
-    this.#demandUnlocked()
+    this.#demandReadyToCreate()
     return this.putDraft(draft, null, opts)
   }
 
   tryCreate(input: BoxDna, opts: PutListingOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  /** Demands that the vault be unlocked. */
-  #demandUnlocked(): void { if (this.lockState() === 'locked') { throw lockedError() } }
+  /** A birth needs this listing enabled and the vault unlocked. */
+  #demandReadyToCreate(): void {
+    this.demandEnabled()
+    if (this.lockState() === 'locked') { throw lockedError() }
+  }
   // --
 
   // == [Defined by the box listing]

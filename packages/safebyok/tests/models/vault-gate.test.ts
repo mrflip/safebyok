@@ -277,7 +277,7 @@ describe("vault.delVault()", () => {
     expect(vault.isPresent).to.be.false
     expect(listing.at(vault.scope)).to.equal(vault)
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    await TH.expectRefusal(boxes.fetch({ ...vault.scope, boxlabel: 'anthropic_api_key' }), 'disabled')
+    await TH.expectRefusal(boxes.hello(), 'disabled')
   })
 
   it("leaves the dialog open on a wrong passphrase, the vault unlocked and nothing stored", async () => {

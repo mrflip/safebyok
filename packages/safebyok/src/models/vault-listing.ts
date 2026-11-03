@@ -113,7 +113,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
   override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
-    this.demandEnabled()
     const held = this.at(this.scopeOf(ante))
     if ((held !== null) && (ante.am !== 'd') && (held.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
     return this.delOver(this.sparseOf(ante))
@@ -164,7 +163,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. */
   async fetchListed(vault: Vault): Promise<BoxesListed> {
     const asked = this.scopeOf(vault)
-    this.demandEnabled()
     await this.ensureTimelyWorld()
     const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
     await this.deliver(vaultRowOf(answer), 'nil')

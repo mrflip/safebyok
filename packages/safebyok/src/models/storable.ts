@@ -208,15 +208,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   demandEnabled():  this { if (this.#isDisabled) { throw disabledError() }                             return this }
 
-  demandUnlocked(): this { if (this.demandEnabled().isLocked)    { throw lockedError() }                               return this }
+  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
-  demandPresent():  this { if (! this.demandEnabled().isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
+  demandPresent():  this { if (! this.isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
 
-  demandFull():     this { if (! this.demandEnabled().isFull)    { throw partialLoadError() }                          return this }
+  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
-    const { full } = this.demandEnabled()
+    const { full } = this
     if (full === null) { throw partialLoadError() }
     return full
   }
@@ -226,8 +226,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this.demandReadyToDel()
   }
 
-  /** A delete needs the vault unlocked, and no more: a thing gone is deleted again. */
-  demandReadyToDel(): this { return this.demandUnlocked() }
+  /** A delete needs the thing enabled and the vault unlocked, and no more: a thing gone is deleted again. */
+  demandReadyToDel(): this { return this.demandEnabled().demandUnlocked() }
   // --
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form

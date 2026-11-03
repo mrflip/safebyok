@@ -436,14 +436,54 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const { vault, box, deviceDB } = await makeVaultWithBox()
     vault.sweep()
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
-    TH.expectSyncRefusal(() => vault.demandPresent(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandUnlocked(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandReady(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandReadyForBoxes(), 'disabled')
+    TH.expectSyncRefusal(() => box.demandReadyToSend(), 'disabled')
+    TH.expectSyncRefusal(() => box.demandReadyToUnsealWhisper(), 'disabled')
+    TH.expectSyncRefusal(() => { box.whisper = { val: 'sk-test' } }, 'disabled')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')
     await TH.expectRefusal(vault.fetch(), 'disabled')
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'disabled')
     expect(vault.lock().sweep().vacate()).to.equal(vault)
     expect(box.lock().sweep().vacate()).to.equal(box)
     expect(deviceDB.tryVacate).not.toHaveBeenCalled()
+  })
+
+  it("past a discard a vault's record stays readable, for a log or a debugger", async () => {
+    const { vault, demandStored } = await makeBornVault()
+    vault.sweep()
+    expect(vault.fullRecord).to.deep.equal(demandStored())
+    expect(vault.gate.gate_epoch).to.eq(demandStored().gate.gate_epoch)
+  })
+
+  it("a sweep crossing ensureUnlocked's peek at the cached lease refuses 'disabled', nobody asked", async () => {
+    const { vault, listing, deviceDB } = await makeBornVault()
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    deviceDB.peek.mockImplementationOnce(() => {
+      vault.sweep()
+      return Promise.resolve(null)
+    })
+    await TH.expectRefusal(vault.ensureUnlocked(), 'disabled')
+    expect(dialog).not.toHaveBeenCalled()
+  })
+
+  it("a swept listing stores nothing: a put or a delete refuses 'disabled' before reaching the vaultDB", async () => {
+    const { listing, demandStored } = await makeBornVault()
+    const stored = demandStored()
+    listing.sweep()
+    await TH.expectRefusal(listing.put(stored, stored), 'disabled')
+    await TH.expectRefusal(listing.del(stored), 'disabled')
+    expect(demandStored()).to.eq(stored)
+  })
+
+  it("a box listing swept with its vault refuses a birth 'disabled', ahead of the lock the sweep left", async () => {
+    const { vault, box } = await makeVaultWithBox()
+    const boxes = vault.boxListing
+    vault.sweep()
+    await TH.expectRefusal(boxes.create({ ...box.scope, ...BoxDna, boxlabel: 'other_key' }), 'disabled')
   })
 
   it("a listing past a sweep or a vacate takes no further call, and answers a late notice with nothing", async () => {

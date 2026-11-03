@@ -67,23 +67,26 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
   // --
 
-  // == [Guards]: ensureReadyToUnsealWhisper, demandReadyToUnsealWhisper, ensureReadyToSend, demandReadyToSend
+  // == [Guards]: ensureReadyToUnsealWhisper, demandReadyToUnsealWhisper, ensureReadyToSend, demandReadyToSend, demandReadyToExpose
 
   async ensureReadyToUnsealWhisper(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
     return this.demandReadyToUnsealWhisper()
   }
 
-  /** Demands that the vault be unlocked and the box present, with a full record. */
-  demandReadyToUnsealWhisper(): this { return this.demandUnlocked().demandPresent().demandFull() }
+  /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
+  demandReadyToUnsealWhisper(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
   async ensureReadyToSend(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
     return this.demandReadyToSend()
   }
 
-  /** A send needs the vault unlocked, and no more: a box gone is sent back to life. */
-  demandReadyToSend(): this { return this.demandUnlocked() }
+  /** A send needs the box enabled and the vault unlocked, and no more: a box gone is sent back to life. */
+  demandReadyToSend(): this { return this.demandEnabled().demandUnlocked() }
+
+  /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
+  demandReadyToExpose(): this { return this.demandEnabled().demandUnlocked() }
   // --
 
   // == [The whisper]: whisper, extractWhisper, tryExtractWhisper, expose
@@ -97,7 +100,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   set whisper(whisper: WhisperHolder | LockedBag | null) {
     const forgets = (whisper === null) || Storable.isLockedFUBag(whisper)
     const exposed = forgets ? null : whisperHolder.parse(whisper)
-    if (! forgets) { this.demandUnlocked() }
+    if (! forgets) { this.demandReadyToExpose() }
     this.#exposed = exposed
     this.settle()
   }

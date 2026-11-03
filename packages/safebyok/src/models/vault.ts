@@ -62,7 +62,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   get fmt(): number { return this.central.fmt }
   // --
 
-  // == [The world of its boxes]: clock, lockState, isLocked, ensureTimely, takeWorld
+  // == [The world of its boxes]: clock, lockState, isLocked, ensureTimely, demandReady, takeWorld
 
   get clock(): Clock { return this.world.clock }
 
@@ -74,8 +74,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. */
   async ensureTimely(maxMillis?: number): Promise<this> {
     await this.hydrate({ maxMillisSinceRefresh: maxMillis })
-    return this.demandPresent()
+    return this.demandReady()
   }
+
+  /** What every verb of a vault needs: the vault enabled and present. */
+  demandReady(): this { return this.demandEnabled().demandPresent() }
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   takeWorld(world: unknown): void {
@@ -199,6 +202,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! this.isFull) { await this.fetch() }
     if (await this.#attachCachedLease()) { return this }
     if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
+    this.demandReadyToAttach()
     await Gating.launch('unlock_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ proved }) => this.#unlockByProof(proved) })
     return this
   }
@@ -251,7 +255,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** An attach needs the vault enabled and present. */
-  demandReadyToAttach(): this { return this.demandEnabled().demandPresent() }
+  demandReadyToAttach(): this { return this.demandReady() }
 
   /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
@@ -357,7 +361,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async hello(): Promise<this> {
     this.demandEnabled()
     const listed = await this.listing.fetchListed(this)
-    this.demandPresent()
+    this.demandReady()
     await this.boxListing.hello(listed)
     this.#isGreeted = true
     return this
@@ -414,7 +418,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
 
   /** A box verb needs the vault present and unlocked. */
-  demandReadyForBoxes(): this { return this.demandPresent().demandUnlocked() }
+  demandReadyForBoxes(): this { return this.demandReady().demandUnlocked() }
 
   /** The box listing, this vault having said hello. */
   async #ensureReadyForBoxes(): Promise<BoxListing> {
@@ -433,7 +437,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The listing of this vault's boxes, made once, on first asking. */
   get boxListing(): BoxListing {
-    this.demandPresent()
+    this.demandReady()
     this.#boxListing ??= this.listing.boxListingOf(this)
     return this.#boxListing
   }
