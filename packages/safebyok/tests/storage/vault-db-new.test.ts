@@ -139,11 +139,21 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' }, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
     })
 
-    it("refuses vault_empty for a vault_tok no row holds, though the scope holds another life, whatever ifAbsent says", async () => {
-      const { vaultDB } = await storeWith({ box: true })
+    it("refuses vault_mismatch under a live row of another vault_tok, holding that row, whatever ifAbsent says", async () => {
+      const { vaultDB, vault } = await storeWith({ box: true })
       const answer = await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'oldlife' }, { ifAbsent: 'nil' })
-      expect(answer).to.deep.include({ ok: false, act: 'vault_empty', dbhas: null })
-      expect(answer.world).to.deep.equal(VS.sentinelVaultOf(vaultScope, 'oldlife'))
+      expect(answer).to.deep.include({ ok: false, act: 'vault_mismatch', world: vault, dbhas: vault })
+    })
+
+    it("refuses vault_empty for a vault_tok no row holds, over no row or another life's tombstone", async () => {
+      const vaultDB = new MemoryVaultDB()
+      const asked = { ...boxscope, vault_tok: 'oldlife' }
+      const sentinel = VS.sentinelVaultOf(vaultScope, 'oldlife')
+      expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, act: 'vault_empty', world: sentinel, dbhas: null })
+      const vault = vaultAt()
+      await vaultDB.putVault(vault, { prior: VS.NeverStored })
+      await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
+      expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, act: 'vault_empty', world: sentinel, dbhas: null })
     })
 
     it("refuses vault_gone under this life's tombstone, and damaged_record for a box row failing validation", async () => {
@@ -226,9 +236,9 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ val: box })
     })
 
-    it("refuses vault_empty under a vault_tok that is not the live one's, and vault_gone under this life's tombstone", async () => {
+    it("refuses vault_mismatch under a vault_tok that is not the live one's, and vault_gone under this life's tombstone", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: VS.NeverStored })).to.deep.include({ ok: false, act: 'vault_empty', dbhas: null })
+      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: VS.NeverStored })).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(await vaultDB.tryPutBox(box, { prior: VS.NeverStored })).to.deep.include({ ok: false, act: 'vault_gone' })
     })
@@ -294,10 +304,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
 
-    it("refuses vault_gone under this life's tombstone, and vault_empty for another life", async () => {
+    it("refuses vault_gone under this life's tombstone, and vault_mismatch for another life", async () => {
       const { vaultDB, vault } = await storeWith()
       const oldLife = vaultAt(0, 'oldlife')
-      expect(await vaultDB.tryReplacePassphrase(paramsOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_empty' })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
     })

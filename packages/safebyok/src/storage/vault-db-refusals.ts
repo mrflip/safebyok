@@ -8,6 +8,10 @@ export const vaultEmpty = (world: VaultRow): VaultError => (
   new VaultError('vault_empty', 'Nothing is stored for this life of the vault: read the vault again by its scope.', { meta: { world, dbhas: null } })
 )
 
+export const vaultMismatch = (world: VaultRow): VaultError => (
+  new VaultError('vault_mismatch', 'A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope.', { meta: { world, dbhas: world } })
+)
+
 export const vaultGone = (tombstone: VaultRow): VaultError => (
   new VaultError('vault_gone', 'This vault was deleted.', { meta: { world: tombstone, dbhas: tombstone } })
 )

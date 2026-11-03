@@ -1066,7 +1066,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `no_whisper`          | a `putBox()` left out the whisper, to keep the one the box holds, and no box is stored under that label | Hand `putBox()` the whisper to store |
 | `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here. For a vault kept on the device, the browser's own error is the `cause`; of the device store's error only its `name` is kept, ending the message, as the error may quote a lease record |
 | `camped`              | a VaultDB put told not to replace a live record found one stored: `meta.dbhas` holds it | Take up the stored record. |
-| `vault_empty`         | a VaultDB call named a `vault_tok` no row holds: nothing of this life | Read the vault again by its scope. |
+| `vault_empty`         | a VaultDB call named a `vault_tok` no row holds, and no live row stands there (one under another `vault_tok` is `vault_mismatch`): nothing of this life | Read the vault again by its scope. |
 | `storage_error`       | a VaultDB's store failed; its own error is the `cause` | Retry shortly. |
 
 ### Bad news: tell the user
