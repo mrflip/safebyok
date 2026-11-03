@@ -592,7 +592,7 @@ const rejectingHandler = (): Promise<never> => Promise.reject(new Error("Rejecte
 // --
 
 describe("listing.put: the versioned replace", () => {
-  it("makes the fake store refuse 'stale_write' over a box stored when none was expected, delivering the box stored", async () => {
+  it("refuses 'stale_write' over a box stored when none was expected, delivering the box stored", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), null), 'stale_write')
@@ -601,7 +601,7 @@ describe("listing.put: the versioned replace", () => {
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
   })
 
-  it("makes the fake store refuse 'stale_write' over a tombstone stored when none was expected, delivering the tombstone", async () => {
+  it("refuses 'stale_write' over a tombstone stored when none was expected, delivering the tombstone", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 4 }))
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a0', revision_seq: 0 }), null), 'stale_write')
@@ -631,6 +631,12 @@ describe("listing: an answer is for the scope the call asked about", () => {
 describe("listing.put(duck, ante, { ifPresent }): over a live record", () => {
   const birth = fullBoxRecord({ revision_tok: 'rev-mine', revision_seq: 0 })
   const live  = fullBoxRecord()
+
+  it("refuses 'bad_option' an ifPresent it does not take, calling nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.put(birth, null, { ifPresent: 'replace' } as never), 'bad_option')
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+  })
 
   it("replaces it under 'repl', over its revision", async () => {
     const listing = boxListingOf(held.mw)
