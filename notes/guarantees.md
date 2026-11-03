@@ -305,8 +305,8 @@ that yields a key, and no module exports a route to one: `leaseRecordOf`, which 
 ([#305](https://github.com/mrflip/safebyok/pull/305)). In `src/models/`, the `LeaseFriend` whose
 `peekLease` answers the cached row with its leaseKey handle is held in `Lease.#friend` and made in
 `Vault.#leaseFriend`; no public `Vault` method takes a proving, as a birth runs inside the class
-(`Vault.launchBirth`); `Vault._cheat_leaseFriend` is for tests, called by nothing in `src/`, though
-JavaScript lets a host call it. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export `Lease` and
+(`Vault.launchBirth`); nothing public on a `Vault` or a `Lease` hands the friend out, and a test catches
+it with a spy on `Proving.prototype.buildLease`. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export `Lease` and
 `Proving` as types and classes alone, and none of the registries. Checked by:
 `tests/lease.test.ts` (*hands out no record*), `tests/models/vault-unlock.test.ts` (*a vault and a
 lease show neither the lease friend nor the lease key handle, one level deep, by identity*), `rg` for

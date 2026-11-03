@@ -379,12 +379,6 @@ describe("a tampered lease record", () => {
 })
 
 describe("what a lease shows", () => {
-  it("isMadeFor knows the friend it was made for, and no other", async () => {
-    const { friend, lease } = await grantedWorld()
-    expect(lease.isMadeFor(friend)).to.be.true
-    expect(lease.isMadeFor(fakeLeaseFriendOf())).to.be.false
-  })
-
   it("Object.keys shows its stamp alone: no leaseKey, no wrapped vaultKey, no friend", async () => {
     const { lease } = await grantedWorld()
     expect(Object.keys(lease)).to.have.members(StampFieldnames)

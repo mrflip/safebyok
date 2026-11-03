@@ -94,15 +94,16 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-11-03 (lease_narrow, branch `20261103-lease_narrow`; the Coach: "Let's fix before end of sprint, important, record to
   security.md"): the friend's `peekLease()` (the cached row, with its non-extractable `lease_key` handle), `tryUncacheLease()` (erases the
   row), `attachLease(lease)` (holds a lease as the vault's) and `tryCacheLease(record)` (overwrites the row) were all reachable from a Vault
-  or a Lease. Now `Lease` holds the friend in `#friend` and offers `lease.isMadeFor(friend)`, a boolean over a friend the caller already
-  holds, and `Vault` makes it in a private `#leaseFriend()`. A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
+  or a Lease. Now `Lease` holds the friend in `#friend`, and `Vault` makes it in a private `#leaseFriend()`, the only way to the friend (amended
+  2026-11-03 (small_rulings): `lease.isMadeFor` and the refusal built on it are gone; a lease reaches only the vault whose friend it was built
+  on, as `lease.attach` calls its own friend's `attachLease`). A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
   from `VaultListing`; its run now lives in the Vault class as the public static `Vault.launchBirth(listing, scope)` with a private
   static `#runBirth`, which reaches the private `vault.#unlockByProof`. `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
   itself and refuses 'bad_option' over a vault present, with no gating opened and no KDF run. It takes no proving: the proving comes from the
   gating it launches. A public `vault.unlockByProof(proving)` was set aside, as whatever is passed as a proving is handed the friend
-  (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) `vault._cheat_leaseFriend()` is a public
-  method, named loudly, for tests; it is a door at runtime, and the guarantee is only that nothing in `src/` calls it (a test row checks
-  this), which does not stop a host calling it. (2) A script that patches `Proving.prototype.buildLease`, `Lease.grant` or `Lease.peek`
+  (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) (amended 2026-11-03 (small_rulings): `vault._cheat_leaseFriend()`, a public
+  method for tests, is removed, and no door to the friend is left in `src/`; tests catch the friend with a spy on
+  `Proving.prototype.buildLease`, which is open (2) below.) (2) A script that patches `Proving.prototype.buildLease`, `Lease.grant` or `Lease.peek`
   (the friend is their parameter) can capture the friend from the vault's own calls, as can anything else running in the page.
   (3) The friend was not the only route to the row: `vault.world.deviceDB.peek({ ...vault.scope, vault_tok: vault.vault_tok })` answers the
   same row with the same handle, as do `bank.deviceDB` and `listing.world.deviceDB`. The host supplies the deviceDB and a same-origin

@@ -72,13 +72,10 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Taking hold]: attach, isMadeFor, cache, tryCache
+  // == [Taking hold]: attach, cache, tryCache
 
-  /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. A vault past a sweep, a vacate or a delete refuses, the lease vacated; one this lease was not made for refuses 'bad_option'. */
+  /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. A vault past a sweep, a vacate or a delete refuses, the lease vacated. */
   async attach(): Promise<void> { await this.#friend.attachLease(this) }
-
-  /** True where this lease was made for `friend`. */
-  isMadeFor(friend: LeaseFriend): boolean { return this.#friend === friend }
 
   /** Put this lease in the deviceDB's cache; one peeked from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
   async cache(): Promise<void> {
