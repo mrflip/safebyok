@@ -53,7 +53,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     if (listed === undefined) { return }
     const { boxes, damaged_records } = MSX.boxesListed.parse(listed)
     this.#damagedRecords = Object.freeze(damaged_records)
-    for (const damaged of damaged_records) { this.at(this.scopeOf(damaged))?.vacate() }
+    for (const { boxlabel } of damaged_records) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
   }
 

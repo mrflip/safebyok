@@ -235,9 +235,9 @@ export type BoxPatchGiven = Z.output<typeof boxPatch>
 /** What `vault.putBox` is told, as {@link boxPut} hands it back: a {@link BoxPatchGiven} under its `boxlabel`. */
 export type BoxPutGiven = Z.output<typeof boxPut>
 
-/** The check of what a vault's get lists of its boxes, refusing 'bad_record': `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check. */
-export const boxesListed = objCheck(({ arr, oneof, obj }) => {
-  const damaged = boxSparse.and(obj({ damagekind: oneof(VS.damagekindVals) }))
+/** The check of what a vault's get lists of its boxes, refusing 'bad_record': `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check, whose boxlabel is whatever storage has it under. */
+export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
+  const damaged = boxSparse.extend({ boxlabel: str }).and(obj({ damagekind: oneof(VS.damagekindVals) }))
   return { boxes: arr(boxSparse), damaged_records: arr(damaged) }
 }, { refuseAs: 'bad_record', extras: 'strip' })
 
