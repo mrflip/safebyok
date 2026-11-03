@@ -28,14 +28,7 @@ export type SlotFate = 'receive' | 'lose' | 'replace'
 
 // == [Listing]
 
-/** The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone.
- * `hello` starts the watch. Every answer storage gives to `fetch`, `put` or `del` goes through
- * `deliver`, and every instance is made and held through `#buildOrReceive`, a notice's too, so no
- * scope is built twice; the listing then makes its snapshot again. A call
- * is refused when it cannot give what it asked for: a refusal from storage, or a record its
- * instance's `receive` refuses. Bad news nobody asked about, a refusal met on a notice, is told to
- * `onBadNews`.
- */
+/** SLOPDOC: The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone. */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>> {
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
@@ -148,10 +141,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Storage verbs]: fetch, put, putDraft, del, delOver
 
-  /** The instance under `scope` as storage now holds it, built where none was held, once storage's answer is delivered to it.
-   * Where that leaves nothing present under `scope`, `opts.ifAbsent` says: 'fail', the default, throws {@link absentRefusal}; 'nil' resolves null.
-   * A damaged row refuses 'damaged_record', holding what it held.
-   */
+  /** SLOPDOC: The instance under `scope` as storage now holds it, built where none was held. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
@@ -162,9 +152,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
-  /** Put `duck` over `ante`'s revision, not whatever is held by then, and deliver the answer: `ante` is the record it was made from, null or one never stored for no record.
-   * Over a live record, storage decides by {@link MSX.ifPresentVals}. A 'stale_write' or 'camped' refusal delivers the record storage holds before it is thrown. A `revision_seq` not one past `ante`'s refuses 'invalid_input'.
-   */
+  /** SLOPDOC: Stores `duck` over `ante`'s revision and delivers storage's answer to the instance. */
   async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ante: Revision | null, opts: PutListingOpts = {}): Promise<ThingT | null> {
     const record = this.recordOf(duck)
     const { ifPresent = 'repl' } = MSX.putListingOpts.parse(opts)
@@ -182,7 +170,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return thing
   }
 
-  /** Delete the thing `duck` names, a sparse record or a thing, over the revision of the instance held, or else `duck`'s own, and deliver the answer: its tombstone, or nothing for nothing stored. An entry of a `damaged_records`, `am` 'd', goes over its own revision: that is the customer naming that very row. A 'stale_write' refusal delivers as `put` does. */
+  /** SLOPDOC: Deletes the thing `duck` names and delivers storage's answer: its tombstone, if anything was stored. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     this.demandEnabled()
     const scope = this.scopeOf(duck)
@@ -202,10 +190,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Delivering an answer]: deliver, buildOrReceive, makeThingOf, hold, neverStoredOf
 
-  /** The pipeline every answer takes. Take the world, where the answer has one; hand the record, or none stored, to `#buildOrReceive` under the scope its `req_params` name; a refusal answer is thrown, after the record a 'stale_write' or 'camped' carries is delivered.
-   * The answer's own refusals are thrown: its world's, its `err`, or the absent refusal. A refusal `receive` throws is thrown too, as the instance cannot become what storage holds; but where the answer is itself a refusal, that one is thrown, and the carried record's is told to `onBadNews`.
-   * Only to a fetch is an answer that leaves nothing present absent, once delivered: a `put` and a `del` have the instance back, a tombstone or not.
-   */
+  /** SLOPDOC: The pipeline every storage answer takes, from its world through the instance held to the caller. */
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (answer.ok) {
@@ -226,7 +211,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   // The one place an instance is made and held: `#makeThingOf` is called from here alone, and only where no instance is held.
-  /** The instance under `scope` once `record` meets it: the instance held, or, where none is or {@link fateOver} says 'replace', one born of `record` and held once it has taken it, the one it replaces vacated after. A refusal `receive` throws is thrown, nothing held. The listing then makes its snapshot again. Null for nothing stored and nothing held. A late answer past a sweep or a vacate refuses, building nothing. */
+  /** SLOPDOC: Brings the instance under `scope` up to `record`, building or replacing it as the record's fate says. */
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT>): ThingT
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null {
@@ -251,7 +236,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw new VaultError('bad_record', Phrases.RecordOfOtherScope) }
   }
 
-  /** A new instance for `record`, born over a central never stored, of the record's sparse form, so that `receive` adopts the record as it would any newer one; null for nothing stored. Refuses 'unexpected_error' a record under another `vault_tok` than the vault this listing lies in. */
+  /** SLOPDOC: A new instance for `record`, born of its sparse form so `receive` adopts it like any newer record. */
   #makeThingOf(record: Fetched<RecordT, SparseT> | null): ThingT | null {
     if (record === null) { return null }
     const sparse = this.sparseOf(record)
@@ -275,7 +260,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [The watch]: onNotice
 
-  /** Deliver a notice of a row of this listing's kind as a good answer's record. Any refusal met on the way, the world's or one `receive` throws, is bad news, as nobody asked: told to `onBadNews`, never thrown into the vaultDB's watch. A world found gone ends the listing, which is no refusal. */
+  /** SLOPDOC: Delivers a watch notice of this listing's kind like a good answer, making any refusal bad news. */
   readonly #onNotice = (notice: VaultDBNotice): void => {
     const { val, world } = notice
     if (this.#isDisabled || ! this.isOwnRow(val)) { return }
@@ -321,7 +306,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Bad news]: tellBadNews, tellIfRevoked
 
-  /** Tell each item of `badnews` to the host's `onBadNews`, where one was given, never awaited. A handler that throws, or whose promise rejects, is reported to the platform (`reportToPlatform`) and no more: the call that met the news goes on as it would have, and nothing is thrown into the vaultDB's watch. Call it for bad news no caller waits on. */
+  /** SLOPDOC: Tells bad news no caller waits on to the host's `onBadNews`, whose failures reach only the platform. */
   tellBadNews(badnews: readonly VaultError[]): void {
     const onBadNews = this.#onBadNews
     if (onBadNews === null) { return }
