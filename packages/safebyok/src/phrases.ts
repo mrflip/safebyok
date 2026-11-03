@@ -406,7 +406,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
