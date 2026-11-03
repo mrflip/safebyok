@@ -29,7 +29,7 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
   Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown>>
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, snapshot, horizonMillis, refreshedAt, listeners, watchable
+  // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, snapshot, horizonMillis, refreshedAt, listeners
 
   /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
@@ -57,8 +57,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The fetch under way, which every `fetch` made meanwhile joins, resolving whether storage held a record. */
   readonly #oneFetchAtATime = oneAtATime(async () => (await this.listing.fetch(this.scope, { ifAbsent: 'nil' })) !== null)
   readonly #listeners = new Set<() => void>()
-  /** Whether the listing's watch should push full records for this thing: true until set otherwise. */
-  #watchable = true
   // --
 
   // == [Statics]: isLockedFUBag
@@ -120,7 +118,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   toJSON(): SparseT { return this.sparse }
   // --
 
-  // == [States]: isTimely, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, isWatchable
+  // == [States]: isTimely, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord
 
   /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
   get isTimely(): boolean { return this.#isRefreshedWithin(this.#horizonMillis) }
@@ -149,10 +147,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   protected isTombstoneRecord(record: Fetched<RecordT, SparseT>): record is Tombstone<SparseT> {
     return MSX.isTombstone(record)
   }
-
-  get isWatchable(): boolean { return this.#watchable }
-
-  set isWatchable(watchable: boolean) { this.#watchable = MSX.watchable.parse(watchable) }
   // --
 
   // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, becomeNotifiable
@@ -260,7 +254,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
-  // == [Receiving]: receive, adopt, settle, tombstoneFor, priorRevisionTok
+  // == [Receiving]: receive, adopt, settle, tombstoneFor
 
   /** Take in what storage said about this thing: `rcvd`, or null for nothing stored, which reads as a tombstone at the
    * revision held. A record storage could not validate arrives as a tombstone 'd', made of what the listing recovered.
@@ -295,12 +289,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   protected tombstoneFor(revision: Revision, am: 'd' | 'x' = 'x'): Tombstone<SparseT> {
     const { revision_tok, revision_seq } = revision
     return { ...this.sparse, revision_tok, revision_seq, written_at: this.world.clock.now(), am }
-  }
-
-  /** The `revision_tok` storage should hold when this thing is deleted: central's; null for a thing never stored, which expects no record. */
-  priorRevisionTok(): string | null {
-    const { revision_tok, revision_seq } = this.#central
-    return revision_seq === MSX.NeverStoredSeq ? null : revision_tok
   }
   // --
 

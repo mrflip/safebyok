@@ -83,7 +83,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault record a box's answer carries, received as any record of this vault is. What `receive` hands back goes nowhere: the box listing takes its world synchronously, where the vault listing delivers asynchronously. */
   takeWorld(world: unknown): void {
-    this.receive(this.listing.sparseOf(world))
+    const sparse = this.listing.sparseOf(world)
+    if (sparse.vault_tok === this.vault_tok) { this.receive(sparse) }
   }
   // --
 
@@ -135,7 +136,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     await this.hydrate()
     const held = this.demandFullProps()
     if (held.gate !== ante) { throw gateMovedUnderChange(held) }
-    const record = { ...held, revision_tok: randomId(), revision_seq: held.revision_seq + 1, written_at: this.world.clock.now(), gate }
+    const record = { ...held, revision_tok: randomId(), revision_seq: held.revision_seq + 1, written_at: this.world.clock.now(), gate: { ...gate, gate_epoch: held.gate.gate_epoch + 1 } }
     await this.listing.put(record, held)
     return this
   }
