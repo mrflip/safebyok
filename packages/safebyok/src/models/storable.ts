@@ -285,9 +285,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** As `sweep`, and what this device has cached of it goes too. Storage is untouched. A repeat is a no-op. Never throws. */
   vacate(): this { return this.#disable(() => { this.vacateContents() }) }
 
-  protected sweepContents(): void {}
+  protected sweepContents(): void { /* a thing of no contents has none to drop */ }
 
-  protected vacateContents(): void {}
+  protected vacateContents(): void { /* a thing of no contents has none to drop */ }
 
   /** Marked first, so that a repeat met on the way finds the work done. */
   #disable(dropContents: () => void): this {

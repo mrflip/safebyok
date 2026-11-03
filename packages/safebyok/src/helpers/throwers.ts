@@ -18,5 +18,5 @@ export const partialLoadError = () => new VaultError('bad_option', Phrases.Parti
 
 export const alreadyHeldError    = () => new VaultError('bad_option', Phrases.AlreadyHeld)
 
-export const disabledError    = () => new VaultError('bad_option', Phrases.LetGoInstance)
+export const disabledError    = () => new VaultError('disabled', Phrases.LetGoInstance)
 // --

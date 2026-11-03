@@ -163,6 +163,7 @@ const FamilyCases = [
   ["damaged_record",      "bad_news",  'a stored row failing its checks is set aside and told of'],
   ["invalid_input",       "misuse",    'an argument failing its check is a bug in the caller'],
   ["gate_issue",          "misuse",    'gate params at odds with the stored row are a bug in the caller'],
+  ["disabled",            "misuse",    'calling an object let go by a sweep, a vacate or a delete is a bug: ask the bank for it again'],
 ] as const
 
 describe("each kind's family", () => {

@@ -82,7 +82,7 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp> = {}): FakeLeas
 }
 // --
 
-// == [Leases]: GrantedAs, makeGrantedLease, sealStampsOf
+// == [Leases]: GrantedAs, makeGrantedLease, sealStampOf
 
 /** What {@link makeGrantedLease} records of a proving, unless told otherwise: the first gate, proved by passphrase. */
 export const GrantedAs: LeaseGrantOpts = Object.freeze({ gate_epoch: FirstGateEpoch, wayinkind: 'passphrase' })
@@ -93,10 +93,7 @@ export const makeGrantedLease = async (friend: FakeLeaseFriend, opts: LeaseGrant
 )
 
 /** The two stamps a box hands the lease to seal its whisper under, its own fields, flat: `boxlabel` and `box_tok` for the boxKey's wrap, the same and `revision_seq` for the whisper's cipher. `overrides` lays fields over both. */
-export const sealStampsOf = (boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): { boxKeyStamp: CipherCtxRecord, whisperStamp: CipherCtxRecord } => ({
-  boxKeyStamp:  { boxlabel, box_tok: `box-tok-${boxlabel}`, ...overrides },
-  whisperStamp: { boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides },
-})
+export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord => ({ boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides })
 // --
 
 // == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, proofClosureOf
