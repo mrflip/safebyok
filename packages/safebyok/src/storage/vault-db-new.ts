@@ -86,7 +86,7 @@ export abstract class VaultDB {
   protected abstract doPutVault(record: VaultRecord, terms: PutTerms): Awaitable<Landing>
   /** Writes `record` when the box row meets `terms` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
   protected abstract doPutBox(record: BoxRecord, terms: PutTerms): Awaitable<BoxLanding>
-  /** SLOPDOC: In one transaction, tombstones this life's vault row at `prior` and its box rows, or writes nothing. */
+  /** SLOPDOC: In one transaction, tombstones a live row at `prior` and this life's boxes; a repeat sweeps them. */
   protected abstract doDelVault(tombstone: VaultTombstone, prior: Revision): Awaitable<Landing>
   /** Writes `tombstone` when the box row is live at `prior` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
   protected abstract doDelBox(tombstone: BoxTombstone, prior: Revision): Awaitable<BoxLanding>
