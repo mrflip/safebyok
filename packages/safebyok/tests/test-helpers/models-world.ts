@@ -2,8 +2,8 @@
  * Import it directly, not through `TH`: `src/models/` is not exported, and the door
  * `tests/test-helpers.ts` is published as `safebyok/testing`.
  *
- * Time. The clock is settable, and starts at {@link T0}. The Trigger a storable runs schedules its
- * launches with `setTimeout`, a delay it computes from the clock, so the world installs vitest's
+ * Time. The clock is settable, and starts at {@link T0}. A timer schedules with `setTimeout`, a delay
+ * computed from the clock, so the world installs vitest's
  * fake timers (`fakeTimers: false` leaves real ones) and moves both together:
  * `await mw.advance(ms)` moves the clock and fires every timer that falls due; `mw.setNow(ms)`
  * only jumps the clock, firing none. Never move the clock any other way, and call `mw.dispose()`
