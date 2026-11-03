@@ -43,7 +43,7 @@ export type BankOpts = {
   onPanic?:             ((refusal: VaultError) => unknown) | undefined
 }
 
-/** `made` until a `hello` answers, and again past a sweep; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
+/** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'
 
 export type BankSnapshot = BankScope & Readonly<{ stage: BankStage, err: VaultError | null, device_id: string, vaults: readonly VaultSnapshot[] }>
@@ -72,7 +72,7 @@ export class Bank implements VaultWorld {
   readonly #listeners = new Set<() => void>()
   #vaultListing:         VaultListing
   #device_id:            string
-  /** The outcome of the last `hello`, null with none since the bank was made or swept. */
+  /** The outcome of the last `hello`, null with none since the bank was made, swept or vacated. */
   #lastHello:            Outcome<void> | null = null
   #snapshot:             BankSnapshot
 
@@ -125,7 +125,7 @@ export class Bank implements VaultWorld {
 
   // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord, demandReady
 
-  /** A forced reset, and a host may call it again: every vault and tombstone the vaultDB holds is listed, the device record cached, and the watch started. Old leases are tidied whatever it answers. Refused, it leaves the bank not ready, and its refusal is what `ensureVault` and `vaultOf` throw. */
+  /** A forced reset, and a host may call it again: every vault and tombstone the vaultDB holds is listed, the device record cached, and the watch started. Old leases are tidied once the vaultDB has answered or refused, so an offline `hello` tidies too. Refused, it leaves the bank not ready, and its refusal is what `ensureVault` and `vaultOf` throw. */
   async hello(): Promise<void> {
     this.#lastHello = await outcomeOf(() => this.#bringUp(this.#vaultListing))
     this.#remakeSnapshot()
@@ -136,10 +136,13 @@ export class Bank implements VaultWorld {
 
   /** A sweep crossing it leaves `listing` disabled, which refuses: the `hello` is for a listing no longer the bank's. */
   async #bringUp(listing: VaultListing): Promise<void> {
-    await this.tidy()
-    await this.keyDeriver.load?.()
-    await this.strengthChecker.load?.()
-    await listing.fetchBank()
+    try {
+      await this.keyDeriver.load?.()
+      await this.strengthChecker.load?.()
+      await listing.fetchBank()
+    } finally {
+      await this.tidy()
+    }
     await this.#cacheDeviceRecord()
     await listing.hello()
     listing.demandEnabled()
@@ -172,11 +175,13 @@ export class Bank implements VaultWorld {
     return this
   }
 
-  /** Every listed vault vacated, the open gating declined, a birth's too, and every lease of this bank cached on this device erased, the vaultDB untouched. The bank stays ready. Never throws. */
+  /** Every listed vault vacated, the open gating declined, a birth's too, and every lease of this bank cached on this device erased, the vaultDB untouched. Not ready until the next `hello`, which lists them afresh. Never throws. */
   vacate(): this {
+    this.#lastHello = null
     this.#vaultListing.openGating?.declineAtDiscard()
     for (const vault of this.#vaultListing.things) { vault.vacate() }
     void this.#vacateLeasesProvedBefore(FarFuture)
+    this.#remakeSnapshot()
     return this
   }
 
