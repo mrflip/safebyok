@@ -4,6 +4,10 @@
 
 Each bullet is a row of the doc's *Resolved* tab as it stood: the matter, the Rec, the Coach's answer word for word, the date, where it was raised, and where the work went. Batches run newest first; inside a batch, the doc's order.
 
+### 2026-11-03, after the sweep
+
+* **Who owns a passkey answer's PRF bytes.** Rec: handing a clear to `attempt` gives it away, always zeroed; next sprint. The Coach: "handing a clear to attempt gives it away, and it's zeroed before attempt answers, always" <-- agree. Raised on #458's `wrong_passkey` row. Went to `unrace-nextplan.md` and `unrace-gating-prompt.md`.
+
 ### Batch 14 (newest)
 
 - **A rule for try forms.** Coach: "Nothing that strident. It's not uniformly the case that one of them is natural / A try form that only calls other try forms builds an outcome with grace, that the throw form gives the val of / A try form riddled with catches and if statements should just be a throw form / It's usually not ambiguous, and if it is my next question is should it be broken up, calling out to service methods it sits next to". 2026-11-03. Closer Look. `unrace-next.md`.

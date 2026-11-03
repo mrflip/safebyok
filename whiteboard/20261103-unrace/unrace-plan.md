@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." 16 is cancelled; 21, 22, 14 and then 23 finish this sprint. The Coach agreed to close after those, so 18, 19 and 20 move to a new sprint, seeded in `unrace-nextplan.md`. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** closed 2026-11-03: the goal is met, `tests/models/proof.test.ts` green; threads 1 to 15, 17 and 21 to 24 filed, 16 cancelled, 18 to 20 moved to next sprint (`whiteboard/20261102-newdesign/unrace-nextplan.md`). See `human/20261103-sprint_unrace_done.md`.
 
 ## The goal
 
@@ -444,6 +444,14 @@ a newer row from a box answer; `MemoryVaultDB` tells watchers by microtask, so t
 * *The Coach, in the row:* "yes. It is the only intervention besides bank.autolock, and we make firmly clear that the autolock is a best-effort reminder process, not a guarantee".
 * **Touches:** `Lease.peek`, whatever hands it the autolock duration; tests. It erases and answers null as it does for a lease of another epoch.
 * *Orchestrator:* in this sprint, as moving `autolock` out of `hello` opened this gap on the line the Coach merges. **Levels:** `medium` review, G9. **Size:** small. **Depends on:** 14.
+
+### 24. `newdesign` (the Coach, in chat, 2026-11-03)
+
+> would you rename whiteboard/20261102-unrace to whiteboard/20261102-newdesign; correct any pointers to it. Move the preplan and noted files into your sprint directory, and rename "crossings" to "reference-timings.md". There are three design docs -- rename them to be newdesign-proof.md (gating) newdesign-vaultdb.md (vaultdb) newdesign-models.md (models). Help me update those three to be correct without expanding: I want it to continue to be *my* guidance, not filtered through agent's mouths, and not expanded to include what's written. However, there's parts of it that I can't do well, like updating the call diagrams for the gating files -- those should reflect reality. In those docs, correct anything that's wrong or that I've indicated clear intent for. Add rows for things that you're certain we've settled -- for example, bank.autolock. In chat, propose what else you'd add.
+
+And on thread 23's erase: "should we leave alone the lease? Or tombstone it? leaving it in there but not loading it sounds like a safer option." So `Lease.peek` past autolock answers null and leaves the row.
+
+*Review:* `low`, by hand. Fixed: "unread" became "not loaded" in `Lease.peek`'s doc block and two test titles. Left: G4's list of what erases an expired row is shorter than the code's (safe side, moves with `notes/security.md`). Design docs spot checked against `src/models/`, not read through.
 
 ## Bent from the pre-plan
 
