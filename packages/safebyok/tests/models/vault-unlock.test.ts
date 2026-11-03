@@ -151,12 +151,12 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   })
 })
 
-describe("lease.attach: the one way a vault comes to hold a lease", () => {
-  const makeFreshLease = async ({ vault, opts: { world } }: Awaited<ReturnType<typeof makeBornVault>>) => {
-    const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
-    return proving.buildLease(vault.leaseFriend())
-  }
+const makeFreshLease = async ({ vault, opts: { world } }: Awaited<ReturnType<typeof makeBornVault>>) => {
+  const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
+  return proving.buildLease(vault.leaseFriend())
+}
 
+describe("lease.attach: the one way a vault comes to hold a lease", () => {
   it("holds the lease, reading unlocked, and caches its row: the lease it displaces is dropped", async () => {
     const born = await makeBornVault()
     const { vault, deviceDB } = born
@@ -323,6 +323,13 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
   })
 })
 
+const expectLockWon = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
+  expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
+  expect(vault.isLocked).to.be.true
+  await TH.eventually(() => deviceDB.cachedNow() === null)
+  await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+}
+
 describe("A lease renewed through a gate change", () => {
   it("renewed: a lease held is attached under the epoch that landed, its row cached, and the vault never reads locked on the way", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
@@ -351,13 +358,6 @@ describe("A lease renewed through a gate change", () => {
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
     expect(deviceDB.cachedNow()).to.be.null
   })
-
-  const expectLockWon = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
-    expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-    expect(vault.isLocked).to.be.true
-    await TH.eventually(() => deviceDB.cachedNow() === null)
-    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
-  }
 
   it("lock crossed: a lock() during the proof wins: the change lands, the new lease goes unattached, and no row stands", async () => {
     const born = await makeBornVault()

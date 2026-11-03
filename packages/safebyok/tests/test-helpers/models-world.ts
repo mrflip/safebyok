@@ -313,13 +313,13 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     sealStampedString: async (whisperText, stamp) => {
       demandFakeUnlocked()
       sealedTexts.set(String(stableJsonify(stamp)), whisperText)
-      return Promise.resolve({ box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered })
+      return { box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered }
     },
     unsealStampedString: async (_sealed, stamp) => {
       demandFakeUnlocked()
       const whisperText = sealedTexts.get(String(stableJsonify(stamp)))
       if (whisperText === undefined) { throw new VaultError('damaged_box', Phrases.UnopenedWhisper) }
-      return Promise.resolve(whisperText)
+      return whisperText
     },
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
     ensureTimely: async (maxMillis) => {
