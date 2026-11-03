@@ -359,6 +359,22 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(relisted?.isLocked).to.be.true
   })
 
+  it("declines a birth's open gating, so no lease lands past the vacate and the next ask is free to open", async () => {
+    const world = makeBankWorld()
+    let closeDialog: () => void = vi.fn()
+    const bank = world.bankOn({ requestCleartext: async (gating) => {
+      await new Promise<void>((resolve) => { closeDialog = resolve })
+      await gating.attempt(byPassphrase(Passphrase) as never)
+    } })
+    await bank.hello()
+    const asking = bank.ensureVault(VaultBag)
+    bank.vacate()
+    await TH.expectRefusal(asking, 'locked_while_asking')
+    expect(bank.vaultListing.openGating).to.be.null
+    closeDialog()
+    expect(world.leaseRows()).to.deep.equal([])
+  })
+
   it("sweeps its vaults and leaves their cached leases; refuses until the next hello, which builds a fresh listing and picks the lease up, nobody asked", async () => {
     const world = makeBankWorld()
     const { bank, vault } = await makeBankWithVault(world)
