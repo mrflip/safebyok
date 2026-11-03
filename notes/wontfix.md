@@ -80,6 +80,6 @@ not as a settled ruling, and check it against the current design before relying 
   is removed from the vaultDB and the delete is answered, whatever the erase of the cached lease did. The same
   ruling: a host with no `onPanic` has given its opinion.
 * 2026-11-03 (the Coach, unrace): **a host's own getter that throws a `VaultError` quoting the passphrase passes
-  the gating's check whole.** The gating tells an error of its own from a host's by its class and does not
-  inspect the text; a `VaultError` a host's getter throws, with the passphrase in its message, reaches the caller
-  as it was thrown. The Coach: "Wontfix agreed".
+  the gating's check whole.** The gating wraps a foreign throw from a getter as `unexpected_error` with no cause, but passes a
+  `VaultError` as it came and does not inspect its text; one a host's getter throws with the passphrase in its
+  message reaches the caller whole. The Coach: "Wontfix agreed".
