@@ -410,7 +410,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The shape of `record`: 'gone' for a tombstone, 'full' for a record `isFullRecord` accepts, 'sparse' for any other. */
   protected classifyRecordShape(record: Fetched<RecordT, SparseT>): RecordShape {
     if (this.isTombstoneRecord(record)) { return 'gone' }
-    if (this.isFullRecord(record))     { return 'full' }
+    if (this.isFullRecord(record))      { return 'full' }
     return 'sparse'
   }
   // --
