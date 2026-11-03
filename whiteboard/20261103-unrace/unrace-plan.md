@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." 16 is cancelled; 21 and then 14 finish this sprint. The Coach agreed to close after those, so 18, 19 and 20 move to a new sprint, seeded in `unrace-next.md`. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." 16 is cancelled; 21, 22 and then 14 finish this sprint. The Coach agreed to close after those, so 18, 19 and 20 move to a new sprint, seeded in `unrace-next.md`. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
@@ -337,11 +337,12 @@ Earlier threads do this for what they rewrite, as they go. This thread takes wha
   that no longer says it, go. STYLE.md: *"You are getting very inconsistent guidance right now on comments, I have only recently learned how
   dangerous they are for agents. I will reform that soon, but a brief note would help"*. `wontfix.md`: *"If the host has no on panic they've given
   their opinion, wontfix."*
+* **The Coach's row:** refusals go in dedicated files too: one models-refusals file beside the shapes.
 * **The Coach's note:** *"relocate the checks and types at the top of models files into the shapes directory or model-shapes ?
   Anything with a good reason can stick around, but it saves token ussage to not have them there, and agents will write better
   ones. Types are best made from checks"*.
 * **Levels:** `sonnet` worker, `low` review; an `opus` worker for the guarantees, if they turn out to be more than wording.
-  **Size:** small. **Depends on:** 21; it runs last.
+  **Size:** small. **Depends on:** 22; it runs last.
 
 ### 15. `lease_narrow` (the Coach's ruling, 2026-11-03)
 
@@ -425,6 +426,13 @@ a newer row from a box answer; `MemoryVaultDB` tells watchers by microtask, so t
   coverage?"*
 * `bank.sweep` nulls `#lastHello` first; `takeWorld`'s `bad_record`.
 * **Levels:** `medium` review. **Size:** small. **Depends on:** 17.
+
+### 22. `tidy_host` (the Coach's row, 2026-11-03)
+
+*"tidy is supposed to call lock() on them not fiddle with the devicedb, I have a feeling I misled someone. remove it from hello, we can instruct the host to call it on their own."*
+
+* **Touches:** `bank.ts`, its tests, the proof. Supersedes thread 12's `finally`. `bank.vacate` keeps its unconditional erase.
+* **Levels:** `low` review. **Size:** small. **Depends on:** 21.
 
 ## Bent from the pre-plan
 
