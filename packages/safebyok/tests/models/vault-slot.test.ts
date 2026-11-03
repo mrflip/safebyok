@@ -79,6 +79,24 @@ describe("a tombstone over a live vault", () => {
   })
 })
 
+describe("a box notice carrying the vault's tombstone as its world", () => {
+  it("ends the box listing with no bad news, the vault listing's own watch off", async () => {
+    const onBadNews = vi.fn()
+    const { opts, demandStored, listing: born } = makeVaultWorld()
+    const bornVault = await born.create(Dna, byPassphrase(Passphrase))
+    await bornVault.boxListing.create(BoxDna)
+    const listing = new VaultListing({ ...opts, onBadNews })
+    const vault = await listing.build(demandStored())
+    const boxes = vault.boxListing
+    await boxes.hello()
+    await bornVault.del()
+    await erased()
+    expect(vault.isPresent).to.be.false
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
+    expect(onBadNews).not.toHaveBeenCalled()
+  })
+})
+
 describe("vault.del()", () => {
   it("lands on that same end state, the tombstone stored", async () => {
     const world = await makeBornVault()
