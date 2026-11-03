@@ -487,5 +487,4 @@ describe("a vault and a lease show neither the lease friend nor the lease key ha
     expect('leaseFriend' in vault).to.be.false
     expect('friend' in lease).to.be.false
   })
-
 })
