@@ -1,6 +1,6 @@
 # Thread 11: gate_changes (2026-11-03)
 
-Branch `20261103-gate_changes`, PR #TBD, stacked on #458. Justify: green, safebyok 4712 passed, 37 skipped.
+Branch `20261103-gate_changes`, [PR #459](https://github.com/mrflip/safebyok/pull/459), stacked on #458. Justify: green, safebyok 4712 passed, 37 skipped.
 
 * **Built**:
   * `Vault.replacePassphrase()`, `addPasskey()`, `revokePasskey()`, `delVault()`, each with a `try*`, on `Gating.launch` as thread 10's `build_vault` and `unlock_vault` are. `#landGate(proved, commit)` is the shared land for the first three, `#runDelVault(ante)` the delete's.
@@ -16,10 +16,10 @@ Branch `20261103-gate_changes`, PR #TBD, stacked on #458. Justify: green, safeby
   * `declineAtDiscard()` beside `declineAtLock()`: a goodbye or vacate settles any kind, `del_vault` included, as the vault is leaving.
   * `Vault.del()` is `delVault()`, with no opts: one door to delete, so no unguarded delete exists. Set aside: leaving Storable's `del` public beside it.
   * `Vault.fullRecord` is a new public getter over protected `demandFullProps`, as `Storable.full` is protected and `models/gating.ts` needs the record.
-  * `putVault` keeps `'fail'` and `'get'`; default `'fail'`. `vaultdb-invariants.md` lines 122-126 also strike `'fail'`, but the handoff names only `repl`, and `'fail'` is what `Listing.put`'s refusal reads. `camped` now wins over `stale_write` on a live row, so the test takes `camped`.
+  * `putVault` keeps `'fail'` and `'get'`; default `'fail'`. `vaultdb-invariants.md` lines 122-126 also strike `'fail'`, but the handoff names only `repl`, and a refusal for a put over a live row is worth keeping as the default. `camped` now wins over `stale_write` on a live row, so the test takes `camped`.
   * Listing verbs have no `try*`, to keep the surface small; the vault's `try*` carries the outcome.
   * An idempotent `revoked` with no passkey moves nothing, per the Coach's "we can switch if it's an issue".
-* **Pulled forward / left**: nothing pulled. `unrace-gating.md`'s *Guarantees to amend* and *Rows for `notes/wontfix.md`* are thread 14's (`shapes_sweep`) by the plan, so `notes/guarantees.md` lines 106, 144, 208 still name `spendAnswer`, and `VOCABULARY.md`'s and the README's change-passphrase passages are not moved. `src/gating.ts` (old code) still has its own `spendAnswer`; radioactive, untouched.
+* **Pulled forward / left**: nothing pulled. `unrace-gating.md`'s *Guarantees to amend* and *Rows for `notes/wontfix.md`* are thread 14's (`shapes_sweep`) by the plan, so `notes/guarantees.md` lines 106, 144, 208 still name `spendAnswer`, and `VOCABULARY.md`'s and the README's change-passphrase passages are not moved. `src/gating.ts` (old code) still has its own `spendAnswer`; radioactive, untouched. `notes/security.md` took this thread's decisions (no session ended, passkey retained, params with no next gate, `del_vault`); the enter-key rule stays with thread 14.
 * **Discoveries**:
   * Tombstones are made real with `delTyping` from another session; a hand-laid row misses the memory vaultDB's tombstone. `vault.fetch()` of a tombstone throws `vault_gone`.
   * `camped` from `addPasskey` is not reachable through a `Vault` in a test, as the revision moves with it; `vault-db-new.test.ts` covers it.
