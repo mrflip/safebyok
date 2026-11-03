@@ -249,6 +249,19 @@ describe("building over a tombstone", () => {
   })
 })
 
+describe("the entrypoints, handed rubble", () => {
+  it("listing.ensureVault refuses a record that is no record, storing nothing", async () => {
+    const { listing, storedNow } = makeVaultWorld()
+    await TH.expectRefusal(listing.ensureVault({ garbage: true } as never, VS.NeverStored), 'bad_record')
+    expect(storedNow()).to.be.null
+  })
+
+  it("listing.del refuses a duck that is no record, as its check does", async () => {
+    const { listing } = makeVaultWorld()
+    await TH.expectRefusal(listing.del(null as never), 'bad_scope')
+  })
+})
+
 describe("lock() with an erase that throws synchronously", () => {
   it("reads locked, does not throw, and panics", async () => {
     const onPanic = vi.fn()
