@@ -6,7 +6,7 @@ import { type LeaseGrantOpts, type LeaseRecord, LeaseFormat } from '../../src/mo
 import { bad } from '../../src/outcome'
 import { isLeaseKey } from '../../src/shapes/device'
 import * as TH from '../test-helpers'
-import { type FakeLeaseFriend, GrantedAs, fakeLeaseFriendOf, makeGrantedLease, sealStampOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { type FakeLeaseFriend, FriendLeaseMillis, GrantedAs, fakeLeaseFriendOf, makeGrantedLease, sealStampOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -126,8 +126,36 @@ describe("Lease.peek(friend, gate_epoch) and Lease.tryPeek", () => {
     expect(await got!.unsealWith(sealed, stamp)).to.eq('{"val":"cached"}')
   })
 
-  it("makes no check of the lease's age: a lease cached long ago is in force", async () => {
+  it("answers a lease proved exactly the autolock duration ago, which still opens what the granted lease sealed", async () => {
+    const { friend, lease: granted } = await grantedWorld()
+    const stamp = sealStampOf('b1')
+    const sealed = await granted.sealWith('{"val":"cached"}', stamp)
+    vi.setSystemTime(T0 + FriendLeaseMillis)
+    const got = await Lease.peek(friend, GrantedAs.gate_epoch)
+    expect(await got?.unsealWith(sealed, stamp)).to.eq('{"val":"cached"}')
+    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
+  })
+
+  it("forgets a lease past autolock as it forgets one of another epoch: it answers null and is uncached, so the vault asks for a proof", async () => {
     const { friend } = await grantedWorld()
+    vi.setSystemTime(T0 + FriendLeaseMillis + 1)
+    expect(await Lease.peek(friend, GrantedAs.gate_epoch)).to.be.null
+    expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
+    expect(friend.cached).to.be.null
+  })
+
+  it("warns of an uncache refused past autolock, and still answers null, throwing nothing", async () => {
+    const { friend } = await grantedWorld()
+    friend.tryUncacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    vi.setSystemTime(T0 + FriendLeaseMillis + 1)
+    expect(await Lease.peek(friend, GrantedAs.gate_epoch)).to.be.null
+    expect(friend.logged.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'Lease.peek', refusalkind: 'unexpected_error' }]])
+  })
+
+  it("finds nothing past an autolock of Infinity: a lease cached long ago is in force", async () => {
+    const friend = fakeLeaseFriendOf({ leaseMillis: Infinity })
+    const lease = await makeGrantedLease(friend)
+    await lease.cache()
     vi.setSystemTime(T0 + (400 * 24 * 60 * 60_000))
     const got = await Lease.peek(friend, GrantedAs.gate_epoch)
     expect(got?.isInForce).to.be.true

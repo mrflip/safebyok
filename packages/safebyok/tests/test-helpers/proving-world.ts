@@ -38,7 +38,10 @@ export const useFakeClock = (): void => {
 export const WorldStamp: VaultStamp = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
 // --
 
-// == [The friend]: FakeLeaseFriend, fakeLeaseFriendOf
+// == [The friend]: FriendLeaseMillis, FakeLeaseFriend, fakeLeaseFriendOf
+
+/** The autolock duration of a {@link fakeLeaseFriendOf}: a day. */
+export const FriendLeaseMillis = 24 * 60 * 60_000
 
 /** A fake of a vault as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one slot. */
 export type FakeLeaseFriend = LeaseFriend & {
@@ -59,10 +62,11 @@ export type FakeLeaseFriend = LeaseFriend & {
  *   const friend = fakeLeaseFriendOf({ vault_tok: 'vault-tok-other' })
  *   friend.tryCacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the disk is full')))
  */
-export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp> = {}): FakeLeaseFriend => {
+export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFriend, 'leaseMillis'>> = {}): FakeLeaseFriend => {
   const { logger, calls } = spyLogger()
   const friend: FakeLeaseFriend = {
     ...WorldStamp,
+    leaseMillis:     FriendLeaseMillis,
     ...overrides,
     clock:           { now: () => Date.now() },
     logger,

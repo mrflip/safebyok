@@ -272,7 +272,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
   })
 
-  it("a host calling autolock locks a vault past its autolock, and a host calling it after a late page's hello leaves that page asking", async () => {
+  it("a host calling autolock locks a vault past its autolock, and a late page asks for a proof whether its host calls it or not", async () => {
     const { world, bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
@@ -290,7 +290,7 @@ describe("the proof", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
     expect(vault.isUnlocked).to.be.false
 
-    // A page opened late unlocks by what is cached until its host calls autolock, as it does after hello; its unlock then asks.
+    // A page opened late whose host never calls autolock asks all the same: Lease.peek erases the row at the door.
     await vault.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
@@ -300,12 +300,19 @@ describe("the proof", () => {
     await latePage.hello()
     lateUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
     expect(world.leaseRows()).to.have.lengthOf(1)
-    await latePage.autolock()
-    lateUi.expectRenders([])
-    await TH.eventually(() => world.leaseRows().length === 0)
     await latePage.vaultOf(VaultBag)?.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     lateUi.expectRenders(['ready: main unlocked'])
+
+    // Its host calling autolock after hello erases the row before anyone asks.
+    world.advance(AutolockMillis + 1)
+    const laterPage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    const laterUi = mountComponent(laterPage, bankStatus)
+    await laterPage.hello()
+    laterUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
+    await laterPage.autolock()
+    laterUi.expectRenders([])
+    await TH.eventually(() => world.leaseRows().length === 0)
   })
 
   it("signing out: bank.vacate empties the screen and this device, and the next hello lists the vault again, locked", async () => {

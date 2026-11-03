@@ -239,20 +239,64 @@ describe("bank.autolock", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("is not called by hello, so on a fresh page an old lease stands, and the vault unlocks by it without asking", async () => {
+  it("is not called by hello, so an old row stands until the vault's ensureUnlocked meets it, erases it, and asks for a proof", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
-    const requestCleartext = vi.fn<RequestCleartext>()
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
     const fresh = world.bankOn({ requestCleartext })
     const scan = vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore')
+    const tryVacate = vi.spyOn(world.deviceDB, 'tryVacate')
     await fresh.hello()
     expect(scan).not.toHaveBeenCalled()
     expect(world.leaseRows()).to.have.lengthOf(1)
     const vault = fresh.vaultOf(VaultBag)
     await vault?.ensureUnlocked()
+    expect(tryVacate).toHaveBeenCalledOnce()
+    expect(requestCleartext).toHaveBeenCalledOnce()
+    expect(vault?.isUnlocked).to.be.true
+    expect(scan).not.toHaveBeenCalled()
+  })
+
+  it("past autolock, ensureUnlocked with no dialog refuses as it does with no row at all, not for the lease's age", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    world.advance(AutolockMillis + 1)
+    const fresh = world.bankOn({ requestCleartext: undefined })
+    await fresh.hello()
+    const vault = fresh.vaultOf(VaultBag)
+    await TH.expectRefusal(vault!.ensureUnlocked(), 'vault_locked')
+    expect(world.leaseRows()).to.have.lengthOf(0)
+  })
+
+  it("a row just inside autolock still opens on a fresh page, asking nothing", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    world.advance(AutolockMillis)
+    const requestCleartext = vi.fn<RequestCleartext>()
+    const fresh = world.bankOn({ requestCleartext })
+    await fresh.hello()
+    const vault = fresh.vaultOf(VaultBag)
+    await vault?.ensureUnlocked()
     expect(vault?.isUnlocked).to.be.true
     expect(requestCleartext).not.toHaveBeenCalled()
+    expect(world.leaseRows()).to.have.lengthOf(1)
+  })
+
+  it("past autolock, a refused erase warns and still asks for a proof, with no bad news and no panic", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    world.advance(AutolockMillis + 1)
+    const onBadNews = vi.fn()
+    const onPanic = vi.fn()
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const fresh = world.bankOn({ requestCleartext, onBadNews, onPanic })
+    await fresh.hello()
+    vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValueOnce({ ok: false, err: new VaultError('storage_unavailable', 'no store') })
+    await fresh.vaultOf(VaultBag)?.ensureUnlocked()
+    expect(requestCleartext).toHaveBeenCalledOnce()
+    expect(onBadNews).not.toHaveBeenCalled()
+    expect(onPanic).not.toHaveBeenCalled()
   })
 
   it("called by a host after hello on a fresh page, erases an old lease through the vault just listed, and that vault asks again", async () => {

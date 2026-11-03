@@ -421,11 +421,16 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
+/** The autolock duration in milliseconds, Infinity for none. */
+const leaseMillis = Checker(({ int, lit, union }) => union([int.positive(), lit(Infinity)]), 'bad_option')
+
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
   clock:           HX.clockShape,
   logger:          HX.loggerShape,
+  /** The autolock duration: a cached row proved longer ago than this is due for locking. */
+  leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
   lock:            fn<() => unknown>(),
   /** Hold a lease as the vault's: what `lease.attach()` calls. */
@@ -472,8 +477,8 @@ export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseS
 export const deviceDBDuck = Checker(({ obj, fn }) => obj({ peek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
-export const vaultListingOpts = objCheck(({ obj, fn, int, lit, union }) => ({
-  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: union([int.positive(), lit(Infinity)]).optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn().optional() }),
+export const vaultListingOpts = objCheck(({ obj, fn }) => ({
+  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn().optional() }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
 

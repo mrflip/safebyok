@@ -234,13 +234,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   #makeFriend(): LeaseFriend {
-    const { world: { clock, logger, deviceDB } } = this
+    const { world: { clock, logger, deviceDB, leaseMillis = DefaultLeaseMillis } } = this
     const stamp = MSX.vaultStamp.parse(this)
     const asked = { ...this.scope, vault_tok: this.vault_tok }
     return {
       ...stamp,
       clock,
       logger,
+      leaseMillis,
       lock:            () => { this.lock() },
       attachLease:     (lease) => this.#attachLease(lease),
       peekLease:       () => deviceDB.peek(asked),
