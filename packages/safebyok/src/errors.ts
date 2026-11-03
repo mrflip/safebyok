@@ -15,7 +15,7 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `crypto_failed`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
- *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`,
+ *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
  *   `same_passphrase`, `camped`, `vault_empty`, `storage_error`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
@@ -75,6 +75,9 @@ export const refusalKindVals = [
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box is stored under that label
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
+  'already_asking',      // a gating is open on this bank, so a second one was not launched: one dialog at a time, and no join
+  'locked_while_asking', // a lock landed before the user's attempt, so the gating settled and nothing was proved
+  'declined',            // the dialog was declined, or closed with no attempt under way, so nothing was done
   'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a vaultDB put told not to replace a live row found one there
@@ -140,6 +143,9 @@ export const RefusalFamilyForKind = {
   damaged_lease:       'bad_news',
   no_whisper:          'condition',
   attempt_in_flight:   'condition',
+  already_asking:      'condition',
+  locked_while_asking: 'condition',
+  declined:            'condition',
   passphrase_required: 'misuse',
   same_passphrase:     'condition',
   camped:              'condition',

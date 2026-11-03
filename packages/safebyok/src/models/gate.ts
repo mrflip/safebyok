@@ -2,8 +2,8 @@ import { Checkers } from '../checks/validator'
 import { VaultError } from '../errors'
 import { decorate, tattoo } from '../helpers'
 import * as Phrases from '../phrases'
-import { type AttemptClosure, type GateProps, type PasskeyClosure, type PasskeyWayinRecord, type PassphraseClosure, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, FirstGateEpoch, attemptCleartexts, cleartexts, gateAttemptArgs, gateBuildArgs, gateProps, passkeyAddArgs, passkeyCleartexts, passkeyRevokeArgs, passphraseCleartexts, passphraseReplaceArgs, vaultStamp } from './models-shapes'
-import { NOVEL, PasskeyProving, PassphraseProving, type Proving } from './proving'
+import { type AttemptClosure, type GateProps, type PasskeyClosure, type PasskeyWayinRecord, type PassphraseClosure, type PassphraseWayinRecord, type ProvingWorld, type VaultStamp, type WayinHeader, FirstGateEpoch, attemptCleartexts, gateAttemptArgs, gateProps, passkeyAddArgs, passkeyCleartexts, passkeyRevokeArgs, passphraseCleartexts, passphraseReplaceArgs, vaultStamp } from './models-shapes'
+import { PasskeyProving, PassphraseProving, type Proving } from './proving'
 import { Wayin } from './wayin'
 
 /** Stays here: it names the class. */
@@ -18,7 +18,7 @@ const Checks = Checkers('bad_option', ({ obj, custom }) => {
 export type GateChange = { gate: GateProps, proved: PassphraseProving }
 // --
 
-// == [Gate]: make, build, attemptProof, provePassphrase, demandPasskeyAddable, withPassphraseReplaced, withPasskeyAdded, withPasskeyRevoked, pickle, toJSON
+// == [Gate]: make, attemptProof, provePassphrase, demandPasskeyAddable, withPassphraseReplaced, withPasskeyAdded, withPasskeyRevoked, pickle, toJSON
 
 /** The wayins of a vault's record as of one `gate_epoch`, a read-only view: a change to them is made and landed elsewhere, and a new `Gate` read from the record that lands. */
 export class Gate {
@@ -43,19 +43,6 @@ export class Gate {
   static make(stamp: VaultStamp, passphraseWayin: Wayin, passkeyWayin: Wayin | null): Gate {
     Checks.gateMakeArgs.parse({ passphraseWayin, passkeyWayin })
     return new Gate(stamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passphraseWayin.pickle(), passkey_wayin: passkeyWayin?.pickle() ?? null })
-  }
-
-  /** A first gate for the vault `stamp` names, its wayins made from what `proofClosure` answers, beside the passphrase proving, which grants the vault its first lease. */
-  static async build(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ gate: Gate, proving: PassphraseProving }> {
-    const { stamp: checked } = gateBuildArgs.parse({ stamp, proofClosure, world })
-    return hearing(proofClosure, async (handed) => {
-      const { passphrase, passkeyAnswer } = cleartexts.parse(handed)
-      const proving = await PassphraseProving.buildNovel(checked, passphrase, world)
-      const passkeyProving = passkeyAnswer ? await PasskeyProving.buildNovel(checked, passkeyAnswer, world) : null
-      const passphraseWayin = await proving.buildWayin(NOVEL)
-      const passkeyWayin = passkeyProving === null ? null : await passkeyProving.buildWayin(proving)
-      return { gate: this.make(checked, passphraseWayin, passkeyWayin), proving }
-    })
   }
 
   /** The proving of this gate's wayin that what `proofClosure` answers opens: the passphrase's where it hands one, else the passkey's. What it answers refuses as {@link PassphraseProving.buildStored} and {@link PasskeyProving.buildStored} do, and a passkey's answer is spent whatever follows. */
@@ -121,7 +108,7 @@ export class Gate {
 // == [Hearing a closure]: hearing, invokeClosure, spendAnswer
 
 /** What `use` makes of what `closure` answers, which is spent whatever follows (G2). What the closure throws is replaced, not kept as a cause, as it heard the passphrase (G8). */
-const hearing = async <ValT>(closure: ProofClosure | AttemptClosure | PassphraseClosure | PasskeyClosure, use: (handed: unknown) => Promise<ValT>): Promise<ValT> => {
+const hearing = async <ValT>(closure: AttemptClosure | PassphraseClosure | PasskeyClosure, use: (handed: unknown) => Promise<ValT>): Promise<ValT> => {
   const handed = await invokeClosure(closure)
   try {
     return await use(handed)
@@ -130,7 +117,7 @@ const hearing = async <ValT>(closure: ProofClosure | AttemptClosure | Passphrase
   }
 }
 
-const invokeClosure = async (closure: ProofClosure | AttemptClosure | PassphraseClosure | PasskeyClosure): Promise<unknown> => {
+const invokeClosure = async (closure: AttemptClosure | PassphraseClosure | PasskeyClosure): Promise<unknown> => {
   try {
     return await closure()
   } catch {

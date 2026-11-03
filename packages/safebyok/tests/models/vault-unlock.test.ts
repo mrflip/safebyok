@@ -6,7 +6,7 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, roundTrip, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, roundTrip, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -103,9 +103,9 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'vault_locked')
     await TH.eventually(() => deviceDB.cachedNow() === null)
     await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
-    await TH.expectRefusal(vault.ensureUnlocked(byPassphrase('not the passphrase')), 'wrong_passphrase')
+    await TH.expectRefusal(unlockTyping(vault, byPassphrase('not the passphrase')), 'wrong_passphrase')
     expect(vault.isLocked).to.be.true
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
     expect(deviceDB.tryVacate).toHaveBeenCalledOnce()
@@ -130,7 +130,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(listing.sparseOf(record))
     expect(vault.isLocked).to.be.true
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
     expect(vault.isFull).to.be.true
   })
@@ -209,7 +209,7 @@ describe("lease.attach: the one way a vault comes to hold a lease", () => {
     const vault = await listing.build(record)
     deviceDB.tryCache.mockResolvedValueOnce(TH.bad(new VaultError('storage_blocked', 'the disk is full')))
     vault.lock()
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
     expect(onBadNews).toHaveBeenCalledOnce()
     listing.goodbye()
@@ -240,14 +240,14 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
   it("takes up no lease cached under an older gate, and uncaches it: asking for the proof", async () => {
     const { vault, demandStored, anotherSession, deviceDB } = await makeBornVault()
     vault.lock()
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     const stale = deviceDB.cachedNow()
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     deviceDB.layCached(stale)
     const again = await anotherSession().build(demandStored())
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
     expect(deviceDB.cachedNow()).to.be.null
-    await again.ensureUnlocked(byPassphrase(NewPassphrase))
+    await unlockTyping(again, byPassphrase(NewPassphrase))
     expect(again.isUnlocked).to.be.true
   })
 
@@ -255,7 +255,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const { vault, demandStored } = await makeBornVaultWithPasskey()
     const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
     const theirs = await other.listing.build(other.demandStored())
-    await theirs.ensureUnlocked(byPasskey('laptop'))
+    await unlockTyping(theirs, byPasskey('laptop'))
     await vault.revokePasskey(byPassphrase(Passphrase))
     other.storeBehindOurBack(demandStored())
     const again = await other.anotherSession().build(other.demandStored())
@@ -294,7 +294,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const again = await listing.build(demandStored())
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
     expect(onBadNews.mock.calls[0]?.[0]).to.deep.include({ refusalkind: 'damaged_lease' })
-    await again.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(again, byPassphrase(Passphrase))
     expect(again.isUnlocked).to.be.true
     listing.goodbye()
   })
@@ -306,7 +306,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const again = await anotherSession().build(record)
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     await again.ensureUnlocked()
     expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
   })
@@ -469,7 +469,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
     TH.expectSyncRefusal(() => vault.demandPresent(), 'disabled')
     TH.expectSyncRefusal(() => box.demandUnlocked(), 'disabled')
-    await TH.expectRefusal(vault.ensureUnlocked(byPassphrase(Passphrase)), 'disabled')
+    await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')
     await TH.expectRefusal(vault.fetch(), 'disabled')
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'disabled')
     expect(vault.lock().sweep().vacate()).to.equal(vault)

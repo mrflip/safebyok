@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
 import { fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
-import { Dna, Passphrase, makeVaultWorld, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { Dna, Passphrase, makeVaultWorld, useVaultWorlds, vaultRoundTrip, unlockTyping, buildTyping } from '../test-helpers/vault-world'
 
 const held = useModelsWorld()
 useVaultWorlds()
@@ -46,7 +46,7 @@ const byLaptopPasskey = async () => ({ passkeyAnswer: await TH.passkeyOf('laptop
 const bornWithPasskey = async () => {
   const world = makeVaultWorld()
   const passkeyAnswer = await TH.passkeyOf('laptop')
-  const vault = await world.listing.create(Dna, () => ({ passphrase: Passphrase, passkeyAnswer }))
+  const vault = await buildTyping(world.listing, Dna, () => ({ passphrase: Passphrase, passkeyAnswer }))
   const demandStored = () => {
     const record = world.storedNow()
     if (record === null) { throw new Error('nothing stored') }
@@ -69,7 +69,7 @@ describe("the gate changes the vault sends", () => {
     const { vault, demandStored } = await bornWithPasskey()
     const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
     const theirs = await other.listing.build(demandStored())
-    await theirs.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(theirs, byPassphrase(Passphrase))
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     other.storeBehindOurBack(demandStored())
     await theirs.fetch()

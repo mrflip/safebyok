@@ -1,7 +1,6 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { omit } from 'es-toolkit'
-import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
@@ -16,12 +15,14 @@ import { BoxListing } from './box-listing'
 import { type DelTombstone, type SlotFate, Listing } from './listing'
 import { Gate } from './gate'
 import type { PassphraseProving } from './proving'
+import { type AnyGating, type ProvingsForGatingkind, type RequestCleartext, Gating, alreadyAsking } from './gating'
 import { type BoxesListed, type Dna, type Fetched, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { NOVEL } from './proving'
 import * as MSX from './models-shapes'
 import { cmpRevisions } from './storable'
 import { type VaultSnapshot, Vault } from './vault'
 
-// == [Given to a vault listing]: VaultWorld, VaultDna, VaultListingOpts
+// == [Given to a vault listing]: VaultWorld, VaultListingOpts
 
 /** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. `vault.leaseFriend()` binds its deviceDB's lease verbs to each vault. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
@@ -31,12 +32,11 @@ export type VaultWorld = ListingWorld & ProvingWorld & {
   deviceDB:    DeviceDB
   /** Hears a refused erase of the cached lease, and no secret material. */
   onPanic?:    ((refusal: VaultError) => unknown) | undefined
+  /** The host's dialog. With none, a vault that needs asking for refuses. */
+  requestCleartext?: RequestCleartext | undefined
   /** The horizon of a vault's boxes, by default the vault's own. */
   boxRefreshMillis?: number
 }
-
-/** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `create` makes from its `proofClosure`. */
-export type VaultDna = Dna<VaultScope, VaultRecord>
 
 export type VaultListingOpts = ListingOpts & { world: VaultWorld }
 // --
@@ -47,23 +47,35 @@ export type VaultListingOpts = ListingOpts & { world: VaultWorld }
 export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault> {
   declare readonly world: VaultWorld
 
+  #openGating: AnyGating | null = null
+
   constructor(opts: VaultListingOpts) {
     super(opts)
     MSX.vaultListingOpts.parse(opts)
     Object.freeze(this)
   }
 
-  /** Build the gate of a vault under a `vault_tok` fresh from {@link makeLifeTok}, from what `proofClosure` answers, and store it over no record; resolves the vault held once it lands, unlocked under the lease its passphrase proving grants. A tombstone in the slot is the revision it goes over, and it replaces that. Refuses 'bad_option' with no closure, or a vault present in the slot, before the closure is asked anything; 'stale_write' where storage holds a newer record, delivered first. A refusal before the put lands holds nothing of the dna; a lease refused after it leaves the vault stored and held, locked. */
-  async create(input: VaultDna, proofClosure?: ProofClosure): Promise<Vault> {
-    const prior = this.#demandBirthSlot(input)
-    const { draft, proving } = await this.#draftWithProving({ ...this.stampDna(input), ...VS.nextRevisionOf(prior ?? VS.NeverStored, this.clock.now()) }, proofClosure)
-    const vault = await this.putDraft(draft, prior)
-    const lease = await proving.buildLease(vault.leaseFriend())
-    await lease.attach()
-    return vault
+  /** A new vault under `scope`, asked of the user through a gating, stored, held, and unlocked under its passphrase's lease; where another vault won the slot meanwhile, that one, locked. Refuses 'bad_option' a vault present in the slot, nobody asked. A refused put holds nothing; a lease refused past the put leaves the vault stored and held, locked. */
+  async buildVault(scope: VaultScope): Promise<Vault> {
+    const checked = this.scopeOf(scope)
+    const prior = this.#demandBirthSlot(checked) ?? VS.NeverStored
+    return Gating.launch('build_vault', { listing: this, scope: checked, vault: null, run: (provings) => this.#runBirth(provings, prior) })
   }
 
-  tryCreate(input: VaultDna, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.create(input, proofClosure)) }
+  tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
+
+  /** Past the enter key: the put is the commit, and a vault_tok other than the record's is another's vault, which keeps its lock. */
+  async #runBirth({ passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: Revision): Promise<Vault> {
+    const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
+    const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null
+    const record = recordOfBirth(Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin), prior, this.clock.now())
+    const vault = await this.ensureVault(record, prior)
+    if (vault.vault_tok === record.vault_tok) {
+      const lease = await passphraseProving.buildLease(vault.leaseFriend())
+      await lease.attach()
+    }
+    return vault
+  }
 
   /** Put `record`, a birth, over `prior`, the tombstone's revision or never stored, and resolve the vault held. Landed, a new vault of it replaces the slot's tombstone or void, locked. Where another vault stands stored, a vault of that one is held and answered, locked, a success: the caller tells by `vault_tok`. Refused, it stores nothing and holds nothing of `record`; a 'stale_write' delivers the record stored. */
   ensureVault(record: VaultRecord, prior: Revision): Promise<Vault> {
@@ -79,6 +91,36 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     if (held?.isPresent === true) { throw alreadyHeldError() }
     return held
   }
+
+  // == [The one gating open]: openGating, holdGating, releaseGating, declineGatingAtLock, sweep, vacate
+
+  get openGating(): AnyGating | null { return this.#openGating }
+
+  /** Claims the one gating this bank may have open; refuses 'already_asking' while one is. */
+  holdGating(gating: AnyGating): void {
+    if (this.#openGating !== null) { throw alreadyAsking() }
+    this.#openGating = gating
+  }
+
+  /** The open gating has settled. */
+  releaseGating(): void { this.#openGating = null }
+
+  /** The open gating hears a lock of `vault`, if it asks for that vault: a birth's does not. */
+  declineGatingAtLock(vault: Vault): void {
+    if (this.#openGating?.vault === vault) { this.#openGating.declineAtLock() }
+  }
+
+  /** A goodbye settles the open gating too, whatever vault it asks for, once any attempt under way has run. */
+  override sweep(): this {
+    this.#openGating?.declineAtLock()
+    return super.sweep()
+  }
+
+  override vacate(): this {
+    this.#openGating?.declineAtLock()
+    return super.vacate()
+  }
+  // --
 
   /** The listing of `vault`'s boxes, its watch not started. Bad news of a box goes where this listing's goes. */
   boxListingOf(vault: Vault): BoxListing {
@@ -119,14 +161,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
 
-  /** The record of a vault's birth, and the proving its gate was built under: the dna under a fresh `vault_tok`, and the gate {@link Gate.build} makes of that stamp from what `proofClosure` answers; without one, refuses 'bad_option'. */
-  async #draftWithProving(dna: Dna<VaultScope, VaultRecord> & Revision & Times, proofClosure?: ProofClosure): Promise<{ draft: VaultRecord, proving: PassphraseProving }> {
-    const checked = MSX.vaultBuildArgs.parse({ proofClosure })
-    const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
-    const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.proofClosure, this.world)
-    return { draft: { ...sparse, am: 'a', gate: gate.pickle() }, proving }
-  }
-
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
     return new Vault(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
@@ -157,6 +191,14 @@ const NothingListed: BoxesListed = Object.freeze({ boxes: [], damaged_records: [
 /** `answer` with its `val` the vault row alone, as a listing delivers it. */
 const vaultRowOf = (answer: Awaited<ReturnType<VaultDB['tryGetVault']>>) => (
   (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_records']) } : answer
+)
+// --
+
+// == [Birth]: recordOfBirth
+
+/** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
+const recordOfBirth = (gate: Gate, prior: Revision, now: number): VaultRecord => (
+  { ...gate.stamp, fmt: VaultFormat, am: 'a', ...VS.nextRevisionOf(prior, now), gate: gate.pickle() }
 )
 // --
 

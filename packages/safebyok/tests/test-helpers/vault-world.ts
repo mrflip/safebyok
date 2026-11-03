@@ -3,10 +3,14 @@
 import { afterEach, vi } from 'vitest'
 import type { BoxWorld } from '../../src/models/box-listing'
 import type { Lease } from '../../src/models/lease'
-import type { ProofClosure, VaultRecord } from '../../src/models/models-shapes'
+import type { RequestCleartext } from '../../src/models/gating'
+import type { VaultRecord } from '../../src/models/models-shapes'
 import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
+import type { Outcome } from '../../src/outcome'
+import type { VaultScope } from '../../src/shapes/scopes'
+import type * as VX from '../../src/shapes/vault'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
@@ -30,6 +34,36 @@ export const byPassphrase = (passphrase: string) => () => ({ passphrase })
 
 /** The proof closure of a user who touches the passkey `tag` names, its answer as `passkeyOf` makes it. */
 export const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await passkeyOf(tag) })
+
+/** What the user does at the dialog, in a proof closure's words: a passphrase, a passkey's answer, or both. */
+export type Typing = () => Promise<Typed> | Typed
+
+type Typed = { passphrase?: string, passkeyAnswer?: VX.PasskeyAnswer | null }
+
+/** What `ask` answers under a dialog shown once: it attempts what `typing` answers and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
+const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
+  const { requestCleartext: asBefore } = world
+  let heard: Outcome<unknown> | null = null
+  const dialog: RequestCleartext = async (gating) => {
+    const { passphrase, passkeyAnswer } = await typing()
+    heard = await gating.attempt({ ...(passphrase !== undefined && { passphraseClear: passphrase }), ...(passkeyAnswer && { passkeyClear: passkeyAnswer }) } as never)
+  }
+  world.requestCleartext = dialog
+  try {
+    return await ask()
+  } catch (err) {
+    const attempted = heard as Outcome<unknown> | null
+    throw attempted?.ok === false ? attempted.err : err
+  } finally {
+    world.requestCleartext = asBefore
+  }
+}
+
+/** `listing.buildVault(scope)`, the user doing `typing` at the dialog. */
+export const buildTyping = (listing: VaultListing, scope: VaultScope, typing: Typing): Promise<Vault> => askTyping(listing.world, typing, () => listing.buildVault(scope))
+
+/** `vault.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
+export const unlockTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.ensureUnlocked())
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
@@ -116,14 +150,14 @@ export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 /** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB holds it. */
 export const storedVaultRecord = async (passphrase: string = Passphrase): Promise<VaultRecord> => {
   const { listing, demandStored } = makeVaultWorld()
-  await listing.create(Dna, byPassphrase(passphrase))
+  await buildTyping(listing, Dna, byPassphrase(passphrase))
   return demandStored()
 }
 
-/** A vault created of `Dna` by `proofClosure` (under {@link Passphrase} unless told otherwise), in a fresh world: unlocked, its lease cached on the device. `worldOverrides` says otherwise of the world. */
-export const makeBornVault = async (proofClosure: ProofClosure = byPassphrase(Passphrase), worldOverrides: Partial<VaultWorld> = {}) => {
+/** A vault created of `Dna` by `typing` (under {@link Passphrase} unless told otherwise), in a fresh world: unlocked, its lease cached on the device. `worldOverrides` says otherwise of the world. */
+export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), worldOverrides: Partial<VaultWorld> = {}) => {
   const world = makeVaultWorld(null, worldOverrides)
-  const vault = await world.listing.create(Dna, proofClosure)
+  const vault = await buildTyping(world.listing, Dna, typing)
   return { ...world, vault }
 }
 

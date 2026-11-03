@@ -1,196 +1,211 @@
-import { noop } from 'es-toolkit'
+import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
-import type { VaultLogger } from '../logger'
-import { type Outcome, bad, good, outcomeOf, valOf } from '../outcome'
+import { type Outcome, bad, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
-import { type VaultScope, vaultScope } from '../shapes/scopes'
+import type { VaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
-import type { CleartextsForGatingkind, GatingKind, StrengthChecker } from './models-shapes'
+import type { ClearsForGatingkind, GatingKind, WayinHeader } from './models-shapes'
 import * as MSX from './models-shapes'
+import { PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
-import type { VaultDna, VaultListing } from './vault-listing'
+import type { VaultListing, VaultWorld } from './vault-listing'
 
-// == [Given to a gating]: GatingWorld, RequestCleartext, AnyGating, GatingSnapshot, Run
+// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs
 
-export type GatingWorld = {
-  requestCleartext?: RequestCleartext | undefined
-  strengthChecker:   StrengthChecker
-  logger:            VaultLogger
-}
-
+/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
 export type RequestCleartext = (gating: AnyGating) => unknown
 
 export type AnyGating = { [KindT in GatingKind]: Gating<KindT> }[GatingKind]
 
 export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
 
-type Run = (handed: unknown) => Promise<Vault>
+/** What an attempt makes of the clears it is handed, for its `run`. */
+export type ProvingsForGatingkind = {
+  build_vault:  { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
+  unlock_vault: { proved: Proving }
+}
+
+/** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
+export type Run<KindT extends GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
+
+export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault }
+
+export type LaunchArgs<KindT extends GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
 // --
 
-// == [Gating]: buildVault, unlockVault, replacePassphrase, addPasskey, revokePasskey, each with its try form; isOpen, attempt, decline, toJSON
+// == [Gating]: launch, isOpen, whenSettled, checkStrength, attempt, decline, declineAtLock, toJSON
 
+/** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and settles once: launch answers with that outcome. */
 export class Gating<KindT extends GatingKind = GatingKind> {
-  declare readonly gatingkind: KindT
-  declare readonly applabel:   string
-  declare readonly user_id:    string
-  declare readonly vaultlabel: string
-  declare readonly vault:      Vault | null
+  declare readonly gatingkind:    KindT
+  declare readonly applabel:      string
+  declare readonly user_id:       string
+  declare readonly vaultlabel:    string
+  declare readonly vault:         VaultForGatingkind[KindT]
+  /** The header of the passkey wayin in the gate at launch, for the dialog to ask that passkey; null with none. */
+  declare readonly passkeyHeader: WayinHeader | null
 
-  readonly #run:     Run
+  readonly #listing: VaultListing
+  readonly #run:     Run<KindT>
+  readonly #prove:   Prove<KindT>
   readonly #settled: Promise<Outcome<Vault>>
-  readonly #settle:  (outcome: Outcome<Vault>) => void
-  #outcome:    Outcome<Vault> | null = null
-  #attempting: Promise<unknown> | null = null
+  #settle:        (outcome: Outcome<Vault>) => void = () => undefined
+  #outcome:       Outcome<Vault> | null = null
+  #isAttempting  = false
+  #isLastAttempt = false
 
-  private constructor(gatingkind: KindT, scope: VaultScope, vault: Vault | null, run: Run, settled: Promise<Outcome<Vault>>, settle: (outcome: Outcome<Vault>) => void) {
-    tattoo(this, { gatingkind: MSX.gatingkind.parse(gatingkind) as KindT, ...vaultScope.parse(scope) }, { writable: false })
+  private constructor(gatingkind: KindT, { listing, scope, vault, run }: LaunchArgs<KindT>) {
+    tattoo(this, { gatingkind, ...scope }, { writable: false })
     adorn(this, 'vault', vault)
+    adorn(this, 'passkeyHeader', vault?.gate.toJSON().passkey_wayin ?? null)
+    this.#listing = listing
     this.#run = run
-    this.#settled = settled
-    this.#settle = settle
+    this.#prove = ProveForGatingkind[gatingkind]
+    this.#settled = new Promise((resolve) => { this.#settle = resolve })
     Object.freeze(this)
   }
 
-  static buildVault(listing: VaultListing, dna: VaultDna, world: GatingWorld): Promise<Vault> {
-    const scope = listing.scopeOf(dna)
-    return this.#ask('build_vault', scope, null, world, async (handed) => {
-      const checked = MSX.vaultBuildCleartexts.parse(handed)
-      await checkStrength(world, checked.passphrase, scope)
-      return listing.create(dna, () => checked)
-    })
-  }
-
-  static tryBuildVault(listing: VaultListing, dna: VaultDna, world: GatingWorld): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(listing, dna, world)) }
-
-  // GAP: vault.ts `ensureUnlocked(proofClosure?)` throws noProofToUnlock() where none is handed; with a world that carries `requestCleartext`, it would `await Gating.unlockVault(this, this.world)`.
-  static unlockVault(vault: Vault, world: GatingWorld): Promise<Vault> {
-    return this.#ask('unlock_vault', vault.scope, vault, world, async (handed) => {
-      const checked = MSX.vaultUnlockCleartexts.parse(handed)
-      await vault.ensureUnlocked(() => checked)
-      return vault
-    })
-  }
-
-  static tryUnlockVault(vault: Vault, world: GatingWorld): Promise<Outcome<Vault>> { return outcomeOf(() => this.unlockVault(vault, world)) }
-
-  // GAP: vault.ts `replacePassphrase`, `addPasskey` and `revokePasskey` take closures only; called with none, each would ask through its Gating static here, as `unlockVault`'s GAP says.
-  static replacePassphrase(vault: Vault, world: GatingWorld): Promise<Vault> {
-    return this.#ask('replace_passphrase', vault.scope, vault, world, async (handed) => {
-      const { passphrase, nextPassphrase } = MSX.passphraseReplaceCleartexts.parse(handed)
-      if (passphrase === nextPassphrase) { throw samePassphrase() }
-      await checkStrength(world, nextPassphrase, vault.scope)
-      return vault.replacePassphrase(() => ({ passphrase }), () => ({ passphrase: nextPassphrase }))
-    })
-  }
-
-  static tryReplacePassphrase(vault: Vault, world: GatingWorld): Promise<Outcome<Vault>> { return outcomeOf(() => this.replacePassphrase(vault, world)) }
-
-  static addPasskey(vault: Vault, world: GatingWorld): Promise<Vault> {
-    return this.#ask('add_passkey', vault.scope, vault, world, (handed) => {
-      const { passphrase, passkeyAnswer } = MSX.passkeyAddCleartexts.parse(handed)
-      return vault.addPasskey(() => ({ passphrase }), () => ({ passkeyAnswer }))
-    })
-  }
-
-  static tryAddPasskey(vault: Vault, world: GatingWorld): Promise<Outcome<Vault>> { return outcomeOf(() => this.addPasskey(vault, world)) }
-
-  static revokePasskey(vault: Vault, world: GatingWorld): Promise<Vault> {
-    return this.#ask('revoke_passkey', vault.scope, vault, world, (handed) => {
-      const { passphrase } = MSX.passkeyRevokeCleartexts.parse(handed)
-      return vault.revokePasskey(() => ({ passphrase }))
-    })
-  }
-
-  static tryRevokePasskey(vault: Vault, world: GatingWorld): Promise<Outcome<Vault>> { return outcomeOf(() => this.revokePasskey(vault, world)) }
-
-  static async #ask(gatingkind: GatingKind, scope: VaultScope, vault: Vault | null, world: GatingWorld, run: Run): Promise<Vault> {
-    const { requestCleartext } = MSX.gatingWorld.parse(world) as GatingWorld
+  /** The dialog shown with a new gating, resolving what `run` answers once it settles. Refuses 'already_asking' a gating open on this bank, with no join; 'bad_option' a world with no dialog; 'declined' or 'locked_while_asking' an ask that ended with no attempt. */
+  static async launch<KindT extends GatingKind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
+    const { scope } = MSX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, run: args.run })
+    const { requestCleartext } = args.listing.world
     if (requestCleartext === undefined) { throw noRequestCleartext() }
-    let settle: (outcome: Outcome<Vault>) => void = noop
-    const settled = new Promise<Outcome<Vault>>((resolve) => { settle = resolve })
-    const gating = new Gating(gatingkind, scope, vault, run, settled, settle)
-    const heard = await hearRequestCleartext(requestCleartext, gating)
-    await gating.#attempting
-    gating.#settleOnce(heard.ok ? bad(gatingDeclined()) : heard)
+    const gating = new Gating(gatingkind, { ...args, scope })
+    args.listing.holdGating(gating as unknown as AnyGating)
+    void gating.#askHost(requestCleartext)
     return valOf(await gating.#settled)
+  }
+
+  async #askHost(requestCleartext: RequestCleartext): Promise<void> {
+    try {
+      await requestCleartext(this as unknown as AnyGating)
+      this.#endAsking(gatingDeclined())
+    } catch {
+      this.#endAsking(requestCleartextThrew())
+    }
   }
 
   get isOpen(): boolean { return this.#outcome === null }
 
-  attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome<Vault>> {
-    if (this.#outcome !== null) { return Promise.resolve(bad(gatingSettled())) }
-    const attempting = this.#attemptOnce(cleartexts)
-    this.#attempting = attempting
-    return attempting
+  /** The outcome once settled, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
+  get whenSettled(): Promise<Outcome<Vault>> { return this.#settled }
+
+  /** The verdict on a passphrase, as the user types it. Nothing changes. */
+  checkStrength(passphraseClear: string): Promise<VX.PassphraseVerdict> {
+    return Proving.checkStrength(VX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
   }
 
-  async #attemptOnce(cleartexts: unknown): Promise<Outcome<Vault>> {
-    const outcome = await outcomeOf(() => this.#run(cleartexts))
-    if (outcome.ok || ! isCorrectable(outcome.err)) { this.#settleOnce(outcome) }
+  get #scope(): VaultScope {
+    const { applabel, user_id, vaultlabel } = this
+    return { applabel, user_id, vaultlabel }
+  }
+
+  /** The one door for a clear: what the user typed tried once, answered as an Outcome. Done, or refused for good, it settles the gating; a correctable refusal ({@link MSX.correctableKindVals}) leaves it open, and a passkey's answer unspent, to go again. Refuses 'attempt_in_flight' while one runs, and 'gating_landed' once settled, spending what it was handed. */
+  attempt(clears: ClearsForGatingkind[KindT]): Promise<Outcome<Vault>> {
+    const refusal = this.#refusalOfAttempt()
+    if (refusal !== null) {
+      spendClears(clears)
+      return Promise.resolve(bad(refusal))
+    }
+    this.#isAttempting = true
+    return this.#attemptOnce(clears)
+  }
+
+  #refusalOfAttempt(): VaultError | null {
+    if (this.#outcome !== null) { return gatingSettled() }
+    return this.#isAttempting ? attemptInFlight() : null
+  }
+
+  async #attemptOnce(clears: ClearsForGatingkind[KindT]): Promise<Outcome<Vault>> {
+    const asked = { scope: this.#scope, vault: this.vault, world: this.#listing.world }
+    const outcome = await outcomeOf(async () => this.#run(await this.#prove(asked, clears)))
+    this.#isAttempting = false
+    if (outcome.ok || (! isCorrectable(outcome.err)) || this.#isLastAttempt) {
+      spendClears(clears)
+      this.#settleOnce(outcome)
+    }
     return outcome
   }
 
-  decline(): void {
-    this.#settleOnce(bad(gatingDeclined()))
+  /** The user said no. With no attempt under way the gating settles 'declined'; one under way runs on, and its outcome settles it. */
+  decline(): void { this.#endAsking(gatingDeclined()) }
+
+  /** A lock on the vault it asks for. With no attempt under way the gating settles 'locked_while_asking'; past the enter key nothing turns back, and the attempt's outcome settles it. */
+  declineAtLock(): void { this.#endAsking(lockedWhileAsking()) }
+
+  /** No more attempts: `refusal` settles the gating, or else the attempt under way does, whatever it answers. */
+  #endAsking(refusal: VaultError): void {
+    if (this.#isAttempting) {
+      this.#isLastAttempt = true
+      return
+    }
+    this.#settleOnce(bad(refusal))
   }
 
   #settleOnce(outcome: Outcome<Vault>): void {
     if (this.#outcome !== null) { return }
     this.#outcome = outcome
+    this.#listing.releaseGating()
     this.#settle(outcome)
   }
 
   toJSON(): GatingSnapshot {
-    const { gatingkind, applabel, user_id, vaultlabel } = this
-    return { gatingkind, applabel, user_id, vaultlabel }
+    const { gatingkind } = this
+    return { gatingkind, ...this.#scope }
   }
 }
 // --
 
-// == [Host calls]: hearRequestCleartext, checkStrength, verdictOf, isCorrectable
+// == [An attempt's provings]: Prove, ProveForGatingkind, isCorrectable, spendClears
 
-const hearRequestCleartext = async (requestCleartext: RequestCleartext, gating: AnyGating): Promise<Outcome<void>> => {
-  try {
-    await requestCleartext(gating)
-    return good(undefined)
-  } catch {
-    return bad(requestCleartextThrew())
-  }
-}
+type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
 
-const checkStrength = async (world: GatingWorld, passphrase: string, scope: VaultScope): Promise<void> => {
-  const verdict = await verdictOf(world.strengthChecker, passphrase, scope)
-  if (! verdict.success) { throw notAVerdict() }
-  if (! verdict.data.strong) { throw weakPassphrase(verdict.data.reason) }
-}
+type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
 
-const verdictOf = async (strengthChecker: StrengthChecker, passphrase: string, scope: VaultScope): Promise<ReturnType<typeof VX.passphraseVerdict.safeParse>> => {
-  try {
-    return VX.passphraseVerdict.safeParse(await strengthChecker(passphrase, scope))
-  } catch {
-    throw strengthCheckerThrew()
-  }
+/** Past the enter key: everything that ends up in the record is made here, one stamp and one clock reading per attempt. These hear the clears, and hand on provings. */
+const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
+  build_vault: async ({ scope, world }, clears) => {
+    const { passphraseClear, passkeyClear } = MSX.vaultBuildClears.parse(clears)
+    const stamp = MSX.vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: world.clock.now() })
+    const passphraseProving = await PassphraseProving.buildNovel(stamp, passphraseClear, world)
+    const passkeyProving = passkeyClear ? await PasskeyProving.buildNovel(stamp, passkeyClear, world) : null
+    return { passphraseProving, passkeyProving }
+  },
+  unlock_vault: async ({ vault, world }, clears) => {
+    const { passphraseClear, passkeyClear } = MSX.vaultUnlockClears.parse(clears)
+    await vault.ensureTimely(MSX.Promptly)
+    const { gate } = vault
+    const proved = (passphraseClear === undefined) ? await PasskeyProving.buildStored(gate, passkeyClear!) : await PassphraseProving.buildStored(gate, passphraseClear, world)
+    return { proved }
+  },
 }
 
 const isCorrectable = (err: VaultError): boolean => (MSX.correctableKindVals as readonly string[]).includes(err.refusalkind)
+
+/** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not: an answer is single-use (G2). */
+const spendClears = (clears: unknown): void => {
+  // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the outcome it follows.
+  try {
+    const prfBytes: unknown = (clears as { passkeyClear?: { prfBytes?: unknown } | null } | null)?.passkeyClear?.prfBytes
+    if (prfBytes instanceof Uint8Array) { prfBytes.fill(0) }
+  } catch { /* nothing left to spend */ }
+}
 // --
 
-// == [Refusals]: noRequestCleartext, requestCleartextThrew, gatingDeclined, gatingSettled, strengthCheckerThrew, notAVerdict, weakPassphrase, samePassphrase
+// == [Refusals]: alreadyAsking, noRequestCleartext, requestCleartextThrew, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight
+
+export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
 
 const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrases.NoRequestCleartext)
 
 const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
 
-const gatingDeclined = (): VaultError => new VaultError('vault_locked', Phrases.GatingDeclined)
+const gatingDeclined = (): VaultError => new VaultError('declined', Phrases.GatingDeclined)
+
+const lockedWhileAsking = (): VaultError => new VaultError('locked_while_asking', Phrases.LockedWhileAsking)
 
 const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)
 
-const strengthCheckerThrew = (): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerThrew)
-
-const notAVerdict = (): VaultError => new VaultError('bad_option', Phrases.NotAVerdict)
-
-const weakPassphrase = (reason: string): VaultError => new VaultError('weak_passphrase', reason)
-
-const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)
+const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
 // --

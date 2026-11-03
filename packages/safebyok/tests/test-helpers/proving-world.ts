@@ -9,8 +9,10 @@
 import { afterEach, beforeEach, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes } from '../../src/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/crypto'
+import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
-import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProofClosure, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
+import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
+import { type AttemptClosure, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/outcome'
 import type { KeyDeriver } from '../../src/key-deriver'
@@ -96,7 +98,7 @@ export const makeGrantedLease = async (friend: FakeLeaseFriend, opts: LeaseGrant
 export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord => ({ boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides })
 // --
 
-// == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, proofClosureOf
+// == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, proofClosureOf, builtGateOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = VX.passphraseCleartext.parse('correct horse battery staple')
@@ -122,9 +124,19 @@ export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.P
 })
 
 /** A synchronous proof closure; a test of an async one, or one that throws, writes its own. */
-export const proofClosureOf = (passphrase: string = TestPassphrase, passkeyAnswer?: VX.PasskeyAnswer): ProofClosure => () => (
+export const proofClosureOf = (passphrase: string = TestPassphrase, passkeyAnswer?: VX.PasskeyAnswer): AttemptClosure => () => (
   passkeyAnswer === undefined ? { passphrase } : { passphrase, passkeyAnswer }
 )
+
+/** A first gate of {@link WorldStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving. */
+export const builtGateOf = async (answer?: VX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> => {
+  const world = provingWorldOf()
+  const proving = await PassphraseProving.buildNovel(WorldStamp, VX.passphraseCleartext.parse(TestPassphrase), world)
+  const passkeyProving = answer && await PasskeyProving.buildNovel(WorldStamp, answer, world)
+  const passphraseWayin = await proving.buildWayin(NOVEL)
+  const passkeyWayin = await passkeyProving?.buildWayin(proving) ?? null
+  return { gate: Gate.make(WorldStamp, passphraseWayin, passkeyWayin), proving }
+}
 // --
 
 // == [Bytes]: isZeroed

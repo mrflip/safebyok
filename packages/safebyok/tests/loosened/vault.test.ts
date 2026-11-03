@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { PrfSalt } from '../../src/shapes/fields'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, vaultRoundTrip, useVaultWorlds } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, vaultRoundTrip, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -13,10 +13,10 @@ describe("the ways in changing under a vault unlocked", () => {
     const record = await storedVaultRecord()
     const { listing, storeBehindOurBack } = makeVaultWorld(record)
     const vault = await listing.build(record)
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     const other = makeVaultWorld(record, { device_id: 'device-2' })
     const theirs = await other.listing.build(record)
-    await theirs.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(theirs, byPassphrase(Passphrase))
     await theirs.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     const received = storeBehindOurBack(other.demandStored())
     vault.receive(received)
@@ -42,7 +42,7 @@ describe("an older copy of the vault record", () => {
     expect(restored.isLocked).to.be.true
     expect(restored.revision_seq).to.eq(ante.revision_seq)
     expect(restored.gate.pickle()).to.deep.equal(ante.gate)
-    await restored.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(restored, byPassphrase(Passphrase))
     expect(restored.isUnlocked).to.be.true
   })
 })
@@ -57,7 +57,7 @@ describe("a vault record stored damaged", () => {
     const { listing } = makeVaultWorld(damaged)
     const vault = await listing.build(damaged)
     expect(vault.isFull).to.be.true
-    await TH.expectRefusal(vault.ensureUnlocked(byPassphrase(Passphrase)), 'bad_record')
+    await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'bad_record')
     expect(vault.isLocked).to.be.true
   })
 
