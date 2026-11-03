@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import type { Gating } from '../../src/models/gating'
-import type { GatingKind } from '../../src/models/models-shapes'
+import { type GatingKind, Promptly } from '../../src/models/models-shapes'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
@@ -213,6 +213,15 @@ describe("vault.revokePasskey()", () => {
     expect(await vault.revokePasskey()).to.equal(vault)
     expect(shown).to.have.lengthOf(0)
     expect(storedNow()).to.equal(ante)
+  })
+
+  it("refreshes before it answers at once: a passkey added elsewhere, within the vault's horizon, is asked for and revoked", async () => {
+    const { vault, demandStored, anotherSession, advance } = await makeBornVault()
+    await addPasskeyTyping(await anotherSession().build(demandStored()), Passphrase, 'laptop')
+    advance(Promptly)
+    expect(vault.gate.pkWayin).to.be.null
+    await revokeTyping(vault, Passphrase)
+    expect(demandStored().gate.passkey_wayin).to.be.null
   })
 
   it("refuses 'wrong_passphrase' a passkey's holder who cannot prove the passphrase, the wayin left", async () => {
