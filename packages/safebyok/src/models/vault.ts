@@ -83,10 +83,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.demandPresent()
   }
 
-  /** The vault record a box's answer carries, received as any record of this vault is. What `receive` hands back goes nowhere: the box listing takes its world synchronously, where the vault listing delivers asynchronously. */
+  /** The vault row a box's answer carries, received whole as any record of this vault is, so a gate moved elsewhere arrives with it. What `receive` hands back goes nowhere: the box listing takes its world synchronously, where the vault listing delivers asynchronously. */
   takeWorld(world: unknown): void {
-    const sparse = this.listing.sparseOf(world)
-    if (sparse.vault_tok === this.vault_tok) { this.receive(sparse) }
+    const row = VS.vaultRow.parse(world)
+    if (row.vault_tok === this.vault_tok) { this.receive(row) }
   }
   // --
 
@@ -179,8 +179,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** This vault, unlocked: as it stands, else by the lease this device has cached, else by asking the user through an unlock_vault gating, which answers as {@link Gating.launch}. With no dialog in the world, refuses 'vault_locked'. A refused look at the cache is told as bad news, and asks. */
   async ensureUnlocked(): Promise<this> {
-    await this.ensureTimely()
     if (this.isUnlocked) { return this }
+    await this.ensureTimely()
     if (! this.isFull) { await this.fetch() }
     if (await this.#attachCachedLease()) { return this }
     if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
@@ -253,6 +253,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease = lease
     if (displaced !== null && displaced !== lease) { displaced.evict() }
     this.settle()
+    this.#boxListing?.settleThings()
     const cached = await caching
     if (! cached.ok) { this.listing.tellBadNews([cached.err]) }
   }
