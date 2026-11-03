@@ -30,7 +30,7 @@ const Checks = Checkers('bad_record', ({ unk, custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, Cacheable, NeverStoredSeq, MinRefreshMillis, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, NeverStoredSeq, MinRefreshMillis, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check or its seal, and reads as gone) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
@@ -39,15 +39,12 @@ export const amVals = ['a', 'd', 'x'] as const
 export const tombstoneAmVals = ['d', 'x'] as const
 
 /** The checks of what the base knows of any record, each refusing 'bad_record': `am`, one of {@link amVals}; `revision`, `times`, `liveness` and `vaulted`, a part each; and `sparseBase`, the four together, the least a sparse form carries beside its scope.
- * `tombstone` is a sparse base that is damaged or gone; `buildableRecord` is one with `central` and
- * `staged` beside it, a copy as a storable saves it to the device cache, uncached and ready for a
- * listing to build an instance with. Each takes its fields from whatever carries them, a record, a
- * storable or a snapshot, and strips the rest. `buildableRecords` checks that the cache's load is
- * an array, and leaves each copy in it to `buildableRecord`.
+ * `tombstone` is a sparse base that is damaged or gone. Each takes its fields from whatever carries
+ * them, a record, a storable or a snapshot, and strips the rest.
  *
  * @example sparseBase.parse(box)   // { revision_tok, revision_seq, registered_at, written_at, am, vault_tok }
  */
-export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords } = Checkers('bad_record', ({ obj, arr, unk, int, oneof, revision_tok, vault_tok, epochMillis }) => {
+export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } = Checkers('bad_record', ({ obj, int, oneof, revision_tok, vault_tok, epochMillis }) => {
   const am = oneof(amVals)
   const revision = obj({
     revision_tok,
@@ -64,9 +61,7 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone, bu
   const vaulted    = obj({ vault_tok })
   const sparseBase = obj({ ...revision.shape, ...times.shape, ...liveness.shape, ...vaulted.shape })
   const tombstone  = sparseBase.extend({ am: oneof(tombstoneAmVals) })
-  const buildableRecord  = sparseBase.extend({ central: sparseBase, staged: sparseBase.nullable() })
-  const buildableRecords = arr(unk)
-  return { am, revision, times, liveness, vaulted, sparseBase, tombstone, buildableRecord, buildableRecords }
+  return { am, revision, times, liveness, vaulted, sparseBase, tombstone }
 }, [FX])
 
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
@@ -98,14 +93,8 @@ export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals
 /** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
-/** The DNA of a storable, what a caller hands `listing.build`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
+/** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
-
-/** The copy a storable saves to the device cache at each settle, and a listing revives it from: the sparse form, with `central` and `staged` beside it, `staged` null where nothing is staged. {@link buildableRecord} checks what the base knows of one. */
-export type Cacheable<RecordT, SparseT> = SparseT & Readonly<{
-  central: Fetched<RecordT, SparseT>
-  staged:  Fetched<RecordT, SparseT> | null
-}>
 
 /** The `revision_seq` of a central never stored: a thing is born with a tombstone here as its central, so that any record received is newer, and nothing stored is what it expects. */
 export const NeverStoredSeq = -1
@@ -149,7 +138,7 @@ export type Answer<ScopeT, RecordT, SparseT> = Outcome<Fetched<RecordT, SparseT>
 export type Notice<RecordT, SparseT> = Readonly<{ record: Fetched<RecordT, SparseT>, world: unknown }>
 // --
 
-// == [Reconciling]: recordShapeVals, ageVals, receivedActVals, centralPolicyVals, stagedActVals, recordShape, age, receivedAct, centralPolicy, stagedAct, reconciled, stagedForms, settled, RecordShape, Age, ReceivedAct, CentralPolicy, StagedAct, Reconciled, StagedForms, Settled
+// == [Reconciling]: recordShapeVals, ageVals, centralPolicyVals, recordShape, age, centralPolicy, reconciled, settled, RecordShape, Age, CentralPolicy, Reconciled, Settled
 
 /** The shapes of a record as `classifyRecordShape` tells them: `sparse`, `full`, `gone` (a tombstone, `am` 'x') or `ouch` (a damaged one's tombstone, `am` 'd'). */
 export const recordShapeVals = ['sparse', 'full', 'gone', 'ouch'] as const
@@ -157,37 +146,17 @@ export const recordShapeVals = ['sparse', 'full', 'gone', 'ouch'] as const
 /** How a revision `post` compares to an `ante`, as `cmpRevisions` tells it. */
 export const ageVals = ['older', 'same', 'newer'] as const
 
-/** The policies of `reconcileCentral` that go on to `reconcileStaged`: `fill` the record in hand, `adopt` the one received, or take it as `gone` or `ouch`. */
-export const receivedActVals = ['fill', 'adopt', 'gone', 'ouch'] as const
+/** Every policy `reconcileCentral` may choose: `older`, `same` and `skip` end the receive with central as it was; `fill` takes the record over the one in hand; `adopt` takes the one received; `gone` and `ouch` take it as deleted or damaged. */
+export const centralPolicyVals = ['older', 'same', 'skip', 'fill', 'adopt', 'gone', 'ouch'] as const
 
-/** Every policy `reconcileCentral` may choose: `older`, `same` and `skip` end the receive with central as it was; the rest are {@link receivedActVals}. */
-export const centralPolicyVals = ['older', 'same', 'skip', ...receivedActVals] as const
-
-/** The rows of `reconcileStaged`: a verb called here, `edit` or `del`, or one of {@link receivedActVals}. */
-export const stagedActVals = ['edit', 'del', ...receivedActVals] as const
-
-/** The checks of what reconciling passes, each refusing 'unexpected_error': the kinds above, each by its list; `reconciled`, what `reconcileCentral` hands back; `stagedForms`, what `reconcileStaged` reads; and `settled`, what `settle` and `receive` hand back.
- * `stagedForms` holds the act to its row: `edit` carries the `patch` and no `rcvd`, `del`
- * neither, and a received act the `rcvd` and no `patch`. Every record passes {@link sparseBase};
- * `staged` is null where nothing is staged. Checks only.
- */
-export const { recordShape, age, receivedAct, centralPolicy, stagedAct, reconciled, stagedForms, settled } = Checkers('unexpected_error', ({ obj, arr, discrim, lit, oneof, absent, vaultError }) => {
-  const forms = obj({ central: sparseBase, staged: sparseBase.nullable(), nextRevision: revision })
-  return {
-    recordShape:   oneof(recordShapeVals),
-    age:           oneof(ageVals),
-    receivedAct:   oneof(receivedActVals),
-    centralPolicy: oneof(centralPolicyVals),
-    stagedAct:     oneof(stagedActVals),
-    reconciled:    obj({ central: sparseBase, policy: oneof(centralPolicyVals) }),
-    stagedForms:   discrim('act', [
-      forms.extend({ act: lit('edit'),            patch: sparseBase, rcvd: absent }),
-      forms.extend({ act: lit('del'),             patch: absent,     rcvd: absent }),
-      forms.extend({ act: oneof(receivedActVals), patch: absent,     rcvd: sparseBase }),
-    ]),
-    settled:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
-  }
-}, [Checks])
+/** The checks of what reconciling passes, each refusing 'unexpected_error': the kinds above, each by its list; `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
+export const { recordShape, age, centralPolicy, reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
+  recordShape:   oneof(recordShapeVals),
+  age:           oneof(ageVals),
+  centralPolicy: oneof(centralPolicyVals),
+  reconciled:    obj({ central: sparseBase, policy: oneof(centralPolicyVals) }),
+  settled:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
+}), [Checks])
 
 /** The shape of a record: one of {@link recordShapeVals}. */
 export type RecordShape = Z.infer<typeof recordShape>
@@ -195,32 +164,13 @@ export type RecordShape = Z.infer<typeof recordShape>
 /** How one revision compares to another: one of {@link ageVals}. */
 export type Age = Z.infer<typeof age>
 
-/** A policy that goes on to `reconcileStaged`: one of {@link receivedActVals}. */
-export type ReceivedAct = Z.infer<typeof receivedAct>
-
 /** A policy of `reconcileCentral`: one of {@link centralPolicyVals}. */
 export type CentralPolicy = Z.infer<typeof centralPolicy>
-
-/** A row of `reconcileStaged`: one of {@link stagedActVals}. */
-export type StagedAct = Z.infer<typeof stagedAct>
 
 /** Return type of `reconcileCentral`: the central that results, and the policy that chose it. {@link reconciled} checks what the base knows of one. */
 export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, SparseT>, policy: CentralPolicy }>
 
-/** The forms every row of `reconcileStaged` takes: `central` as held, `staged` as held or null where nothing is staged, and the revision after the central that results. */
-type FormsBase<RecordT, SparseT> = Readonly<{
-  central:      Fetched<RecordT, SparseT>
-  staged:       Fetched<RecordT, SparseT> | null
-  nextRevision: Revision
-}>
-
-/** The bag `reconcileStaged` reads, and all it reads: the act, and by act the record `makeStaged` made of an edit's `patch`, or the record storage delivered as `rcvd`. {@link stagedForms} checks what the base knows of one. */
-export type StagedForms<RecordT, SparseT> =
-  | (FormsBase<RecordT, SparseT> & Readonly<{ act: 'edit', patch: RecordT, rcvd?: undefined }>)
-  | (FormsBase<RecordT, SparseT> & Readonly<{ act: 'del', patch?: undefined, rcvd?: undefined }>)
-  | (FormsBase<RecordT, SparseT> & Readonly<{ act: ReceivedAct, patch?: undefined, rcvd: Fetched<RecordT, SparseT> }>)
-
-/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. The copy for the device cache is saved by `settle` itself, not handed back in this return. */
+/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. */
 export type Settled = Z.infer<typeof settled>
 // --
 
@@ -287,7 +237,7 @@ export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, lit, appl
 export type BoxSparse = Z.infer<typeof boxSparse>
 export type BoxRecord = Z.infer<typeof boxRecord>
 
-/** The checks of what a caller hands to make or update a box, each a duckish refusing 'bad_option' and naming the failing field: `boxDna`, what `build` takes; `boxPatch`, what `edit`, `send` and `seal` take. A record is checked by `boxRecord` or `boxSparse`, never by these.
+/** The checks of what a caller hands to make or update a box, each a duckish refusing 'bad_option' and naming the failing field: `boxDna`, what `create` takes; `boxPatch`, what `send` takes. A record is checked by `boxRecord` or `boxSparse`, never by these.
  * Both require `whisper`, the {@link WhisperHolder} sealed in, and `sidecar`, as every update of a
  * box names both. A whisper that fails {@link whisperHolder} refuses 'bad_option' here, as every
  * field does, naming `whisper` or `whisper.val`. The props the factory controls may be given, must
@@ -382,13 +332,11 @@ export type FetchOpts = Z.infer<typeof fetchOpts>
 /** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional: `'replace'`, the default and only policy, the versioned replace. */
 export type SendOpts = Z.infer<typeof sendOpts>
 
-export type EditOpts = TimelyOpts
-
 /** The options a storable is made with, after its world, listing and records: its refresh horizon, and the trigger's `eagerFrac`. */
 export type StorableOpts = Z.infer<typeof storableOpts>
 // --
 
-// == [The world and the listing]: lockStateVals, LOCKED, LockedBag, IsListing, isListing, lockState, world, listingOpts, boxListingOpts, LockState, World, ListingWorld, Store, Cache, ListingOpts
+// == [The world and the listing]: lockStateVals, LOCKED, LockedBag, IsListing, isListing, lockState, world, listingOpts, boxListingOpts, LockState, World, ListingWorld, Store, ListingOpts
 
 /** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
 export const lockStateVals = ['unlocked', 'locked'] as const
@@ -450,34 +398,19 @@ export type Store<ScopeT, RecordT, SparseT> = {
   watch(onNotice: (notice: Notice<RecordT, SparseT>) => Promise<void>, fullFor: () => readonly ScopeT[]): () => void
 }
 
-/** The deviceDB's cache of one kind of thing: loaded once, by the listing's `hello`; saved by each instance's settle, the listing handing it to each instance it makes.
- * `save` is best effort, never awaited by the settle that calls it: a refusal is told as bad news,
- * and nothing waits on it. An adapter keeps the order of its calls, so the last `save` of a thing
- * wins. A settle saves each time, so a host whose cache is slow may debounce `save` for each thing,
- * keyed by its scope (`_.debounce` per scope, or a join primitive), before handing the cache over:
- * one `save` serves every thing of the kind, so a single debounce over every call keeps only the
- * last thing's copy.
- */
-export type Cache<RecordT, SparseT> = {
-  load(): Promise<readonly Cacheable<RecordT, SparseT>[]>
-  save(cacheable: Cacheable<RecordT, SparseT>): Promise<void>
-}
-
-/** The options a listing is made with: its world, store and cache, the refresh horizon of each thing it makes, and where to tell bad news. */
+/** The options a listing is made with: its world and store, the refresh horizon of each thing it makes, and where to tell bad news. */
 export type ListingOpts<ScopeT, RecordT, SparseT> = {
   world:                 ListingWorld
   store:                 Store<ScopeT, RecordT, SparseT>
-  cache:                 Cache<RecordT, SparseT>
   maxMillisSinceRefresh: number
   /** Told bad news nobody asked about; its answer, a promise too, is heard out and never awaited. */
   onBadNews?:            ((news: VaultError) => unknown) | undefined
 }
 
-/** The check of a listing's constructor arguments, as far as the base can tell: each of the world, store and cache answers to its verbs, and the horizon is {@link horizonMillis}. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a listing's constructor arguments, as far as the base can tell: each of the world and store answers to its verbs, and the horizon is {@link horizonMillis}. Its `parse` refuses 'bad_option'. Checks only. */
 export const listingOpts = objCheck(({ obj, fn }) => ({
   world:                 obj({ clock: HX.clockShape, lockState: fn(), ensureTimely: fn(), takeWorld: fn() }),
   store:                 obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
-  cache:                 obj({ load: fn(), save: fn() }),
   maxMillisSinceRefresh: horizonMillis,
   onBadNews:             fn().optional(),
 }), 'bad_option')
@@ -490,13 +423,11 @@ export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel
 
 // == [Making a storable]: storableArgs
 
-/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, the cache answers to `load` and `save`, `central` passes {@link sparseBase}, `staged` does too or is null, and the options are {@link storableOpts}. The concrete class's validator judges the records further. Its `parse` refuses 'bad_option'. Checks only. */
-export const storableArgs = objCheck(({ custom, obj, fn }) => ({
+/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, `central` passes {@link sparseBase}, and the options are {@link storableOpts}. Its `parse` refuses 'bad_option'. Checks only. */
+export const storableArgs = objCheck(({ custom }) => ({
   world,
   listing: custom<object>(isListing, Phrases.ListingExpected),
-  cache:   obj({ load: fn(), save: fn() }),
   central: sparseBase,
-  staged:  sparseBase.nullable(),
   opts:    storableOpts,
 }), 'bad_option')
 // --
@@ -551,7 +482,7 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultPatch, VaultRecord, VaultSparse
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, VaultRecord, VaultSparse
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const VaultFormat = 6001
@@ -562,12 +493,6 @@ export const { vaultRecord, vaultSparse } = Checkers('bad_record', ({ obj, lit, 
   const vaultRecord = vaultSparse.extend({ gate: gateProps }).strict()
   return { vaultRecord, vaultSparse }
 }, [FX])
-
-/** The check of a vault's patch, refusing 'bad_option', naming the field: `{}`, or any prop of the vault's record, each checked, so `{ ...record }` will do; a field no vault record has refuses. The vault ignores every prop, its `gate` included: a patch only moves the revision. Its output is the props given, for the vault to hold its scope fields to its own.
- * @example vaultPatch.parse({})                          // {}
- * @example vaultPatch.parse({ ...record })               // the record's props, as given
- */
-export const vaultPatch = Checker(() => vaultRecord.partial().strict(), 'bad_option')
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
@@ -737,7 +662,6 @@ export const bankOpts = objCheck(({ obj, fn, applabel, user_id, device_id }) => 
   user_id,
   device_id:           device_id.optional(),
   vaultStore:          obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
-  vaultCache:          obj({ load: fn(), save: fn() }),
   deviceDB:            leaseDeviceDB,
   keyDeriver:          HX.keyDeriverShape,
   requestCleartext:    fn().optional(),

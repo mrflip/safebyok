@@ -84,7 +84,6 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
       del:   () => Promise.reject(new Error('not in these tests')),
       watch: () => nothing,
     },
-    cache: { load: () => Promise.resolve([]), save: () => Promise.resolve() },
     maxMillisSinceRefresh: 10 * 60_000,
   }
   const makeListing = (): VaultListing => {
@@ -113,19 +112,17 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
 }
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
-/** The record of a vault built of `Dna`, gated under `passphrase` and sent, as a vaultDB holds it. */
+/** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB holds it. */
 export const storedVaultRecord = async (passphrase: string = Passphrase): Promise<VaultRecord> => {
   const { listing, demandStored } = makeVaultWorld()
-  const vault = await listing.build(Dna, byPassphrase(passphrase))
-  await vault.send({})
+  await listing.create(Dna, byPassphrase(passphrase))
   return demandStored()
 }
 
-/** A vault born of `Dna` by `proofClosure` (under {@link Passphrase} unless told otherwise) and sent, in a fresh world: unlocked, its lease kept on the device. */
+/** A vault created of `Dna` by `proofClosure` (under {@link Passphrase} unless told otherwise), in a fresh world: unlocked, its lease kept on the device. */
 export const makeBornVault = async (proofClosure: ProofClosure = byPassphrase(Passphrase)) => {
   const world = makeVaultWorld()
-  const vault = await world.listing.build(Dna, proofClosure)
-  await vault.send({})
+  const vault = await world.listing.create(Dna, proofClosure)
   return { ...world, vault }
 }
 

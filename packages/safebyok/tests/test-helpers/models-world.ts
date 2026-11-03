@@ -1,4 +1,4 @@
-/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a fake vaultDB store, a fake device cache, one log of every call made to them, and the builders of the records they hold.
+/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a fake vaultDB store, one log of every call made to them, and the builders of the records they hold.
  * Import it directly, not through `TH`: `src/models/` is not exported, and the door
  * `tests/test-helpers.ts` is published as `safebyok/testing`.
  *
@@ -20,9 +20,9 @@
 import { afterEach, beforeEach, vi } from 'vitest'
 import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
-import { type BoxPatch, Box } from '../../src/models/box'
-import { BoxListing, type BoxCache, type BoxDna, type BoxLease, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Cache, type Cacheable, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import { Box } from '../../src/models/box'
+import { BoxListing, type BoxDna, type BoxLease, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
+import { type BoxRecord, type BoxSparse, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import * as Refusals from '../../src/refusals'
@@ -81,7 +81,7 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer
 
-/** One call made to the world, the store or the cache, as {@link ModelsWorld.calls} logs it, in the order made. */
+/** One call made to the world or the store, as {@link ModelsWorld.calls} logs it, in the order made. */
 export type ModelsCall =
   | { verb: 'ensureTimely', opts: TimelyOpts }
   | { verb: 'takeWorld',    world: unknown }
@@ -90,8 +90,6 @@ export type ModelsCall =
   | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
   | { verb: 'watch',        onNotice: (notice: Notice<BoxRecord, BoxSparse>) => Promise<void>, fullFor: () => readonly Boxscope[] }
   | { verb: 'unwatch' }
-  | { verb: 'load' }
-  | { verb: 'save',         cacheable: Cacheable<BoxRecord, BoxSparse> }
 
 /** The answer of a scripted call: the answer itself, or a function of the call that makes it (or throws, or rejects). Whatever it answers is handed to the listing as it is, a malformed answer too. */
 export type Scripted<CallT> = object | null | undefined | ((call: CallT) => unknown)
@@ -119,11 +117,11 @@ export type ModelsWorldOpts = {
   fakeTimers?:  boolean
 }
 
-/** The fake vault, store and cache of one box listing, with their calls and the means to script them.
+/** The fake vault and store of one box listing, with their calls and the means to script them.
  * By default the store answers as a store that keeps what it is given: `get` answers the record
  * seeded under the boxlabel, or null; `put` keeps the record and answers it; `del` keeps and
  * answers a tombstone at the revision after the one stored, under a fresh tok (revision 0 over no
- * row); `watch` and the cache do as they are told. `put` and `del` enforce the versioned replace as
+ * row); `watch` does as it is told. `put` and `del` enforce the versioned replace as
  * the `Store` doc block states it, case by case: over another tok than `priorRevisionTok` (any row, for
  * `priorRevisionTok` null), 'stale_write' carrying the row; over no row with a `priorRevisionTok`, 'stale_write'
  * carrying nothing; a put's `revision_seq` unfit for `priorRevisionTok`, or other than the row's + 1,
@@ -135,8 +133,7 @@ export type ModelsWorld = {
   /** The vault, as the listing is given it. */
   world:  BoxWorld
   store:  BoxStore
-  cache:  BoxCache
-  /** Every call made to the world, the store and the cache, in order, oldest first. A live array. */
+  /** Every call made to the world and the store, in order, oldest first. A live array. */
   calls:  readonly ModelsCall[]
   /** The refusals the listing told its `onBadNews`, oldest first. A live array. */
   badnews: readonly VaultError[]
@@ -144,8 +141,7 @@ export type ModelsWorld = {
   onBadNews: (news: VaultError) => void
   /** The records the store keeps, by boxlabel: the one vault's boxes. */
   stored: Map<string, Fetched<BoxRecord, BoxSparse>>
-  /** The copies the cache keeps, by boxlabel; `save` replaces the one of its box. */
-  cached: Map<string, Cacheable<BoxRecord, BoxSparse>>
+
   /** Every watch started, oldest first. A live array. */
   watches: readonly ModelsWatch[]
 
@@ -166,16 +162,12 @@ export type ModelsWorld = {
 
   /** Keep `record` in the store as the one under its boxlabel. */
   seedStore(record: Fetched<BoxRecord, BoxSparse>): void
-  /** Keep `copies` in the cache as `load` will answer them. */
-  seedCache(...copies: readonly Cacheable<BoxRecord, BoxSparse>[]): void
 
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
   willPut(...answers: readonly Scripted<{ record: BoxRecord, priorRevisionTok: string | null }>[]): void
   willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
   willEnsureTimely(...thunks: readonly ((opts: TimelyOpts) => Promise<void> | void)[]): void
-  willLoad(...answers: readonly Scripted<undefined>[]): void
-  willSave(...thunks: readonly ((cacheable: Cacheable<BoxRecord, BoxSparse>) => Promise<void> | void)[]): void
 
   /** The good answer about `scope`: `val` is the record stored, null for none. */
   answerOf(scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world?: unknown): BoxAnswer
@@ -212,7 +204,7 @@ class Script<CallT> {
   }
 }
 
-/** Make a fake vault, store and cache for a {@link BoxListing}, with the calls they log and the means to script them.
+/** Make a fake vault and store for a {@link BoxListing}, with the calls they log and the means to script them.
  * Pass the result to {@link boxListingOf}.
  *
  * @example
@@ -236,14 +228,11 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const badnews: VaultError[] = []
   const watches: ModelsWatch[] = []
   const stored = new Map<string, Fetched<BoxRecord, BoxSparse>>()
-  const cached = new Map<string, Cacheable<BoxRecord, BoxSparse>>()
   const scripts = {
     get:          new Script<{ scope: Boxscope }>(),
     put:          new Script<{ record: BoxRecord, priorRevisionTok: string | null }>(),
     del:          new Script<{ scope: Boxscope, priorRevisionTok: string | null }>(),
     ensureTimely: new Script<TimelyOpts>(),
-    load:         new Script<undefined>(),
-    save:         new Script<Cacheable<BoxRecord, BoxSparse>>(),
   }
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
   const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ scope, ok: true, val, world })
@@ -335,21 +324,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     },
   }
 
-  const cache: BoxCache = {
-    load: async () => {
-      calls.push({ verb: 'load' })
-      const { scripted, answer } = scripts.load.take(undefined)
-      if (scripted) { return (await answer) as readonly Cacheable<BoxRecord, BoxSparse>[] }
-      return [...cached.values()]
-    },
-    save: async (cacheable) => {
-      calls.push({ verb: 'save', cacheable })
-      const { scripted, answer } = scripts.save.take(cacheable)
-      if (scripted) { await answer }
-      cached.set(cacheable.boxlabel, cacheable)
-    },
-  }
-
   const liveWatch = (): ModelsWatch => {
     const live = watches.findLast((watch) => watch.active)
     if (live === undefined) { throw new Error('No watch is live: the listing has not started one, or has ended it.') }
@@ -366,7 +340,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, store, cache, calls, badnews, stored, cached, watches,
+    world, store, calls, badnews, stored, watches,
     onBadNews:  (news) => { badnews.push(news) },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0 },
@@ -380,14 +354,11 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     dispose,
 
     seedStore: (record) => { stored.set(record.boxlabel, record) },
-    seedCache: (...copies) => { for (const copy of copies) { cached.set(copy.boxlabel, copy) } },
 
     willGet:          (...answers) => { scripts.get.push(...answers) },
     willPut:          (...answers) => { scripts.put.push(...answers) },
     willDel:          (...answers) => { scripts.del.push(...answers) },
     willEnsureTimely: (...thunks) => { scripts.ensureTimely.push(...thunks) },
-    willLoad:         (...answers) => { scripts.load.push(...answers) },
-    willSave:         (...thunks) => { scripts.save.push(...thunks) },
 
     answerOf,
     refusalOf,
@@ -433,20 +404,21 @@ export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: Model
 
 // == [Testable]: TestableBox, TestableBoxListing, boxListingOf
 
-/** A {@link Box} that shows a test the records it holds, which the storable keeps protected: `_cheat_central` and `_cheat_staged` are its `central` and `staged`, as of now. Hosts get no such door; a test that wants the state itself, not its snapshot, makes its boxes by {@link boxListingOf} or by `new TestableBox`. */
+/** A {@link Box} that shows a test the record it holds, which the storable keeps protected: `_cheat_central` is its `central`, as a {@link TestableBoxListing} makes it. */
 export class TestableBox extends Box {
   get _cheat_central(): Fetched<BoxRecord, BoxSparse> { return this.central } // eslint-disable-line unicorn/prefer-private-class-fields
 
-  get _cheat_staged(): Fetched<BoxRecord, BoxSparse> | null { return this.staged } // eslint-disable-line unicorn/prefer-private-class-fields
 }
 
-/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
+/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `create`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
-  protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>): TestableBox {
-    return new TestableBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
+  protected override makeThing(central: Fetched<BoxRecord, BoxSparse>): TestableBox {
+    return new TestableBox(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
 
-  override async build(input: Parameters<BoxListing['build']>[0]): Promise<TestableBox> { return testableOf(await super.build(input)) }
+  override async build(...args: Parameters<BoxListing['build']>): Promise<TestableBox> { return testableOf(await super.build(...args)) }
+
+  override async create(...args: Parameters<BoxListing['create']>): Promise<TestableBox> { return testableOf(await super.create(...args)) }
 
   override async fetch(...args: Parameters<BoxListing['fetch']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.fetch(...args)) }
 
@@ -464,7 +436,7 @@ const testableOf = (box: Box): TestableBox => {
 
 const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null ? null : testableOf(box))
 
-/** A {@link BoxListing} over the world's vault, store and cache, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes.
+/** A {@link BoxListing} over the world's vault and store, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes.
  *
  * @example const listing = boxListingOf(mw, { maxMillisSinceRefresh: 1000 })
  */
@@ -472,7 +444,6 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
   new TestableBoxListing({
     world:                 mw.world,
     store:                 mw.store,
-    cache:                 mw.cache,
     maxMillisSinceRefresh: 10 * 60_000,
     onBadNews:             mw.onBadNews,
     ...overrides,
@@ -482,50 +453,32 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose boxes fake the seal in `edit`, for a test that wants sealed parts it can tell apart by revision, or acts while an edit is under way: the whisper given to `edit` or `send` comes out as the fake ciphered bags named for the revision it is staged under, with the sidecar given. `duringMakeStaged`, where given, runs once each `makeStaged` has made its staged record, before it resolves, for a test that acts while an edit is under way.
+/** A {@link boxListingOf} whose lease fakes the seal, for a test that wants sealed parts it can tell apart by revision, or acts while a `send` is sealing: the whisper given to `send` comes out as the fake ciphered bags named for the revision it is sealed under, and `duringSeal` runs once the real seal is done.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.edit({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
- * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each edit
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.send({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
+ * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
-export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringMakeStaged: () => void = () => undefined): TestableBoxListing => {
-  class FakeSealBox extends TestableBox {
-    protected override async makeStaged(patch: BoxPatch): Promise<BoxRecord> {
-      const staged = await super.makeStaged(patch)
-      duringMakeStaged()
-      return { ...staged, box_key_wrapped: fakeCiphered(`boxkey-${staged.revision_tok}`), whisper_ciphered: fakeCiphered(`whisper-${staged.revision_tok}`) }
+export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
+  const demandLease = (): BoxLease => {
+    const lease = mw.world.demandLease()
+    return {
+      unsealWith: (...args) => lease.unsealWith(...args),
+      sealWith:   async (serializedWhisper, boxKeyStamp, whisperStamp) => {
+        await lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp)
+        duringSeal()
+        return { box_key_wrapped: fakeCiphered(`boxkey-${whisperStamp['revision_tok']}`), whisper_ciphered: fakeCiphered(`whisper-${whisperStamp['revision_tok']}`) }
+      },
     }
   }
-  class FakeSealBoxListing extends TestableBoxListing {
-    protected override makeThing(central: Fetched<BoxRecord, BoxSparse>, staged: Fetched<BoxRecord, BoxSparse> | null, cache: Cache<BoxRecord, BoxSparse>): TestableBox {
-      return new FakeSealBox(this.world, this, cache, central, staged, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
-    }
-  }
-  return new FakeSealBoxListing({
-    world:                 mw.world,
-    store:                 mw.store,
-    cache:                 mw.cache,
-    maxMillisSinceRefresh: 10 * 60_000,
-    onBadNews:             mw.onBadNews,
-    ...overrides,
-  })
-}
-// --
-
-// == [Peeking]: lastSaveOf
-
-/** The copy last saved to the fake device cache for `box`'s scope, as `mw` logged the save: a box saves its own at every settle, so this is the state it last settled into. Throws where no copy was saved for the scope. */
-export function lastSaveOf(mw: ModelsWorld, box: { readonly boxlabel: string }): Cacheable<BoxRecord, BoxSparse> {
-  const saved = mw.callsOf('save').findLast((call) => call.cacheable.boxlabel === box.boxlabel)
-  if (saved === undefined) { throw new Error(`no copy was saved to the cache for ${box.boxlabel}`) }
-  return saved.cacheable
+  return boxListingOf(mw, { world: { ...mw.world, demandLease }, ...overrides })
 }
 // --
 
 // == [Dna]: boxDnaOf
 
-/** A box's dna for `build`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them.
+/** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them.
  *
- * @example await boxListingOf(mw).build(boxDnaOf(mw.boxscope('anthropic_api_key')))
+ * @example await boxListingOf(mw).create(boxDnaOf(mw.boxscope('anthropic_api_key')))
  * @example boxDnaOf(mw.boxscope('anthropic_api_key'), { sidecar: { account: 'work' } })
  */
 export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: { val: 'sk-test-0000' }, sidecar: {}, ...overrides })

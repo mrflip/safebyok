@@ -14,7 +14,7 @@ import { Gating, type GatingWorld, type RequestCleartext } from './gating'
 import type { LeaseDeviceDB, LockState, ProofClosure, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
-import { type VaultCache, type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
+import { type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
 
 // == [Given to a bank]: DefaultPesterMillis, DefaultRefreshMillis, BankOpts, BankSnapshot, RefusingStrengthChecker
 
@@ -27,7 +27,6 @@ export type BankOpts = {
   user_id:              string
   device_id?:           string | undefined
   vaultStore:           VaultStore
-  vaultCache:           VaultCache
   deviceDB:             LeaseDeviceDB
   keyDeriver:           KeyDeriver
   requestCleartext?:    RequestCleartext | undefined
@@ -73,7 +72,7 @@ export class Bank implements VaultWorld, GatingWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultStore, vaultCache, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
+    const { applabel, user_id, device_id = randomId(), vaultStore, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, pesterMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
@@ -86,7 +85,7 @@ export class Bank implements VaultWorld, GatingWorld {
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.pesterMillis = millisOf(pesterMinutes, DefaultPesterMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
-    this.vaultListing = new VaultListing({ world: this, store: vaultStore, cache: vaultCache, maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
+    this.vaultListing = new VaultListing({ world: this, store: vaultStore, maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
     if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
     Object.freeze(this)
   }
@@ -133,7 +132,6 @@ export class Bank implements VaultWorld, GatingWorld {
     const built = await outcomeOf(() => this.#buildVault(scope, proofClosure))
     if (built.ok) { return built.val }
     if (built.err.refusalkind !== 'stale_write') { throw built.err }
-    // GAP: listing.ts keeps the draft held under `scope` after its first send meets 'stale_write', and `Vault.receive` refuses the record stored under the other `vault_tok`; the listing needs to drop the draft (or `#buildOrReceive` to replace a never-stored draft) for this fetch to hand back the vault another device built.
     const stored = await this.vaultListing.fetch(scope)
     if (stored === null) { throw this.vaultListing.absentRefusal(scope) }
     return stored
@@ -143,8 +141,7 @@ export class Bank implements VaultWorld, GatingWorld {
 
   async #buildVault(scope: VaultScope, proofClosure?: ProofClosure): Promise<Vault> {
     if (proofClosure === undefined) { return Gating.buildVault(this.vaultListing, scope, this) }
-    const vault = await this.vaultListing.build(scope, proofClosure)
-    return vault.send({})
+    return this.vaultListing.create(scope, proofClosure)
   }
 
   closeVault(bag: VaultBag): void {

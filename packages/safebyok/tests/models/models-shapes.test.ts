@@ -1,8 +1,7 @@
-import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
 import * as MSX from '../../src/models/models-shapes'
-import type { VaultPatch } from '../../src/models/vault'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import * as TH from '../test-helpers'
 
@@ -142,26 +141,6 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
   })
 
-  describe("MSX.buildableRecord", () => {
-    const cacheable = { ...sparse, central: sparse, staged: null }
-    holdsCases(MSX.buildableRecord, 'bad_record', [
-      // good:
-      [cacheable,                                          true,  'passes a sparse form with a central and no staged, null'],
-      [{ ...sparse, central: gone, staged: full },         true,  'passes a tombstone central and a full staged'],
-      [{ ...cacheable, extra: 1 },                         true,  'passes a bag carrying more, stripping the rest'],
-      // bad:
-      [{ ...sparse, central: sparse },                     false, 'refuses a missing staged: null is how none is said'],
-      [{ ...sparse, staged: null },                        false, 'refuses a missing central'],
-      [{ ...cacheable, central: null },                    false, 'refuses a null central'],
-      [{ ...cacheable, staged: { am: 'a' } },              false, 'refuses a staged that fails sparseBase'],
-    ])
-
-    it("strips a sidecar and the rest from the bag, central and staged included", () => {
-      const parsed = MSX.buildableRecord.parse({ ...full, central: full, staged: full })
-      expect(parsed).to.deep.equal({ ...baseProps, central: baseProps, staged: baseProps })
-    })
-  })
-
   describe("MSX.isTombstone and MSX.NeverStoredSeq", () => {
     it("tells a damaged or gone record from an alive one, whatever its form", () => {
       expect(MSX.isTombstone(gone)).to.be.true
@@ -238,14 +217,10 @@ describe("The checks of what reconciling passes", () => {
 
   describe("MSX.recordShape", () => { checkSet(MSX.recordShape, MSX.recordShapeVals, ['empty', null, 'older']) })
   describe("MSX.age",         () => { checkSet(MSX.age, MSX.ageVals, ['skip', null, 'fill']) })
-  describe("MSX.receivedAct", () => { checkSet(MSX.receivedAct, MSX.receivedActVals, ['older', 'edit', 'skip', null]) })
   describe("MSX.centralPolicy", () => { checkSet(MSX.centralPolicy, MSX.centralPolicyVals, ['edit', 'del', null]) })
-  describe("MSX.stagedAct",   () => { checkSet(MSX.stagedAct, MSX.stagedActVals, ['older', 'same', 'skip', null]) })
 
-  it("list the acts of each table: the received acts are a part of both", () => {
-    expect(MSX.receivedActVals).to.deep.equal(['fill', 'adopt', 'gone', 'ouch'])
+  it("list the kinds of the table", () => {
     expect(MSX.centralPolicyVals).to.deep.equal(['older', 'same', 'skip', 'fill', 'adopt', 'gone', 'ouch'])
-    expect(MSX.stagedActVals).to.deep.equal(['edit', 'del', 'fill', 'adopt', 'gone', 'ouch'])
     expect(MSX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone', 'ouch'])
     expect(MSX.ageVals).to.deep.equal(['older', 'same', 'newer'])
   })
@@ -266,34 +241,6 @@ describe("The checks of what reconciling passes", () => {
       [{ badnews: [new VaultError('stale_write', 'x')] },     true,  'passes bad news of VaultErrors'],
       [{ badnews: [new Error('plain')] },                     false, 'refuses bad news that is no VaultError'],
       [{},                                                    false, 'refuses a missing badnews'],
-    ])
-  })
-
-  describe("MSX.stagedForms", () => {
-    const base = { central: sparse, staged: null, nextRevision: { revision_tok: 'rev-a2', revision_seq: 2 } }
-    holdsCases(MSX.stagedForms, 'unexpected_error', [
-      // edit carries the patch and no rcvd:
-      [{ ...base, act: 'edit', patch: full },                             true,  'passes an edit carrying its patch'],
-      [{ ...base, act: 'edit' },                                          false, 'refuses an edit with no patch'],
-      [{ ...base, act: 'edit', patch: full, rcvd: full },                 false, 'refuses an edit that carries an rcvd'],
-      // del carries neither:
-      [{ ...base, act: 'del' },                                           true,  'passes a del carrying neither'],
-      [{ ...base, act: 'del', patch: full },                              false, 'refuses a del that carries a patch'],
-      [{ ...base, act: 'del', rcvd: gone },                               false, 'refuses a del that carries an rcvd'],
-      // a received act carries the rcvd and no patch:
-      ...MSX.receivedActVals.flatMap((act): Case[] => [
-        [{ ...base, act, rcvd: full },                                    true,  `passes '${act}' carrying its rcvd`],
-        [{ ...base, act },                                                false, `refuses '${act}' with no rcvd`],
-        [{ ...base, act, rcvd: full, patch: full },                       false, `refuses '${act}' that carries a patch`],
-      ]),
-      // the rest of the bag:
-      [{ ...base, act: 'del', staged: full },                             true,  'passes a staged held'],
-      [{ ...base, act: 'del', staged: undefined },                        false, 'refuses a missing staged: none staged is null'],
-      [{ ...base, act: 'del', nextRevision: undefined },                  false, 'refuses a missing nextRevision'],
-      [{ ...base, act: 'del', central: { am: 'a' } },                     false, 'refuses a central that fails sparseBase'],
-      [{ ...base, act: 'skip', rcvd: full },                              false, 'refuses an act that is no row of reconcileStaged'],
-      [{ ...base, rcvd: full },                                           false, 'refuses a bag with no act'],
-      [null,                                                              false, 'refuses null'],
     ])
   })
 })
@@ -483,9 +430,9 @@ describe("The checks of the world and the listing", () => {
   })
 
   describe("MSX.listingOpts", () => {
-    const opts = { world: mw.world, store: mw.store, cache: mw.cache, maxMillisSinceRefresh: 1000, onBadNews: mw.onBadNews }
+    const opts = { world: mw.world, store: mw.store, maxMillisSinceRefresh: 1000, onBadNews: mw.onBadNews }
     holdsCases(MSX.listingOpts, 'bad_option', [
-      [opts,                                                     true,  'passes the test world, store and cache'],
+      [opts,                                                     true,  'passes the test world and store'],
       [{ ...opts, onBadNews: undefined },                        true,  'passes no onBadNews'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
       [{ ...opts, world: undefined },                            false, 'refuses a missing world'],
@@ -495,7 +442,6 @@ describe("The checks of the world and the listing", () => {
       [{ ...opts, world: { ...mw.world, clock: {} } },           false, 'refuses a world with no clock'],
       [{ ...opts, store: { ...mw.store, put: undefined } },      false, 'refuses a store with no put'],
       [{ ...opts, store: { ...mw.store, watch: undefined } },      false, 'refuses a store with no watch'],
-      [{ ...opts, cache: { ...mw.cache, save: undefined } },     false, 'refuses a cache with no save'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
       [{ ...opts, onBadNews: 'tell me' },                        false, 'refuses an onBadNews that is no function'],
@@ -510,19 +456,14 @@ describe("The checks of the world and the listing", () => {
 
   describe("MSX.storableArgs", () => {
     const listing = boxListingOf(mw)
-    const args = { world: mw.world, listing, cache: mw.cache, central: sparse, staged: null, opts: { maxMillisSinceRefresh: 1000 } }
+    const args = { world: mw.world, listing, central: sparse, opts: { maxMillisSinceRefresh: 1000 } }
     holdsCases(MSX.storableArgs, 'bad_option', [
-      [args,                                           true,  'passes a world, a listing, a cache, a central, no staged and the options'],
-      [{ ...args, staged: full },                      true,  'passes a staged beside the central'],
-      [{ ...args, central: gone, staged: gone },       true,  'passes tombstones'],
-      [{ ...args, staged: undefined },                 false, 'refuses a missing staged: none staged is null'],
+      [args,                                           true,  'passes a world, a listing, a central and the options'],
+      [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
       [{ ...args, central: { am: 'a' } },              false, 'refuses a central that fails sparseBase'],
-      [{ ...args, staged: { am: 'a' } },               false, 'refuses a staged that fails sparseBase'],
       [{ ...args, listing: {} },                       false, 'refuses a listing that answers to no IsListing'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
-      [{ ...args, cache: undefined },                  false, 'refuses a missing cache'],
-      [{ ...args, cache: { load: () => [] } },         false, 'refuses a cache with no save'],
       [{ ...args, world: {} },                         false, 'refuses a world with no clock'],
       [{ ...args, opts: {} },                          false, 'refuses options with no horizon'],
       [{ ...args, opts: { maxMillisSinceRefresh: -1 } }, false, 'refuses a negative horizon'],
@@ -804,30 +745,5 @@ describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault recor
 
   it("strips the gate from the sparse form", () => {
     expect(MSX.vaultSparse.parse({ ...sparseVault, gate })).to.deep.equal(sparseVault)
-  })
-})
-
-describe("MSX.vaultPatch: the duckish of a vault's patch, which Vault.isFullPatch holds it to", () => {
-  const { boxlabel: _boxlabel, ...vaultscope } = scope
-  const record = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps, gate: { passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null } }
-
-  holdsCases(MSX.vaultPatch, 'bad_option', [
-    [{},                                       true,  'passes an empty patch, as its first example shows'],
-    [record,                                   true,  'passes the vault record given back, as its second example shows'],
-    [{ revision_seq: 99, am: 'x' },            true,  'passes the factory props, whatever they say'],
-    [{ gate: {} },                             false, 'refuses a gate without its wayins'],
-    [{ shelf: 1 },                             false, 'refuses a field no vault record has'],
-    [{ ...record, revision_seq: 'one' },       false, 'refuses a factory prop that fails its check'],
-    [{ ...record, vaultlabel: 'V' },           false, 'refuses a scope field that fails its check'],
-    [undefined,                                false, 'refuses undefined'],
-  ])
-
-  it("hands back the props as given, for the vault to hold its scope fields to its own, and names the failing field", () => {
-    expect(MSX.vaultPatch.parse(record)).to.deep.equal(record)
-    expect(TH.expectSyncRefusal(() => MSX.vaultPatch.parse({ revision_seq: 'one' }), 'bad_option').meta?.fieldnames).to.deep.equal(['revision_seq'])
-  })
-
-  it("types the vault record given back as a VaultPatch, as `{ ...record }` will do", () => {
-    expectTypeOf<MSX.VaultRecord>().toExtend<VaultPatch>()
   })
 })

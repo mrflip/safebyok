@@ -57,8 +57,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     return this.#ask('build_vault', scope, null, world, async (handed) => {
       const checked = MSX.vaultBuildCleartexts.parse(handed)
       await checkStrength(world, checked.passphrase, scope)
-      const vault = await listing.build(dna, () => checked)
-      return vault.send({})
+      return listing.create(dna, () => checked)
     })
   }
 
