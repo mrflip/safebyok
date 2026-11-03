@@ -52,7 +52,7 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } =
     revision_seq: int,
   })
   const times = obj({
-    /** When this life of the thing began: the `written_at` of its birth, a draft's or an edit's over a tombstone, kept by every later revision of that life. */
+    /** When this life of the thing began: the `written_at` of its birth, a `create`'s or a `send`'s over a tombstone, kept by every later revision of that life. */
     registered_at: epochMillis,
     /** When the record in hand was written; on a tombstone, when it was deleted. */
     written_at:    epochMillis,
@@ -182,7 +182,7 @@ export type Settled = Z.infer<typeof settled>
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const BoxFormat = 5001
 
-/** The check of the object a box takes and gives its whisper in, `{ val }`, the whisper itself its `val`: what `edit`, `send`, `seal` and `build` take as `whisper`, and what `box.whisper` and `unsealWhisper` give. Its `parse` refuses 'bad_option', naming the failing field and quoting none of it.
+/** The check of the object a box takes and gives its whisper in, `{ val }`, the whisper itself its `val`: what `send` and `create` take as `whisper`, and what `box.whisper` and `unsealWhisper` give. Its `parse` refuses 'bad_option', naming the failing field and quoting none of it.
  * The `val` is a whisper as the old box keeps one, checked by the same check: any JSON value a
  * whisper can carry, never a bare null. The object takes no other field. {@link LOCKED}, which a
  * locked box answers for its whisper, refuses with a sentence that names it. A parse hands back a
@@ -220,7 +220,7 @@ export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, lit, appl
     applabel, user_id, vaultlabel, boxlabel,
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
-    /** The life of the box under its boxlabel: minted at its birth, a draft's or an edit's over a tombstone, and kept by every later revision. */
+    /** The life of the box under its boxlabel: minted at its birth, a `create`'s or a `send`'s over a tombstone, and kept by every later revision. */
     box_tok,
     /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
     whisper_codec:          lit('json_v1'),
@@ -248,9 +248,9 @@ export type BoxRecord = Z.infer<typeof boxRecord>
  *
  * `boxDna` requires the scope too, and fills `whisper_codec` and `whisper_schema_version` with
  * their defaults where missing or undefined; the factory's props are `fmt`, `am`, `vault_tok`,
- * `box_tok`, `revision_tok` and the times. The sealed parts never come from a dna: `build` seals every box it
+ * `box_tok`, `revision_tok` and the times. The sealed parts never come from a dna: `create` seals every box it
  * makes, so a dna carrying one refuses, as a field it does not take, and `revision_seq` among them:
- * input carrying one is a record, which `build` holds to the record check.
+ * input carrying one is a record, which goes to `build`.
  *
  * `boxPatch` takes the round trip of a box's record, `{ ...record, whisper, sidecar }`: every prop
  * of the record but the sidecar is the factory's, the scope, `revision_seq`, the whisper's codec and
@@ -523,7 +523,7 @@ export type PassphraseClosure    = () => PassphraseCleartexts | Promise<Passphra
 export type PasskeyClosure       = () => PasskeyCleartexts | Promise<PasskeyCleartexts>
 export type ProvingWorld         = Z.infer<typeof provingWorld>
 
-/** The arguments of the proving makers, of `VaultListing.build` of a dna, and of the gate's operations: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
+/** The arguments of the proving makers, of `VaultListing.create`, and of the gate's operations: a `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one. */
 export const { provingPairArgs, provingMakeArgs, passphraseMakeArgs, provingAttemptArgs, passphraseClosureArgs, passkeyClosureArgs, vaultBuildArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs } = Checkers('bad_option', ({ obj, fn, passphraseCleartext }) => ({
   provingPairArgs:       obj({ stamp: vaultStamp, proofClosure: fn<ProofClosure>(), world: provingWorld }),
   provingMakeArgs:       obj({ stamp: vaultStamp, world: provingWorld }),

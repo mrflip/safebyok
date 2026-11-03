@@ -129,7 +129,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryRevokePasskey(proofClosure: AttemptClosure): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey(proofClosure)) }
 
-  /** Put `gate` over the record in hand, under the next revision: the vault's one path to a new gate, and a stopgap until the gate verbs' own threads replace it. Where a hydrate shows the record's gate is no longer `ante`, the one proved against, it refuses 'stale_write', storing nothing. */
+  /** Put `gate` over the record in hand, under the next revision: the vault's one path to a new gate. Where a hydrate shows the record's gate is no longer `ante`, the one proved against, it refuses 'stale_write', storing nothing. */
   async #sendGate(ante: GateProps, gate: GateProps): Promise<this> {
     await this.hydrate()
     const held = this.demandFullProps()

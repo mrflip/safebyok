@@ -95,7 +95,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     for (const { ok, err } of outcomes) { if (! ok) { this.tellBadNews([err]) } }
   }
 
-  /** Refuses 'bad_option' a birth under a `scope` already held: `send` the instance held, which brings a box deleted or damaged back to life. */
+  /** Refuses 'bad_option' a birth under a `scope` already held. A box's `send` brings one deleted or damaged back to life. */
   protected demandNotHeld(scope: ScopeT): void {
     if (this.at(scope) !== null) { throw alreadyHeldError() }
   }
@@ -148,7 +148,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   tryDel(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.del(duck)) }
 
-  /** The `revision_tok` storage should hold under `scope` when a record is put or deleted: the instance held there names it; null where none is held. */
+  /** The `revision_tok` storage should hold under `scope` when a record is deleted: the instance held there names it; null where none is held. */
   priorRevisionTokOf(scope: ScopeT): string | null {
     return this.at(scope)?.priorRevisionTok() ?? null
   }
@@ -179,7 +179,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   // The one place an instance is made and held: `#makeThingOf` is called from here alone, and only where no instance is held.
-  /** The instance under `scope` once `record` meets it, null for nothing stored: the instance held, or, where none is, one born of `record` and held once it has taken it. A refusal `receive` throws is thrown, nothing held. The listing then makes its snapshot again. Null for nothing stored and nothing held. */
+  /** The instance under `scope` once `record` meets it: the instance held, or, where none is, one born of `record` and held once it has taken it. A refusal `receive` throws is thrown, nothing held. The listing then makes its snapshot again. Null for nothing stored and nothing held. */
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT>): ThingT
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null {
