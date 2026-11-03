@@ -466,7 +466,7 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
       sealWith:   async (serializedWhisper, boxKeyStamp, whisperStamp) => {
         await lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp)
         duringSeal()
-        return { box_key_wrapped: fakeCiphered(`boxkey-${whisperStamp['revision_tok']}`), whisper_ciphered: fakeCiphered(`whisper-${whisperStamp['revision_tok']}`) }
+        return { box_key_wrapped: fakeCiphered(`boxkey-${String(whisperStamp['revision_tok'])}`), whisper_ciphered: fakeCiphered(`whisper-${String(whisperStamp['revision_tok'])}`) }
       },
     }
   }

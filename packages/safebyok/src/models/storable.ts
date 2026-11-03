@@ -398,9 +398,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     throw new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
   }
 
-  /** Whether `record` is of the life of `held`, the central held unless given: the same {@link lifeTokPathOf}. */
-  #sameLife(record: Fetched<RecordT, SparseT>, held: Fetched<RecordT, SparseT> = this.#central): boolean {
-    return this.lifeTokPathOf(record) === this.lifeTokPathOf(held)
+  /** Whether `record` is of the life of the central held: the same {@link lifeTokPathOf}. */
+  #sameLife(record: Fetched<RecordT, SparseT>): boolean {
+    return this.lifeTokPathOf(record) === this.lifeTokPathOf(this.#central)
   }
 
   /** The shape of `record`, by its `am` first: 'ouch' for a damaged one's tombstone, 'gone' for a deletion's, then 'full' for a record `isFullRecord` accepts, 'sparse' for any other. */

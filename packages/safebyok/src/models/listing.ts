@@ -83,7 +83,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   get watchableThings(): readonly ThingT[] { return this.things.filter((thing) => thing.isWatchable) }
 
   /** The instance of `record`, sparse, full or a tombstone, once it is delivered as a fetch's answer would be, and held; a thing already held under its scope receives it, and a refusal its `receive` throws is thrown. Stores nothing. */
-  async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> {
+  async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     this.sparseOf(record)
     return this.#buildOrReceive(this.scopeOf(record), record)
   }
