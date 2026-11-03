@@ -639,14 +639,27 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
     })
   })
 
+  describe("boxPut", () => {
+    holdsCases(MSX.boxPut, 'bad_option', [
+      [{ boxlabel: scope.boxlabel, whisper },                                true,  'passes a boxlabel and a whisper, as its example shows'],
+      [{ boxlabel: scope.boxlabel, sidecar: {} },                            true,  'passes a boxlabel and a sidecar'],
+      [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with both halves'],
+      [{ whisper, sidecar: {} },                                             false, 'refuses a patch with no boxlabel'],
+      [{ boxlabel: scope.boxlabel },                                         false, 'refuses a boxlabel naming neither half'],
+      [{ boxlabel: '', whisper },                                            false, 'refuses an empty boxlabel'],
+      [{ boxlabel: scope.boxlabel, whisper, sidecarr: {} },                  false, 'refuses a field no box record has'],
+    ])
+  })
+
   describe("boxPatch", () => {
     holdsCases(MSX.boxPatch, 'bad_option', [
       [{ whisper, sidecar: {} },                                             true,  'passes the whisper and the sidecar alone'],
       [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with its whisper and a sidecar, as its sixth example shows'],
       [{ ...sparse, whisper, sidecar: {} },                                  true,  'passes a sparse record given back so'],
       [{ ...sealedless, revision_seq: 99, am: 'x', whisper, sidecar: {} },   true,  'passes the factory props, revision_seq among them, whatever they say'],
-      [{ whisper },                                                          false, 'refuses a patch with no sidecar'],
-      [{ sidecar: {} },                                                      false, 'refuses a patch with no whisper'],
+      [{ whisper },                                                          true,  'passes a whisper alone, the sidecar kept'],
+      [{ sidecar: {} },                                                      true,  'passes a sidecar alone, the whisper kept, as its example shows'],
+      [{},                                                                   false, 'refuses a patch naming neither, as its example shows'],
       [{ whisper: MSX.LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper, as its seventh example shows'],
       [{ whisper: 'sk-ant-fake', sidecar: {} },                              false, 'refuses a bare whisper'],
       [{ whisper, sidecar: 'note' },                                         false, 'refuses a sidecar that fails its check'],

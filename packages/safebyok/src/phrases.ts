@@ -272,7 +272,7 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -281,7 +281,10 @@ export const PartialLoad = "The record in hand is not full, so it cannot be open
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so create made nothing of the dna: listing.at(scope) answers it, and a box's send also brings a deleted or damaged box back to life."
 
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
-export const BoxPatchAdvice = "Nothing was stored. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
+export const BoxPatchAdvice = "Nothing was stored. An update of a box names its whisper, as { val }, its sidecar, or both: the half left out is kept."
+
+/** Why an update of a box naming neither its whisper nor its sidecar stores nothing. */
+export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to store."
 
 /** Why an update of a box whose patch names another's scope stores nothing. */
 export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`

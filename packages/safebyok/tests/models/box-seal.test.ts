@@ -29,10 +29,10 @@ describe("a box sealed and unsealed through the vault's lease", () => {
   it("opens the whisper create sealed, and the one a later send sealed, each as its { val }; the sealed parts carry none of it", async () => {
     const { boxes } = await sealWorld()
     const box = await boxes.create(BoxDna)
-    expect(await box.unsealWhisper()).to.deep.equal(Whisper)
+    expect(await box.extractWhisper()).to.deep.equal(Whisper)
     expect(JSON.stringify(box._cheat_central)).to.not.include('sk-test-0000')
     await box.send({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } })
-    expect(await box.unsealWhisper()).to.deep.equal({ val: 'sk-test-1111' })
+    expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-1111' })
   })
 
   it("opens the sealed record in another listing, and refuses 'damaged_box' for it with its sidecar altered, as the seal binds it", async () => {
@@ -40,16 +40,16 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     const built = await boxes.create(BoxDna)
     const sealed = built._cheat_central
     const intact = await boxesOf().build(sealed)
-    expect(await intact.unsealWhisper()).to.deep.equal(Whisper)
+    expect(await intact.extractWhisper()).to.deep.equal(Whisper)
     const altered = await boxesOf().build({ ...sealed, sidecar: { account: 'home' } } as BoxRecord)
-    await TH.expectRefusal(altered.unsealWhisper(), 'damaged_box')
+    await TH.expectRefusal(altered.extractWhisper(), 'damaged_box')
   })
 
   it("refuses 'vault_locked' from the lease, at the seal and the unseal, once the vault locks", async () => {
     const { boxes, vault } = await sealWorld()
     const box = await boxes.create(BoxDna)
     vault.lock()
-    await TH.expectRefusal(box.unsealWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
     await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } }), 'vault_locked')
   })
 })

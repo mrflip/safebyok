@@ -104,7 +104,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     return stored
   }
   return {
-    listing, opts, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
+    listing, opts, vaultDB, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
     anotherSession: makeListing,
     /** Move the clock on by `millis`; no timer fires. */

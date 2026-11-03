@@ -30,7 +30,7 @@ export type SlotFate = 'receive' | 'lose' | 'replace'
 
 /** The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone.
  * `hello` starts the watch. Every answer storage gives to `fetch`, `put` or `del` goes through
- * `#deliver`, and every instance is made and held through `#buildOrReceive`, a notice's too, so no
+ * `deliver`, and every instance is made and held through `#buildOrReceive`, a notice's too, so no
  * scope is built twice; the listing then makes its snapshot again. A call
  * is refused when it cannot give what it asked for: a refusal from storage, or a record its
  * instance's `receive` refuses. Bad news nobody asked about, a refusal met on a notice, is told to
@@ -152,7 +152,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const asked = this.scopeOf(scope)
     this.demandEnabled()
     await this.ensureTimelyWorld(maxWorldMillis)
-    return this.#deliver(await this.tryGetRow(asked), ifAbsent)
+    return this.deliver(await this.tryGetRow(asked), ifAbsent)
   }
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
@@ -165,7 +165,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const { ifPresent = 'repl' } = MSX.putListingOpts.parse(opts)
     const prior = priorOf(MSX.putAnte.parse(ante))
     this.demandEnabled()
-    return this.#deliver(await this.tryPutRow(record, { prior, ifPresent }))
+    return this.deliver(await this.tryPutRow(record, { prior, ifPresent }))
   }
 
   tryPut(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ante: Revision | null, opts: PutListingOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.put(duck, ante, opts)) }
@@ -185,7 +185,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const sparse = held?.sparse ?? this.sparseOf(duck)
     const prior = priorOf(sparse)
     const tombstone = { ...sparse, ...VS.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
-    return this.#deliver(await this.tryDelRow(tombstone, { prior }))
+    return this.deliver(await this.tryDelRow(tombstone, { prior }))
   }
 
   tryDel(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.del(duck)) }
@@ -197,7 +197,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * The answer's own refusals are thrown: its world's, its `err`, or the absent refusal. A refusal `receive` throws is thrown too, as the instance cannot become what storage holds; but where the answer is itself a refusal, that one is thrown, and the carried record's is told to `onBadNews`.
    * Only to a fetch is an answer that leaves nothing present absent, once delivered: a `put` and a `del` have the instance back, a tombstone or not.
    */
-  async #deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
+  protected async deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (answer.ok) {
       const scope = this.scopeOf(answer.req_params)

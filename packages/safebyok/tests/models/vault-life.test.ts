@@ -30,7 +30,7 @@ const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBor
   }
   const unsealIn = async (vault: Vault) => {
     const found = await boxIn(vault)
-    return found.unsealWhisper()
+    return found.extractWhisper()
   }
   /** The next session on this device: a new listing over the same stores and deviceDB, holding the vault record stored, after its hello. */
   const openNextSession = async () => {
@@ -48,7 +48,7 @@ describe("Birth: a vault born with its gate seals its first box under the birth 
     expect(vault.isUnlocked).to.be.true
     expect(demandStored().gate).to.deep.include(vault.gate.pickle())
     expect(demandStored().gate.passkey_wayin).to.be.null
-    expect(await box.unsealWhisper()).to.deep.equal(Whisper)
+    expect(await box.extractWhisper()).to.deep.equal(Whisper)
     const stored = JSON.stringify([demandStored(), box._cheat_central])
     expect(stored).not.to.include(Whisper.val)
     expect(stored).not.to.include(Passphrase)
@@ -63,11 +63,11 @@ describe("Locking, and the sessions after it on this device", () => {
     const { vault: again } = await openNextSession()
     expect(again.isLocked).to.be.true
     const box = await boxIn(again)
-    await TH.expectRefusal(box.unsealWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
     await TH.expectRefusal(again.ensureUnlocked(byPassphrase('not the passphrase')), 'wrong_passphrase')
     await again.ensureUnlocked(byPassphrase(Passphrase))
-    expect(await box.unsealWhisper()).to.deep.equal(Whisper)
+    expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
   it("leaves the cached lease at a sweep, so the next session's ensureUnlocked takes it up and opens the box without asking; a lock() there erases it, and the session after asks for the passphrase again", async () => {
@@ -109,7 +109,7 @@ describe("The lock, with a box in hand", () => {
     vault.lock()
     expect(vault.isLocked).to.be.true
     expect(box.whisper).to.equal(LOCKED)
-    await TH.expectRefusal(box.unsealWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
     expect(again.isLocked).to.be.true
@@ -123,7 +123,7 @@ describe("The lock, with a box in hand", () => {
     expect(box.whisper).to.equal(LOCKED)
     await vault.ensureUnlocked(byPassphrase(Passphrase))
     expect(box.whisper).to.deep.equal(Whisper)
-    expect(await box.unsealWhisper()).to.deep.equal(Whisper)
+    expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 })
 

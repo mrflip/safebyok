@@ -1,6 +1,6 @@
-/** Crossings of `lock()`, pinned as the code meets them: one landing in the middle of a send, and one landing while an unlock proves. */
+/** Crossings of `lock()`, pinned as the code meets them: one landing in the middle of a send, one while an unlock proves, and one during a box verb. */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as TH from '../test-helpers'
 import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 import { Passphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
@@ -47,5 +47,22 @@ describe("A lock that lands while an unlock proves", () => {
     expect(deviceDB.tryCache).toHaveBeenCalledTimes(2)
     vault.lock()
     expect(vault.isUnlocked).to.be.false
+  })
+})
+
+describe("A lock that lands during a box verb", () => {
+  it("during the first box call's hello refuses 'vault_locked', opening nothing", async () => {
+    const { vault, vaultDB } = await makeBornVault()
+    const tryGetVault = vaultDB.tryGetVault.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryGetVault').mockImplementationOnce((...args) => { vault.lock(); return tryGetVault(...args) })
+    await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'vault_locked')
+  })
+
+  it("during getBox's get refuses 'vault_locked' though the box came back", async () => {
+    const { vault, vaultDB } = await makeBornVault()
+    await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' } })
+    const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
+    await TH.expectRefusal(vault.fetchBox('anthropic_api_key'), 'vault_locked')
   })
 })
