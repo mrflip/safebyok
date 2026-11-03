@@ -9,17 +9,17 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  * * **Misuse**: a programming error, the host developer's to fix. Let it reach an error boundary
  *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`, `bad_whisper`,
  *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`, `unknown_key_deriver`,
- *   `insecure_context`, `unexpected_error`, `passphrase_required`.
+ *   `insecure_context`, `unexpected_error`, `passphrase_required`, `invalid_input`, `gate_issue`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `crypto_failed`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
  *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`,
- *   `same_passphrase`.
+ *   `same_passphrase`, `camped`, `vault_empty`, `storage_error`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
- *   `vault_behind`, `identity_revoked`.
+ *   `vault_behind`, `identity_revoked`, `damaged_record`.
  *
  * A record that fails its checks is named for who is at fault, by a VaultDB and a vault alike. One
  * read from storage that fails them, or a box that will not open under the lease in hand, is
@@ -77,6 +77,12 @@ export const refusalKindVals = [
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
   'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
   'same_passphrase',     // a new passphrase that is the one the vault already has
+  'camped',              // a vaultDB put told not to replace a live row found one there
+  'vault_empty',         // a vaultDB call named a vault_tok no row holds: nothing of this life, whatever else the scope holds
+  'storage_error',       // a vaultDB's store failed: its own error is the cause
+  'damaged_record',      // a vaultDB row read alone failed its checks, and is set aside
+  'invalid_input',       // an argument to a vaultDB verb failed its check
+  'gate_issue',          // a vaultDB gate verb whose params fail the integrity checks against the stored row
 ] as const
 export type RefusalKind = typeof refusalKindVals[number]
 
@@ -135,6 +141,12 @@ export const RefusalFamilyForKind = {
   attempt_in_flight:   'condition',
   passphrase_required: 'misuse',
   same_passphrase:     'condition',
+  camped:              'condition',
+  vault_empty:         'condition',
+  storage_error:       'condition',
+  damaged_record:      'bad_news',
+  invalid_input:       'misuse',
+  gate_issue:          'misuse',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /** The facts a refusal learned, each under its own name, filled only by the refusals that name it.
@@ -167,6 +179,16 @@ export type RefusalMeta = {
   wayin_listed?: WayinSummary
   /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */
   fieldnames?:   readonly string[]
+  /** A vaultDB's refusal: the verb that refused. */
+  call?:         string
+  /** A vaultDB's refusal: what happened, when it is not said by the refusalkind alone. */
+  act?:          string
+  /** A vaultDB's refusal: the vault row as read in the step that refused. */
+  world?:        unknown
+  /** A vaultDB's refusal: the row stored where the write was aimed, or null for none. */
+  dbhas?:        unknown
+  /** A vaultDB's refusal: the request's scope, vault_tok and other safe metadata. */
+  req_params?:   Readonly<Record<string, unknown>>
 }
 
 /** The options of a VaultError beside its refusalkind and message: the `cause` behind it, and its `meta`. */

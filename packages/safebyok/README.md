@@ -1030,6 +1030,8 @@ which `useListedVault` hands down).
 | `insecure_context`    | `Bank.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
 | `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, a `strengthChecker` that throws at all, or its `load`, or the key deriver's, failing at `hello()`). What a key deriver or a strength checker threw is kept nowhere, not its message, meta or `cause`, as each was handed a passphrase; the logger hears only that the deriver threw (`call: 'deriveKeyBytes'`), and the kind of a `VaultError` it threw when that kind is listed. (A key deriver's `VaultError` of the condition family keeps its kind, in safebyok's own words, rather than refusing here.) What a `load` threw is its `cause`, as it heard nothing | Do not retry; read the log for the deriver's kind (or the `cause` of a `load`), and fix the function, or report the bug |
 | `passphrase_required` | `delWayin('passphrase')`: a vault keeps its passphrase, which can be replaced, never removed | Call `putWayin('passphrase')` to replace it |
+| `invalid_input`       | an argument to a VaultDB verb failed its check | Fix the call. |
+| `gate_issue`          | a VaultDB gate verb's params fail the integrity checks against the stored row | Fix the call. |
 
 ### Conditions: handle them at run time
 
@@ -1063,6 +1065,9 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `same_passphrase`     | a `change_passphrase` attempt whose next passphrase is the current one; the gating stays open | Show it in place, and ask for a different one |
 | `no_whisper`          | a `putBox()` left out the whisper, to keep the one the box holds, and no box is stored under that label | Hand `putBox()` the whisper to store |
 | `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here. For a vault kept on the device, the browser's own error is the `cause`; of the device store's error only its `name` is kept, ending the message, as the error may quote a lease record |
+| `camped`              | a VaultDB put told not to replace a live record found one stored: `meta.dbhas` holds it | Take up the stored record. |
+| `vault_empty`         | a VaultDB call named a `vault_tok` no row holds: nothing of this life | Read the vault again by its scope. |
+| `storage_error`       | a VaultDB's store failed; its own error is the `cause` | Retry shortly. |
 
 ### Bad news: tell the user
 
@@ -1089,6 +1094,7 @@ const bank = Bank.make({ ...opts, onBadNews: (news) => { telemetry.report(news.r
 | `newer_format`        | the vault's stored record is in a form this version does not know -- a `format` -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
 | `vault_behind`        | this device has already seen the vault at a higher `vault_epoch` than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked, or was not born: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device with `bank.clearCachedVault` (see *A vault behind this device*, below); otherwise the app's support should look at its storage |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
+| `damaged_record`      | a VaultDB row read alone failed its checks, and is set aside | Tell the user this record cannot be read. |
 
 `Bank.make` itself throws `bad_option`, `bad_scope` or `insecure_context`, at once.
 `bank.ensureVault`, as it reads the vault from storage, can refuse with `storage_unavailable`,
