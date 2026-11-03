@@ -66,7 +66,8 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
   the cache's `lease.peek` loses.** The vault reads unlocked on the lease peeked, the lock's erase
   stands, and the next session asks for a proof. The next `lock()` ends that session.
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*):
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here):
   **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
   the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
   gets it from `lease.peek` and attaches it, asking nothing, so a vault the user locked reopens with no
@@ -84,3 +85,15 @@ not as a settled ruling, and check it against the current design before relying 
   the gating's check whole.** The gating replaces a foreign throw from a getter with `unexpected_error`, keeping nothing of it, but passes a
   `VaultError` as it came and does not inspect its text; one a host's getter throws with the passphrase in its
   message reaches the caller whole. The Coach: "Wontfix agreed".
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Changing the gate*, and *Rows for
+  `notes/wontfix.md`*, since moved here): **a gate change leaves another device's session lease to run.** No device
+  locks on it: another device's session keeps its lease to its `lock()` or next `bank.autolock`, and its cached lease, of the
+  older `gate_epoch`, is forgotten at its next session.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here): **a damaged row stays until the customer names it for
+  deletion.** It still counts toward `maxBoxes`. Ruled: the customer clears it with their own store's tools; not built yet.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here): **cross-tab complications, all of them.** Tab A's `lock()` or
+  vacate leaves tab B unlocked, and nothing tells it.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+  since moved here): **a put can land though its answer is lost.**
