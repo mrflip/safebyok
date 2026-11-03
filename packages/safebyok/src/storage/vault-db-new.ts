@@ -312,7 +312,10 @@ export abstract class VaultDB {
     return this.doWatch(VS.watchScope.parse(scope), ({ vault, box }) => {
       const world = VS.vaultRow.safeParse(vault)
       if (! world.success) { return }
-      if (box === undefined) { onNotice({ act: (world.data.am === 'x') ? 'gone' : 'got', val: world.data, world: world.data }); return }
+      if (box === undefined) {
+        onNotice({ act: (world.data.am === 'x') ? 'gone' : 'got', val: world.data, world: world.data })
+        return
+      }
       const val = VS.boxRow.safeParse(box)
       if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gone' : 'got', val: val.data, world: world.data }) }
     })
