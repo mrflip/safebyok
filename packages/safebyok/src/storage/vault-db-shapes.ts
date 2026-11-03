@@ -107,7 +107,7 @@ export type ReqParams = Readonly<Z.infer<typeof reqParams>>
 export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
 // --
 
-// == [Row helpers]: reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
+// == [Row helpers]: reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
 
 /** The request's safe metadata, for an answer to carry; empty when any of it fails its check, as a bad field may be anything. */
 export const reqParamsOf = (args: unknown): ReqParams => {
@@ -135,6 +135,12 @@ export const isLiveRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'a')
 
 /** True when `raw` is a live row of the life `vault_tok`. */
 export const isLiveRowUnder = (raw: unknown, vault_tok: string): boolean => (isLiveRow(raw) && (peekOf(raw)?.vault_tok === vault_tok))
+
+/** True when `raw` passes a vault row's checks, live in the life `vault_tok`: a box write lands only under one, as the base refuses any other. */
+export const isCheckedLiveVault = (raw: unknown, vault_tok: string): boolean => {
+  const parsed = vaultRow.safeParse(raw)
+  return parsed.success && (parsed.data.am === 'a') && (parsed.data.vault_tok === vault_tok)
+}
 
 export const isTombstoneRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'x')
 

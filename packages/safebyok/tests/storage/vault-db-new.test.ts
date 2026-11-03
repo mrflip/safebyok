@@ -265,6 +265,20 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("box writes under a vault row failing its checks", () => {
+    it("refuse as a read does, and change nothing", async () => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      const boxRows = vaultDB._cheat_boxRowsOf(vaultScope, 'life1')
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { ...vault, gate: 'rubble' })
+      const nextBox = boxAt(1)
+      expect(await vaultDB.tryPutBox(nextBox, { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_record' })
+      expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_record' })
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { ...vault, fmt: VS.VaultFormat + 1 })
+      expect(await vaultDB.tryPutBox(nextBox, { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'newer_format' })
+      expect(boxRows.get('openai')).to.deep.equal(box)
+    })
+  })
+
   describe("gate verbs", () => {
     it("replacePassphrase lays the wayin on, moves gate_epoch and the revision each one up, and leaves the rest as stored", async () => {
       const { vaultDB, vault } = await storeWith()
