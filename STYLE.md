@@ -124,7 +124,7 @@ scopepath is a `boxScopepath` (`BoxScopepath`), like every other `fooScopepath`.
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
 a menu choice is a `kind` (`scopepathkind`) or a `flavor`. **`state` names nothing public**: a
 React app already means its own component state by it. Name a status for what it is about: a
-thing's stage in its life is its `lifecycle`.
+thing's stage in its life is its `stage`.
 
 **`isFoo` is a boolean. A function returning a predicate ends in `Pred`**:
 `withinVaultScopepathPred(scope)`.
