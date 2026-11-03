@@ -125,7 +125,7 @@ export class Bank implements VaultWorld {
 
   // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord, demandReady
 
-  /** A forced reset, and a host may call it again: every vault and tombstone the vaultDB holds is listed, the device record cached, the watch started, and old leases tidied. Refused, it leaves the bank not ready, and its refusal is what `ensureVault` and `vaultOf` throw. */
+  /** A forced reset, and a host may call it again: every vault and tombstone the vaultDB holds is listed, the device record cached, and the watch started. Old leases are tidied whatever it answers. Refused, it leaves the bank not ready, and its refusal is what `ensureVault` and `vaultOf` throw. */
   async hello(): Promise<void> {
     this.#lastHello = await outcomeOf(() => this.#bringUp(this.#vaultListing))
     this.#remakeSnapshot()
@@ -136,12 +136,12 @@ export class Bank implements VaultWorld {
 
   /** A sweep crossing it leaves `listing` disabled, which refuses: the `hello` is for a listing no longer the bank's. */
   async #bringUp(listing: VaultListing): Promise<void> {
+    await this.tidy()
     await this.keyDeriver.load?.()
     await this.strengthChecker.load?.()
     await listing.fetchBank()
     await this.#cacheDeviceRecord()
     await listing.hello()
-    await this.tidy()
     listing.demandEnabled()
   }
 
