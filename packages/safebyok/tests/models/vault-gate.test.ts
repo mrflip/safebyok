@@ -117,6 +117,19 @@ describe("vault.replacePassphrase()", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: landedEpoch })
   })
 
+  it("spreads the record the attempt read, not the live vault: a record delivered during the proving refuses 'stale_write', overwriting nothing", async () => {
+    const born = await makeBornVault()
+    const { vault, demandStored, storeBehindOurBack, opts: { world } } = born
+    world.strengthChecker = async () => {
+      const moved = storeBehindOurBack(demandStored())
+      await vault.fetch()
+      expect(vault.revision_seq).to.eq(moved.revision_seq)
+      return { strong: true as const }
+    }
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'stale_write')
+    await proveBy(born, Passphrase)
+  })
+
   it("the try form answers the refusal", async () => {
     const born = await makeBornVault()
     born.opts.world.requestCleartext = (gating) => { gating.decline() }
