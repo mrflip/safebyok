@@ -225,16 +225,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lease]: leaseFriend, _cheat_leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
+  // == [The lease]: leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
 
-  /** All a lease or a proving hears of this vault: one friend for its life, so an attach knows its own lease. */
+  /** All a lease or a proving hears of this vault, made once. */
   #leaseFriend(): LeaseFriend {
     this.#friend ??= this.#makeFriend()
     return this.#friend
   }
-
-  /** For tests alone: the friend, whose `peekLease` answers the cached row. Nothing in `src/` calls it. */
-  _cheat_leaseFriend(): LeaseFriend { return this.#leaseFriend() } // eslint-disable-line unicorn/prefer-private-class-fields
 
   #makeFriend(): LeaseFriend {
     const { world: { clock, logger, deviceDB } } = this
@@ -257,7 +254,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
-    if (! lease.isMadeFor(this.#leaseFriend())) { throw leaseOfOtherHolder() }
     if (lease.isForgotten) { throw leaseNotInForce() }
     try {
       this.demandReadyToAttach()
@@ -498,15 +494,13 @@ const recordOfBirth = (gate: Gate, prior: MSX.Revision, now: number): VaultRecor
 )
 // --
 
-// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce
+// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock, leaseNotInForce
 
 const listingExpected = (): VaultError => new VaultError('bad_option', Phrases.ListingExpected)
 
 const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
 const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
-
-const leaseOfOtherHolder = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherHolder)
 
 const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
