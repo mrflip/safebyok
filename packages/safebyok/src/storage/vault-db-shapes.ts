@@ -101,6 +101,7 @@ export type BoxRow         = BoxRecord | BoxTombstone
 export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseParams>>
 export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
+export type IfPresent = typeof ifPresentVals[number]
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>

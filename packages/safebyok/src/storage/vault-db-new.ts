@@ -5,7 +5,7 @@ import { type BadOutcome, type GoodOutcome, outcomeOf } from '../outcome'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import * as Refuse from './vault-db-refusals'
 import * as VS from './vault-db-shapes'
-import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DelOpts, Gate, IfAbsentOpts, PutOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
+import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DelOpts, Gate, IfAbsentOpts, IfPresent, PutOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
 
 // == [Answers]: AnswerFacts, GoodAnswer, BadAnswer, Answer, Said, BankListed, VaultListed, Tidied, Notice, answerOf
 
@@ -138,7 +138,7 @@ export abstract class VaultDB {
       const boxQuery = VS.boxQuery.parse(asked)
       const { ifAbsent } = VS.ifAbsentOpts.parse(opts ?? {})
       const { vault, box } = await adapted(() => this.doGetBox(boxQuery))
-      const world = demandVaultLife(vaultRowOf(vault), boxQuery, boxQuery.vault_tok)
+      const world = checkedVaultLife(vaultRowOf(vault), boxQuery, boxQuery.vault_tok)
       const stored = boxRowOf(box)
       if (stored?.am === 'a') { return { act: 'got', val: stored, world } }
       if (ifAbsent === 'fail') { throw Refuse.absentBox(world, stored) }
@@ -172,7 +172,7 @@ export abstract class VaultDB {
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
       const { landed, ante, vault } = await adapted(() => this.doPutBox(boxRecord, { prior, mayReplaceLive: (ifPresent === 'repl') }))
-      const world = demandVaultLife(vaultRowOf(vault), boxRecord, boxRecord.vault_tok)
+      const world = checkedVaultLife(vaultRowOf(vault), boxRecord, boxRecord.vault_tok)
       if (landed) { return { act: landingActOf(ante), val: boxRecord, world } }
       const stored = boxRowOf(ante)
       if (stored?.am === 'a') {
@@ -186,7 +186,7 @@ export abstract class VaultDB {
   async tryPutVault(record: VaultRecord, opts: PutOpts) { return answerOf(() => this.putVault(record, opts)) }
   async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
 
-  async #landVault(record: VaultRecord, prior: Revision, ifPresent: 'repl' | 'fail' | 'get'): Promise<Said<VaultRow, PutAct, VaultRow>> {
+  async #landVault(record: VaultRecord, prior: Revision, ifPresent: IfPresent): Promise<Said<VaultRow, PutAct, VaultRow>> {
     const { landed, ante } = await adapted(() => this.doPutVault(record, { prior, mayReplaceLive: (ifPresent === 'repl') }))
     if (landed) { return { act: landingActOf(ante), val: record, world: record } }
     const stored = vaultRowOf(ante)
@@ -241,7 +241,7 @@ export abstract class VaultDB {
   /** A gate verb's one path: a get, the integrity checks, the wayin laid on, and a put conditional on the prior revision. A null wayin has nothing to lay on, and answers the row as stored. */
   async #moveGate<ActT extends string>(ante: VaultSparse, act: ActT, wayinOf: (stored: VaultRecord) => Partial<Gate> | null): Promise<Said<VaultRecord, ActT, VaultRow>> {
     const { vault } = await adapted(() => this.doGetVault(VS.vaultScope.parse(ante)))
-    const stored = demandVaultLife(vaultRowOf(vault), ante, ante.vault_tok)
+    const stored = checkedVaultLife(vaultRowOf(vault), ante, ante.vault_tok)
     if (! VS.isRowAt(stored, ante)) { throw Refuse.staleWrite(stored, stored) }
     if (stored.registered_at !== ante.registered_at) { throw Refuse.gateIssue(stored, 'its registered_at is not the stored one.') }
     const wayin = wayinOf(stored)
@@ -265,7 +265,7 @@ export abstract class VaultDB {
       const { prior } = VS.delOpts.parse(opts)
       demandNextSeq(boxTombstone, prior)
       const { landed, ante, vault } = await adapted(() => this.doDelBox(boxTombstone, prior))
-      const world = demandVaultLife(vaultRowOf(vault), boxTombstone, boxTombstone.vault_tok)
+      const world = checkedVaultLife(vaultRowOf(vault), boxTombstone, boxTombstone.vault_tok)
       if (landed) { return { act: 'deleted', val: boxTombstone, world } }
       const stored = boxRowOf(ante)
       if (stored === null) { return { act: 'void', val: VS.sentinelBoxOf(boxTombstone, boxTombstone.vault_tok), world } }
@@ -337,7 +337,7 @@ export abstract class VaultDB {
   // --
 }
 
-// == [Row checks]: adapted, unreadableRowOf, vaultRowOf, boxRowOf, listedBoxesOf, demandVaultLife, demandNextSeq, landingActOf, jsonBytes
+// == [Row checks]: adapted, unreadableRowOf, vaultRowOf, boxRowOf, listedBoxesOf, checkedVaultLife, demandNextSeq, landingActOf, jsonBytes
 
 /** A store call: what it throws that is no refusal of its own is a `storage_error`. */
 const adapted = async <ValT>(thunk: () => Awaitable<ValT>): Promise<ValT> => {
@@ -373,7 +373,7 @@ const listedBoxesOf = (scope: VaultScope, vault_tok: string, rows: { boxlabel: s
 }
 
 /** The vault row when it is live in this life; otherwise refuses `vault_mismatch` for a live row of another, `vault_gone` for this life's tombstone, and `vault_empty` for nothing of this life. */
-const demandVaultLife = (stored: VaultRow | null, scope: VaultScope, vault_tok: string): VaultRecord => {
+const checkedVaultLife = (stored: VaultRow | null, scope: VaultScope, vault_tok: string): VaultRecord => {
   if ((stored?.am === 'a') && (stored.vault_tok !== vault_tok)) { throw Refuse.vaultMismatch(stored) }
   if (stored?.vault_tok !== vault_tok) { throw Refuse.vaultEmpty(VS.sentinelVaultOf(scope, vault_tok)) }
   if (stored.am === 'x') { throw Refuse.vaultGone(stored) }
