@@ -342,7 +342,13 @@ check that cannot be written marks an invariant that is not one."
 
 * *Orchestrator:* no thread's items named these, as thread 11's review found. After the proof, as the proof is what the sprint is
   for; before the sweep, so it sweeps them. Holds to the no-machinery rule: a check reads what is there, and adds no state.
-* **Levels:** `high` review. **Size:** medium. **Depends on:** 13, and the Coach's row.
+* *The Coach:* "Have each check, then the empty invariant is obvious": every row gets a check, and none is dropped for lack of one.
+* **Also, the Coach's rulings:** a gate verb refused `vault_gone` or `vault_mismatch` delivers its row to the Vault, through a
+  protected `isRefusalOfRow` on `Listing`, overridden in `VaultListing`, as a box verb's `dbhas` is the vault row; one test. And a gate
+  change rejecting after its record is stored: "I can't see at a glance that the ones you named are wontfix, so document them and if
+  it's straightforward test in halpimonfire". So `crossings.md`, not `wontfix.md`, and a test that a refused `tryCache` during
+  `replacePassphrase` resolves and fires `onBadNews`.
+* **Levels:** `high` review. **Size:** medium. **Depends on:** 13.
 
 ## Bent from the pre-plan
 
