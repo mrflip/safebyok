@@ -171,6 +171,14 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.revision_seq).to.eq(1)
     })
 
+    it("throws a refusal as it came, where its answer names no scope", async () => {
+      const listing = boxListingOf(held.mw)
+      const err = new VaultError('unexpected_error', "A bug.")
+      held.mw.willGet({ ...held.mw.refusalOf(scopeOf(), err), req_params: {} })
+      const outcome = await listing.tryFetch(scopeOf())
+      expect(outcome.err).to.eq(err)
+    })
+
     it("takes the world of a good answer", async () => {
       held.mw.seedStore(fullBoxRecord())
       held.mw.willGet(held.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
