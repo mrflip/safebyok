@@ -41,6 +41,10 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
+  `VaultListing.#runBirth` (`packages/safebyok/src/models/vault-listing.ts`), where `ensureVault` answers a vault of another `vault_tok`
+  (another device won the slot), the proving is of the record that lost, so no lease is built or attached: that vault is answered
+  locked, a success the caller tells by `vault_tok`. (Models are not yet exported from the package.)
 * 2026-11-03 (vault_slot, branch `20261103-vault_slot`): **A tombstone taken in by a vault leaves the cached lease row standing if the
   erase is refused.** A tombstone a vault takes in (from `vault.del()`, or found by a fetch or notice) lands the end state: lock, erase
   the row this device has cached of the lease, box listing vacated, the vault staying in its slot. An erase refused on this path goes to
@@ -78,6 +82,11 @@ added or folded into through the subagent, and no other entry changes.
   **A `lock()` crossing an unlock before its attach ends unlocked.** This includes a `lock()` during `Lease.peek` or during the proof:
   the erase lands, then the attach holds a lease and caches its row afresh, so the row and the unlocked state stand after a `lock()`
   that returned.
+  Amended 2026-11-03 (gating, branch `20261103-gating`; ruled by the Coach): at the gating, a `lock()` crossing an unlock attempt already
+  past the user's enter key does not abort it (`declineAtLock`, `models/gating.ts`). The vault ends unlocked, and the next `lock()` ends
+  that session: we hold proof that this user intends and is permitted to have the vault unlocked, and nothing turns back midway. A
+  `lock()` before the enter key settles the gating `locked_while_asking`; a later attempt refuses `gating_landed`, spending the passkey
+  answer it was handed.
 
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
@@ -401,6 +410,8 @@ added or folded into through the subagent, and no other entry changes.
   (`vault_locked`); a malformed argument is `bad_option`, quoting none of it. One gating is pending per vault; a second attempt
   while one runs refuses `attempt_in_flight`. Entries below that name `unlock()`, `putWayin()` with a passphrase, `Ask`, `attempt(proof)`
   or `getProof` describe the calls this replaced.
+  Amended 2026-11-03 (gating, branch `20261103-gating`): `models/gating.ts` keeps this: `requestCleartextThrew` is an `unexpected_error`
+  with no `cause`, as the host's `requestCleartext` heard the passphrase.
 * 2026-10-23 (primitives sprint, thread 9, gating): **the pantry consult is the unlocking gating's first step, before the host is asked,
   and a lease that does not fit is left in the pantry.** The vault reads `deviceDB.tryGetLease`; then the gating must not have
   landed (a lock, a decline or a let-go during the read takes nothing up); then the one take-up predicate (`#fitsTakeUp`,
@@ -3288,6 +3299,9 @@ added or folded into through the subagent, and no other entry changes.
   imported, whatever happens, so a `PasskeyAnswer` works once and a host must ask the passkey afresh for each call.
   Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` (amended 2026-10-27 (validator_ducks): now `passkeyAnswer.parse` (amended 2026-10-28 (validator_names): `passkeyAnswerShape.parse` when this was written), `src/shapes/vault.ts`; its `prfBytes` check is by tag, a shared `bytes` kit maker, so bytes from another realm such as an iframe or jsdom are accepted, as the lease's bytes already were; the all-zero refusal is unchanged) before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
   Amended 2026-10-28 (activity_mount, PR [#350](https://github.com/mrflip/safebyok/pull/350); the Coach asked for both fixes): (1) `src/gating.ts`: a gating's attempt now spends the `PasskeyAnswer` it is handed (`spendAnswer`; the `answerOf` argument to `attemptOf` in `#gatingOf`), zeroing `prfBytes` on every outcome except a refusal the user can correct (`correctableKindVals`). Before, only `PasskeyProving.seal` zeroed them, so an attempt refused before the seal left them as they were: the gating already over (`gating_landed`), another attempt in flight (`attempt_in_flight`), a malformed passphrase beside the answer (`bad_option`), a lock landing before the seal, a storage failure before it. A correctable refusal raised before the seal (a mistyped passphrase in `put_passkey`, `absent_wayin`) still leaves the answer unspent, because the README promises a host it may hand the same answer in again; zeroing it is then the host's. A host that retried with the same answer after misuse now meets `bad_option`. (2) `safebyok-react`: `useWhenShown` first parked a passkey answer that came back while the dialog was hidden (React's `<Activity>`, a Suspense boundary) and tried it when the dialog showed again, with no time limit and no zeroing if the dialog unmounted while hidden, so the bytes lived in a closure in a ref until garbage collection. Now `PasskeyUnlockButton` and `GatingModal`'s put_passkey form try an answer at once while shown (`useWhenShown().isShown()`) or zero it untried; only the outcome of an attempt waits for the dialog to show. Each dialog also zeroes the answer once its one attempt is done, refused or not (`attemptOnce`, `packages/safebyok-react/src/passkey.ts`). A passkey touched while the dialog is hidden needs a second touch, and for put_passkey leaves an unused credential on the authenticator. Unchanged: a JavaScript string passphrase cannot be zeroed (G1's caveat).
+  Amended 2026-11-03 (gating, branch `20261103-gating`): in `packages/safebyok/src/models/gating.ts` the gating holds the clears only for
+  the length of an attempt, and its `run` hears provings, never a clear. `spendClears` zeroes a passkey answer's PRF bytes on every path but
+  a correctable refusal, including an attempt refused before it is tried (`gating_landed`, `attempt_in_flight`).
 * 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot
