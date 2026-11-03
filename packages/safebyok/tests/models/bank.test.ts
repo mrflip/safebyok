@@ -239,7 +239,7 @@ describe("bank.autolock", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("is not called by hello, so an old row stands until the vault's ensureUnlocked meets it, erases it, and asks for a proof", async () => {
+  it("is not called by hello, so an old row stands, and the vault's ensureUnlocked leaves it, asking for a proof whose lease is written over it", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
@@ -252,10 +252,12 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
     const vault = fresh.vaultOf(VaultBag)
     await vault?.ensureUnlocked()
-    expect(tryVacate).toHaveBeenCalledOnce()
+    expect(tryVacate).not.toHaveBeenCalled()
     expect(requestCleartext).toHaveBeenCalledOnce()
     expect(vault?.isUnlocked).to.be.true
     expect(scan).not.toHaveBeenCalled()
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    expect((world.leaseRows()[0] as LeaseRow).proved_at).to.eq(T0 + AutolockMillis + 1)
   })
 
   it("past autolock, ensureUnlocked with no dialog refuses as it does with no row at all, not for the lease's age", async () => {
@@ -266,7 +268,7 @@ describe("bank.autolock", () => {
     await fresh.hello()
     const vault = fresh.vaultOf(VaultBag)
     await TH.expectRefusal(vault!.ensureUnlocked(), 'vault_locked')
-    expect(world.leaseRows()).to.have.lengthOf(0)
+    expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
   it("a row just inside autolock still opens on a fresh page, asking nothing", async () => {
@@ -299,24 +301,19 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("past autolock, a refused erase warns and still asks for a proof, whose lease is written over the row, with no bad news and no panic", async () => {
+  it("past autolock, a late page's ensureUnlocked leaves the row, not loaded, so the page holding its lease finds it and locks", async () => {
     const world = makeBankWorld()
-    await makeBankWithVault(world)
+    const { bank: pageA, vault: vaultA } = await makeBankWithVault(world)
+    const row = world.leaseRows()[0]
     world.advance(AutolockMillis + 1)
-    const onBadNews = vi.fn()
-    const onPanic = vi.fn()
-    const spy = TH.spyLogger()
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
-    const fresh = world.bankOn({ requestCleartext, onBadNews, onPanic, logger: spy.logger })
-    await fresh.hello()
-    vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValueOnce({ ok: false, err: new VaultError('storage_unavailable', 'no store') })
-    await fresh.vaultOf(VaultBag)?.ensureUnlocked()
-    expect(requestCleartext).toHaveBeenCalledOnce()
-    expect(spy.calls.map(({ level, story }) => [level, story])).to.deep.include(['warn', { call: 'Lease.peek', refusalkind: 'storage_unavailable' }])
-    expect(world.leaseRows()).to.have.lengthOf(1)
-    expect((world.leaseRows()[0] as LeaseRow).proved_at).to.eq(T0 + AutolockMillis + 1)
-    expect(onBadNews).not.toHaveBeenCalled()
-    expect(onPanic).not.toHaveBeenCalled()
+    const pageB = world.bankOn({ requestCleartext: undefined })
+    await pageB.hello()
+    await TH.expectRefusal(pageB.vaultOf(VaultBag)!.ensureUnlocked(), 'vault_locked')
+    expect(world.leaseRows()).to.deep.equal([row])
+    expect(vaultA.isUnlocked).to.be.true
+    await pageA.autolock()
+    expect(vaultA.isLocked).to.be.true
+    await TH.eventually(() => world.leaseRows().length === 0)
   })
 
   it("called by a host after hello on a fresh page, erases an old lease through the vault just listed, and that vault asks again", async () => {

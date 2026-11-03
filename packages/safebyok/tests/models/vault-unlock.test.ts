@@ -212,7 +212,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(other.deviceDB.cachedNow()).to.be.null
   })
 
-  it("takes up a cached lease as old as the world's leaseMillis, and erases one any older, which reads as no row", async () => {
+  it("takes up a cached lease as old as the world's leaseMillis, and leaves one any older not loaded, which reads as no row", async () => {
     const { demandStored, anotherSession, advance, deviceDB } = await makeBornVault()
     advance(LeaseMillis)
     const within = await anotherSession().build(demandStored())
@@ -222,7 +222,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const past = await anotherSession().build(demandStored())
     await TH.expectRefusal(past.ensureUnlocked(), 'vault_locked')
     expect(past.isLocked).to.be.true
-    expect(deviceDB.cachedNow()).to.be.null
+    expect(deviceDB.cachedNow()).to.not.be.null
   })
 
   it("judges by DefaultLeaseMillis where the world names no leaseMillis", async () => {
@@ -234,7 +234,8 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     advance(1)
     const past = await anotherSession().build(demandStored())
     await TH.expectRefusal(past.ensureUnlocked(), 'vault_locked')
-    expect(deviceDB.cachedNow()).to.be.null
+    expect(past.isLocked).to.be.true
+    expect(deviceDB.cachedNow()).to.not.be.null
   })
 
   it("locks the vault where a cached lease will not open at its first seal: 'damaged_lease', and the row erased", async () => {

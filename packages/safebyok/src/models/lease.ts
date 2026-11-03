@@ -42,8 +42,8 @@ export class Lease implements LeaseStamp {
 
   // == [Making one]: peek, tryPeek, grant
 
-  /** The lease cached for `gate_epoch`, or null so the vault asks for a proof: a row of another epoch or stamp, or one
-   * past autolock, is uncached. Only at the door: a lease held in a page stays held until something locks it.
+  /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is uncached;
+   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
    */
   static async peek(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
     leasePeekArgs.parse({ friend, gate_epoch })
@@ -52,10 +52,11 @@ export class Lease implements LeaseStamp {
     const checked = leaseRecord.safeParse(cached)
     // The damaged row stands until the next lease is cached over it.
     if (! checked.success) { throw damagedLease() }
-    if (checked.data.gate_epoch !== gate_epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend)) || isPastAutolock(checked.data, friend)) {
+    if (checked.data.gate_epoch !== gate_epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
       await uncacheForgotten(friend)
       return null
     }
+    if (isPastAutolock(checked.data, friend)) { return null }
     return new Lease(friend, checked.data, true)
   }
 
@@ -187,7 +188,7 @@ export class Lease implements LeaseStamp {
 }
 // --
 
-// == [Forgetting the cached record]: isPastAutolock, uncacheForgotten
+// == [Judging the cached record]: isPastAutolock, uncacheForgotten
 
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
 const isPastAutolock = ({ proved_at }: LeaseStamp, { clock, leaseMillis }: LeaseFriend): boolean => clock.now() - proved_at > leaseMillis

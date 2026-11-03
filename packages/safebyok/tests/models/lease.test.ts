@@ -136,20 +136,31 @@ describe("Lease.peek(friend, gate_epoch) and Lease.tryPeek", () => {
     expect(friend.tryUncacheLease).not.toHaveBeenCalled()
   })
 
-  it("forgets a lease past autolock as it forgets one of another epoch: it answers null and is uncached, so the vault asks for a proof", async () => {
+  it("answers null past autolock, so the vault asks for a proof, and leaves the row untouched, warning of nothing", async () => {
     const { friend } = await grantedWorld()
+    const row = friend.cached
     vi.setSystemTime(T0 + FriendLeaseMillis + 1)
     expect(await Lease.peek(friend, GrantedAs.gate_epoch)).to.be.null
-    expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
-    expect(friend.cached).to.be.null
+    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
+    expect(friend.cached).to.eq(row)
+    expect(friend.logged).to.deep.equal([])
   })
 
-  it("warns of an uncache refused past autolock, and still answers null, throwing nothing", async () => {
+  it("opens a row past autolock again once the clock is set back, as the row was left", async () => {
     const { friend } = await grantedWorld()
-    friend.tryUncacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
     vi.setSystemTime(T0 + FriendLeaseMillis + 1)
     expect(await Lease.peek(friend, GrantedAs.gate_epoch)).to.be.null
-    expect(friend.logged.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'Lease.peek', refusalkind: 'unexpected_error' }]])
+    vi.setSystemTime(T0)
+    const got = await Lease.peek(friend, GrantedAs.gate_epoch)
+    expect(got?.isInForce).to.be.true
+  })
+
+  it("uncaches a row of another epoch even past autolock: the epoch is judged first", async () => {
+    const { friend } = await grantedWorld()
+    vi.setSystemTime(T0 + FriendLeaseMillis + 1)
+    expect(await Lease.peek(friend, GrantedAs.gate_epoch + 1)).to.be.null
+    expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
+    expect(friend.cached).to.be.null
   })
 
   it("carries a clock that throws to Lease.tryPeek's bad Outcome, and uncaches nothing", async () => {

@@ -290,7 +290,7 @@ describe("the proof", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
     expect(vault.isUnlocked).to.be.false
 
-    // A page opened late whose host never calls autolock asks all the same: Lease.peek erases the row at the door.
+    // A page opened late whose host never calls autolock asks all the same: Lease.peek leaves the row and reads as no row.
     await vault.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
@@ -300,9 +300,12 @@ describe("the proof", () => {
     await latePage.hello()
     lateUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
     expect(world.leaseRows()).to.have.lengthOf(1)
+    const expiredRow = world.leaseRows()[0]
     await latePage.vaultOf(VaultBag)?.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     lateUi.expectRenders(['ready: main unlocked'])
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    expect(world.leaseRows()[0]).to.not.deep.equal(expiredRow)
 
     // Its host calling autolock after hello erases the row before anyone asks.
     world.advance(AutolockMillis + 1)
@@ -312,6 +315,22 @@ describe("the proof", () => {
     laterUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
     await laterPage.autolock()
     laterUi.expectRenders([])
+    await TH.eventually(() => world.leaseRows().length === 0)
+  })
+
+  it("a row past autolock outlives a late page with no dialog, and the first page's bank.autolock finds it and locks", async () => {
+    const { world, bank, vault } = await buildHost()
+    const bankUi = mountComponent(bank, bankStatus)
+    bankUi.expectRenders(['ready: main unlocked'])
+    world.advance(AutolockMillis + 1)
+    const latePage = world.bankOn({ requestCleartext: undefined, onBadNews })
+    await latePage.hello()
+    await TH.expectRefusal(latePage.vaultOf(VaultBag)!.ensureUnlocked(), 'vault_locked')
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    bankUi.expectRenders([])
+    await bank.autolock()
+    bankUi.expectRenders(['ready: main locked'])
+    expect(vault.isLocked).to.be.true
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 

@@ -243,9 +243,8 @@ memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
 erased from the store at `lock()`. In `src/models/` no lease is dropped at a time, and **autolock is a best-effort reminder process, not a
 guarantee**: a lease held in a page stays held until something locks it. Two things answer to the autolock duration, against a row cached on
-this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row. `Lease.peek`, at the
-door, uncaches such a row and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof; a refused erase there leaves
-the row, with a warning, to the next peek. `Lease.peek` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the host's clock, so a clock set back puts them off. A record read back whose key is extractable, of another
+this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` erases it. `Lease.peek`, at the
+door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.peek` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the host's clock: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
 algorithm, or for another use reads as `corrupt_record` (`isLeaseKey`, `types.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
 vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease
