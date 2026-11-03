@@ -376,7 +376,6 @@ export const UnlockFirst = "The vault is locked, so nothing was read or written:
 /** Why a locked vault with no lease kept is not unlocked without a proof. */
 export const NoProofToUnlock = "The vault is locked, this device has no lease of it cached, and this bank was made without a requestCleartext, so nothing can ask the user for a proof: give Bank.make a requestCleartext."
 
-/** Why a vault attaches no lease made for another vault, or for another Vault object. */
 /** Why an instance past a sweep, a vacate or a delete answers nothing. */
 export const LetGoInstance = "This object was let go, by a sweep, a vacate or a delete, so it answers nothing more: ask the bank for the vault again."
 
