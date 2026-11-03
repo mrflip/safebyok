@@ -58,6 +58,12 @@ small conflict where threads 1 and 3 meet, at the restack before thread 7.
 
 **Thread 7, `lease_seams`.** `vault.leaseFriend()` over the real deviceDB; `lease.attach()`, `#attachLease`, `#renewLease(proved, gate_epoch, heldLease)`, `#vacateLease`, `#panic`; `sweep`, `vacate` and the `disabled` refusal; `vault.sealStampedString`, `unsealStampedString`; `vault.boxListing` and `listing.boxListingOf`, with no watch started. `with*` answers `{ gate, proved }`. `Bank.goodbye` sweeps, so a `hello` after it refuses until thread 12. `vault.del()` doesn't yet reach the spec's end state.
 
+**Thread 8, `vault_slot`.** `vaultListing.ensureVault(record, prior)` is `putDraft` with `{ ifPresent: 'get' }`. `fateOver` answers `receive`, `lose` or `replace`. A tombstone leaves the vault in its slot. `del(duck)` takes a held vault or a `damaged_records` entry. `vault_gone` is a vault tombstoned in the slot, `absent_vault` nothing held. `delVault`, `delBox` delete a damaged row named as `damaged_records` lists it.
+
+**Thread 9, `vault_boxes`.** `vault.hello`, `getBox`, `fetchBox`, `putBox`, `delBox`, each with a `try` form; `box.extractWhisper`, answering `{ val }`; `box.send({ whisper?, sidecar? })`. Box verbs demand the unlock, so the proof must unlock first. `vault.hello` needs no unlock, and the first box call runs it. `makeVaultWorld` returns `vaultDB`, the memory DB.
+
+**Thread 10, `gating`.** `tests/models/gating.test.ts`. Kinds go in `gatingKindVals`, `ProvingsForGatingkind`, `VaultForGatingkind`, `ProveForGatingkind` and the clears in `models-shapes.ts`. One flag, `#isLastAttempt`. A birth's `run` is `#runBirth` in `VaultListing`; a refused lease leaves the vault stored and held, locked; a rebirth mints a fresh `vault_tok`. `bank.ensureVault(bag)` calls `tryBuildVault(scope)`, and the bank hands on `world.requestCleartext`. Test helpers `buildTyping` and `unlockTyping`.
+
 ## Crossings raised
 
 To go into `whiteboard/20261102-unrace/crossings.md`:
@@ -72,3 +78,8 @@ To go into `whiteboard/20261102-unrace/crossings.md`:
   draws (thread 5's review).
 * `box.expose` assigns `#exposed` after its await, so a sweep of that box alone leaves a whisper on a swept box; `expose` is
   postponed this sprint (thread 7's review).
+* `create`'s put answer that loses to a delete and a new life hands back another vault; thread 10's `#runBirth` ended this.
+* A `lock()` during the `ensureTimely` in `delBox`'s no-box-held path lets the tombstone land on a vault now locked (thread 9's review).
+* An instance arriving during `putBox`'s `ensureTimely` sends the birth into `demandNotHeld`, refusing `bad_option` (thread 9's review).
+* A second `attempt` with the same answer while the first runs zeroes the bytes in use, so the first answers `bad_option` (thread 10's review).
+* A tombstone or sparse record landing during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).

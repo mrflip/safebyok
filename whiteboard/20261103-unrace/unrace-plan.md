@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 7 filed; thread 8 building. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455.
+* **Status:** threads 1 to 10 filed; thread 11 building. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458.
 
 ## The goal
 
@@ -261,6 +261,9 @@ The Gating half of the text in thread 3.
   opinion. Select whichever implementation feels the cleanest to reason about, and keep it simple. The doc's choice is only a
   default.
 * **Levels:** `high` review, as it touches what `notes/guarantees.md` covers. **Size:** medium. **Depends on:** 8.
+* *Review:* flagged twice at high. The first's G2 (a foreign-realm answer unspent) and G8 (a getter's throw kept as `cause`) were
+  reworked. The second's verdict getter (a G8 regression) goes to thread 11's first commit, and a host's forged `VaultError` is
+  the Coach's row. No third review, by the sprint's rule.
 
 ### 11. `gate_changes` (pre-plan 10)
 
