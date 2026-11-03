@@ -456,6 +456,25 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.snapshot.stage).to.eq('ready')
   })
 
+  it("keeps the snapshot's device_id with the bank's where a sweep crosses the hello that cached it, and tells its listeners", async () => {
+    const world = makeBankWorld()
+    await world.bankOn({ device_id: 'device-first' }).hello()
+    const bank = world.bankOn({ device_id: 'device-second' })
+    const listener = vi.fn()
+    bank.subscribe(listener)
+    const caching = world.deviceDB.cacheDeviceRecord.bind(world.deviceDB)
+    vi.spyOn(world.deviceDB, 'cacheDeviceRecord').mockImplementation(async (asked) => {
+      const cached = await caching(asked)
+      bank.sweep()
+      return cached
+    })
+    const { err } = await bank.tryHello()
+    expect(err?.refusalkind).to.eq('disabled')
+    expect(bank.device_id).to.eq('device-first')
+    expect(bank.snapshot).to.include({ stage: 'made', device_id: 'device-first' })
+    expect(listener).toHaveBeenCalled()
+  })
+
   it("never throws on a repeat", async () => {
     const { bank } = await makeBankWithVault()
     expect(bank.lock().lock()).to.equal(bank)
