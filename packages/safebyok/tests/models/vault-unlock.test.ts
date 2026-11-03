@@ -3,10 +3,10 @@ import { makeLeaseKey } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
-import type { VaultWorld } from '../../src/models/vault-listing'
+import { type VaultWorld, VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { Dna, NewPassphrase, Passphrase, T0, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, NewPassphrase, Passphrase, T0, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, roundTrip, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -169,6 +169,20 @@ describe("The lease this device keeps: taken up at the next session's hello", ()
     expect(again.isUnlocked).to.be.true
     expect(await again.ensureUnlocked()).to.equal(again.demandLease())
     expect(await roundTrip(vault.demandLease(), again.demandLease())).to.eq('sk-test')
+  })
+
+  it("looks for no lease of a vault deleted, as it has no gate, and tells no bad news of it", async () => {
+    const { gate: _gate, ...sparse } = await storedVaultRecord()
+    const tombstone = { ...sparse, am: 'd' as const }
+    const { opts, deviceDB } = makeVaultWorld(tombstone as never)
+    const onBadNews = vi.fn()
+    const listing = new VaultListing({ ...opts, onBadNews })
+    const vault = await listing.build(tombstone)
+    await listing.hello()
+    expect(vault.isLocked).to.be.true
+    expect(deviceDB.tryGetLease).not.toHaveBeenCalled()
+    expect(onBadNews).not.toHaveBeenCalled()
+    listing.goodbye()
   })
 
   it("takes up no lease cached under an older gate, and uncaches it: the next session after a gate change asks for the proof", async () => {

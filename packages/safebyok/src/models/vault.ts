@@ -237,9 +237,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     }
   }
 
-  /** The lease this device has cached for the gate of the record in hand, fetching a vault held sparse for that gate. */
+  /** The lease this device has cached for the gate of the record in hand, fetching a vault held sparse for that gate. A vault gone has no gate, so no lease. */
   async #peekLease(): Promise<Lease | null> {
-    if (! this.isFull) { await this.fetch() }
+    if (! this.isFull) { await this.fetch({ ifAbsent: 'nil' }) }
+    if (! this.isFull) { return null }
     return Lease.peek(this.leaseFriend(), this.gate.gate_epoch)
   }
 
