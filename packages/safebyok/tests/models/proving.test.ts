@@ -9,7 +9,7 @@ import { Wayin } from '../../src/models/wayin'
 import { vaultScope } from '../../src/shapes/scopes'
 import { type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, DeviceId, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, builtGateOf, DeviceId, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -43,7 +43,7 @@ const gateWithBoth = async (epochs = 0): Promise<{ gate: Gate, answerOf: () => P
   const answer = passkeyAnswerOf()
   const { credential_id, prf_salt_b64 } = answer
   const prfBytes = new Uint8Array(answer.prfBytes)
-  const { gate } = await Gate.build(WorldStamp, proofClosureOf(TestPassphrase, answer), provingWorldOf())
+  const { gate } = await builtGateOf(answer)
   const answerOf = (): PasskeyAnswer => ({ credential_id, prf_salt_b64, prfBytes: new Uint8Array(prfBytes) })
   return { gate: epochs === 0 ? gate : new Gate(WorldStamp, { ...gate.pickle(), gate_epoch: FirstGateEpoch + epochs }), answerOf }
 }
@@ -275,7 +275,7 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
   })
 
   it("refuses a gate with no passkey wayin as 'absent_wayin', the answer unspent", async () => {
-    const { gate } = await Gate.build(WorldStamp, proofClosureOf(), provingWorldOf())
+    const { gate } = await builtGateOf()
     const answer = passkeyAnswerOf()
     await TH.expectRefusal(PasskeyProving.buildStored(gate, answer), 'absent_wayin')
     expect(isZeroed(answer.prfBytes)).to.be.false

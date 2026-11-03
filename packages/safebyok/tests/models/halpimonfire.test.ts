@@ -1,6 +1,7 @@
 /** Crossings of `lock()`, pinned as the code meets them: one landing in the middle of a send, one while an unlock proves, and one during a box verb. */
 
 import { describe, expect, it, vi } from 'vitest'
+import type { Gating } from '../../src/models/gating'
 import * as TH from '../test-helpers'
 import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 import { Passphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
@@ -36,13 +37,14 @@ describe("a lock() landing during a send", () => {
 
 describe("A lock that lands while an unlock proves", () => {
   it("ends unlocked: the proof still takes up and caches its lease, and the next lock() ends that session", async () => {
-    const { vault, deviceDB } = await makeBornVault()
+    const { vault, deviceDB, opts } = await makeBornVault()
     vault.lock()
-    const lockingAnswer = () => {
+    opts.world.requestCleartext = async (gating) => {
+      const attempting = (gating as Gating<'unlock_vault'>).attempt({ passphraseClear: Passphrase })
       vault.lock()
-      return { passphrase: Passphrase }
+      await attempting
     }
-    await vault.ensureUnlocked(lockingAnswer)
+    await vault.ensureUnlocked()
     expect(vault.isUnlocked).to.be.true
     expect(deviceDB.tryCache).toHaveBeenCalledTimes(2)
     vault.lock()

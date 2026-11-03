@@ -377,7 +377,7 @@ export const LeaseNotInForce = "This lease is out of force, as the vault locked 
 export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
 
 /** Why a locked vault with no lease kept is not unlocked without a proof. */
-export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
+export const NoProofToUnlock = "The vault is locked, this device has no lease of it cached, and this bank was made without a requestCleartext, so nothing can ask the user for a proof: give Bank.make a requestCleartext."
 
 /** Why a vault attaches no lease made for another vault, or for another Vault object. */
 export const LeaseOfOtherHolder = "This lease was made for another vault, or another Vault object of this one, so this one did not attach it: a bug in the caller."
@@ -406,7 +406,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, RequestCleartextThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -414,11 +414,17 @@ export const PositiveMinutesShape = "Expected a number of minutes above zero, fr
 
 export const GatingDeclined = "The prompt was declined, or closed before an attempt succeeded, so nothing was unlocked or changed: ask again when the user wants the vault."
 
+export const AlreadyAsking = "A prompt is already open on this bank, so this one was not shown: the host owns the one dialog, and disables what opens it meanwhile."
+
+export const LockedWhileAsking = "The vault was locked before the user answered the prompt, so nothing was proved: ask again when the user wants the vault."
+
+export const AttemptInFlight = "An attempt is already under way on this prompt, so this one was not tried: disable the submit button until it answers."
+
 export const GatingSettled = "This prompt has ended -- it was answered, declined, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
-export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: hand the call a proof closure, or give Bank.make a requestCleartext."
+export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: give Bank.make a requestCleartext."
 
 export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."
 

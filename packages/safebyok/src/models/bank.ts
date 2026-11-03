@@ -12,8 +12,8 @@ import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { VaultDB } from '../storage/vault-db-new'
-import { Gating, type GatingWorld, type RequestCleartext } from './gating'
-import type { LockState, ProofClosure, StrengthChecker } from './models-shapes'
+import type { RequestCleartext } from './gating'
+import type { LockState, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
 import { type VaultWorld, VaultListing } from './vault-listing'
@@ -48,7 +48,7 @@ const RefusingStrengthChecker: StrengthChecker = () => ({ strong: false, reason:
 
 // == [Bank]
 
-export class Bank implements VaultWorld, GatingWorld {
+export class Bank implements VaultWorld {
   declare readonly applabel: string
   declare readonly user_id:  string
   readonly scope:            BankScope
@@ -122,11 +122,11 @@ export class Bank implements VaultWorld, GatingWorld {
 
   vaultOf(bag: VaultBag): Vault | null { return this.vaultListing.at(this.vaultScopeOf(bag)) }
 
-  async ensureVault(bag: VaultBag, proofClosure?: ProofClosure): Promise<Vault> {
+  async ensureVault(bag: VaultBag): Promise<Vault> {
     const scope = this.vaultScopeOf(bag)
     const fetched = await this.vaultListing.fetch(scope, { ifAbsent: 'nil' })
     if (fetched !== null) { return fetched }
-    const built = await outcomeOf(() => this.#buildVault(scope, proofClosure))
+    const built = await this.vaultListing.tryBuildVault(scope)
     if (built.ok) { return built.val }
     if (built.err.refusalkind !== 'stale_write') { throw built.err }
     const stored = await this.vaultListing.fetch(scope)
@@ -134,12 +134,7 @@ export class Bank implements VaultWorld, GatingWorld {
     return stored
   }
 
-  tryEnsureVault(bag: VaultBag, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag, proofClosure)) }
-
-  async #buildVault(scope: VaultScope, proofClosure?: ProofClosure): Promise<Vault> {
-    if (proofClosure === undefined) { return Gating.buildVault(this.vaultListing, scope, this) }
-    return this.vaultListing.create(scope, proofClosure)
-  }
+  tryEnsureVault(bag: VaultBag): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag)) }
 
   closeVault(bag: VaultBag): void {
     this.vaultOf(bag)?.lock()

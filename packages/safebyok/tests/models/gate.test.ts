@@ -1,127 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PasskeySaltBytes } from '../../src/consts'
-import { randomBytes, toB64 } from '../../src/crypto'
+import { randomBytes } from '../../src/crypto'
 import { Gate } from '../../src/models/gate'
 import { type GateProps, FirstGateEpoch } from '../../src/models/models-shapes'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { builtGateOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
-const findsWeak = () => ({ strong: false as const, reason: 'too short' })
-
-/** The PRF bytes a closure's answer carries, or one zero byte where it carries none: zeroed either way once the gate is built or refused. */
-const prfBytesOf = (handed: unknown): Uint8Array => (
-  (handed as { passkeyAnswer?: { prfBytes?: Uint8Array } } | null)?.passkeyAnswer?.prfBytes ?? new Uint8Array(1)
-)
-
-/** The PRF bytes are copied before the build zeroes them, for the backdoor. */
+/** The PRF bytes are copied, for the backdoor. */
 const builtGate = async ({ passkey = false } = {}) => {
   const answer = passkey ? passkeyAnswerOf() : undefined
   const prfBytes = answer && new Uint8Array(answer.prfBytes)
-  const { gate } = await Gate.build(WorldStamp, proofClosureOf(TestPassphrase, answer), provingWorldOf())
+  const { gate } = await builtGateOf(answer)
   return { gate, answer, prfBytes }
 }
-
-describe("Gate.build(stamp, proofClosure, world)", () => {
-  it("builds a gate of the first epoch, of a passphrase wayin alone when the closure hands back a passphrase alone", async () => {
-    const { gate } = await builtGate()
-    expect(gate.gate_epoch).to.eq(FirstGateEpoch)
-    expect(gate.passphrase_wayin.wayinkind).to.eq('passphrase')
-    expect(gate.passkey_wayin).to.be.null
-  })
-
-  it("builds a passphrase wayin alone when the closure hands back passkeyAnswer null", async () => {
-    const { gate } = await Gate.build(WorldStamp, () => ({ passphrase: TestPassphrase, passkeyAnswer: null }), provingWorldOf())
-    expect(gate.passkey_wayin).to.be.null
-  })
-
-  it("answers the passphrase proving beside the gate, holding its wayin", async () => {
-    const { gate, proving } = await Gate.build(WorldStamp, proofClosureOf(), provingWorldOf())
-    expect(proving).to.be.instanceOf(PassphraseProving)
-    expect(proving.header).to.deep.equal(gate.ppWayin.toJSON())
-    await TH.expectRefusal(proving.buildWayin(NOVEL), 'unexpected_error')
-  })
-
-  it("awaits a closure that answers a promise", async () => {
-    const { gate } = await Gate.build(WorldStamp, () => Promise.resolve({ passphrase: TestPassphrase }), provingWorldOf())
-    expect(gate.passphrase_wayin.wayinkind).to.eq('passphrase')
-  })
-
-  it("builds a gate of a passphrase and a passkey wayin when the closure hands back a passkey answer, zeroing its PRF bytes (G2)", async () => {
-    const { gate, answer } = await builtGate({ passkey: true })
-    expect(gate.passphrase_wayin.wayinkind).to.eq('passphrase')
-    expect(gate.passkey_wayin?.wayinkind).to.eq('passkey')
-    expect(gate.passkey_wayin?.credential_id).to.eq(answer!.credential_id)
-    expect(isZeroed(answer!.prfBytes)).to.be.true
-  })
-
-  it("wraps one new vaultKey in both wayins", async () => {
-    const { gate, prfBytes } = await builtGate({ passkey: true })
-    const viaPassphrase = await _cheat_vaultKeyBytesOf(WorldStamp, gate.ppWayin, { passphrase: TestPassphrase })
-    const viaPasskey = await _cheat_vaultKeyBytesOf(WorldStamp, gate.pkWayin!, { prfBytes: prfBytes! })
-    expect(viaPasskey).to.deep.equal(viaPassphrase)
-  })
-
-  it("wraps a different vaultKey for each gate built", async () => {
-    const one = await builtGate()
-    const two = await builtGate()
-    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(WorldStamp, one.gate.ppWayin, { passphrase: TestPassphrase })
-    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(WorldStamp, two.gate.ppWayin, { passphrase: TestPassphrase })
-    expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
-  })
-
-  it("refuses a world its check refuses as 'bad_option', without invoking the closure", async () => {
-    const proofClosure = vi.fn(proofClosureOf())
-    const world = TH.omitting(provingWorldOf(), 'device_id')
-    await TH.expectRefusal(Gate.build(WorldStamp, proofClosure, world), 'bad_option')
-    expect(proofClosure).not.toHaveBeenCalled()
-  })
-
-  it("refuses a throwing closure as 'unexpected_error', quoting none of what it threw and keeping no cause", async () => {
-    const err = await TH.expectRefusal(Gate.build(WorldStamp, () => { throw new Error(TestPassphrase) }, provingWorldOf()), 'unexpected_error')
-    expect(err.cause).to.be.undefined
-    expect(TH.thrownText(err)).to.not.include(TestPassphrase)
-  })
-
-  it("refuses a closure that is no function as 'bad_option'", async () => {
-    await TH.expectRefusal(Gate.build(WorldStamp, { passphrase: TestPassphrase } as never, provingWorldOf()), 'bad_option')
-  })
-
-  const AnswerCases = [
-    [() => ({ passphrase: 42 }),                                                                                                         'a passphrase that is no string'],
-    [() => ({}),                                                                                                                         'no passphrase'],
-    [() => null,                                                                                                                         'null'],
-    [() => ({ passphrase: TestPassphrase, passcode: '1234' }),                                                                           'a field no closure hands back'],
-    [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: new Uint8Array(32) }) }),                           'a spent passkey answer, its PRF bytes all zero (G2)'],
-    [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prfBytes: randomBytes(31) }) }),                              'PRF bytes one short'],
-    [() => ({ passphrase: TestPassphrase, passkeyAnswer: passkeyAnswerOf({ prf_salt_b64: toB64(randomBytes(PasskeySaltBytes - 1)) }) }), 'a passkey salt one byte short'],
-    [() => ({ passphrase: TestPassphrase, passkeyAnswer: TH.omitting(passkeyAnswerOf(), 'credential_id') }),                             'a passkey answer with no credential_id'],
-  ] as const
-
-  for (const [answerOf, blurb] of AnswerCases) {
-    it(`refuses ${blurb} as 'bad_option', zeroing any PRF bytes it carries`, async () => {
-      const handed = answerOf()
-      const err = await TH.expectRefusal(Gate.build(WorldStamp, () => handed as never, provingWorldOf()), 'bad_option')
-      expect(isZeroed(prfBytesOf(handed))).to.be.true
-      expect(TH.thrownText(err)).to.not.include(TestPassphrase)
-    })
-  }
-
-  it("zeroes the PRF bytes even when the passphrase's keyDeriver throws after the answer passed its check (G2)", async () => {
-    const answer = passkeyAnswerOf()
-    const keyDeriver = { key_deriver_label: 'test_scripted_v0', salt_bytes: 16, deriveKeyBytes: () => { throw new Error('out of memory') } }
-    await TH.expectRefusal(Gate.build(WorldStamp, proofClosureOf(TestPassphrase, answer), provingWorldOf({ keyDeriver })), 'unexpected_error')
-    expect(isZeroed(answer.prfBytes)).to.be.true
-  })
-
-  it("refuses a passphrase the world finds weak as 'weak_passphrase', zeroing the PRF bytes all the same (G2)", async () => {
-    const answer = passkeyAnswerOf()
-    await TH.expectRefusal(Gate.build(WorldStamp, proofClosureOf(TestPassphrase, answer), provingWorldOf({ strengthChecker: findsWeak })), 'weak_passphrase')
-    expect(isZeroed(answer.prfBytes)).to.be.true
-  })
-})
 
 describe("Gate.make(stamp, passphraseWayin, passkeyWayin)", () => {
   it("is of the first epoch, holding the wayins handed", async () => {

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { BoxRecord } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
-import { Dna, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds, buildTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -18,7 +18,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sideca
 /** Box listings whose world is a real vault, born unlocked under `Passphrase`, over its vaultDB. */
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
-  const vault = await vaultWorld.listing.create(Dna, () => ({ passphrase: Passphrase }))
+  const vault = await buildTyping(vaultWorld.listing, Dna, () => ({ passphrase: Passphrase }))
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
   const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault), vaultDB: vaultWorld.opts.vaultDB })

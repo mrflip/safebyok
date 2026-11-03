@@ -10,6 +10,7 @@ import * as VS from '../storage/vault-db-shapes'
 import { type Box, type BoxPut, noWhisperToKeep } from './box'
 import type { BoxListing, BoxWorld } from './box-listing'
 import { type GateChange, Gate } from './gate'
+import { Gating } from './gating'
 import { Lease } from './lease'
 import type { AttemptClosure, Fetched, FetchOpts, GateProps, LeaseFriend, LockState, PasskeyClosure, PassphraseClosure, Revision, SealedWhisper, SendOpts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
@@ -147,19 +148,26 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Unlocking]: isUnlocked, ensureUnlocked, attachCachedLease
+  // == [Unlocking]: isUnlocked, ensureUnlocked, tryEnsureUnlocked, unlockByProof, attachCachedLease
 
   get isUnlocked(): boolean { return this.#lease !== null }
 
-  /** This vault, unlocked: as it stands, else by the lease this device has cached, else by the proof `proofClosure` answers; with no proof, refuses 'vault_locked'. A refused look at the cache is told as bad news, and asks for the proof. A `lock()` crossing an unlock before its attach ends unlocked; the next `lock()` ends that. */
-  async ensureUnlocked(proofClosure?: AttemptClosure): Promise<this> {
+  /** This vault, unlocked: as it stands, else by the lease this device has cached, else by asking the user through an unlock_vault gating, which answers as {@link Gating.launch}. With no dialog in the world, refuses 'vault_locked'. A refused look at the cache is told as bad news, and asks. */
+  async ensureUnlocked(): Promise<this> {
     await this.ensureTimely()
     if (this.isUnlocked) { return this }
     if (! this.isFull) { await this.fetch() }
     if (await this.#attachCachedLease()) { return this }
-    if (proofClosure === undefined) { throw noProofToUnlock() }
-    const proving = await this.gate.attemptProof(proofClosure, this.world)
-    const lease = await proving.buildLease(this.leaseFriend())
+    if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
+    await Gating.launch('unlock_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ proved }) => this.#unlockByProof(proved) })
+    return this
+  }
+
+  tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
+
+  /** Past the enter key: a lock crossing this is answered by the next `lock()`, as the proof says this user may have the vault unlocked. */
+  async #unlockByProof(proved: Proving): Promise<this> {
+    const lease = await proved.buildLease(this.leaseFriend())
     await lease.attach()
     return this
   }
@@ -275,6 +283,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (this.isDisabled) { return this }
     void this.#vacateLease()
     this.#boxListing?.lock()
+    this.listing.declineGatingAtLock(this)
     return this
   }
   // --
@@ -399,12 +408,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   protected override sweepContents(): void {
     this.#dropLease()
     this.#boxListing?.sweep()
+    this.listing.declineGatingAtLock(this)
   }
 
   /** Locked, the row cached erased, and the boxes vacated. */
   protected override vacateContents(): void {
     void this.#vacateLease()
     this.#boxListing?.vacate()
+    this.listing.declineGatingAtLock(this)
   }
   // --
 

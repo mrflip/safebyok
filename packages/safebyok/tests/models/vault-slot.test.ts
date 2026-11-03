@@ -9,7 +9,7 @@ import { VaultListing } from '../../src/models/vault-listing'
 import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as VS from '../../src/storage/vault-db-shapes'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, byPassphrase, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -64,7 +64,7 @@ describe("a tombstone over a live vault", () => {
     const onPanic = vi.fn()
     const onBadNews = vi.fn()
     const { opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onPanic })
-    await born.create(Dna, byPassphrase(Passphrase))
+    await buildTyping(born, Dna, byPassphrase(Passphrase))
     const listing = new VaultListing({ ...opts, onBadNews })
     const vault = await listing.build(demandStored())
     const refusal = new VaultError('storage_blocked', 'the disk is full')
@@ -83,7 +83,7 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
   it("ends the box listing with no bad news, the vault listing's own watch off", async () => {
     const onBadNews = vi.fn()
     const { opts, demandStored, listing: born } = makeVaultWorld()
-    const bornVault = await born.create(Dna, byPassphrase(Passphrase))
+    const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
     await bornVault.boxListing.create(BoxDna)
     const listing = new VaultListing({ ...opts, onBadNews })
     const vault = await listing.build(demandStored())
@@ -183,9 +183,9 @@ describe("an older record", () => {
 })
 
 describe("building over a tombstone", () => {
-  it("listing.create replaces the tombstone at the next revision, unlocked under a new vault_tok", async () => {
+  it("listing.buildVault replaces the tombstone at the next revision, unlocked under a new vault_tok", async () => {
     const { vault, listing, storedNow } = await deleted()
-    const reborn = await listing.create(Dna, byPassphrase(Passphrase))
+    const reborn = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     expect(reborn).to.not.eq(vault)
     expect(reborn.vault_tok).to.not.eq(vault.vault_tok)
     expect(reborn.revision_seq).to.eq(2)
@@ -195,18 +195,18 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.include({ am: 'a', vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
-  it("listing.create refuses 'bad_option' a vault present in the slot, asking the closure nothing", async () => {
+  it("listing.buildVault refuses 'bad_option' a vault present in the slot, asking the closure nothing", async () => {
     const { listing } = await makeBornVault()
     const closure = vi.fn(byPassphrase(Passphrase))
-    await TH.expectRefusal(listing.create(Dna, closure), 'bad_option')
+    await TH.expectRefusal(buildTyping(listing, Dna, closure), 'bad_option')
     expect(closure).not.toHaveBeenCalled()
   })
 
-  it("a session that fetched only the tombstone creates over it", async () => {
+  it("a session that fetched only the tombstone builds over it", async () => {
     const { anotherSession, storedNow } = await deleted()
     const session = anotherSession()
     expect(await session.fetch(Dna, { ifAbsent: 'nil' })).to.be.null
-    const reborn = await session.create(Dna, byPassphrase(Passphrase))
+    const reborn = await buildTyping(session, Dna, byPassphrase(Passphrase))
     expect(storedNow()).to.include({ vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 

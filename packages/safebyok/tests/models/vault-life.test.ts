@@ -5,7 +5,7 @@ import { LOCKED, type VaultRecord } from '../../src/models/models-shapes'
 import type { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
-import { Dna, NewPassphrase, Passphrase, boxWorldOf, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, NewPassphrase, Passphrase, boxWorldOf, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -65,8 +65,8 @@ describe("Locking, and the sessions after it on this device", () => {
     const box = await boxIn(again)
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
-    await TH.expectRefusal(again.ensureUnlocked(byPassphrase('not the passphrase')), 'wrong_passphrase')
-    await again.ensureUnlocked(byPassphrase(Passphrase))
+    await TH.expectRefusal(unlockTyping(again, byPassphrase('not the passphrase')), 'wrong_passphrase')
+    await unlockTyping(again, byPassphrase(Passphrase))
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
@@ -82,7 +82,7 @@ describe("Locking, and the sessions after it on this device", () => {
     const third = await openNextSession()
     expect(third.vault.isLocked).to.be.true
     await TH.expectRefusal(third.vault.ensureUnlocked(), 'vault_locked')
-    await third.vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(third.vault, byPassphrase(Passphrase))
     expect(await unsealIn(third.vault)).to.deep.equal(Whisper)
   })
 
@@ -91,7 +91,7 @@ describe("Locking, and the sessions after it on this device", () => {
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const second = await openNextSession()
-    await second.vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(second.vault, byPassphrase(Passphrase))
     const theirs = await boxIn(second.vault)
     await theirs.send({ whisper: NewWhisper, sidecar: Sidecar })
     await vault.ensureUnlocked()
@@ -121,7 +121,7 @@ describe("The lock, with a box in hand", () => {
     await box.expose()
     vault.lock()
     expect(box.whisper).to.equal(LOCKED)
-    await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(vault, byPassphrase(Passphrase))
     expect(box.whisper).to.deep.equal(Whisper)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
@@ -136,13 +136,13 @@ describe("Changing the gate, with a box sealed before the change", () => {
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const second = await openNextSession()
-    await TH.expectRefusal(second.vault.ensureUnlocked(byPassphrase(Passphrase)), 'wrong_passphrase')
-    await second.vault.ensureUnlocked(byPassphrase(NewPassphrase))
+    await TH.expectRefusal(unlockTyping(second.vault, byPassphrase(Passphrase)), 'wrong_passphrase')
+    await unlockTyping(second.vault, byPassphrase(NewPassphrase))
     expect(await unsealIn(second.vault)).to.deep.equal(NewWhisper)
     second.vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const third = await openNextSession()
-    await third.vault.ensureUnlocked(byPasskey('laptop'))
+    await unlockTyping(third.vault, byPasskey('laptop'))
     expect(await unsealIn(third.vault)).to.deep.equal(NewWhisper)
   })
 
@@ -152,7 +152,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
-    await again.ensureUnlocked(byPasskey('laptop'))
+    await unlockTyping(again, byPasskey('laptop'))
     expect(again.isUnlocked).to.be.true
     expect(await unsealIn(again)).to.deep.equal(Whisper)
   })
@@ -160,15 +160,15 @@ describe("Changing the gate, with a box sealed before the change", () => {
   it("revokes the passkey: a vault unlocked by the passkey stays unlocked through the revoke and still seals; the next session's passkey refuses 'absent_wayin', and the passphrase opens what that vault sealed", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     vault.lock()
-    await vault.ensureUnlocked(byPasskey('laptop'))
+    await unlockTyping(vault, byPasskey('laptop'))
     await vault.revokePasskey(byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
     await box.send({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
-    await TH.expectRefusal(again.ensureUnlocked(byPasskey('laptop')), 'absent_wayin')
-    await again.ensureUnlocked(byPassphrase(Passphrase))
+    await TH.expectRefusal(unlockTyping(again, byPasskey('laptop')), 'absent_wayin')
+    await unlockTyping(again, byPassphrase(Passphrase))
     expect(await unsealIn(again)).to.deep.equal(NewWhisper)
   })
 })
@@ -187,7 +187,7 @@ describe("Another device, over the same vaultDB and boxes", () => {
     const other = await openOtherDevice(demandStored())
     expect(other.vault.isLocked).to.be.true
     await TH.expectRefusal(other.vault.ensureUnlocked(), 'vault_locked')
-    await other.vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(other.vault, byPassphrase(Passphrase))
     expect(other.deviceDB.cachedNow()).not.to.be.null
     expect(await unsealIn(other.vault)).to.deep.equal(Whisper)
     vault.lock()
@@ -199,7 +199,7 @@ describe("Another device, over the same vaultDB and boxes", () => {
   it("seals, on the other device, a whisper this one opens: every lease of the vault holds its one vaultKey", async () => {
     const { vault, boxIn, unsealIn, demandStored } = await makeVaultWithBox()
     const other = await openOtherDevice(demandStored())
-    await other.vault.ensureUnlocked(byPassphrase(Passphrase))
+    await unlockTyping(other.vault, byPassphrase(Passphrase))
     const theirs = await boxIn(other.vault)
     await theirs.send({ whisper: NewWhisper, sidecar: Sidecar })
     expect(await unsealIn(vault)).to.deep.equal(NewWhisper)
