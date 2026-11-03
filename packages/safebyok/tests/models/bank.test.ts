@@ -226,76 +226,73 @@ describe("bank.ensureVault", () => {
   })
 })
 
-describe("bank.tidy", () => {
-  it("erases a lease past its autolock and locks its listed vault, leaving a younger one", async () => {
+describe("bank.autolock", () => {
+  it("locks a listed vault past its autolock, which erases its lease, leaving a younger one", async () => {
     const { world, bank, vault } = await makeBankWithVault()
-    await bank.tidy()
+    await bank.autolock()
     expect(vault.isUnlocked).to.be.true
     expect(world.leaseRows()).to.have.lengthOf(1)
     world.advance(AutolockMillis + 1)
-    await bank.tidy()
+    await bank.autolock()
     expect(vault.isLocked).to.be.true
     expect(bank.snapshot.vaults[0]?.lockState).to.eq('locked')
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("runs in hello, so a fresh page erases an old lease through the vault it has just listed, and that vault asks again", async () => {
+  it("is not called by hello, so on a fresh page an old lease stands, and the vault unlocks by it without asking", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
+    const requestCleartext = vi.fn<RequestCleartext>()
+    const fresh = world.bankOn({ requestCleartext })
+    const scan = vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore')
+    await fresh.hello()
+    expect(scan).not.toHaveBeenCalled()
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    const vault = fresh.vaultOf(VaultBag)
+    await vault?.ensureUnlocked()
+    expect(vault?.isUnlocked).to.be.true
+    expect(requestCleartext).not.toHaveBeenCalled()
+  })
+
+  it("called by a host after hello on a fresh page, erases an old lease through the vault just listed, and that vault asks again", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    world.advance(AutolockMillis + 1)
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const fresh = world.bankOn({ requestCleartext })
+    await fresh.hello()
+    await fresh.autolock()
+    await TH.eventually(() => world.leaseRows().length === 0)
+    const vault = fresh.vaultOf(VaultBag)
+    expect(vault?.isLocked).to.be.true
+    await vault?.ensureUnlocked()
+    expect(requestCleartext).toHaveBeenCalledOnce()
+  })
+
+  it("relies on vault.lock() erasing the row cached for a vault already locked, as a fresh page's vault holds no lease", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
     const fresh = world.bankOn()
     await fresh.hello()
-    expect(world.leaseRows()).to.have.lengthOf(0)
-    expect(fresh.vaultOf(VaultBag)?.isLocked).to.be.true
-  })
-
-  it("runs once the vaultDB has answered, after getBank and before anything past it", async () => {
-    const world = makeBankWorld()
-    const bank = world.bankOn()
-    const getBank = vi.spyOn(world.vaultDB, 'tryGetBank')
-    const scan = vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore')
-    const cacheRecord = vi.spyOn(world.deviceDB, 'cacheDeviceRecord')
-    await bank.hello()
-    expect(getBank).toHaveBeenCalledBefore(scan)
-    expect(scan).toHaveBeenCalledBefore(cacheRecord)
-  })
-
-  it("runs on a hello refused by a plugin that will not load", async () => {
-    const { world } = await makeBankWithVault()
-    world.advance(AutolockMillis + 1)
-    const refused = new VaultError('crypto_failed', 'no wasm here')
-    const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
-    await TH.expectRefusal(bank.hello(), 'crypto_failed')
-    expect(world.leaseRows()).to.have.lengthOf(0)
-  })
-
-  it("leaves hello's own refusal the one thrown where the tidy is refused too, its refusal bad news", async () => {
-    const world = makeBankWorld()
-    const onBadNews = vi.fn()
-    const bank = world.bankOn({ onBadNews })
-    const scanRefusal = new VaultError('storage_unavailable', 'no store')
-    vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore').mockResolvedValueOnce({ ok: false, err: scanRefusal })
-    world.vaultDB._cheat_refuseGets('storage_error')
-    await TH.expectRefusal(bank.hello(), 'storage_error')
-    expect(bank.snapshot.err?.refusalkind).to.eq('storage_error')
-    expect(onBadNews).toHaveBeenCalledWith(scanRefusal)
-  })
-
-  it("runs on a hello refused offline, so it still erases an old lease and locks its listed vault", async () => {
-    const { world, bank, vault } = await makeBankWithVault()
-    world.advance(AutolockMillis + 1)
-    world.vaultDB._cheat_refuseGets('storage_error')
-    await TH.expectRefusal(bank.hello(), 'storage_error')
-    expect(vault.isLocked).to.be.true
+    const vault = fresh.vaultOf(VaultBag)
+    expect(vault?.isLocked).to.be.true
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    vault?.lock()
     await TH.eventually(() => world.leaseRows().length === 0)
-    const { world: freshWorld } = await makeBankWithVault()
-    freshWorld.advance(AutolockMillis + 1)
-    freshWorld.vaultDB._cheat_refuseGets('storage_error')
-    await TH.expectRefusal(freshWorld.bankOn().hello(), 'storage_error')
-    expect(freshWorld.leaseRows()).to.have.lengthOf(0)
   })
 
-  it("erases only its own bank's leases: another user's and another app's old leases on this device survive", async () => {
+  it("does nothing before a hello, having nothing listed, and leaves the row where it is", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    world.advance(AutolockMillis + 1)
+    const onBadNews = vi.fn()
+    await world.bankOn({ onBadNews }).autolock()
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    expect(onBadNews).not.toHaveBeenCalled()
+  })
+
+  it("keeps to its own bank's leases: another user's and another app's old leases on this device survive", async () => {
     const world = makeBankWorld()
     const { bank: ours } = await makeBankWithVault(world)
     const others = [world.bankOn({ user_id: 'u2' }), world.bankOn({ applabel: 'other_app' })]
@@ -305,19 +302,21 @@ describe("bank.tidy", () => {
     }
     expect(world.leaseRows()).to.have.lengthOf(3)
     world.advance(AutolockMillis + 1)
-    await ours.tidy()
+    await ours.autolock()
     await TH.eventually(() => world.leaseRows().length === 2)
     expect(world.leaseRows().map((row) => (row as { user_id: string, applabel: string }).user_id + (row as { applabel: string }).applabel)).to.have.members(['u2acme', 'u1other_app'])
     for (const other of others) { expect(other.vaultOf(VaultBag)?.isUnlocked).to.be.true }
     expect(ours.vaultOf(VaultBag)?.isLocked).to.be.true
   })
 
-  it("erases an old row of another life without locking the vault listed", async () => {
+  it("leaves an old row whose vault is not listed, and one of another life, neither locking the vault listed", async () => {
     const { world, bank, vault } = await makeBankWithVault()
+    await world.deviceDB.cache(oldLeaseRow(world, 'unlisted'))
     await world.deviceDB.cache(oldLeaseRow(world, Dna.vaultlabel))
-    await bank.tidy()
+    const rowsBefore = world.leaseRows()
+    await bank.autolock()
     expect(vault.isUnlocked).to.be.true
-    expect(world.leaseRows()).to.deep.equal([])
+    expect(world.leaseRows()).to.deep.equal(rowsBefore)
   })
 
   it("tells a refused scan as bad news, never throwing", async () => {
@@ -326,36 +325,27 @@ describe("bank.tidy", () => {
     const bank = world.bankOn({ onBadNews })
     const refusal = new VaultError('storage_unavailable', 'no store')
     vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore').mockResolvedValueOnce({ ok: false, err: refusal })
-    await bank.tidy()
+    await bank.autolock()
     expect(onBadNews).toHaveBeenCalledWith(refusal)
   })
 
-  it("panics at a lease it cannot erase: onPanic hears it, a rejection of it goes to the platform, and without one the refusal does", async () => {
-    const world = makeBankWorld()
-    const refusal = new VaultError('storage_unavailable', 'no store')
+  it("leaves a refused erase to the vault's own lock, whose panic onPanic hears", async () => {
     const onPanic = vi.fn()
-    const bank = world.bankOn({ onPanic })
-    const row = { ...BankBag, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
-    vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore').mockResolvedValue({ ok: true, val: [row] })
+    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+    const refusal = new VaultError('storage_unavailable', 'no store')
     vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValue({ ok: false, err: refusal })
-    await bank.tidy()
+    world.advance(AutolockMillis + 1)
+    await bank.autolock()
+    expect(vault.isLocked).to.be.true
+    await TH.eventually(() => onPanic.mock.calls.length === 1)
     expect(onPanic).toHaveBeenCalledWith(refusal)
-    const reported = vi.fn()
-    vi.stubGlobal('reportError', reported)
-    onPanic.mockRejectedValueOnce(new Error('panic handler broke'))
-    await bank.tidy()
-    expect(reported).toHaveBeenCalledOnce()
-    await world.bankOn().tidy()
-    expect(reported).toHaveBeenCalledTimes(2)
-    expect(reported).toHaveBeenLastCalledWith(refusal)
-    vi.unstubAllGlobals()
   })
 
   it("finds nothing past an autolock of Infinity", async () => {
     const onBadNews = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { autolockMinutes: Infinity, onBadNews })
     world.advance(AutolockMillis * 1000)
-    await bank.tidy()
+    await bank.autolock()
     expect(vault.isUnlocked).to.be.true
     expect(onBadNews).not.toHaveBeenCalled()
   })
@@ -393,6 +383,39 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(relisted?.isPresent).to.be.true
     expect(relisted).not.to.equal(vault)
     expect(relisted?.isLocked).to.be.true
+  })
+
+  it("erases a fresh page's rows of its own bank with nothing listed, another user's staying", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    const elsewhere = world.bankOn({ user_id: 'u2' })
+    await elsewhere.hello()
+    await elsewhere.ensureVault(VaultBag)
+    world.bankOn().vacate()
+    await TH.eventually(() => world.leaseRows().length === 1)
+    expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
+  })
+
+  it("panics at a lease it cannot erase: onPanic hears it, a rejection of it goes to the platform, and without one the refusal does", async () => {
+    const world = makeBankWorld()
+    const refusal = new VaultError('storage_unavailable', 'no store')
+    const onPanic = vi.fn()
+    const bank = world.bankOn({ onPanic })
+    const row = { ...BankBag, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
+    vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore').mockResolvedValue({ ok: true, val: [row] })
+    vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValue({ ok: false, err: refusal })
+    bank.vacate()
+    await TH.eventually(() => onPanic.mock.calls.length === 1)
+    expect(onPanic).toHaveBeenCalledWith(refusal)
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    onPanic.mockRejectedValueOnce(new Error('panic handler broke'))
+    bank.vacate()
+    await TH.eventually(() => reported.mock.calls.length === 1)
+    world.bankOn().vacate()
+    await TH.eventually(() => reported.mock.calls.length === 2)
+    expect(reported).toHaveBeenLastCalledWith(refusal)
+    vi.unstubAllGlobals()
   })
 
   it("tells its listeners of a vacate with nothing listed, the stage alone having changed", async () => {

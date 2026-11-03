@@ -138,13 +138,9 @@ export class Bank implements VaultWorld {
 
   /** A sweep crossing it leaves `listing` disabled, which refuses. */
   async #bringUp(listing: VaultListing): Promise<void> {
-    try {
-      await this.keyDeriver.load?.()
-      await this.strengthChecker.load?.()
-      await listing.fetchBank()
-    } finally {
-      await this.tidy()
-    }
+    await this.keyDeriver.load?.()
+    await this.strengthChecker.load?.()
+    await listing.fetchBank()
     await this.#cacheDeviceRecord()
     await listing.hello()
     listing.demandEnabled()
@@ -163,12 +159,19 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Ending]: tidy, lock, vacate, sweep, panic
+  // == [Ending]: autolock, lock, vacate, sweep, ownLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
 
-  /** Erase each lease of this bank cached on this device past its autolock duration, locking its listed vault. Never throws, and needs no `hello`: a refused scan is bad news, and a lease that will not erase panics. Another bank's leases stay. */
-  async tidy(): Promise<void> {
+  /**
+   * A host calls this after each `hello` and on a timer of its own, as nothing else autolocks: each listed vault whose
+   * lease cached on this device is past autolock is locked, which erases that lease.
+   */
+  async autolock(): Promise<void> {
     const cutoff = Math.floor(this.clock.now() - this.leaseMillis)
-    await this.#vacateLeasesProvedBefore(Math.max(FarPast, cutoff))
+    const oldRows = await this.#ownLeasesProvedBefore(Math.max(FarPast, cutoff))
+    for (const row of oldRows) {
+      const listed = this.#vaultListing.at(row)
+      if (listed?.vault_tok === row.vault_tok) { listed.lock() }
+    }
   }
 
   /** Every listed vault locked; the bank stays ready. Never throws. */
@@ -182,7 +185,7 @@ export class Bank implements VaultWorld {
     this.#lastHello = null
     this.#vaultListing.openGating?.declineAtDiscard()
     for (const vault of this.#vaultListing.things) { vault.vacate() }
-    void this.#vacateLeasesProvedBefore(FarFuture)
+    void this.#eraseOwnLeases()
     this.#remakeSnapshot()
     return this
   }
@@ -196,25 +199,25 @@ export class Bank implements VaultWorld {
     return this
   }
 
-  async #vacateLeasesProvedBefore(cutoff: number): Promise<void> {
+  /** This bank's rows among the cached leases proved before `cutoff`; a refused scan is bad news, and finds none. */
+  async #ownLeasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
     const scan = await this.deviceDB.tryLeasesProvedBefore(cutoff)
     if (! scan.ok) {
       this.#vaultListing.tellBadNews([scan.err])
-      return
+      return []
     }
-    const ownRows = scan.val.filter((row) => this.#isOwnLease(row))
-    await Promise.all(ownRows.map((row) => this.#vacateLease(row)))
+    return scan.val.filter((row) => this.#isOwnLease(row))
   }
 
   #isOwnLease({ applabel, user_id }: LeaseSparse): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
 
-  /** The listed vault of that life locks, which erases the row or panics; a row with no such vault is erased here. */
-  async #vacateLease(row: LeaseSparse): Promise<void> {
-    const listed = this.#vaultListing.at(row)
-    if (listed?.vault_tok === row.vault_tok) {
-      listed.lock()
-      return
-    }
+  /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed none. */
+  async #eraseOwnLeases(): Promise<void> {
+    const rows = await this.#ownLeasesProvedBefore(FarFuture)
+    await Promise.all(rows.map((row) => this.#eraseLease(row)))
+  }
+
+  async #eraseLease(row: LeaseSparse): Promise<void> {
     const vacated = await this.deviceDB.tryVacate(row)
     if (! vacated.ok) { await this.#panic(vacated.err) }
   }

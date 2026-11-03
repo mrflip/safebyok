@@ -41,6 +41,12 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (tidy_host, branch `20261103-tidy_host`): **`bank.hello` does not call `bank.autolock`; only a host does, so a lease row
+  cached past its autolock duration stands until then.** `bank.autolock()` (`packages/safebyok/src/models/bank.ts`; the verb was
+  `bank.tidy`) is the only caller of the autolock check, and `Lease.peek` does not judge a row's age, so `vault.ensureUnlocked` on a
+  fresh page attaches a row past autolock, with no proof, unless the host called `autolock` first. `autolock` locks only listed vaults
+  of the row's own `vault_tok`: a row whose vault is not listed, or of another life, stays on the device until a lease is cached over
+  it or `bank.vacate` erases it. (Models are not yet exported from `src/index.ts`.)
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change does not rotate the vaultKey, so it ends no session.**
   `Vault.replacePassphrase`, `addPasskey` and `revokePasskey` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
   and a device that holds the vaultKey keeps it to its lock. Revoking a passkey or replacing a passphrase stops new unlocks through the
