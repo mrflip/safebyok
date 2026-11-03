@@ -1,5 +1,5 @@
 import { makeLifeTok } from '../crypto'
-import { VaultError } from '../errors'
+import { VaultError, isVaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
@@ -157,7 +157,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 }
 // --
 
-// == [An attempt's provings]: Prove, ProveForGatingkind, isCorrectable, spendClears
+// == [An attempt's provings]: Prove, ProveForGatingkind, checkedClears, isCorrectable, spendClears
 
 type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
 
@@ -166,14 +166,14 @@ type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) =>
 /** Past the enter key, the last to hear the clears. A birth's stamp is minted here, one per attempt. */
 const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   build_vault: async ({ scope, world }, clears) => {
-    const { passphraseClear, passkeyClear } = MSX.vaultBuildClears.parse(clears)
+    const { passphraseClear, passkeyClear } = checkedClears(MSX.vaultBuildClears, clears)
     const stamp = MSX.vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: world.clock.now() })
     const passphraseProving = await PassphraseProving.buildNovel(stamp, passphraseClear, world)
     const passkeyProving = passkeyClear ? await PasskeyProving.buildNovel(stamp, passkeyClear, world) : null
     return { passphraseProving, passkeyProving }
   },
   unlock_vault: async ({ vault, world }, clears) => {
-    const { passphraseClear, passkeyClear } = MSX.vaultUnlockClears.parse(clears)
+    const { passphraseClear, passkeyClear } = checkedClears(MSX.vaultUnlockClears, clears)
     await vault.ensureTimely(MSX.Promptly)
     const { gate } = vault
     const proved = (passphraseClear === undefined) ? await PasskeyProving.buildStored(gate, passkeyClear!) : await PassphraseProving.buildStored(gate, passphraseClear, world)
@@ -181,25 +181,36 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   },
 }
 
+/** The clears through their checker. A throw that is no refusal came from a getter or proxy of the host's, reading a clear, so nothing of it is kept (G8). */
+const checkedClears = <ClearsT>(checker: { parse: (clears: unknown) => ClearsT }, clears: unknown): ClearsT => {
+  try {
+    return checker.parse(clears)
+  } catch (err) {
+    throw isVaultError(err) ? err : clearsThrew()
+  }
+}
+
 const isCorrectable = (err: VaultError): boolean => (MSX.correctableKindVals as readonly string[]).includes(err.refusalkind)
 
-/** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not: an answer is single-use (G2). */
+/** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not and of any realm: an answer is single-use (G2). */
 const spendClears = (clears: unknown): void => {
   // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the outcome it follows.
   try {
     const prfBytes: unknown = (clears as { passkeyClear?: { prfBytes?: unknown } | null } | null)?.passkeyClear?.prfBytes
-    if (prfBytes instanceof Uint8Array) { prfBytes.fill(0) }
+    if (ArrayBuffer.isView(prfBytes)) { new Uint8Array(prfBytes.buffer, prfBytes.byteOffset, prfBytes.byteLength).fill(0) }
   } catch { /* nothing left to spend */ }
 }
 // --
 
-// == [Refusals]: alreadyAsking, noRequestCleartext, requestCleartextThrew, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight
+// == [Refusals]: alreadyAsking, noRequestCleartext, requestCleartextThrew, clearsThrew, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight
 
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
 
 const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrases.NoRequestCleartext)
 
 const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
+
+const clearsThrew = (): VaultError => new VaultError('unexpected_error', Phrases.ClearsThrew)
 
 const gatingDeclined = (): VaultError => new VaultError('declined', Phrases.GatingDeclined)
 
