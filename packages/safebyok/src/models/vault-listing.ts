@@ -44,7 +44,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the gate of a vault under a `vault_tok` fresh from {@link makeLifeTok}, from what `proofClosure` answers, and store it over no record; resolves the vault held once it lands, unlocked under the lease its passphrase proving grants. Refuses 'bad_option' with no closure, or a scope already held, before the closure is asked anything; 'stale_write' where storage holds a vault, delivered first. A refusal holds nothing of the dna. */
+  /** Build the gate of a vault under a `vault_tok` fresh from {@link makeLifeTok}, from what `proofClosure` answers, and store it over no record; resolves the vault held once it lands, unlocked under the lease its passphrase proving grants. Refuses 'bad_option' with no closure, or a scope already held, before the closure is asked anything; 'stale_write' where storage holds a vault, delivered first. A refusal before the put lands holds nothing of the dna; a lease refused after it leaves the vault stored and held, locked. */
   async create(input: VaultDna, proofClosure?: ProofClosure): Promise<Vault> {
     this.demandNotHeld(input)
     const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
