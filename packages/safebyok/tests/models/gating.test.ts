@@ -361,6 +361,20 @@ describe("an unlock through a gating", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
+  it("replaces what a getter on a passkey's answer throws, so the passphrase it quotes appears nowhere in the refusal (G8)", async () => {
+    const { vault, gatingAt } = await lockedVault()
+    const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'unexpected_error')
+    const gating = await gatingAt<'unlock_vault'>()
+    const passkeyClear = { ...await TH.passkeyOf('laptop'), get prfBytes(): Uint8Array { throw new Error(Passphrase) } }
+    const err = await TH.expectBad(gating.attempt({ passkeyClear }), 'unexpected_error')
+    await unlocking
+    expect(gating.isOpen).to.be.false
+    expect(err.cause).to.be.undefined
+    expect(err.message).to.not.include(Passphrase)
+    expect(err.stack).to.not.include(Passphrase)
+    expect(JSON.stringify(err)).to.not.include(Passphrase)
+  })
+
   it("settles 'vault_gone' where the vault was deleted behind the dialog", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'vault_gone')
