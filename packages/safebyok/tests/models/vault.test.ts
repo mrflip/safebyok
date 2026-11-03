@@ -136,6 +136,12 @@ describe("vault.ensureTimely(maxMillis)", () => {
     expect(gets).toHaveBeenCalledOnce()
   })
 
+  it("joins the fetch under way: overlapping calls make one get and share its answer", async () => {
+    const { vault, gets } = await bornWithGets()
+    await expect(Promise.all([vault.ensureTimely(0), vault.ensureTimely(0)])).resolves.to.deep.equal([vault, vault])
+    expect(gets).toHaveBeenCalledOnce()
+  })
+
   it("lands what it fetches on the instance", async () => {
     const { vault, demandStored, storeBehindOurBack } = await bornWithGets()
     const landed = storeBehindOurBack(demandStored())
