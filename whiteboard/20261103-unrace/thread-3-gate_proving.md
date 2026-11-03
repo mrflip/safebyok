@@ -1,6 +1,6 @@
 # Thread 3: gate_proving (2026-11-03)
 
-Branch `20261103-gate_proving`, PR [#451](https://github.com/mrflip/safebyok/pull/451), off `main`. Justify: green; safebyok 4824 passed, 37 skipped.
+Branch `20261103-gate_proving`, PR [#451](https://github.com/mrflip/safebyok/pull/451), stacked on #452, in the line main → #449 → #453 → #450 → #454 → #452 → #451. Justify: green; safebyok 4646 passed, 37 skipped.
 
 * **Built**:
   * `models/proving.ts`, rewritten: the statics `Proving.checkStrength`, `PassphraseProving.buildNovel` and `buildStored`, `PasskeyProving.buildNovel` and `buildStored` hear the clears; `buildWayin(NOVEL | proving)` and `buildLease(friend, gate_epoch?)` do not.
@@ -31,8 +31,15 @@ Branch `20261103-gate_proving`, PR [#451](https://github.com/mrflip/safebyok/pul
   * `Proving` importing `Gate` to check `instanceof`: a runtime cycle.
   * Closures in `proving.ts`: the spec moves them to the gating, so they sit in `gate.ts` for as long as the `with*` do.
   * `demandOpens`: it is async, so STYLE makes it `checkOpens`.
+* **Restacked over the line** (2026-11-03; the tip before it is the local tag `20261103-gate_proving-prerebase`, was `4574144a`):
+  * The line's way kept everywhere it overlaps: no staging, no `Cache`, no Store, `send` on `Box` only, births through `listing.create`. `create` now takes thread 3's lease with `vault.leaseCachedOf(proving)` over `putDraft`.
+  * The `gate_epoch` settled: `gateProps` requires it, so a `Gate` carries it, and `listing.recordOf(vault)` holds (pinned in `vault.test.ts`). `#draftWithProving` and `#sendGate` no longer write it over what the `Gate` and the `with*` already give; `wayinsOf` in the test world goes with it.
+  * `VS.gate` is `uint.positive()`: a stored `gate_epoch` of 0 reads as a damaged row. It was `uint` and the models refused 0 only later, at the `Gate`.
+  * Tests that went: the staged-edit and autolock pins in `loosened.test.ts`, each deleted by one side, so its `[The seal]` section; the `Vault.edit`/`send` block and `MSX.vaultPatch`, deleted by the line.
+  * `helpers/trigger.ts` and its test are gone, with `MaxTimerHours`, `MaxTimerMillis` and the `ErrorExpected` phrase, which only it read. `one-at-a-time.ts` stays.
+  * The first commit alone is red on `tsc` and seven tests, as the line's shapes and its conflicts meet there; the repair commit after the rest of the thread's commits greens them. Each commit between is red the same way.
 * **Discoveries**:
-  * The crossing: a `lock()` landing while `vault.ensureUnlocked` proves is crossed, and keeps a lease that should drop, in the vault and in the cache. It stands as it did before this thread, and `tests/models/halpimonfire.test.ts` pins it. Refusing needs a sight of the lock at the far end of the window, which `vault.ts` has no simple way to take today; thread 7's `#attachLease` is the place.
+  * The crossing: a `lock()` landing while `vault.ensureUnlocked` proves ends unlocked, the lease in the vault and in the cache, as `noted.md` rules; the next `lock()` ends that session. `tests/models/halpimonfire.test.ts` pins it.
   * `vault.leaseCachedOf` is public only because `vault-listing.ts` calls it; thread 7 can fold it in.
 * **For the Coach**:
   * The six rows of the PR's open questions; none blocks.
