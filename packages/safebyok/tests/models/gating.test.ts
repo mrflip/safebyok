@@ -14,7 +14,7 @@ useVaultWorlds()
 const passphraseClear = Passphrase
 const Wrong = 'not the passphrase at all'
 
-const strengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: 'too short' } : { strong: true as const })
+const strengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: "too short" } : { strong: true as const })
 
 /** A dialog that shows each gating to the test, and stays up until it settles. */
 const makeDialog = () => {
@@ -27,7 +27,7 @@ const makeDialog = () => {
     /** The `nth` gating shown, once it has been. */
     gatingAt: <KindT extends GatingKind>(nth = 0) => vi.waitFor(() => {
       const gating = shown[nth]
-      if (gating === undefined) { throw new Error('no dialog shown yet') }
+      if (gating === undefined) { throw new Error("no dialog shown yet") }
       return gating as unknown as Gating<KindT>
     }, { interval: 1 }),
   }
@@ -101,14 +101,14 @@ describe("a birth through a gating", () => {
     const { listing, gatingAt } = birthWorld({ strengthChecker })
     void listing.tryBuildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
-    expect(await gating.checkStrength('weak')).to.deep.equal({ strong: false, reason: 'too short' })
+    expect(await gating.checkStrength('weak')).to.deep.equal({ strong: false, reason: "too short" })
     expect(gating.isOpen).to.be.true
     gating.decline()
   })
 
   it("holds nothing where the put is refused: the gating settles the refusal, nothing stored, held or cached", async () => {
     const { listing, opts, gatingAt, storedNow, deviceDB } = birthWorld()
-    const refusal = new VaultError('storage_blocked', 'the disk is full')
+    const refusal = new VaultError('storage_blocked', "the disk is full")
     vi.spyOn(opts.vaultDB, 'tryPutVault').mockResolvedValueOnce(TH.bad(refusal) as never)
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'storage_blocked')
     const gating = await gatingAt<'build_vault'>()
@@ -121,7 +121,7 @@ describe("a birth through a gating", () => {
 
   it("leaves the vault stored and held, locked, where the lease is refused past the put, and the passphrase opens it next", async () => {
     const { listing, gatingAt, storedNow, deviceDB } = birthWorld()
-    vi.spyOn(PassphraseProving.prototype, 'buildLease').mockRejectedValueOnce(new VaultError('unexpected_error', 'no lease today'))
+    vi.spyOn(PassphraseProving.prototype, 'buildLease').mockRejectedValueOnce(new VaultError('unexpected_error', "no lease today"))
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'unexpected_error')
     const gating = await gatingAt<'build_vault'>()
     await TH.expectBad(gating.attempt({ passphraseClear }), 'unexpected_error')
