@@ -1,15 +1,22 @@
-/** The test world of a vault listing in `src/models/`: a vaultDB of one row, a device cache that keeps nothing, a deviceDB that keeps one lease, and a clock the test moves. */
+/** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a {@link MemoryDeviceDB} with its lease verbs spied on, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
-import type { VaultScope } from '../../src/shapes/scopes'
 import type { BoxWorld } from '../../src/models/box-listing'
 import type { Lease } from '../../src/models/lease'
-import type { ProofClosure, VaultRecord, VaultSparse } from '../../src/models/models-shapes'
+import type { RequestCleartext } from '../../src/models/gating'
+import type { VaultRecord } from '../../src/models/models-shapes'
+import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
-import { NOVEL, Proving } from '../../src/models/proving'
+import { NOVEL, PassphraseProving } from '../../src/models/proving'
+import type { Outcome } from '../../src/outcome'
+import type { VaultScope } from '../../src/shapes/scopes'
+import type * as VX from '../../src/shapes/vault'
+import { passphraseCleartext } from '../../src/shapes/vault'
 import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { quietLogger } from './logging'
-import { passkeyOf, testDeriver } from './builders'
+import { anyStrengthChecker, passkeyOf, testDeriver } from './builders'
 
 /** The clock's first reading: 31 October 2026. */
 export const T0 = Date.UTC(2026, 9, 31)
@@ -22,44 +29,85 @@ export const Passphrase = 'correct horse battery staple'
 /** The passphrase a gate change sets in place of {@link Passphrase}. */
 export const NewPassphrase = 'a new passphrase for the vault'
 
-/** The proof closure of a user who types `passphrase`. */
-export const byPassphrase = (passphrase: string) => () => ({ passphrase })
+/** What a user who types `passphrase` hands the gating. */
+export const byPassphrase = (passphrase: string): Typed => ({ passphraseClear: passphrase })
 
-/** The proof closure of a user who touches the passkey `tag` names, its answer as `passkeyOf` makes it. */
-export const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await passkeyOf(tag) })
+/** What a user who touches the passkey `tag` names hands the gating, its answer as `passkeyOf` makes it. */
+export const byPasskey = async (tag: string): Promise<Typed> => ({ passkeyClear: await passkeyOf(tag) })
+
+/** What the user hands a gating's attempt at the dialog, whatever its kind, or what is about to make it. */
+export type Typing = Typed | Promise<Typed>
+
+type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: VX.PasskeyAnswer | null }
+
+/** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
+const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
+  const { requestCleartext: asBefore } = world
+  let heard: Outcome<unknown> | null = null
+  const dialog: RequestCleartext = async (gating) => {
+    heard = await gating.attempt(await typing as never)
+  }
+  world.requestCleartext = dialog
+  try {
+    return await ask()
+  } catch (err) {
+    const attempted = heard as Outcome<unknown> | null
+    throw attempted?.ok === false ? attempted.err : err
+  } finally {
+    world.requestCleartext = asBefore
+  }
+}
+
+/** `listing.buildVault(scope)`, the user doing `typing` at the dialog. */
+export const buildTyping = (listing: VaultListing, scope: VaultScope, typing: Typing): Promise<Vault> => askTyping(listing.world, typing, () => listing.buildVault(scope))
+
+/** `vault.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
+export const unlockTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.ensureUnlocked())
+
+/** `vault.replacePassphrase()`, the user typing the passphrase and the next at the dialog. */
+export const replaceTyping = (vault: Vault, ante: string, next: string): Promise<Vault> => askTyping(vault.world, { antePassphraseClear: ante, nextPassphraseClear: next }, () => vault.replacePassphrase())
+
+/** `vault.addPasskey()`, the user typing the passphrase and touching the passkey `tag` names at the dialog. */
+export const addPasskeyTyping = async (vault: Vault, passphrase: string, tag: string): Promise<Vault> => askTyping(vault.world, { passphraseClear: passphrase, passkeyClear: await passkeyOf(tag) }, () => vault.addPasskey())
+
+/** `vault.revokePasskey()`, the user typing `passphrase` at the dialog, should it be shown. */
+export const revokeTyping = (vault: Vault, passphrase: string): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.revokePasskey())
+
+/** `vault.delVault()`, the user typing `passphrase` at the dialog. */
+export const delTyping = (vault: Vault, passphrase: string = Passphrase): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.delVault())
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
 
-const ok = <ValT>(val: ValT) => Promise.resolve({ ok: true as const, val, err: null })
 const nothing = (): void => undefined
 
 /** Every listing made since the last test. */
 const madeListings: VaultListing[] = []
 
-/** Say goodbye to every listing a test made, after it, so no autolock timer outlives its test: call it once at the top of a test file. */
+/** Say goodbye to every listing a test made, after it, so nothing outlives its test: call it once at the top of a test file. */
 export const useVaultWorlds = (): void => {
   afterEach(() => {
     for (const listing of madeListings.splice(0)) { listing.goodbye() }
   })
 }
 
-/** A deviceDB that keeps the one lease last put, and logs each lease verb. */
+/** The real deviceDB, each verb a friend binds spied on, and the one row these worlds hold, to read or lay over. */
 const makeDeviceDB = () => {
-  let kept: unknown = null
+  const memoryDB = new MemoryDeviceDB()
+  const rows = memoryDB._cheat_leaseRows()
   return {
-    keptNow:     () => kept,
-    keep:        (record: unknown) => { kept = record },
-    tryGetLease: vi.fn((_scope: VaultScope) => ok(kept)),
-    tryPutLease: vi.fn((record: unknown) => { kept = record; return ok(record) }),
-    tryDelLease: vi.fn((_scope: VaultScope) => { kept = null; return ok(undefined) }),
+    memoryDB,
+    peek:      vi.spyOn(memoryDB, 'peek'),
+    tryCache:  vi.spyOn(memoryDB, 'tryCache'),
+    tryVacate: vi.spyOn(memoryDB, 'tryVacate'),
+    cachedNow: (): unknown => [...rows.values()][0] ?? null,
+    layCached: (record: unknown) => { rows.set([...rows.keys()][0] ?? 'no-row', record) },
   }
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: Partial<VaultWorld> = {}) => {
-  let stored = stored0
   let now = T0
   const deviceDB = makeDeviceDB()
   const world: VaultWorld = {
@@ -70,23 +118,17 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
     logger:       quietLogger,
     keyDeriver:   testDeriver,
+    strengthChecker: anyStrengthChecker,
     device_id:    'device-1',
     leaseMillis:  LeaseMillis,
-    deviceDB:     deviceDB as unknown as VaultWorld['deviceDB'],
+    deviceDB:     deviceDB.memoryDB,
     ...worldOverrides,
   }
-  const answerOf = (scope: VaultScope, val: VaultRecord | VaultSparse | null) => ({ scope, ok: true as const, val, world: null })
-  const opts: VaultListingOpts = {
-    world,
-    store: {
-      get:   (scope) => Promise.resolve(answerOf(scope, stored)),
-      put:   (record) => { stored = record; return Promise.resolve(answerOf(record, record)) },
-      del:   () => Promise.reject(new Error('not in these tests')),
-      watch: () => nothing,
-    },
-    cache: { load: () => Promise.resolve([]), save: () => Promise.resolve() },
-    maxMillisSinceRefresh: 10 * 60_000,
-  }
+  const vaultDB = new MemoryVaultDB({ clock: world.clock })
+  const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
+  if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
+  const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
+  const opts: VaultListingOpts = { world, vaultDB, maxMillisSinceRefresh: 10 * 60_000 }
   const makeListing = (): VaultListing => {
     const made = new VaultListing(opts)
     madeListings.push(made)
@@ -95,16 +137,19 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   const listing = makeListing()
   /** Another device's put of `record`, landing in the vaultDB behind this one's back, at the next revision. */
   const storeBehindOurBack = (record: VaultRecord): VaultRecord => {
-    stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
+    const stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
+    vaultrows.set(Dna.vaultlabel, stored)
     return stored
   }
+  /** Lay `record` in the vaultDB as it is, as a restore from an older copy does. */
+  const restoreRow = (record: VaultRecord | VaultTombstone): void => { vaultrows.set(Dna.vaultlabel, record) }
   const demandStored = (): VaultRecord => {
+    const stored = storedNow()
     if (stored === null) { throw new Error('nothing stored') }
     return stored
   }
   return {
-    listing, opts, deviceDB, storeBehindOurBack, demandStored,
-    storedNow:      () => stored,
+    listing, opts, vaultDB, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
     anotherSession: makeListing,
     /** Move the clock on by `millis`; no timer fires. */
@@ -113,45 +158,41 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
 }
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
-/** The record of a vault built of `Dna`, gated under `passphrase` and sent, as a vaultDB holds it. */
+/** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB holds it. */
 export const storedVaultRecord = async (passphrase: string = Passphrase): Promise<VaultRecord> => {
   const { listing, demandStored } = makeVaultWorld()
-  const vault = await listing.build(Dna, byPassphrase(passphrase))
-  await vault.send({})
+  await buildTyping(listing, Dna, byPassphrase(passphrase))
   return demandStored()
 }
 
-/** A vault born of `Dna` by `proofClosure` (under {@link Passphrase} unless told otherwise) and sent, in a fresh world: unlocked, its lease kept on the device. */
-export const makeBornVault = async (proofClosure: ProofClosure = byPassphrase(Passphrase)) => {
-  const world = makeVaultWorld()
-  const vault = await world.listing.build(Dna, proofClosure)
-  await vault.send({})
+/** A vault created of `Dna` by `typing` (under {@link Passphrase} unless told otherwise), in a fresh world: unlocked, its lease cached on the device. `worldOverrides` says otherwise of the world. */
+export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), worldOverrides: Partial<VaultWorld> = {}) => {
+  const world = makeVaultWorld(null, worldOverrides)
+  const vault = await buildTyping(world.listing, Dna, typing)
   return { ...world, vault }
 }
 
 /** A vault born as {@link makeBornVault} makes it, with the passkey of the `laptop` beside the passphrase. */
 export const makeBornVaultWithPasskey = async () => {
-  const passkeyAnswer = await passkeyOf('laptop')
-  return makeBornVault(() => ({ passphrase: Passphrase, passkeyAnswer }))
+  return makeBornVault({ passphraseClear: Passphrase, passkeyClear: await passkeyOf('laptop') })
 }
 
-const RoundTripBoxKeyStamp  = Object.freeze({ boxlabel: 'anthropic_api_key' })
-const RoundTripWhisperStamp = Object.freeze({ revision_seq: 1 })
+const RoundTripStamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
-/** What `opener` unseals of a whisper `sealer` seals: the two hold one vaultKey only if it comes back. */
-export const roundTrip = async (sealer: Lease, opener: Lease): Promise<string> => {
-  const sealed = await sealer.sealWith(new TextEncoder().encode('sk-test'), RoundTripBoxKeyStamp, RoundTripWhisperStamp)
-  return new TextDecoder().decode(await opener.unsealWith(sealed, RoundTripBoxKeyStamp, RoundTripWhisperStamp))
-}
+/** What the lease `opener` unseals of a whisper the vault `sealer` seals: the two hold one vaultKey only if it comes back. */
+export const roundTrip = async (sealer: Vault, opener: Lease): Promise<string> => opener.unsealWith(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp)
+
+/** {@link roundTrip} through the vaults' own seal verbs. */
+export const vaultRoundTrip = async (sealer: Vault, opener: Vault): Promise<string> => opener.unsealStampedString(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp)
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
 export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
-  const { passphraseProving } = await Proving.makeProvingPair({ ...Dna, vault_tok, registered_at }, () => ({ passphrase: Passphrase }), makeVaultWorld().opts.world)
-  await passphraseProving.makeWayin(NOVEL)
-  return passphraseProving
+  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), makeVaultWorld().opts.world)
+  await proving.buildWayin(NOVEL)
+  return proving
 }
 
-/** `vault` as its boxes see it, but that it takes no world: the models world's fake store answers with none. */
+/** `vault` as its boxes see it, but that it takes no world. */
 export const boxWorldOf = (vault: Vault): BoxWorld => ({
   clock:        vault.clock,
   scope:        vault.scope,
@@ -159,5 +200,6 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   lockState:    () => vault.lockState(),
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
-  demandLease:  () => vault.demandLease(),
+  sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
+  unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
 })

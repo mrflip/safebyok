@@ -41,6 +41,93 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change does not rotate the vaultKey, so it ends no session.**
+  `Vault.replacePassphrase`, `addPasskey` and `revokePasskey` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
+  and a device that holds the vaultKey keeps it to its lock. Revoking a passkey or replacing a passphrase stops new unlocks through the
+  old way in; it does not evict a device already unlocked, nor undo what an attacker who once held the vaultKey learned. A lease held on
+  the acting device is renewed under the new gate epoch (`#renewLease`), unless a `lock()` crossed the change. (Models are not yet
+  exported from the package.)
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`replacePassphrase` keeps the passkey.** A vault must always have a
+  passphrase; the passkey is optional. Replacing the passphrase after a suspected compromise does not remove a passkey; a host wanting
+  both gone calls `revokePasskey` as well.
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change is its params, with no client-side next gate.** The params
+  spread the record read after a timely refresh (`vault.ensureTimely(MSX.Promptly)`, `timelyAnte` in `models/gating.ts`) inside the
+  attempt, and land conditional on its revision at the vaultDB, so a change crossing another refuses `stale_write` and stores nothing.
+  The prior `Gate.with*` and closure-taking `attemptProof` (host code handed proof closures) are gone: what the user types arrives as
+  clears through the one gating, and is spent by `spendClears`, which also zeroes a bare `ArrayBuffer` `prfBytes`.
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`del_vault`'s proof is a client-side confirmation; the vaultDB checks no
+  proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). `Vault.#runDelVault` locks first,
+  so no box opens under a lease while the tombstone goes out; a refused delete leaves the vault locked. A `lock()` does not settle a
+  `del_vault` asking, as a lock does not stop a delete (`declineAtLock` skips that kind), but a goodbye or vacate does
+  (`declineAtDiscard`). `Vault.del()` is `delVault()`, so there is no unguarded delete through the Vault. `vaultListing.del(ante)`
+  refuses `stale_write`, asking nothing of the vaultDB, for an instance of another life than the slot's vault, as a delivered answer
+  would tombstone the live vault locally.
+* 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
+  `VaultListing.#runBirth` (`packages/safebyok/src/models/vault-listing.ts`), where `ensureVault` answers a vault of another `vault_tok`
+  (another device won the slot), the proving is of the record that lost, so no lease is built or attached: that vault is answered
+  locked, a success the caller tells by `vault_tok`. (Models are not yet exported from the package.)
+* 2026-11-03 (vault_slot, branch `20261103-vault_slot`): **A tombstone taken in by a vault leaves the cached lease row standing if the
+  erase is refused.** A tombstone a vault takes in (from `vault.del()`, or found by a fetch or notice) lands the end state: lock, erase
+  the row this device has cached of the lease, box listing vacated, the vault staying in its slot. An erase refused on this path goes to
+  `onBadNews` and is not a panic, as the tombstone stands, so the cached row can outlive the vault's deletion on this device until a
+  later erase. It is bound to the old `vault_tok`, which a new life of the vault reads as none, and it remains usable only by a holder
+  of the old vault's stamp. (Models are not yet exported from the package.)
+* 2026-11-03 (vault_slot, branch `20261103-vault_slot`): **A stored row that fails its checks is removed only by the customer naming
+  it.** Such a row is never delivered to an instance and nothing acts on it. `delVault` / `delBox` land only where the tombstone's
+  `prior` matches the row as `damaged_records` lists it (its revision and `vault_tok`, or the sentinels where the row cannot be read);
+  any other prior refuses as a get does, and a `put` cannot overwrite a damaged row. The check is `VS.isDamagedVaultAt` /
+  `VS.isDamagedBoxAt` (`packages/safebyok/src/storage/vault-db-shapes.ts`), used in `memory-vault-db.ts`. Amended 2026-11-03
+  (vault_boxes, branch `20261103-vault_boxes`): `vault.delBox(boxlabel)` (`src/models/vault.ts`) over a row that fails its checks
+  takes that row's own revision (`boxes.damagedAt`) as the tombstone's `prior` and lays the tombstone over it, on the customer's
+  naming the label alone.
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **A whisper crosses the seal seam as a string.**
+  `vault.sealStampedString(whisperText, stamp)` and `unsealStampedString` hand a whisper between `Box` and `Lease` as a JavaScript
+  string, which cannot be zeroed; `Lease.sealWith` and `unsealWith` zero only the bytes they encode or decipher themselves. Before
+  this, the caller's serialized bytes were zeroed by the lease. Amended 2026-11-03 (vault_boxes, branch `20261103-vault_boxes`):
+  `box.send({ sidecar })` with no whisper (`Box.#edit`, `#keptWhisper`, `#unseal`) unseals the stored whisper and seals it again
+  under the new stamp, as the stamp binds the sidecar, so a metadata-only update opens the whisper; its value is held as a string,
+  not zeroable, from the unseal to the seal. (Models are not yet exported from the package.)
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **The friend is a public
+  route to a lease row.** `vault.leaseFriend()` and `lease.friend` are public, and `friend.peekLease()` answers the row this device
+  caches, including the `lease_key` handle and `vault_key_lease_wrapped`, to whoever holds a Vault or a Lease. (Models are not yet
+  exported from the package.)
+  Amended 2026-11-03 (lease_narrow, branch `20261103-lease_narrow`; the Coach: "Let's fix before end of sprint, important, record to
+  security.md"): the friend's `peekLease()` (the cached row, with its non-extractable `lease_key` handle), `tryUncacheLease()` (erases the
+  row), `attachLease(lease)` (holds a lease as the vault's) and `tryCacheLease(record)` (overwrites the row) were all reachable from a Vault
+  or a Lease. Now `Lease` holds the friend in `#friend` and offers `lease.isMadeFor(friend)`, a boolean over a friend the caller already
+  holds, and `Vault` makes it in a private `#leaseFriend()`. A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
+  from `VaultListing`; its run now lives in the Vault class as the public static `Vault.launchBirth(listing, scope)` with a private
+  static `#runBirth`, which reaches the private `vault.#unlockByProof`. `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
+  itself and refuses 'bad_option' over a vault present, with no gating opened and no KDF run. It takes no proving: the proving comes from the
+  gating it launches. A public `vault.unlockByProof(proving)` was set aside, as whatever is passed as a proving is handed the friend
+  (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) `vault._cheat_leaseFriend()` is a public
+  method, named loudly, for tests; it is a door at runtime, and the guarantee is only that nothing in `src/` calls it (a test row checks
+  this), which does not stop a host calling it. (2) A script that patches `Proving.prototype.buildLease`, `Lease.grant` or `Lease.peek`
+  (the friend is their parameter) can capture the friend from the vault's own calls, as can anything else running in the page.
+  (3) The friend was not the only route to the row: `vault.world.deviceDB.peek({ ...vault.scope, vault_tok: vault.vault_tok })` answers the
+  same row with the same handle, as do `bank.deviceDB` and `listing.world.deviceDB`. The host supplies the deviceDB and a same-origin
+  script can open its store regardless, so this removes a route from the Vault and Lease API and does not put the cached row out of a
+  host's reach. (4) A friend of the host's own, handed to `proving.buildLease(ownFriend)`, hears a new lease's record, `lease_key` handle
+  included, when `lease.cache()` passes it to `ownFriend.tryCacheLease`. That takes a proving, so the passphrase, which the host's dialog
+  already hears, and it reaches a new lease's handle, never the cached row. Raised to the Coach.
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **A refused erase at
+  `lock()` is a panic.** `vault.#vacateLease` reads locked at once, but where the deviceDB refuses the erase the row stands: with a host
+  `onPanic` the vault stays locked and enabled, the row in place, and the next `ensureUnlocked` on this device takes it up with no proof;
+  with none, the refusal goes to the platform's `reportError` where there is one, and the vault is vacated, which tries the erase once
+  more. Amended 2026-11-03 (vault_slot, branch `20261103-vault_slot`): `#vacateLease`
+  (`packages/safebyok/src/models/vault.ts`) evicts and nulls the lease before it calls the deviceDB's erase, and turns a synchronous
+  throw from a duck's `tryVacate` into a refusal, so `lock()` cannot fail open: it reads locked and does not throw, and the refused
+  erase goes to the panic path above.
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`; ruled by the Coach):
+  **A `lock()` crossing an unlock before its attach ends unlocked.** This includes a `lock()` during `Lease.peek` or during the proof:
+  the erase lands, then the attach holds a lease and caches its row afresh, so the row and the unlocked state stand after a `lock()`
+  that returned.
+  Amended 2026-11-03 (gating, branch `20261103-gating`; ruled by the Coach): at the gating, a `lock()` crossing an unlock attempt already
+  past the user's enter key does not abort it (`declineAtLock`, `models/gating.ts`). The vault ends unlocked, and the next `lock()` ends
+  that session: we hold proof that this user intends and is permitted to have the vault unlocked, and nothing turns back midway. A
+  `lock()` before the enter key settles the gating `locked_while_asking`; a later attempt refuses `gating_landed`, spending the passkey
+  answer it was handed.
+
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
   value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,
@@ -363,6 +450,8 @@ added or folded into through the subagent, and no other entry changes.
   (`vault_locked`); a malformed argument is `bad_option`, quoting none of it. One gating is pending per vault; a second attempt
   while one runs refuses `attempt_in_flight`. Entries below that name `unlock()`, `putWayin()` with a passphrase, `Ask`, `attempt(proof)`
   or `getProof` describe the calls this replaced.
+  Amended 2026-11-03 (gating, branch `20261103-gating`): `models/gating.ts` keeps this: `requestCleartextThrew` is an `unexpected_error`
+  with no `cause`, as the host's `requestCleartext` heard the passphrase.
 * 2026-10-23 (primitives sprint, thread 9, gating): **the pantry consult is the unlocking gating's first step, before the host is asked,
   and a lease that does not fit is left in the pantry.** The vault reads `deviceDB.tryGetLease`; then the gating must not have
   landed (a lock, a decline or a let-go during the read takes nothing up); then the one take-up predicate (`#fitsTakeUp`,
@@ -390,11 +479,16 @@ added or folded into through the subagent, and no other entry changes.
   seals (and zeroes) the new passkey's answer, so a typo returns to the dialog with the answer unspent; the strength check
   runs before any derivation. `same_passphrase` compares the two strings the user typed in this tab with `===`: no
   attacker observes it, and no constant time is used (the spec has it so). The seals of a chain share no junction.
+  Amended 2026-11-03 (gate_changes): the refusal carries no secret material, and as a correctable refusal (`MSX.correctableKindVals`) it
+  leaves the answer unspent so the dialog can be tried again.
 * 2026-10-23 (primitives sprint, thread 9, gating): **deleting a vault is proven by its passphrase.** `del()` raises a `del_vault`
   gating: the passphrase is sealed and checked, then `delVault` expects `{ vault_tok, gate_epoch }` (a stale tab's old
   passphrase cannot delete). The gating settles with success first; then the vault locks (the lease erased) and the Vault
   object goes. A forgotten passphrase can therefore no longer delete a sound vault from the client; `delDamagedVault`
   remains for props that fail their checks, and `safebyok-react`'s start over is off pending a ruling.
+  Amended 2026-11-03 (gate_changes): in `models/vault.ts` the passphrase's proof is a client-side confirmation only; the vaultDB is
+  conditional on the revision and checks no proof. `#runDelVault` locks first and the delete follows, where this entry has the lock
+  after it; a refused delete leaves the vault locked. See the 2026-11-03 (gate_changes) entry on `del_vault`.
 * 2026-10-23 (primitives sprint, thread 9, gating): **a grant the device store refuses after a change to the ways in landed is warned of, not
   thrown (today's contract).** For change passphrase and put or delete passkey, a `storage_unavailable` or `storage_blocked`
   from `tryPutLease` after the gate was stored is logged through the host's logger as a warning, the vault left locked on this
@@ -3250,6 +3344,9 @@ added or folded into through the subagent, and no other entry changes.
   imported, whatever happens, so a `PasskeyAnswer` works once and a host must ask the passkey afresh for each call.
   Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` (amended 2026-10-27 (validator_ducks): now `passkeyAnswer.parse` (amended 2026-10-28 (validator_names): `passkeyAnswerShape.parse` when this was written), `src/shapes/vault.ts`; its `prfBytes` check is by tag, a shared `bytes` kit maker, so bytes from another realm such as an iframe or jsdom are accepted, as the lease's bytes already were; the all-zero refusal is unchanged) before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
   Amended 2026-10-28 (activity_mount, PR [#350](https://github.com/mrflip/safebyok/pull/350); the Coach asked for both fixes): (1) `src/gating.ts`: a gating's attempt now spends the `PasskeyAnswer` it is handed (`spendAnswer`; the `answerOf` argument to `attemptOf` in `#gatingOf`), zeroing `prfBytes` on every outcome except a refusal the user can correct (`correctableKindVals`). Before, only `PasskeyProving.seal` zeroed them, so an attempt refused before the seal left them as they were: the gating already over (`gating_landed`), another attempt in flight (`attempt_in_flight`), a malformed passphrase beside the answer (`bad_option`), a lock landing before the seal, a storage failure before it. A correctable refusal raised before the seal (a mistyped passphrase in `put_passkey`, `absent_wayin`) still leaves the answer unspent, because the README promises a host it may hand the same answer in again; zeroing it is then the host's. A host that retried with the same answer after misuse now meets `bad_option`. (2) `safebyok-react`: `useWhenShown` first parked a passkey answer that came back while the dialog was hidden (React's `<Activity>`, a Suspense boundary) and tried it when the dialog showed again, with no time limit and no zeroing if the dialog unmounted while hidden, so the bytes lived in a closure in a ref until garbage collection. Now `PasskeyUnlockButton` and `GatingModal`'s put_passkey form try an answer at once while shown (`useWhenShown().isShown()`) or zero it untried; only the outcome of an attempt waits for the dialog to show. Each dialog also zeroes the answer once its one attempt is done, refused or not (`attemptOnce`, `packages/safebyok-react/src/passkey.ts`). A passkey touched while the dialog is hidden needs a second touch, and for put_passkey leaves an unused credential on the authenticator. Unchanged: a JavaScript string passphrase cannot be zeroed (G1's caveat).
+  Amended 2026-11-03 (gating, branch `20261103-gating`): in `packages/safebyok/src/models/gating.ts` the gating holds the clears only for
+  the length of an attempt, and its `run` hears provings, never a clear. `spendClears` zeroes a passkey answer's PRF bytes on every path but
+  a correctable refusal, including an attempt refused before it is tried (`gating_landed`, `attempt_in_flight`).
 * 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot

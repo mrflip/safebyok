@@ -50,7 +50,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, ErrorExpected, LeftOutExpected
+// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -67,14 +67,8 @@ export const CtxStampExpected = "Expected a flat object of strings and numbers, 
 /** The listing a storable is made in. */
 export const ListingExpected = "Expected a Listing"
 
-/** The `err` of a storage call's answer. */
+/** Anything but a VaultError, where bad news is told. */
 export const VaultErrorExpected = "Expected a VaultError"
-
-/** The `err` of a task a trigger is told failed. */
-export const ErrorExpected = "Expected an Error"
-
-/** A field a bag must not carry beside another. */
-export const LeftOutExpected = "Expected it left out"
 // --
 
 // == [Passphrases]: PassphraseNotText
@@ -278,22 +272,22 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: PartialLoad, MovedUnderEdit, AlreadyHeld, BoxPatchAdvice, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, LockedIsNoWhisper, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
-/** Why an edit laid over a central that moved while it was being made stages nothing. */
-export const MovedUnderEdit = "Storage delivered a newer record while this edit was being made, so the edit was laid over a record storage no longer holds, and nothing was staged. The record in hand is now the one delivered: call again to edit it."
-
-/** Why `build` makes nothing of a dna for a scope the listing already holds. */
-export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so build made nothing of the dna: edit the instance that listing.at(scope) answers, which also brings a deleted or damaged one back to life."
+/** Why `create` makes nothing of a dna for a scope the listing already holds. */
+export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so create made nothing of the dna: listing.at(scope) answers it, and a box's send also brings a deleted or damaged box back to life."
 
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
-export const BoxPatchAdvice = "Nothing was staged. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
+export const BoxPatchAdvice = "Nothing was stored. An update of a box names its whisper, as { val }, its sidecar, or both: the half left out is kept."
 
-/** Why an update of a box or a vault whose patch names another's scope stages nothing. */
-export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was staged: update the one it names, which listing.at(scope) answers.`
+/** Why an update of a box naming neither its whisper nor its sidecar stores nothing. */
+export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to store."
+
+/** Why an update of a box whose patch names another's scope stores nothing. */
+export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`
 
 /** Why LOCKED, which a locked box answers for its whisper, is refused where a whisper is wanted. */
 export const LockedIsNoWhisper = "LOCKED is not a whisper: unseal or expose one first"
@@ -315,12 +309,6 @@ export const OtherVaultTokAtBirth = "Storage gave a record under another vault_t
 
 /** Why a record delivered under one scope that names another is not taken in. */
 export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
-
-/** Why a put whose `revision_seq` does not fit the `revision_tok` it is laid over is refused, by this device before it is sent or by storage. */
-export const PutUnfitForPrior = "A put's revision_seq does not fit the record it is laid over, so nothing was stored: revision 0 goes over no record, and each later revision over the record at the revision before it, named by its revision_tok. An edit mints the revision that fits: put the record an edit staged, not one as it was received or made elsewhere."
-
-/** Why an answer for one scope that was asked for another is not taken in. */
-export const AnswerOfOtherScope = "Storage answered for a scope other than the one asked, so nothing was made or changed of the answer: a bug in the storage adapter, which should answer each call about the scope it is given."
 
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
@@ -364,17 +352,14 @@ export const ProvingOfOtherVault = "The source proving is of another vault: a wa
 /** Why a lease is not granted to a vault other than the one a proving is of. */
 export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds."
 
-/** Why a proof closure's throw is replaced: it heard the passphrase. */
-export const ProofClosureThrew = "The proof closure threw rather than handing back a passphrase. What it threw is left out, as it heard the passphrase."
-
 /** Why a keyDeriver's throw is replaced: it heard the passphrase. */
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, vaultAbsent, ClosureWithRecord
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, LetGoInstance, vaultAbsent, VaultDeleted
 
-/** Why a lease that will not open locks its vault. */
-export const DamagedLease = "This device's lease would not open, so the vault was locked and the lease dropped: unlock it again to carry on."
+/** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
+export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
 /** Why a whisper that will not open under the vault's key is refused. */
 export const UnopenedWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
@@ -382,41 +367,37 @@ export const UnopenedWhisper = "That whisper would not open under this vault's k
 /** Why a whisper that opened but is no whisper this package knows is refused. */
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
 
-/** Why a lease past its autolock_at, or forgotten, opens nothing. */
-export const LeaseNotInForce = "This lease is no longer in force -- its time ran out, or it was forgotten when the vault locked -- so nothing was read or written: unlock the vault again."
+/** Why a lease dropped opens nothing. */
+export const LeaseNotInForce = "This lease is out of force, as the vault locked or the lease would not open, so nothing was read or written: unlock the vault again."
 
 /** Why a call that needs the vault unlocked is refused while it is locked. */
 export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
 
 /** Why a locked vault with no lease kept is not unlocked without a proof. */
-export const NoProofToUnlock = "The vault is locked and this device keeps no lease of it, so it needs a proof: call ensureUnlocked with a proof closure that answers the passphrase or a passkey."
+export const NoProofToUnlock = "The vault is locked, this device has no lease of it cached, and this bank was made without a requestCleartext, so nothing can ask the user for a proof: give Bank.make a requestCleartext."
 
-/** Why a vault takes up no lease of another vault, or granted to another Vault object. */
-export const LeaseOfOtherHolder = "This lease was granted to another vault, or to another Vault object of this one, so this one did not take it up: a bug in the caller."
+/** Why a vault attaches no lease made for another vault, or for another Vault object. */
+export const LeaseOfOtherHolder = "This lease was made for another vault, or another Vault object of this one, so this one did not attach it: a bug in the caller."
+
+/** Why an instance past a sweep, a vacate or a delete answers nothing. */
+export const LetGoInstance = "This object was let go, by a sweep, a vacate or a delete, so it answers nothing more: ask the bank for the vault again."
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
 
-/** Why a vault built of a record takes no proof closure. */
-export const ClosureWithRecord = "A vault built of a record takes no proofClosure: its gate is the one the record carries."
+export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
 
-// == [Models: gates]: GateChangeNeedsPassphrase, GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
-
-/** Why a passkey's answer does not prove a change to the gate. */
-export const GateChangeNeedsPassphrase = "Only the passphrase proves a change to the vault's passphrase or passkey, and this proof handed in a passkey's answer, so nothing more was asked and nothing changed. The passkey still unlocks the vault: prove the change with the passphrase."
-
-/** Why a gate change proved against a record that has since moved is not sent. */
-export const GateMovedUnderChange = "The vault's record was changed elsewhere while this change was being proved, and its passphrase or passkey may have changed with it, so nothing was changed. The vault in hand now holds the newer record: call again to make the change over it."
+// == [Models: gates]: PasskeyHeldAlready, DelOfOtherLife
 
 /** Why a passkey is not added to a gate that holds one. */
 export const PasskeyHeldAlready = "This vault has a passkey already, and holds one at a time, so nothing was asked or changed: revoke it first (vault.revokePasskey), then add the new one."
 
-/** Why revoking a passkey changes nothing where the gate holds none. */
-export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
+/** Why a stale Vault's delete does not reach the vault made since in its slot. */
+export const DelOfOtherLife = "This Vault was deleted and made anew since it was read, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, GatingSettled, RequestCleartextThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -424,11 +405,19 @@ export const PositiveMinutesShape = "Expected a number of minutes above zero, fr
 
 export const GatingDeclined = "The prompt was declined, or closed before an attempt succeeded, so nothing was unlocked or changed: ask again when the user wants the vault."
 
+export const AlreadyAsking = "A prompt is already open on this bank, so this one was not shown: the host owns the one dialog, and disables what opens it meanwhile."
+
+export const LockedWhileAsking = "The vault was locked before the user answered the prompt, so nothing was proved: ask again when the user wants the vault."
+
+export const AttemptInFlight = "An attempt is already under way on this prompt, so this one was not tried: disable the submit button until it answers."
+
 export const GatingSettled = "This prompt has ended -- it was answered, declined, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
-export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: hand the call a proof closure, or give Bank.make a requestCleartext."
+export const ClearsThrew = "Reading what was handed to this attempt threw, so nothing was tried. What it threw is left out, as it may quote the passphrase: hand attempt a plain object."
+
+export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: give Bank.make a requestCleartext."
 
 export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."
 
@@ -445,4 +434,15 @@ export const suppliedSpecChanged = (label: string): string => `A key deriver lab
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): string => `This key deriver takes a salt of ${String(expectedCount)} bytes, and was handed one of ${String(handedCount)}: a salt made by another deriver, or a stored salt that has been damaged.`
 
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."
+// --
+
+// == [The models' bank]: BankHelloFirst, DeviceRecordRewritten, vaultStoredDamaged
+
+export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait for it first."
+
+/** Bad news of a device record that failed its checks and was replaced. */
+export const DeviceRecordRewritten = "This device's record for the bank was damaged, so it was written over: the device now has a new device_id."
+
+/** Bad news of a vault row `getBank` set aside. */
+export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --

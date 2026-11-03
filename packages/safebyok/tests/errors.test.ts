@@ -156,7 +156,17 @@ const FamilyCases = [
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
   ["no_whisper",          "condition", 'a store keeping a whisper where none is stored is told to the caller, who hands one in'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
+  ["already_asking",      "condition", 'a second launch while a dialog is up is the host deduping late, not a fault'],
+  ["locked_while_asking", "condition", 'a lock before the enter key ends the ask: the user locked, and nothing was proved'],
+  ["declined",            "condition", 'a closed dialog is the user saying no, not a fault'],
   ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
+  ["camped",              "condition", 'a put told not to replace a live record takes up the one stored'],
+  ["vault_empty",         "condition", 'a vault_tok of a life no row holds is a fact of syncing: read the vault by its scope'],
+  ["storage_error",       "condition", "a vaultDB's store failing is tried again shortly"],
+  ["damaged_record",      "bad_news",  'a stored row failing its checks is set aside and told of'],
+  ["invalid_input",       "misuse",    'an argument failing its check is a bug in the caller'],
+  ["gate_issue",          "misuse",    'gate params at odds with the stored row are a bug in the caller'],
+  ["disabled",            "misuse",    'calling an object let go by a sweep, a vacate or a delete is a bug: ask the bank for it again'],
 ] as const
 
 describe("each kind's family", () => {

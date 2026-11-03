@@ -1,101 +1,60 @@
+import { Checkers } from '../checks/validator'
 import { VaultError } from '../errors'
 import { decorate, tattoo } from '../helpers'
 import * as Phrases from '../phrases'
-import { type AttemptClosure, type GateProps, type PasskeyClosure, type PasskeyWayinRecord, type PassphraseClosure, type PassphraseWayinRecord, type ProofClosure, type ProvingWorld, type VaultStamp, type WayinHeader, gateProps, passkeyAddArgs, passkeyRevokeArgs, passphraseReplaceArgs, vaultStamp } from './models-shapes'
-import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
+import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultStamp, type WayinHeader, FirstGateEpoch, gateProps, vaultStamp } from './models-shapes'
 import { Wayin } from './wayin'
 
-// == [Gate]: build, novelWayins, attemptProof, provePassphrase, withPassphraseReplaced, withPasskeyAdded, withPasskeyRevoked, pickle, toJSON
+/** Stays here: it names the class. */
+const Checks = Checkers('bad_option', ({ obj, custom }) => {
+  const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
+  return { gateMakeArgs: obj({ passphraseWayin: wayin, passkeyWayin: wayin.nullable() }) }
+})
 
+// == [Gate]: make, demandPasskeyAddable, pickle, toJSON
+
+/** The wayins of a vault's record as of one `gate_epoch`, a read-only view: a change is a vaultDB verb's, and a new `Gate` is read from the record it lands. */
 export class Gate {
+  declare readonly gate_epoch:       number
   declare readonly passphrase_wayin: PassphraseWayinRecord
   declare readonly passkey_wayin:    PasskeyWayinRecord | null
   declare readonly ppWayin:          Wayin
   declare readonly pkWayin:          Wayin | null
   declare readonly stamp:            VaultStamp
 
-  /** The gate of the vault `stamp` names, its wayins as `props` pickles them. */
   constructor(stamp: VaultStamp, props: unknown) {
     const checked = vaultStamp.parse(stamp)
-    const { passphrase_wayin, passkey_wayin } = gateProps.parse(props)
+    const { gate_epoch, passphrase_wayin, passkey_wayin } = gateProps.parse(props)
     const ppWayin = new Wayin(passphrase_wayin)
     const pkWayin = passkey_wayin === null ? null : new Wayin(passkey_wayin)
-    tattoo(this, { passphrase_wayin: ppWayin.pickle(), passkey_wayin: pkWayin?.pickle() ?? null }, { writable: false })
+    tattoo(this, { gate_epoch, passphrase_wayin: ppWayin.pickle(), passkey_wayin: pkWayin?.pickle() ?? null }, { writable: false })
     decorate<Gate>(this, { ppWayin, pkWayin, stamp: checked })
     Object.freeze(this)
   }
 
-  /** A novel gate for the vault `stamp` names, its wayins made from what `proofClosure` answers, beside the passphrase proving, which grants the vault its first lease. */
-  static async build(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ gate: Gate, proving: PassphraseProving }> {
-    const { proving, passphrase, passkey } = await Gate.#novelWayins(stamp, proofClosure, world)
-    return { gate: new Gate(stamp, { passphrase_wayin: passphrase.pickle(), passkey_wayin: passkey?.pickle() ?? null }), proving }
+  /** The first gate of the vault `stamp` names, of `gate_epoch` 1. */
+  static make(stamp: VaultStamp, passphraseWayin: Wayin, passkeyWayin: Wayin | null): Gate {
+    Checks.gateMakeArgs.parse({ passphraseWayin, passkeyWayin })
+    return new Gate(stamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passphraseWayin.pickle(), passkey_wayin: passkeyWayin?.pickle() ?? null })
   }
 
-  static async #novelWayins(stamp: VaultStamp, proofClosure: ProofClosure, world: ProvingWorld): Promise<{ proving: PassphraseProving, passphrase: Wayin, passkey: Wayin | null }> {
-    const { passphraseProving, passkeyProving } = await Proving.makeProvingPair(stamp, proofClosure, world)
-    const passphrase = await passphraseProving.makeWayin(NOVEL)
-    const passkey = passkeyProving === null ? null : await passkeyProving.makeWayin(passphraseProving)
-    return { proving: passphraseProving, passphrase, passkey }
-  }
-
-  /** The proving of this gate's wayin that what `proofClosure` answers opens, as {@link Proving.attempt} makes it. */
-  attemptProof(proofClosure: AttemptClosure, world: ProvingWorld): Promise<Proving> {
-    return Proving.attempt(this.stamp, this.pickle(), proofClosure, world)
-  }
-
-  /** Ask the proof through `attemptProof` and answer the proving where it is the passphrase's: a change to the gate is proved by the passphrase alone, so a passkey's answer that opens refuses 'bad_option', spent. */
-  async #provePassphrase(proofClosure: AttemptClosure, world: ProvingWorld): Promise<PassphraseProving> {
-    const proved = await this.attemptProof(proofClosure, world)
-    if (! (proved instanceof PassphraseProving)) { throw changeNeedsPassphrase() }
-    return proved
-  }
-
-  /** The props of the next gate, once `proofClosure` proves this one by its passphrase: a passphrase wayin for the passphrase `passphraseClosure` answers, sealed from that proving, and the passkey wayin as stored, as the vaultKey does not change. */
-  async withPassphraseReplaced(proofClosure: AttemptClosure, passphraseClosure: PassphraseClosure, world: ProvingWorld): Promise<GateProps> {
-    passphraseReplaceArgs.parse({ proofClosure, passphraseClosure })
-    const proved = await this.#provePassphrase(proofClosure, world)
-    // not yet: the strengthChecker's verdict on the new passphrase, once the world carries one
-    const proving = await PassphraseProving.makeFromClosure(this.stamp, passphraseClosure, world)
-    const passphrase = await proving.makeWayin(proved)
-    return gateProps.parse({ passphrase_wayin: passphrase.pickle(), passkey_wayin: this.passkey_wayin })
-  }
-
-  /** The props of the next gate, once `proofClosure` proves this one by its passphrase: a passkey wayin for the passkey whose answer `passkeyClosure` hands in, sealed from that proving. A gate that holds a passkey refuses 'bad_option' before asking anything. */
-  async withPasskeyAdded(proofClosure: AttemptClosure, passkeyClosure: PasskeyClosure, world: ProvingWorld): Promise<GateProps> {
-    passkeyAddArgs.parse({ proofClosure, passkeyClosure })
+  /** Refuses 'bad_option' where this gate holds a passkey: the one check before anyone is asked for one. */
+  demandPasskeyAddable(): void {
     if (this.pkWayin !== null) { throw passkeyHeldAlready() }
-    const proved = await this.#provePassphrase(proofClosure, world)
-    const proving = await PasskeyProving.makeFromClosure(this.stamp, passkeyClosure, world)
-    const passkey = await proving.makeWayin(proved)
-    return gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: passkey.pickle() })
   }
-
-  /** The props of the next gate, once `proofClosure` proves this one by its passphrase: the passphrase wayin as stored, and no passkey wayin. A gate without a passkey refuses 'absent_wayin' before asking anything. */
-  async withPasskeyRevoked(proofClosure: AttemptClosure, world: ProvingWorld): Promise<GateProps> {
-    passkeyRevokeArgs.parse({ proofClosure })
-    if (this.pkWayin === null) { throw noPasskeyToRevoke() }
-    await this.#provePassphrase(proofClosure, world)
-    return gateProps.parse({ passphrase_wayin: this.passphrase_wayin, passkey_wayin: null })
-  }
-
-  // not yet: gate_epoch
 
   pickle(): GateProps {
-    const { passphrase_wayin, passkey_wayin } = this
-    return Object.freeze({ passphrase_wayin, passkey_wayin })
+    const { gate_epoch, passphrase_wayin, passkey_wayin } = this
+    return Object.freeze({ gate_epoch, passphrase_wayin, passkey_wayin })
   }
 
-  toJSON(): { passphrase_wayin: WayinHeader, passkey_wayin: WayinHeader | null } {
-    return { passphrase_wayin: this.ppWayin.toJSON(), passkey_wayin: this.pkWayin?.toJSON() ?? null }
+  toJSON(): { gate_epoch: number, passphrase_wayin: WayinHeader, passkey_wayin: WayinHeader | null } {
+    return { gate_epoch: this.gate_epoch, passphrase_wayin: this.ppWayin.toJSON(), passkey_wayin: this.pkWayin?.toJSON() ?? null }
   }
 }
 // --
 
-// == [Refusals]: changeNeedsPassphrase, passkeyHeldAlready, noPasskeyToRevoke
-
-const changeNeedsPassphrase = (): VaultError => new VaultError('bad_option', Phrases.GateChangeNeedsPassphrase)
+// == [Refusals]: passkeyHeldAlready
 
 const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
-
-const noPasskeyToRevoke = (): VaultError => new VaultError('absent_wayin', Phrases.NoPasskeyToRevoke)
 // --
