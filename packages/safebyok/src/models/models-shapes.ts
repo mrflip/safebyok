@@ -1,10 +1,4 @@
-/** The shapes the models share, imported as `MSX`: each section banner names the forms it holds.
- * A type generic over a model's record cannot come from its validator, so it stays a type, with
- * the validator beside it: each check judges what the base can know of a record, its revision,
- * its times, its `am` and its `vault_tok`, and leaves the concrete class's validator the rest.
- * A check of a bag reconciling passes refuses 'unexpected_error': a bag that fails one is a bug
- * in Storable, never a host's. Every other `parse` refuses as its doc says, quoting none of its input.
- */
+/** SLOPDOC: The shapes the models share, imported as `MSX`; each section banner names the forms it holds. */
 
 import { deepFreeze, omit } from 'es-toolkit'
 import type * as Z from 'zod'
@@ -39,12 +33,7 @@ export const { amVals } = VS
 /** The `am` a tombstone carries: damaged or gone, never alive. */
 export const tombstoneAmVals = ['d', 'x'] as const
 
-/** The checks of what the base knows of any record, each refusing 'bad_record': `am`, one of {@link amVals}; `revision`, `times`, `liveness` and `vaulted`, a part each; and `sparseBase`, the four together, the least a sparse form carries beside its scope.
- * `tombstone` is a sparse base that is damaged or gone. Each takes its fields from whatever carries
- * them, a record, a storable or a snapshot, and strips the rest.
- *
- * @example sparseBase.parse(box)   // { revision_tok, revision_seq, registered_at, written_at, am, vault_tok }
- */
+/** SLOPDOC: The checks of what the base knows of any record, from whatever carries it: record, storable or snapshot. */
 export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
   am:         VS.am,
   revision:   VS.revision,
@@ -76,9 +65,7 @@ export type Vaulted = Readonly<Z.infer<typeof vaulted>>
 /** The least a sparse form carries: the scope, and what {@link sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
 export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
 
-/** The sparse form of a thing damaged or gone: every sparse prop stays on it, for the record; nothing the user put in the thing does. {@link tombstone} checks what the base knows of one.
- * A row that fails its check is listed in `damaged_records` as a tombstone, `am` 'd', with sentinels for what cannot be read. It is never delivered: it leaves the vaultDB only when the customer names it to `del`. For a box, see {@link boxSparse}.
- */
+/** SLOPDOC: The sparse form of a thing damaged or gone: its sparse props stay on it, the user's content goes. */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof tombstoneAmVals[number] }>
 
 /** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
@@ -135,39 +122,14 @@ export type Settled = Z.infer<typeof settled>
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const { BoxFormat } = VS
 
-/** The check of the object a box takes and gives its whisper in, `{ val }`, the whisper itself its `val`: what `send` and `create` take as `whisper`, and what `box.whisper` and `extractWhisper` give. Its `parse` refuses 'bad_option', naming the failing field and quoting none of it.
- * The `val` is a whisper as the old box keeps one, checked by the same check: any JSON value a
- * whisper can carry, never a bare null. The object takes no other field. {@link LOCKED}, which a
- * locked box answers for its whisper, refuses with a sentence that names it. A parse hands back a
- * copy frozen through, `val` and all, never the caller's own object, so the host's later changes
- * to theirs reach no box, and a box's to its own reach no host: set `box.whisper` anew to change
- * it.
- *
- * Its kind is 'bad_option', not the old box's 'bad_whisper': a whisper reaches a box inside a
- * dna or a patch, each checked whole by one check of one kind, so the setter, which takes the
- * whisper alone, refuses as they do.
- *
- * @example whisperHolder.parse({ val: 'sk-ant-...' })                 // a frozen { val: 'sk-ant-...' }, a copy
- * @example whisperHolder.parse({ val: { apiKey: 'sk-ant-...', orgId: null } })
- * @example whisperHolder.parse('sk-ant-...')                          // throws 'bad_option': a whisper is given as { val }
- * @example whisperHolder.parse({ val: null })                         // throws 'bad_option', naming val: emptying a box is del's job
- * @example whisperHolder.parse({ val: 'sk-ant-...', note: 'work' })   // throws 'bad_option': it takes no other field
- * @example whisperHolder.parse(LOCKED)                                // throws 'bad_option': LOCKED is not a whisper
- */
+/** SLOPDOC: The check of `{ val }`, the object a box takes and gives its whisper in, handing back a frozen copy. */
 export const whisperHolder = Checker(({ obj, custom }) => custom((val) => val !== LOCKED, Phrases.LockedIsNoWhisper)
   .pipe(obj({ val: whisper }).strict().overwrite((holder) => deepFreeze(holder)).readonly()), 'bad_option')
 
 /** The object a box takes and gives its whisper in: `{ val }`, frozen, the whisper its `val`. */
 export type WhisperHolder = Z.output<typeof whisperHolder>
 
-/** The checks of a box's forms, each refusing 'bad_record', from a record or from a box ducking as one: `boxRecord`, the full record, strict, as a stored record is; `boxSparse`, a plain copy of every field but the sidecar and the sealed parts, the rest stripped. The scope alone is `boxscope` in shapes/scopes.
- * The sealed parts are the whisper ciphered under the boxKey, and that boxKey wrapped under the
- * vaultKey, each the {@link FX.ciphered} bag AES-GCM hands back, its iv and its ciphertext, as
- * the kit's `whisper_ciphered` and `box_key_wrapped` check them. The sidecar is the host's JSON
- * object, stored in the clear beside them but bound by the seal, so it rides only on the full record.
- * The sparse form keeps `whisper_codec` and `whisper_schema_version`, which say how a whisper is
- * sealed, so a sparse record can be sealed over as it is.
- */
+/** SLOPDOC: The checks of a box's stored forms, full and sparse, from a record or a box ducking as one. */
 export const { boxRecord, boxSparse } = Checkers('bad_record', () => ({ boxRecord: VS.boxRecord, boxSparse: VS.boxSparse }))
 
 export type BoxSparse = Z.infer<typeof boxSparse>
@@ -176,39 +138,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
 /** True where a patch names a half of its box. */
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
-/** The checks of what a caller hands to make or update a box, each a duckish refusing 'bad_option' and naming the failing field: `boxDna`, what `create` takes; `boxPatch`, what `send` takes; `boxPut`, what `vault.putBox` takes. A record is checked by `boxRecord` or `boxSparse`, never by these.
- * A whisper that fails {@link whisperHolder} refuses 'bad_option' here, as every field does, naming
- * `whisper` or `whisper.val`. The props the factory controls may be given, must pass their checks,
- * and are stripped. A field none takes refuses, as a bag a person typed would.
- *
- * `boxDna` requires `whisper`, the {@link WhisperHolder} sealed in, and `sidecar`: a birth has none
- * to keep.
- *
- * `boxDna` requires the scope too, and fills `whisper_codec` and `whisper_schema_version` with
- * their defaults where missing or undefined; the factory's props are `fmt`, `am`, `vault_tok`,
- * `box_tok`, `revision_tok` and the times. The sealed parts never come from a dna: `create` seals every box it
- * makes, so a dna carrying one refuses, as a field it does not take, and `revision_seq` among them:
- * input carrying one is a record, which goes to `build`.
- *
- * `boxPatch` names `whisper`, `sidecar` or both, the half left out being kept, and refuses a patch
- * naming neither. It takes the round trip of a box's record, `{ ...record, whisper, sidecar }`: every prop
- * of the record but the sidecar is the factory's, the scope, `revision_seq`, the whisper's codec and
- * the sealed parts among them. It hands back the whisper and the sidecar, and the scope's fields as
- * given, each undefined where left out, for the box to hold to its own scope.
- *
- * `boxPut` is `boxPatch` with the `boxlabel` required.
- *
- * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' }, sidecar: {} })                                 // { ...scope, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1, whisper: { val: 'sk-ant-...' } }
- * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' }, sidecar: {}, am: 'x', vault_tok: 'tok-u1' })   // the scope, whisper, sidecar and defaults: am and vault_tok are the factory's
- * @example boxDna.parse({ ...scope, whisper: { val: 'sk-ant-...' } })                                              // throws 'bad_option', naming sidecar
- * @example boxDna.parse({ ...scope, revision_seq: 3 })                                                             // throws 'bad_option': a dna carries no revision_seq
- * @example boxDna.parse({ ...scope, whisper_ciphered: ciphered })                                                  // throws 'bad_option': the sealed parts are the seal's to make
- * @example boxPatch.parse({ ...record, whisper: { val: 'sk-ant-...' }, sidecar: {} })                              // { whisper: { val: 'sk-ant-...' }, sidecar: {}, ...scope }
- * @example boxPatch.parse({ sidecar: { note: 'work' } })                                                            // { sidecar: { note: 'work' } }, the whisper kept
- * @example boxPatch.parse({})                                                                                       // throws 'bad_option': it names neither half
- * @example boxPatch.parse({ whisper: LOCKED, sidecar: {} })                                                        // throws 'bad_option', naming whisper: LOCKED is not a whisper
- * @example boxPut.parse({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-ant-...' } })                          // { boxlabel, whisper, ... }
- */
+/** SLOPDOC: The checks of what a caller hands to make or update a box: for `create`, `send` and `putBox`. */
 export const { boxDna, boxPatch, boxPut } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
   const halves  = { whisper: whisperHolder, sidecar }
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
@@ -259,14 +189,7 @@ export const { ifAbsentVals } = VS
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
 
-/** The checks of the options a storable and its verbs take, each refusing 'bad_option', naming the failing field.
- * `ifPresent` is optional, one of {@link ifPresentVals}; `ifAbsent` is one of {@link ifAbsentVals}. `horizonMillis`
- * is a span of milliseconds, 0 or more, or `Infinity` for never; `maxMillis` is one or none. `timelyOpts` says how fresh the
- * record in hand (`maxMillisSinceRefresh`) and the world (`maxWorldMillis`) must be before a verb
- * goes on; `fetchOpts` adds `ifAbsent`; `sendOpts` adds `ifPresent`; `storableOpts` is what a storable is made with. Each takes its fields from the bag given and
- * strips the rest. `listener` is what
- * `subscribe` enrolls, a function.
- */
+/** SLOPDOC: The checks of the options a storable and its verbs take. */
 export const { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
   const ifPresent     = oneof(ifPresentVals)
   const ifAbsent      = oneof(ifAbsentVals)
@@ -310,11 +233,7 @@ export const lockStateVals = ['unlocked', 'locked'] as const
 /** The brand {@link LOCKED} is made with: a symbol of this module's, never `Symbol.for`, so no code outside the package spells it. A copy of LOCKED carries it too, so the brand tells LOCKED from a whisper, never from its copies. */
 const LockedBrand: unique symbol = Symbol('safebyok.locked')
 
-/** The bag a storable answers in place of what the locked vault hides: `box.whisper` answers it while the vault is locked. A frozen singleton, branded by a symbol of the package's own.
- * Tell it apart with `Storable.isLockedFUBag(val)`, which is true for this one object alone: never
- * by `===` against a bag you built, nor by its look, as a copy of it is no LOCKED. Setting
- * `box.whisper = LOCKED` forgets the exposed whisper, as null does.
- */
+/** SLOPDOC: The frozen singleton answered for what the locked vault hides; `Storable.isLockedFUBag` tells it. */
 export const LOCKED: LockedBag = Object.freeze({ [LockedBrand]: true as const })
 
 /** The type of {@link LOCKED}, which a copy of it has too: `Storable.isLockedFUBag` alone tells LOCKED itself. */
@@ -449,7 +368,7 @@ export type GateProps = Z.infer<typeof gateProps>
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const { VaultFormat } = VS
 
-/** The checks of a vault's forms, each refusing 'bad_record', from a record or from a vault ducking as one: `vaultSparse`, a plain copy of the scope and the base's fields, the rest stripped; `vaultRecord`, those fields and the `gate`, its wayins as {@link gateProps} checks them, strict, as a stored record is. A vault record is never without its gate. The scope alone is `vaultScope` in shapes/scopes. */
+/** SLOPDOC: The checks of a vault's stored forms, sparse and with its gate, from a record or a vault ducking as one. */
 export const { vaultRecord, vaultSparse } = Checkers('bad_record', () => ({ vaultRecord: VS.vaultRecord, vaultSparse: VS.vaultSparse }))
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
@@ -532,7 +451,7 @@ const isCtxStamp = (val: unknown): boolean => (
     && Object.values(val).every((field) => typeof field === 'string' || Number.isFinite(field))
 )
 
-/** The arguments of each lease verb. A stamp is the caller's own fields fixed for its record's life, flat; the lease binds it under the vault's stamp and each of its own purposes (`box_key_wrapped`, `whisper_ciphered`), so the purposes never leave it. */
+/** SLOPDOC: The arguments of each lease verb, and the flat stamp that binds a lease to its caller's record. */
 export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
