@@ -100,8 +100,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
       throw answer.err
     }
     const { vaults, damaged_records } = answer.val
-    await Promise.all(vaults.map((record) => this.build(record)))
     this.tellBadNews(damaged_records.map((damaged) => vaultStoredDamaged(damaged)))
+    await Promise.all(vaults.map((record) => this.build(record)))
   }
 
   // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
