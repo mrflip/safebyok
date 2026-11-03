@@ -54,9 +54,9 @@ export class Gate {
   }
 
   /** The proving of this gate's wayin that what `proofClosure` answers opens: the passphrase's where it hands one, else the passkey's. What it answers refuses as {@link PassphraseProving.buildStored} and {@link PasskeyProving.buildStored} do, and a passkey's answer is spent whatever follows. */
-  attemptProof(proofClosure: AttemptClosure, world: ProvingWorld): Promise<Proving> {
+  async attemptProof(proofClosure: AttemptClosure, world: ProvingWorld): Promise<Proving> {
     gateAttemptArgs.parse({ proofClosure, world })
-    return hearing(proofClosure, async (handed) => {
+    return await hearing(proofClosure, async (handed) => {
       const { passphrase, passkeyAnswer } = attemptCleartexts.parse(handed)
       if (passphrase !== undefined) { return PassphraseProving.buildStored(this, passphrase, world) }
       return PasskeyProving.buildStored(this, passkeyAnswer!)

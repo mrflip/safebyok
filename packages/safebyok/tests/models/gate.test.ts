@@ -180,7 +180,7 @@ describe("gate.attemptProof(proofClosure, world)", () => {
   it("refuses a world its check refuses as 'bad_option', without invoking the closure", async () => {
     const { gate } = await builtGate()
     const proofClosure = vi.fn(proofClosureOf())
-    TH.expectSyncRefusal(() => gate.attemptProof(proofClosure, {} as never), 'bad_option')
+    await TH.expectRefusal(gate.attemptProof(proofClosure, {} as never), 'bad_option')
     expect(proofClosure).not.toHaveBeenCalled()
   })
 })
