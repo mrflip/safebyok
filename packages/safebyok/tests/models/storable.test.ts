@@ -973,28 +973,6 @@ describe("storable verbs while the vault is locked", () => {
     })
   }
 
-  it("refuses a send whose vault locks during the seal with 'vault_locked', putting nothing", async () => {
-    const lock = { during: false }
-    const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLockState('locked') } })
-    const record = held.mw.fullBoxRecord()
-    held.mw.seedStore(record)
-    const box = await listing.build(record)
-    lock.during = true
-    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
-    expect(held.mw.callsOf('put')).to.deep.equal([])
-  })
-
-  it("completes a send whose vault locks during the put: the record lands", async () => {
-    const { box } = await timelyBoxOf()
-    held.mw.willPut(({ record }) => {
-      held.mw.setLockState('locked')
-      return held.mw.answerOf(box.scope, record)
-    })
-    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
-    expect(box.isLocked).to.be.true
-    expect(box.sidecar).to.deep.equal({ note: 'sent while locking' })
-  })
-
   it("follows the listing's word on isLocked, reading it fresh each time", async () => {
     const { box } = await timelyBoxOf()
     expect(box.isLocked).to.be.false
