@@ -1,11 +1,13 @@
 # Thread 17: doc_strip (2026-11-03)
 
-Branch `20261103-doc_strip`, PR #463, stacked on #460. Justify: green, 6,978 tests passed, 220 skipped.
+Branch `20261103-doc_strip`, PR #463, stacked on #462 (thread 15, `20261103-lease_narrow`, past #460 and #461 of thread 13). Justify: green, 6,995 tests passed, 220 skipped.
 
 * **Built**: every doc block over the bound in `src/models/*.ts` and the named `src/storage/` files is one
   `/** SLOPDOC: ... */` line giving the purpose. Over the bound (over 240 characters of text, or over two lines):
-  **55 of 449 before, 0 of 449 after**. All 55 fit one 120-character line, marker included; none took a second.
-  `rg -n SLOPDOC packages/safebyok/src` lists them. 14 source files changed, 60 lines in, 214 out.
+  **55 of 449 before, 0 of 454 after**; threads 13 and 15 added none over the bound. Four more, under the bound but
+  written or moved by them, were stripped alike (`Vault.launchBirth`, `#runBirth`, `demandBirthSlot`, `VaultWorld`), so 59 lines
+  carry `SLOPDOC`. All fit one 120-character line, marker included; none took a second.
+  `rg -n SLOPDOC packages/safebyok/src` lists them. 14 source files changed, 65 lines in, 220 out against the base.
 * **Moved to a `//`** (five, each one line on the line it governs; every other sentence simply went):
   * `models/box.ts`, in `#edit`: a whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
   * `models/gating.ts`, in `attempt`: a clear is spent even when refused at the door.
@@ -13,7 +15,7 @@ Branch `20261103-doc_strip`, PR #463, stacked on #460. Justify: green, 6,978 tes
   * `models/lease.ts`, in `peek`: a damaged row stands until the next lease is cached over it.
   * `models/vault.ts`, in `#vacateLease`: the lease goes first; the erase starts before any await, landing in call order.
 * **Proof of no code change**: `A script, recorded in the PR body,` printed each changed `.ts`, base and tip, through TypeScript's printer
-  with `removeComments`, so types stay in the comparison: 14 files compared with `20261103-bank`, 0 differ.
+  with `removeComments`, so types stay in the comparison: 14 files compared with `20261103-lease_narrow` after the restack, 0 differ.
 * **Decisions taken**: `models:` and `storage:` prefixes, one commit per file, as the log has them. Under-bound blocks
   stayed; none I passed only narrated parameters, and I passed few.
 * **Discoveries**: no lint rule asks anything of a doc block, and no test reads the doc text of these files: `errors.test.ts`
@@ -43,7 +45,7 @@ Thirteen. Each wrote only with the job squeezed, or reads only by way of its cal
    row and a row of another `vault_tok` stand.
 10. `models/vault-listing.ts:80`, `ensureVault`: one line calling `putDraft`, with four sentences of doc before; it shares a
     name with `bank.ensureVault`, which does far more, and succeeds with another's vault, told only by `vault_tok`.
-11. `models/vault-listing.ts:58`, `buildVault`: asks, stores, holds and unlocks, or answers another's vault locked; a lease
+11. `models/vault-listing.ts`, `buildVault`, now `Vault.launchBirth` with its `#runBirth` in `vault.ts`: asks, stores, holds and unlocks, or answers another's vault locked; a lease
     refused past the put leaves it stored and held, locked. Two results and a half-way state.
 12. `models/listing.ts:169` and `models/vault-listing.ts:134`, `del`: the base goes over the revision held unless a damaged
     entry names its own, and the override goes over `ante`'s own always. The revision is the point, and the two disagree.
