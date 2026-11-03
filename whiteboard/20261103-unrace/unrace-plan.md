@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 12 filed; threads 13 and 15 building, cut from 12. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** threads 1 to 12 filed; threads 13, 15 and 17 building, cut from 12; then 18, 19, 20, 16, 14. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
@@ -35,8 +35,8 @@ polishing.
 
 ## Read first
 
-In `whiteboard/20261102-unrace/`, by section (`rg -n '^#' <file>`). Authoritative for the interface, governed by common
-sense: they are a design draft. The Coach: "Don't drive yourself off a cliff following a typo by me."
+In `whiteboard/20261102-unrace/`, by section (`rg -n '^#' <file>`). A design draft. The Coach, 2026-11-03: "it was wrong of me to
+state that those code paths were "authoritative", they are pseudo code as a design artifact." Common sense and good practice win.
 
 * `models-invariants.md`: the seams, as tables. Its legend and *Preconditions* first.
 * `unrace-gating.md`: each operation's steps and their order. *Notable Changes* first.
@@ -77,9 +77,9 @@ Event crossings or unmet invariants are solved by throwing.
 * Within `models/`, a thread that removes something moves its callers, or leaves it for the thread that moves the last one,
   so `pnpm justify` stays green. Remove "anything that seems obsoleted" and list it in the PR. The spec's tables list only
   interesting rows: a missing row alone obsoletes nothing, and new tests follow the interesting rows.
-* Doc blocks are short and clear, rarely past a couple of lines; say what the caller gets and when it refuses. Never a line
-  narrating the parameters or restating the signature. Reviewers don't raise STYLE.md's *every export has a doc block*; a
-  lint rule demanding one is reported, not padded.
+* A doc block is one or two 120-character lines giving the purpose. The Coach, 2026-11-03: "listing every refusal possible is
+  foolish, wastes tokens and metastasizes". Never a line narrating the parameters or restating the signature. Reviewers don't
+  raise STYLE.md's *every export has a doc block*; a lint rule demanding one is reported, not padded.
 * `try*` answers an Outcome; the plain verb throws. Throw through small factories, never `new VaultError` inline. No
   catch-and-relabel, except where a host function hears a clear (G8). Key-handling zeroes its bytes in `try/finally`.
   Checkers and the types made from them live in `models-shapes.ts`. New writing says *cached*, never *kept*. A test backdoor
@@ -325,11 +325,13 @@ Earlier threads do this for what they rewrite, as they go. This thread takes wha
 
 * **Touches:** `models/*`.
 * **Also:** `unrace-gating.md` *Guarantees to amend* and *Rows for `notes/wontfix.md`*.
+* **The Coach, on Closer Look:** the tree for `ensureUnlocked` says why it asks `ensureTimely` first: *"ensure timely is to make sure
+  the vault is recent enough to know if it deserves a lease, the tree would be better off to say so"*.
 * **The Coach's note:** *"relocate the checks and types at the top of models files into the shapes directory or model-shapes ?
   Anything with a good reason can stick around, but it saves token ussage to not have them there, and agents will write better
   ones. Types are best made from checks"*.
 * **Levels:** `sonnet` worker, `low` review; an `opus` worker for the guarantees, if they turn out to be more than wording.
-  **Size:** small. **Depends on:** 13, 15, 16; it runs last.
+  **Size:** small. **Depends on:** 16; it runs last.
 
 ### 15. `lease_narrow` (the Coach's ruling, 2026-11-03)
 
@@ -355,7 +357,52 @@ check that cannot be written marks an invariant that is not one."
   change rejecting after its record is stored: "I can't see at a glance that the ones you named are wontfix, so document them and if
   it's straightforward test in halpimonfire". So `crossings.md`, not `wontfix.md`, and a test that a refused `tryCache` during
   `replacePassphrase` resolves and fires `onBadNews`.
-* **Levels:** `high` review. **Size:** medium. **Depends on:** 13.
+* **Levels:** `high` review. **Size:** medium. **Depends on:** 20.
+
+### 17. `doc_strip` (the Coach, on Closer Look, 2026-11-03)
+
+*"100% agree with "says more about the method than the docs" listing every refusal possible is foolish, wastes tokens and
+metastasizes. Strip every doc block that is longer than one or two 120-character lines and have an agent replace it with a line
+that describe the purpose of the function WITHOUT sacrificing readability. A method that can't easily be described thusly is a big
+smell. Flag all methods with logorrheic "SLOPDOC" in the replacement"*
+
+* *Orchestrator:* the item the Coach is most worried about. Cut from 12's tip, beside 13 and 15, and restacked over them: 55 of 449
+  blocks, doc lines only, in `models/` and the new `storage/` files. Every replacement opens `SLOPDOC:`; a method that won't go in
+  a line goes on the thread file's *Smells*. **Levels:** `low` review, `opus` style pass. **Size:** small. **Depends on:** 12.
+
+### 18. `plain_seam` (the Coach, on Closer Look, 2026-11-03)
+
+*"Nothing has been contemplated that involved running zod inside a transaction, I think the "its checks" may have been loose
+language."* *"world and dbhas have the full record by design. Refusals should use error factories that determine by selection what
+goes into the error and its meta"*
+
+* **Items:** a store's atomic step conditions on fields, never a Zod check (`doPutBox`, `doDelVault`, `isStopped`, the memory store's
+  `safeParse` and `isDamagedVaultAt`; `doCacheDeviceRecord`'s closure); refusal factories select what goes on the `VaultError` and its
+  `meta`, so `JSON.stringify(err)` holds no wayin or salt, and `world` and `dbhas` travel on the answer. `#call`, `answerOf` and the meta
+  route may fall away with that: the cold read says so, and a plain answer frame is the aim.
+* **Touches:** `storage/`, `listing.ts`'s `recordOfAnswer` and `recordOfRefusal`. **Levels:** `high` review, G8. **Size:** medium.
+  **Depends on:** 13, 15, 17.
+
+### 19. `world_whole` (the Coach, on Closer Look, 2026-11-03)
+
+*"this sounds like someone worked around the typechecker by eviscerating the code. fix"*. *"vault hello should not be involved in
+populating box listings by anything more than triggering the one code path that does"*. *"box being durable is useful and important
+for the non react user. Replacing a vault is epochal in a way that replacing a box is not,. Still, some of that machinery is a little
+sus"*
+
+* **Items:** `Vault.takeWorld` takes the whole row, and `if (! this.isFull)`, the sparse refusals and "unlocks a vault held sparse" go;
+  one code path populates a box listing, with `fetchListed`, `NothingListed` and `BoxListing.hello(listed?)` falling away as they can; say
+  which of `lifeTokPathOf`, `#sameLife`, `OneRevisionTwoLives`, `isBirthday` could go, and take out what plainly can.
+* **Touches:** `vault.ts`, `listing.ts`, `box-listing.ts`, `vault-listing.ts`, `storable.ts`. **Levels:** `medium` review. **Size:** medium.
+  **Depends on:** 18.
+
+### 20. `test_teeth` (the Coach, on Closer Look, 2026-11-03)
+
+*"Fix the weak tests great catch"*: the "a lock() landing during a send" crossings run no real `vault.lock()`; no test has a real Vault hear
+a newer row from a box answer; `MemoryVaultDB` tells watchers by microtask, so the other order runs only where a test forces it;
+`_cheat_boxRowsOf` is the store's own accessor and creates a row on a read.
+
+* **Levels:** `low` review. **Size:** small. **Depends on:** 19.
 
 ## Bent from the pre-plan
 
