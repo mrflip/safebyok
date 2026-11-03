@@ -41,6 +41,24 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **A whisper crosses the seal seam as a string.**
+  `vault.sealStampedString(whisperText, stamp)` and `unsealStampedString` hand a whisper between `Box` and `Lease` as a JavaScript
+  string, which cannot be zeroed; `Lease.sealWith` and `unsealWith` zero only the bytes they encode or decipher themselves. Before
+  this, the caller's serialized bytes were zeroed by the lease. (Models are not yet exported from the package.)
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **The friend is a public
+  route to a lease row.** `vault.leaseFriend()` and `lease.friend` are public, and `friend.peekLease()` answers the row this device
+  caches, including the `lease_key` handle and `vault_key_lease_wrapped`, to whoever holds a Vault or a Lease. (Models are not yet
+  exported from the package.)
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **A refused erase at
+  `lock()` is a panic.** `vault.#vacateLease` reads locked at once, but where the deviceDB refuses the erase the row stands: with a host
+  `onPanic` the vault stays locked and enabled, the row in place, and the next `ensureUnlocked` on this device takes it up with no proof;
+  with none, the refusal goes to the platform's `reportError` where there is one, and the vault is vacated, which tries the erase once
+  more.
+* 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`; ruled by the Coach):
+  **A `lock()` crossing an unlock before its attach ends unlocked.** This includes a `lock()` during `Lease.peek` or during the proof:
+  the erase lands, then the attach holds a lease and caches its row afresh, so the row and the unlocked state stand after a `lock()`
+  that returned.
+
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the
   value or throws the refusal (likewise every verb of both classes). The core (`vault.ts`, `bank.ts`, `KeptLease.read`,
