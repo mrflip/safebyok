@@ -20,7 +20,7 @@ export const VaultFormat = 6001
 export const NeverStored = { revision_tok: NeverStoredTok, revision_seq: NeverStoredSeq } as const
 // --
 
-// == [Checkers]: am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
+// == [Checkers]: amVals, ifAbsentVals, ifPresentVals, damagekindVals, Damagekind, DamagedVault, DamagedBox, am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
 
 export const amVals = ['a', 'd', 'x'] as const
 export const ifAbsentVals = ['fail', 'nil'] as const

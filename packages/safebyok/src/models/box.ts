@@ -135,7 +135,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // == [Sending]: send, trySend, edit
 
   /** Seal `patch` over the record in hand and put it over that record's revision, resolving once storage's answer is received; a snapshot shows the change only then. Refuses 'bad_option', naming the field, `opts` or a patch that fails {@link MSX.boxPatch}, before any guard; 'vault_locked', at the seal's end too, storing nothing; and 'stale_write' where the record moved, the record stored delivered first. On a box gone or damaged, this is its rebirth. A refusal leaves nothing behind.
-   * Over a live record, `opts.ifPresent` says: `repl`, the default, replaces it; `fail` refuses 'camped', the box then holding what storage holds; `get` saves nothing, and resolves with the box holding what storage holds, `patch` discarded.
+   * Over a live record, storage decides by {@link MSX.ifPresentVals}; under `get`, the send resolves with the box holding what storage holds, `patch` discarded.
    */
   async send(patch: BoxPatch, opts: SendOpts = {}): Promise<this> {
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
