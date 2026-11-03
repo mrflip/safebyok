@@ -23,7 +23,7 @@ export type BoxWorld = ListingWorld & {
   unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
 }
 
-/** The dna of a box, with the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar `create` seals, both required: what a caller hands `create`, which holds it to {@link boxDna}. It carries no sealed parts, which only the seal makes. */
+/** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
 export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper: WhisperHolder, sidecar: Sidecar }
 
 export type BoxListingOpts = ListingOpts & { world: BoxWorld }
@@ -77,7 +77,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Birth]: create, tryCreate, demandUnlocked
 
-  /** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'vault_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
+  /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
   async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
     const dna = boxDna.parse(input)
     this.#demandUnlocked()
