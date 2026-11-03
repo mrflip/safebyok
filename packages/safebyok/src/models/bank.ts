@@ -189,9 +189,9 @@ export class Bank implements VaultWorld {
 
   /** Cleanup while the page lives: the watch ended and each vault swept, its cached lease left for the next session. Not ready until the next `hello`, which starts a fresh listing. Never throws. */
   sweep(): this {
+    this.#lastHello = null
     this.#vaultListing.sweep()
     this.#vaultListing = this.#makeListing()
-    this.#lastHello = null
     this.#remakeSnapshot()
     return this
   }
