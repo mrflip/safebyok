@@ -311,11 +311,13 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
     sealStampedString: async (whisperText, stamp) => {
+      await Promise.resolve()
       demandFakeUnlocked()
       sealedTexts.set(String(stableJsonify(stamp)), whisperText)
       return { box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered }
     },
     unsealStampedString: async (_sealed, stamp) => {
+      await Promise.resolve()
       demandFakeUnlocked()
       const whisperText = sealedTexts.get(String(stableJsonify(stamp)))
       if (whisperText === undefined) { throw new VaultError('damaged_box', Phrases.UnopenedWhisper) }
