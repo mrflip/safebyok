@@ -1,6 +1,6 @@
 # Thread 22: tidy_host (2026-11-03)
 
-Branch `20261103-tidy_host`, PR #PRNUM, stacked on #464. Justify: green; core 4783 passed, 37 skipped; `tests/models` 1156,
+Branch `20261103-tidy_host`, PR #465, stacked on #464. Justify: green; core 4783 passed, 37 skipped; `tests/models` 1156,
 `proof.test.ts` among them. Size budgets unmoved; empty changeset.
 
 * **Built**, in `src/models/bank.ts`:
