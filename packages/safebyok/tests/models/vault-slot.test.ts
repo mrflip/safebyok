@@ -118,6 +118,17 @@ describe("a newer record of another vault_tok over a live vault", () => {
   })
 })
 
+describe("an old instance, replaced by the very call it made", () => {
+  it("vault.del() refuses 'disabled', and the new life stored stands", async () => {
+    const { vault, restoreRow, storedNow } = await makeBornVault()
+    const other = await otherLifeAt(5)
+    restoreRow(other)
+    await TH.expectRefusal(vault.del({ maxMillisSinceRefresh: 0 }), 'disabled')
+    expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
+    TH.expectSyncRefusal(() => vault.demandReadyToDel(), 'disabled')
+  })
+})
+
 describe("an older record", () => {
   it("of another vault_tok loses to a live vault, changing nothing", async () => {
     const { vault, listing, demandStored, restoreRow, storeBehindOurBack } = await makeBornVault()

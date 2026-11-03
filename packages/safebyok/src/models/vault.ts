@@ -330,10 +330,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   ensureReadyToChangeGate(): Promise<this> { return this.ensureTimely(MSX.Promptly) }
 
   /** A vault deleted has no life left to delete. Not yet: the passphrase's proof the old `vault.del` took. */
-  override demandReadyToDel(): this {
-    if (this.am === 'x') { throw this.listing.absentRefusal(this.scope) }
-    return this
-  }
+  override demandReadyToDel(): this { return this.demandPresent() }
   // --
 
   // == [Required by Storable]: isFullRecord, lifeTokPathOf, makeSnapshot
