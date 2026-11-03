@@ -41,6 +41,27 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change does not rotate the vaultKey, so it ends no session.**
+  `Vault.replacePassphrase`, `addPasskey` and `revokePasskey` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
+  and a device that holds the vaultKey keeps it to its lock. Revoking a passkey or replacing a passphrase stops new unlocks through the
+  old way in; it does not evict a device already unlocked, nor undo what an attacker who once held the vaultKey learned. A lease held on
+  the acting device is renewed under the new gate epoch (`#renewLease`), unless a `lock()` crossed the change. (Models are not yet
+  exported from the package.)
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`replacePassphrase` keeps the passkey.** A vault must always have a
+  passphrase; the passkey is optional. Replacing the passphrase after a suspected compromise does not remove a passkey; a host wanting
+  both gone calls `revokePasskey` as well.
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change is its params, with no client-side next gate.** The params
+  spread the record read after a timely refresh (`vault.ensureTimely(MSX.Promptly)`, `timelyAnte` in `models/gating.ts`) inside the
+  attempt, and land conditional on its revision at the vaultDB, so a change crossing another refuses `stale_write` and stores nothing.
+  The prior `Gate.with*` and closure-taking `attemptProof` (host code handed proof closures) are gone: what the user types arrives as
+  clears through the one gating, and is spent by `spendClears`, which also zeroes a bare `ArrayBuffer` `prfBytes`.
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`del_vault`'s proof is a client-side confirmation; the vaultDB checks no
+  proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). `Vault.#runDelVault` locks first,
+  so no box opens under a lease while the tombstone goes out; a refused delete leaves the vault locked. A `lock()` does not settle a
+  `del_vault` asking, as a lock does not stop a delete (`declineAtLock` skips that kind), but a goodbye or vacate does
+  (`declineAtDiscard`). `Vault.del()` is `delVault()`, so there is no unguarded delete through the Vault. `vaultListing.del(ante)`
+  refuses `stale_write`, asking nothing of the vaultDB, for an instance of another life than the slot's vault, as a delivered answer
+  would tombstone the live vault locally.
 * 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
   `VaultListing.#runBirth` (`packages/safebyok/src/models/vault-listing.ts`), where `ensureVault` answers a vault of another `vault_tok`
   (another device won the slot), the proving is of the record that lost, so no lease is built or attached: that vault is answered
@@ -439,11 +460,16 @@ added or folded into through the subagent, and no other entry changes.
   seals (and zeroes) the new passkey's answer, so a typo returns to the dialog with the answer unspent; the strength check
   runs before any derivation. `same_passphrase` compares the two strings the user typed in this tab with `===`: no
   attacker observes it, and no constant time is used (the spec has it so). The seals of a chain share no junction.
+  Amended 2026-11-03 (gate_changes): the refusal carries no secret material, and as a correctable refusal (`MSX.correctableKindVals`) it
+  leaves the answer unspent so the dialog can be tried again.
 * 2026-10-23 (primitives sprint, thread 9, gating): **deleting a vault is proven by its passphrase.** `del()` raises a `del_vault`
   gating: the passphrase is sealed and checked, then `delVault` expects `{ vault_tok, gate_epoch }` (a stale tab's old
   passphrase cannot delete). The gating settles with success first; then the vault locks (the lease erased) and the Vault
   object goes. A forgotten passphrase can therefore no longer delete a sound vault from the client; `delDamagedVault`
   remains for props that fail their checks, and `safebyok-react`'s start over is off pending a ruling.
+  Amended 2026-11-03 (gate_changes): in `models/vault.ts` the passphrase's proof is a client-side confirmation only; the vaultDB is
+  conditional on the revision and checks no proof. `#runDelVault` locks first and the delete follows, where this entry has the lock
+  after it; a refused delete leaves the vault locked. See the 2026-11-03 (gate_changes) entry on `del_vault`.
 * 2026-10-23 (primitives sprint, thread 9, gating): **a grant the device store refuses after a change to the ways in landed is warned of, not
   thrown (today's contract).** For change passphrase and put or delete passkey, a `storage_unavailable` or `storage_blocked`
   from `tryPutLease` after the gate was stored is logged through the host's logger as a warning, the vault left locked on this
