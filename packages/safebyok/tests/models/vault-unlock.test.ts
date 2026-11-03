@@ -479,7 +479,7 @@ const valuesShownBy = (holder: object): unknown[] => {
   return shown
 }
 
-describe("the lease friend and the lease key handle: nothing a host holds hands them out", () => {
+describe("a vault and a lease show neither the lease friend nor the lease key handle, one level deep, by identity", () => {
   it("no field or getter of a vault or its lease shows either, nor Object.keys or JSON.stringify", async () => {
     const born = await makeBornVault()
     const { vault, deviceDB } = born

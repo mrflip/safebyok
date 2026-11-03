@@ -53,11 +53,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   /** A new vault under `scope`, asked of the user through a gating, stored, held, and unlocked under its passphrase's lease; where another vault won the slot meanwhile, that one, locked. Refuses 'bad_option' a vault present in the slot, nobody asked. A refused put holds nothing; a lease refused past the put leaves the vault stored and held, locked. */
-  async buildVault(scope: VaultScope): Promise<Vault> {
-    const checked = this.scopeOf(scope)
-    const prior = this.#demandBirthSlot(checked) ?? VS.NeverStored
-    return Vault.launchBirth(this, checked, prior)
-  }
+  buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope) }
 
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
 
@@ -69,7 +65,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   tryEnsureVault(record: VaultRecord, prior: Revision): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(record, prior)) }
 
   /** The tombstone a birth under `scope` goes over, or null over none held; refuses 'bad_option' a vault present in the slot. */
-  #demandBirthSlot(scope: VaultScope): Vault | null {
+  demandBirthSlot(scope: VaultScope): Vault | null {
     this.demandEnabled()
     const held = this.at(scope)
     if (held?.isPresent === true) { throw alreadyHeldError() }

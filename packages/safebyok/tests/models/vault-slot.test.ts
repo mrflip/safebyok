@@ -3,8 +3,9 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
+import type { AnyGating } from '../../src/models/gating'
 import type { VaultRecord } from '../../src/models/models-shapes'
-import type { Vault } from '../../src/models/vault'
+import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as VS from '../../src/storage/vault-db-shapes'
@@ -201,6 +202,40 @@ describe("building over a tombstone", () => {
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
     await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
+    expect(dialog).not.toHaveBeenCalled()
+  })
+
+  it("Vault.launchBirth refuses 'bad_option' a vault present in the slot, no gating opened and no KDF run", async () => {
+    const keyDeriver = { ...TH.testDeriver }
+    const deriveKeyBytes = vi.spyOn(keyDeriver, 'deriveKeyBytes')
+    const { listing, storedNow } = await makeBornVault(byPassphrase(Passphrase), { keyDeriver })
+    expect(deriveKeyBytes).toHaveBeenCalled()
+    deriveKeyBytes.mockClear()
+    const before = storedNow()
+    const dialog = vi.fn(async (gating: AnyGating) => { await gating.attempt(byPassphrase('a-new-passphrase') as never) })
+    listing.world.requestCleartext = dialog
+    await TH.expectRefusal(Vault.launchBirth(listing, Dna), 'bad_option')
+    expect(dialog).not.toHaveBeenCalled()
+    expect(listing.openGating).to.be.null
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+    expect(storedNow()).to.deep.equal(before)
+  })
+
+  it("Vault.launchBirth refuses 'bad_option' what is no listing, and 'bad_scope' what is no scope, nobody asked", async () => {
+    await TH.expectRefusal(Vault.launchBirth(undefined as never, Dna), 'bad_option')
+    const { listing } = makeVaultWorld()
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    await TH.expectRefusal(Vault.launchBirth(listing, null as never), 'bad_scope')
+    expect(dialog).not.toHaveBeenCalled()
+  })
+
+  it("Vault.launchBirth refuses 'disabled' on a swept listing, nobody asked", async () => {
+    const { listing } = makeVaultWorld()
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    listing.sweep()
+    await TH.expectRefusal(Vault.launchBirth(listing, Dna), 'disabled')
     expect(dialog).not.toHaveBeenCalled()
   })
 
