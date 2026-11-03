@@ -72,6 +72,15 @@ describe("VaultListing.build of a record, and its constructor", () => {
     TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'deviceDB') }), 'bad_option')
     TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'keyDeriver') }), 'bad_option')
   })
+
+  it("refuses 'bad_option' a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
+    const { opts } = makeVaultWorld()
+    for (const verb of ['peek', 'tryCache', 'tryVacate']) {
+      const missing = { peek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
+      TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, deviceDB: missing as never } }), 'bad_option')
+    }
+    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, onPanic: 'call me' as never } }), 'bad_option')
+  })
 })
 
 describe("proving.buildLease(friend): the vault is taken at the grant", () => {
