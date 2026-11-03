@@ -150,9 +150,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * Only a fetch judges, by passing its `ifAbsent`: an answer of nothing stored, or of a tombstone, is then absent, once delivered, and throws {@link absentRefusal} under 'fail' and resolves null under 'nil'. A `put` and a `del` pass none, and have the instance back, a tombstone or not.
    */
   async #deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
-    const scope = this.scopeOf(answer.req_params)
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (answer.ok) {
+      const scope = this.scopeOf(answer.req_params)
       const record = recordOfAnswer<RecordT, SparseT>(answer)
       const thing = this.#buildOrReceive(scope, record)
       const isAbsent = record === null || MSX.isTombstone(record)
@@ -161,7 +161,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     }
     const stored = recordOfRefusal<RecordT, SparseT>(answer)
     if (stored !== null) {
-      const delivered = await outcomeOf(() => this.#buildOrReceive(scope, stored))
+      const delivered = await outcomeOf(() => this.#buildOrReceive(this.scopeOf(answer.req_params), stored))
       if (! delivered.ok) { this.tellBadNews([delivered.err]) }
     }
     throw answer.err
