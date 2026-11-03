@@ -81,6 +81,7 @@ export const {
 }, [FX])
 
 export const vaultDBOpts = objCheck(({ num }) => ({ clock: HX.clockShape.optional(), maxRecordBytes: num.positive().optional() }), 'bad_option')
+export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape, maxBoxes: uint.optional() }), 'bad_option')
 
 export type Revision       = Readonly<Z.infer<typeof revision>>
 export type BankScope      = Readonly<Z.infer<typeof bankScope>>
@@ -105,6 +106,7 @@ export type PutOpts = Readonly<Z.input<typeof putOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
 export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
+export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 // --
 
 // == [Row helpers]: reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
