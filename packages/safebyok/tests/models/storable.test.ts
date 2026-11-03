@@ -142,6 +142,23 @@ describe("storable.fetch(opts): one fetch at a time", () => {
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
   })
 
+  it("judges each call's ifAbsent for itself: a 'fail' refuses and a 'nil' resolves, though they share one get", async () => {
+    const { box } = await timelyBoxOf(1000)
+    const hold = holdOf()
+    const { scope } = box
+    held.mw.willGet(async () => {
+      await hold.promise
+      return held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-gone' }))
+    })
+    const failing = box.fetch({ ifAbsent: 'fail' })
+    const nilling = box.fetch({ ifAbsent: 'nil' })
+    await vi.advanceTimersByTimeAsync(0)
+    hold.open()
+    await TH.expectRefusal(failing, 'absent_box')
+    await expect(nilling).resolves.to.eq(box)
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+  })
+
   it("starts a fetch of its own once the one under way has ended", async () => {
     const { box } = await timelyBoxOf(1000)
     await box.fetch()
