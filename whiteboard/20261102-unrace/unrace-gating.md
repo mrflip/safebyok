@@ -16,7 +16,7 @@ bank.hello()                                         a forced reset; a host may 
   │    same life      → vault.receive(record)
   │    new vault_tok  → old_vault.vacate, unlist; add build(vault)
   ├─ listing: each gone_vault by scope
-  │    a tombstone    → a vault listed stays in its slot and takes it in (locked, row erased, boxes vacated); else add build(tombstone)
+  │    a tombstone    → a vault listed of its vault_tok stays in its slot and takes it in (locked, row erased, boxes vacated); of another, it replaces that vault; else add build(tombstone)
   ├─ bank.#keepDeviceRecord
   └─ subscribe to VaultDB                              no autolock here: the host calls bank.autolock() after hello, and on its own timer
 
@@ -127,7 +127,7 @@ shows a change only once it has landed.
   separate entrypoint because it replaces the object; only a deleted vault stays in its slot, tombstoned, so a late
   fetch answer loses to it; its box listing and boxes are deleted
 * No timers on a Storable or a lease: a JS timer on a page that may be suspended at any moment says nothing. Refresh
-  timers belong to the listing or the bank. Autolock is `bank.autolock`, called by a host as it likes, after hello and on its own timer
+  timers belong to the listing or the bank. Autolock is a best-effort reminder, not a guarantee: `bank.autolock`, called by a host as it likes, after hello and on its own timer, and `lease.peek` uncaching a row past it at the door
 * A lease records `proved_at` and the kind of proving. `bank.autolock` finds cached leases through a deviceDB index range
   scan, so a fresh page needs no instance, and locks each listed vault of the row's own `vault_tok`, which erases the row.
   It shouts: a refused scan is bad news, and a lock whose erase is refused panics
@@ -295,7 +295,7 @@ the enter key, so the birth runs through, unlocked.
 vault.ensureUnlocked()
 ├─ await ensureTimely                                asked first: it makes the vault recent enough to know if it deserves a lease
 ├─ a lease in force → done
-├─ lease.peek → lease.attach → done, where one is cached; of this vault_tok and gate_epoch
+├─ lease.peek → lease.attach → done, where one is cached; of this vault_tok and gate_epoch, and not past autolock, which is uncached and reads as no row
 ├─ a gating open on this bank → refuses already_asking
 └─ Gating.launch('unlock_vault', { vault, run })
    ├─ void #askHost → requestCleartext(gating)
