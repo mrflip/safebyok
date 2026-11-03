@@ -284,7 +284,7 @@ export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make th
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why `create` makes nothing of a dna for a scope the listing already holds. */
-export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so create made nothing of the dna: send the instance that listing.at(scope) answers, which also brings a deleted or damaged box back to life."
+export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so create made nothing of the dna: listing.at(scope) answers it, and a box's send also brings a deleted or damaged box back to life."
 
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
 export const BoxPatchAdvice = "Nothing was stored. Every update of a box names both its whisper and its sidecar, as { whisper: { val }, sidecar }; to keep either as it is, give it again: box.unsealWhisper() answers the whisper stored, and box.sidecar, once that has hydrated the box, the sidecar."
