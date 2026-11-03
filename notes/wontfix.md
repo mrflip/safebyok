@@ -70,16 +70,17 @@ not as a settled ruling, and check it against the current design before relying 
   **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
   the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
   gets it from `lease.peek` and attaches it, asking nothing, so a vault the user locked reopens with no
-  passphrase. The panic's vacate stops that in the tab that locked, but the row can survive for other tabs
-  and later sessions. The Coach: "This is why the panic button exists, there is no fix we can apply if the
+  passphrase. With no `onPanic`, the panic's vacate stops that in the tab that locked; with one, stopping it is the
+  host's. Either way the row can survive for other tabs and later sessions. The Coach, 2026-11-02: won't fix, but
+  "one I worry about"; and, 2026-11-03: "This is why the panic button exists, there is no fix we can apply if the
   system somehow is operational enough to read leases, decrypt data and everything else but delete data."
 * 2026-11-03 (the Coach, unrace): **a refused erase with no `onPanic` can bring a false prompt.** `Vault.#panic`
   unlists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
   host has no on panic they've given their opinion, wontfix."
 * 2026-11-03 (the Coach, unrace): **a delete whose erase is refused, with no `onPanic`, still lands.** The vault
-  is removed from the vaultDB and the delete is answered, whatever the erase of the cached lease did. The same
+  is tombstoned in the vaultDB and the delete is answered, whatever the erase of the cached lease did. The same
   ruling: a host with no `onPanic` has given its opinion.
 * 2026-11-03 (the Coach, unrace): **a host's own getter that throws a `VaultError` quoting the passphrase passes
-  the gating's check whole.** The gating wraps a foreign throw from a getter as `unexpected_error` with no cause, but passes a
+  the gating's check whole.** The gating replaces a foreign throw from a getter with `unexpected_error`, keeping nothing of it, but passes a
   `VaultError` as it came and does not inspect its text; one a host's getter throws with the passphrase in its
   message reaches the caller whole. The Coach: "Wontfix agreed".
