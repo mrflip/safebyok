@@ -1,6 +1,6 @@
 # Thread 23: peek_autolock (2026-11-03)
 
-Branch `20261103-peek_autolock`, PR #PRNUM, stacked on #466. Justify: green; core 4790 passed, 37 skipped; size budgets unmoved;
+Branch `20261103-peek_autolock`, PR #467, stacked on #466. Justify: green; core 4790 passed, 37 skipped; size budgets unmoved;
 empty changeset.
 
 * **Built**:
