@@ -12,11 +12,7 @@ export type Awaitable<ValT> = ValT | Promise<ValT>
 /** `born` for the first record of a bank scope, `held` for one already cached, which stands, and `rewrote` for a damaged one written over: bad news for the bank. `record` is what the device now holds. */
 export type DeviceCached = { act: 'born' | 'held' | 'rewrote', record: DeviceRecord }
 
-/** The base of a deviceDB. Each verb throws its refusal and returns its answer; each `try*` answers an Outcome.
- * **Calls land in the order they were made:** each verb calls its `do*` before awaiting anything, so
- * a store that starts each call's work in the order called keeps a `vacate` made after a `cache` erasing it.
- * No verb returns or logs a `lease_key`; the sparse answer of `leasesProvedBefore` holds none.
- */
+/** SLOPDOC: The base of a deviceDB: calls land in the order made, and no verb returns or logs a `lease_key`. */
 export abstract class DeviceDB {
   // == [Generic calls]: doCache, doPeek, doVacate, doLeasesProvedBefore, doCacheDeviceRecord
 
