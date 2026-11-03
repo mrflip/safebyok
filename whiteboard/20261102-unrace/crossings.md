@@ -48,3 +48,17 @@ context, not by fine-tuning each of these.
 
 * A `lock()` landing during `lease.peek` (0.5 to 5 ms) loses: the vault ends unlocked with its cached row erased, until the
   next `lock()`.
+
+## A gate change rejecting after its record is stored
+
+The vaultDB is the ground truth: in each of these the verb's caller hears a refusal though the record landed, the next fetch
+brings this device up to it, and nothing guards against them. Each is pinned in `tests/models/halpimonfire.test.ts`.
+
+* A `sweep` or `vacate` of the listing while the store's answer comes back: delivering it refuses `disabled`. The new
+  passphrase opens the vault from then on, and the next `hello` lists the row.
+* A crypto failure in `proved.buildLease`, staged by a mock: the failure rejects, the vault holds the new gate and the old
+  lease, unlocked and sealing, and its cached row is of the old epoch, so the next session asks for a proof.
+* `demandReadyToAttach` refusing after a tombstone or a sweep crosses is **a birth's alone**: `vault_gone` or `disabled`, the new
+  lease vacated. A gate change can't meet it: the tombstone or sweep drops the lease held, `#renewLease` sees it forgotten
+  and vacates the new one, and the verb *resolves*, over a vault now gone or let go.
+* A refused `tryCache` is no rejection: the verb resolves, unlocked, and `onBadNews` hears it.
