@@ -407,7 +407,7 @@ export type ListingOpts<ScopeT, RecordT, SparseT> = {
   onBadNews?:            ((news: VaultError) => unknown) | undefined
 }
 
-/** The check of a listing's constructor arguments, as far as the base can tell: each of the world and store answers to its verbs, and the horizon is {@link horizonMillis}. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a listing's constructor arguments, as far as the base can tell. Its `parse` refuses 'bad_option'. Checks only. */
 export const listingOpts = objCheck(({ obj, fn }) => ({
   world:                 obj({ clock: HX.clockShape, lockState: fn(), ensureTimely: fn(), takeWorld: fn() }),
   store:                 obj({ get: fn(), put: fn(), del: fn(), watch: fn() }),
@@ -423,7 +423,7 @@ export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel
 
 // == [Making a storable]: storableArgs
 
-/** The check of a storable's constructor arguments, as far as the base can tell: the world carries a clock, the listing answers to {@link IsListing}, `central` passes {@link sparseBase}, and the options are {@link storableOpts}. Its `parse` refuses 'bad_option'. Checks only. */
+/** The check of a storable's constructor arguments, as far as the base can tell. Its `parse` refuses 'bad_option'. Checks only. */
 export const storableArgs = objCheck(({ custom }) => ({
   world,
   listing: custom<object>(isListing, Phrases.ListingExpected),
