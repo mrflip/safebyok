@@ -241,10 +241,11 @@ written by `DeviceDB.putLease` (IndexedDB keeps it by structured clone) and read
 `KeptLease.tryGet`, which holds it closed until a Vault object takes it up; and `Lease.#record` in
 memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
-erased from the store at `lock()`. In `src/models/` no lease is dropped at a time: it runs to its lock, or to the
-next `bank.autolock`, which only the host calls, and which locks each listed vault whose row cached on this device was proved longer ago
-than the autolock duration. Nothing else holds a lease to that duration: a lease the deviceDB refused to cache is not found, and
-`ensureUnlocked` attaches a cached row whatever its age. A record read back whose key is extractable, of another
+erased from the store at `lock()`. In `src/models/` no lease is dropped at a time, and **autolock is a best-effort reminder process, not a
+guarantee**: a lease held in a page stays held until something locks it. Two things answer to the autolock duration, against a row cached on
+this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row. `Lease.peek`, at the
+door, uncaches such a row and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof; a refused erase there leaves
+the row, with a warning, to the next peek. Neither reaches a lease already held, nor one the deviceDB refused to cache. A record read back whose key is extractable, of another
 algorithm, or for another use reads as `corrupt_record` (`isLeaseKey`, `types.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
 vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease
