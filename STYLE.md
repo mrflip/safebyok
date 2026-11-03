@@ -693,6 +693,10 @@ rows with it.
 
 ## Comments and doc blocks
 
+**For now, a doc block is one or two 120-character lines giving the purpose: no refusal lists and no narrated
+parameters. Where the rest of this section disagrees, this note wins.** (The Coach, 2026-11-03: the guidance on
+comments is inconsistent, and a reform is coming.)
+
 * `/** */` for doc blocks, `//` for a running clarification or commented-out code.
 * Bulleted lists use `*` at the top level and `-` below, indented two spaces per level.
 * **Every exported function, class, constant and type gets a doc block**, written for its caller:
