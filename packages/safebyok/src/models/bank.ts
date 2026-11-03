@@ -130,10 +130,8 @@ export class Bank implements VaultWorld {
   async hello(): Promise<void> {
     const listing = this.#vaultListing
     const hello = await outcomeOf(() => this.#bringUp(listing))
-    if (listing === this.#vaultListing) {
-      this.#lastHello = hello
-      this.#remakeSnapshot()
-    }
+    if (listing === this.#vaultListing) { this.#lastHello = hello }
+    this.#remakeSnapshot()
     valOf(hello)
   }
 
