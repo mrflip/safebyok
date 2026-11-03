@@ -451,7 +451,7 @@ const isCtxStamp = (val: unknown): boolean => (
     && Object.values(val).every((field) => typeof field === 'string' || Number.isFinite(field))
 )
 
-/** SLOPDOC: The arguments of each lease verb, and the flat stamp that binds a lease to its caller's record. */
+/** SLOPDOC: The arguments of each lease verb, and the flat stamp binding what a lease seals to its caller's record. */
 export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
