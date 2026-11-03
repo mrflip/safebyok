@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as MSX from '../../src/models/models-shapes'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -47,8 +47,15 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(record)
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(record.gate))
+    expect(vault.gate.pickle()).to.deep.equal(record.gate)
     expect(vault.gate).to.equal(vault.gate)
+  })
+
+  it("ducks as its record, the gate_epoch riding on the Gate: listing.recordOf(vault) answers the record it holds", async () => {
+    const record = await storedVaultRecord()
+    const { listing } = makeVaultWorld(record)
+    const vault = await listing.build(record)
+    expect(listing.recordOf(vault)).to.deep.equal(record)
   })
 
   it("has no gate in hand while it holds a sparse record, and refuses 'bad_option' until it is hydrated", async () => {
@@ -57,7 +64,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const vault = await listing.build(listing.sparseOf(record))
     TH.expectSyncRefusal(() => vault.gate, 'bad_option')
     await vault.hydrate()
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(record.gate))
+    expect(vault.gate.pickle()).to.deep.equal(record.gate)
   })
 
   it("refuses 'bad_option' a world without what a vault's gate and lease need", () => {
@@ -67,17 +74,16 @@ describe("VaultListing.build of a record, and its constructor", () => {
   })
 })
 
-describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the grant", () => {
-  it("grants the vault whose stamp the proving is of a lease, through the vault's dbfriend", async () => {
+describe("proving.buildLease(friend): the vault is taken at the grant", () => {
+  it("grants the vault whose stamp the proving is of a lease, caching nothing of itself", async () => {
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
     const proving = await makeProving(vault)
     deviceDB.tryPutLease.mockClear()
-    const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 })
+    const lease = await proving.buildLease(vault.leaseFriend())
     expect(lease.isInForce).to.be.true
-    expect(lease.vault).to.equal(vault)
-    expect(deviceDB.tryPutLease).toHaveBeenCalledOnce()
-    await lease.forget()
+    expect(deviceDB.tryPutLease).not.toHaveBeenCalled()
+    lease.evict()
   })
 
   it("refuses 'bad_option' a vault of another stamp, before any key is touched", async () => {
@@ -85,18 +91,18 @@ describe("Proving.makeLease(vault, dbfriend, opts): the vault is taken at the gr
     const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryPutLease.mockClear()
-    await TH.expectRefusal(proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: 60_000 }), 'bad_option')
+    await TH.expectRefusal(proving.buildLease(vault.leaseFriend()), 'bad_option')
     expect(deviceDB.tryPutLease).not.toHaveBeenCalled()
   })
 })
 
-describe("Vault.leaseDBFriend", () => {
-  it("binds the world's lease verbs to the vault's scope, so no verb takes one", async () => {
+describe("vault.leaseFriend()", () => {
+  it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await listing.create(Dna, () => ({ passphrase: Passphrase }))
-    const dbfriend = vault.leaseDBFriend()
-    await dbfriend.tryGetLease()
-    await dbfriend.tryDelLease()
+    const friend = vault.leaseFriend()
+    await friend.peekLease()
+    await friend.tryUncacheLease()
     expect(deviceDB.tryGetLease).toHaveBeenCalledWith(vault.scope)
     expect(deviceDB.tryDelLease).toHaveBeenCalledWith(vault.scope)
   })

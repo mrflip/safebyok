@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as TH from '../test-helpers'
-import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, roundTrip, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, roundTrip, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -13,12 +13,12 @@ describe("Vault.replacePassphrase", () => {
     const post = demandStored().gate
     expect(post.passphrase_wayin).not.to.deep.equal(ante.passphrase_wayin)
     expect(post.passkey_wayin).to.deep.equal(ante.passkey_wayin)
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(post))
+    expect(vault.gate.pickle()).to.deep.equal(post)
     await TH.expectRefusal(vault.gate.attemptProof(byPassphrase(Passphrase), world), 'wrong_passphrase')
     const byKey = await vault.gate.attemptProof(byPasskey('laptop'), world)
     expect(byKey.wayinkind).to.eq('passkey')
     const proving = await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
-    const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis })
+    const lease = await proving.buildLease(vault.leaseFriend())
     expect(vault.demandLease()).to.equal(held)
     expect(held.isInForce).to.be.true
     expect(await roundTrip(held, lease)).to.eq('sk-test')
@@ -79,7 +79,7 @@ describe("Vault.addPasskey", () => {
     const { credential_id } = await TH.passkeyOf('laptop')
     expect(post.passkey_wayin?.credential_id).to.eq(credential_id)
     const proving = await vault.gate.attemptProof(byPasskey('laptop'), world)
-    const lease = await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: LeaseMillis })
+    const lease = await proving.buildLease(vault.leaseFriend())
     expect(await roundTrip(vault.demandLease(), lease)).to.eq('sk-test')
     lease.evict()
   })
@@ -117,8 +117,8 @@ describe("Vault.revokePasskey", () => {
     const { vault, demandStored, opts: { world } } = await makeBornVaultWithPasskey()
     const ante = demandStored().gate
     await vault.revokePasskey(byPassphrase(Passphrase))
-    expect(wayinsOf(demandStored().gate)).to.deep.equal({ passphrase_wayin: ante.passphrase_wayin, passkey_wayin: null })
-    await TH.expectRefusal(vault.gate.attemptProof(byPasskey('laptop'), world), 'wrong_passkey')
+    expect(demandStored().gate).to.deep.equal({ gate_epoch: ante.gate_epoch + 1, passphrase_wayin: ante.passphrase_wayin, passkey_wayin: null })
+    await TH.expectRefusal(vault.gate.attemptProof(byPasskey('laptop'), world), 'absent_wayin')
     const proving = await vault.gate.attemptProof(byPassphrase(Passphrase), world)
     expect(proving.wayinkind).to.eq('passphrase')
   })

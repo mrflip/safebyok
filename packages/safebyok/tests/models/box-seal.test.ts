@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { BoxRecord } from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
-import { Dna, LeaseMillis, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -45,10 +45,10 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     await TH.expectRefusal(altered.unsealWhisper(), 'damaged_box')
   })
 
-  it("refuses 'vault_locked' from the lease, at the seal and the unseal, once the clock passes its autolock_at", async () => {
-    const { boxes, advance } = await sealWorld()
+  it("refuses 'vault_locked' from the lease, at the seal and the unseal, once the vault locks", async () => {
+    const { boxes, vault } = await sealWorld()
     const box = await boxes.create(BoxDna)
-    advance(LeaseMillis)
+    vault.lock()
     await TH.expectRefusal(box.unsealWhisper(), 'vault_locked')
     await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } }), 'vault_locked')
   })

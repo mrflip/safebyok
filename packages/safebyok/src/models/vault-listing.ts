@@ -12,17 +12,17 @@ import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-sha
 import { type DelTombstone, Listing } from './listing'
 import { Gate } from './gate'
 import type { PassphraseProving } from './proving'
-import { type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, FirstGateEpoch, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type Dna, type Fetched, type LeaseDeviceDB, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultDna, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseFriend()` binds it. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
-  leaseMillis?: LeaseGrantOpts['leaseMillis']
+  leaseMillis?: number
   deviceDB:    LeaseDeviceDB
 }
 
@@ -49,7 +49,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     this.demandNotHeld(input)
     const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
     const vault = await this.putDraft(draft)
-    vault.takeUpLease(await proving.makeLease(vault, vault.leaseDBFriend(), { leaseMillis: vault.leaseMillis }))
+    vault.takeUpLease(await vault.leaseCachedOf(proving))
     return vault
   }
 
@@ -86,7 +86,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     const checked = MSX.vaultBuildArgs.parse({ proofClosure })
     const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
     const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.proofClosure, this.world)
-    return { draft: { ...sparse, am: 'a', gate: { ...gate.pickle(), gate_epoch: FirstGateEpoch } }, proving }
+    return { draft: { ...sparse, am: 'a', gate: gate.pickle() }, proving }
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {

@@ -1,15 +1,14 @@
 import { consistent } from '../checks/validator'
-import { FarFuture } from '../consts'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
 import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
-import { type IntervalMillis, Trigger } from '../helpers/trigger'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
-import { type LeaseDBFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type LeaseVault, type SealedWhisper, type VaultStamp, LeaseFormat, leaseGetArgs, leaseGrantArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, serializedBytes, vaultStamp } from './models-shapes'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseGrantArgs, leasePeekArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, serializedBytes, vaultStamp } from './models-shapes'
 
 // == [Lease]
 
+/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It holds the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
   declare readonly fmt:           typeof LeaseFormat
   declare readonly applabel:      string
@@ -17,101 +16,88 @@ export class Lease implements LeaseStamp {
   declare readonly vaultlabel:    string
   declare readonly vault_tok:     string
   declare readonly registered_at: number
-  declare readonly autolock_at:   number
-  declare readonly vault:         LeaseVault
-  declare readonly dbfriend:      LeaseDBFriend
+  declare readonly gate_epoch:    number
+  declare readonly proved_at:     number
+  declare readonly wayinkind:     WayinKind
+  declare readonly friend:        LeaseFriend
 
-  /** The record with its keys, null once forgotten. */
+  /** The record with its keys, null once out of force. */
   #record: LeaseRecord | null
 
   /** The stamp of the vault this lease is of, parsed once: what every ctx under it binds. */
   readonly #vaultStamp: VaultStamp
 
-  /** Fires `vault.lock()` at `autolock_at`; disarmed when the lease is forgotten or evicted. */
-  readonly #autolock: Trigger<void>
+  /** True where this lease came from the cache, so caching it has nothing to do. */
+  readonly #isPeeked: boolean
 
-  private constructor(vault: LeaseVault, dbfriend: LeaseDBFriend, record: LeaseRecord, intervalMillis: IntervalMillis) {
+  private constructor(friend: LeaseFriend, record: LeaseRecord, isPeeked: boolean) {
     this.#record = leaseRecord.parse(record)
     tattoo(this, leaseStamp.parse(record), { writable: false, configurable: false })
-    adorn(this, 'vault', vault)
-    adorn(this, 'dbfriend', dbfriend)
-    this.#vaultStamp = vaultStamp.parse(vault)
-    // A lease in hand is a success of the autolock's task: timely, and its timer set, for `intervalMillis` from now, when the autolock fires.
-    this.#autolock = new Trigger({
-      clock:          vault.clock,
-      intervalMillis,
-      eagerFrac:      1,
-      doTryLaunch:    () => outcomeOf(() => { this.#autolockNow() }),
-      onTimerRefusal: (err) => { dbfriend.logger.warn('The autolock fired, but locking the vault was refused.', { call: 'Lease.autolock', refusalkind: err.refusalkind }) },
-    })
+    adorn(this, 'friend', friend)
+    this.#vaultStamp = vaultStamp.parse(friend)
+    this.#isPeeked = isPeeked
     Object.freeze(this)
-    this.#autolock.taskCompleted()
   }
 
-  // == [Making one]: get, tryGet, grant
+  // == [Making one]: peek, tryPeek, grant
 
-  /** The lease this device keeps of `vault`, or null for none; one past its `autolock_at` is forgotten, its record erased, and answers null. */
-  static async get(vault: LeaseVault, dbfriend: LeaseDBFriend): Promise<Lease | null> {
-    leaseGetArgs.parse({ vault, dbfriend })
-    const kept = await dbfriend.tryGetLease()
-    if (! kept.ok) { throw kept.err }
-    if (kept.val === null) { return null }
-    const checked = leaseRecord.safeParse(kept.val)
-    if (! checked.success || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(vault))) {
-      // Neither the record nor what it failed is told: it may hold key material.
-      dbfriend.logger.warn("This device's lease could not be read as a lease of this vault, so it counts as none and was left where it lies: the vault asks for the passphrase, and the next grant writes over it.", { call: 'Lease.get' })
+  /** The lease this device has cached of the vault for `gate_epoch`, or null for none. One of another `vault_tok` or epoch is uncached and answers null, so the vault asks for a proof. A record that is no lease refuses 'damaged_lease', quoting nothing, and stays in place until the next lease is cached over it. */
+  static async peek(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
+    leasePeekArgs.parse({ friend, gate_epoch })
+    const cached = await friend.peekLease()
+    if (cached === null) { return null }
+    const checked = leaseRecord.safeParse(cached)
+    if (! checked.success) { throw damagedLease() }
+    if (checked.data.gate_epoch !== gate_epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+      await uncacheForgotten(friend)
       return null
     }
-    if (checked.data.autolock_at <= vault.clock.now()) {
-      await eraseKept(dbfriend, 'Lease.get')
-      return null
-    }
-    return new Lease(vault, dbfriend, checked.data, checked.data.autolock_at - vault.clock.now())
+    return new Lease(friend, checked.data, true)
   }
 
-  static tryGet(vault: LeaseVault, dbfriend: LeaseDBFriend): Promise<Outcome<Lease | null>> {
-    return outcomeOf(() => this.get(vault, dbfriend))
+  static tryPeek(friend: LeaseFriend, gate_epoch: number): Promise<Outcome<Lease | null>> {
+    return outcomeOf(() => this.peek(friend, gate_epoch))
   }
 
-  static async grant(vault: LeaseVault, dbfriend: LeaseDBFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
-    const { opts: { leaseMillis } } = leaseGrantArgs.parse({ vault, dbfriend, vaultKey, opts })
-    const held     = vaultStamp.parse(vault)
-    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, autolock_at: Math.min(vault.clock.now() + leaseMillis, FarFuture) })
+  /** A new lease under a fresh leaseKey. It is cached by {@link Lease.tryCache}, not here. */
+  static async grant(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
+    const { opts: { gate_epoch, wayinkind } } = leaseGrantArgs.parse({ friend, vaultKey, opts })
+    const held     = vaultStamp.parse(friend)
+    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, gate_epoch, proved_at: friend.clock.now(), wayinkind })
     const leaseKey = await makeLeaseKey()
     const vault_key_lease_wrapped = await wrapKeyUnder(leaseKey, vaultKey, cipherCtx([held, granted], 'vault_key_lease_wrapped'))
-    const record = leaseRecord.parse({ ...granted, lease_key: leaseKey, vault_key_lease_wrapped })
-    const put = await dbfriend.tryPutLease(record)
-    // The deviceDB is a cache: a put refused costs the next session a passphrase, not this one its proof.
-    if (! put.ok) { dbfriend.logger.warn('The lease was granted but could not be kept on this device: the next session asks for the passphrase again.', { call: 'Lease.grant', refusalkind: put.err.refusalkind }) }
-    return new Lease(vault, dbfriend, record, leaseMillis)
+    return new Lease(friend, leaseRecord.parse({ ...granted, lease_key: leaseKey, vault_key_lease_wrapped }), false)
   }
   // --
 
-  // == [Ending one]: forget, evict, isForgotten, isInForce, autolockNow
+  // == [The cache]: cache, tryCache
 
-  /** Drop the keys and erase the record where the deviceDB keeps it. Nothing here has bytes to zero: the leaseKey is a non-extractable handle, and the wrap is ciphertext; dropping the record is all that can be done. */
-  async forget(): Promise<void> {
+  /** Put this lease in the deviceDB's cache; one peeked from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
+  async cache(): Promise<void> {
+    if (this.#isPeeked) { return }
+    valOf(await this.friend.tryCacheLease(this.#demandRecord()))
+  }
+
+  tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
+  // --
+
+  // == [Ending one]: vacate, tryVacate, evict, isForgotten, isInForce
+
+  /** Drop the keys and uncache the record, so this device is locked. Nothing here has bytes to zero: the leaseKey is a non-extractable handle, and the wrap is ciphertext. A refused uncache leaves the lease out of force and the record cached. */
+  async vacate(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
-    const del = await this.dbfriend.tryDelLease()
-    if (! del.ok) { throw del.err }
+    valOf(await this.friend.tryUncacheLease())
   }
 
-  /** Drop the keys and disarm the autolock, leaving the record the deviceDB keeps. */
-  evict(): void {
-    this.#record = null
-    this.#autolock.disarm()
-  }
+  tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
+
+  /** Drop the keys, leaving the cached record for the next session. */
+  evict(): void { this.#record = null }
 
   get isForgotten(): boolean { return this.#record === null }
 
-  get isInForce(): boolean { return this.#record !== null && this.#autolock.isTimely }
-
-  /** The autolock's launch: lock the vault, which erases the kept lease by scope; evict here too, for a lease the vault never took up. */
-  #autolockNow(): void {
-    this.vault.lock()
-    this.evict()
-  }
+  get isInForce(): boolean { return this.#record !== null }
   // --
 
   // == [Its stamp]: toJSON
@@ -158,20 +144,20 @@ export class Lease implements LeaseStamp {
 
   // == [The vaultKey]: demandRecord, vaultKey, leaseStamp
 
-  /** The record, while the lease is in force: past `autolock_at`, or forgotten, refuses 'vault_locked'. */
+  /** The record, while the lease is in force: out of force refuses 'vault_locked'. */
   #demandRecord(): LeaseRecord {
-    if (this.#record === null || ! this.#autolock.isTimely) { throw leaseNotInForce() }
+    if (this.#record === null) { throw leaseNotInForce() }
     return this.#record
   }
 
-  /** The vaultKey for this one call, non-extractable, with the one usage. A lease not in force refuses 'vault_locked'; one that will not open is dropped, locks the vault, and refuses 'damaged_lease'. Nothing keeps the key between calls. */
+  /** The vaultKey for this one call, non-extractable, with the one usage. A lease out of force refuses 'vault_locked'; one that will not open is dropped, locks the vault, and refuses 'damaged_lease'. Nothing keeps the key between calls. */
   async #vaultKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
     const { lease_key, vault_key_lease_wrapped } = this.#demandRecord()
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
     const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), damagedLease)
     if (! opened.ok) {
-      // Locking drops the vault's lease and erases the kept one by scope; this one is evicted too, should the vault hold another.
-      this.vault.lock()
+      // Locking drops the vault's lease and uncaches by scope; this one is evicted too, should the vault hold another.
+      this.friend.lock()
       this.evict()
     }
     return valOf(opened)
@@ -182,12 +168,12 @@ export class Lease implements LeaseStamp {
 }
 // --
 
-// == [Erasing the kept record]: eraseKept
+// == [Forgetting the cached record]: uncacheForgotten
 
-/** Erase the record the deviceDB keeps, warning of a refusal: tried once, never again (notes/wontfix.md). */
-const eraseKept = async (dbfriend: LeaseDBFriend, call: string): Promise<void> => {
-  const del = await dbfriend.tryDelLease()
-  if (! del.ok) { dbfriend.logger.warn("This device's lease could not be erased: the next grant writes over it.", { call, refusalkind: del.err.refusalkind }) }
+/** Uncache a record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
+const uncacheForgotten = async (friend: LeaseFriend): Promise<void> => {
+  const del = await friend.tryUncacheLease()
+  if (! del.ok) { friend.logger.warn("This device's lease could not be erased: the next lease is written over it.", { call: 'Lease.peek', refusalkind: del.err.refusalkind }) }
 }
 // --
 

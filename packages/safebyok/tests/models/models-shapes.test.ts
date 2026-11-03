@@ -682,6 +682,8 @@ describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault recor
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
     [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
     [sparseVault,                    false, 'refuses a record without its gate'],
+    [{ ...sparseVault, gate: { ...gate, gate_epoch: undefined } }, false, 'refuses a gate without its gate_epoch'],
+    [{ ...sparseVault, gate: { ...gate, gate_epoch: 0 } },         false, 'refuses gate_epoch 0: the first is 1'],
     [{ ...sparseVault, gate: {} },   false, 'refuses a gate without its wayins'],
   ])
 

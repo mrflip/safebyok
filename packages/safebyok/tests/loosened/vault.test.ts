@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { PrfSalt } from '../../src/shapes/fields'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, roundTrip, storedVaultRecord, useVaultWorlds, wayinsOf } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, roundTrip, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -20,30 +20,13 @@ describe("the ways in changing under a vault unlocked", () => {
     await theirs.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     const received = storeBehindOurBack(other.demandStored())
     vault.receive(received)
-    expect(vault.gate.pickle()).to.deep.equal(wayinsOf(received.gate))
+    expect(vault.gate.pickle()).to.deep.equal(received.gate)
     expect(received.gate.passphrase_wayin).not.to.deep.equal(record.gate.passphrase_wayin)
     expect(vault.isUnlocked).to.be.true
     expect(vault.demandLease()).to.equal(held)
     expect(await roundTrip(held, held)).to.eq('sk-test')
   })
 
-  it("README.md:844, 'each other device falls back to `locked` and must unlock again': a lease another device kept under its passkey is taken up at its next session's hello after the passkey was revoked here, and opens what this device seals", async () => {
-    const { vault, demandStored } = await makeBornVaultWithPasskey()
-    const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
-    const theirs = await other.listing.build(other.demandStored())
-    await theirs.ensureUnlocked(byPasskey('laptop'))
-    other.listing.goodbye()
-    await vault.revokePasskey(byPassphrase(Passphrase))
-    other.storeBehindOurBack(demandStored())
-    const later = other.anotherSession()
-    const again = await later.build(other.demandStored())
-    expect(other.deviceDB.keptNow()).not.to.be.null
-    expect(again.isLocked).to.be.true
-    await later.hello()
-    expect(again.gate.pkWayin).to.be.null
-    expect(again.isUnlocked).to.be.true
-    expect(await roundTrip(vault.demandLease(), again.demandLease())).to.eq('sk-test')
-  })
 })
 
 describe("an older copy of the vault record", () => {
@@ -59,7 +42,7 @@ describe("an older copy of the vault record", () => {
     await later.hello()
     expect(restored.isLocked).to.be.true
     expect(restored.revision_seq).to.eq(ante.revision_seq)
-    expect(restored.gate.pickle()).to.deep.equal(wayinsOf(ante.gate))
+    expect(restored.gate.pickle()).to.deep.equal(ante.gate)
     await restored.ensureUnlocked(byPassphrase(Passphrase))
     expect(restored.isUnlocked).to.be.true
   })

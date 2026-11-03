@@ -57,7 +57,7 @@ export const {
 
   const passphraseWayin = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const passkeyWayin    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
-  const gate            = obj({ gate_epoch: uint, passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin.nullable() }).strict()
+  const gate            = obj({ gate_epoch: uint.positive(), passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin.nullable() }).strict()
 
   const vaultSparse    = vaultScope.extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
   const vaultRecord    = vaultSparse.extend({ am: lit('a'), gate }).strict()
