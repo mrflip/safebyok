@@ -180,7 +180,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Delete the thing `duck` names, a sparse record or a thing, over the revision of the instance held, or else `duck`'s own, and deliver the answer: its tombstone, or nothing for nothing stored. An entry of a `damaged_records`, `am` 'd', goes over its own revision: that is the customer naming that very row. A 'stale_write' refusal delivers as `put` does. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
     this.demandEnabled()
-    const held = (duck.am === 'd') ? null : this.at(this.scopeOf(duck))
+    const scope = this.scopeOf(duck)
+    const held = (duck.am === 'd') ? null : this.at(scope)
     const sparse = held?.sparse ?? this.sparseOf(duck)
     const prior = priorOf(sparse)
     const tombstone = { ...sparse, ...VS.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
