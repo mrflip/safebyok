@@ -166,8 +166,8 @@ describe("The checks of what reconciling passes", () => {
   describe("MSX.centralPolicy", () => { checkSet(MSX.centralPolicy, MSX.centralPolicyVals, ['edit', 'del', null]) })
 
   it("list the kinds of the table", () => {
-    expect(MSX.centralPolicyVals).to.deep.equal(['older', 'same', 'skip', 'fill', 'adopt', 'gone', 'ouch'])
-    expect(MSX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone', 'ouch'])
+    expect(MSX.centralPolicyVals).to.deep.equal(['older', 'same', 'fill', 'adopt', 'gone'])
+    expect(MSX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone'])
     expect(MSX.ageVals).to.deep.equal(['older', 'same', 'newer'])
   })
 

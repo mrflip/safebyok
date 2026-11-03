@@ -258,7 +258,7 @@ export abstract class VaultDB {
 
   // == [Dels]: delBox, delVault, tidyGone, tryDelBox, tryDelVault, tryTidyGone
 
-  /** Writes the tombstone over a live row at `prior`: `deleted`. A row already `gone` or `void` answers so, the request discarded. A row moved past `prior` refuses `stale_write`. */
+  /** Writes the tombstone over a live row at `prior`: `deleted`. A row already `gone` or `void` answers so, the request discarded. A row moved past `prior` refuses `stale_write`. A row failing its checks is deleted only as `damaged_records` lists it, sentinels and all; otherwise it refuses as a get does. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
     return this.#call<BoxTombstone, DelAct, VaultRow>('delBox', { ...tombstone, ...opts }, async () => {
       const boxTombstone = VS.boxTombstone.parse(tombstone)
@@ -274,7 +274,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Writes the tombstone over the live row at `prior` and tombstones this life's boxes in one transaction: `deleted`. A repeat writes no vault row, whatever its revision, still tombstones the boxes, and answers `gone`, or `void` for a row that is nothing of this life. A row moved past `prior` refuses `stale_write`, and tombstones nothing. */
+  /** Writes the tombstone over the live row at `prior` and tombstones this life's boxes in one transaction: `deleted`. A repeat writes no vault row, whatever its revision, still tombstones the boxes, and answers `gone`, or `void` for a row that is nothing of this life. A row moved past `prior` refuses `stale_write`, and tombstones nothing. A row failing its checks is deleted only as `damaged_records` lists it, sentinels and all; otherwise it refuses as a get does. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> {
     return this.#call<VaultTombstone, DelAct, VaultRow>('delVault', { ...tombstone, ...opts }, async () => {
       const vaultTombstone = VS.vaultTombstone.parse(tombstone)

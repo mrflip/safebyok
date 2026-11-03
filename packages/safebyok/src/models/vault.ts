@@ -1,6 +1,6 @@
 import { type CipherCtxRecord, randomId } from '../crypto'
 import { VaultError } from '../errors'
-import { type Outcome, outcomeOf } from '../outcome'
+import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
@@ -36,8 +36,8 @@ export type VaultSnapshot = VaultScope & Readonly<{
  * Its `vault_tok` is the life of the vault in its scope, fixed at birth: a birth's is minted
  * by the listing, a received record's is its own, and a record under another `vault_tok` throws
  * 'unexpected_error'. Its record carries its gate, the wayins, and nothing else stores them. Its
- * guards take no lock: its record holds no secret. A vault deleted or damaged is not sent back to
- * life, as a box is: a new life is a new `vault_tok`, so a new instance, created by the listing.
+ * guards take no lock: its record holds no secret. A vault deleted is not sent back to life, as a
+ * box is: a new life is a new `vault_tok`, so a new instance, created by the listing.
  */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> implements BoxWorld {
   /** The scope, tattooed on by Storable's constructor. */
@@ -70,7 +70,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The vault's own lock, not its world's: the bank has none. */
   override get isLocked(): boolean { return this.lockState() === 'locked' }
 
-  /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. A vault found gone or damaged refuses its absent refusal. */
+  /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. A vault found gone refuses 'vault_gone', and a row found damaged 'damaged_record'. */
   async ensureTimely(maxMillis?: number): Promise<this> {
     await this.hydrate({ maxMillisSinceRefresh: maxMillis })
     return this.demandPresent()
@@ -171,7 +171,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lease]: leaseFriend, demandReadyToAttach, attachLease, renewLease, vacateLease, vacateUnattached, panic, lock
+  // == [The lease]: leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
 
   /** All a lease or a proving hears of this vault: the one friend for its life, which is how an attach knows a lease made for this very instance. */
   leaseFriend(): LeaseFriend {
@@ -229,14 +229,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     await lease.attach()
   }
 
-  /** Read locked and erase the row, whether or not a lease is held. The erase is called before the first await, so it lands in call order against any cache; refused, it is a panic. */
-  async #vacateLease(): Promise<void> {
-    const vacating = this.leaseFriend().tryUncacheLease()
+  #dropLease(): void {
     this.#lease?.evict()
     this.#lease = null
+  }
+
+  /** Read locked and erase the row, whether or not a lease is held. The lease goes first, so an erase that throws leaves none; the erase is called before the first await, so it lands in call order against any cache. Refused, `onRefused` hears it, by default a panic. */
+  async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#panic(refusal)): Promise<void> {
+    this.#dropLease()
+    const vacating = outcomeOf(async () => { valOf(await this.leaseFriend().tryUncacheLease()) })
     this.settle()
     const vacated = await vacating
-    if (! vacated.ok) { await this.#panic(vacated.err) }
+    if (! vacated.ok) { await onRefused(vacated.err) }
   }
 
   /** Drop a lease this vault did not attach, and its row. */
@@ -290,18 +294,26 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Children and discards]: boxListing, sweepContents, vacateContents
+  // == [Children and discards]: boxListing, adopt, sweepContents, vacateContents
 
-  /** The listing of this vault's boxes, made once, on first asking. */
+  /** The listing of this vault's boxes, made once, on first asking. A vault gone refuses 'vault_gone'. */
   get boxListing(): BoxListing {
+    this.demandPresent()
     this.#boxListing ??= this.listing.boxListingOf(this)
     return this.#boxListing
   }
 
+  /** A tombstone taken in is a delete's end state, here or elsewhere: locked, the row cached erased, the boxes vacated, and the vault staying in its slot. A refused erase is bad news, and the tombstone stands. */
+  protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
+    super.adopt(central)
+    if (this.isPresent) { return }
+    void this.#vacateLease((refusal) => { this.listing.tellBadNews([refusal]) })
+    this.#boxListing?.vacate()
+  }
+
   /** The lease dropped, the row cached left for the next session, and the boxes swept. */
   protected override sweepContents(): void {
-    this.#lease?.evict()
-    this.#lease = null
+    this.#dropLease()
     this.#boxListing?.sweep()
   }
 
@@ -317,7 +329,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** A gate change keeps the rest of the record in hand and needs the vault present and refreshed {@link MSX.Promptly}; no lock, as its record holds no secret. */
   ensureReadyToChangeGate(): Promise<this> { return this.ensureTimely(MSX.Promptly) }
 
-  /** A vault deleted has no life left to delete; a damaged one may be deleted, as `bank.delDamagedVault` did. Not yet: the passphrase's proof the old `vault.del` took. */
+  /** A vault deleted has no life left to delete. Not yet: the passphrase's proof the old `vault.del` took. */
   override demandReadyToDel(): this {
     if (this.am === 'x') { throw this.listing.absentRefusal(this.scope) }
     return this

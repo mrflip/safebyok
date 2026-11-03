@@ -356,7 +356,7 @@ export const ProofClosureThrew = "The proof closure threw rather than handing ba
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, LetGoInstance, vaultAbsent
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LeaseOfOtherHolder, LetGoInstance, vaultAbsent, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
@@ -384,6 +384,8 @@ export const LetGoInstance = "This object was let go, by a sweep, a vacate or a 
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
+
+export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
 
 // == [Models: gates]: GateChangeNeedsPassphrase, GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke

@@ -125,7 +125,6 @@ describe("BoxListing", () => {
       full:    fullBoxRecord(),
       sparse:  sparseBoxRecord(),
       gone:    tombstoneBoxRecord({ revision_seq: 2 }),
-      damaged: tombstoneBoxRecord({ revision_seq: 2 }, 'd'),
     }
 
     for (const [form, record] of Object.entries(records)) {
@@ -175,31 +174,6 @@ describe("BoxListing", () => {
     })
   })
 
-  describe("listing.fetch(scope) answering a damaged record", () => {
-    it("builds and holds a damaged box for a tombstone in the box's sparse form, for a box not yet held", async () => {
-      const listing = boxListingOf(held.mw)
-      const scope = held.mw.boxscope('anthropic_api_key')
-      const damaged = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }, 'd')
-      expect(damaged).to.deep.equal({ ...sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }), am: 'd' })
-      held.mw.willGet(held.mw.answerOf(scope, damaged))
-      expect(await listing.fetch(scope, { ifAbsent: 'nil' })).to.be.null
-      const box = listing.at(scope)
-      expect(box).to.be.instanceOf(Box)
-      expect(box?.isPresent).to.be.false
-      expect(box?.am).to.eq('d')
-      expect(box?._cheat_central).to.deep.equal(damaged)
-    })
-
-    it("refuses a tombstone of only the scope, vault_tok, revision and times as 'bad_record' at the box's sparse form", async () => {
-      const listing = boxListingOf(held.mw)
-      const scope = held.mw.boxscope('anthropic_api_key')
-      const { vault_tok, revision_tok, registered_at, written_at } = fullBoxRecord()
-      const bare = { ...scope, vault_tok, am: 'd', revision_tok, revision_seq: 2, registered_at, written_at }
-      held.mw.willGet(held.mw.answerOf(scope, bare as never))
-      await TH.expectRefusal(listing.fetch(scope), 'bad_record')
-      expect(listing.at(scope)).to.be.null
-    })
-  })
 })
 
 describe("BoxListing: create holds a dna to boxDna at its door", () => {
@@ -259,7 +233,6 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
 
 const scope   = () => held.mw.boxscope('anthropic_api_key')
 const gone    = () => tombstoneBoxRecord({ revision_seq: 2 })
-const damaged = () => tombstoneBoxRecord({ revision_seq: 2 }, 'd')
 /** The revision a stale_write says storage holds. */
 const stored = { revision_tok: 'rev-s5', revision_seq: 5 }
 /** A full box held, and the calls forgotten. */
@@ -311,11 +284,8 @@ describe("BoxListing: an absent box", () => {
   })
 
   describe("listing.fetch(scope) of a stored tombstone", () => {
-    for (const [form, tombstone, am] of [['deleted', gone, 'x'], ['damaged', damaged, 'd']] as const) {
-      /** A damaged row reaches a fetch by script, until `tryGetBox` delivers one (thread 8). */
-      const storeTombstone = () => {
-        if (am === 'x') { held.mw.seedStore(tombstone()) } else { held.mw.willGet(held.mw.answerOf(scope(), tombstone())) }
-      }
+    for (const [form, tombstone, am] of [['deleted', gone, 'x']] as const) {
+      const storeTombstone = () => { held.mw.seedStore(tombstone()) }
 
       it(`refuses 'absent_box' for a ${form} box, built and held as its tombstone`, async () => {
         storeTombstone()
@@ -405,11 +375,6 @@ describe("BoxListing: an absent box", () => {
       expect(listing.snapshot).to.deep.equal([])
     })
 
-    it("holds a damaged instance the same way", async () => {
-      const box = await boxListingOf(held.mw).build(damaged())
-      expect(box.am).to.eq('d')
-      expect(box.isPresent).to.be.false
-    })
   })
 
   describe("a refused answer carrying what storage holds", () => {

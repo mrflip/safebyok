@@ -10,12 +10,15 @@ import type { VaultLogger } from '../logger'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
+import * as VS from '../storage/vault-db-shapes'
+import { alreadyHeldError } from '../helpers/throwers'
 import { BoxListing } from './box-listing'
-import { type DelTombstone, Listing } from './listing'
+import { type DelTombstone, type SlotFate, Listing } from './listing'
 import { Gate } from './gate'
 import type { PassphraseProving } from './proving'
 import { type Dna, type Fetched, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
+import { cmpRevisions } from './storable'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultDna, VaultListingOpts
@@ -50,17 +53,32 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** Build the gate of a vault under a `vault_tok` fresh from {@link makeLifeTok}, from what `proofClosure` answers, and store it over no record; resolves the vault held once it lands, unlocked under the lease its passphrase proving grants. Refuses 'bad_option' with no closure, or a scope already held, before the closure is asked anything; 'stale_write' where storage holds a vault, delivered first. A refusal before the put lands holds nothing of the dna; a lease refused after it leaves the vault stored and held, locked. */
+  /** Build the gate of a vault under a `vault_tok` fresh from {@link makeLifeTok}, from what `proofClosure` answers, and store it over no record; resolves the vault held once it lands, unlocked under the lease its passphrase proving grants. A tombstone in the slot is the revision it goes over, and it replaces that. Refuses 'bad_option' with no closure, or a vault present in the slot, before the closure is asked anything; 'stale_write' where storage holds a newer record, delivered first. A refusal before the put lands holds nothing of the dna; a lease refused after it leaves the vault stored and held, locked. */
   async create(input: VaultDna, proofClosure?: ProofClosure): Promise<Vault> {
-    this.demandNotHeld(input)
-    const { draft, proving } = await this.#draftWithProving(this.stampDna(input), proofClosure)
-    const vault = await this.putDraft(draft)
+    const prior = this.#priorOfBirth(input)
+    const { draft, proving } = await this.#draftWithProving({ ...this.stampDna(input), ...VS.nextRevisionOf(prior ?? VS.NeverStored, this.clock.now()) }, proofClosure)
+    const vault = await this.putDraft(draft, prior)
     const lease = await proving.buildLease(vault.leaseFriend())
     await lease.attach()
     return vault
   }
 
   tryCreate(input: VaultDna, proofClosure?: ProofClosure): Promise<Outcome<Vault>> { return outcomeOf(() => this.create(input, proofClosure)) }
+
+  /** The commit of a birth: `record` put over `prior`, the tombstone's revision or never stored. Landed, a new vault of it replaces the slot's tombstone or void, locked. Where another vault stands stored, a vault of that one is held and answered, locked, a success: the caller tells by `vault_tok`. Refused, it stores nothing and holds nothing of `record`; a 'stale_write' delivers the record stored. */
+  ensureVault(record: VaultRecord, prior: Revision): Promise<Vault> {
+    return this.putDraft(record, prior, { ifPresent: 'get' })
+  }
+
+  tryEnsureVault(record: VaultRecord, prior: Revision): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(record, prior)) }
+
+  /** The tombstone a birth under `scope` goes over, or null over none held; refuses 'bad_option' a vault present in the slot. */
+  #priorOfBirth(scope: VaultScope): Vault | null {
+    this.demandEnabled()
+    const held = this.at(scope)
+    if (held?.isPresent === true) { throw alreadyHeldError() }
+    return held
+  }
 
   /** The listing of `vault`'s boxes, its watch not started. Bad news of a box goes where this listing's goes. */
   boxListingOf(vault: Vault): BoxListing {
@@ -71,6 +89,15 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   // == [Defined by the vault listing]
 
   protected vaultTokOfWorld(): null { return null }
+
+  /** An older record loses to the vault held. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
+  protected override fateOver(held: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
+    const age = cmpRevisions(held, record)
+    if (age === 'older') { return 'lose' }
+    const isOtherLife = record.vault_tok !== held.vault_tok
+    const isRebirth = (! held.isPresent) && (! MSX.isTombstone(record))
+    return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
+  }
 
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
@@ -94,8 +121,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new Vault(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
 
+  /** A vault gone, one in the slot and tombstoned, is 'vault_gone', as the vaultDB says of it to a box verb; nothing held is 'absent_vault'. */
   absentRefusal(scope: VaultScope): VaultError {
-    return new VaultError('absent_vault', Phrases.vaultAbsent(scope.vaultlabel))
+    return (this.at(scope) === null) ? vaultAbsent(scope) : vaultGone()
   }
 
   /** The vault row alone: the boxes `getVault` lists with it are the vault's box listing's to take. */
@@ -113,4 +141,11 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected isOwnRow(row: VaultRow | BoxRow): row is VaultRow { return ! ('boxlabel' in row) }
   // --
 }
+// --
+
+// == [Refusals]: vaultAbsent, vaultGone
+
+const vaultAbsent = ({ vaultlabel }: VaultScope): VaultError => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
+
+const vaultGone = (): VaultError => new VaultError('vault_gone', Phrases.VaultDeleted)
 // --

@@ -224,14 +224,13 @@ const Centrals: Readonly<Record<RecordShape, () => Rec>> = {
   full:   () => fullBoxRecord(CentralRev),
   sparse: () => sparseBoxRecord(CentralRev),
   gone:   () => tombstoneBoxRecord(CentralRev),
-  ouch:   () => tombstoneBoxRecord(CentralRev, 'd'),
 }
 
 /** A record storage delivers, by shape, at the revision given; a full one carries a sidecar of its own. */
 const rcvdOf = (shape: RecordShape, rev: Partial<BoxSparse>): Rec => {
   if (shape === 'full')   { return fullBoxRecord({ ...rev, am: 'a', sidecar: { note: 'delivered' } }) }
   if (shape === 'sparse') { return sparseBoxRecord(rev) }
-  return tombstoneBoxRecord(rev, shape === 'ouch' ? 'd' : 'x')
+  return tombstoneBoxRecord(rev)
 }
 
 /** A box holding `central`, not held by the listing and not yet timely. */
@@ -263,9 +262,8 @@ const expectReceiveConflict = (box: SpiedBox, rcvd: Rec | null): void => {
   expect(stateOf(box)).to.deep.equal(before)
 }
 
-const ShapesAll: readonly RecordShape[] = ['full', 'sparse', 'gone', 'ouch']
+const ShapesAll: readonly RecordShape[] = ['full', 'sparse', 'gone']
 const ShapesAlive: readonly RecordShape[] = ['full', 'sparse']
-const ShapesUndamaged: readonly RecordShape[] = ['full', 'sparse', 'gone']
 
 describe("cmpRevisions(ante, post)", () => {
   const ante = { revision_seq: 2, revision_tok: 'rev-c2' }
@@ -296,9 +294,6 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
           expectReceivedUnchanged(boxOf(Centrals[centralShape]()), rcvdOf(rcvdShape, OlderRev), 'older')
         })
       }
-      it(`older | ouch | ${centralShape} takes 'skip', central as it was`, () => {
-        expectReceivedUnchanged(boxOf(Centrals[centralShape]()), rcvdOf('ouch', OlderRev), 'skip')
-      })
     }
 
     for (const rcvdShape of ShapesAll) {
@@ -346,7 +341,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       })
     }
 
-    for (const centralShape of ['full', 'sparse', 'ouch'] as const) {
+    for (const centralShape of ['full', 'sparse'] as const) {
       it(`same | sparse | any (${centralShape}) takes 'same', central as it was`, () => {
         expectReceivedUnchanged(boxOf(Centrals[centralShape]()), rcvdOf('sparse', SameRev), 'same')
       })
@@ -371,32 +366,6 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       expect(box.written_at).to.eq(SameRev.written_at)
     })
 
-    for (const centralShape of ShapesAll) {
-      it(`same | ouch | any (${centralShape}) takes 'skip', central as it was`, () => {
-        expectReceivedUnchanged(boxOf(Centrals[centralShape]()), rcvdOf('ouch', SameRev), 'skip')
-      })
-    }
-
-    it("same | gone | ouch takes 'gone': central becomes the stored tombstone", () => {
-      const box = boxOf(Centrals.ouch())
-      const rcvd = rcvdOf('gone', SameRev)
-      box.receive(rcvd)
-      expect(policies).to.deep.equal(['gone'])
-      expect(box._cheat_central).to.deep.equal(rcvd)
-      expect(box.isPresent).to.be.false
-      expect(stateOf(box)).to.include({ revision_seq: 2, revision_tok: 'rev-c2', written_at: SameRev.written_at })
-    })
-
-    it("same | full | ouch takes 'fill': central becomes the delivered record, and the thing is present and full", () => {
-      const box = boxOf(Centrals.ouch())
-      const rcvd = rcvdOf('full', SameRev)
-      box.receive(rcvd)
-      expect(policies).to.deep.equal(['fill'])
-      expect(box._cheat_central).to.deep.equal(rcvd)
-      expect(box.isPresent).to.be.true
-      expect(box.isFull).to.be.true
-      expect(box.sidecar).to.deep.equal({ note: 'delivered' })
-    })
   })
 
   describe("a newer rcvd", () => {
@@ -422,13 +391,6 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
         expect(stateOf(box)).to.include({ revision_seq: 3, revision_tok: 'rev-n3', written_at: NewerRev.written_at })
       })
 
-      it(`newer | ouch | any (${centralShape}) takes 'ouch': central becomes an ouchstone of the sparse props held, under the damaged record's revision, written now`, () => {
-        const box = boxOf(Centrals[centralShape]())
-        box.receive(tombstoneBoxRecord({ ...NewerRev, registered_at: T0 - 5 }, 'd'))
-        expect(policies).to.deep.equal(['ouch'])
-        expect(box._cheat_central).to.deep.equal({ ...sparseBoxRecord(CentralRev), revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 9000, am: 'd' })
-        expect(stateOf(box)).to.include({ revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 9000 })
-      })
     }
   })
 
@@ -438,11 +400,11 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
 
     for (const rcvdShape of ShapesAll) {
       it(`other | older | ${rcvdShape} | full takes the older rows: a past life, its revisions ordered with this one's`, () => {
-        expectReceivedUnchanged(boxOf(Centrals.full()), rcvdOf(rcvdShape, { ...OlderRev, ...OtherLife }), rcvdShape === 'ouch' ? 'skip' : 'older')
+        expectReceivedUnchanged(boxOf(Centrals.full()), rcvdOf(rcvdShape, { ...OlderRev, ...OtherLife }), 'older')
       })
     }
 
-    for (const rcvdShape of ShapesUndamaged) {
+    for (const rcvdShape of ShapesAll) {
       it(`other | same | ${rcvdShape} | full refuses 'record_conflict': one revision cannot begin a life and continue another`, () => {
         const box = boxOf(Centrals.full())
         const before = stateOf(box)
@@ -450,12 +412,6 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
         expect(err.message).to.eq(Phrases.OneRevisionTwoLives)
         expect(policies).to.deep.equal([])
         expect(stateOf(box)).to.deep.equal(before)
-      })
-    }
-
-    for (const centralShape of ShapesAll) {
-      it(`other | same | ouch | ${centralShape} takes 'skip': damage is weighed before life, as a damaged record's box_tok is no more to be trusted than the rest of it`, () => {
-        expectReceivedUnchanged(boxOf(Centrals[centralShape]()), rcvdOf('ouch', { ...SameRev, ...OtherLife }), 'skip')
       })
     }
 
@@ -492,15 +448,6 @@ describe("storable.receive(null)", () => {
       expectReceiveConflict(boxOf(Centrals[centralShape]()), null)
     })
   }
-
-  it("for a thing held damaged takes 'gone', by same | gone | ouch: central becomes a deletion's tombstone at the revision held", () => {
-    held.mw.setNow(T0 + 9000)
-    const box = boxOf(Centrals.ouch())
-    box.receive(null)
-    expect(policies).to.deep.equal(['gone'])
-    expect(box._cheat_central).to.deep.equal({ ...Centrals.ouch(), written_at: T0 + 9000, am: 'x' })
-    expect(box.isPresent).to.be.false
-  })
 
   it("for a thing held gone reads as 'same', by same | gone | gone", () => {
     expectReceivedUnchanged(boxOf(Centrals.gone()), null, 'same')
@@ -869,16 +816,6 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     expect(box.revision_seq).to.eq(tombstone.revision_seq)
   })
 
-  it("deletes a damaged thing at the ouchstone's revision", async () => {
-    const listing = boxListingOf(held.mw)
-    const ouchstone = held.mw.tombstoneBoxRecord({ revision_seq: 3, revision_tok: 'rev-d3' }, 'd')
-    const box = await listing.build(ouchstone)
-    held.mw.clearCalls()
-    held.mw.willDel(({ scope }) => held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: 4, revision_tok: 'rev-x4' })))
-    await expect(box.del()).resolves.to.eq(box)
-    expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-d3')
-    expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: 4 })
-  })
 })
 // --
 

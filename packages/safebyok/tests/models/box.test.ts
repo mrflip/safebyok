@@ -16,7 +16,6 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
     // whole:
     [() => fullBoxRecord(),                true,  'a full record'],
     [() => tombstoneBoxRecord(),           true,  "a deletion's tombstone"],
-    [() => tombstoneBoxRecord({}, 'd'),    true,  'a damaged record, as the tombstone storage hands back'],
     // not whole:
     [() => sparseBoxRecord(),              false, 'a sparse record'],
   ] as const satisfies readonly (readonly [() => Fetched<BoxRecord, BoxSparse> | null, boolean, string])[]
@@ -71,7 +70,6 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
   const HeldCases = [
     ['a box held alive',          () => fullBoxRecord()],
     ['a box held deleted',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'x')],
-    ['a box held damaged',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'd')],
   ] as const
   const OtherVaultCases = [
     [2, 'a newer record'],
@@ -97,20 +95,11 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     expect(box._cheat_central).to.eq(central)
   })
 
-  it("throws 'unexpected_error' for a damaged record under another vault_tok at or before the revision held, the vault_tok weighed before damage", async () => {
-    const box = await builtOf(fullBoxRecord())
-    const central = box._cheat_central
-    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' }, 'd')), 'unexpected_error')
-    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 0, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' }, 'd')), 'unexpected_error')
-    expect(box._cheat_central).to.eq(central)
-  })
-
-  it("throws 'unexpected_error' over a box just created, and for a tombstone or a damaged record under another vault_tok", async () => {
+  it("throws 'unexpected_error' over a box just created, and for a tombstone under another vault_tok", async () => {
     const box = await boxListingOf(held.mw).create(boxDnaOf(held.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
     TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })), 'unexpected_error')
     TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')), 'unexpected_error')
-    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'd')), 'unexpected_error')
     expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 0 })
   })
 
@@ -139,7 +128,6 @@ describe("box.unsealWhisper(): refused from its guard", () => {
   const RefusedCases = [
     // absent, refused ahead of the seal:
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      "unlocked", "absent_box",       'a deleted box'],
-    [() => tombstoneBoxRecord({ revision_seq: 2 }, 'd'), "unlocked", "absent_box",       'a damaged box'],
     // locked, refused first:
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      "locked",   "vault_locked",     'a deleted box while the vault is locked'],
     [() => fullBoxRecord(),                              "locked",   "vault_locked",     'a full box while the vault is locked'],
@@ -181,7 +169,6 @@ describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
 describe("box.send(patch): rebirth over a tombstone", () => {
   const TombstoneCases = [
     ["x", "rev-x2", 'a deleted box'],
-    ["d", "rev-d2", 'a damaged box'],
   ] as const
   for (const [am, tok, blurb] of TombstoneCases) {
     it(`puts ${blurb} alive at the next revision, registered now under a new box_tok, over the tombstone's revision`, async () => {
@@ -292,11 +279,6 @@ describe("Box snapshot", () => {
     it("gone: not present and not full, the sidecar null", async () => {
       const snapshot = await snapshotOf(held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
       expect(snapshot).to.include({ full: false, present: false, exposed: false, sidecar: null, revision_seq: 2, revision_tok: 'rev-x2' })
-    })
-
-    it("damaged: as gone is", async () => {
-      const snapshot = await snapshotOf(held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-d2' }, 'd'))
-      expect(snapshot).to.include({ full: false, present: false, exposed: false, sidecar: null, revision_seq: 2, revision_tok: 'rev-d2' })
     })
 
     it("born from a dna: present, full, the sidecar empty, at revision 0 registered and written now", async () => {

@@ -63,9 +63,11 @@ export class MemoryVaultDB extends VaultDB {
   protected doDelVault(tombstone: VaultTombstone, prior: Revision): Landing {
     const ante = this.#vaultRowOf(tombstone)
     const isOurs = VS.isLiveRowUnder(ante, tombstone.vault_tok)
-    const isStopped = isOurs ? (! VS.isRowAt(ante, prior)) : ((ante !== null) && (! VS.vaultRow.safeParse(ante).success))
+    const isNamedDamage = VS.isDamagedVaultAt(ante, tombstone, prior)
+    const isStopped = isOurs ? (! VS.isRowAt(ante, prior)) : ((ante !== null) && (! VS.vaultRow.safeParse(ante).success) && (! isNamedDamage))
     if (isStopped) { return { landed: false, ante: structuredClone(ante) } }
-    if (isOurs) { this.#storeVaultRow(tombstone) }
+    const landed = isOurs || isNamedDamage
+    if (landed) { this.#storeVaultRow(tombstone) }
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     for (const [boxlabel, box] of boxrows) {
       const boxTombstone = VS.boxTombstoneOf(box, tombstone.written_at)
@@ -73,14 +75,15 @@ export class MemoryVaultDB extends VaultDB {
       boxrows.set(boxlabel, boxTombstone)
       this.#tell(tombstone, { vault: this.#vaultRowOf(tombstone), box: boxTombstone })
     }
-    return { landed: isOurs, ante: structuredClone(ante) }
+    return { landed, ante: structuredClone(ante) }
   }
 
   protected doDelBox(tombstone: BoxTombstone, prior: Revision): BoxLanding {
     const vault = this.#vaultRowOf(tombstone)
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     const ante = boxrows.get(tombstone.boxlabel) ?? null
-    const landed = VS.isCheckedLiveVault(vault, tombstone.vault_tok) && VS.isLiveRow(ante) && VS.isRowAt(ante, prior)
+    const isDeletable = (VS.isLiveRow(ante) && VS.isRowAt(ante, prior)) || VS.isDamagedBoxAt(ante, tombstone, prior)
+    const landed = VS.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
     if (landed) { this.#storeBoxRow(boxrows, vault, tombstone) }
     return { landed, ante: structuredClone(ante), vault: structuredClone(vault) }
   }
