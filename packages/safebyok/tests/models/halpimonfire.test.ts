@@ -117,7 +117,7 @@ describe("A gate change after its record is stored", () => {
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
     expect(vault.isPresent).to.be.false
     expect(vault.isUnlocked).to.be.false
-    expect(deviceDB.cachedNow()).to.eq(null)
+    expect(deviceDB.cachedNow()).to.be.null
   })
 
   it("a tombstone crossing a birth's lease refuses 'vault_gone' at demandReadyToAttach, the lease vacated", async () => {
@@ -128,7 +128,7 @@ describe("A gate change after its record is stored", () => {
     })
     await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)), 'vault_gone')
     expect(listing.at(Dna)?.isPresent).to.be.false
-    expect(deviceDB.cachedNow()).to.eq(null)
+    expect(deviceDB.cachedNow()).to.be.null
   })
 
   it("a sweep crossing a birth's lease refuses 'disabled' at demandReadyToAttach, the row stored, no lease cached", async () => {
@@ -136,7 +136,7 @@ describe("A gate change after its record is stored", () => {
     crossingGrant(() => listing.sweep())
     await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)), 'disabled')
     expect(storedNow()).to.include({ am: 'a' })
-    expect(deviceDB.cachedNow()).to.eq(null)
+    expect(deviceDB.cachedNow()).to.be.null
   })
 
   it("a refused tryCache during replacePassphrase resolves, unlocked, and tells onBadNews", async () => {
