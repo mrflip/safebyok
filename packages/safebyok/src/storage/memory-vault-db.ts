@@ -51,7 +51,7 @@ export class MemoryVaultDB extends VaultDB {
     const vault = this.#vaultRowOf(record)
     const boxrows = this._cheat_boxRowsOf(record, record.vault_tok)
     const ante = boxrows.get(record.boxlabel) ?? null
-    const landed = VS.isLiveRowUnder(vault, record.vault_tok) && VS.isRowAt(ante, prior) && (mayReplaceLive || (! VS.isLiveRow(ante)))
+    const landed = VS.isCheckedLiveVault(vault, record.vault_tok) && VS.isRowAt(ante, prior) && (mayReplaceLive || (! VS.isLiveRow(ante)))
     if (landed) {
       this.#demandRoom(boxrows, ante)
       this.#storeBoxRow(boxrows, vault, record)
@@ -78,7 +78,7 @@ export class MemoryVaultDB extends VaultDB {
     const vault = this.#vaultRowOf(tombstone)
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     const ante = boxrows.get(tombstone.boxlabel) ?? null
-    const landed = VS.isLiveRowUnder(vault, tombstone.vault_tok) && VS.isLiveRow(ante) && VS.isRowAt(ante, prior)
+    const landed = VS.isCheckedLiveVault(vault, tombstone.vault_tok) && VS.isLiveRow(ante) && VS.isRowAt(ante, prior)
     if (landed) { this.#storeBoxRow(boxrows, vault, tombstone) }
     return { landed, ante: structuredClone(ante), vault: structuredClone(vault) }
   }
