@@ -223,13 +223,13 @@ export abstract class VaultDB {
     })
   }
 
-  /** Nulls the row's passkey wayin, as {@link VaultDB.replacePassphrase} does, whether or not it holds one. */
+  /** Nulls the row's passkey wayin, as {@link VaultDB.replacePassphrase} does. A row holding none answers `revoked` as stored, nothing moved. */
   async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
     return this.#call<VaultRecord, 'revoked', VaultRow>('revokePasskey', params, async () => {
       const { gate, ...ante } = VS.revokePasskeyParams.parse(params)
       return this.#moveGate(ante, 'revoked', (stored) => {
         if (gate.passphrase_wayin !== undefined) { throw Refuse.gateIssue(stored, 'revokePasskey leaves the passphrase alone.') }
-        return { passkey_wayin: null }
+        return (stored.gate.passkey_wayin === null) ? null : { passkey_wayin: null }
       })
     })
   }
@@ -238,16 +238,18 @@ export abstract class VaultDB {
   async tryAddPasskey(params: AddPasskeyParams) { return answerOf(() => this.addPasskey(params)) }
   async tryRevokePasskey(params: RevokePasskeyParams) { return answerOf(() => this.revokePasskey(params)) }
 
-  /** A gate verb's one path: a get, the integrity checks, the wayin laid on, and a put conditional on the prior revision. */
-  async #moveGate<ActT extends string>(ante: VaultSparse, act: ActT, wayinOf: (stored: VaultRecord) => Partial<Gate>): Promise<Said<VaultRecord, ActT, VaultRow>> {
+  /** A gate verb's one path: a get, the integrity checks, the wayin laid on, and a put conditional on the prior revision. A null wayin has nothing to lay on, and answers the row as stored. */
+  async #moveGate<ActT extends string>(ante: VaultSparse, act: ActT, wayinOf: (stored: VaultRecord) => Partial<Gate> | null): Promise<Said<VaultRecord, ActT, VaultRow>> {
     const { vault } = await adapted(() => this.doGetVault(VS.vaultScope.parse(ante)))
     const stored = demandVaultLife(vaultRowOf(vault), ante, ante.vault_tok)
     if (! VS.isRowAt(stored, ante)) { throw Refuse.staleWrite(stored, stored) }
     if (stored.registered_at !== ante.registered_at) { throw Refuse.gateIssue(stored, 'its registered_at is not the stored one.') }
+    const wayin = wayinOf(stored)
+    if (wayin === null) { return { act, val: stored, world: stored } }
     const record: VaultRecord = {
       ...stored,
       ...VS.nextRevisionOf(stored, this.#clock.now()),
-      gate: { ...stored.gate, ...wayinOf(stored), gate_epoch: stored.gate.gate_epoch + 1 },
+      gate: { ...stored.gate, ...wayin, gate_epoch: stored.gate.gate_epoch + 1 },
     }
     await this.#landVault(record, VS.revisionOf(stored), 'repl')
     return { act, val: record, world: record }
