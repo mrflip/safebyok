@@ -298,7 +298,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   abstract sparseOf(duck: unknown): SparseT
   /** The full record `duck` is, as a plain copy; refuses a duck that is not full. */
   abstract recordOf(duck: unknown): RecordT
-  /** Construct the instance. */
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
   abstract absentRefusal(scope: ScopeT): VaultError
   /** The record a 'stale_write' refusal carries, what storage holds; null for none, or for a record that fails its check. */
