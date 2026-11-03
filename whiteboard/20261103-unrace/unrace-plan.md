@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** planned; threads 1 to 3 starting.
+* **Status:** threads 1 to 3 reviewed or in review, thread 4 building.
 
 ## The goal
 
@@ -144,6 +144,9 @@ subclass layer will do putVault, getVault, etc. Only implement the in-memory one
   nothing to translate. `gate_epoch` lives where `unrace-gating.md` *Changing the gate* reads it, `stored.gate.gate_epoch`,
   unless the record's shape says better.
 * **Size:** medium. **Depends on:** nothing.
+* *Review:* fixed at medium, 9 fixes (a live row under another `vault_tok` refuses `vault_mismatch`, by the Coach; a void row
+  matches only the whole `NeverStored`; three cases where a store wrote or erased what the base then refused), none significant.
+  Left: `repl`'s `vault_tok` swap until thread 10; newer-format rows (a row); names and VOCABULARY.md rows for thread 6 or 14.
 
 ### 3. `gate_proving` (pre-plan 4)
 
@@ -166,6 +169,9 @@ obsoleted."* This thread takes Gate, Wayin and Proving.
   `crossings.md`), bound to the vault's scope; thread 4 builds the deviceDB under them, and until thread 7 the vault adapts
   today's `tryGetLease`, `tryPutLease` and `tryDelLease` to them.
 * **Levels:** `high` review: this is the key handling. **Size:** medium, the top of it. **Depends on:** nothing.
+* *Review:* fixed at high, G1 to G3, G8, G9 hold, none significant. A tombstone no longer tells bad news at every hello;
+  `gate.attemptProof` rejects rather than throws; narrating doc blocks stripped. Left for thread 7: stale phrases,
+  `takeUpLease`'s lost identity check, `leaseCachedOf`.
 
 ### 4. `device_db` (from pre-plan 7's item 2)
 
@@ -217,7 +223,10 @@ stuff was debrided"*
   The vault's seal verbs lock on `damaged_lease`.
 * **Unsealing:** *"have lease do the decode and fill; it owns security. box does the deserialization"*. `box.#unseal` decodes
   and fills today.
-* *Orchestrator:* the friend reaches thread 4's deviceDB.
+* *Orchestrator:* the friend reaches thread 4's deviceDB. Folds in thread 3's `vault.leaseCachedOf`; settles `takeUpLease`'s
+  identity with `#attachLease`; fixes `Phrases.LeaseNotInForce`, `LeaseOfOtherHolder` and `DamagedLease`; and rewords
+  `halpimonfire.test.ts`'s "until the Coach rules", as `noted.md` has ruled a `lock()` crossing an unlock: it ends unlocked.
+  The refusal for a locked vault is `vault_locked`.
 * **Levels:** `high` review, as it touches what `notes/guarantees.md` covers. **Size:** medium. **Depends on:** 3, 4, 6.
 
 ### 8. `vault_slot` (pre-plan 7's item 1)
@@ -247,6 +256,7 @@ The Gating half of the text in thread 3.
 * **Read:** `unrace-gating.md` *`build_vault`*, *`unlock_vault`*; `models-invariants.md` *Gating*.
 * **Touches:** `models/gating.ts`, a new `tests/models/gating.test.ts`, `vault-listing.ts`, the verbs that launch one.
 * **Items:** `launch`, `attempt`, `build_vault`, `unlock_vault`.
+* *Orchestrator:* when `repl` leaves the public `putVault`, say whether a rebirth must carry a fresh `vault_tok`.
 * **`gating.decline` crossing an attempt:** the system is being asked to lock and unlock at the same time, and we have no
   opinion. Select whichever implementation feels the cleanest to reason about, and keep it simple. The doc's choice is only a
   default.
