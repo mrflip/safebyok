@@ -30,7 +30,7 @@ const Checks = Checkers('bad_record', ({ unk, custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, NeverStoredSeq, MinRefreshMillis, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, putAnte, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, NeverStoredSeq, MinRefreshMillis, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check or its seal, and reads as gone) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
@@ -63,6 +63,9 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } =
   const tombstone  = sparseBase.extend({ am: oneof(tombstoneAmVals) })
   return { am, revision, times, liveness, vaulted, sparseBase, tombstone }
 }, [FX])
+
+/** The check of the revision `listing.put` lays a record over, refusing 'bad_option': a revision, or null for no record. */
+export const putAnte = Checker(() => revision.nullable(), 'bad_option')
 
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
 export type Am = Z.infer<typeof am>

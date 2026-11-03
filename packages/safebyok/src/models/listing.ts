@@ -117,13 +117,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
-  /** Put `duck`, a record or a thing ducking as its record, over `ante`'s revision, not whatever is held by then, and deliver the answer: `ante` is the record it was made from, null or one never stored for no record. A 'stale_write' refusal delivers the record storage holds before it is thrown.
+  /** Put `duck`, a record or a thing ducking as its record, over `ante`'s revision, not whatever is held by then, and deliver the answer: `ante` is the record it was made from, null or one never stored for no record, and anything else refuses 'bad_option'. A 'stale_write' refusal delivers the record storage holds before it is thrown.
    * A record whose `revision_seq` does not fit that revision refuses 'bad_record' before anything is sent: revision 0 goes over no record, and a later revision over one.
    */
   async put(duck: RecordT | Thing<ScopeT, RecordT, SparseT>, ante: Revision | null): Promise<ThingT | null> {
     const record = this.recordOf(duck)
     const scope = this.scopeOf(record)
-    const priorRevisionTok = (ante === null || ante.revision_seq === NeverStoredSeq) ? null : ante.revision_tok
+    const prior = MSX.putAnte.parse(ante)
+    const priorRevisionTok = (prior === null || prior.revision_seq === NeverStoredSeq) ? null : prior.revision_tok
     if (! fitsPriorRevisionTok(record.revision_seq, priorRevisionTok)) { throw new VaultError('bad_record', Phrases.PutUnfitForPrior) }
     const answer = await this.#store.put(record, priorRevisionTok)
     return this.#deliver(answer, scope)
