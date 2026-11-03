@@ -161,8 +161,7 @@ export class Bank implements VaultWorld {
 
   // == [Ending]: autolock, lock, vacate, sweep, ownLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
 
-  /**
-   * A host calls this after each `hello` and on a timer of its own, as nothing else autolocks: each listed vault whose
+  /** A host calls this after each `hello` and on a timer of its own, as nothing else autolocks: each listed vault whose
    * lease cached on this device is past autolock is locked, which erases that lease.
    */
   async autolock(): Promise<void> {
@@ -211,7 +210,9 @@ export class Bank implements VaultWorld {
 
   #isOwnLease({ applabel, user_id }: LeaseSparse): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
 
-  /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed none. */
+  /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
+   * none.
+   */
   async #eraseOwnLeases(): Promise<void> {
     const rows = await this.#ownLeasesProvedBefore(FarFuture)
     await Promise.all(rows.map((row) => this.#eraseLease(row)))
