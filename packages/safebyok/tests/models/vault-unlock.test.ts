@@ -468,7 +468,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
   })
 })
 
-/** What `holder` answers by every field and getter it has or inherits, symbols too, its methods left uncalled. A getter that refuses answers nothing. */
+/** Every value `holder` shows by a field or getter, own or inherited, symbols too; its methods stay uncalled. */
 const valuesShownBy = (holder: object): unknown[] => {
   const shown: unknown[] = []
   for (let proto: object | null = holder; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
