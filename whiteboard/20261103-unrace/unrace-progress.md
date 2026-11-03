@@ -18,6 +18,8 @@ it. Threads 1, 6 and 7 all ran so; a thread file is enough to hand over on.
 * A live row under another `vault_tok` refuses `vault_mismatch`; `vault_empty` is no row of that life.
 * `Promptly` is 2,000 ms. An idempotent `revoked` moves nothing ("we can switch if it's an issue").
 * The refusal for a locked vault is `vault_locked`, the kind that exists (the orchestrator's call, on the Rec's "clash").
+* The specs are pseudo code: "it was wrong of me to state that those code paths were "authoritative"". A doc block is one or two 120-character lines
+  giving the purpose. `ensureUnlocked` asks `ensureTimely` first, on purpose.
 * `tidy` touches only its own bank's leases. A lock whose erase is refused, and a host getter forging a `VaultError`, are wontfix.
   `leaseFriend` narrows before the sprint ends (thread 15). The Coach reviews the whisper-as-a-string amendment at thread 14.
 
@@ -70,6 +72,12 @@ small conflict where threads 1 and 3 meet, at the restack before thread 7.
 
 **Thread 12, `bank`.** `bank.hello`, `tidy`, `lock`, `vacate`, `sweep`; `Bank.goodbye`, `closeVault`, `closeVaults` are gone. `#bringUp` is `try { loads; fetchBank } finally { tidy }`, then the device record, the watch and `demandEnabled`: `tidy` needs only the deviceDB's scan and the bank's autolock. `stage` is `made`, `ready` or `refused`; `vacate` leaves `made`, with `ensureVault` and `vaultOf` refusing `BankHelloFirst`. `tidy`, `lock`, `vacate`, `sweep` need no `hello`, and `vacate` erases all its own bank's rows. `sweep` swaps in a fresh listing at once. `listing.fetchBank()`, `tellIfRevoked`. `tests/test-helpers/bank-world.ts`: `makeBankWorld`, `makeBankWithVault`, `RefusingVaultDB`.
 
+**Thread 13, `proof`.** `tests/models/proof.test.ts`: 9 rows, real `Bank` on real in-memory stores, through `subscribe` and `getSnapshot` detached. `BoxSnapshot` gains `lockState`; `#attachLease` calls `listing.settleThings()`. `bank.hello` makes one identity comparison on its listing. `Vault.takeWorld` parses `VS.vaultRow` and takes the whole row; thread 19 finishes it. The thread file ends with what the demo needs next.
+
+**Thread 15, `lease_narrow`.** `lease.#friend`, `vault.#leaseFriend()`, `vault._cheat_leaseFriend()` for tests, `lease.isMadeFor`. `Vault.launchBirth(listing, scope)`, with `#runBirth` and `recordOfBirth` now in `vault.ts`; `listing.demandBirthSlot` is public, and `buildVault` is one line. `world.deviceDB` still reaches the cached row.
+
+**Thread 17, `doc_strip`.** Every doc block under the bound; 55 open `SLOPDOC:`. The thread file's *Smells* lists 13, and Closer Look two more. A restack conflict takes the code of 13 or 15 and the `SLOPDOC` line.
+
 ## Crossings raised
 
 To go into `whiteboard/20261102-unrace/crossings.md`:
@@ -101,3 +109,5 @@ To go into `whiteboard/20261102-unrace/crossings.md`:
 * A `getBank` or plugin load that never answers holds `tidy` back; this keeps a lease that should drop (thread 12's rework).
 * A `hello` crossing `bank.vacate` lands `ready` on the emptied listing, which reopens the false prompt, by reading (thread 12's rework and second review).
 * The watch stays on past a vacate, so a notice can list a vault on a bank not ready, by reading (thread 12's rework).
+* A `hello` in flight crossing `bank.vacate` lands on the same listing, so it can mark the bank `ready` and list the vaults, locked, after a sign-out; it holds no lease (thread 13, by reading).
+* `demandBirthSlot` sees only what this session holds, so a birth over a vault stored but not yet fetched still asks and runs the KDF, then answers that vault locked (thread 15's second review).

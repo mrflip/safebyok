@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 12 filed; threads 13, 15 and 17 building, cut from 12; then 18, 19, 20, 16, 14. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. Paused on the Coach: what a row failing its check does, the rest of their Undergrowth replies, `gh pr ready` on #461 and #463. Then 18, 19, 20, 16, 14. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
@@ -316,6 +316,12 @@ check escapes `bank.vacate`; `stage` against VOCABULARY's `lifecycle` (thread 14
   thread file ends with what the demo would need next.
 * **Size:** large, unknowable until run. **Depends on:** 12.
 
+*Review:* `fixed` at medium, with mutations: 10 of 12 failed the proof before the fixes, and a whisper in a box's snapshot and `takeWorld` stripping
+the gate passed it. Fixed: the proof now fails on any bad news and on a whisper in any snapshot; `mountComponent` takes `subscribe` and
+`getSnapshot` detached; `bank.hello` remakes its snapshot where a sweep crossed it. Left, all minor: a box's own snapshot past a vault delete; a
+replaced whisper tells nobody; `bank.sweep`'s order; a lock's mixed lists over several boxes; `takeWorld`'s refusal kind; `ensureUnlocked`'s doc
+block; dialog casts.
+
 ### 14. `shapes_sweep` (pre-plan 12)
 
 *"move checkers to the models' shapes files and define types from them. It's good to reuse shapes defined in the src/
@@ -343,6 +349,10 @@ with `friend.peekLease()` answering the cached row and its lease key handle (G9)
 * *Orchestrator:* cut from thread 12's tip, beside thread 13; a new thread, so the numbers no longer run in order. **Size:** small.
   **Depends on:** 12.
 
+*Review:* `flagged` at high: `Vault.launchBirth` over a vault present dropped a typed passphrase and answered ok. Reworked to take `(listing, scope)`
+and check the slot itself. Second review `clean` at low. Left: `demandBirthSlot`'s name; `_cheat_leaseFriend` and `isMadeFor`, and `world.deviceDB`,
+in rows with the Coach; a birth's synchronous claim unpinned (thread 20). #461 stays a draft, as `gh pr ready` was denied.
+
 ### 16. `method_ends` (the spec's, unbuilt; the Coach's row is open)
 
 `unrace-gating.md` *End-of-method invariants*: "Each method states what holds when it ends, whatever crossed it, and checks it: a
@@ -369,6 +379,9 @@ smell. Flag all methods with logorrheic "SLOPDOC" in the replacement"*
 * *Orchestrator:* the item the Coach is most worried about. Cut from 12's tip, beside 13 and 15, and restacked over them: 55 of 449
   blocks, doc lines only, in `models/` and the new `storage/` files. Every replacement opens `SLOPDOC:`; a method that won't go in
   a line goes on the thread file's *Smells*. **Levels:** `low` review, `opus` style pass. **Size:** small. **Depends on:** 12.
+
+*Review:* `fixed` at low, by hand: 6 lines corrected, one of them a false claim that no `DeviceDB` verb returns a `lease_key`. Smells now 15. No `/code-review` or
+`opus` style pass ran, and the reviewer's own mechanical check was refused. #463 stays a draft, as `gh pr ready` was denied.
 
 ### 18. `plain_seam` (the Coach, on Closer Look, 2026-11-03)
 
