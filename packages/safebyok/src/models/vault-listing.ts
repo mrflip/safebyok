@@ -13,17 +13,15 @@ import * as VS from '../storage/vault-db-shapes'
 import { alreadyHeldError } from '../helpers/throwers'
 import { BoxListing } from './box-listing'
 import { type DelTombstone, type SlotFate, Listing } from './listing'
-import { Gate } from './gate'
-import { type AnyGating, type ProvingsForGatingkind, type RequestCleartext, Gating, alreadyAsking } from './gating'
-import { type BoxesListed, type Fetched, type ListingOpts, type ListingWorld, type ProvingWorld, type Revision, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
-import { NOVEL } from './proving'
+import { type AnyGating, type RequestCleartext, alreadyAsking } from './gating'
+import { type BoxesListed, type Fetched, type ListingOpts, type ListingWorld, type ProvingWorld, type Revision, type VaultRecord, type VaultSparse, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { cmpRevisions } from './storable'
 import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. `vault.leaseFriend()` binds its deviceDB's lease verbs to each vault. */
+/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Each vault's lease friend binds its deviceDB's lease verbs. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
@@ -58,23 +56,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async buildVault(scope: VaultScope): Promise<Vault> {
     const checked = this.scopeOf(scope)
     const prior = this.#demandBirthSlot(checked) ?? VS.NeverStored
-    return Gating.launch('build_vault', { listing: this, scope: checked, vault: null, run: (provings) => this.#runBirth(provings, prior) })
+    return Vault.launchBirth(this, checked, prior)
   }
 
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
-
-  /** Past the enter key: the put is the commit, and a vault_tok other than the record's is another's vault, which keeps its lock. */
-  async #runBirth({ passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: Revision): Promise<Vault> {
-    const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
-    const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null
-    const record = recordOfBirth(Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin), prior, this.clock.now())
-    const vault = await this.ensureVault(record, prior)
-    if (vault.vault_tok === record.vault_tok) {
-      const lease = await passphraseProving.buildLease(vault.leaseFriend())
-      await lease.attach()
-    }
-    return vault
-  }
 
   /** Put `record`, a birth, over `prior`, the tombstone's revision or never stored, and resolve the vault held. Landed, a new vault of it replaces the slot's tombstone or void, locked. Where another vault stands stored, a vault of that one is held and answered, locked, a success: the caller tells by `vault_tok`. Refused, it stores nothing and holds nothing of `record`; a 'stale_write' delivers the record stored. */
   ensureVault(record: VaultRecord, prior: Revision): Promise<Vault> {
@@ -244,14 +229,6 @@ const NothingListed: BoxesListed = Object.freeze({ boxes: [], damaged_records: [
 /** `answer` with its `val` the vault row alone, as a listing delivers it. */
 const vaultRowOf = (answer: Awaited<ReturnType<VaultDB['tryGetVault']>>) => (
   (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_records']) } : answer
-)
-// --
-
-// == [Birth]: recordOfBirth
-
-/** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
-const recordOfBirth = (gate: Gate, prior: Revision, now: number): VaultRecord => (
-  { ...gate.stamp, fmt: VaultFormat, am: 'a', ...VS.nextRevisionOf(prior, now), gate: gate.pickle() }
 )
 // --
 

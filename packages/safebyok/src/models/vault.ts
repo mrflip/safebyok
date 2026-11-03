@@ -14,7 +14,7 @@ import { type ProvingsForGatingkind, Gating } from './gating'
 import { Lease } from './lease'
 import type { Fetched, FetchOpts, GateProps, LeaseFriend, LockState, SealedWhisper, SendOpts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-import type { Proving } from './proving'
+import { type Proving, NOVEL } from './proving'
 import { Storable } from './storable'
 import type { VaultListing, VaultWorld } from './vault-listing'
 
@@ -173,6 +173,25 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   override del(): Promise<this> { return this.delVault() }
   // --
 
+  // == [Birth]: launchBirth, runBirth
+
+  /** A new vault under `scope`, by a gating; it takes no proving, so the friend goes only to the gating's own. */
+  static async launchBirth(listing: VaultListing, scope: VaultScope, prior: MSX.Revision): Promise<Vault> {
+    MSX.revision.parse(prior)
+    return Gating.launch('build_vault', { listing, scope, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
+  }
+
+  /** Past the enter key: the put is the commit, and a vault_tok not the record's is another's vault, left locked. */
+  static async #runBirth(listing: VaultListing, { passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: MSX.Revision): Promise<Vault> {
+    const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
+    const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null
+    const record = recordOfBirth(Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin), prior, listing.clock.now())
+    const vault = await listing.ensureVault(record, prior)
+    if (vault.vault_tok === record.vault_tok) { await vault.#unlockByProof(passphraseProving) }
+    return vault
+  }
+  // --
+
   // == [Unlocking]: isUnlocked, ensureUnlocked, tryEnsureUnlocked, unlockByProof, attachCachedLease
 
   get isUnlocked(): boolean { return this.#lease !== null }
@@ -192,14 +211,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Past the enter key: a lock crossing this is answered by the next `lock()`, as the proof says this user may have the vault unlocked. */
   async #unlockByProof(proved: Proving): Promise<this> {
-    const lease = await proved.buildLease(this.leaseFriend())
+    const lease = await proved.buildLease(this.#leaseFriend())
     await lease.attach()
     return this
   }
 
   /** True where the lease this device has cached for this gate is now attached. */
   async #attachCachedLease(): Promise<boolean> {
-    const peeked = await Lease.tryPeek(this.leaseFriend(), this.gate.gate_epoch)
+    const peeked = await Lease.tryPeek(this.#leaseFriend(), this.gate.gate_epoch)
     if (! peeked.ok) {
       this.listing.tellBadNews([peeked.err])
       return false
@@ -210,13 +229,16 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lease]: leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
+  // == [The lease]: leaseFriend, _cheat_leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
 
-  /** All a lease or a proving hears of this vault: the one friend for its life, which is how an attach knows a lease made for this very instance. */
-  leaseFriend(): LeaseFriend {
+  /** All a lease or a proving hears of this vault: one friend for its life, so an attach knows its own lease. */
+  #leaseFriend(): LeaseFriend {
     this.#friend ??= this.#makeFriend()
     return this.#friend
   }
+
+  /** For tests alone: the friend, whose `peekLease` answers the cached row. Nothing in `src/` calls it. */
+  _cheat_leaseFriend(): LeaseFriend { return this.#leaseFriend() } // eslint-disable-line unicorn/prefer-private-class-fields
 
   #makeFriend(): LeaseFriend {
     const { world: { clock, logger, deviceDB } } = this
@@ -239,7 +261,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Hold `lease` as the vault's, dropping any it displaces, and cache it. A lease of another holder refuses 'bad_option', left alone, as its row is another's; one out of force refuses 'vault_locked'; on a vault not ready, the lease is vacated and the refusal thrown. A refused cache costs the next session a proof, not this one its lease, so it is told as bad news. */
   async #attachLease(lease: Lease): Promise<void> {
-    if (lease.friend !== this.leaseFriend()) { throw leaseOfOtherHolder() }
+    if (! lease.isMadeFor(this.#leaseFriend())) { throw leaseOfOtherHolder() }
     if (lease.isForgotten) { throw leaseNotInForce() }
     try {
       this.demandReadyToAttach()
@@ -261,7 +283,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Attach a new lease under `gate_epoch`, where `heldLease` is still in force: a vault locked at the start stays locked, and a lock crossing the change wins, the new lease vacated. */
   async #renewLease(proved: Proving, gate_epoch: number, heldLease: Lease | null): Promise<void> {
     if (heldLease === null) { return }
-    const lease = await proved.buildLease(this.leaseFriend(), gate_epoch)
+    const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
     if (heldLease.isForgotten) {
       await this.#vacateUnattached(lease)
       return
@@ -277,7 +299,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Drop any lease held and erase the row cached. The lease goes first, so an erase that throws leaves none; the erase is called before the first await, so it lands in call order against any cache. Refused, `onRefused` hears it, by default a panic. */
   async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#panic(refusal)): Promise<void> {
     this.#dropLease()
-    const vacating = outcomeOf(async () => { valOf(await this.leaseFriend().tryUncacheLease()) })
+    const vacating = outcomeOf(async () => { valOf(await this.#leaseFriend().tryUncacheLease()) })
     this.settle()
     const vacated = await vacating
     if (! vacated.ok) { await onRefused(vacated.err) }
@@ -469,6 +491,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 }
+// --
+
+// == [Birth's record]: recordOfBirth
+
+/** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
+const recordOfBirth = (gate: Gate, prior: MSX.Revision, now: number): VaultRecord => (
+  { ...gate.stamp, fmt: MSX.VaultFormat, am: 'a', ...VS.nextRevisionOf(prior, now), gate: gate.pickle() }
+)
 // --
 
 // == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce

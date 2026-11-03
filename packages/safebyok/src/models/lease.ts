@@ -1,7 +1,7 @@
 import { consistent } from '../checks/validator'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
 import { VaultError } from '../errors'
-import { adorn, tattoo } from '../helpers'
+import { tattoo } from '../helpers'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseGrantArgs, leasePeekArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
@@ -19,7 +19,8 @@ export class Lease implements LeaseStamp {
   declare readonly gate_epoch:    number
   declare readonly proved_at:     number
   declare readonly wayinkind:     WayinKind
-  declare readonly friend:        LeaseFriend
+  /** All this lease hears of its vault. */
+  readonly #friend: LeaseFriend
 
   /** The record with its keys, null once out of force. */
   #record: LeaseRecord | null
@@ -33,7 +34,7 @@ export class Lease implements LeaseStamp {
   private constructor(friend: LeaseFriend, record: LeaseRecord, isPeeked: boolean) {
     this.#record = leaseRecord.parse(record)
     tattoo(this, leaseStamp.parse(record), { writable: false, configurable: false })
-    adorn(this, 'friend', friend)
+    this.#friend = friend
     this.#vaultStamp = vaultStamp.parse(friend)
     this.#isPeeked = isPeeked
     Object.freeze(this)
@@ -70,15 +71,18 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Taking hold]: attach, cache, tryCache
+  // == [Taking hold]: attach, isMadeFor, cache, tryCache
 
   /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. A vault past a sweep, a vacate or a delete refuses, the lease vacated; one this lease was not made for refuses 'bad_option'. */
-  async attach(): Promise<void> { await this.friend.attachLease(this) }
+  async attach(): Promise<void> { await this.#friend.attachLease(this) }
+
+  /** True where this lease was made for `friend`: how a vault knows a lease of its own instance. */
+  isMadeFor(friend: LeaseFriend): boolean { return this.#friend === friend }
 
   /** Put this lease in the deviceDB's cache; one peeked from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
   async cache(): Promise<void> {
     if (this.#isPeeked) { return }
-    valOf(await this.friend.tryCacheLease(this.#demandRecord()))
+    valOf(await this.#friend.tryCacheLease(this.#demandRecord()))
   }
 
   tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
@@ -90,7 +94,7 @@ export class Lease implements LeaseStamp {
   async vacate(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
-    valOf(await this.friend.tryUncacheLease())
+    valOf(await this.#friend.tryUncacheLease())
   }
 
   tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
@@ -172,7 +176,7 @@ export class Lease implements LeaseStamp {
     const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), damagedLease)
     if (! opened.ok) {
       // Locking drops the vault's lease and uncaches by scope; this one is evicted too, should the vault hold another.
-      this.friend.lock()
+      this.#friend.lock()
       this.evict()
     }
     return valOf(opened)

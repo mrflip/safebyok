@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
@@ -110,7 +113,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
 
 const makeFreshLease = async ({ vault, opts: { world } }: Awaited<ReturnType<typeof makeBornVault>>) => {
   const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
-  return proving.buildLease(vault.leaseFriend())
+  return proving.buildLease(vault._cheat_leaseFriend())
 }
 
 describe("lease.attach: the one way a vault comes to hold a lease", () => {
@@ -132,8 +135,8 @@ describe("lease.attach: the one way a vault comes to hold a lease", () => {
     const later = born.anotherSession()
     const other = await later.build(born.demandStored())
     const proving = await PassphraseProving.buildStored(born.vault.gate, passphraseCleartext.parse(Passphrase), born.opts.world)
-    const lease = await proving.buildLease(other.leaseFriend())
-    await TH.expectRefusal(born.vault.leaseFriend().attachLease(lease), 'bad_option')
+    const lease = await proving.buildLease(other._cheat_leaseFriend())
+    await TH.expectRefusal(born.vault._cheat_leaseFriend().attachLease(lease), 'bad_option')
     expect(lease.isInForce).to.be.true
     expect(born.deviceDB.tryVacate).not.toHaveBeenCalled()
   })
@@ -462,5 +465,49 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(reported).toHaveBeenCalledWith(thrown)
     vault.sweep()
     expect(listing.at(vault.scope)).to.be.null
+  })
+})
+
+/** What `holder` answers by every field and getter it has or inherits, symbols too, its methods left uncalled. A getter that refuses answers nothing. */
+const valuesShownBy = (holder: object): unknown[] => {
+  const shown: unknown[] = []
+  for (let proto: object | null = holder; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
+    for (const ckey of Reflect.ownKeys(proto)) {
+      try { shown.push(Reflect.get(holder, ckey)) } catch { /* a getter's refusal shows nothing */ }
+    }
+  }
+  return shown
+}
+
+describe("the lease friend and the lease key handle: nothing a host holds hands them out", () => {
+  it("no field or getter of a vault or its lease shows either, nor Object.keys or JSON.stringify", async () => {
+    const born = await makeBornVault()
+    const { vault, deviceDB } = born
+    const lease = await makeFreshLease(born)
+    await lease.attach()
+    const friend = vault._cheat_leaseFriend()
+    const row = deviceDB.cachedNow() as Record<string, unknown>
+    expect(row['lease_key']).to.be.an.instanceof(CryptoKey)
+    for (const holder of [vault, lease]) {
+      const shown = valuesShownBy(holder)
+      expect(shown).to.not.include(friend)
+      expect(shown).to.not.include(row['lease_key'])
+      expect(shown).to.not.include(row)
+      const json = JSON.stringify(holder)
+      for (const named of ['friend', 'leaseFriend', 'peekLease', 'lease_key', 'vault_key_lease_wrapped']) {
+        expect(Object.keys(holder)).to.not.include(named)
+        expect(json).to.not.include(named)
+      }
+    }
+    expect('leaseFriend' in vault).to.be.false
+    expect('friend' in lease).to.be.false
+  })
+
+  it("nothing in src/ calls _cheat_leaseFriend, which vault.ts alone defines", () => {
+    const srcDir = fileURLToPath(new URL('../../src/', import.meta.url))
+    const callers = readdirSync(srcDir, { recursive: true, encoding: 'utf8' })
+      .filter((relpath) => relpath.endsWith('.ts'))
+      .flatMap((relpath) => (readFileSync(path.join(srcDir, relpath), 'utf8').match(/_cheat_leaseFriend\(/g) ?? []).map(() => relpath))
+    expect(callers).to.deep.equal([path.join('models', 'vault.ts')])
   })
 })
