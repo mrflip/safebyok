@@ -22,7 +22,7 @@ The plan's threads 18 `plain_seam`, 19 `world_whole` and 20 `test_teeth` carry t
 * **Cached rows of no listed vault.** "removing rows that are not in the listing seems like another but different and async task." `bank.autolock` (thread 22, was `tidy`) leaves them; a task of its own, not yet designed.
 
 * **The `badnews` return and `policy`** go, and the watch tells the host when it drops a row ("yes"). The rest of reporting in `deliver` waits for the Coach's design: "the bad news and other reporting during deliver is poorly conceived, but I don't know yet what the right thing is".
-* **Open Matters rows still at `drafting` when this was written:** a rule for `try` forms; `getBoxes`; whether a box answer keeps the vault row, where the Coach has begun "yes I intended no change to the `world` field, that's working great"; the box's rebirth machinery; the memory store's notice order; fate; undergrowth; the gating family; an old lease opening with `autolock` out of `hello`.
+* **Open Matters rows still at `drafting` when this was written:** a rule for `try` forms; `getBoxes`; whether a box answer keeps the vault row, where the Coach has begun "yes I intended no change to the `world` field, that's working great"; the box's rebirth machinery; the memory store's notice order; fate; undergrowth; the gating family.
 
 ## A standalone thread: refusals and typechecks
 
