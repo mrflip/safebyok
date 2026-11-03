@@ -54,6 +54,12 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.callsOf('get')).to.deep.equal([])
     })
 
+    it("rejects, throwing nothing at its caller, where the store's watch refuses", async () => {
+      const listing = boxListingOf(held.mw)
+      vi.spyOn(held.mw.store, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The store could not be reached.") })
+      await expect(listing.hello()).rejects.toThrow(/could not be reached/)
+    })
+
     it("starts one watch however often it is called", async () => {
       const listing = boxListingOf(held.mw)
       await listing.hello()
