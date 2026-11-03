@@ -67,7 +67,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Constructor]: constructor, assignInitialProps, assign
 
-  /** Checks the arguments, holds central, inscribes the props, settles, and seals itself. A refresh its timer launched that was refused is bad news, told to `listing.tellBadNews`. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
+  /** A refresh its timer launched that was refused is bad news, told to `listing.tellBadNews`. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
   constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, opts: StorableOpts) {
     MSX.storableArgs.parse({ world, listing, central, opts })
     adorn(this, 'world', world)
@@ -308,7 +308,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return { ...this.sparse, revision_tok, revision_seq, written_at: this.world.clock.now(), am }
   }
 
-  /** The `revision_tok` storage should hold when this thing is put or deleted: central's; null for a thing never stored, which expects no record. */
+  /** The `revision_tok` storage should hold when this thing is deleted: central's; null for a thing never stored, which expects no record. */
   priorRevisionTok(): string | null {
     const { revision_tok, revision_seq } = this.#central
     return revision_seq === MSX.NeverStoredSeq ? null : revision_tok
