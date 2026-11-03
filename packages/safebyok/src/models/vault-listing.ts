@@ -184,6 +184,11 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
   }
 
+  /** A vault verb refused over a tombstone or another life carries the row itself, where a box verb's `dbhas` is its vault's. */
+  protected override isRefusalOfRow(err: VaultError): boolean {
+    return super.isRefusalOfRow(err) || (err.refusalkind === 'vault_gone') || (err.refusalkind === 'vault_mismatch')
+  }
+
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
   }

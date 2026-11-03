@@ -6,7 +6,7 @@ import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
-import { NewPassphrase, Passphrase, addPasskeyTyping, delTyping, makeBornVault, makeBornVaultWithPasskey, replaceTyping, revokeTyping, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, addPasskeyTyping, delTyping, makeBornVault, makeBornVaultWithPasskey, replaceTyping, revokeTyping, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -115,6 +115,23 @@ describe("vault.replacePassphrase()", () => {
     expect(vault.gate.gate_epoch).to.eq(landedEpoch + 1)
     expect(vault.isUnlocked).to.be.true
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: landedEpoch })
+  })
+
+  it("refuses 'vault_gone' a vault deleted since the last fetch, the vault tombstoned before the refusal is thrown", async () => {
+    const { vault, demandStored, anotherSession } = await makeBornVault()
+    await delTyping(await anotherSession().build(demandStored()))
+    expect(vault.isPresent).to.be.true
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'vault_gone')
+    expect(vault.isPresent).to.be.false
+    expect(vault.revision_seq).to.eq(demandStored().revision_seq)
+  })
+
+  it("refuses 'vault_mismatch' a vault of another life stored since the last fetch, that life replacing the vault in its slot", async () => {
+    const { vault, listing, restoreRow } = await makeBornVault()
+    const other = { ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' }
+    restoreRow(other)
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'vault_mismatch')
+    expect(listing.at(vault.scope)?.vault_tok).to.eq(other.vault_tok)
   })
 
   it("spreads the record the attempt read, not the live vault: a record delivered during the proving refuses 'stale_write', overwriting nothing", async () => {
