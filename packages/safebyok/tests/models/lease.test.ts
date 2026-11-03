@@ -290,7 +290,7 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
   })
 
   const WrongStampCases = [
-    [sealStampOf('b2'),                    "another box's stamp"],
+    [sealStampOf('b2'),                      "another box's stamp"],
     [sealStampOf('b1', { revision_seq: 2 }), "another revision's stamp"],
   ] as const
 
