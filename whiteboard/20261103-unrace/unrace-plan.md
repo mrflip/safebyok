@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." So 18, 19 and 20 are held for triage; 16 is cancelled; 21 and then 14 go ahead on the restacked line. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
+* **Status:** threads 1 to 13, 15 and 17 filed, the proof green; 13, 15 and 17 sit side by side on 12, to be restacked into a line. The Coach: "You can keep going; don't schedule new work around the closer look responses until we triage." 16 is cancelled; 21 and then 14 finish this sprint. The Coach agreed to close after those, so 18, 19 and 20 move to a new sprint, seeded in `unrace-next.md`. The Coach, on permissions: "You and workers may manage your prs and force push with lease using gh or git". Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
