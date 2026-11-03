@@ -180,6 +180,8 @@ stuff was debrided"*
 * **Touches:** `models/vault.ts`, `lease.ts`, `box.ts`, `box-listing.ts`.
 * **Items:** `leaseFriend`, `#attachLease`, `#renewLease`, `#vacateLease`, the seal verbs, and the discards down the chain.
   The vault's seal verbs lock on `damaged_lease`.
+* **Unsealing:** *"have lease do the decode and fill; it owns security. box does the deserialization"*. `box.#unseal` decodes
+  and fills today.
 * **Levels:** `opus` worker. **Size:** medium. **Depends on:** 4, 5.
 
 ### 7. `vault_slot`

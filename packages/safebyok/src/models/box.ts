@@ -123,7 +123,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxPatch, BoxS
     const record = this.demandFullProps()
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(MSX.boxSparse.parse(record), sidecar)
-    // fixme: have lease do the decode and fill; it owns security. box does the deserialization
     const bytes = await this.world.demandLease().unsealWith({ box_key_wrapped, whisper_ciphered }, stamp, stamp)
     try {
       const held = whisperHolder.safeParse(parseJsonOrNull(new TextDecoder().decode(bytes)))
