@@ -268,13 +268,14 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryAddPasskey(paramsOf(val, { passkey_wayin: { ...passkeyWayin, device_id: 'd2' } }))).to.deep.include({ ok: false, act: 'camped', dbhas: val, world: val })
     })
 
-    it("revokePasskey nulls a passkey held, and answers revoked over none", async () => {
+    it("revokePasskey nulls a passkey held, and over none answers revoked with nothing moved", async () => {
       const { vaultDB, vault } = await storeWith()
       const { val: holding } = await vaultDB.addPasskey(paramsOf(vault, { passkey_wayin: passkeyWayin }))
       const { act, val } = await vaultDB.revokePasskey(paramsOf(holding, { passkey_wayin: null }))
       expect(act).to.eq('revoked')
       expect(val.gate).to.deep.equal({ gate_epoch: 3, passphrase_wayin: passphraseWayin, passkey_wayin: null })
-      expect(await vaultDB.revokePasskey(paramsOf(val, { passkey_wayin: null }))).to.deep.include({ act: 'revoked' })
+      expect(await vaultDB.revokePasskey(paramsOf(val, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val, world: val })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: val })
     })
 
     it("a gate verb refuses stale_write when the row moved past its params' revision, even a verb its row would otherwise refuse", async () => {
