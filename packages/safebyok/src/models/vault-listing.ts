@@ -88,9 +88,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. A damaged row refuses 'damaged_record'. */
   async fetchListed(vault: Vault): Promise<BoxesListed> {
+    const asked = this.scopeOf(vault)
     this.demandEnabled()
     await this.ensureTimelyWorld()
-    const answer = await this.vaultDB.tryGetVault(vault.scope, { ifAbsent: 'nil' })
+    const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
     await this.deliver(vaultRowOf(answer), 'nil')
     return MSX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
   }
