@@ -6,7 +6,7 @@ import { type LeaseGrantOpts, type LeaseRecord, LeaseFormat } from '../../src/mo
 import { bad } from '../../src/outcome'
 import { isLeaseKey } from '../../src/shapes/device'
 import * as TH from '../test-helpers'
-import { type FakeLeaseFriend, GrantedAs, fakeLeaseFriendOf, isZeroed, makeGrantedLease, sealStampsOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { type FakeLeaseFriend, GrantedAs, fakeLeaseFriendOf, makeGrantedLease, sealStampOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -14,10 +14,7 @@ const StampFieldnames = ['fmt', 'applabel', 'user_id', 'vaultlabel', 'vault_tok'
 
 const Stamped = { ...WorldStamp, fmt: LeaseFormat, proved_at: T0, ...GrantedAs }
 
-/** A whisper's serialized bytes, fresh each call: a test checks they are zeroed. */
-const whisperBytesOf = (text = '{"val":"sk-test-0000"}'): Uint8Array => new TextEncoder().encode(text)
-
-const textOf = (bytes: Uint8Array): string => new TextDecoder().decode(bytes)
+const WhisperText = '{"val":"sk-test-0000"}'
 
 /** A lease granted and cached, beside the friend that hears it. */
 const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseFriend, lease: Lease }> => {
@@ -103,8 +100,7 @@ describe("lease.cache() and lease.tryCache()", () => {
     await TH.expectRefusal(lease.cache(), 'unexpected_error')
     await TH.expectBad(lease.tryCache(), 'unexpected_error')
     expect(lease.isInForce).to.be.true
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
+    await lease.sealWith(WhisperText, sealStampOf('b1'))
   })
 
   it("refuses 'vault_locked' once out of force, so nothing is cached", async () => {
@@ -123,11 +119,11 @@ describe("Lease.peek(friend, gate_epoch) and Lease.tryPeek", () => {
 
   it("answers the cached lease of this vault and epoch, which opens what the granted lease sealed", async () => {
     const { friend, lease: granted } = await grantedWorld()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    const sealed = await granted.sealWith(whisperBytesOf('{"val":"cached"}'), boxKeyStamp, whisperStamp)
+    const stamp = sealStampOf('b1')
+    const sealed = await granted.sealWith('{"val":"cached"}', stamp)
     const got = await Lease.peek(friend, GrantedAs.gate_epoch)
     expect(got?.toJSON()).to.deep.equal(granted.toJSON())
-    expect(textOf(await got!.unsealWith(sealed, boxKeyStamp, whisperStamp))).to.eq('{"val":"cached"}')
+    expect(await got!.unsealWith(sealed, stamp)).to.eq('{"val":"cached"}')
   })
 
   it("makes no check of the lease's age: a lease cached long ago is in force", async () => {
@@ -244,40 +240,30 @@ describe("lease.vacate(), lease.evict(), isForgotten and isInForce", () => {
     expect(friend.cached).to.not.be.null
   })
 
-  it("refuses sealWith and unsealWith once vacated, as 'vault_locked', and still zeroes the whisper bytes", async () => {
+  it("refuses sealWith and unsealWith once vacated, as 'vault_locked'", async () => {
     const { lease } = await grantedWorld()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
+    const stamp = sealStampOf('b1')
+    const sealed = await lease.sealWith(WhisperText, stamp)
     await lease.vacate()
-    const bytes = whisperBytesOf()
-    await TH.expectRefusal(lease.sealWith(bytes, boxKeyStamp, whisperStamp), 'vault_locked')
-    expect(isZeroed(bytes)).to.be.true
-    await TH.expectRefusal(lease.unsealWith(sealed, boxKeyStamp, whisperStamp), 'vault_locked')
+    await TH.expectRefusal(lease.sealWith(WhisperText, stamp), 'vault_locked')
+    await TH.expectRefusal(lease.unsealWith(sealed, stamp), 'vault_locked')
   })
 })
 
-describe("lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp) and unsealWith", () => {
-  it("round-trips a whisper's bytes under the same two stamps", async () => {
+describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () => {
+  it("round-trips a whisper's text under the same stamp", async () => {
     const { lease } = await grantedWorld()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    const sealed = await lease.sealWith(whisperBytesOf('{"val":"sk-test-1234"}'), boxKeyStamp, whisperStamp)
+    const stamp = sealStampOf('b1')
+    const sealed = await lease.sealWith('{"val":"sk-test-1234"}', stamp)
     expect(Object.keys(sealed)).to.have.members(['box_key_wrapped', 'whisper_ciphered'])
-    expect(textOf(await lease.unsealWith(sealed, boxKeyStamp, whisperStamp))).to.eq('{"val":"sk-test-1234"}')
-  })
-
-  it("zeroes the whisper bytes it was handed once sealed", async () => {
-    const { lease } = await grantedWorld()
-    const bytes = whisperBytesOf()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    await lease.sealWith(bytes, boxKeyStamp, whisperStamp)
-    expect(isZeroed(bytes)).to.be.true
+    expect(await lease.unsealWith(sealed, stamp)).to.eq('{"val":"sk-test-1234"}')
   })
 
   it("seals the same whisper under the same stamps differently each time: a fresh boxKey and cipherIv", async () => {
     const { lease } = await grantedWorld()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    const first  = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
-    const second = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
+    const stamp = sealStampOf('b1')
+    const first  = await lease.sealWith(WhisperText, stamp)
+    const second = await lease.sealWith(WhisperText, stamp)
     expect(first.whisper_ciphered.ciphertext_b64).to.not.eq(second.whisper_ciphered.ciphertext_b64)
     expect(first.box_key_wrapped.ciphertext_b64).to.not.eq(second.box_key_wrapped.ciphertext_b64)
   })
@@ -292,71 +278,59 @@ describe("lease.sealWith(serializedWhisper, boxKeyStamp, whisperStamp) and unsea
   ] as const
 
   for (const [stamp, blurb] of BadStampCases) {
-    it(`refuses ${blurb} for either stamp as 'bad_option', and still zeroes the whisper bytes`, async () => {
+    it(`refuses ${blurb} for the stamp as 'bad_option'`, async () => {
       const { lease } = await grantedWorld()
-      const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-      const asBoxKeyStamp = whisperBytesOf()
-      await TH.expectRefusal(lease.sealWith(asBoxKeyStamp, stamp as never, whisperStamp), 'bad_option')
-      expect(isZeroed(asBoxKeyStamp)).to.be.true
-      const asWhisperStamp = whisperBytesOf()
-      await TH.expectRefusal(lease.sealWith(asWhisperStamp, boxKeyStamp, stamp as never), 'bad_option')
-      expect(isZeroed(asWhisperStamp)).to.be.true
+      await TH.expectRefusal(lease.sealWith(WhisperText, stamp as never), 'bad_option')
     })
   }
 
-  it("refuses a whisper that is not bytes as 'bad_option'", async () => {
+  it("refuses a whisper that is no string as 'bad_option'", async () => {
     const { lease } = await grantedWorld()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    await TH.expectRefusal(lease.sealWith('{"val":"sk-test-0000"}' as never, boxKeyStamp, whisperStamp), 'bad_option')
+    await TH.expectRefusal(lease.sealWith(new TextEncoder().encode(WhisperText) as never, sealStampOf('b1')), 'bad_option')
   })
 
   const WrongStampCases = [
-    [{ boxKeyStamp: sealStampsOf('b2').boxKeyStamp },                        "another box's boxKey stamp"],
-    [{ whisperStamp: sealStampsOf('b1', { revision_seq: 2 }).whisperStamp }, "another revision's whisper stamp"],
-    [{ boxKeyStamp: sealStampsOf('b1').whisperStamp, whisperStamp: sealStampsOf('b1').boxKeyStamp }, 'the two stamps swapped'],
+    [sealStampOf('b2'),                    "another box's stamp"],
+    [sealStampOf('b1', { revision_seq: 2 }), "another revision's stamp"],
   ] as const
 
   for (const [wrong, blurb] of WrongStampCases) {
     it(`refuses to open under ${blurb}, as 'damaged_box', and locks nothing`, async () => {
       const { friend, lease } = await grantedWorld()
-      const right = sealStampsOf('b1')
-      const sealed = await lease.sealWith(whisperBytesOf(), right.boxKeyStamp, right.whisperStamp)
-      const { boxKeyStamp, whisperStamp } = { ...right, ...wrong }
-      await TH.expectRefusal(lease.unsealWith(sealed, boxKeyStamp, whisperStamp), 'damaged_box')
+      const sealed = await lease.sealWith(WhisperText, sealStampOf('b1'))
+      await TH.expectRefusal(lease.unsealWith(sealed, wrong), 'damaged_box')
       expect(friend.lock).not.toHaveBeenCalled()
     })
   }
 
   it("refuses to open the box key and whisper of one box laid under another's: 'damaged_box'", async () => {
     const { lease } = await grantedWorld()
-    const one = sealStampsOf('b1')
-    const two = sealStampsOf('b2')
-    const sealedOne = await lease.sealWith(whisperBytesOf(), one.boxKeyStamp, one.whisperStamp)
-    const sealedTwo = await lease.sealWith(whisperBytesOf(), two.boxKeyStamp, two.whisperStamp)
-    await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: sealedOne.box_key_wrapped, whisper_ciphered: sealedTwo.whisper_ciphered }, two.boxKeyStamp, two.whisperStamp), 'damaged_box')
+    const sealedOne = await lease.sealWith(WhisperText, sealStampOf('b1'))
+    const sealedTwo = await lease.sealWith(WhisperText, sealStampOf('b2'))
+    await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: sealedOne.box_key_wrapped, whisper_ciphered: sealedTwo.whisper_ciphered }, sealStampOf('b2')), 'damaged_box')
   })
 
   it("refuses to open what another vault sealed under the same box stamps, as 'damaged_box'", async () => {
     const { lease } = await grantedWorld()
     const other = await makeGrantedLease(fakeLeaseFriendOf({ vault_tok: 'vault-tok-other' }))
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    const sealed = await other.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
-    await TH.expectRefusal(lease.unsealWith(sealed, boxKeyStamp, whisperStamp), 'damaged_box')
+    const stamp = sealStampOf('b1')
+    const sealed = await other.sealWith(WhisperText, stamp)
+    await TH.expectRefusal(lease.unsealWith(sealed, stamp), 'damaged_box')
   })
 
   it("refuses tampered ciphertext as 'damaged_box', quoting none of it", async () => {
     const { lease } = await grantedWorld()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
+    const stamp = sealStampOf('b1')
+    const sealed = await lease.sealWith(WhisperText, stamp)
     const tampered = { ...sealed, whisper_ciphered: { ...sealed.whisper_ciphered, ciphertext_b64: TH.tweakB64(sealed.whisper_ciphered.ciphertext_b64) } }
-    const err = await TH.expectRefusal(lease.unsealWith(tampered, boxKeyStamp, whisperStamp), 'damaged_box')
+    const err = await TH.expectRefusal(lease.unsealWith(tampered, stamp), 'damaged_box')
     expect(TH.thrownText(err)).to.not.include(tampered.whisper_ciphered.ciphertext_b64)
   })
 
   it("refuses sealed parts that are no ciphered bags as 'bad_option'", async () => {
     const { lease } = await grantedWorld()
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: 'wrapped' } as never, boxKeyStamp, whisperStamp), 'bad_option')
+    const stamp = sealStampOf('b1')
+    await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: 'wrapped' } as never, stamp), 'bad_option')
   })
 })
 
@@ -371,19 +345,17 @@ describe("a tampered lease record", () => {
   for (const [tamper, blurb] of TamperCases) {
     it(`reads as a lease, but with ${blurb} its first seal or unseal locks the vault, refuses 'damaged_lease' and lets the lease go, uncaching nothing itself, so the next refuses 'vault_locked'`, async () => {
       const { friend, lease } = await grantedWorld()
-      const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-      const sealed = await lease.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp)
+      const stamp = sealStampOf('b1')
+      const sealed = await lease.sealWith(WhisperText, stamp)
       const other = await grantedWorld()
       friend.cached = tamper(friend.cached as LeaseRecord, other.friend.cached as LeaseRecord)
       const got = await Lease.peek(friend, GrantedAs.gate_epoch)
       expect(got).to.be.instanceOf(Lease)
-      await TH.expectRefusal(got!.unsealWith(sealed, boxKeyStamp, whisperStamp), 'damaged_lease')
+      await TH.expectRefusal(got!.unsealWith(sealed, stamp), 'damaged_lease')
       expect(friend.lock).toHaveBeenCalledTimes(1)
       expect(got!.isForgotten).to.be.true
       expect(friend.tryUncacheLease).not.toHaveBeenCalled()
-      const bytes = whisperBytesOf()
-      await TH.expectRefusal(got!.sealWith(bytes, boxKeyStamp, whisperStamp), 'vault_locked')
-      expect(isZeroed(bytes)).to.be.true
+      await TH.expectRefusal(got!.sealWith(WhisperText, stamp), 'vault_locked')
       expect(friend.lock).toHaveBeenCalledTimes(1)
     })
   }
@@ -392,16 +364,16 @@ describe("a tampered lease record", () => {
     const { friend } = await grantedWorld()
     friend.cached = { ...(friend.cached as LeaseRecord), gate_epoch: 2 }
     const got = await Lease.peek(friend, 2)
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    await TH.expectRefusal(got!.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'damaged_lease')
+    const stamp = sealStampOf('b1')
+    await TH.expectRefusal(got!.sealWith(WhisperText, stamp), 'damaged_lease')
   })
 
   it("refuses 'damaged_lease' quoting none of the record", async () => {
     const { friend } = await grantedWorld()
     friend.cached = { ...(friend.cached as LeaseRecord), proved_at: T0 + 1 }
     const got = await Lease.peek(friend, GrantedAs.gate_epoch)
-    const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
-    const err = await TH.expectRefusal(got!.sealWith(whisperBytesOf(), boxKeyStamp, whisperStamp), 'damaged_lease')
+    const stamp = sealStampOf('b1')
+    const err = await TH.expectRefusal(got!.sealWith(WhisperText, stamp), 'damaged_lease')
     expect(TH.thrownText(err)).to.not.include((friend.cached as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
   })
 })

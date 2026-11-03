@@ -102,7 +102,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Stop holding `thing`, as its own discard asks: the slot empties only for this very instance. */
   unlist(thing: Thing<ScopeT, RecordT, SparseT>): void {
     const scopepath = this.scopepathOf(this.scopeOf(thing))
-    if (this.#things.get(scopepath) !== thing) { return }
+    const held: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(scopepath)
+    if (held !== thing) { return }
     this.#things.delete(scopepath)
     this.#remakeSnapshot()
   }

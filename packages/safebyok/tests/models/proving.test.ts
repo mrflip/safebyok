@@ -9,7 +9,7 @@ import { Wayin } from '../../src/models/wayin'
 import { vaultScope } from '../../src/shapes/scopes'
 import { type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, DeviceId, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, DeviceId, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, proofClosureOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -52,17 +52,14 @@ const findsWeak = () => ({ strong: false as const, reason: 'too short' })
 
 const findsStrongAsync = () => Promise.resolve({ strong: true as const })
 
-const whisperBytesOf = (text: string): Uint8Array => new TextEncoder().encode(text)
-
 /** Whether `one`'s lease opens what `other`'s seals: whether both hold one vaultKey. */
 const expectOneVaultKey = async (one: Proving, other: Proving): Promise<void> => {
   const friend = fakeLeaseFriendOf()
-  const { boxKeyStamp, whisperStamp } = sealStampsOf('b1')
+  const stamp = sealStampOf('b1')
   const sealer = await one.buildLease(friend)
   const opener = await other.buildLease(friend)
-  const sealed = await sealer.sealWith(whisperBytesOf('{"val":"sk-test-5678"}'), boxKeyStamp, whisperStamp)
-  const opened = await opener.unsealWith(sealed, boxKeyStamp, whisperStamp)
-  expect(new TextDecoder().decode(opened)).to.eq('{"val":"sk-test-5678"}')
+  const sealed = await sealer.sealWith('{"val":"sk-test-5678"}', stamp)
+  expect(await opener.unsealWith(sealed, stamp)).to.eq('{"val":"sk-test-5678"}')
 }
 
 describe("Proving.checkStrength(passphraseClear, scope, world)", () => {

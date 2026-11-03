@@ -204,9 +204,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (lease.isForgotten) { throw leaseNotInForce() }
     try {
       this.demandReadyToAttach()
-    } catch (refusal) {
+    } catch (err) {
       await this.#vacateUnattached(lease)
-      throw refusal
+      throw err
     }
     // Called before the settle, as a listener may call `lock()`, whose erase must land after this put.
     const caching = lease.tryCache()

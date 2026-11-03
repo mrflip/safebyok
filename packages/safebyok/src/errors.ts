@@ -9,7 +9,7 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  * * **Misuse**: a programming error, the host developer's to fix. Let it reach an error boundary
  *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`, `bad_whisper`,
  *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`, `unknown_key_deriver`,
- *   `insecure_context`, `unexpected_error`, `passphrase_required`, `invalid_input`, `gate_issue`.
+ *   `insecure_context`, `unexpected_error`, `passphrase_required`, `invalid_input`, `gate_issue`, `disabled`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `crypto_failed`,
@@ -83,6 +83,7 @@ export const refusalKindVals = [
   'damaged_record',      // a vaultDB row read alone failed its checks, and is set aside
   'invalid_input',       // an argument to a vaultDB verb failed its check
   'gate_issue',          // a vaultDB gate verb whose params fail the integrity checks against the stored row
+  'disabled',            // a call on an object let go by a sweep, a vacate or a delete: it answers nothing more, and the bank has a fresh one
 ] as const
 export type RefusalKind = typeof refusalKindVals[number]
 
@@ -147,6 +148,7 @@ export const RefusalFamilyForKind = {
   damaged_record:      'bad_news',
   invalid_input:       'misuse',
   gate_issue:          'misuse',
+  disabled:            'misuse',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /** The facts a refusal learned, each under its own name, filled only by the refusals that name it.

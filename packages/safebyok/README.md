@@ -1032,6 +1032,7 @@ which `useListedVault` hands down).
 | `passphrase_required` | `delWayin('passphrase')`: a vault keeps its passphrase, which can be replaced, never removed | Call `putWayin('passphrase')` to replace it |
 | `invalid_input`       | an argument to a VaultDB verb failed its check | Fix the call. |
 | `gate_issue`          | a VaultDB gate verb's params fail the integrity checks against the stored row | Fix the call. |
+| `disabled`            | a call on an object let go by a sweep, a vacate or a delete | Ask the bank for the vault again, and drop the old reference. |
 
 ### Conditions: handle them at run time
 
