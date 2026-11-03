@@ -66,3 +66,20 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-03 (unrace, `whiteboard/20261102-unrace/unrace-gating.md`, *The lease*): **a `lock()` during
   the cache's `lease.peek` loses.** The vault reads unlocked on the lease peeked, the lock's erase
   stands, and the next session asks for a proof. The next `lock()` ends that session.
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-unrace/unrace-gating.md`, *Rows for `notes/wontfix.md`*):
+  **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
+  the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
+  gets it from `lease.peek` and attaches it, asking nothing, so a vault the user locked reopens with no
+  passphrase. The panic's vacate stops that in the tab that locked, but the row can survive for other tabs
+  and later sessions. The Coach: "This is why the panic button exists, there is no fix we can apply if the
+  system somehow is operational enough to read leases, decrypt data and everything else but delete data."
+* 2026-11-03 (the Coach, unrace): **a refused erase with no `onPanic` can bring a false prompt.** `Vault.#panic`
+  unlists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
+  host has no on panic they've given their opinion, wontfix."
+* 2026-11-03 (the Coach, unrace): **a delete whose erase is refused, with no `onPanic`, still lands.** The vault
+  is removed from the vaultDB and the delete is answered, whatever the erase of the cached lease did. The same
+  ruling: a host with no `onPanic` has given its opinion.
+* 2026-11-03 (the Coach, unrace): **a host's own getter that throws a `VaultError` quoting the passphrase passes
+  the gating's check whole.** The gating tells an error of its own from a host's by its class and does not
+  inspect the text; a `VaultError` a host's getter throws, with the passphrase in its message, reaches the caller
+  as it was thrown. The Coach: "Wontfix agreed".
