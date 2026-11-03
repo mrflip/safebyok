@@ -90,7 +90,7 @@ export abstract class VaultDB {
   protected abstract doDelVault(tombstone: VaultTombstone, prior: Revision): Awaitable<Landing>
   /** Writes `tombstone` when the box row is live at `prior` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
   protected abstract doDelBox(tombstone: BoxTombstone, prior: Revision): Awaitable<BoxLanding>
-  /** Removes the box rows whose vault row is void, a tombstone, or under another `vault_tok`, and counts those left in the bank. */
+  /** Removes the box rows whose vault row is void, a tombstone, or under another `vault_tok`, as {@link VS.isLifeOver} says, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
   /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */
   protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }

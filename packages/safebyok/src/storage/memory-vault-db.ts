@@ -88,7 +88,7 @@ export class MemoryVaultDB extends VaultDB {
     let totalCount = 0
     for (const [ckey, { scope: vaultScope, vault_tok, boxrows }] of this.#boxLives) {
       if ((vaultScope.applabel !== scope.applabel) || (vaultScope.user_id !== scope.user_id)) { continue }
-      if (VS.isLiveRowUnder(this.#vaultRowOf(vaultScope), vault_tok)) { totalCount += boxrows.size } else { this.#boxLives.delete(ckey) }
+      if (VS.isLifeOver(this.#vaultRowOf(vaultScope), vault_tok)) { this.#boxLives.delete(ckey) } else { totalCount += boxrows.size }
     }
     return { totalCount }
   }

@@ -428,6 +428,15 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("tidyGone over a vault row past reading", () => {
+    it("keeps its boxes, as it may yet be read", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { garbage: true })
+      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })
+      expect(vaultDB._cheat_boxRowsOf(vaultScope, 'life1').get('openai')).to.deep.equal(box)
+    })
+  })
+
   describe("watch", () => {
     it("tells of a box row and a vault row that changed, as got and gone, until told to stop", async () => {
       const { vaultDB, vault, box } = await storeWith()
