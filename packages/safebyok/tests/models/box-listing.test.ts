@@ -75,7 +75,8 @@ describe("BoxListing", () => {
       await TH.expectRefusal(listing.create(dna()), 'stale_write')
       expect(listing.at(scope())).to.be.null
       expect(listing.snapshot).to.deep.equal([])
-      expect((await listing.create(dna())).revision_seq).to.eq(0)
+      const again = await listing.create(dna())
+      expect(again.revision_seq).to.eq(0)
     })
 
     it("holds what storage holds where the put meets it, delivered before 'stale_write' is thrown", async () => {
@@ -238,7 +239,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
   })
 
   it("refuses a revision_seq in the dna, as the factory has none to give", async () => {
-    await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), revision_seq: 3 } as never), 'bad_option')
+    await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), revision_seq: 3 }), 'bad_option')
   })
 
   it("gives each box born a box_tok of its own, its birthday gift", async () => {
