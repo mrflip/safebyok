@@ -19,8 +19,7 @@ useBankWorlds()
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
-/**
- * A component over `useSyncExternalStore(store.subscribe, store.getSnapshot)`, painting `view` of each snapshot.
+/** A component over `useSyncExternalStore(store.subscribe, store.getSnapshot)`, painting `view` of each snapshot.
  * A listener told with nothing new, or a snapshot that changed with no listener told, fails the next `expectRenders`.
  */
 const mountComponent = <SnapshotT>(store: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) => {
@@ -81,7 +80,7 @@ const makeDialog = () => {
 // --
 
 /** A bank past its `hello` with the vault of `VaultBag` built and unlocked, and the dialog that did it, cleared. */
-const makeHost = async () => {
+const buildHost = async () => {
   const world = makeBankWorld()
   const dialog = makeDialog()
   const bank = world.bankOn({ requestCleartext: dialog.requestCleartext })
@@ -210,7 +209,7 @@ describe("the proof", () => {
   })
 
   it("replacing the passphrase: nothing locks, and from then on only the new one opens the vault", async () => {
-    const { bank, vault, dialog } = await makeHost()
+    const { bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
@@ -229,7 +228,7 @@ describe("the proof", () => {
   })
 
   it("adding and revoking a passkey: the passkey opens the vault until it is revoked", async () => {
-    const { bank, vault, dialog } = await makeHost()
+    const { bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
@@ -263,7 +262,7 @@ describe("the proof", () => {
   })
 
   it("tidy locks a vault past its autolock, and the next hello's tidy leaves the next page asking", async () => {
-    const { world, bank, vault, dialog } = await makeHost()
+    const { world, bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
@@ -293,7 +292,7 @@ describe("the proof", () => {
   })
 
   it("signing out: bank.vacate empties the screen and this device, and the next hello lists the vault again, locked", async () => {
-    const { world, bank, vault, dialog } = await makeHost()
+    const { world, bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
@@ -313,7 +312,7 @@ describe("the proof", () => {
   })
 
   it("the store goes out of reach: an unlocked vault keeps its lease, a refused hello paints refused, and the next one recovers", async () => {
-    const { world, bank, vault } = await makeHost()
+    const { world, bank, vault } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
@@ -334,7 +333,7 @@ describe("the proof", () => {
   })
 
   it("a second device: what it does reaches this one's components through the watch, with nobody asked and no lock", async () => {
-    const { world, bank, vault, dialog } = await makeHost()
+    const { world, bank, vault, dialog } = await buildHost()
     const box = await vault.putBox(ApiKey)
     const bankUi = mountComponent(bank, bankStatus)
     const boxesUi = mountComponent(vault.boxListing, boxList)
@@ -407,7 +406,7 @@ describe("the proof", () => {
   })
 
   it("React StrictMode over a vault already cached: the second effect's listing holds it, and picks up the lease with nobody asked", async () => {
-    const { world, dialog } = await makeHost()
+    const { world, dialog } = await buildHost()
     const bank = world.bankOn({ requestCleartext: dialog.requestCleartext })
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['made: no vaults'])
