@@ -1,4 +1,4 @@
-/** The vaultDB's records, its verbs' params and their checkers, imported as `VS`. Every `parse` refuses 'invalid_input', quoting none of it; a stored row is judged by `safeParse`. */
+/** The one place each stored thing's shape is drawn: the vaultDB's records, its verbs' params and their checkers, imported as `VS`. Every `parse` refuses 'invalid_input', quoting none of it; a stored row is judged by `safeParse`. The models take these same shapes, refusing 'bad_record'. */
 
 import type * as Z from 'zod'
 import { Checkers, objCheck } from '../checks/validator'
@@ -20,22 +20,34 @@ export const VaultFormat = 6001
 export const NeverStored = { revision_tok: NeverStoredTok, revision_seq: NeverStoredSeq } as const
 // --
 
-// == [Checkers]: revision, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
+// == [Checkers]: am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
 
 export const amVals = ['a', 'd', 'x'] as const
 export const ifAbsentVals = ['fail', 'nil'] as const
 export const ifPresentVals = ['repl', 'fail', 'get'] as const
+export const damagekindVals = ['format_mismatch', 'damaged_record'] as const
 
 export const {
-  revision, bankScope, vaultScope, boxscope, boxQuery, watchScope,
+  am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope,
   passphraseWayin, passkeyWayin, gate, vaultSparse, vaultRecord, vaultTombstone, vaultRow,
   boxSparse, boxRecord, boxTombstone, boxRow,
   replacePassphraseParams, passkeyAddParams, revokePasskeyParams,
   ifAbsentOpts, putOpts, delOpts, reqParams, rowPeek, fmtPeek,
 } = Checkers('invalid_input', ({ obj, lit, int, uint, num, unk, oneof, discrim, applabel, user_id, vaultlabel, boxlabel, epochMillis, revision_tok, vault_tok, box_tok, device_id, key_deriver_label, credential_id, salt_b64, prfSalt, vault_key_wayin_wrapped, box_key_wrapped, whisper_ciphered }) => {
-  const revision = obj({ revision_tok, revision_seq: int })
+  const revision = obj({
+    revision_tok,
+    /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. {@link NeverStoredSeq} marks a row never stored. */
+    revision_seq: int,
+  })
   const am = oneof(amVals)
-  const sparseBase = obj({ ...revision.shape, registered_at: epochMillis, written_at: epochMillis, am, vault_tok })
+  const times = obj({
+    /** When this life of the thing began: the `written_at` of its birth, kept by every later revision of that life. */
+    registered_at: epochMillis,
+    /** When the record in hand was written; on a tombstone, when it was deleted. */
+    written_at:    epochMillis,
+  })
+  const vaulted = obj({ vault_tok })
+  const sparseBase = obj({ ...revision.shape, ...times.shape, am, ...vaulted.shape })
 
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
@@ -52,8 +64,24 @@ export const {
   const vaultTombstone = vaultSparse.extend({ am: lit('x') }).strict()
   const vaultRow       = discrim('am', [vaultRecord, vaultTombstone])
 
-  const boxSparse    = boxscope.extend({ fmt: lit(BoxFormat), ...sparseBase.shape, box_tok, whisper_codec: lit('json_v1'), whisper_schema_version: lit(1) })
-  const boxRecord    = boxSparse.extend({ am: lit('a'), sidecar, box_key_wrapped, whisper_ciphered }).strict()
+  const boxSparse = boxscope.extend({
+    fmt: lit(BoxFormat),
+    ...sparseBase.shape,
+    /** The life of the box under its boxlabel: minted at its birth, and kept by every later revision. */
+    box_tok,
+    /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
+    whisper_codec:          lit('json_v1'),
+    /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
+    whisper_schema_version: lit(1),
+  })
+  const boxRecord = boxSparse.extend({
+    am: lit('a'),
+    sidecar,
+    /** This box's boxKey, wrapped under the vaultKey. */
+    box_key_wrapped,
+    /** The whisper, ciphered under this box's boxKey. */
+    whisper_ciphered,
+  }).strict()
   const boxTombstone = boxSparse.extend({ am: lit('x') }).strict()
   const boxRow       = discrim('am', [boxRecord, boxTombstone])
 
@@ -72,7 +100,7 @@ export const {
   const fmtPeek   = obj({ fmt: num })
 
   return {
-    revision, bankScope, vaultScope, boxscope, boxQuery, watchScope,
+    am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope,
     passphraseWayin, passkeyWayin, gate, vaultSparse, vaultRecord, vaultTombstone, vaultRow,
     boxSparse, boxRecord, boxTombstone, boxRow,
     replacePassphraseParams, passkeyAddParams, revokePasskeyParams,
@@ -83,6 +111,7 @@ export const {
 export const vaultDBOpts = objCheck(({ num }) => ({ clock: HX.clockShape.optional(), maxRecordBytes: num.positive().optional() }), 'bad_option')
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape, maxBoxes: uint.optional() }), 'bad_option')
 
+export type Times          = Readonly<Z.infer<typeof times>>
 export type Revision       = Readonly<Z.infer<typeof revision>>
 export type BankScope      = Readonly<Z.infer<typeof bankScope>>
 export type VaultScope     = Readonly<Z.infer<typeof vaultScope>>
@@ -102,6 +131,10 @@ export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseP
 export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
 export type IfPresent = typeof ifPresentVals[number]
+/** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_record`, anything else. */
+export type Damagekind = typeof damagekindVals[number]
+export type DamagedVault = VaultSparse & Readonly<{ damagekind: Damagekind }>
+export type DamagedBox   = BoxSparse & Readonly<{ damagekind: Damagekind }>
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
@@ -110,7 +143,7 @@ export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
 export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 // --
 
-// == [Row helpers]: reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
+// == [Row helpers]: reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, boxTombstoneOf
 
 /** The request's safe metadata, for an answer to carry; empty when any of it fails its check, as a bad field may be anything. */
 export const reqParamsOf = (args: unknown): ReqParams => {
@@ -166,11 +199,19 @@ export const sentinelBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxsc
   applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...NeverStored, ...sentinelTimes, am: 'x', vault_tok, box_tok: NeverStoredTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
 })
 
+/** True when `raw` names a format past `ownFormat`: a row a newer version of the app wrote. */
+export const isNewerFormat = (raw: unknown, ownFormat: number): boolean => {
+  const peek = fmtPeek.safeParse(raw)
+  return peek.success && (peek.data.fmt > ownFormat)
+}
+
+const damagekindOf = (raw: unknown, ownFormat: number): Damagekind => (isNewerFormat(raw, ownFormat) ? 'format_mismatch' : 'damaged_record')
+
 /** A vault row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
-export const damagedVaultOf = (scope: VaultScope, raw: unknown): VaultSparse => ({ ...sentinelVaultOf(scope), ...peekOf(raw), am: 'd' })
+export const damagedVaultOf = (scope: VaultScope, raw: unknown): DamagedVault => ({ ...sentinelVaultOf(scope), ...peekOf(raw), am: 'd', damagekind: damagekindOf(raw, VaultFormat) })
 
 /** A box row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
-export const damagedBoxOf = (scope: Boxscope, vault_tok: string, raw: unknown): BoxSparse => ({ ...sentinelBoxOf(scope, vault_tok), ...peekOf(raw), vault_tok, am: 'd' })
+export const damagedBoxOf = (scope: Boxscope, vault_tok: string, raw: unknown): DamagedBox => ({ ...sentinelBoxOf(scope, vault_tok), ...peekOf(raw), vault_tok, am: 'd', damagekind: damagekindOf(raw, BoxFormat) })
 
 /** The tombstone a vault's deletion leaves for a box row, or null for a row already one or past reading. */
 export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone | null => {

@@ -50,7 +50,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, ErrorExpected, LeftOutExpected
+// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected, ErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -73,8 +73,6 @@ export const VaultErrorExpected = "Expected a VaultError"
 /** The `err` of a task a trigger is told failed. */
 export const ErrorExpected = "Expected an Error"
 
-/** A field a bag must not carry beside another. */
-export const LeftOutExpected = "Expected it left out"
 // --
 
 // == [Passphrases]: PassphraseNotText
@@ -312,12 +310,6 @@ export const OtherVaultTokAtBirth = "Storage gave a record under another vault_t
 
 /** Why a record delivered under one scope that names another is not taken in. */
 export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
-
-/** Why a put whose `revision_seq` does not fit the `revision_tok` it is laid over is refused, by this device before it is sent or by storage. */
-export const PutUnfitForPrior = "A put's revision_seq does not fit the record it is laid over, so nothing was stored: revision 0 goes over no record, and each later revision over the record at the revision before it, named by its revision_tok. A send mints the revision that fits: send the change, not a record as it was received or made elsewhere."
-
-/** Why an answer for one scope that was asked for another is not taken in. */
-export const AnswerOfOtherScope = "Storage answered for a scope other than the one asked, so nothing was made or changed of the answer: a bug in the storage adapter, which should answer each call about the scope it is given."
 
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."

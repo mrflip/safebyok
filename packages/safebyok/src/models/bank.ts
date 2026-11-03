@@ -10,11 +10,12 @@ import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
+import type { VaultDB } from '../storage/vault-db-new'
 import { Gating, type GatingWorld, type RequestCleartext } from './gating'
 import type { LeaseDeviceDB, LockState, ProofClosure, StrengthChecker } from './models-shapes'
 import * as MSX from './models-shapes'
 import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
-import { type VaultStore, type VaultWorld, VaultListing } from './vault-listing'
+import { type VaultWorld, VaultListing } from './vault-listing'
 
 // == [Given to a bank]: DefaultRefreshMillis, BankOpts, BankSnapshot, RefusingStrengthChecker
 
@@ -24,7 +25,7 @@ export type BankOpts = {
   applabel:             string
   user_id:              string
   device_id?:           string | undefined
-  vaultStore:           VaultStore
+  vaultDB:              VaultDB
   deviceDB:             LeaseDeviceDB
   keyDeriver:           KeyDeriver
   requestCleartext?:    RequestCleartext | undefined
@@ -67,7 +68,7 @@ export class Bank implements VaultWorld, GatingWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     MSX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultStore, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
+    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope, { writable: false })
     this.device_id = device_id
@@ -79,7 +80,7 @@ export class Bank implements VaultWorld, GatingWorld {
     this.strengthChecker = strengthChecker
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
-    this.vaultListing = new VaultListing({ world: this, store: vaultStore, maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
+    this.vaultListing = new VaultListing({ world: this, vaultDB, maxMillisSinceRefresh: millisOf(vaultRefreshMinutes, DefaultRefreshMillis), onBadNews })
     if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
     Object.freeze(this)
   }

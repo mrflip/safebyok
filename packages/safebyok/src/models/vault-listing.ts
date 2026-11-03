@@ -1,19 +1,22 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
+import { omit } from 'es-toolkit'
 import { makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
-import { Listing } from './listing'
+import type { Notice } from '../storage/vault-db-new'
+import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
+import { type DelTombstone, Listing } from './listing'
 import { Gate } from './gate'
 import type { PassphraseProving } from './proving'
-import { type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Store, type Times, type VaultRecord, type VaultSparse, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
+import { type Dna, type Fetched, type LeaseDeviceDB, type LeaseGrantOpts, type ListingOpts, type ListingWorld, type ProofClosure, type ProvingWorld, type Revision, type Times, type VaultRecord, type VaultSparse, FirstGateEpoch, VaultFormat, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type VaultSnapshot, Vault } from './vault'
 
-// == [Given to a vault listing]: VaultWorld, VaultStore, VaultDna, VaultListingOpts
+// == [Given to a vault listing]: VaultWorld, VaultDna, VaultListingOpts
 
 /** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Its lease verbs take the vault's scope; `vault.leaseDBFriend()` binds it. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
@@ -23,13 +26,10 @@ export type VaultWorld = ListingWorld & ProvingWorld & {
   deviceDB:    LeaseDeviceDB
 }
 
-/** The vaultDB's vault verbs, as this listing calls them. */
-export type VaultStore = Store<VaultScope, VaultRecord, VaultSparse>
-
 /** The dna of a vault: its scope. A gate it carries is ignored: the gate of a vault drafted is the one `create` makes from its `proofClosure`. */
 export type VaultDna = Dna<VaultScope, VaultRecord>
 
-export type VaultListingOpts = ListingOpts<VaultScope, VaultRecord, VaultSparse> & { world: VaultWorld }
+export type VaultListingOpts = ListingOpts & { world: VaultWorld }
 // --
 
 // == [VaultListing]
@@ -86,7 +86,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     const checked = MSX.vaultBuildArgs.parse({ proofClosure })
     const sparse: VaultSparse = { ...dna, fmt: VaultFormat, am: 'a', vault_tok: makeLifeTok() }
     const { gate, proving } = await Gate.build(MSX.vaultStamp.parse(sparse), checked.proofClosure, this.world)
-    return { draft: { ...sparse, gate: gate.pickle() }, proving }
+    return { draft: { ...sparse, am: 'a', gate: { ...gate.pickle(), gate_epoch: FirstGateEpoch } }, proving }
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
@@ -97,12 +97,19 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new VaultError('absent_vault', Phrases.vaultAbsent(scope.vaultlabel))
   }
 
-  /** The record `meta.vault_stored` carries, where it is a record of these forms; else null. */
-  protected storedInStaleRefusal(err: VaultError): Fetched<VaultRecord, VaultSparse> | null {
-    const stored: unknown = err.meta?.vault_stored
-    const full = vaultRecord.safeParse(stored)
-    return full.success ? full.data : null
+  /** The vault row alone: the boxes `getVault` lists with it are the vault's box listing's to take. */
+  protected async tryGetRow(scope: VaultScope) {
+    const answer = await this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' })
+    return (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_records']) } : answer
   }
+
+  protected tryPutRow(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts) }
+
+  protected tryDelRow(tombstone: DelTombstone<VaultSparse>, opts: DelOpts) { return this.vaultDB.tryDelVault(tombstone, opts) }
+
+  protected watchRows(onNotice: (notice: Notice) => void): () => void { return this.vaultDB.watch(this.world.scope, onNotice) }
+
+  protected isOwnRow(row: VaultRow | BoxRow): row is VaultRow { return ! ('boxlabel' in row) }
   // --
 }
 // --

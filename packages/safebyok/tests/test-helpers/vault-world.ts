@@ -1,13 +1,15 @@
-/** The test world of a vault listing in `src/models/`: a vaultDB of one row, a device cache that keeps nothing, a deviceDB that keeps one lease, and a clock the test moves. */
+/** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a device cache that keeps nothing, a deviceDB that keeps one lease, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
 import type { VaultScope } from '../../src/shapes/scopes'
 import type { BoxWorld } from '../../src/models/box-listing'
 import type { Lease } from '../../src/models/lease'
-import type { ProofClosure, VaultRecord, VaultSparse } from '../../src/models/models-shapes'
+import type { GateProps, ProofClosure, VaultRecord } from '../../src/models/models-shapes'
+import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, Proving } from '../../src/models/proving'
 import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { quietLogger } from './logging'
 import { passkeyOf, testDeriver } from './builders'
 
@@ -27,6 +29,9 @@ export const byPassphrase = (passphrase: string) => () => ({ passphrase })
 
 /** The proof closure of a user who touches the passkey `tag` names, its answer as `passkeyOf` makes it. */
 export const byPasskey = (tag: string) => async () => ({ passkeyAnswer: await passkeyOf(tag) })
+
+/** The wayins of a stored gate, as `gate.pickle()` gives them: a `Gate` carries no `gate_epoch`. */
+export const wayinsOf = ({ passphrase_wayin, passkey_wayin }: GateProps): GateProps => ({ passphrase_wayin, passkey_wayin })
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
@@ -59,7 +64,6 @@ export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: Partial<VaultWorld> = {}) => {
-  let stored = stored0
   let now = T0
   const deviceDB = makeDeviceDB()
   const world: VaultWorld = {
@@ -75,17 +79,11 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     deviceDB:     deviceDB as unknown as VaultWorld['deviceDB'],
     ...worldOverrides,
   }
-  const answerOf = (scope: VaultScope, val: VaultRecord | VaultSparse | null) => ({ scope, ok: true as const, val, world: null })
-  const opts: VaultListingOpts = {
-    world,
-    store: {
-      get:   (scope) => Promise.resolve(answerOf(scope, stored)),
-      put:   (record) => { stored = record; return Promise.resolve(answerOf(record, record)) },
-      del:   () => Promise.reject(new Error('not in these tests')),
-      watch: () => nothing,
-    },
-    maxMillisSinceRefresh: 10 * 60_000,
-  }
+  const vaultDB = new MemoryVaultDB({ clock: world.clock })
+  const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
+  if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
+  const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
+  const opts: VaultListingOpts = { world, vaultDB, maxMillisSinceRefresh: 10 * 60_000 }
   const makeListing = (): VaultListing => {
     const made = new VaultListing(opts)
     madeListings.push(made)
@@ -94,16 +92,19 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   const listing = makeListing()
   /** Another device's put of `record`, landing in the vaultDB behind this one's back, at the next revision. */
   const storeBehindOurBack = (record: VaultRecord): VaultRecord => {
-    stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
+    const stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
+    vaultrows.set(Dna.vaultlabel, stored)
     return stored
   }
+  /** Lay `record` in the vaultDB as it is, as a restore from an older copy does. */
+  const restoreRow = (record: VaultRecord | VaultTombstone): void => { vaultrows.set(Dna.vaultlabel, record) }
   const demandStored = (): VaultRecord => {
+    const stored = storedNow()
     if (stored === null) { throw new Error('nothing stored') }
     return stored
   }
   return {
-    listing, opts, deviceDB, storeBehindOurBack, demandStored,
-    storedNow:      () => stored,
+    listing, opts, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
     anotherSession: makeListing,
     /** Move the clock on by `millis`; no timer fires. */
@@ -148,7 +149,7 @@ export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: str
   return passphraseProving
 }
 
-/** `vault` as its boxes see it, but that it takes no world: the models world's fake store answers with none. */
+/** `vault` as its boxes see it, but that it takes no world. */
 export const boxWorldOf = (vault: Vault): BoxWorld => ({
   clock:        vault.clock,
   scope:        vault.scope,

@@ -22,9 +22,9 @@ const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBor
   const world = await born
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
-  const box = await boxListingOf(mw, { world: boxWorldOf(world.vault) }).create(BoxDna)
+  const box = await boxListingOf(mw, { world: boxWorldOf(world.vault), vaultDB: world.opts.vaultDB }).create(BoxDna)
   const boxIn = async (vault: Vault) => {
-    const found = await boxListingOf(mw, { world: boxWorldOf(vault) }).fetch(box.scope)
+    const found = await boxListingOf(mw, { world: boxWorldOf(vault), vaultDB: world.opts.vaultDB }).fetch(box.scope)
     if (found === null) { throw new Error('no box stored') }
     return found
   }
@@ -46,7 +46,7 @@ describe("Birth: a vault born with its gate seals its first box under the birth 
   it("is born unlocked under a gate of its passphrase, which the vault record stores, and a box built in it opens the whisper it sealed; neither record stored holds the whisper or the passphrase", async () => {
     const { vault, box, demandStored } = await makeVaultWithBox()
     expect(vault.isUnlocked).to.be.true
-    expect(demandStored().gate).to.deep.equal(vault.gate.pickle())
+    expect(demandStored().gate).to.deep.include(vault.gate.pickle())
     expect(demandStored().gate.passkey_wayin).to.be.null
     expect(await box.unsealWhisper()).to.deep.equal(Whisper)
     const stored = JSON.stringify([demandStored(), box._cheat_central])

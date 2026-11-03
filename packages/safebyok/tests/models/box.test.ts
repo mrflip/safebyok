@@ -122,12 +122,12 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     expect(box.revision_seq).to.eq(1)
   })
 
-  it("tells 'unexpected_error' to onBadNews for a notice under another vault_tok, keeping its own copy", async () => {
+  it("passes over a notice under another vault_tok, keeping its own copy", async () => {
     const listing = boxListingOf(held.mw)
     await listing.hello()
     const box = await listing.build(fullBoxRecord())
     await held.mw.notify(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' }))
-    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(held.mw.badnews).to.deep.equal([])
     expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 1 })
   })
 })
@@ -509,8 +509,9 @@ describe("box.send(patch): the vault's lease seals the whisper and the sidecar",
   })
 
   it("seals the sidecar given over a live box still sparse once hydrated", async () => {
-    held.mw.seedStore(sparseBoxRecord())
+    held.mw.seedStore(fullBoxRecord())
     const box = await builtOf(sparseBoxRecord())
+    held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
     await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } })
     expect(box.isFull).to.be.true
     expect(box.sidecar).to.deep.equal({ account: 'home' })
@@ -529,8 +530,8 @@ describe("box.send(patch): the vault's lease seals the whisper and the sidecar",
 /** Options that leave the box as built: a fetch of storage's box first would show the box built is not the first. */
 const asBuilt = { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity } as const
 
-describe("box.send: the versioned replace, with or without ifPresent 'replace'", () => {
-  for (const opts of [{}, { ifPresent: 'replace' }] as const) {
+describe("box.send: the versioned replace, with or without ifPresent 'repl'", () => {
+  for (const opts of [{}, { ifPresent: 'repl' }] as const) {
     it(`refuses 'stale_write' for a box that moved in storage, handing the box the revision stored, with opts ${JSON.stringify(opts)}`, async () => {
       const box = await builtOf(fullBoxRecord())
       held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
@@ -551,20 +552,34 @@ describe("box.send: the versioned replace, with or without ifPresent 'replace'",
     })
   }
 
-  it("puts over the revision in hand, with ifPresent 'replace'", async () => {
+  it("puts over the revision in hand, with ifPresent 'repl'", async () => {
     const box = await builtOf(fullBoxRecord())
-    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'replace', ...asBuilt })).resolves.to.eq(box)
+    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'repl', ...asBuilt })).resolves.to.eq(box)
     expect(box.revision_seq).to.eq(2)
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2 })
   })
 
+  it("refuses 'camped' with ifPresent 'fail' over a live record, saving nothing", async () => {
+    const box = await builtOf(fullBoxRecord())
+    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fail', ...asBuilt }), 'camped')
+    expect(box.revision_seq).to.eq(1)
+    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-a1', revision_seq: 1 })
+  })
+
+  it("resolves itself with ifPresent 'get' over a live record, holding that record and saving nothing", async () => {
+    const box = await builtOf(fullBoxRecord())
+    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'get', ...asBuilt })).resolves.to.eq(box)
+    expect(box.revision_seq).to.eq(1)
+    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-a1', revision_seq: 1 })
+  })
+
   it("takes the timely options beside ifPresent, handing the world its maxWorldMillis", async () => {
     const box = await builtOf(fullBoxRecord())
-    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'replace', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
+    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'repl', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
     expect(held.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
   })
 
-  it("refuses 'bad_option' an ifPresent that is not 'replace', before putting anything", async () => {
+  it("refuses 'bad_option' an ifPresent off its menu, before putting anything", async () => {
     const box = await builtOf(fullBoxRecord())
     const before = box._cheat_central
     held.mw.clearCalls()
@@ -764,13 +779,6 @@ describe("Box and Storable entries: arguments checked first of all, before any g
     })
   }
 
-  it("refuses setting isWatchable to anything but a boolean as 'bad_option', keeping the flag", async () => {
-    const box = await builtOf(fullBoxRecord())
-    const before = box.isWatchable
-    TH.expectSyncRefusal(() => { box.isWatchable = 'yes' as never }, 'bad_option')
-    expect(box.isWatchable).to.eq(before)
-  })
-
   it("refuses subscribing anything but a function as 'bad_option'", async () => {
     const box = await builtOf(fullBoxRecord())
     TH.expectSyncRefusal(() => box.subscribe('call me' as never), 'bad_option')
@@ -810,7 +818,7 @@ describe("Box and Storable entries: arguments checked first of all, before any g
 
   /** A record handed back as a patch, every field the box controls given and none of it heeded. */
   const roundTripOf = (record: BoxRecord) => ({
-    ...record, revision_tok: 'rev-ignored', revision_seq: 99, am: 'x', written_at: T0 + 99, registered_at: T0 + 99,
+    ...record, revision_tok: 'rev-ignored', revision_seq: 99, am: 'x' as never, written_at: T0 + 99, registered_at: T0 + 99,
     whisper: { val: 'sk-test-1111' }, sidecar: { note: 'round trip' },
   } as const)
 

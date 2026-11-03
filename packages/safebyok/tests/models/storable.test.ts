@@ -229,7 +229,7 @@ const Centrals: Readonly<Record<RecordShape, () => Rec>> = {
 
 /** A record storage delivers, by shape, at the revision given; a full one carries a sidecar of its own. */
 const rcvdOf = (shape: RecordShape, rev: Partial<BoxSparse>): Rec => {
-  if (shape === 'full')   { return fullBoxRecord({ ...rev, sidecar: { note: 'delivered' } }) }
+  if (shape === 'full')   { return fullBoxRecord({ ...rev, am: 'a', sidecar: { note: 'delivered' } }) }
   if (shape === 'sparse') { return sparseBoxRecord(rev) }
   return tombstoneBoxRecord(rev, shape === 'ouch' ? 'd' : 'x')
 }
@@ -847,7 +847,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_tok: 'rev-x2' })
   })
 
-  it("deletes again a thing deleted, at its tombstone's revision; a tombstone at the next revision answered reads 'gone'", async () => {
+  it("deletes again a thing deleted, at its tombstone's revision, which stays", async () => {
     const { box } = await timelyBoxOf()
     await box.del()
     const tombstone = box._cheat_central
@@ -855,7 +855,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     await expect(box.del()).resolves.to.eq(box)
     const [del] = held.mw.callsOf('del')
     expect(del?.priorRevisionTok).to.equal(tombstone.revision_tok)
-    expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq + 1 })
+    expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq })
   })
 
   it("deletes again a thing deleted; the same tombstone answered reads 'same'", async () => {
@@ -872,9 +872,9 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
   it("deletes a damaged thing at the ouchstone's revision", async () => {
     const listing = boxListingOf(held.mw)
     const ouchstone = held.mw.tombstoneBoxRecord({ revision_seq: 3, revision_tok: 'rev-d3' }, 'd')
-    held.mw.seedStore(ouchstone)
     const box = await listing.build(ouchstone)
     held.mw.clearCalls()
+    held.mw.willDel(({ scope }) => held.mw.answerOf(scope, held.mw.tombstoneBoxRecord({ revision_seq: 4, revision_tok: 'rev-x4' })))
     await expect(box.del()).resolves.to.eq(box)
     expect(held.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-d3')
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: 4 })

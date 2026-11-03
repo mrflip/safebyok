@@ -5,7 +5,7 @@ import { type BadOutcome, type GoodOutcome, outcomeOf } from '../outcome'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import * as Refuse from './vault-db-refusals'
 import * as VS from './vault-db-shapes'
-import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DelOpts, Gate, IfAbsentOpts, IfPresent, PutOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
+import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, IfPresent, PutOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
 
 // == [Answers]: AnswerFacts, GoodAnswer, BadAnswer, Answer, Said, BankListed, VaultListed, Tidied, Notice, answerOf
 
@@ -25,8 +25,8 @@ export type DelAct = 'deleted' | 'gone' | 'void'
 
 type Said<ValT, ActT extends string, WorldT> = { act: ActT, val: ValT, world: WorldT, dbhas?: unknown }
 
-export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_records: VaultSparse[] }
-export type VaultListed = VaultRecord & { boxes: BoxSparse[], damaged_records: BoxSparse[] }
+export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_records: DamagedVault[] }
+export type VaultListed = VaultRecord & { boxes: BoxSparse[], damaged_records: DamagedBox[] }
 export type Tidied      = { totalCount: number }
 
 /** A row that changed, as a watch hears it. Nothing may count on hearing one. */
@@ -344,10 +344,7 @@ const adapted = async <ValT>(thunk: () => Awaitable<ValT>): Promise<ValT> => {
   try { return await thunk() } catch (err) { throw (isVaultError(err) ? err : Refuse.storageError(err)) }
 }
 
-const unreadableRowOf = (raw: unknown, ownFormat: number): VaultError => {
-  const peek = VS.fmtPeek.safeParse(raw)
-  return (peek.success && (peek.data.fmt > ownFormat)) ? Refuse.newerFormat() : Refuse.damagedRecord()
-}
+const unreadableRowOf = (raw: unknown, ownFormat: number): VaultError => (VS.isNewerFormat(raw, ownFormat) ? Refuse.newerFormat() : Refuse.damagedRecord())
 
 const vaultRowOf = (raw: unknown): VaultRow | null => {
   if (raw === null) { return null }

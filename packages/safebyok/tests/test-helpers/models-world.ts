@@ -1,4 +1,4 @@
-/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a fake vaultDB store, one log of every call made to them, and the builders of the records they hold.
+/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a {@link TestableVaultDB} over one live vault row, one log of every call made to them, and the builders of the records they hold.
  * Import it directly, not through `TH`: `src/models/` is not exported, and the door
  * `tests/test-helpers.ts` is published as `safebyok/testing`.
  *
@@ -18,17 +18,22 @@
  */
 
 import { afterEach, beforeEach, vi } from 'vitest'
-import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
-import { BoxListing, type BoxDna, type BoxLease, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Fetched, type LockState, type Notice, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import { BoxListing, type BoxDna, type BoxLease, type BoxListingOpts, type BoxWorld } from '../../src/models/box-listing'
+import type { ListingAnswer } from '../../src/models/listing'
+import { type BoxRecord, type BoxSparse, type Fetched, type LockState, type Tombstone, BoxFormat } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
-import * as Refusals from '../../src/refusals'
+import type * as FX from '../../src/shapes/fields'
 import * as CX from '../../src/shapes/scopes'
 import type { Boxscope } from '../../src/shapes/scopes'
 import { stableJsonify } from '../../src/stable-jsonify'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import type { Notice } from '../../src/storage/vault-db-new'
+import * as Refuse from '../../src/storage/vault-db-refusals'
+import * as VS from '../../src/storage/vault-db-shapes'
+import type { BoxQuery, BoxRow, BoxTombstone, DelOpts, IfAbsentOpts, PutOpts, ReqParams, Revision, VaultRecord, WatchScope } from '../../src/storage/vault-db-shapes'
 import { fakeCiphered } from './builders'
 
 // == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord
@@ -38,6 +43,23 @@ export const T0 = 1_700_000_000_000
 
 /** The vault's scope and `vault_tok` that {@link makeModelsWorld} gives its world, and the builders below give their records. */
 const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
+
+/** The one live vault row of every world, which a box verb demands. */
+export const worldVaultRow = (): VaultRecord => ({
+  ...WorldVault.scope,
+  fmt:           VS.VaultFormat,
+  vault_tok:     WorldVault.vault_tok,
+  am:            'a',
+  revision_tok:  'rev-world',
+  revision_seq:  0,
+  registered_at: T0,
+  written_at:    T0,
+  gate:          {
+    gate_epoch:       1,
+    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA' as FX.PassphraseSalt, device_id: 'd1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
+    passkey_wayin:    null,
+  },
+})
 
 /** A full box record that passes `boxRecord`, in {@link WorldVault}: revision 1 of the box `anthropic_api_key`, of the life `box-tok-a`, alive, registered and written at {@link T0}, its sealed parts the fake ciphered bags that open under no key. `overrides` says otherwise.
  *
@@ -79,26 +101,25 @@ export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse =
 export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' | 'x' = 'x'): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am })
 // --
 
-// == [Calls and answers]: ModelsCall, Scripted, BoxAnswer
+// == [Calls and answers]: ModelsCall, Scripted, BoxAnswer, ModelsWatch
 
-/** One call made to the world or the store, as {@link ModelsWorld.calls} logs it, in the order made. */
+/** One call made to the world or the vaultDB, as {@link ModelsWorld.calls} logs it, in the order made. `priorRevisionTok` is null for a birth, over {@link VS.NeverStored}. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'takeWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
-  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null }
+  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifPresent: PutOpts['ifPresent'] }
   | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
-  | { verb: 'watch',        onNotice: (notice: Notice<BoxRecord, BoxSparse>) => Promise<void>, fullFor: () => readonly Boxscope[] }
+  | { verb: 'watch',        onNotice: (notice: Notice) => void }
   | { verb: 'unwatch' }
 
-/** The answer of a scripted call: the answer itself, or a function of the call that makes it (or throws, or rejects). Whatever it answers is handed to the listing as it is, a malformed answer too. */
-export type Scripted<CallT> = object | null | undefined | ((call: CallT) => unknown)
+/** The answer of a scripted call: the answer itself, or a function of the call that makes it (or throws, or rejects). */
+export type Scripted<CallT> = BoxAnswer | ((call: CallT) => unknown)
 
-/** The answer of a store call: the `Answer` for boxes. */
-export type BoxAnswer = Awaited<ReturnType<BoxStore['get']>>
+export type BoxAnswer = ListingAnswer<BoxRecord, BoxSparse>
 
-/** A watch the listing started: the callbacks it gave, and whether it is still live. */
-export type ModelsWatch = { onNotice: (notice: Notice<BoxRecord, BoxSparse>) => Promise<void>, fullFor: () => readonly Boxscope[], active: boolean }
+/** A watch the listing started: the callback it gave, and whether it is still live. */
+export type ModelsWatch = { onNotice: (notice: Notice) => void, active: boolean }
 // --
 
 // == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
@@ -117,30 +138,22 @@ export type ModelsWorldOpts = {
   fakeTimers?:  boolean
 }
 
-/** The fake vault and store of one box listing, with their calls and the means to script them.
- * By default the store answers as a store that keeps what it is given: `get` answers the record
- * seeded under the boxlabel, or null; `put` keeps the record and answers it; `del` keeps and
- * answers a tombstone at the revision after the one stored, under a fresh tok (revision 0 over no
- * row); `watch` does as it is told. `put` and `del` enforce the versioned replace as
- * the `Store` doc block states it, case by case: over another tok than `priorRevisionTok` (any row, for
- * `priorRevisionTok` null), 'stale_write' carrying the row; over no row with a `priorRevisionTok`, 'stale_write'
- * carrying nothing; a put's `revision_seq` unfit for `priorRevisionTok`, or other than the row's + 1,
- * 'bad_record'. A put that lands is kept exactly as given.
- * Each `will...` queues an answer for the next call of its verb, one answer per call, then back to
- * the default.
+/** The fake vault and the vaultDB of one box listing, with their calls and the means to script them.
+ * By default the vaultDB answers as a {@link MemoryVaultDB} does. Each `will...` queues an answer for
+ * the next call of its verb, one answer per call, then back to the default.
  */
 export type ModelsWorld = {
   /** The vault, as the listing is given it. */
   world:  BoxWorld
-  store:  BoxStore
-  /** Every call made to the world and the store, in order, oldest first. A live array. */
+  vaultDB: TestableVaultDB
+  /** Every call made to the world and the vaultDB, in order, oldest first. A live array. */
   calls:  readonly ModelsCall[]
   /** The refusals the listing told its `onBadNews`, oldest first. A live array. */
   badnews: readonly VaultError[]
   /** The `onBadNews` {@link boxListingOf} gives the listing: it logs into `badnews`. */
   onBadNews: (news: VaultError) => void
-  /** The records the store keeps, by boxlabel: the one vault's boxes. */
-  stored: Map<string, Fetched<BoxRecord, BoxSparse>>
+  /** The vaultDB's own box rows, by boxlabel: the one vault's boxes. */
+  stored: Map<string, unknown>
 
   /** Every watch started, oldest first. A live array. */
   watches: readonly ModelsWatch[]
@@ -160,28 +173,24 @@ export type ModelsWorld = {
   /** End the watches and put real timers back. Call it in `afterEach`. */
   dispose(): void
 
-  /** Keep `record` in the store as the one under its boxlabel. */
+  /** Lay `record` in the vaultDB as the row under its boxlabel, unchecked. */
   seedStore(record: Fetched<BoxRecord, BoxSparse>): void
 
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
-  willPut(...answers: readonly Scripted<{ record: BoxRecord, priorRevisionTok: string | null }>[]): void
+  willPut(...answers: readonly Scripted<PutCall>[]): void
   willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
   willEnsureTimely(...thunks: readonly ((maxMillis: number | undefined) => Promise<void> | void)[]): void
 
   /** The good answer about `scope`: `val` is the record stored, null for none. */
   answerOf(scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world?: unknown): BoxAnswer
-  /** The refused answer about `scope`. */
-  refusalOf(scope: Boxscope, err: VaultError, world?: unknown): BoxAnswer
-  /** The `stale_write` refusal about `scope` carrying what storage holds as `meta.box_stored`: a record, full or sparse, or null; `undefined` leaves `meta` out. */
+  /** The refused answer about `scope`; `dbhas` is the row it carries. */
+  refusalOf(scope: Boxscope, err: VaultError, world?: unknown, dbhas?: unknown): BoxAnswer
+  /** The `stale_write` refusal about `scope` carrying what storage holds as `dbhas`: a record, or null; `undefined` leaves it out. */
   staleWriteOf(scope: Boxscope, stored: Fetched<BoxRecord, BoxSparse> | null | undefined, world?: unknown): BoxAnswer
 
-  /** Push `record` through the live watch as a notice, resolving once the listing has delivered it. Throws where no watch is live. */
+  /** Push `record` through the live watch as a notice, under the world's vault row unless told otherwise, resolving once the listing has delivered it. Throws where no watch is live. */
   notify(record: Fetched<BoxRecord, BoxSparse>, world?: unknown): Promise<void>
-  /** Push `notice`, whatever it is, through the live watch: for a malformed one. */
-  notifyRaw(notice: unknown): Promise<void>
-  /** The scopes the live watch asks full records for now. Throws where no watch is live. */
-  watchedScopes(): readonly Boxscope[]
 
   /** {@link fullBoxRecord}, in this world's vault. */
   fullBoxRecord(overrides?: Partial<BoxRecord>): BoxRecord
@@ -200,11 +209,67 @@ class Script<CallT> {
   take(call: CallT): { scripted: boolean, answer: unknown } {
     if (this.#queue.length === 0) { return { scripted: false, answer: undefined } }
     const next = this.#queue.shift()
-    return { scripted: true, answer: typeof next === 'function' ? (next as (call: CallT) => unknown)(call) : next }
+    return { scripted: true, answer: typeof next === 'function' ? next(call) : next }
   }
 }
 
-/** Make a fake vault and store for a {@link BoxListing}, with the calls they log and the means to script them.
+type GetCall = { scope: Boxscope }
+type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifPresent: PutOpts['ifPresent'] }
+type DelCall = { scope: Boxscope, priorRevisionTok: string | null }
+
+/** The `revision_tok` a call goes over: null for a birth. */
+const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === VS.NeverStoredTok) ? null : revision_tok)
+
+/** A {@link MemoryVaultDB} whose box verbs and watch log each call, and answer what a test scripts in place of their own. */
+export class TestableVaultDB extends MemoryVaultDB {
+  readonly #calls:   ModelsCall[]
+  readonly #watches: ModelsWatch[]
+  readonly scripts = { get: new Script<GetCall>(), put: new Script<PutCall>(), del: new Script<DelCall>() }
+
+  constructor(calls: ModelsCall[], watches: ModelsWatch[], now: () => number) {
+    super({ clock: { now } })
+    this.#calls = calls
+    this.#watches = watches
+  }
+
+  override async tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts) {
+    const scope = CX.boxscope.parse(asked)
+    this.#calls.push({ verb: 'get', scope })
+    const { scripted, answer } = this.scripts.get.take({ scope })
+    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryGetBox']>>) : super.tryGetBox(asked, opts)
+  }
+
+  override async tryPutBox(record: BoxRecord, opts: PutOpts) {
+    const call: PutCall = { record, priorRevisionTok: priorTokOf(opts.prior), ifPresent: opts.ifPresent }
+    this.#calls.push({ verb: 'put', ...call })
+    const { scripted, answer } = this.scripts.put.take(call)
+    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryPutBox']>>) : super.tryPutBox(record, opts)
+  }
+
+  override async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) {
+    const call: DelCall = { scope: CX.boxscope.parse(tombstone), priorRevisionTok: priorTokOf(opts.prior) }
+    this.#calls.push({ verb: 'del', ...call })
+    const { scripted, answer } = this.scripts.del.take(call)
+    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelBox']>>) : super.tryDelBox(tombstone, opts)
+  }
+
+  override watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
+    const watch: ModelsWatch = { onNotice, active: true }
+    this.#calls.push({ verb: 'watch', onNotice })
+    this.#watches.push(watch)
+    const unwatch = super.watch(scope, onNotice)
+    return () => {
+      this.#calls.push({ verb: 'unwatch' })
+      watch.active = false
+      unwatch()
+    }
+  }
+}
+
+const factsOf = (scope: Boxscope) => ({ meta: { call: 'scripted' }, req_params: scope as ReqParams })
+const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ ok: true, val, world, act: 'got', ...factsOf(scope) })
+
+/** Make a fake vault and a vaultDB for a {@link BoxListing}, with the calls they log and the means to script them.
  * Pass the result to {@link boxListingOf}.
  *
  * @example
@@ -227,21 +292,12 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const calls: ModelsCall[] = []
   const badnews: VaultError[] = []
   const watches: ModelsWatch[] = []
-  const stored = new Map<string, Fetched<BoxRecord, BoxSparse>>()
-  const scripts = {
-    get:          new Script<{ scope: Boxscope }>(),
-    put:          new Script<{ record: BoxRecord, priorRevisionTok: string | null }>(),
-    del:          new Script<{ scope: Boxscope, priorRevisionTok: string | null }>(),
-    ensureTimely: new Script<number | undefined>(),
-  }
+  const vaultDB = new TestableVaultDB(calls, watches, clockNow)
+  vaultDB._cheat_vaultRowsOf(WorldVault.scope).set(WorldVault.scope.vaultlabel, worldVaultRow())
+  const stored = vaultDB._cheat_boxRowsOf(WorldVault.scope, WorldVault.vault_tok)
+  const ensureTimelyScript = new Script<number | undefined>()
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
-  const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ scope, ok: true, val, world })
-  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null): BoxAnswer => ({ scope, ok: false, err, world })
-  /** The 'stale_write' a put or del over `priorRevisionTok` meets where `held` is stored, or null where it may land: over no row with a `priorRevisionTok`, carrying nothing; over a row under another tok, carrying it. */
-  const casRefusalOf = (scope: Boxscope, held: Fetched<BoxRecord, BoxSparse> | undefined, priorRevisionTok: string | null): BoxAnswer | null => {
-    if (held === undefined) { return priorRevisionTok === null ? null : refusalOf(scope, new VaultError('stale_write', Refusals.StaleBoxMessage)) }
-    return held.revision_tok === priorRevisionTok ? null : refusalOf(scope, Refusals.staleBox(held))
-  }
+  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.refusalkind, ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
 
   // The fake lease: the bytes sealed, by the stamp they were sealed under.
   const sealedBytes = new Map<string, Uint8Array>()
@@ -270,57 +326,8 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
     ensureTimely: async (maxMillis) => {
       calls.push({ verb: 'ensureTimely', maxMillis })
-      const { scripted, answer } = scripts.ensureTimely.take(maxMillis)
+      const { scripted, answer } = ensureTimelyScript.take(maxMillis)
       if (scripted) { await answer }
-    },
-  }
-
-  const store: ModelsWorld['store'] = {
-    get: async (scope) => {
-      calls.push({ verb: 'get', scope })
-      const { scripted, answer } = scripts.get.take({ scope })
-      if (scripted) { return (await answer) as BoxAnswer }
-      return answerOf(scope, stored.get(scope.boxlabel) ?? null)
-    },
-    put: async (record, priorRevisionTok) => {
-      calls.push({ verb: 'put', record, priorRevisionTok })
-      const { scripted, answer } = scripts.put.take({ record, priorRevisionTok })
-      if (scripted) { return (await answer) as BoxAnswer }
-      const held = stored.get(record.boxlabel)
-      const scope = CX.boxscope.parse(record)
-      const fitsPriorRevisionTok = priorRevisionTok === null ? record.revision_seq === 0 : record.revision_seq > 0
-      if (! fitsPriorRevisionTok) { return refusalOf(scope, new VaultError('bad_record', Phrases.PutUnfitForPrior)) }
-      const refused = casRefusalOf(scope, held, priorRevisionTok)
-      if (refused !== null) { return refused }
-      if (held !== undefined && record.revision_seq !== held.revision_seq + 1) { return refusalOf(scope, new VaultError('bad_record', Phrases.PutUnfitForPrior)) }
-      stored.set(record.boxlabel, record)
-      return answerOf(scope, record)
-    },
-    del: async (scope, priorRevisionTok) => {
-      calls.push({ verb: 'del', scope, priorRevisionTok })
-      const { scripted, answer } = scripts.del.take({ scope, priorRevisionTok })
-      if (scripted) { return (await answer) as BoxAnswer }
-      const held = stored.get(scope.boxlabel)
-      const refused = casRefusalOf(scope, held, priorRevisionTok)
-      if (refused !== null) { return refused }
-      const tombstone = tombstoneBoxRecord({
-        ...scope,
-        ...(held !== undefined && sparseOf(held)),
-        revision_tok: randomId(),
-        revision_seq: (held?.revision_seq ?? NeverStoredSeq) + 1,
-        written_at:   clockNow(),
-      })
-      stored.set(scope.boxlabel, tombstone)
-      return answerOf(scope, tombstone)
-    },
-    watch: (onNotice, fullFor) => {
-      const watch: ModelsWatch = { onNotice, fullFor, active: true }
-      calls.push({ verb: 'watch', onNotice, fullFor })
-      watches.push(watch)
-      return () => {
-        calls.push({ verb: 'unwatch' })
-        watch.active = false
-      }
     },
   }
 
@@ -328,6 +335,11 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     const live = watches.findLast((watch) => watch.active)
     if (live === undefined) { throw new Error('No watch is live: the listing has not started one, or has ended it.') }
     return live
+  }
+
+  /** Every microtask a notice set going has run, under fake timers or real. */
+  const settled = async (): Promise<void> => {
+    if (fakeTimers) { await vi.advanceTimersByTimeAsync(0) } else { await new Promise((resolve) => { setTimeout(resolve, 0) }) }
   }
 
   const setNow = (ms: number): void => {
@@ -340,7 +352,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, store, calls, badnews, stored, watches,
+    world, vaultDB, calls, badnews, stored, watches,
     onBadNews:  (news) => { badnews.push(news) },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0 },
@@ -355,21 +367,23 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
     seedStore: (record) => { stored.set(record.boxlabel, record) },
 
-    willGet:          (...answers) => { scripts.get.push(...answers) },
-    willPut:          (...answers) => { scripts.put.push(...answers) },
-    willDel:          (...answers) => { scripts.del.push(...answers) },
-    willEnsureTimely: (...thunks) => { scripts.ensureTimely.push(...thunks) },
+    willGet:          (...answers) => { vaultDB.scripts.get.push(...answers) },
+    willPut:          (...answers) => { vaultDB.scripts.put.push(...answers) },
+    willDel:          (...answers) => { vaultDB.scripts.del.push(...answers) },
+    willEnsureTimely: (...thunks) => { ensureTimelyScript.push(...thunks) },
 
     answerOf,
     refusalOf,
     staleWriteOf: (scope, storedNow, worldNow = null) => {
-      const err = storedNow === undefined ? new VaultError('stale_write', Refusals.StaleBoxMessage) : Refusals.staleBox(storedNow)
-      return refusalOf(scope, err, worldNow)
+      const err = Refuse.staleWrite(worldVaultRow(), (storedNow ?? null) as BoxRow | null)
+      return refusalOf(scope, err, worldNow, storedNow)
     },
 
-    notify:       (record, worldNow = null) => liveWatch().onNotice({ record, world: worldNow }),
-    notifyRaw:    (notice) => liveWatch().onNotice(notice as Notice<BoxRecord, BoxSparse>),
-    watchedScopes: () => liveWatch().fullFor(),
+    notify: async (record, worldNow = worldVaultRow()) => {
+      const notice = { act: MSX.isTombstone(record) ? 'gone' : 'got', val: record, world: worldNow } as Notice
+      liveWatch().onNotice(notice)
+      await settled()
+    },
 
     fullBoxRecord:      (overrides) => fullBoxRecord(overrides),
     sparseBoxRecord:    (overrides) => sparseBoxRecord(overrides),
@@ -377,9 +391,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     boxscope:           scopeFor,
   }
 }
-
-/** The sparse form of any record the store keeps. */
-const sparseOf = (record: Fetched<BoxRecord, BoxSparse>): BoxSparse => MSX.boxSparse.parse(record)
 
 /** A new {@link makeModelsWorld} before each test, disposed after it. Call it at the top of a test file; `held.mw` is the current test's world, as `mw` in the other examples.
  *
@@ -436,14 +447,14 @@ const testableOf = (box: Box): TestableBox => {
 
 const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null ? null : testableOf(box))
 
-/** A {@link BoxListing} over the world's vault and store, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes.
+/** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes.
  *
  * @example const listing = boxListingOf(mw, { maxMillisSinceRefresh: 1000 })
  */
 export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}): TestableBoxListing => (
   new TestableBoxListing({
     world:                 mw.world,
-    store:                 mw.store,
+    vaultDB:               mw.vaultDB,
     maxMillisSinceRefresh: 10 * 60_000,
     onBadNews:             mw.onBadNews,
     ...overrides,
