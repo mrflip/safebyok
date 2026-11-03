@@ -169,8 +169,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Birth]: launchBirth, runBirth
 
-  /** Build a vault under `scope` through a gating, whose own proving alone is handed the friend.
-   * A vault present in the slot refuses 'bad_option', nobody asked. */
+  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
     if (! MSX.isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
@@ -178,7 +177,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return Gating.launch('build_vault', { listing, scope: checked, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
   }
 
-  /** Past the enter key: the put is the commit, and a vault_tok not the record's is another's vault, left locked. */
+  /** SLOPDOC: Stores the birth record, and unlocks under its passphrase's lease if the vault stored is its own. */
   static async #runBirth(listing: VaultListing, { passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: MSX.Revision): Promise<Vault> {
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null

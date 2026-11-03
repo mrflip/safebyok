@@ -21,7 +21,7 @@ import { type VaultSnapshot, Vault } from './vault'
 
 // == [Given to a vault listing]: VaultWorld, VaultListingOpts
 
-/** The bank, as far as its vaults need it: a {@link ListingWorld}, and what a vault's gate and lease need of it, as `vaultListingOpts` checks it. Each vault's lease friend binds its deviceDB's lease verbs. */
+/** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
   scope:       BankScope
   logger:      VaultLogger
@@ -64,7 +64,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   tryEnsureVault(record: VaultRecord, prior: Revision): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(record, prior)) }
 
-  /** The tombstone a birth under `scope` goes over, or null over none held; refuses 'bad_option' a vault present in the slot. */
+  /** SLOPDOC: The tombstone a birth under `scope` goes over, or null where the slot holds none. */
   demandBirthSlot(scope: VaultScope): Vault | null {
     this.demandEnabled()
     const held = this.at(scope)
