@@ -18,7 +18,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sideca
 /** Box listings whose world is a real vault, born unlocked under `Passphrase`, over its vaultDB. */
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
-  const vault = await buildTyping(vaultWorld.listing, Dna, () => ({ passphrase: Passphrase }))
+  const vault = await buildTyping(vaultWorld.listing, Dna, { passphraseClear: Passphrase })
   const mw = makeModelsWorld({ fakeTimers: false })
   modelsWorlds.push(mw)
   const boxesOf = () => boxListingOf(mw, { world: boxWorldOf(vault), vaultDB: vaultWorld.opts.vaultDB })

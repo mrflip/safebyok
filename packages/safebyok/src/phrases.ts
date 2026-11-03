@@ -352,9 +352,6 @@ export const ProvingOfOtherVault = "The source proving is of another vault: a wa
 /** Why a lease is not granted to a vault other than the one a proving is of. */
 export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds."
 
-/** Why a proof closure's throw is replaced: it heard the passphrase. */
-export const ProofClosureThrew = "The proof closure threw rather than handing back a passphrase. What it threw is left out, as it heard the passphrase."
-
 /** Why a keyDeriver's throw is replaced: it heard the passphrase. */
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
@@ -391,19 +388,13 @@ export const vaultAbsent = (vaultlabel: string): string => `No vault is stored u
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
 
-// == [Models: gates]: GateChangeNeedsPassphrase, GateMovedUnderChange, PasskeyHeldAlready, NoPasskeyToRevoke
-
-/** Why a passkey's answer does not prove a change to the gate. */
-export const GateChangeNeedsPassphrase = "Only the passphrase proves a change to the vault's passphrase or passkey, and this proof handed in a passkey's answer, so nothing more was asked and nothing changed. The passkey still unlocks the vault: prove the change with the passphrase."
-
-/** Why a gate change proved against a record that has since moved is not sent. */
-export const GateMovedUnderChange = "The vault's record was changed elsewhere while this change was being proved, and its passphrase or passkey may have changed with it, so nothing was changed. The vault in hand now holds the newer record: call again to make the change over it."
+// == [Models: gates]: PasskeyHeldAlready, DelOfOtherLife
 
 /** Why a passkey is not added to a gate that holds one. */
 export const PasskeyHeldAlready = "This vault has a passkey already, and holds one at a time, so nothing was asked or changed: revoke it first (vault.revokePasskey), then add the new one."
 
-/** Why revoking a passkey changes nothing where the gate holds none. */
-export const NoPasskeyToRevoke = "This vault has no passkey to revoke: it may have been revoked on another device. Nothing was asked or changed."
+/** Why a stale Vault's delete does not reach the vault made since in its slot. */
+export const DelOfOtherLife = "This Vault was deleted and made anew since it was read, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
 // == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice

@@ -7,7 +7,9 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
 import { fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
-import { Dna, Passphrase, makeVaultWorld, useVaultWorlds, vaultRoundTrip, unlockTyping, buildTyping } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, makeVaultWorld, replaceTyping, useVaultWorlds, vaultRoundTrip, unlockTyping, buildTyping } from '../test-helpers/vault-world'
+import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
+import { passphraseCleartext } from '../../src/shapes/vault'
 
 const held = useModelsWorld()
 useVaultWorlds()
@@ -40,13 +42,10 @@ describe("registered_at over a rebirth", () => {
 // == [Changing the gate]: the passkey stays, other devices stay unlocked, no strength check
 
 const NewPassphrase = 'a new passphrase for the vault'
-const byPassphrase = (passphrase: string) => () => ({ passphrase })
-const byLaptopPasskey = async () => ({ passkeyAnswer: await TH.passkeyOf('laptop') })
 /** A vault created with a passphrase and the laptop's passkey. */
 const bornWithPasskey = async () => {
   const world = makeVaultWorld()
-  const passkeyAnswer = await TH.passkeyOf('laptop')
-  const vault = await buildTyping(world.listing, Dna, () => ({ passphrase: Passphrase, passkeyAnswer }))
+  const vault = await buildTyping(world.listing, Dna, { passphraseClear: Passphrase, passkeyClear: await TH.passkeyOf('laptop') })
   const demandStored = () => {
     const record = world.storedNow()
     if (record === null) { throw new Error('nothing stored') }
@@ -57,11 +56,11 @@ const bornWithPasskey = async () => {
 
 describe("the gate changes the vault sends", () => {
   it("README.md:841, 'A new passphrase removes the passkey with the old one': the passkey wayin is kept as stored, and the passkey still opens", async () => {
-    const { vault, demandStored, opts: { world } } = await bornWithPasskey()
+    const { vault, demandStored } = await bornWithPasskey()
     const { passkey_wayin } = demandStored().gate
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     expect(demandStored().gate.passkey_wayin).to.deep.equal(passkey_wayin)
-    const proving = await vault.gate.attemptProof(byLaptopPasskey, world)
+    const proving = await PasskeyProving.buildStored(vault.gate, await TH.passkeyOf('laptop'))
     expect(proving.wayinkind).to.eq('passkey')
   })
 
@@ -70,7 +69,7 @@ describe("the gate changes the vault sends", () => {
     const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
     const theirs = await other.listing.build(demandStored())
     await unlockTyping(theirs, byPassphrase(Passphrase))
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
     other.storeBehindOurBack(demandStored())
     await theirs.fetch()
     expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
@@ -80,8 +79,8 @@ describe("the gate changes the vault sends", () => {
 
   it("README.md:853, 'each change_passphrase sets -- is put to the vault's strengthChecker first': a one-letter new passphrase is set, as the world carries no checker", async () => {
     const { vault, opts: { world } } = await bornWithPasskey()
-    await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase('x'))
-    const proving = await vault.gate.attemptProof(byPassphrase('x'), world)
+    await replaceTyping(vault, Passphrase, 'x')
+    const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse('x'), world)
     expect(proving.wayinkind).to.eq('passphrase')
   })
 })

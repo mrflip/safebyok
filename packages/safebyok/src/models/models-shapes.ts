@@ -456,39 +456,24 @@ export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
 // --
 
-// == [What a proving is handed]: attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld, gateAttemptArgs, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs, AttemptCleartexts, PassphraseCleartexts, PasskeyCleartexts, AttemptClosure, PassphraseClosure, PasskeyClosure, ProvingWorld, StampedGate
+// == [What a proving is handed]: provingWorld, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate
 
-/** What a proof closure hands in: `attemptCleartexts` at a gate change's proof, a passphrase or a passkey's answer; `passphraseCleartexts` and `passkeyCleartexts` for a gate's new wayin, a new passphrase or a new passkey's answer. */
-export const { attemptCleartexts, passphraseCleartexts, passkeyCleartexts, provingWorld } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer, clockShape, keyDeriverShape, strengthChecker, device_id }) => ({
-  attemptCleartexts:    obj({ passphrase: passphraseCleartext.optional(), passkeyAnswer: passkeyAnswer.nullable().optional() }).strict()
-    .refine(({ passphrase, passkeyAnswer: answer = null }) => passphrase !== undefined || answer !== null, Phrases.ProofMissing),
-  passphraseCleartexts: obj({ passphrase: passphraseCleartext }).strict(),
-  passkeyCleartexts:    obj({ passkeyAnswer: freshPasskeyAnswer }).strict(),
-  provingWorld:         obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
+export const { provingWorld } = Checkers('bad_option', ({ obj, clockShape, keyDeriverShape, strengthChecker, device_id }) => ({
+  provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
 }), [FX, HX, VX])
 
-export type AttemptCleartexts    = Z.input<typeof attemptCleartexts>
-export type PassphraseCleartexts = Z.input<typeof passphraseCleartexts>
-export type PasskeyCleartexts    = Z.input<typeof passkeyCleartexts>
-export type AttemptClosure       = () => AttemptCleartexts | Promise<AttemptCleartexts>
-export type PassphraseClosure    = () => PassphraseCleartexts | Promise<PassphraseCleartexts>
-export type PasskeyClosure       = () => PasskeyCleartexts | Promise<PasskeyCleartexts>
-export type ProvingWorld         = Z.infer<typeof provingWorld>
+export type ProvingWorld = Z.infer<typeof provingWorld>
 
-/** The arguments of the provings' statics and the gate's operations. A `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one; a `gate` is whatever carries a {@link vaultStamp} as `stamp`, and {@link gateProps}, as a `Gate` does. */
-export const { stampedGate, gateAttemptArgs, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, passphraseReplaceArgs, passkeyAddArgs, passkeyRevokeArgs } = Checkers('bad_option', ({ obj, fn, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer }) => {
+/** The arguments of the provings' statics. A `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one; a `gate` is whatever carries a {@link vaultStamp} as `stamp`, and {@link gateProps}, as a `Gate` does. */
+export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer }) => {
   const stampedGate = obj({ stamp: vaultStamp, ...gateProps.shape })
   return {
     stampedGate,
-    gateAttemptArgs:       obj({ proofClosure: fn<AttemptClosure>(), world: provingWorld }),
     passphraseNovelArgs:   obj({ stamp: vaultStamp, passphraseClear: passphraseCleartext, world: provingWorld }),
     passkeyNovelArgs:      obj({ stamp: vaultStamp, passkeyClear: freshPasskeyAnswer, world: provingWorld }),
     passphraseStoredArgs:  obj({ gate: stampedGate, passphraseClear: passphraseCleartext, world: provingWorld }),
     passkeyStoredArgs:     obj({ gate: stampedGate, passkeyClear: passkeyAnswer }),
     strengthArgs:          obj({ passphraseClear: passphraseCleartext, scope: vaultScope, world: provingWorld }),
-    passphraseReplaceArgs: obj({ proofClosure: fn<AttemptClosure>(), passphraseClosure: fn<PassphraseClosure>() }),
-    passkeyAddArgs:        obj({ proofClosure: fn<AttemptClosure>(), passkeyClosure: fn<PasskeyClosure>() }),
-    passkeyRevokeArgs:     obj({ proofClosure: fn<AttemptClosure>() }),
   }
 }, [VX])
 
@@ -573,19 +558,23 @@ export const vaultListingOpts = objCheck(({ obj, fn, int, lit, union }) => ({
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
 
-// == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildClears, vaultUnlockClears, gatingLaunchArgs, GatingKind, ClearsForGatingkind, StrengthChecker
+// == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, GatingKind, ClearsForGatingkind, StrengthChecker
 
-export const gatingKindVals = ['build_vault', 'unlock_vault'] as const
+export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey', 'del_vault'] as const
 
 /** The refusals an attempt leaves its gating open under, for the user to try again. */
 export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
 
 /** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
-export const { gatingkind, vaultBuildClears, vaultUnlockClears } = Checkers('bad_option', ({ oneof, obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer }) => ({
-  gatingkind:        oneof(gatingKindVals),
-  vaultBuildClears:  obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
-  vaultUnlockClears: obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
+export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer }) => ({
+  gatingkind:              oneof(gatingKindVals),
+  vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
+  vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
     .refine(({ passphraseClear, passkeyClear = null }) => passphraseClear !== undefined || passkeyClear !== null, Phrases.ProofMissing),
+  passphraseReplaceClears: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
+  passkeyAddClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
+  passkeyRevokeClears:     obj({ passphraseClear: passphraseCleartext }).strict(),
+  vaultDelClears:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }), [VX])
 
 /** The check of what launches a gating. */
@@ -593,7 +582,14 @@ export const gatingLaunchArgs = objCheck(({ fn }) => ({ gatingkind, scope: vault
 
 export type GatingKind = typeof gatingKindVals[number]
 
-export type ClearsForGatingkind = { build_vault: Z.input<typeof vaultBuildClears>, unlock_vault: Z.input<typeof vaultUnlockClears> }
+export type ClearsForGatingkind = {
+  build_vault:        Z.input<typeof vaultBuildClears>
+  unlock_vault:       Z.input<typeof vaultUnlockClears>
+  replace_passphrase: Z.input<typeof passphraseReplaceClears>
+  add_passkey:        Z.input<typeof passkeyAddClears>
+  revoke_passkey:     Z.input<typeof passkeyRevokeClears>
+  del_vault:          Z.input<typeof vaultDelClears>
+}
 
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --

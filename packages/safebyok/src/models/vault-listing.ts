@@ -8,7 +8,7 @@ import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
 import type { VaultLogger } from '../logger'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { Notice, VaultDB } from '../storage/vault-db-new'
-import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
+import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
 import { alreadyHeldError } from '../helpers/throwers'
 import { BoxListing } from './box-listing'
@@ -91,7 +91,36 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return held
   }
 
-  // == [The one gating open]: openGating, holdGating, releaseGating, declineGatingAtLock, sweep, vacate
+  // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
+
+  /** Lay a new passphrase wayin on the row, and deliver what it stores to the vault held. `params` spread the record the attempt read, so a row moved since refuses 'stale_write', the row stored delivered first. Nothing locks: the vaultKey does not change. */
+  async replacePassphrase(params: ReplacePassphraseParams): Promise<void> {
+    this.demandEnabled()
+    await this.deliver(await this.vaultDB.tryReplacePassphrase(params))
+  }
+
+  /** Lay a passkey wayin on the row, as {@link replacePassphrase} does; one held refuses 'camped'. */
+  async addPasskey(params: AddPasskeyParams): Promise<void> {
+    this.demandEnabled()
+    await this.deliver(await this.vaultDB.tryAddPasskey(params))
+  }
+
+  /** Null the row's passkey wayin, as {@link replacePassphrase} does; with none held, nothing moves. */
+  async revokePasskey(params: RevokePasskeyParams): Promise<void> {
+    this.demandEnabled()
+    await this.deliver(await this.vaultDB.tryRevokePasskey(params))
+  }
+
+  /** Delete the vault `ante` names, over its own revision and not the slot's, its answer delivered; its boxes cascade in the vaultDB. A row moved since refuses 'stale_write', delivered first; `ante` of another life than the slot's refuses 'stale_write', nothing asked of the vaultDB. An entry of a `damaged_records` names that very row, whatever is held. */
+  override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
+    this.demandEnabled()
+    const held = this.at(this.scopeOf(ante))
+    if ((held !== null) && (ante.am !== 'd') && (held.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
+    return this.delOver(this.sparseOf(ante))
+  }
+  // --
+
+  // == [The one gating open]: openGating, holdGating, releaseGating, declineGatingAtLock, declineGatingAtDiscard, sweep, vacate
 
   get openGating(): AnyGating | null { return this.#openGating }
 
@@ -109,14 +138,19 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     if (this.#openGating?.vault === vault) { this.#openGating.declineAtLock() }
   }
 
+  /** `vault` is going away: the open gating settles, if it asks for that vault, whatever its kind. */
+  declineGatingAtDiscard(vault: Vault): void {
+    if (this.#openGating?.vault === vault) { this.#openGating.declineAtDiscard() }
+  }
+
   /** A goodbye settles the open gating too, whatever vault it asks for, once any attempt under way has run. */
   override sweep(): this {
-    this.#openGating?.declineAtLock()
+    this.#openGating?.declineAtDiscard()
     return super.sweep()
   }
 
   override vacate(): this {
-    this.#openGating?.declineAtLock()
+    this.#openGating?.declineAtDiscard()
     return super.vacate()
   }
   // --
@@ -172,7 +206,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** The vault row alone: the boxes `getVault` lists with it are the vault's box listing's to take. */
   protected async tryGetRow(scope: VaultScope) { return vaultRowOf(await this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' })) }
 
-  protected tryPutRow(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts) }
+  /** The vaultDB refuses `repl` on a vault: a record moves only by a gate verb. */
+  protected tryPutRow(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts as PutVaultOpts) }
 
   protected tryDelRow(tombstone: DelTombstone<VaultSparse>, opts: DelOpts) { return this.vaultDB.tryDelVault(tombstone, opts) }
 
@@ -201,9 +236,11 @@ const recordOfBirth = (gate: Gate, prior: Revision, now: number): VaultRecord =>
 )
 // --
 
-// == [Refusals]: vaultAbsent, vaultGone
+// == [Refusals]: vaultAbsent, vaultGone, delOfOtherLife
 
 const vaultAbsent = ({ vaultlabel }: VaultScope): VaultError => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
 
 const vaultGone = (): VaultError => new VaultError('vault_gone', Phrases.VaultDeleted)
+
+const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
 // --

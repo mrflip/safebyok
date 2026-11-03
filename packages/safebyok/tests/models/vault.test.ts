@@ -1,16 +1,15 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
-import * as MSX from '../../src/models/models-shapes'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, buildTyping } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, makeBornVault, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, buildTyping, byPassphrase } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
 describe("VaultListing.buildVault: the gate is built before the vault is born, and stored in the vault record alone", () => {
   it("builds the vault's gate from what the closure answers, and stores the record with it over no record", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, () => ({ passphrase: Passphrase }))
+    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     expect(vault.gate.passphrase_wayin.wayinkind).to.eq('passphrase')
     expect(vault.gate.passkey_wayin).to.be.null
     expect(vault.gate.stamp).to.deep.equal({ ...Dna, vault_tok: vault.vault_tok, registered_at: T0 })
@@ -24,20 +23,21 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(listing.things).to.have.lengthOf(0)
   })
 
-  it("holds no vault where the closure throws: the refusal is the sanitized 'unexpected_error', and a second buildVault is not refused as already held", async () => {
-    const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(buildTyping(listing, Dna, () => { throw new Error("the user closed the dialog") }), 'unexpected_error')
+  it("holds no vault where the dialog throws: the refusal is the sanitized 'unexpected_error', and a second buildVault is not refused as already held", async () => {
+    const { listing, storedNow } = makeVaultWorld(null, { requestCleartext: () => { throw new Error("the user closed the dialog") } })
+    await TH.expectRefusal(listing.buildVault(Dna), 'unexpected_error')
     expect(listing.things).to.have.lengthOf(0)
-    const vault = await buildTyping(listing, Dna, () => ({ passphrase: Passphrase }))
+    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("refuses 'bad_option' a dna for a scope already held, before the closure is asked anything", async () => {
+  it("refuses 'bad_option' a dna for a scope already held, before the dialog is shown", async () => {
     const { listing } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, () => ({ passphrase: Passphrase }))
-    const closure = vi.fn(() => ({ passphrase: Passphrase }))
-    await TH.expectRefusal(buildTyping(listing, Dna, closure), 'bad_option')
-    expect(closure).not.toHaveBeenCalled()
+    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
+    expect(dialog).not.toHaveBeenCalled()
     expect(listing.at(Dna)).to.equal(vault)
   })
 })
@@ -86,7 +86,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
 describe("proving.buildLease(friend): the vault is taken at the grant", () => {
   it("grants the vault whose stamp the proving is of a lease, caching nothing of itself", async () => {
     const { listing, deviceDB } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, () => ({ passphrase: Passphrase }))
+    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const proving = await makeProving(vault)
     deviceDB.tryCache.mockClear()
     const lease = await proving.buildLease(vault.leaseFriend())
@@ -97,7 +97,7 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
 
   it("refuses 'bad_option' a vault of another stamp, before any key is touched", async () => {
     const { listing, deviceDB } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, () => ({ passphrase: Passphrase }))
+    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryCache.mockClear()
     await TH.expectRefusal(proving.buildLease(vault.leaseFriend()), 'bad_option')
@@ -108,7 +108,7 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
 describe("vault.leaseFriend()", () => {
   it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
     const { listing, deviceDB } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, () => ({ passphrase: Passphrase }))
+    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const friend = vault.leaseFriend()
     await friend.peekLease()
     await friend.tryUncacheLease()
@@ -178,16 +178,3 @@ describe("vault.ensureTimely(maxMillis)", () => {
   })
 })
 
-describe("vault.ensureReadyToChangeGate(): a gate is changed over a record fetched within Promptly", () => {
-  it("fetches nothing under 2,000 ms since the last fetch, and fetches at 2,000 ms", async () => {
-    expect(MSX.Promptly).to.eq(2000)
-    const { vault, opts, advance } = await makeBornVault()
-    const gets = vi.spyOn(opts.vaultDB, 'tryGetVault')
-    advance(MSX.Promptly - 1)
-    await vault.ensureReadyToChangeGate()
-    expect(gets).not.toHaveBeenCalled()
-    advance(1)
-    await vault.ensureReadyToChangeGate()
-    expect(gets).toHaveBeenCalledOnce()
-  })
-})

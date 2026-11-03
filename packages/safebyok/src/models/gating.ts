@@ -5,8 +5,9 @@ import { type Outcome, bad, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { VaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
-import type { ClearsForGatingkind, GatingKind, WayinHeader } from './models-shapes'
+import type { ClearsForGatingkind, GatingKind, VaultRecord, WayinHeader } from './models-shapes'
 import * as MSX from './models-shapes'
+import type { Gate } from './gate'
 import { PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
 import type { VaultListing, VaultWorld } from './vault-listing'
@@ -22,19 +23,23 @@ export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
 
 /** What an attempt makes of the clears it is handed, for its `run`. */
 export type ProvingsForGatingkind = {
-  build_vault:  { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
-  unlock_vault: { proved: Proving }
+  build_vault:        { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
+  unlock_vault:       { proved: Proving }
+  replace_passphrase: { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
+  add_passkey:        { ante: VaultRecord, proved: PassphraseProving, passkeyProving: PasskeyProving }
+  revoke_passkey:     { ante: VaultRecord, proved: PassphraseProving }
+  del_vault:          { ante: VaultRecord, proved: PassphraseProving }
 }
 
 /** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
 export type Run<KindT extends GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
 
-export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault }
+export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
 export type LaunchArgs<KindT extends GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
 // --
 
-// == [Gating]: launch, isOpen, whenSettled, checkStrength, attempt, decline, declineAtLock, toJSON
+// == [Gating]: launch, isOpen, whenSettled, checkStrength, attempt, decline, declineAtLock, declineAtDiscard, toJSON
 
 /** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and settles once: launch answers with that outcome. */
 export class Gating<KindT extends GatingKind = GatingKind> {
@@ -131,8 +136,13 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   /** The user said no. With no attempt under way the gating settles 'declined'; one under way runs on, and its outcome settles it. */
   decline(): void { this.#endAsking(gatingDeclined()) }
 
-  /** A lock on the vault it asks for. With no attempt under way the gating settles 'locked_while_asking'; past the enter key nothing turns back, and the attempt's outcome settles it. */
-  declineAtLock(): void { this.#endAsking(lockedWhileAsking()) }
+  /** A lock on the vault it asks for. With no attempt under way the gating settles 'locked_while_asking'; past the enter key nothing turns back, and the attempt's outcome settles it. A `del_vault` hears nothing: a lock does not stop a delete. */
+  declineAtLock(): void {
+    if (this.gatingkind !== 'del_vault') { this.declineAtDiscard() }
+  }
+
+  /** What it asks of is going away, whatever its kind: it settles as {@link declineAtLock} has it. */
+  declineAtDiscard(): void { this.#endAsking(lockedWhileAsking()) }
 
   /** No more attempts: `refusal` settles the gating, or else the attempt under way does, whatever it answers. */
   #endAsking(refusal: VaultError): void {
@@ -157,7 +167,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 }
 // --
 
-// == [An attempt's provings]: Prove, ProveForGatingkind, checkedClears, isCorrectable, spendClears
+// == [An attempt's provings]: Prove, ProveForGatingkind, timelyAnte, provePassphrase, checkedClears, isCorrectable, spendClears
 
 type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
 
@@ -179,6 +189,34 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
     const proved = (passphraseClear === undefined) ? await PasskeyProving.buildStored(gate, passkeyClear!) : await PassphraseProving.buildStored(gate, passphraseClear, world)
     return { proved }
   },
+  replace_passphrase: async ({ vault, world }, clears) => {
+    const { antePassphraseClear, nextPassphraseClear } = checkedClears(MSX.passphraseReplaceClears, clears)
+    if (antePassphraseClear === nextPassphraseClear) { throw samePassphrase() }
+    const { ante, gate } = await timelyAnte(vault)
+    const anteProving = await PassphraseProving.buildStored(gate, antePassphraseClear, world)
+    const nextProving = await PassphraseProving.buildNovel(gate.stamp, nextPassphraseClear, world)
+    return { ante, anteProving, nextProving }
+  },
+  add_passkey: async ({ vault, world }, clears) => {
+    const { passphraseClear, passkeyClear } = checkedClears(MSX.passkeyAddClears, clears)
+    const { ante, gate } = await timelyAnte(vault)
+    const proved = await PassphraseProving.buildStored(gate, passphraseClear, world)
+    const passkeyProving = await PasskeyProving.buildNovel(gate.stamp, passkeyClear, world)
+    return { ante, proved, passkeyProving }
+  },
+  revoke_passkey: ({ vault, world }, clears) => provePassphrase(vault, checkedClears(MSX.passkeyRevokeClears, clears), world),
+  del_vault:      ({ vault, world }, clears) => provePassphrase(vault, checkedClears(MSX.vaultDelClears, clears), world),
+}
+
+/** The attempt's one record and the gate it holds, read once, after its timeliness request: a vault found gone refuses here. */
+const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
+  await vault.ensureTimely(MSX.Promptly)
+  return { ante: vault.fullRecord, gate: vault.gate }
+}
+
+const provePassphrase = async (vault: Vault, { passphraseClear }: { passphraseClear: VX.PassphraseCleartext }, world: VaultWorld): Promise<{ ante: VaultRecord, proved: PassphraseProving }> => {
+  const { ante, gate } = await timelyAnte(vault)
+  return { ante, proved: await PassphraseProving.buildStored(gate, passphraseClear, world) }
 }
 
 /** The clears through their checker. A throw that is no refusal came from a getter or proxy of the host's, reading a clear, so nothing of it is kept (G8). */
@@ -192,17 +230,18 @@ const checkedClears = <ClearsT>(checker: { parse: (clears: unknown) => ClearsT }
 
 const isCorrectable = (err: VaultError): boolean => (MSX.correctableKindVals as readonly string[]).includes(err.refusalkind)
 
-/** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not and of any realm: an answer is single-use (G2). */
+/** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not and of any realm, a bare ArrayBuffer too, as WebAuthn hands one: an answer is single-use (G2). */
 const spendClears = (clears: unknown): void => {
   // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the outcome it follows.
   try {
     const prfBytes: unknown = (clears as { passkeyClear?: { prfBytes?: unknown } | null } | null)?.passkeyClear?.prfBytes
     if (ArrayBuffer.isView(prfBytes)) { new Uint8Array(prfBytes.buffer, prfBytes.byteOffset, prfBytes.byteLength).fill(0) }
+    if (Object.prototype.toString.call(prfBytes) === '[object ArrayBuffer]') { new Uint8Array(prfBytes as ArrayBuffer).fill(0) }
   } catch { /* nothing left to spend */ }
 }
 // --
 
-// == [Refusals]: alreadyAsking, noRequestCleartext, requestCleartextThrew, clearsThrew, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight
+// == [Refusals]: alreadyAsking, noRequestCleartext, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight
 
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
 
@@ -211,6 +250,8 @@ const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrase
 const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
 
 const clearsThrew = (): VaultError => new VaultError('unexpected_error', Phrases.ClearsThrew)
+
+const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)
 
 const gatingDeclined = (): VaultError => new VaultError('declined', Phrases.GatingDeclined)
 

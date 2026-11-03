@@ -141,7 +141,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Storage verbs]: fetch, put, putDraft, del
+  // == [Storage verbs]: fetch, put, putDraft, del, delOver
 
   /** The instance under `scope` as storage now holds it, built where none was held, once storage's answer is delivered to it.
    * Where that leaves nothing present under `scope`, `opts.ifAbsent` says: 'fail', the default, throws {@link absentRefusal}; 'nil' resolves null.
@@ -182,7 +182,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.demandEnabled()
     const scope = this.scopeOf(duck)
     const held = (duck.am === 'd') ? null : this.at(scope)
-    const sparse = held?.sparse ?? this.sparseOf(duck)
+    return this.delOver(held?.sparse ?? this.sparseOf(duck))
+  }
+
+  /** A tombstone over `sparse`'s own revision, and its answer delivered. */
+  protected async delOver(sparse: SparseT): Promise<ThingT | null> {
     const prior = priorOf(sparse)
     const tombstone = { ...sparse, ...VS.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
     return this.deliver(await this.tryDelRow(tombstone, { prior }))

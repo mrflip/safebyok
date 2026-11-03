@@ -32,7 +32,7 @@ export const {
   passphraseWayin, passkeyWayin, gate, vaultSparse, vaultRecord, vaultTombstone, vaultRow,
   boxSparse, boxRecord, boxTombstone, boxRow,
   replacePassphraseParams, passkeyAddParams, revokePasskeyParams,
-  ifAbsentOpts, putOpts, delOpts, reqParams, rowPeek, fmtPeek,
+  ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, rowPeek, fmtPeek,
 } = Checkers('invalid_input', ({ obj, lit, int, uint, num, unk, oneof, discrim, applabel, user_id, vaultlabel, boxlabel, epochMillis, revision_tok, vault_tok, box_tok, device_id, key_deriver_label, credential_id, salt_b64, prfSalt, vault_key_wayin_wrapped, box_key_wrapped, whisper_ciphered }) => {
   const revision = obj({
     revision_tok,
@@ -93,6 +93,7 @@ export const {
 
   const ifAbsentOpts = obj({ ifAbsent: oneof(ifAbsentVals).default('fail') })
   const putOpts = obj({ prior: revision, ifPresent: oneof(ifPresentVals).default('repl') })
+  const putVaultOpts = obj({ prior: revision, ifPresent: oneof(['fail', 'get']).default('fail') })
   const delOpts = obj({ prior: revision })
 
   const reqParams = obj({ applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, ...revision.shape, prior: revision }).partial()
@@ -104,7 +105,7 @@ export const {
     passphraseWayin, passkeyWayin, gate, vaultSparse, vaultRecord, vaultTombstone, vaultRow,
     boxSparse, boxRecord, boxTombstone, boxRow,
     replacePassphraseParams, passkeyAddParams, revokePasskeyParams,
-    ifAbsentOpts, putOpts, delOpts, reqParams, rowPeek, fmtPeek,
+    ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, rowPeek, fmtPeek,
   }
 }, [FX])
 
@@ -137,6 +138,8 @@ export type DamagedVault = VaultSparse & Readonly<{ damagekind: Damagekind }>
 export type DamagedBox   = BoxSparse & Readonly<{ damagekind: Damagekind }>
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
+/** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
+export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
 export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
