@@ -22,7 +22,7 @@ import { randomId } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing, type BoxDna, type BoxLease, type BoxListingOpts, type BoxStore, type BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Fetched, type LockState, type Notice, type TimelyOpts, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
+import { type BoxRecord, type BoxSparse, type Fetched, type LockState, type Notice, type Tombstone, BoxFormat, NeverStoredSeq } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import * as Refusals from '../../src/refusals'
@@ -83,7 +83,7 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 
 /** One call made to the world or the store, as {@link ModelsWorld.calls} logs it, in the order made. */
 export type ModelsCall =
-  | { verb: 'ensureTimely', opts: TimelyOpts }
+  | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'takeWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
   | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null }
@@ -167,7 +167,7 @@ export type ModelsWorld = {
   willPut(...answers: readonly Scripted<{ record: BoxRecord, priorRevisionTok: string | null }>[]): void
   willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
-  willEnsureTimely(...thunks: readonly ((opts: TimelyOpts) => Promise<void> | void)[]): void
+  willEnsureTimely(...thunks: readonly ((maxMillis: number | undefined) => Promise<void> | void)[]): void
 
   /** The good answer about `scope`: `val` is the record stored, null for none. */
   answerOf(scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world?: unknown): BoxAnswer
@@ -232,7 +232,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     get:          new Script<{ scope: Boxscope }>(),
     put:          new Script<{ record: BoxRecord, priorRevisionTok: string | null }>(),
     del:          new Script<{ scope: Boxscope, priorRevisionTok: string | null }>(),
-    ensureTimely: new Script<TimelyOpts>(),
+    ensureTimely: new Script<number | undefined>(),
   }
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
   const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ scope, ok: true, val, world })
@@ -268,9 +268,9 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       return lease
     },
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
-    ensureTimely: async (timelyOpts) => {
-      calls.push({ verb: 'ensureTimely', opts: timelyOpts })
-      const { scripted, answer } = scripts.ensureTimely.take(timelyOpts)
+    ensureTimely: async (maxMillis) => {
+      calls.push({ verb: 'ensureTimely', maxMillis })
+      const { scripted, answer } = scripts.ensureTimely.take(maxMillis)
       if (scripted) { await answer }
     },
   }

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MaxTimerMillis } from '../../src/consts'
 import { VaultError } from '../../src/errors'
 import type { BoxRecord, BoxSparse, CentralPolicy, Fetched, RecordShape, Reconciled } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
@@ -11,7 +10,7 @@ import { type BoxAnswer, TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListing
 
 const held = useModelsWorld()
 
-// == [Hydrate]: when it fetches, the world first, one fetch at a time, the trigger's horizon
+// == [Hydrate]: when it fetches, the world first, the thing's horizon
 
 /** A box listing of horizon `horizonMillis`, and its box `anthropic_api_key` built from the full record seeded in the store at revision 1: received at the clock's reading, so timely from then. Calls are cleared after. */
 const timelyBoxOf = async (horizonMillis = 1000) => {
@@ -37,7 +36,7 @@ describe("storable.hydrate(opts): when it fetches", () => {
     [999,       { maxMillisSinceRefresh: 1000 },     0, 'does not fetch a record timely by the maxMillisSinceRefresh given'],
     [1000,      { maxMillisSinceRefresh: 1000 },     1, 'fetches a record untimely by the maxMillisSinceRefresh given'],
     [1e12,      { maxMillisSinceRefresh: Infinity }, 0, 'fetches nothing under maxMillisSinceRefresh Infinity, however old the record'],
-    // by the thing's own horizon, the whole of it, not the eagerFrac 0.8 of it its timer fires at:
+    // by the thing's own horizon:
     [999,       {},                                  0, 'does not fetch, given no horizon, before the thing is untimely'],
     [1000,      {},                                  1, 'fetches, given no horizon, once the thing is untimely'],
   ] as const
@@ -53,15 +52,14 @@ describe("storable.hydrate(opts): when it fetches", () => {
   const SparseCases = [
     [{ maxMillisSinceRefresh: Infinity }, 'under maxMillisSinceRefresh Infinity'],
     [{ maxMillisSinceRefresh: 60_000 },   'under a horizon it is timely by'],
-    [{},                                  'before the launch scheduled'],
+    [{},                                  'under no horizon given'],
   ] as const
   for (const [opts, blurb] of SparseCases) {
-    it(`fetches a sparse central however timely, once MinRefreshMillis has passed since the last fetch: ${blurb}`, async () => {
+    it(`fetches a sparse central however timely: ${blurb}`, async () => {
       const { listing, box } = await timelyBoxOf(60_000)
       await listing.build(held.mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       held.mw.seedStore(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       held.mw.clearCalls()
-      held.mw.setNow(T0 + MSX.MinRefreshMillis)
       expect(box.isFull).to.be.false
       expect(box.isTimely).to.be.true
       await box.hydrate(opts)
@@ -71,17 +69,6 @@ describe("storable.hydrate(opts): when it fetches", () => {
       expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     })
   }
-
-  it("shares the last fetch with a hydrate of a sparse central within MinRefreshMillis of it, never refreshing at 0", async () => {
-    const { listing, box } = await timelyBoxOf(60_000)
-    await listing.build(held.mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
-    held.mw.seedStore(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
-    held.mw.clearCalls()
-    held.mw.setNow(T0 + MSX.MinRefreshMillis - 1)
-    await box.hydrate({ maxMillisSinceRefresh: 60_000 })
-    expect(held.mw.callsOf('get')).to.have.lengthOf(0)
-    expect(box.isFull).to.be.false
-  })
 
   it("never fetches a created box for want of the whisperCiphered: the birth that landed is full", async () => {
     const box = await boxListingOf(held.mw).create(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
@@ -99,17 +86,9 @@ describe("storable.hydrate(opts): when it fetches", () => {
     expect(held.mw.callsOf('get')).to.deep.equal([])
   })
 
-  it("fetches nothing under maxMillisSinceRefresh Infinity for a thing never fetched, its central full", async () => {
-    const { mw } = held
-    const listing = boxListingOf(mw)
-    const box = new TestableBox(mw.world, listing, mw.fullBoxRecord(), { maxMillisSinceRefresh: 1000 })
-    expect(box.isTimely).to.be.false
-    await box.hydrate({ maxMillisSinceRefresh: Infinity })
-    expect(mw.callsOf('get')).to.deep.equal([])
-  })
 })
 
-describe("storable.hydrate(opts): the world first, and one fetch at a time", () => {
+describe("storable.hydrate(opts): the world first", () => {
   it("calls the world's ensureTimely first every time, whether it fetches or not", async () => {
     const { box } = await timelyBoxOf(1000)
     await box.hydrate({ maxMillisSinceRefresh: 1000 })
@@ -143,123 +122,42 @@ describe("storable.hydrate(opts): the world first, and one fetch at a time", () 
     expect(held.mw.callsOf('get')).to.deep.equal([])
   })
 
-  it("joins the fetch under way: calls made during it make no fetch of their own", async () => {
-    const { box } = await timelyBoxOf(1000)
+  it("joins nothing: each call that finds the record untimely makes a get of its own, landing on the one instance", async () => {
+    const { listing, box } = await timelyBoxOf(1000)
     held.mw.setNow(T0 + 1000)
-    const hold = holdOf()
-    const { scope } = box
-    held.mw.willGet(async () => {
-      await hold.promise
-      return held.mw.answerOf(scope, held.mw.fullBoxRecord())
-    })
-    const first = box.hydrate()
-    await vi.advanceTimersByTimeAsync(0)
-    const second = box.hydrate()
-    const third = box.hydrate({ maxMillisSinceRefresh: 0 })
-    await vi.advanceTimersByTimeAsync(0)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    hold.open()
-    expect(await Promise.all([first, second, third])).to.deep.equal([box, box, box])
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    await Promise.all([box.hydrate(), box.hydrate()])
+    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
+    expect(listing.things).to.deep.equal([box])
   })
 })
 
-describe("storable.fetch(opts): one fetch at a time, ifAbsent judged for each call", () => {
-  it("joins the fetch under way, from fetch or from hydrate: one get serves them all", async () => {
+describe("storable.fetch(opts)", () => {
+  it("makes a get of its own each time, whatever is under way", async () => {
     const { box } = await timelyBoxOf(1000)
-    const hold = holdOf()
-    const { scope } = box
-    held.mw.willGet(async () => {
-      await hold.promise
-      return held.mw.answerOf(scope, held.mw.fullBoxRecord())
-    })
-    const first = box.fetch()
-    await vi.advanceTimersByTimeAsync(0)
-    const second = box.fetch()
-    const third = box.hydrate({ maxMillisSinceRefresh: 0 })
-    await vi.advanceTimersByTimeAsync(0)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    hold.open()
-    expect(await Promise.all([first, second, third])).to.deep.equal([box, box, box])
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-  })
-
-  it("starts a fetch of its own once the one under way has ended", async () => {
-    const { box } = await timelyBoxOf(1000)
-    await box.fetch()
-    await box.fetch()
+    await Promise.all([box.fetch(), box.fetch()])
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
 
-  it("answers a 'fail' call the absent refusal and a 'nil' call this thing, though they share one fetch of nothing stored", async () => {
-    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(tombstoneBoxRecord({ revision_seq: 2 }))
-    held.mw.clearCalls()
-    const hold = holdOf()
-    const { scope } = box
-    held.mw.willGet(async () => {
-      await hold.promise
-      return held.mw.answerOf(scope, null)
-    })
-    const failing = box.fetch({ ifAbsent: 'fail' })
-    await vi.advanceTimersByTimeAsync(0)
-    const nilling = box.fetch({ ifAbsent: 'nil' })
-    await vi.advanceTimersByTimeAsync(0)
-    hold.open()
-    await expect(nilling).resolves.to.eq(box)
-    await TH.expectRefusal(failing, 'absent_box')
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-  })
 })
 
 describe("storable.hydrate(opts): after a failed fetch", () => {
-  it("schedules no launch after the scheduled one fails, and the next hydrate launches on demand", async () => {
-    const { box } = await timelyBoxOf(1000)
-    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
-    await held.mw.advance(800)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    expect(vi.getTimerCount()).to.eq(0)
-    await held.mw.advance(60_000)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    await box.hydrate()
-    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
-    expect(vi.getTimerCount()).to.eq(1)
-  })
-
-  it("rejects a hydrate whose fetch fails with its refusal, scheduling no launch, and launches again on the next", async () => {
+  it("rejects a hydrate whose fetch fails with its refusal, and fetches again on the next", async () => {
     const { box } = await timelyBoxOf()
     held.mw.setNow(T0 + 2000)
     held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
-    const timers = vi.getTimerCount()
     await expect(box.hydrate()).rejects.toThrow(/could not be reached/)
-    expect(vi.getTimerCount()).to.eq(timers)
     await box.hydrate()
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
   })
 })
 
-describe("storable.hydrate(opts): a horizon past MaxTimerMillis", () => {
-  const horizonMillis = 2 * MaxTimerMillis
-
-  it("arms no timer, and reads stale once the horizon is passed", async () => {
-    const { box } = await timelyBoxOf(horizonMillis)
+describe("storable: no timer", () => {
+  it("arms none, however long the record in hand sits: an untimely record waits for the next call that asks", async () => {
+    const { box } = await timelyBoxOf(1000)
     expect(vi.getTimerCount()).to.eq(0)
-    await held.mw.advance(horizonMillis - 1)
-    expect(box.isTimely).to.be.true
-    await held.mw.advance(1)
+    await held.mw.advance(5000)
     expect(box.isTimely).to.be.false
     expect(held.mw.callsOf('get')).to.deep.equal([])
-    await box.hydrate()
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-  })
-
-  it("fetches under that horizon given once it is passed, and not before", async () => {
-    const { box } = await timelyBoxOf(horizonMillis)
-    held.mw.setNow(T0 + horizonMillis - 1)
-    await box.hydrate({ maxMillisSinceRefresh: horizonMillis })
-    expect(held.mw.callsOf('get')).to.deep.equal([])
-    held.mw.setNow(T0 + horizonMillis)
-    await box.hydrate({ maxMillisSinceRefresh: horizonMillis })
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
   })
 })
 
@@ -1022,7 +920,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
 })
 // --
 
-// == [Success by receive's verdict]: success noted on the fetch path, a refused background refresh
+// == [Success by receive's verdict]: success noted on the fetch path
 
 describe("storable.hydrate(opts): success is receive's verdict on the record fetched", () => {
   it("notes no success for a fetch answered with an older record: the next hydrate fetches again", async () => {
@@ -1070,33 +968,6 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
   })
 })
 
-describe("storable: a refresh the timer launches, which no caller awaits", () => {
-  it("tells a refused fetch to onBadNews", async () => {
-    const { box } = await timelyBoxOf(1000)
-    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
-    await held.mw.advance(800)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['storage_unavailable'])
-  })
-
-  it("tells a refusal of the record fetched to onBadNews: nothing stored for a box held alive", async () => {
-    const { box } = await timelyBoxOf(1000)
-    held.mw.willGet(held.mw.answerOf(box.scope, null))
-    await held.mw.advance(800)
-    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['record_conflict'])
-    expect(box.isPresent).to.be.true
-  })
-
-  it("tells nothing of a box held gone that storage answers nothing stored: its ifAbsent is 'nil'", async () => {
-    const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
-    const box = await listing.build(tombstoneBoxRecord({ revision_seq: 2 }))
-    held.mw.clearCalls()
-    held.mw.willGet(held.mw.answerOf(box.scope, null))
-    await held.mw.advance(800)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    expect(held.mw.badnews).to.deep.equal([])
-  })
-})
 // --
 
 // == [Rebirth, sentences]: a deletion arriving again after a send, phrases.ts
@@ -1140,43 +1011,6 @@ describe("storable refusal sentences, from phrases.ts", () => {
     const { box } = await timelyBoxOf()
     const err = TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })), 'unexpected_error')
     expect(err.message).to.eq(Phrases.OtherVaultTok)
-  })
-})
-// --
-
-// == [The timer after a launch]: rescheduled after any launch that completes
-
-describe("storable: the timer after a launch that completes", () => {
-  it("launches again at the horizon after a fetch answered with an older record, which noted no success", async () => {
-    const { listing, box } = await timelyBoxOf(1000)
-    await listing.build(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
-    held.mw.clearCalls()
-    held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord()))
-    await held.mw.advance(800)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    // The answer noted no success: the one at T0 stands, and ages out with its horizon.
-    expect(box.isTimely).to.be.true
-    await held.mw.advance(200)
-    expect(box.isTimely).to.be.false
-    await held.mw.advance(600)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
-  })
-
-  it("launches again at the horizon after a fetch answered with a sparse record where nothing whole is held", async () => {
-    const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(sparseBoxRecord())
-    held.mw.clearCalls()
-    held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
-    await box.hydrate()
-    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
-    await held.mw.advance(800)
-    expect(held.mw.callsOf('get')).to.have.lengthOf(2)
-  })
-
-  it("stops the timer after a refused launch", async () => {
-    const { box } = await timelyBoxOf(1000)
-    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
-    await held.mw.advance(800)
-    expect(vi.getTimerCount()).to.eq(0)
   })
 })
 // --

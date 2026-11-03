@@ -390,14 +390,6 @@ describe("BoxListing: an absent box", () => {
       expect(box.isPresent).to.be.false
     })
 
-    it("has the trigger's scheduled refresh pass 'nil' too: no refusal escapes when a box is lost in storage", async () => {
-      const listing = boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 })
-      const box = await listing.build(fullBoxRecord())
-      held.mw.seedStore(gone())
-      await held.mw.advance(5000)
-      expect(box.isPresent).to.be.false
-      expect(held.mw.callsOf('get').length).to.be.greaterThan(0)
-    })
   })
 
   describe("listing.build(tombstone)", () => {
@@ -704,15 +696,6 @@ describe("BoxListing and Listing entries: arguments checked first of all, before
     const listing = boxListingOf(held.mw)
     TH.expectSyncRefusal(() => listing.at(undefined as never), 'bad_scope')
     TH.expectSyncRefusal(() => listing.at({ ...held.mw.boxscope('anthropic_api_key'), boxlabel: 'B' }), 'bad_scope')
-  })
-
-  it("refuses hydrateAll with opts out of range as 'bad_option', hydrating none and telling no news", async () => {
-    const listing = boxListingOf(held.mw)
-    await listing.build(fullBoxRecord())
-    held.mw.clearCalls()
-    await TH.expectRefusal(listing.hydrateAll({ maxWorldMillis: -1 }), 'bad_option')
-    expect(held.mw.calls).to.deep.equal([])
-    expect(held.mw.badnews).to.deep.equal([])
   })
 
   it("refuses subscribing anything but a function as 'bad_option'", () => {

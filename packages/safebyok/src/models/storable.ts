@@ -1,11 +1,9 @@
 import { VaultError } from '../errors'
 import { adorn, tattoo } from '../helpers'
 import { type Outcome, outcomeOf } from '../outcome'
-import { oneAtATime } from '../one-at-a-time'
 import { stableJsonify } from '../stable-jsonify'
 import { lockedError, partialLoadError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
-import { Trigger } from '../helpers/trigger'
 import type { Listing } from './listing'
 import type { Age, Am, Fetched, FetchOpts, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
@@ -30,7 +28,7 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
   Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown>>
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, snapshot, trigger, listeners, watchable
+  // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, snapshot, horizonMillis, refreshedAt, listeners, watchable
 
   /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
@@ -51,9 +49,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #central: Fetched<RecordT, SparseT>
   /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
-  readonly #trigger: Trigger<this>
-  /** The fetch under way, which every `fetch` made meanwhile joins, resolving whether storage held a record. */
-  readonly #oneFetchAtATime = oneAtATime(() => this.doFetch())
+  /** How long after its last refresh the record in hand stays timely, where a caller names no age of its own. */
+  readonly #horizonMillis: number
+  /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
+  #refreshedAt: number | null = null
   readonly #listeners = new Set<() => void>()
   /** Whether the listing's watch should push full records for this thing: true until set otherwise. */
   #watchable = true
@@ -67,9 +66,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Constructor]: constructor, assignInitialProps, assign
 
-  /** A refresh its timer launched that was refused is bad news, told to `listing.tellBadNews`. A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
+  /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
   constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, opts: StorableOpts) {
     MSX.storableArgs.parse({ world, listing, central, opts })
+    this.#horizonMillis = opts.maxMillisSinceRefresh
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
     this.#scope = Object.freeze(listing.scopeOf(central))
@@ -77,15 +77,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.assignInitialProps(central)
     this.settle()
     Object.seal(this)
-    //
-    this.#trigger = new Trigger({
-      clock:          world.clock,
-      intervalMillis: opts.maxMillisSinceRefresh,
-      eagerFrac:      opts.eagerFrac,
-      // `receive` notes success by its verdict: a record not older, central or the record in hand whole. The next launch is scheduled after any launch that completes.
-      doTryLaunch:    () => this.tryFetch({ ifAbsent: 'nil' }),
-      onTimerRefusal: (err) => { this.listing.tellBadNews([err]) },
-    })
   }
 
   /** Inscribe the own props, before the seal: the scope and `vault_tok`, tattooed immutably, and `registered_at`, here; through `assign`, the ones that follow the record in hand. A concrete class with props of its own overrides it, calls super first, and inscribes them the same way: as own props, assigned, tattooed or adorned, never as #fields, which do not exist while the base constructor runs. */
@@ -128,7 +119,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [States]: isTimely, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, isWatchable
 
-  get isTimely(): boolean { return this.#trigger.isTimely }
+  /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
+  get isTimely(): boolean { return this.#isRefreshedWithin(this.#horizonMillis) }
+
+  #isRefreshedWithin(maxMillis: number): boolean {
+    return this.#refreshedAt !== null && this.world.clock.now() - this.#refreshedAt < maxMillis
+  }
 
   get isLocked(): boolean { return this.listing.lockState() === 'locked' }
 
@@ -198,7 +194,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToFetch, ensureReadyToDel, demandReadyToDel
+  // == [Guards]: demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToDel, demandReadyToDel
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
@@ -213,12 +209,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return full
   }
 
-  /** A fetch needs only the world timely: it takes no lock, and may find the thing gone. */
-  async ensureReadyToFetch(opts: TimelyOpts = {}): Promise<this> {
-    await this.listing.ensureTimelyWorld(opts)
-    return this
-  }
-
   async ensureReadyToDel(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
     return this.demandReadyToDel()
@@ -230,33 +220,22 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
 
-  /** Get the record storage holds, through the listing, which delivers it to `receive`: one fetch at a time, a call made while one is under way joining it, and settling as it settles, its refusal included.
-   * Where nothing is stored, or a tombstone, `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil'
-   * resolves this thing, absent. It is judged for each call, joined or not. `opts` are checked first, before the world is made timely.
-   */
+  /** Get the record storage holds, through the listing, which delivers it to `receive`. Where nothing is stored, or a tombstone, `opts.ifAbsent` says: 'fail', the default, throws the absent refusal; 'nil' resolves this thing, absent. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
-    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
-    await this.ensureReadyToFetch(timely)
-    const isStored = await this.#oneFetchAtATime()
-    if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
+    await this.listing.fetch(this.scope, opts)
     return this
-  }
-
-  /** Get the record storage holds, through the listing, at once: the one fetch that `fetch` has calls made meanwhile join. Resolves whether storage held a record, not a tombstone. */
-  protected async doFetch(): Promise<boolean> {
-    return (await this.listing.fetch(this.scope, { ifAbsent: 'nil' })) !== null
   }
 
   tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> {
     return outcomeOf(() => this.fetch(opts))
   }
 
-  /** The world timely first, as its answer may lock the vault or take the thing away; then the record in hand, by the horizon given, or by {@link MSX.MinRefreshMillis} where it is not whole, so fetched again whatever its age once that short horizon passes. Calls made during a fetch join it. */
+  /** The world timely first, as its answer may lock the vault or take the thing away. Then the record in hand, where it is whole and refreshed within `opts.maxMillisSinceRefresh`, by default the thing's horizon; otherwise fetched, a thing found absent being no refusal. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
-    const timely = MSX.timelyOpts.parse(opts)
-    await this.ensureReadyToFetch(timely)
-    await this.#trigger.ensureTimelyWithin(this.#isWhole ? timely.maxMillisSinceRefresh : MSX.MinRefreshMillis)
-    return this
+    const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
+    await this.listing.ensureTimelyWorld(maxWorldMillis)
+    if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
+    return this.fetch({ ifAbsent: 'nil' })
   }
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
@@ -285,7 +264,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const older = cmpRevisions(this.#central, answer) === 'older'
     const isTaken = central !== this.#central
     if (isTaken) { this.adopt(central) }
-    if (! older && this.#isWhole) { this.#trigger.taskCompleted() }
+    if (! older && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
     return isTaken ? this.settle() : { badnews: [] }
   }
 

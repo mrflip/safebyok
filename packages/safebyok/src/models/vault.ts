@@ -8,7 +8,7 @@ import type { VaultScope } from '../shapes/scopes'
 import type { BoxWorld } from './box-listing'
 import { Gate } from './gate'
 import { Lease } from './lease'
-import type { AttemptClosure, Fetched, GateProps, LeaseDBFriend, LockState, PasskeyClosure, PassphraseClosure, Revision, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { AttemptClosure, Fetched, GateProps, LeaseDBFriend, LockState, PasskeyClosure, PassphraseClosure, Revision, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 import type { VaultWorld } from './vault-listing'
@@ -75,9 +75,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The vault's own lock, not its world's: the bank has none. */
   override get isLocked(): boolean { return this.lockState() === 'locked' }
 
-  /** A box's verb wants its world timely: hydrate the vault by `maxWorldMillis`, the box's horizon for its world. */
-  async ensureTimely(opts: TimelyOpts): Promise<void> {
-    await this.hydrate({ maxMillisSinceRefresh: opts.maxWorldMillis })
+  /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. A vault found gone or damaged refuses its absent refusal. */
+  async ensureTimely(maxMillis?: number): Promise<this> {
+    await this.hydrate({ maxMillisSinceRefresh: maxMillis })
+    return this.demandPresent()
   }
 
   /** The vault record a box's answer carries, received as any record of this vault is. What `receive` hands back goes nowhere: the box listing takes its world synchronously, where the vault listing delivers asynchronously. */
@@ -151,7 +152,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
    * A caller that joins an unlock in flight shares its outcome, a refusal included, and proves by calling again.
    */
   async ensureUnlocked(proofClosure?: AttemptClosure): Promise<Lease> {
-    await this.ensureTimely({})
+    await this.ensureTimely()
     const held = this.#lease
     if (held?.isInForce) { return held }
     if (held !== null) { this.lock() }
@@ -290,13 +291,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Guards]: ensureReadyToChangeGate, demandReadyToDel
 
-  /** A gate change keeps the rest of the record in hand and needs the vault present; no lock, as its record holds no secret. A vault held sparse fetches its full record first, whatever its age. */
-  async ensureReadyToChangeGate(opts: TimelyOpts = {}): Promise<this> {
-    await this.hydrate(opts)
-    this.demandPresent()
-    if (! this.isFull) { await this.fetch(opts) }
-    return this.demandPresent()
-  }
+  /** A gate change keeps the rest of the record in hand and needs the vault present and refreshed {@link MSX.Promptly}; no lock, as its record holds no secret. */
+  ensureReadyToChangeGate(): Promise<this> { return this.ensureTimely(MSX.Promptly) }
 
   /** A vault deleted has no life left to delete; a damaged one may be deleted, as `bank.delDamagedVault` did. Not yet: the passphrase's proof the old `vault.del` took. */
   override demandReadyToDel(): this {
