@@ -72,7 +72,7 @@ export class Bank implements VaultWorld {
   readonly #listeners = new Set<() => void>()
   #vaultListing:         VaultListing
   #device_id:            string
-  /** What the last `hello` answered, null with none since the bank was made or swept. */
+  /** The outcome of the last `hello`, null with none since the bank was made or swept. */
   #lastHello:            Outcome<void> | null = null
   #snapshot:             BankSnapshot
 
