@@ -153,7 +153,7 @@ export abstract class VaultDB {
 
   // == [Puts]: putVault, putBox, tryPutVault, tryPutBox
 
-  /** Stores `record` when the row stands at `prior`: `born` over void, `reborn` over a tombstone. Over a live row, `ifPresent: 'fail'`, the default, refuses `camped` and 'get' answers it as `declined`; a row moved past `prior` refuses `stale_write`. A live row moves only by a gate verb. */
+  /** Stores `record` when the row stands at `prior`: `born` over void, `reborn` over a tombstone. Over a live row, at `prior` or not, `ifPresent: 'fail'`, the default, refuses `camped` and 'get' answers it as `declined`; a tombstone or void that is not `prior` refuses `stale_write`. A live row moves only by a gate verb. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     return this.#call<VaultRow, PutAct, VaultRow>('putVault', { ...record, ...opts }, async () => {
       const vaultRecord = VS.vaultRecord.parse(record)
