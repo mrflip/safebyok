@@ -84,7 +84,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     Object.seal(this)
   }
 
-  /** SLOPDOC: Inscribes the own props fixed at birth; a subclass adds its own the same way, never as #fields. */
+  /** SLOPDOC: Inscribes the own props before the seal; a subclass adds its own the same way, never as #fields. */
   protected assignInitialProps(central: Fetched<RecordT, SparseT>): void {
     tattoo(this, { ...this.scope, vault_tok: central.vault_tok }, { writable: false, configurable: false })
     this.registered_at = central.registered_at
@@ -301,7 +301,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Receiving]: receive, adopt, settle, tombstoneFor
 
-  /** SLOPDOC: Takes in what storage said of this thing: judges it against the record in hand, adopts it and settles. */
+  /** SLOPDOC: Takes in what storage said: judges it against the record in hand, adopts and settles what it takes. */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
     if (this.#isDisabled) { return { badnews: [] } }
     const answer = rcvd ?? this.tombstoneFor(this.#central)
