@@ -239,7 +239,7 @@ describe("bank.tidy", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("runs in hello, so a fresh page erases an old lease with no vault listed, and its vault asks again", async () => {
+  it("runs in hello, so a fresh page erases an old lease through the vault it has just listed, and that vault asks again", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
