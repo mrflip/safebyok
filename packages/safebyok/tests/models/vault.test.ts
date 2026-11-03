@@ -24,7 +24,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(listing.things).to.have.lengthOf(0)
   })
 
-  it("holds no vault where the closure throws: the refusal is the sanitized 'unexpected_error', and a second create is not refused as already held", async () => {
+  it("holds no vault where the closure throws: the refusal is the sanitized 'unexpected_error', and a second buildVault is not refused as already held", async () => {
     const { listing, storedNow } = makeVaultWorld()
     await TH.expectRefusal(buildTyping(listing, Dna, () => { throw new Error("the user closed the dialog") }), 'unexpected_error')
     expect(listing.things).to.have.lengthOf(0)
