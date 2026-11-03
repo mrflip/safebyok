@@ -1,6 +1,6 @@
 # Thread 17: doc_strip (2026-11-03)
 
-Branch `20261103-doc_strip`, PR #PRNUM, stacked on #460. Justify: JUSTIFY.
+Branch `20261103-doc_strip`, PR #463, stacked on #460. Justify: green, 6,978 tests passed, 220 skipped.
 
 * **Built**: every doc block over the bound in `src/models/*.ts` and the named `src/storage/` files is one
   `/** SLOPDOC: ... */` line giving the purpose. Over the bound (over 240 characters of text, or over two lines):
@@ -53,7 +53,7 @@ Thirteen. Each wrote only with the job squeezed, or reads only by way of its cal
 ## For the Coach
 
 * **The table in `reconcileCentral` lived nowhere else** but an old thread file. It is gone with the block, as you asked;
-  `git show bc37d226:packages/safebyok/src/models/storable.ts` has it at line 346. The thread's recommendation is to give it
+  `git show bc37d226:packages/safebyok/src/models/storable.ts` has it at line 346. I recommend giving it
   a home in a spec or `notes/` only if the smell above survives.
 * **Under-bound blocks still list refusals**: 57 of them name a `Refuses` in one or two lines. The bound let them stay.
 * **Some under-bound blocks now point at a line that no longer says it**: `as {@link replacePassphrase} does` in
