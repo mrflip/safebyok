@@ -89,7 +89,7 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const proving = await makeProving(vault)
     deviceDB.tryCache.mockClear()
-    const lease = await proving.buildLease(vault.leaseFriend())
+    const lease = await proving.buildLease(vault._cheat_leaseFriend())
     expect(lease.isInForce).to.be.true
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
     lease.evict()
@@ -100,16 +100,16 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryCache.mockClear()
-    await TH.expectRefusal(proving.buildLease(vault.leaseFriend()), 'bad_option')
+    await TH.expectRefusal(proving.buildLease(vault._cheat_leaseFriend()), 'bad_option')
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
   })
 })
 
-describe("vault.leaseFriend()", () => {
+describe("vault._cheat_leaseFriend()", () => {
   it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
     const { listing, deviceDB } = makeVaultWorld()
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
-    const friend = vault.leaseFriend()
+    const friend = vault._cheat_leaseFriend()
     await friend.peekLease()
     await friend.tryUncacheLease()
     const asked = { ...vault.scope, vault_tok: vault.vault_tok }

@@ -549,7 +549,7 @@ export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseS
 
 // == [The vault's world]: deviceDBDuck, vaultListingOpts
 
-/** A deviceDB, as far as a duck can tell: the verbs `vault.leaseFriend()` binds. */
+/** A deviceDB, as far as a duck can tell: the verbs a vault's lease friend binds. */
 export const deviceDBDuck = Checker(({ obj, fn }) => obj({ peek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Its `parse` refuses 'bad_option'. Checks only. */

@@ -30,7 +30,7 @@ guarantees until shown otherwise.
 | `packages/safebyok/src/types/types.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 | `packages/safebyok/src/models/proving.ts` | the wayinKey, and the vaultKey unwrapped per call and moved from proving to proving inside `makeWayin(source)`, handed only to `Lease.grant`; the PRF bytes, spent in a `finally` |
 | `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `forget` |
-| `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; `Gate.build` hands the passphrase proving back to the listing, which drops it after the birth lease |
+| `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; the passphrase proving a birth's gating made is dropped after `Vault.launchBirth`'s lease |
 | `packages/safebyok/src/models/box.ts` | holds no key: hands the lease the bytes and stamps and gets bytes back; zeroes the opened bytes in a `finally` |
 
 Beside them, three host functions hear the passphrase and are guarded where they are called:
@@ -302,9 +302,14 @@ reaches the vault's tools through a package-private route (the Symbol-keyed acce
 `registerProvingTools` before it), which hands it `putLease` and `holdLease`, not a key: what that
 route reaches is no key and yields none. Neither class has a getter, field, spread, JSON or Symbol
 that yields a key, and no module exports a route to one: `leaseRecordOf`, which did, is gone
-([#305](https://github.com/mrflip/safebyok/pull/305)). The entry points export `Lease` and
+([#305](https://github.com/mrflip/safebyok/pull/305)). In `src/models/`, the `LeaseFriend` whose
+`peekLease` answers the cached row with its leaseKey handle is held in `Lease.#friend` and made in
+`Vault.#leaseFriend`; no public `Vault` method takes a proving, as a birth runs inside the class
+(`Vault.launchBirth`); `Vault._cheat_leaseFriend` is for tests, called by nothing in `src/`, though
+JavaScript lets a host call it. The row itself is also in reach of whoever holds the deviceDB. The entry points export `Lease` and
 `Proving` as types and classes alone, and none of the registries. Checked by:
-`tests/lease.test.ts` (*hands out no record*), `rg` for the crypto imports.
+`tests/lease.test.ts` (*hands out no record*), `tests/models/vault-unlock.test.ts` (*nothing a host
+holds hands them out*), `rg` for the crypto imports.
 
 **G10. Foundations the construction rests on.**
 
