@@ -443,7 +443,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(again.isUnlocked).to.be.true
   })
 
-  it("does not let a hello crossing a sweep ready the bank on the listing it swept", async () => {
+  it("does not let a hello crossing a sweep touch the bank's stage: its own caller hears the refusal, as an effect's cleanup does not want a flicker", async () => {
     const world = makeBankWorld()
     const bank = world.bankOn()
     const hello = bank.tryHello()
@@ -451,7 +451,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const { ok, err } = await hello
     expect(ok).to.be.false
     expect(err?.refusalkind).to.eq('disabled')
-    expect(bank.snapshot.stage).to.eq('refused')
+    expect(bank.snapshot.stage).to.eq('made')
     await bank.hello()
     expect(bank.snapshot.stage).to.eq('ready')
   })
