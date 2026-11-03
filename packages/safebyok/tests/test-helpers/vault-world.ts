@@ -48,15 +48,16 @@ export const useVaultWorlds = (): void => {
 
 /** The real deviceDB, each verb a friend binds spied on, and the one row these worlds hold, to read or lay over. */
 const makeDeviceDB = () => {
-  const deviceDB = new MemoryDeviceDB()
-  const rows = deviceDB._cheat_leaseRows()
-  return Object.assign(deviceDB, {
-    peek:      vi.spyOn(deviceDB, 'peek'),
-    tryCache:  vi.spyOn(deviceDB, 'tryCache'),
-    tryVacate: vi.spyOn(deviceDB, 'tryVacate'),
+  const memoryDB = new MemoryDeviceDB()
+  const rows = memoryDB._cheat_leaseRows()
+  return {
+    memoryDB,
+    peek:      vi.spyOn(memoryDB, 'peek'),
+    tryCache:  vi.spyOn(memoryDB, 'tryCache'),
+    tryVacate: vi.spyOn(memoryDB, 'tryVacate'),
     cachedNow: (): unknown => [...rows.values()][0] ?? null,
     layCached: (record: unknown) => { rows.set([...rows.keys()][0] ?? 'no-row', record) },
-  })
+  }
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
@@ -75,7 +76,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     strengthChecker: anyStrengthChecker,
     device_id:    'device-1',
     leaseMillis:  LeaseMillis,
-    deviceDB,
+    deviceDB:     deviceDB.memoryDB,
     ...worldOverrides,
   }
   const vaultDB = new MemoryVaultDB({ clock: world.clock })
