@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { BoxProps, BoxSnapshot } from '../../src/models/box'
-import type { BoxLease, BoxWorld } from '../../src/models/box-listing'
+import type { BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/phrases'
@@ -160,20 +160,17 @@ describe("box.unsealWhisper(): refused from its guard", () => {
 
 describe("box.unsealWhisper(): what the lease opens that is no whisper", () => {
   const OpenedCases = [
-    ['bytes that are no JSON',          'sk-test-SECRET {'],
+    ['text that is no JSON',            'sk-test-SECRET {'],
     ['JSON that is no { val } holder',  '{"value":"sk-test-SECRET"}'],
   ] as const
   for (const [blurb, text] of OpenedCases) {
-    it(`refuses 'damaged_box' for ${blurb}, quoting none of it, the opened bytes zeroed`, async () => {
-      const opened = new TextEncoder().encode(text)
-      const lease: BoxLease = { sealWith: () => Promise.reject(new Error('nothing is sealed here')), unsealWith: () => Promise.resolve(opened) }
+    it(`refuses 'damaged_box' for ${blurb}, quoting none of it`, async () => {
       const { world } = held.mw
-      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (maxMillis) => world.ensureTimely(maxMillis), demandLease: () => lease }
+      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (maxMillis) => world.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text) }
       const box = await boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
       const err = await TH.expectRefusal(box.unsealWhisper(), 'damaged_box')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
       expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')
-      expect(opened.every((byte) => byte === 0)).to.be.true
     })
   }
 })

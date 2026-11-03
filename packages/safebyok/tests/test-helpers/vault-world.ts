@@ -1,4 +1,4 @@
-/** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a device cache that keeps nothing, a {@link MemoryDeviceDB} with its lease verbs spied on, and a clock the test moves. */
+/** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a {@link MemoryDeviceDB} with its lease verbs spied on, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
 import type { BoxWorld } from '../../src/models/box-listing'
@@ -54,8 +54,8 @@ const makeDeviceDB = () => {
     peek:      vi.spyOn(deviceDB, 'peek'),
     tryCache:  vi.spyOn(deviceDB, 'tryCache'),
     tryVacate: vi.spyOn(deviceDB, 'tryVacate'),
-    keptNow:   (): unknown => [...rows.values()][0] ?? null,
-    keep:      (record: unknown) => { rows.set([...rows.keys()][0] ?? 'no-row', record) },
+    cachedNow: (): unknown => [...rows.values()][0] ?? null,
+    layCached: (record: unknown) => { rows.set([...rows.keys()][0] ?? 'no-row', record) },
   })
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
@@ -119,9 +119,9 @@ export const storedVaultRecord = async (passphrase: string = Passphrase): Promis
   return demandStored()
 }
 
-/** A vault created of `Dna` by `proofClosure` (under {@link Passphrase} unless told otherwise), in a fresh world: unlocked, its lease kept on the device. */
-export const makeBornVault = async (proofClosure: ProofClosure = byPassphrase(Passphrase)) => {
-  const world = makeVaultWorld()
+/** A vault created of `Dna` by `proofClosure` (under {@link Passphrase} unless told otherwise), in a fresh world: unlocked, its lease cached on the device. `worldOverrides` says otherwise of the world. */
+export const makeBornVault = async (proofClosure: ProofClosure = byPassphrase(Passphrase), worldOverrides: Partial<VaultWorld> = {}) => {
+  const world = makeVaultWorld(null, worldOverrides)
   const vault = await world.listing.create(Dna, proofClosure)
   return { ...world, vault }
 }
@@ -134,8 +134,8 @@ export const makeBornVaultWithPasskey = async () => {
 
 const RoundTripStamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
-/** What `opener` unseals of a whisper `sealer` seals: the two hold one vaultKey only if it comes back. */
-export const roundTrip = async (sealer: Lease, opener: Lease): Promise<string> => opener.unsealWith(await sealer.sealWith('sk-test', RoundTripStamp), RoundTripStamp)
+/** What the lease `opener` unseals of a whisper the vault `sealer` seals: the two hold one vaultKey only if it comes back. */
+export const roundTrip = async (sealer: Vault, opener: Lease): Promise<string> => opener.unsealWith(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp)
 
 /** {@link roundTrip} through the vaults' own seal verbs. */
 export const vaultRoundTrip = async (sealer: Vault, opener: Vault): Promise<string> => opener.unsealStampedString(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp)

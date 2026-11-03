@@ -5,9 +5,8 @@ import { NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, make
 useVaultWorlds()
 
 describe("Vault.replacePassphrase", () => {
-  it("replaces the passphrase wayin and keeps the passkey wayin as stored: the new passphrase opens, the old refuses 'wrong_passphrase', the passkey still opens, and the lease held stays in force", async () => {
+  it("replaces the passphrase wayin and keeps the passkey wayin as stored: the new passphrase opens, the old refuses 'wrong_passphrase', the passkey still opens, and the vault stays unlocked", async () => {
     const { vault, demandStored, opts: { world } } = await makeBornVaultWithPasskey()
-    const held = vault.demandLease()
     const ante = demandStored().gate
     expect(await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))).to.equal(vault)
     const post = demandStored().gate
@@ -19,9 +18,8 @@ describe("Vault.replacePassphrase", () => {
     expect(byKey.wayinkind).to.eq('passkey')
     const proving = await vault.gate.attemptProof(byPassphrase(NewPassphrase), world)
     const lease = await proving.buildLease(vault.leaseFriend())
-    expect(vault.demandLease()).to.equal(held)
-    expect(held.isInForce).to.be.true
-    expect(await roundTrip(held, lease)).to.eq('sk-test')
+    expect(vault.isUnlocked).to.be.true
+    expect(await roundTrip(vault, lease)).to.eq('sk-test')
     lease.evict()
   })
 
@@ -80,7 +78,7 @@ describe("Vault.addPasskey", () => {
     expect(post.passkey_wayin?.credential_id).to.eq(credential_id)
     const proving = await vault.gate.attemptProof(byPasskey('laptop'), world)
     const lease = await proving.buildLease(vault.leaseFriend())
-    expect(await roundTrip(vault.demandLease(), lease)).to.eq('sk-test')
+    expect(await roundTrip(vault, lease)).to.eq('sk-test')
     lease.evict()
   })
 

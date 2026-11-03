@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import type { PrfSalt } from '../../src/shapes/fields'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, roundTrip, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, vaultRoundTrip, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -13,7 +13,7 @@ describe("the ways in changing under a vault unlocked", () => {
     const record = await storedVaultRecord()
     const { listing, storeBehindOurBack } = makeVaultWorld(record)
     const vault = await listing.build(record)
-    const held = await vault.ensureUnlocked(byPassphrase(Passphrase))
+    await vault.ensureUnlocked(byPassphrase(Passphrase))
     const other = makeVaultWorld(record, { device_id: 'device-2' })
     const theirs = await other.listing.build(record)
     await theirs.ensureUnlocked(byPassphrase(Passphrase))
@@ -23,8 +23,7 @@ describe("the ways in changing under a vault unlocked", () => {
     expect(vault.gate.pickle()).to.deep.equal(received.gate)
     expect(received.gate.passphrase_wayin).not.to.deep.equal(record.gate.passphrase_wayin)
     expect(vault.isUnlocked).to.be.true
-    expect(vault.demandLease()).to.equal(held)
-    expect(await roundTrip(held, held)).to.eq('sk-test')
+    expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
   })
 
 })
@@ -35,7 +34,7 @@ describe("an older copy of the vault record", () => {
     const ante = demandStored()
     await vault.replacePassphrase(byPassphrase(Passphrase), byPassphrase(NewPassphrase))
     vault.lock()
-    await TH.eventually(() => deviceDB.keptNow() === null)
+    await TH.eventually(() => deviceDB.cachedNow() === null)
     restoreRow(ante)
     const later = anotherSession()
     const restored = await later.build(demandStored())
