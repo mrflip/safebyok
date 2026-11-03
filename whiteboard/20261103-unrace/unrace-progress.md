@@ -68,6 +68,8 @@ small conflict where threads 1 and 3 meet, at the restack before thread 7.
 
 **Thread 11, `gate_changes`.** `Vault.replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, each with a try form, on `Gating.launch`; `Vault.del()` is `delVault()`, the one door. `#landGate(proved, commit)` lays the lease under the epoch of the record stored. `Vault.fullRecord` is public for `gating.ts`. `declineAtLock()` settles every kind but `del_vault`; `declineAtDiscard()` settles any kind as the vault leaves. `Gate` is read-only: `make`, `demandPasskeyAddable`, `pickle`, `toJSON`. `listing.del(ante)` takes the record. Tombstones are made real in a test with `delTyping` from another session; `vault.fetch()` of one throws `vault_gone`. Helpers `replaceTyping`, `addPasskeyTyping`, `revokeTyping`, `delTyping`.
 
+**Thread 12, `bank`.** `bank.hello`, `tidy`, `lock`, `vacate`, `sweep`; `Bank.goodbye`, `closeVault`, `closeVaults` are gone. `#bringUp` is `try { loads; fetchBank } finally { tidy }`, then the device record, the watch and `demandEnabled`: `tidy` needs only the deviceDB's scan and the bank's autolock. `stage` is `made`, `ready` or `refused`; `vacate` leaves `made`, with `ensureVault` and `vaultOf` refusing `BankHelloFirst`. `tidy`, `lock`, `vacate`, `sweep` need no `hello`, and `vacate` erases all its own bank's rows. `sweep` swaps in a fresh listing at once. `listing.fetchBank()`, `tellIfRevoked`. `tests/test-helpers/bank-world.ts`: `makeBankWorld`, `makeBankWithVault`, `RefusingVaultDB`.
+
 ## Crossings raised
 
 To go into `whiteboard/20261102-unrace/crossings.md`:
@@ -90,3 +92,12 @@ To go into `whiteboard/20261102-unrace/crossings.md`:
 * A `del_vault`'s `lock()` with a refused erase and no `onPanic` vacates the vault during the delete, and `listing.del` still lands (thread 11).
 * A tombstone or discard between the commit and the lease in `#landGate` settles the gating as failed though the row moved (thread 11's review).
 * A gate verb refused `vault_gone` or `vault_mismatch` doesn't deliver, so the Vault reads present until its next fetch, box answer or notice (thread 11's review).
+* Crossing `hello`s: the last to answer sets the stage (thread 12).
+* A record changed between `getBank` and the watch's start isn't heard until the next fetch (thread 12).
+* A listed live vault whose row is void in `getBank` stays listed until its next fetch (thread 12).
+* A held lease whose cache row never landed, or that another page's `tidy` erased, isn't found by `tidy`, leaving the vault unlocked past autolock; this keeps a lease that should drop (thread 12 and its review; a Coach's row).
+* A birth past the enter key finishes and caches its lease after `bank.vacate`; this keeps a lease that should drop (thread 12's review).
+* A swept `hello` landing late marks a fresh listing `refused` (thread 12).
+* A `getBank` or plugin load that never answers holds `tidy` back; this keeps a lease that should drop (thread 12's rework).
+* A `hello` crossing `bank.vacate` lands `ready` on the emptied listing, which reopens the false prompt, by reading (thread 12's rework and second review).
+* The watch stays on past a vacate, so a notice can list a vault on a bank not ready, by reading (thread 12's rework).

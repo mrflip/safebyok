@@ -5,7 +5,7 @@
   independent judgement". Departures from it are marked *Orchestrator:* and listed under *Bent from the pre-plan*.
 * **Levels:** review `medium`; worker and reviewer inherit the orchestrator's `claude-opus-5-5`, at their own effort;
   style pass `sonnet` (`style-reviewer`'s pin). **Three threads at once.**
-* **Status:** threads 1 to 11 filed; thread 12 building. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459.
+* **Status:** threads 1 to 12 filed; threads 13 and 15 building, cut from 12. Line: main → #449 → #453 → #450 → #454 → #452 → #451 → #455 → #456 → #457 → #458 → #459 → #460.
 
 ## The goal
 
@@ -296,6 +296,13 @@ The Bank half of the text in thread 3.
 * *Orchestrator:* the Coach: "At your convenience make it only tidy that banks leases, and test for that". Keep
   `leasesProvedBefore`'s scan; `tidy` vacates only its own bank's rows.
 * **Size:** medium. **Depends on:** 9, 11.
+
+*Review:* `flagged` twice at medium, then low; no third. First fixed `tidy`'s place, a birth left open by `bank.vacate`, and news of
+damaged rows; flagged `bank.vacate` staying ready over an emptied listing, so `ensureVault` asked for a new passphrase for a vault
+that exists. Reworked: `vacate` leaves the bank not ready, and `tidy` runs in a `finally` after `getBank`, per the Coach. Second found
+one narrow door left, a refused erase with no `onPanic` still bringing that prompt: a Coach's row. Left: a late swept `hello` (thread
+13's look-ahead); `ensureVault` on a damaged row asks first; `await bank.tidy()` can resolve before an erase; a lease row failing its
+check escapes `bank.vacate`; `stage` against VOCABULARY's `lifecycle` (thread 14).
 
 ### 13. `proof` (pre-plan 11's second half)
 
