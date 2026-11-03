@@ -96,8 +96,9 @@ added or folded into through the subagent, and no other entry changes.
   row), `attachLease(lease)` (holds a lease as the vault's) and `tryCacheLease(record)` (overwrites the row) were all reachable from a Vault
   or a Lease. Now `Lease` holds the friend in `#friend` and offers `lease.isMadeFor(friend)`, a boolean over a friend the caller already
   holds, and `Vault` makes it in a private `#leaseFriend()`. A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
-  from `VaultListing`; its run now lives in the Vault class as the public static `Vault.launchBirth(listing, scope, prior)` with a private
-  static `#runBirth`, which reaches the private `vault.#unlockByProof`, and `launchBirth` takes no proving: the proving comes from the
+  from `VaultListing`; its run now lives in the Vault class as the public static `Vault.launchBirth(listing, scope)` with a private
+  static `#runBirth`, which reaches the private `vault.#unlockByProof`. `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
+  itself and refuses 'bad_option' over a vault present, with no gating opened and no KDF run. It takes no proving: the proving comes from the
   gating it launches. A public `vault.unlockByProof(proving)` was set aside, as whatever is passed as a proving is handed the friend
   (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) `vault._cheat_leaseFriend()` is a public
   method, named loudly, for tests; it is a door at runtime, and the guarantee is only that nothing in `src/` calls it (a test row checks
@@ -106,7 +107,9 @@ added or folded into through the subagent, and no other entry changes.
   (3) The friend was not the only route to the row: `vault.world.deviceDB.peek({ ...vault.scope, vault_tok: vault.vault_tok })` answers the
   same row with the same handle, as do `bank.deviceDB` and `listing.world.deviceDB`. The host supplies the deviceDB and a same-origin
   script can open its store regardless, so this removes a route from the Vault and Lease API and does not put the cached row out of a
-  host's reach. Raised to the Coach.
+  host's reach. (4) A friend of the host's own, handed to `proving.buildLease(ownFriend)`, hears a new lease's record, `lease_key` handle
+  included, when `lease.cache()` passes it to `ownFriend.tryCacheLease`. That takes a proving, so the passphrase, which the host's dialog
+  already hears, and it reaches a new lease's handle, never the cached row. Raised to the Coach.
 * 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **A refused erase at
   `lock()` is a panic.** `vault.#vacateLease` reads locked at once, but where the deviceDB refuses the erase the row stands: with a host
   `onPanic` the vault stays locked and enabled, the row in place, and the next `ensureUnlocked` on this device takes it up with no proof;

@@ -175,11 +175,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Birth]: launchBirth, runBirth
 
-  /** Build a vault under `scope` over `prior` through a gating, whose own proving alone is handed the friend.
-   * It checks no slot, and a vault present costs the user a dialog for nothing: a host wants `listing.buildVault`. */
-  static async launchBirth(listing: VaultListing, scope: VaultScope, prior: MSX.Revision): Promise<Vault> {
-    MSX.revision.parse(prior)
-    return Gating.launch('build_vault', { listing, scope, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
+  /** Build a vault under `scope` through a gating, whose own proving alone is handed the friend.
+   * A vault present in the slot refuses 'bad_option', nobody asked. */
+  static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
+    if (! MSX.isListing(listing)) { throw listingExpected() }
+    const checked = listing.scopeOf(scope)
+    const prior = listing.demandBirthSlot(checked) ?? VS.NeverStored
+    return Gating.launch('build_vault', { listing, scope: checked, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
   }
 
   /** Past the enter key: the put is the commit, and a vault_tok not the record's is another's vault, left locked. */
@@ -502,7 +504,9 @@ const recordOfBirth = (gate: Gate, prior: MSX.Revision, now: number): VaultRecor
 )
 // --
 
-// == [Refusals]: unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce
+// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock, leaseOfOtherHolder, leaseNotInForce
+
+const listingExpected = (): VaultError => new VaultError('bad_option', Phrases.ListingExpected)
 
 const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 

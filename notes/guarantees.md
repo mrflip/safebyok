@@ -306,10 +306,11 @@ that yields a key, and no module exports a route to one: `leaseRecordOf`, which 
 `peekLease` answers the cached row with its leaseKey handle is held in `Lease.#friend` and made in
 `Vault.#leaseFriend`; no public `Vault` method takes a proving, as a birth runs inside the class
 (`Vault.launchBirth`); `Vault._cheat_leaseFriend` is for tests, called by nothing in `src/`, though
-JavaScript lets a host call it. The row itself is also in reach of whoever holds the deviceDB. The entry points export `Lease` and
+JavaScript lets a host call it. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export `Lease` and
 `Proving` as types and classes alone, and none of the registries. Checked by:
-`tests/lease.test.ts` (*hands out no record*), `tests/models/vault-unlock.test.ts` (*nothing a host
-holds hands them out*), `rg` for the crypto imports.
+`tests/lease.test.ts` (*hands out no record*), `tests/models/vault-unlock.test.ts` (*a vault and a
+lease show neither the lease friend nor the lease key handle, one level deep, by identity*), `rg` for
+the crypto imports.
 
 **G10. Foundations the construction rests on.**
 
