@@ -11,7 +11,7 @@ empty changeset.
   2. Autolock stated as a best-effort reminder, not a guarantee: `bank.autolock`'s and `Lease.peek`'s doc lines, `notes/guarantees.md`
      G4, and the `tidy_host` entry of `notes/security.md`, amended through a `sonnet` subagent.
   3. The specs: the tombstone clause (of its own `vault_tok` it stays in its slot; of another it replaces the vault) in
-     `models-invariants.md` and `unrace-gating.md`'s hello tree, and `lease.peek`'s row past autolock in both.
+     `newdesign-models.md` and `newdesign-proof.md`'s hello tree, and `lease.peek`'s row past autolock in both.
 * **Decisions taken.**
   * **The friend carries the duration.** `LeaseFriend` gains `leaseMillis`, bound in `Vault.#makeFriend` as `world.leaseMillis`, or
     `DefaultLeaseMillis` where the world names none. Set aside: a friend verb answering the row's staleness, as the lease would hand

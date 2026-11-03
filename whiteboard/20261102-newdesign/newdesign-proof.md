@@ -133,7 +133,7 @@ shows a change only once it has landed.
   It shouts: a refused scan is bad news, and a lock whose erase is refused panics
 * For this sprint the device caches only leases and the device record, not vault or box records, and no refresh timer runs
 * The goal: when lock is called, nothing crosses it. We get there with simple code that can be analyzed in context, so a
-  crossing is raised in one sentence (`crossings.md`), not fine-tuned
+  crossing is raised in one sentence (`reference-timings.md`), not fine-tuned
 * A box birth: `vault.putBox` with no box listed makes the record over the sentinel prior, seals it, puts (`born` or
   `reborn`), and the answer is delivered. A sidecar-only `send` unseals and reseals, as the box stamp binds the sidecar
 * A cached lease is never shrugged off when it clearly must not stand. Where a user proving authority and intent to
@@ -319,7 +319,7 @@ run returns → gating settles ok → ensureUnlocked resolves
 A gate is the one thing about a vault record that changes, so a change has a vaultDB verb of its own, named for what
 it does: `replacePassphrase`, `addPasskey` or `revokePasskey`. No client-side next gate exists: a `Gate` is a read-only
 view of a record's gate, and adopt makes a new one from each record. Each verb lets the
-vaultDB check more (`vaultdb-invariants.md`, VG1 to VG3). Each change ends the same way, and needs nothing the vault
+vaultDB check more (`newdesign-vaultdb.md`, VG1 to VG3). Each change ends the same way, and needs nothing the vault
 does not already carry:
 
 ```text
@@ -461,7 +461,7 @@ which its Vault can until the tombstone arrives. After that the front door canno
 tombstone holds no gate; a direct call to the vaultDB still cascades.
 
 The vaultDB refuses a `putBox` under a `vault_tok` that is not the live vault's, a tombstone's among
-them, as `vault_mismatch`; every VaultDB already does (`vaultdb-invariants.md`, V4).
+them, as `vault_mismatch`; every VaultDB already does (`newdesign-vaultdb.md`, V4).
 
 ## Guarantees to amend when this is built
 
@@ -515,7 +515,7 @@ Those drawn above: a gate change leaving another device's session lease to run (
   row in place of the request, `declined`.
 * Every box query names scope and `vault_tok`, and a box row under another `vault_tok` is no row. Only a
   fetch of a vault record has a reason to go by scope alone. No VaultDB fully does
-  this today (`vaultdb-invariants.md`), and `models/listing.ts:238` throws on such a row.
+  this today (`newdesign-vaultdb.md`), and `models/listing.ts:238` throws on such a row.
 
 ## To fix
 

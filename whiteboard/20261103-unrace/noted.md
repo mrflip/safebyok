@@ -1,6 +1,6 @@
 ## Decided
 
-Rulings and their reasons, where `unrace-gating.md` and `models-invariants.md` draw the result and not the why.
+Rulings and their reasons, where `whiteboard/20261102-newdesign/newdesign-proof.md` and `newdesign-models.md` beside it draw the result and not the why.
 
 * **`bank.hello` is a forced reset** (the Coach, 2026-11-02, as the system is too hard to reason about otherwise). It
   loads every vault of the bank from the vaultDB and refuses with no network. Vault and box records are not cached on the device for this

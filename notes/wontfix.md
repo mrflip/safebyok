@@ -57,16 +57,16 @@ not as a settled ruling, and check it against the current design before relying 
   a cache, and the next session asks for the passphrase. Pinned by
   `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
   retrying a refused erase.
-* 2026-11-02 (the Coach, unrace, `whiteboard/20261102-unrace/unrace-new_vault.md`; not yet built):
+* 2026-11-02 (the Coach, unrace, `unrace-new_vault.md` at commit e135d0352, since deleted; not yet built):
   **a failed delete still locks the vault on this device.** `del_vault` locks first, as a lock is
   synchronous and safe, then removes the vault from the vaultDB and the deviceDB, then vacates. So a
   delete the vaultDB refuses still logs the user out of this device, and they log back in to try the
   delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
-* 2026-11-03 (unrace, `whiteboard/20261102-unrace/unrace-gating.md`, *The lease*): **a `lock()` during
+* 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
   the cache's `lease.peek` loses.** The vault reads unlocked on the lease peeked, the lock's erase
   stands, and the next session asks for a proof. The next `lock()` ends that session.
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-unrace/unrace-gating.md`, *Rows for `notes/wontfix.md`*):
+* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*):
   **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
   the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
   gets it from `lease.peek` and attaches it, asking nothing, so a vault the user locked reopens with no

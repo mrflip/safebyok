@@ -13,11 +13,11 @@ No behaviour changes. One commit per kind.
   3. `STYLE.md`: a note at the top of *Comments and doc blocks*; nothing else in the section changed.
   4. Doc blocks in `src/models/*.ts` and the named `src/storage/` files: refusal lists and pointers to blocks that no
      longer say it cut. Proof: `removeComments` printer, base and tip, 16 files compared, 0 differ.
-  5. The specs in `whiteboard/20261102-unrace/` (`noted.md`, `models-invariants.md`, `unrace-gating.md`,
-     `unrace-preplan.md`, `vaultdb-invariants.md`) changed plainly on the listed lines: `ensureUnlocked` asks
+  5. The specs in `whiteboard/20261102-newdesign/` (`newdesign-models.md`, `newdesign-proof.md`, `newdesign-vaultdb.md`)
+     and `whiteboard/20261103-unrace/` (`noted.md`, `unrace-preplan.md`) changed plainly on the listed lines: `ensureUnlocked` asks
      first, no lock check at the attempt, `bank.autolock` out of `hello`, `listing.del` takes the record,
      `vault_mismatch`, `deleted`, `putVault` `fail|get` and `camped`. The Coach's edits to
-     `models-invariants.md` are kept.
+     `newdesign-models.md` are kept.
   6. `VOCABULARY.md`: the gating kinds (`build_vault`, `unlock_vault`, `replace_passphrase`, `add_passkey`,
      `revoke_passkey`, `del_vault`), `putGate` named as the vaultDB calls, `dna` handed to `create`, rows for
      `act`/`world`/`dbhas`, `am` and `camped`, `stage` (`made`, `ready`, `refused`) where it and `STYLE.md` said
@@ -28,7 +28,7 @@ No behaviour changes. One commit per kind.
 * **Decisions taken**
   * Doc blocks that state behaviour, not a refusal list, stay; no `SLOPDOC` added.
   * `spendAnswer` (old `src/gating.ts`) and `spendClears` (models) are both named in `guarantees.md`.
-  * Beyond the list: the fixed tombstone line in the hello tree and `del(ante)` in `models-invariants.md`.
+  * Beyond the list: the fixed tombstone line in the hello tree and `del(ante)` in `newdesign-models.md`.
 
 * **Deviations / skipped**
   * `unrace-preplan.md:135` mentions `tidy`, but it is a quotation of the Coach: left.

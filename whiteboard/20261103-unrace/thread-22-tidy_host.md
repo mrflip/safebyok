@@ -43,10 +43,10 @@ Branch `20261103-tidy_host`, PR #465, stacked on #464. Justify: green; core 4783
 * **Docs.** `notes/guarantees.md` never names `tidy` or `hello` tidying (`rg -n 'tidy'`, no hits), so it needs no change.
 * **For thread 13's file, not mine to edit.** Item 4 of *What the demo needs next* in `thread-13-proof.md` says "A timer calling
   `bank.tidy()`". It stands as to the timer, but needs the new name, and a call after each `hello`. The proof bears this out.
-* **For thread 14: what the specs in `whiteboard/20261102-unrace/` now get wrong.** All say `tidy` for `autolock`.
-  * `hello` calls it: `unrace-gating.md:131`, `models-invariants.md:307`, `unrace-preplan.md:135`.
-  * It vacates rows itself, or any row: `unrace-gating.md:22`, `:206`, `models-invariants.md:255`, `:307`.
-  * In name only: `unrace-gating.md:132`, `:345`, `:472`, `:512`, `models-invariants.md:286`, `noted.md:9`, `unrace-preplan.md:237`,
+* **For thread 14: what the specs in `whiteboard/20261102-newdesign/` and `whiteboard/20261103-unrace/` now get wrong.** All say `tidy` for `autolock`.
+  * `hello` calls it: `newdesign-proof.md:131`, `newdesign-models.md:307`, `unrace-preplan.md:135`.
+  * It vacates rows itself, or any row: `newdesign-proof.md:22`, `:206`, `newdesign-models.md:255`, `:307`.
+  * In name only: `newdesign-proof.md:132`, `:345`, `:472`, `:512`, `newdesign-models.md:286`, `noted.md:9`, `unrace-preplan.md:237`,
     `:240`.
 * **For the Coach.**
   * **A late page unlocks past autolock unless its host calls `autolock`.** Is that the ruling's intent, or should `Lease.peek`

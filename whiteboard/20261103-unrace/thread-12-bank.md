@@ -29,7 +29,7 @@ Branch `20261103-bank`, PR #460, stacked on #459. Justify: green; safebyok 4755 
   * `hydrate` and `listing.fetch` both `ensureTimelyWorld`: harmless under the Bank, whose `ensureTimely` is a no-op, but a box under a vault with `maxMillis` 0 could fetch the vault twice. Left.
   * Node has no `globalThis.reportError`: use `vi.stubGlobal`, not `spyOn`.
   * `Vault`'s `delTyping` helper assigns to the world, which a frozen Bank refuses: tests use `vault.delVault()` with the world's dialog.
-* **Crossings, for `crossings.md`**:
+* **Crossings, for `reference-timings.md`**:
   * Two crossing `hello`s: the last to answer sets the stage, so an old `hello` refused by a sweep can mark the fresh listing `refused` until the next `hello`.
   * A record changed between `getBank` and the watch's start is not heard until the next fetch (the spec's order).
   * Fixed: an offline `hello` no longer refuses before `tidy`.

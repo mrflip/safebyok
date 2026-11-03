@@ -10,7 +10,7 @@ Branch `20261103-small_rulings`, PR #464, stacked on #463. Justify: green; core 
   2. `Listing.isRefusalOfRow`, widened in `VaultListing` by `vault_gone` and `vault_mismatch`, replaces `recordOfRefusal`. A refused
      gate verb's row reaches the Vault before the throw: tombstoned, or the other life in its slot. Two rows in `vault-gate.test.ts`,
      not the one asked for, as `vault_mismatch` is half of the change.
-  3. A section in `whiteboard/20261102-unrace/crossings.md`; six rows in `halpimonfire.test.ts` (seven with the `it.each`), all
+  3. A section in `whiteboard/20261102-newdesign/reference-timings.md`; six rows in `halpimonfire.test.ts` (seven with the `it.each`), all
      staged, none skipped.
   4. `bank.sweep` nulls `#lastHello` first; `MSX.vaultRow` makes `takeWorld` refuse `bad_record`. A row each.
 
@@ -50,7 +50,7 @@ Branch `20261103-small_rulings`, PR #464, stacked on #463. Justify: green; core 
 * **Discoveries**:
   * **The handoff's third case doesn't reject a gate change.** A tombstone or a sweep crossing the renewal's `buildLease` drops the
     held lease, so `#renewLease` sees it forgotten, vacates the new one and the verb *resolves*, over a vault gone or let go.
-    `demandReadyToAttach` is met after a store only in a **birth**: `vault_gone` or `disabled`. Pinned both ways, and `crossings.md`
+    `demandReadyToAttach` is met after a store only in a **birth**: `vault_gone` or `disabled`. Pinned both ways, and `reference-timings.md`
     says so.
   * Crossing, a sentence: a sweep during the renewal's `buildLease` erases the cached row, through `#vacateUnattached`, where a sweep
     otherwise leaves it; the next session asks for a proof.

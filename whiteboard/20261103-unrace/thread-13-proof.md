@@ -43,7 +43,7 @@ Branch `20261103-proof`, PR #462, stacked on #460. Justify: green; safebyok 4765
     own empty array. Both are harmless, and neither is coalesced.
 
 * **Deviations**: a second device, the store out of reach, and `bank.vacate` are rows the handoff did not ask for. The
-  demo needs them, and they are what checked the cold reads. `models-invariants.md` *Public* says `bank.vacate` leaves
+  demo needs them, and they are what checked the cold reads. `newdesign-models.md` *Public* says `bank.vacate` leaves
   the bank ready; the code, per thread 12, leaves it `made`, and the proof follows the code.
 
 * **Discoveries** (pinned by the proof, for whoever writes the demo):
@@ -56,7 +56,7 @@ Branch `20261103-proof`, PR #462, stacked on #460. Justify: green; safebyok 4765
     proof does not assert it).
   * A passkey's answer is spent by an attempt, its bytes zeroed: ask again for each one.
 
-* **Crossings, for `crossings.md`** (read from the code, not run):
+* **Crossings, for `reference-timings.md`** (read from the code, not run):
   * A `hello` in flight crossing `bank.vacate` lands on the same listing, so it can mark the bank `ready` and list the
     vaults again, locked, after a sign-out. It exposes only locked rows and holds no lease.
 
