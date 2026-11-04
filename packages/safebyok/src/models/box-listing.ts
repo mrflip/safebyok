@@ -4,7 +4,6 @@ import type { CipherCtxRecord } from '../crypto'
 import { VaultError } from '../errors'
 import { absentBoxError, notListedBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
-import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
@@ -93,13 +92,12 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Putting]: puttable, create, tryCreate, shellFor
 
-  /** The box a put of `scoped` goes through, taking this listing as timely: the one held, or a void one made for the slot. */
-  puttable(scoped: object, opts: BoxPutOpts = {}): Box {
-    const { ifAbsent, ifPresent } = MSX.boxPutOpts.parse(opts)
+  /** The box a put of `scoped` goes through: the one held, or a void one made for an empty slot. */
+  puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
+    const { ifAbsent } = MSX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
-    if ((ifPresent === 'fail') && ('whisper_ciphered' in scoped)) { throw recordForNewBox() }
     const held = this.at(scope)
-    if ((ifAbsent === 'fail') && (held?.isPresent !== true)) { throw notListedBoxError(scope) }
+    if ((held === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
     return held ?? this.#shellFor(scope)
   }
 
@@ -107,7 +105,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
     const filled = MSX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
-    return this.puttable(input, filled).put(dna, filled)
+    return this.puttable(input, filled).put({ ...input, ...dna }, filled)
   }
 
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
@@ -149,10 +147,4 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected isOwnRow(row: VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (row.vault_tok === this.world.vault_tok) }
   // --
 }
-// --
-
-// == [Refusals]: recordForNewBox
-
-/** A put that said only-if-new, handed a whole record: what it would store is recycled. */
-const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
 // --

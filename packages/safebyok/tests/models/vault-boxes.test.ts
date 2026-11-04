@@ -3,6 +3,7 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultListing } from '../../src/models/vault-listing'
+import * as Phrases from '../../src/phrases'
 import * as VS from '../../src/storage/vault-db-shapes'
 import * as TH from '../test-helpers'
 import { Passphrase, byPassphrase, delTyping, makeBornVault, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
@@ -449,6 +450,14 @@ describe("a void instance, then a put: no hello, no fetch", () => {
 })
 
 describe("vault.putBox over a live box", () => {
+  it("under ifPresent 'fail', refuses a whole record, saying its data would be recycled, and stores nothing", async () => {
+    const { vault, boxrows, tryPutBox } = await makeWorldWithBox()
+    tryPutBox.mockClear()
+    const err = await TH.expectRefusal(vault.putBox(boxrows.get(boxlabel) as never, { ifPresent: 'fail' }), 'bad_option')
+    expect(err.message).to.eq(Phrases.RecordForNewBox)
+    expect(tryPutBox).not.toHaveBeenCalled()
+  })
+
   it("under ifAbsent 'fail' over a box deleted elsewhere, refuses 'absent_box' with the tombstone delivered", async () => {
     const { next, box } = await nextUnlisted()
     const elsewhere = await next.getBox(boxlabel)

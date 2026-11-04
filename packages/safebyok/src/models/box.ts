@@ -1,6 +1,6 @@
 import { type CipherCtxRecord, makeLifeTok, randomId } from '../crypto'
 import { VaultError } from '../errors'
-import { absentBoxError } from '../helpers/throwers'
+import { absentBoxError, notListedBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
@@ -83,12 +83,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  /** The parsed `patch`, once it names this box, the box is enabled, the vault usable and the record whole. */
-  demandPuttable(patch: BoxPatch): BoxPatchGiven {
+  /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
+  demandPuttable(patch: BoxPatch, { ifAbsent, ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
     const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
     this.demandEnabled()
     this.world.demandBoxesUsable()
     this.demandWhole()
+    if ((ifAbsent === 'fail') && (! this.isPresent)) { throw notListedBoxError(this) }
     return given
   }
 
@@ -145,10 +147,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seals `patch` over the record in hand and stores it, answering the box listed; a box gone comes back. */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
     const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = MSX.boxPutOpts.parse(opts)
-    this.listing.puttable({ ...patch, ...this.scope }, { ifAbsent, ifPresent })
-    await this.ensurePuttable(timely); const given = this.demandPuttable(patch)
+    await this.ensurePuttable(timely)
+    const given = this.demandPuttable(patch, { ifAbsent, ifPresent })
     const { record, prior } = await this.#edit(given)
-    this.demandPuttable(patch)
+    this.demandPuttable(patch, { ifAbsent, ifPresent })
     return this.listing.put(record, { prior, ifAbsent, ifPresent })
   }
 
@@ -236,8 +238,10 @@ const parseJsonOrNull = (text: string): unknown => {
 }
 // --
 
-// == [Refusals]: undecodedWhisper
+// == [Refusals]: recordForNewBox, undecodedWhisper
 
+/** A put that said only-if-new, handed a whole record. */
+const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
 
 const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --

@@ -293,26 +293,17 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(listing.puttable(gone.scope)).to.eq(gone)
   })
 
-  it("under ifAbsent 'fail', answers a live box and refuses void or tombstone as 'absent_box', naming vault.hello", async () => {
+  it("under ifAbsent 'fail', answers the box held, alive or deleted, and refuses an empty slot as 'absent_box', naming vault.hello", async () => {
     const listing = boxListingOf(held.mw)
     const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
     const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
     expect(listing.puttable(alive.scope, { ifAbsent: 'fail' })).to.eq(alive)
-    for (const scope of [gone.scope, held.mw.boxscope('void_one')]) {
-      const err = TH.expectSyncRefusal(() => listing.puttable(scope, { ifAbsent: 'fail' }), 'absent_box')
-      expect(err.message).to.eq(Phrases.boxNotListed(scope.boxlabel))
-      expect(err.message).to.contain('vault.hello')
-    }
-    expect(listing.at(held.mw.boxscope('void_one'))).to.be.null
-  })
-
-  it("under ifPresent 'fail', refuses a whole record or a box as 'bad_option': what it would store is recycled", async () => {
-    const listing = boxListingOf(held.mw)
-    const box = await listing.build(fullBoxRecord())
-    TH.expectSyncRefusal(() => listing.puttable(fullBoxRecord(), { ifPresent: 'fail' }), 'bad_option')
-    TH.expectSyncRefusal(() => listing.puttable(box, { ifPresent: 'fail' }), 'bad_option')
-    expect(listing.puttable(fullBoxRecord())).to.eq(box)
-    expect(listing.puttable(box.scope, { ifPresent: 'fail' })).to.eq(box)
+    expect(listing.puttable(gone.scope, { ifAbsent: 'fail' })).to.eq(gone)
+    const scope = held.mw.boxscope('void_one')
+    const err = TH.expectSyncRefusal(() => listing.puttable(scope, { ifAbsent: 'fail' }), 'absent_box')
+    expect(err.message).to.eq(Phrases.boxNotListed(scope.boxlabel))
+    expect(err.message).to.contain('vault.hello')
+    expect(listing.at(scope)).to.be.null
   })
 
   it("refuses 'bad_scope' and a bad option, making no void box", () => {
@@ -338,6 +329,13 @@ describe("boxListing.puttable(scoped, opts)", () => {
 })
 
 describe("boxListing.create(dna, opts)", () => {
+  it("refuses a whole record as 'bad_option', storing nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.create({ ...fullBoxRecord() }), 'bad_option')
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+    expect(listing.things).to.deep.equal([])
+  })
+
   it("refuses ifAbsent 'fail' as 'bad_option': a create that must find a box is not a create", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.create(dna(), { ifAbsent: 'fail' } as never), 'bad_option')
