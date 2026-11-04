@@ -464,9 +464,9 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose world fakes the seal further, for a test that wants sealed parts it can tell apart by revision, or acts while a `send` is sealing: the whisper given to `send` comes out as the fake ciphered bags named for the revision it is sealed under, and `duringSeal` runs once the real seal is done.
+/** A {@link boxListingOf} whose world fakes the seal further, for a test that wants sealed parts it can tell apart by revision, or acts while a `put` is sealing: the whisper given to `put` comes out as the fake ciphered bags named for the revision it is sealed under, and `duringSeal` runs once the real seal is done.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.send({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {

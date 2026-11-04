@@ -474,7 +474,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
     TH.expectSyncRefusal(() => vault.demandUsable(), 'disabled')
     TH.expectSyncRefusal(() => vault.demandBoxesUsable(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandSendable(), 'disabled')
+    TH.expectSyncRefusal(() => box.demandPuttable(), 'disabled')
     TH.expectSyncRefusal(() => box.demandUnsealable(), 'disabled')
     TH.expectSyncRefusal(() => { box.whisper = { val: 'sk-test' } }, 'disabled')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')

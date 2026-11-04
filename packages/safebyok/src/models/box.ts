@@ -8,7 +8,7 @@ import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
 import type { BoxWorld } from './box-listing'
-import { type BoxPatchGiven, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type LockState, type SendOpts, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import { type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type LockState, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 
@@ -29,7 +29,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
 /** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
 export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
 
-/** A host's patch for `send`: either of the {@link BoxHalves} or both, the half left out being kept, and any other prop of the box's record, which the box controls and ignores, so `{ ...record, whisper, sidecar }` will do. `boxPatch` checks it. */
+/** A host's patch for `put`: either of the {@link BoxHalves} or both, the half left out being kept, and any other prop of the box's record, which the box controls and ignores, so `{ ...record, whisper, sidecar }` will do. `boxPatch` checks it. */
 export type BoxPatch = { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
 
 /** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
@@ -48,7 +48,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly world: BoxWorld
 
-  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: a `send` seals the whisper it is given. */
+  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: a `put` seals the whisper it is given. */
   #exposed: WhisperHolder | null = null
 
   // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
@@ -68,7 +68,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
   // --
 
-  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensureSendable, demandSendable, ensureExposable, demandExposable
+  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensurePuttable, demandPuttable, ensureExposable, demandExposable
 
   demandPresent(): this {
     if (! this.isPresent) { throw absentBoxError(this) }
@@ -80,10 +80,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
   demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
-  ensureSendable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
+  ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  /** A send needs the box enabled and the vault unlocked, and no more: a box gone is sent back to life. */
-  demandSendable(): this { return this.demandEnabled().demandUnlocked() }
+  /** A put needs the box enabled and the vault unlocked, and no more: a box gone comes back to life. */
+  demandPuttable(): this { return this.demandEnabled().demandUnlocked() }
 
   ensureExposable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
@@ -135,21 +135,21 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Sending]: send, trySend, edit
+  // == [Putting]: put, tryPut, edit
 
   /** SLOPDOC: Seals `patch` over the record in hand and stores it, or brings a gone box back to life. */
-  async send(patch: BoxPatch, opts: SendOpts = {}): Promise<this> {
-    const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
+  async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
+    const { ifPresent, ...timely } = MSX.boxPutOpts.parse(opts)
     const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
-    await this.ensureSendable(timely); this.demandSendable()
+    await this.ensurePuttable(timely); this.demandPuttable()
     const ante = this.central
     const record = await this.#edit(given, ante)
-    await this.ensureSendable(); this.demandSendable()
+    await this.ensurePuttable(); this.demandPuttable()
     await this.listing.put(record, { prior: ante, ifPresent })
     return this
   }
 
-  trySend(patch: BoxPatch, opts: SendOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.send(patch, opts)) }
+  tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.put(patch, opts)) }
 
   /** SLOPDOC: The next record `patch` makes of `ante`, sealed through the vault and not yet stored. */
   async #edit({ whisper, sidecar }: BoxPatchGiven, ante: Fetched<BoxRecord, BoxSparse>): Promise<BoxRecord> {

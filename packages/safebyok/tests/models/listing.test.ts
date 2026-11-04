@@ -432,13 +432,13 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(told).to.eq(2)
     })
 
-    it("follows a thing's change that no delivery brought: a send, once", async () => {
+    it("follows a thing's change that no delivery brought: a put, once", async () => {
       const listing = boxListingOf(held.mw)
       held.mw.seedStore(fullBoxRecord())
       const box = await listing.build(fullBoxRecord())
       let told = 0
       listing.subscribe(() => { told += 1 })
-      await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
+      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
       expect(told).to.eq(1)
       expect(listing.snapshot[0]).to.eq(box.getSnapshot())
       expect(listing.snapshot[0]?.sidecar).to.deep.equal({ note: 'edited' })
@@ -713,7 +713,7 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
 
 const aliveRow = fullBoxRecord()
 
-describe("listing.put and listing.del: the prior tok they send", () => {
+describe("listing.put and listing.del: the prior tok they put", () => {
   it("refuses 'invalid_input' a record at a revision other than 0 for a box not held, changing nothing", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { prior: VS.VoidRevision }), 'invalid_input')
@@ -743,7 +743,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(aliveRow)
     const box = await listing.build(aliveRow)
-    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
     expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a1'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_seq: 2, revision_tok: box.revision_tok })
   })
@@ -751,7 +751,7 @@ describe("listing.put and listing.del: the prior tok they send", () => {
   it("meets 'stale_write' carrying nothing from a put, and 'record_conflict' from a del, where the box held is stored no more", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(aliveRow)
-    const putErr = await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
+    const putErr = await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
     expect(putErr.meta?.dbhas).to.be.null
     await TH.expectRefusal(box.del(), 'record_conflict')
     expect(box._cheat_central.revision_tok).to.eq('rev-a1')
@@ -762,8 +762,8 @@ describe("listing.put and listing.del: the prior tok they send", () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
     const box = await listing.build(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))
-    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'once' } }), 'stale_write')
-    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'twice' } }), 'stale_write')
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'once' } }), 'stale_write')
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'twice' } }), 'stale_write')
     expect(box._cheat_central.revision_seq).to.eq(5)
     expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a5', 'rev-a5'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_tok: 'rev-a3' })

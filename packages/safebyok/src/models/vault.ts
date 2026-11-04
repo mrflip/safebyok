@@ -13,7 +13,7 @@ import type { BoxListing, BoxWorld } from './box-listing'
 import { Gate } from './gate'
 import { type ProvingsForGatingkind, Gating } from './gating'
 import { Lease } from './lease'
-import type { Fetched, FetchOpts, GateProps, LeaseFriend, LockState, SealedWhisper, SendOpts, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { BoxPutOpts, Fetched, FetchOpts, GateProps, LeaseFriend, LockState, SealedWhisper, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type Proving, NOVEL } from './proving'
 import { Storable } from './storable'
@@ -397,21 +397,21 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** SLOPDOC: Seals and stores the box `patch` names: by its `send` where one is listed, as a birth where none is. */
-  async putBox(patch: BoxPut, opts: SendOpts = {}): Promise<Box> {
+  /** SLOPDOC: Seals and stores the box `patch` names: by its `put` where one is listed, as a birth where none is. */
+  async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
     const { whisper, sidecar, ...named } = MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
-    const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
+    const { ifPresent, ...timely } = MSX.boxPutOpts.parse(opts)
     const scope = this.#boxscopeOf(named.boxlabel)
     this.demandBoxesUsable(named)
     const boxes = this.boxListing
     const held = boxes.at(scope) ?? ((whisper === undefined) ? await boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }) : null)
-    if (held !== null) { return held.send({ whisper, sidecar }, opts) }
+    if (held !== null) { return held.put({ whisper, sidecar }, opts) }
     if (whisper === undefined) { throw noWhisperToKeep() }
     await this.ensureTimely(timely.maxWorldMillis); this.demandBoxesUsable()
     return boxes.create({ ...scope, whisper, sidecar: sidecar ?? {} }, { ifPresent })
   }
 
-  tryPutBox(patch: BoxPut, opts: SendOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
+  tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
   /** SLOPDOC: Deletes the box under `boxlabel`, a damaged row included, answering its tombstone if one was stored. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {

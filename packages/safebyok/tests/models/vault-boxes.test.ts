@@ -1,4 +1,4 @@
-/** A vault's box verbs, from the host's side, on real seals: `hello`, `getBox`, `putBox`, `delBox`, a box's `extractWhisper`, and the sidecar-only `send`. */
+/** A vault's box verbs, from the host's side, on real seals: `hello`, `getBox`, `putBox`, `delBox`, a box's `extractWhisper`, and the sidecar-only `put`. */
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
@@ -339,11 +339,11 @@ describe("vault.putBox over a live box", () => {
   })
 })
 
-describe("a sidecar-only send", () => {
+describe("a sidecar-only put", () => {
   it("unseals and reseals: the sidecar moves, the whisper opens as it was, sealed anew under the new stamp", async () => {
     const { box, boxrows } = await makeWorldWithBox()
     const before = boxrows.get(boxlabel) as { whisper_ciphered: unknown }
-    await box.send({ sidecar: { note: 'home' } })
+    await box.put({ sidecar: { note: 'home' } })
     const after = boxrows.get(boxlabel) as { whisper_ciphered: unknown }
     expect(box.sidecar).to.deep.equal({ note: 'home' })
     expect(after.whisper_ciphered).not.to.deep.equal(before.whisper_ciphered)
@@ -353,7 +353,7 @@ describe("a sidecar-only send", () => {
   it("opens the stored whisper, never the one exposed", async () => {
     const { box } = await makeWorldWithBox()
     box.whisper = { val: 'sk-test-exposed' }
-    await box.send({ sidecar: { note: 'home' } })
+    await box.put({ sidecar: { note: 'home' } })
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
@@ -364,9 +364,9 @@ describe("a sidecar-only send", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("a whisper-only send keeps the sidecar", async () => {
+  it("a whisper-only put keeps the sidecar", async () => {
     const { box } = await makeWorldWithBox()
-    await box.send({ whisper: { val: 'sk-test-0001' } })
+    await box.put({ whisper: { val: 'sk-test-0001' } })
     expect(box.sidecar).to.deep.equal(Sidecar)
     expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
   })
@@ -375,7 +375,7 @@ describe("a sidecar-only send", () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     vault.lock()
     tryPutBox.mockClear()
-    await TH.expectRefusal(box.send({ sidecar: { note: 'home' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ sidecar: { note: 'home' } }), 'vault_locked')
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 })

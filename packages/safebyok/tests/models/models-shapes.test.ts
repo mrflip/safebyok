@@ -303,7 +303,7 @@ describe("The checks of options", () => {
     ])
   })
 
-  describe("MSX.timelyOpts and MSX.sendOpts", () => {
+  describe("MSX.timelyOpts and MSX.boxPutOpts", () => {
     holdsCases(MSX.timelyOpts, 'bad_option', [
       [{},                                          true,  'passes no options'],
       [{ maxMillisSinceRefresh: 0, maxWorldMillis: Infinity }, true, 'passes both horizons'],
@@ -312,7 +312,7 @@ describe("The checks of options", () => {
       [{ maxWorldMillis: '5' },                     false, 'refuses a world horizon that is text'],
       [{ maxWorldMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
     ])
-    holdsCases(MSX.sendOpts, 'bad_option', [
+    holdsCases(MSX.boxPutOpts, 'bad_option', [
       [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
       [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon, as timelyOpts does'],
@@ -320,7 +320,7 @@ describe("The checks of options", () => {
 
     it("take their fields from the bag given and strip the rest", () => {
       expect(MSX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
-      expect(MSX.sendOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
+      expect(MSX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
     })
 
     it("name the failing field", () => {
@@ -532,7 +532,7 @@ describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
   })
 })
 
-describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
+describe("MSX.ifPresentVals, MSX.ifPresent and MSX.boxPutOpts", () => {
   it("name the three policies", () => {
     expect(MSX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
   })
@@ -542,10 +542,10 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],
     ["replace",  false, 'refuses replace, which it does not spell'],
-    [undefined,  false, 'refuses undefined: sendOpts makes it optional, not the check'],
+    [undefined,  false, 'refuses undefined: boxPutOpts makes it optional, not the check'],
   ])
 
-  holdsCases(MSX.sendOpts, 'bad_option', [
+  holdsCases(MSX.boxPutOpts, 'bad_option', [
     [{},                                                true,  'passes no options'],
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
@@ -555,11 +555,11 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
   ])
 
   it("keeps ifPresent and the timely options and strips the rest", () => {
-    expect(MSX.sendOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'nil', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5 })
+    expect(MSX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'nil', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5 })
   })
 
   it("name the failing field", () => {
-    const err = TH.expectSyncRefusal(() => MSX.sendOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => MSX.boxPutOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['ifPresent'])
   })
 })

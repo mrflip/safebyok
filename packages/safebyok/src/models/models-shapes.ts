@@ -135,7 +135,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
 /** True where a patch names a half of its box. */
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
-/** SLOPDOC: The checks of what a caller hands to make or update a box: for `create`, `send` and `putBox`. */
+/** SLOPDOC: The checks of what a caller hands to make or update a box: for `create`, `put` and `putBox`. */
 export const { boxDna, boxPatch, boxPut } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
   const halves  = { whisper: whisperHolder, sidecar }
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
@@ -175,9 +175,9 @@ export type BoxesListed = Z.output<typeof boxesListed>
 export const boxlabelArg = Checker(({ boxlabel }) => boxlabel, 'bad_option')
 // --
 
-// == [Options]: ifPresentVals, ifAbsentVals, putIfAbsentVals, ifPresent, ifAbsent, putIfAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener, IfPresent, IfAbsent, PutIfAbsent, TimelyOpts, FetchOpts, SendOpts, StorableOpts
+// == [Options]: ifPresentVals, ifAbsentVals, putIfAbsentVals, ifPresent, ifAbsent, putIfAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, storableOpts, listener, IfPresent, IfAbsent, PutIfAbsent, TimelyOpts, FetchOpts, BoxPutOpts, StorableOpts
 
-/** The policies when sending a record to a place that already holds a live one: `repl`, the default, replaces it; `fail` refuses `camped`; `get` saves nothing and takes up the live record. Storage decides, atomically. */
+/** The policies when putting a record to a place that already holds a live one: `repl`, the default, replaces it; `fail` refuses `camped`; `get` saves nothing and takes up the live record. Storage decides, atomically. */
 export const { ifPresentVals } = VS
 
 /** The policies when fetching a thing that is absent, never stored or deleted: `fail` with the absent refusal, or resolve `nil`. */
@@ -190,7 +190,7 @@ export const { putIfAbsentVals } = VS
 export const Promptly = 2000
 
 /** SLOPDOC: The checks of the options a storable and its verbs take. */
-export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
+export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, storableOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
   const ifPresent     = oneof(ifPresentVals)
   const ifAbsent      = oneof(ifAbsentVals)
   const putIfAbsent   = oneof(putIfAbsentVals)
@@ -198,16 +198,16 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   const maxMillis     = horizonMillis.optional()
   const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
   const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.optional() })
-  const sendOpts      = timelyOpts.extend({ ifPresent: ifPresent.optional() })
+  const boxPutOpts    = timelyOpts.extend({ ifPresent: ifPresent.optional() })
   const storableOpts  = obj({
     /** The refresh horizon: how long after its last refresh the record in hand stays timely. */
     maxMillisSinceRefresh: horizonMillis,
   })
   const listener      = fn<() => void>()
-  return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener }
+  return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, storableOpts, listener }
 })
 
-/** How `send` meets a live record storage holds, as {@link ifPresent} checks it: one of {@link ifPresentVals}. */
+/** How `put` meets a live record storage holds, as {@link ifPresent} checks it: one of {@link ifPresentVals}. */
 export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
@@ -222,8 +222,8 @@ export type TimelyOpts = Z.infer<typeof timelyOpts>
 /** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
 export type FetchOpts = Z.infer<typeof fetchOpts>
 
-/** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional, one of {@link ifPresentVals}: `repl` by default. */
-export type SendOpts = Z.infer<typeof sendOpts>
+/** `put`'s options: its {@link TimelyOpts}, and `ifPresent`, optional, one of {@link ifPresentVals}: `repl` by default. */
+export type BoxPutOpts = Z.infer<typeof boxPutOpts>
 
 /** The options a storable is made with, after its world, listing and records: its refresh horizon. */
 export type StorableOpts = Z.infer<typeof storableOpts>

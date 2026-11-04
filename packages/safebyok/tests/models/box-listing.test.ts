@@ -570,12 +570,12 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     expect(listing.snapshot[0]).to.include({ present: true, full: false, sidecar: null })
   })
 
-  it("follows the box through a send: the listing shows the sidecar `box.sidecar` now gives", async () => {
+  it("follows the box through a put: the listing shows the sidecar `box.sidecar` now gives", async () => {
     const listing = boxListingOf(held.mw)
     const record = fullBoxRecord({ sidecar: { uncle: 'Bob' } })
     held.mw.seedStore(record)
     const box = await listing.build(record)
-    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { uncle: 'Robert' } })
+    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { uncle: 'Robert' } })
     expect(box.sidecar).to.deep.equal({ uncle: 'Robert' })
     expect(listing.snapshot[0]?.sidecar).to.deep.equal({ uncle: 'Robert' })
   })

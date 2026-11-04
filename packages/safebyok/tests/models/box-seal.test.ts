@@ -26,12 +26,12 @@ const sealWorld = async () => {
 }
 
 describe("a box sealed and unsealed through the vault's lease", () => {
-  it("opens the whisper create sealed, and the one a later send sealed, each as its { val }; the sealed parts carry none of it", async () => {
+  it("opens the whisper create sealed, and the one a later put sealed, each as its { val }; the sealed parts carry none of it", async () => {
     const { boxes } = await sealWorld()
     const box = await boxes.create(BoxDna)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
     expect(JSON.stringify(box._cheat_central)).to.not.include('sk-test-0000')
-    await box.send({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } })
+    await box.put({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } })
     expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-1111' })
   })
 
@@ -50,6 +50,6 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     const box = await boxes.create(BoxDna)
     vault.lock()
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
-    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-1111' }, sidecar: { account: 'home' } }), 'vault_locked')
   })
 })

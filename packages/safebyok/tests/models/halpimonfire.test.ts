@@ -1,4 +1,4 @@
-/** Crossings pinned as the code meets them: a `lock()` in a send, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
+/** Crossings pinned as the code meets them: a `lock()` in a put, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
@@ -13,15 +13,15 @@ import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, m
 const held = useModelsWorld()
 useVaultWorlds()
 
-describe("a lock() landing during a send", () => {
-  it("during the seal refuses 'vault_locked', putting nothing: send checks the lock at both ends of the seal", async () => {
+describe("a lock() landing during a put", () => {
+  it("during the seal refuses 'vault_locked', putting nothing: put checks the lock at both ends of the seal", async () => {
     const lock = { during: false }
     const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLockState('locked') } })
     const record = fullBoxRecord()
     held.mw.seedStore(record)
     const box = await listing.build(record)
     lock.during = true
-    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -33,7 +33,7 @@ describe("a lock() landing during a send", () => {
       held.mw.setLockState('locked')
       return held.mw.answerOf(box.scope, sent)
     })
-    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
+    await expect(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
     expect(box.sidecar).to.deep.equal({ note: 'sent while locking' })
   })
