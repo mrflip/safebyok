@@ -1,6 +1,6 @@
 import { type CipherCtxRecord, makeLifeTok, randomId } from '../crypto'
 import { VaultError } from '../errors'
-import { absentBoxError, notListedBoxError } from '../helpers/throwers'
+import { absentBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
@@ -91,7 +91,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     this.demandEnabled()
     this.world.demandBoxesUsable()
     this.demandWhole()
-    if ((ifAbsent === 'fail') && (! this.isPresent)) { throw notListedBoxError(this) }
+    if (ifAbsent === 'fail') { this.demandPresent() }
     return given
   }
 

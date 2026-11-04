@@ -105,7 +105,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
     const filled = MSX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
-    return this.puttable(input, filled).put({ ...input, ...dna }, filled)
+    return this.puttable(input, filled).put(dna, filled)
   }
 
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
