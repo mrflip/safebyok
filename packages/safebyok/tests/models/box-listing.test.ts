@@ -265,6 +265,73 @@ const heldBox = async () => {
 }
 
 
+const Label = 'anthropic_api_key'
+
+describe("boxListing.get(scoped, opts)", () => {
+  it("hydrates a box held, answering that instance", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(sparseBoxRecord())
+    held.mw.seedStore(fullBoxRecord())
+    held.mw.clearCalls()
+    await expect(listing.get(box.scope)).resolves.to.eq(box)
+    expect(box.isFull).to.be.true
+    expect(held.mw.callsOf('get')).to.have.length(1)
+  })
+
+  it("asks nothing of a full box held within its horizon, and asks again given a horizon of 0", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    held.mw.seedStore(fullBoxRecord())
+    held.mw.clearCalls()
+    await listing.get(box.scope)
+    expect(held.mw.callsOf('get')).to.deep.equal([])
+    await listing.get(box.scope, { maxMillisSinceRefresh: 0 })
+    expect(held.mw.callsOf('get')).to.have.length(1)
+  })
+
+  it("fetches a box not held, and holds what it finds", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.seedStore(fullBoxRecord())
+    const box = await listing.get(held.mw.boxscope(Label))
+    expect(box?.isFull).to.be.true
+    expect(listing.at(held.mw.boxscope(Label))).to.eq(box)
+  })
+
+  it("refuses a box absent as 'absent_box', or answers null where asked for nil", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)), 'absent_box')
+    expect(await listing.get(held.mw.boxscope(Label), { ifAbsent: 'nil' })).to.be.null
+  })
+
+  it("refuses a box whose tombstone it finds as absent, or answers null where asked for nil", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(tombstoneBoxRecord())
+    held.mw.seedStore(tombstoneBoxRecord())
+    await TH.expectRefusal(listing.get(box.scope), 'absent_box')
+    expect(await listing.get(box.scope, { ifAbsent: 'nil' })).to.be.null
+  })
+
+  it("refuses 'vault_locked' before asking storage for anything", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.seedStore(fullBoxRecord())
+    held.mw.setLockState('locked')
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)), 'vault_locked')
+    expect(held.mw.calls).to.deep.equal([])
+  })
+
+  it("refuses 'bad_option' fed a put's ifAbsent, and 'disabled' once vacated", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label), { ifAbsent: 'add' } as never), 'bad_option')
+    listing.vacate()
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)), 'disabled')
+  })
+
+  it("tryGet answers the outcome", async () => {
+    const outcome = await boxListingOf(held.mw).tryGet(held.mw.boxscope(Label))
+    expect(outcome.ok).to.be.false
+  })
+})
+
 describe("BoxListing: an absent box", () => {
   describe("listing.fetch(scope) of nothing stored", () => {
     it("refuses 'absent_box' for a box not held, holding none", async () => {

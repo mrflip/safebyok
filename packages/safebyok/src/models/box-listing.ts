@@ -11,15 +11,16 @@ import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/
 import * as VS from '../storage/vault-db-shapes'
 import { type BoxSnapshot, Box, sealedRecordOf } from './box'
 import { type DelTombstone, Listing } from './listing'
-import { type BoxesListed, type BoxRecord, type BoxSparse, type Dna, type Fetched, type ListingOpts, type ListingWorld, type PutListingOpts, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxesListed, type BoxRecord, type BoxSparse, type Dna, type Fetched, type FetchOpts, type ListingOpts, type ListingWorld, type PutListingOpts, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
 
-/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope and token, and its seal verbs. */
+/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
 export type BoxWorld = ListingWorld & {
   scope:     VaultScope
   vault_tok: string
+  demandBoxesUsable(): unknown
   sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
   unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
 }
@@ -73,6 +74,29 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     const { boxlabel } = this.scopeOf(duck)
     this.#damagedRecords = Object.freeze(this.#damagedRecords.filter((damaged) => damaged.boxlabel !== boxlabel))
     return thing
+  }
+  // --
+
+  // == [Finding]: get, tryGet, demandUsable
+
+  /** The present box under `scoped`, as fresh as asked: one held hydrates, any other is fetched. */
+  async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
+    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
+    const scope = this.scopeOf(scoped)
+    this.demandUsable()
+    const box = await (this.at(scope)?.hydrate(timely) ?? this.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
+    this.demandUsable()
+    if (box?.isPresent === true) { return box }
+    if (ifAbsent === 'nil') { return null }
+    throw this.nothingStoredError(scope)
+  }
+
+  tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
+
+  /** What a box verb needs: the vault usable and unlocked, and this listing enabled. */
+  demandUsable(): this {
+    this.world.demandBoxesUsable()
+    return this.demandEnabled()
   }
   // --
 

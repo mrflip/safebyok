@@ -378,6 +378,7 @@ describe("the proof", () => {
   it("a second device: what it does reaches this one's components through the watch, with nobody asked and no lock", async () => {
     const { world, bank, vault, dialog } = await buildHost()
     const box = await vault.putBox(ApiKey)
+    await vault.hello()
     const bankUi = mountComponent(bank, bankStatus)
     const boxesUi = mountComponent(vault.boxListing, boxList)
     bankUi.expectRenders(['ready: main unlocked'])

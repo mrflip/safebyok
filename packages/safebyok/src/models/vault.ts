@@ -1,7 +1,7 @@
 import { verifyConsistent } from '../checks/validator'
 import type { CipherCtxRecord } from '../crypto'
 import { VaultError } from '../errors'
-import { absentBoxError, deletedVaultError } from '../helpers/throwers'
+import { deletedVaultError } from '../helpers/throwers'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { reportToPlatform } from '../report-error'
@@ -54,9 +54,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #boxListing: BoxListing | null = null
 
   #gate: { props: GateProps, gate: Gate } | null = null
-
-  /** Set once a `hello` has listed the boxes. */
-  #isGreeted = false
 
   // == [Props, as the record has them]: fmt
 
@@ -376,30 +373,21 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form, demandBoxesUsable, ensureGreeted
+  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form, demandBoxesUsable
 
-  /** Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. The first box call runs it; a host may run it sooner. */
+  /** Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. No box verb needs it; the host runs it for the list and the pushes. */
   async hello(): Promise<this> {
     const listed = await this.listing.fetchListed(this)
     await this.ensureUsable(); this.demandUsable()
     await this.boxListing.hello(listed)
-    this.#isGreeted = true
     return this
   }
 
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
 
-  /** SLOPDOC: Finds the full box under `boxlabel`, as fresh as the caller asked. */
+  /** As {@link BoxListing.get}, for the box under `boxlabel`. */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
-    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
-    const scope = this.#boxscopeOf(boxlabel)
-    await this.#ensureGreeted(); this.demandBoxesUsable()
-    const boxes = this.boxListing
-    const box = await (boxes.at(scope)?.hydrate(timely) ?? boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
-    await this.#ensureGreeted(); this.demandBoxesUsable()
-    if (box?.isPresent === true) { return box }
-    if (ifAbsent === 'nil') { return null }
-    throw absentBoxError(scope)
+    return this.boxListing.get(this.#boxscopeOf(boxlabel), opts)
   }
 
   tryGetBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(boxlabel, opts)) }
@@ -414,7 +402,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const { whisper, sidecar, ...named } = MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     const scope = this.#boxscopeOf(named.boxlabel)
-    await this.#ensureGreeted()
     this.demandBoxesUsable(named)
     const boxes = this.boxListing
     const held = boxes.at(scope) ?? ((whisper === undefined) ? await boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }) : null)
@@ -430,7 +417,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const timely = MSX.timelyOpts.parse(opts)
     const scope = this.#boxscopeOf(boxlabel)
-    await this.#ensureGreeted(); this.demandBoxesUsable()
+    this.demandBoxesUsable()
     const boxes = this.boxListing
     const held = boxes.at(scope)
     if (held !== null) { return held.del(timely) }
@@ -444,11 +431,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   demandBoxesUsable(bag: object = {}): this {
     verifyConsistent(bag, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     return this.demandUsable().demandUnlocked()
-  }
-
-  /** This vault having said hello. */
-  async #ensureGreeted(): Promise<void> {
-    if (! this.#isGreeted) { await this.hello() }
   }
 
   #boxscopeOf(boxlabel: string): Boxscope { return { ...this.scope, boxlabel: MSX.boxlabelArg.parse(boxlabel) } }
