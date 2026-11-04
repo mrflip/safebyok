@@ -2,12 +2,13 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
+import type { BoxWorld } from '../../src/models/box-listing'
 import type { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import { Proving } from '../../src/models/proving'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 const held = useModelsWorld()
@@ -71,6 +72,34 @@ describe("A lock that lands during a box verb", () => {
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
     await TH.expectRefusal(vault.fetchBox('anthropic_api_key'), 'vault_locked')
+  })
+})
+
+/** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
+const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
+  const unsealStampedString: BoxWorld['unsealStampedString'] = async (sealed, stamp) => {
+    const whisperText = await held.mw.world.unsealStampedString(sealed, stamp)
+    crossing(box)
+    return whisperText
+  }
+  const listing = boxListingOf(held.mw, { world: { ...held.mw.world, unsealStampedString } })
+  const box = await listing.create(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
+  return box
+}
+
+describe("An ending that lands while box.expose unseals", () => {
+  it.each(['sweep', 'vacate'] as const)("a %s refuses 'disabled', and leaves nothing exposed", async (ending) => {
+    const box = await boxCrossingUnseal((crossed) => crossed[ending]())
+    await TH.expectRefusal(box.expose(), 'disabled')
+    expect(box.isDisabled).to.be.true
+    expect(box.whisper).to.be.null
+  })
+
+  it("a lock() refuses 'vault_locked', and leaves nothing exposed", async () => {
+    const box = await boxCrossingUnseal(() => { held.mw.setLockState('locked') })
+    await TH.expectRefusal(box.expose(), 'vault_locked')
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.be.null
   })
 })
 

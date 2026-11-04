@@ -70,7 +70,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
   // --
 
-  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensurePuttable, demandPuttable, ensureExposable, demandExposable
+  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensurePuttable, demandPuttable, demandExposable
 
   demandPresent(): this {
     if (! this.isPresent) { throw absentBoxError(this) }
@@ -86,8 +86,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** A put needs the box enabled and the vault unlocked, and no more: a box gone comes back to life. */
   demandPuttable(): this { return this.demandEnabled().demandUnlocked() }
-
-  ensureExposable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
   /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
   demandExposable(): this { return this.demandEnabled().demandUnlocked() }
@@ -120,7 +118,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** SLOPDOC: Opens the stored whisper and holds it on the instance, where `box.whisper` offers it until forgotten. */
   async expose(opts: TimelyOpts = {}): Promise<this> {
     const exposed = await this.extractWhisper(opts)
-    await this.ensureExposable(); this.demandExposable()
+    this.demandExposable()
     this.#exposed = exposed
     this.settle()
     return this
