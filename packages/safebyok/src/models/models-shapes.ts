@@ -9,12 +9,22 @@ import * as Phrases from '../phrases'
 import * as HX from '../shapes/host-code'
 import type { CipherCtxRecord } from '../crypto'
 import type { Lease } from './lease'
+import type { Gating } from './gating'
+import type { Listing } from './listing'
+import type { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
+import type { Storable } from './storable'
+import type { Vault } from './vault'
+import type { VaultListing } from './vault-listing'
 import * as VX from '../shapes/vault'
 import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
-import { vaultScope } from '../shapes/scopes'
-import { sidecar, whisper } from '../shapes/box'
+import { type BankScope, type Boxscope, type VaultScope, vaultScope } from '../shapes/scopes'
+import { type Sidecar, sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
-import type { VaultDB } from '../storage/vault-db-new'
+import type { KeyDeriver } from '../deriver/basederiver'
+import type { VaultLogger } from '../logger'
+import type { Clock } from '../shapes/bank-opts'
+import type { DeviceDB } from '../storage/device-db-new'
+import type { Answer, VaultDB } from '../storage/vault-db-new'
 import * as VS from '../storage/vault-db-shapes'
 
 // == [Checks]: Checks
@@ -166,6 +176,29 @@ export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
 export type BoxesListed = Z.output<typeof boxesListed>
 // --
 
+// == [The box's snapshot and patch]: BoxSnapshot, BoxHalves, BoxPatch, BoxPut
+
+export type BoxSnapshot = Boxscope & Readonly<{
+  revision_tok:  string
+  revision_seq:  number
+  registered_at: number
+  written_at:    number
+  sidecar:       Sidecar | null
+  full:          boolean
+  present:       boolean
+  exposed:       boolean
+}>
+
+/** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
+export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
+
+/** A host's patch for `put`: one or both {@link BoxHalves}, the other kept; any other prop of the box's record is ignored. */
+export type BoxPatch = { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
+
+/** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
+export type BoxPut = BoxPatch & { boxlabel: string }
+// --
+
 // == [Options]: ifPresentVals, ifAbsentVals, putIfAbsentVals, ifPresent, ifAbsent, putIfAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, storableOpts, listener, IfPresent, IfAbsent, PutIfAbsent, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts, StorableOpts
 
 /** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` takes it up. */
@@ -307,6 +340,25 @@ export const storableArgs = objCheck(({ custom }) => ({
 }), 'bad_option')
 // --
 
+// == [Given to a listing]: Thing, ListingAnswer, DelTombstone, SlotFate, ListingOf
+
+export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
+
+/** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
+export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, string, unknown>
+
+/** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
+export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
+
+/** The fate of a record meeting the thing in its slot: `receive` takes it in, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */
+export type SlotFate = 'receive' | 'lose' | 'replace'
+
+/** The listing a storable is made in, as it sees it: its own kind of thing, whatever snapshot the concrete class makes. */
+export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> =
+  Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown>>
+// --
+
+
 // == [The vault's stamp]: vaultStamp, VaultStamp
 
 /** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, and strips the rest. */
@@ -362,7 +414,7 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse, VaultSnapshot
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const { VaultFormat } = VS
@@ -372,9 +424,19 @@ export const { vaultRecord, vaultSparse, vaultRow } = Checkers('bad_record', () 
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
+
+export type VaultSnapshot = VaultScope & Readonly<{
+  vault_tok:     string
+  revision_tok:  string
+  revision_seq:  number
+  registered_at: number
+  written_at:    number
+  present:       boolean
+  lockState:     LockState
+}>
 // --
 
-// == [What a proving is handed]: provingWorld, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate
+// == [What a proving is handed]: provingWorld, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
 export const { provingWorld } = Checkers('bad_option', ({ obj, clockShape, keyDeriverShape, strengthChecker, device_id }) => ({
   provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
@@ -396,6 +458,9 @@ export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseSto
 }, [VX])
 
 export type StampedGate = Z.infer<typeof stampedGate>
+
+/** What `Proving.buildWayin` is passed for a wayin over a vaultKey made new: the type of `NOVEL`. */
+export type Novel = typeof NOVEL
 // --
 
 // == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
@@ -483,6 +548,42 @@ export const vaultListingOpts = objCheck(({ obj, fn }) => ({
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
 
+// == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
+
+/** The vault's face to its boxes: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
+export type BoxWorld = ListingWorld & {
+  scope:     VaultScope
+  vault_tok: string
+  demandUnlocked(): unknown
+  sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
+  unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
+}
+
+/** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
+export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper?: WhisperHolder, sidecar?: Sidecar }
+
+export type BoxListingOpts = ListingOpts & { world: BoxWorld }
+// --
+
+// == [Given to a vault listing]: VaultWorld, VaultListingOpts
+
+/** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
+export type VaultWorld = ListingWorld & ProvingWorld & {
+  scope:       BankScope
+  logger:      VaultLogger
+  leaseMillis?: number
+  deviceDB:    DeviceDB
+  /** Hears a refused erase of the cached lease, and no secret material. */
+  onPanic?:    ((refusal: VaultError) => unknown) | undefined
+  /** The host's dialog, if the host gave one. */
+  requestCleartext?: RequestCleartext | undefined
+  /** The horizon of a vault's boxes, by default the vault's own. */
+  boxRefreshMillis?: number
+}
+
+export type VaultListingOpts = ListingOpts & { world: VaultWorld }
+// --
+
 // == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, GatingKind, ClearsForGatingkind, StrengthChecker
 
 export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey', 'del_vault'] as const
@@ -519,6 +620,37 @@ export type ClearsForGatingkind = {
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 
+// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
+
+/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
+export type RequestCleartext = (gating: AnyGating) => unknown
+
+export type AnyGating = { [KindT in GatingKind]: Gating<KindT> }[GatingKind]
+
+export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
+
+/** What an attempt makes of the clears it is handed, for its `run`. */
+export type ProvingsForGatingkind = {
+  build_vault:        { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
+  unlock_vault:       { proved: Proving }
+  replace_passphrase: { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
+  add_passkey:        { ante: VaultRecord, proved: PassphraseProving, passkeyProving: PasskeyProving }
+  revoke_passkey:     { ante: VaultRecord, proved: PassphraseProving }
+  del_vault:          { ante: VaultRecord, proved: PassphraseProving }
+}
+
+/** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
+export type Run<KindT extends GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
+
+export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
+
+export type LaunchArgs<KindT extends GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
+
+export type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
+
+export type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
+// --
+
 // == [The bank's forms]: positiveMinutes, refreshMinutes, bankOpts
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
@@ -543,4 +675,31 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   onBadNews:           fn().optional(),
   onPanic:             fn().optional(),
 }), { refuseAs: 'bad_option' }, [FX])
+// --
+
+// == [Given to a bank]: BankOpts, BankStage, BankSnapshot
+
+export type BankOpts = {
+  applabel:             string
+  user_id:              string
+  device_id?:           string | undefined
+  vaultDB:              VaultDB
+  deviceDB:             DeviceDB
+  keyDeriver:           KeyDeriver
+  requestCleartext?:    RequestCleartext | undefined
+  strengthChecker?:     StrengthChecker | undefined
+  clock?:               Clock | undefined
+  logger?:              VaultLogger | undefined
+  autolockMinutes?:     number | undefined
+  vaultRefreshMinutes?: number | undefined
+  boxRefreshMinutes?:   number | undefined
+  onBadNews?:           ((news: VaultError) => unknown) | undefined
+  /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
+  onPanic?:             ((refusal: VaultError) => unknown) | undefined
+}
+
+/** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
+export type BankStage = 'made' | 'ready' | 'refused'
+
+export type BankSnapshot = BankScope & Readonly<{ stage: BankStage, err: VaultError | null, device_id: string, vaults: readonly VaultSnapshot[] }>
 // --

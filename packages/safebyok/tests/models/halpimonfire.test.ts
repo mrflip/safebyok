@@ -2,7 +2,6 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
-import type { BoxWorld } from '../../src/models/box-listing'
 import type { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import { Proving } from '../../src/models/proving'
@@ -10,6 +9,7 @@ import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import type { BoxWorld } from '../../src/models/models-shapes'
 
 const held = useModelsWorld()
 useVaultWorlds()

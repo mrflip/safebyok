@@ -4,39 +4,18 @@ import { omit } from 'es-toolkit'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
-import { type BankScope, type VaultScope, vaultScope } from '../shapes/scopes'
-import type { VaultLogger } from '../logger'
-import type { DeviceDB } from '../storage/device-db-new'
+import { type VaultScope, vaultScope } from '../shapes/scopes'
 import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
 import { absentVaultError } from '../helpers/throwers'
 import { BoxListing } from './box-listing'
-import { type DelTombstone, type SlotFate, Listing } from './listing'
-import { type AnyGating, type RequestCleartext, alreadyAsking } from './gating'
-import { type BoxesListed, type Fetched, type ListingOpts, type ListingWorld, type ProvingWorld, type VaultRecord, type VaultSparse, vaultRecord, vaultSparse } from './models-shapes'
+import { Listing } from './listing'
+import { alreadyAsking } from './gating'
+import { type AnyGating, type BoxesListed, type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { cmpRevisions } from './storable'
-import { type VaultSnapshot, Vault } from './vault'
-
-// == [Given to a vault listing]: VaultWorld, VaultListingOpts
-
-/** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
-export type VaultWorld = ListingWorld & ProvingWorld & {
-  scope:       BankScope
-  logger:      VaultLogger
-  leaseMillis?: number
-  deviceDB:    DeviceDB
-  /** Hears a refused erase of the cached lease, and no secret material. */
-  onPanic?:    ((refusal: VaultError) => unknown) | undefined
-  /** The host's dialog, if the host gave one. */
-  requestCleartext?: RequestCleartext | undefined
-  /** The horizon of a vault's boxes, by default the vault's own. */
-  boxRefreshMillis?: number
-}
-
-export type VaultListingOpts = ListingOpts & { world: VaultWorld }
-// --
+import { Vault } from './vault'
 
 // == [VaultListing]
 

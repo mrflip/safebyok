@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { BoxHalves, BoxSnapshot } from '../../src/models/box'
-import type { BoxWorld } from '../../src/models/box-listing'
-import { type BoxRecord, type BoxSparse, type Fetched, LOCKED } from '../../src/models/models-shapes'
+import { type BoxHalves, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'

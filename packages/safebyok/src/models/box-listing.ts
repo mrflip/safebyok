@@ -1,35 +1,16 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
-import type { CipherCtxRecord } from '../crypto'
 import { VaultError } from '../errors'
 import { absentBoxError, notListedBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
-import type { Sidecar } from '../shapes/box'
-import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
+import { type Boxscope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { type BoxSnapshot, Box } from './box'
-import { type DelTombstone, Listing } from './listing'
-import { type BoxesListed, type BoxPutOpts, type BoxRecord, type BoxSparse, type BoxCreateOpts, type Dna, type Fetched, type FetchOpts, type ListingOpts, type ListingWorld, type SealedWhisper, type WhisperHolder, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { Box } from './box'
+import { Listing } from './listing'
+import { type BoxCreateOpts, type BoxDna, type BoxesListed, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-
-// == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
-
-/** The vault's face to its boxes: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
-export type BoxWorld = ListingWorld & {
-  scope:     VaultScope
-  vault_tok: string
-  demandUnlocked(): unknown
-  sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
-  unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
-}
-
-/** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
-export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper?: WhisperHolder, sidecar?: Sidecar }
-
-export type BoxListingOpts = ListingOpts & { world: BoxWorld }
-// --
 
 // == [BoxListing]
 

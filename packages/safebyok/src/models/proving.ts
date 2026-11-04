@@ -8,14 +8,13 @@ import * as Phrases from '../phrases'
 import { type VaultScope, vaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
 import { Lease } from './lease'
-import { type LeaseFriend, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, type WayinKind, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from './models-shapes'
+import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, type WayinKind, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from './models-shapes'
 import { Wayin, wayinCtxOf } from './wayin'
 
-// == [NOVEL and the checks]: NOVEL, Novel, RewrapUsage, CheckUsage, Checks
+// == [NOVEL and the checks]: NOVEL, RewrapUsage, CheckUsage, Checks
 
 /** Pass to {@link Proving.buildWayin} for a wayin over a vaultKey made new. */
 export const NOVEL: unique symbol = Symbol('NOVEL')
-export type Novel = typeof NOVEL
 
 /** What the vaultKey is unwrapped as, inside a proving: extractable only so it can be wrapped again, and dropped when the method ends. */
 const RewrapUsage = Object.freeze({ extractable: true, usage: ['wrapKey'] as const })

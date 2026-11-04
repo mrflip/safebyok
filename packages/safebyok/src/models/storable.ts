@@ -6,8 +6,7 @@ import { reportToPlatform } from '../report-error'
 import { stableJsonify } from '../stable-jsonify'
 import { disabledError, lockedError, partialLoadError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
-import type { Listing } from './listing'
-import type { Age, Am, Fetched, FetchOpts, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
+import type { Age, Am, Fetched, FetchOpts, ListingOf, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -24,10 +23,6 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 // --
 
 // == [Storable]
-
-/** The listing a storable is made in, as it sees it: its own kind of thing, whatever snapshot the concrete class makes. */
-export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> =
-  Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown>>
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
   // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, snapshot, horizonMillis, refreshedAt, listeners

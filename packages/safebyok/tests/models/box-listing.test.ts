@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
-import { type BoxDna, type BoxListingOpts, BoxListing } from '../../src/models/box-listing'
+import { BoxListing } from '../../src/models/box-listing'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 import * as VS from '../../src/storage/vault-db-shapes'
+import type { BoxDna, BoxListingOpts } from '../../src/models/models-shapes'
 
 const held = useModelsWorld()
 

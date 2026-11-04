@@ -13,40 +13,14 @@ import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { LeaseSparse } from '../storage/device-db-shapes'
-import type { VaultDB } from '../storage/vault-db-new'
-import type { RequestCleartext } from './gating'
-import type { LockState, StrengthChecker } from './models-shapes'
+import type { BankOpts, BankSnapshot, BankStage, LockState, RequestCleartext, StrengthChecker, VaultWorld } from './models-shapes'
 import * as MSX from './models-shapes'
-import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
-import { type VaultWorld, VaultListing } from './vault-listing'
+import { DefaultLeaseMillis, type Vault } from './vault'
+import { VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultRefreshMillis, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
+// == [Given to a bank]: DefaultRefreshMillis, RefusingStrengthChecker
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
-
-export type BankOpts = {
-  applabel:             string
-  user_id:              string
-  device_id?:           string | undefined
-  vaultDB:              VaultDB
-  deviceDB:             DeviceDB
-  keyDeriver:           KeyDeriver
-  requestCleartext?:    RequestCleartext | undefined
-  strengthChecker?:     StrengthChecker | undefined
-  clock?:               Clock | undefined
-  logger?:              VaultLogger | undefined
-  autolockMinutes?:     number | undefined
-  vaultRefreshMinutes?: number | undefined
-  boxRefreshMinutes?:   number | undefined
-  onBadNews?:           ((news: VaultError) => unknown) | undefined
-  /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
-  onPanic?:             ((refusal: VaultError) => unknown) | undefined
-}
-
-/** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
-export type BankStage = 'made' | 'ready' | 'refused'
-
-export type BankSnapshot = BankScope & Readonly<{ stage: BankStage, err: VaultError | null, device_id: string, vaults: readonly VaultSnapshot[] }>
 
 const RefusingStrengthChecker: StrengthChecker = () => ({ strong: false, reason: Phrases.NoStrengthChecker })
 // --

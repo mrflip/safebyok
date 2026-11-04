@@ -3,14 +3,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import * as Phrases from '../../src/phrases'
-import type { BankSnapshot } from '../../src/models/bank'
-import type { RequestCleartext } from '../../src/models/gating'
 import { makeLifeTok } from '../../src/crypto'
 import type { LeaseRow } from '../../src/storage/device-db-shapes'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, BankBag, VaultBag, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
+import type { BankSnapshot, RequestCleartext } from '../../src/models/models-shapes'
 
 useBankWorlds()
 

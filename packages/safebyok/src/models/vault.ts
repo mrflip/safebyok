@@ -8,31 +8,21 @@ import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import * as VS from '../storage/vault-db-shapes'
-import type { Box, BoxPut } from './box'
-import type { BoxListing, BoxWorld } from './box-listing'
+import type { Box } from './box'
+import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
-import { type ProvingsForGatingkind, Gating } from './gating'
+import { Gating } from './gating'
 import { Lease } from './lease'
-import type { BoxPutOpts, Fetched, FetchOpts, GateProps, LeaseFriend, LockState, SealedWhisper, TimelyOpts, VaultRecord, VaultSparse } from './models-shapes'
+import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, GateProps, LeaseFriend, LockState, ProvingsForGatingkind, SealedWhisper, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from './models-shapes'
 import * as MSX from './models-shapes'
 import { type Proving, NOVEL } from './proving'
 import { Storable } from './storable'
-import type { VaultListing, VaultWorld } from './vault-listing'
+import type { VaultListing } from './vault-listing'
 
-// == [Record forms]: DefaultLeaseMillis, VaultSnapshot
+// == [Defaults]: DefaultLeaseMillis
 
 /** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
-
-export type VaultSnapshot = VaultScope & Readonly<{
-  vault_tok:     string
-  revision_tok:  string
-  revision_seq:  number
-  registered_at: number
-  written_at:    number
-  present:       boolean
-  lockState:     LockState
-}>
 // --
 
 // == [Vault]

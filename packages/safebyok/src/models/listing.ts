@@ -2,7 +2,7 @@
 
 import { verifyConsistent } from '../checks/validator'
 import { VaultError, isVaultError } from '../errors'
-import type { Answer, GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
+import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
 import { disabledError } from '../helpers/throwers'
@@ -10,21 +10,9 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type SparseBase, IsListing } from './models-shapes'
+import { type DelTombstone, type Fetched, type FetchOpts, type IfAbsent, type ListingAnswer, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type SlotFate, type SparseBase, type Thing, IsListing } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
-
-type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
-
-/** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
-export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, string, unknown>
-
-/** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
-export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
-
-/** The fate of a record meeting the thing in its slot: `receive` takes it in, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */
-export type SlotFate = 'receive' | 'lose' | 'replace'
-// --
 
 // == [Listing]
 

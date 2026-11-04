@@ -7,33 +7,10 @@ import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
 import * as VS from '../storage/vault-db-shapes'
-import type { BoxListing, BoxWorld } from './box-listing'
-import { type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import type { BoxListing } from './box-listing'
+import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
-
-// == [Record forms]: BoxSnapshot, BoxHalves, BoxPatch, BoxPut
-
-export type BoxSnapshot = Boxscope & Readonly<{
-  revision_tok:  string
-  revision_seq:  number
-  registered_at: number
-  written_at:    number
-  sidecar:       Sidecar | null
-  full:          boolean
-  present:       boolean
-  exposed:       boolean
-}>
-
-/** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
-export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
-
-/** A host's patch for `put`: one or both {@link BoxHalves}, the other kept; any other prop of the box's record is ignored. */
-export type BoxPatch = { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
-
-/** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
-export type BoxPut = BoxPatch & { boxlabel: string }
-// --
 
 // == [Box]
 
