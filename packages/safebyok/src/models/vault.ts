@@ -196,12 +196,20 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Unlocking]: isUnlocked, ensureUnlocked, tryEnsureUnlocked, unlockByProof, attachCachedLease
+  // == [Unlocking]: isUnlocked, ensureUnlocked, tryEnsureUnlocked, unlock, tryUnlock, unlockByProof, attachCachedLease
 
   get isUnlocked(): boolean { return this.#lease !== null }
 
-  /** SLOPDOC: This vault, unlocked: as it stands, else by the lease cached on this device, else by asking the user. */
+  /** Unlock this vault if it is locked, and nothing else: the caller demands. */
   async ensureUnlocked(): Promise<this> {
+    if (! this.isUnlocked) { await this.unlock() }
+    return this
+  }
+
+  tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
+
+  /** Unlock this vault by the lease cached on this device, else by asking the user. */
+  async unlock(): Promise<this> {
     await this.ensureUsable(); this.demandUsable()
     if (this.isUnlocked) { return this }
     if (! this.isFull) { await this.fetch() }
@@ -212,7 +220,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
+  tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
 
   /** Past the enter key: a lock crossing this is answered by the next `lock()`, as the proof says this user may have the vault unlocked. */
   async #unlockByProof(proved: Proving): Promise<this> {
@@ -261,14 +269,20 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   ensureAttachable(): Promise<this> { return this.ensureUsable() }
 
-  /** An attach needs the vault enabled and present. */
-  demandAttachable(): this { return this.demandUsable() }
+  /** An attach needs the vault enabled and present, and a `lease` given to be of this vault. */
+  demandAttachable(lease: object = {}): this {
+    verifyConsistent(lease, this.#stampOfLife(), { kind: 'bad_option', message: Phrases.otherVaultsBag })
+    return this.demandUsable()
+  }
+
+  /** What a seal's stamp or a lease has to agree with: this vault's scope and this life of it. */
+  #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
 
   /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
     if (lease.isForgotten) { throw leaseNotInForce() }
     try {
-      await this.ensureAttachable(); this.demandAttachable()
+      this.demandAttachable(lease.toJSON())
     } catch (err) {
       await this.#vacateUnattached(lease)
       throw err
@@ -346,17 +360,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
     MSX.leaseSealArgs.parse({ whisperText, stamp })
-    return this.#demandLease().sealWith(whisperText, stamp)
+    return this.#demandLease(stamp).sealWith(whisperText, stamp)
   }
 
   /** The text `sealed` holds, bound to `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     MSX.leaseUnsealArgs.parse({ sealed, stamp })
-    return this.#demandLease().unsealWith(sealed, stamp)
+    return this.#demandLease(stamp).unsealWith(sealed, stamp)
   }
 
-  #demandLease(): Lease {
+  #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled()
+    verifyConsistent(stamp, this.#stampOfLife(), { kind: 'bad_option', message: Phrases.otherVaultsBag })
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }
@@ -399,9 +414,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async putBox(patch: BoxPut, opts: SendOpts = {}): Promise<Box> {
     const { whisper, sidecar, ...named } = MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
-    verifyConsistent(named, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     const scope = this.#boxscopeOf(named.boxlabel)
-    await this.#ensureGreeted(); this.demandBoxesUsable()
+    await this.#ensureGreeted()
+    this.demandBoxesUsable(named)
     const boxes = this.boxListing
     const held = boxes.at(scope) ?? ((whisper === undefined) ? await boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }) : null)
     if (held !== null) { return held.send({ whisper, sidecar }, opts) }
@@ -426,8 +441,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
 
-  /** A box verb needs the vault present and unlocked. */
-  demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }
+  /** A box verb needs the vault enabled, present and unlocked, and a `bag` given to name this vault. */
+  demandBoxesUsable(bag: object = {}): this {
+    verifyConsistent(bag, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    return this.demandUsable().demandUnlocked()
+  }
 
   /** This vault having said hello. */
   async #ensureGreeted(): Promise<void> {
@@ -441,7 +459,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The listing of this vault's boxes, made once, on first asking. */
   get boxListing(): BoxListing {
-    this.demandUsable()
     this.#boxListing ??= this.listing.boxListingOf(this)
     return this.#boxListing
   }

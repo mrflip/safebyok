@@ -35,6 +35,23 @@ describe("proving.buildWayin: one wayin per proving, of its own vault", () => {
 })
 
 describe("Vault.ensureUnlocked and the vault's lock", () => {
+  it("ensureUnlocked leaves a vault unlocked as it stands, where unlock refreshes it first", async () => {
+    const { vault, opts: { vaultDB } } = await makeBornVault()
+    const gets = vi.spyOn(vaultDB, 'tryGetVault')
+    gets.mockClear()
+    await expect(vault.ensureUnlocked()).resolves.to.eq(vault)
+    expect(gets).not.toHaveBeenCalled()
+    await expect(vault.tryUnlock()).resolves.to.include({ ok: true })
+    expect(vault.isUnlocked).to.be.true
+  })
+
+  it("the seal verbs refuse 'bad_option' a stamp of another vault or another life of it", async () => {
+    const { vault } = await makeBornVault()
+    const sealed = await vault.sealStampedString('sk-test', Stamp)
+    await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'bad_option')
+    await TH.expectRefusal(vault.unsealStampedString(sealed, { ...Stamp, vault_tok: 'another-life' }), 'bad_option')
+  })
+
   it("is born unlocked, under the lease its passphrase proving grants and the deviceDB caches; ensureUnlocked answers the vault and asks nothing", async () => {
     const { vault, deviceDB } = await makeBornVault()
     expect(vault.isUnlocked).to.be.true
@@ -115,6 +132,12 @@ const makeFreshLease = async ({ vault, friend, opts: { world } }: Awaited<Return
 }
 
 describe("lease.attach: the one way a vault comes to hold a lease", () => {
+  it("demandAttachable refuses 'bad_option' what is of another vault", async () => {
+    const { vault } = await makeBornVault()
+    expect(vault.demandAttachable({ vault_tok: vault.vault_tok })).to.eq(vault)
+    TH.expectSyncRefusal(() => vault.demandAttachable({ vault_tok: 'another-life' }), 'bad_option')
+  })
+
   it("holds the lease, reading unlocked, and caches its row: the lease it displaces is dropped", async () => {
     const born = await makeBornVaultAndFriend()
     const { vault, deviceDB } = born
@@ -447,6 +470,14 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(vault.lock().sweep().vacate()).to.equal(vault)
     expect(box.lock().sweep().vacate()).to.equal(box)
     expect(deviceDB.tryVacate).not.toHaveBeenCalled()
+  })
+
+  it("past a discard vault.boxListing answers the listing it held, its verbs refusing", async () => {
+    const { vault } = await makeVaultWithBox()
+    const boxes = vault.boxListing
+    vault.sweep()
+    expect(vault.boxListing).to.eq(boxes)
+    await TH.expectRefusal(boxes.hello(), 'disabled')
   })
 
   it("past a discard a vault's record stays readable, for a log or a debugger", async () => {

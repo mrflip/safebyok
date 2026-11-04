@@ -1,6 +1,7 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { omit } from 'es-toolkit'
+import { verifyConsistent } from '../checks/validator'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
@@ -67,6 +68,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** SLOPDOC: The tombstone a birth under `scope` goes over, or null where the slot holds none. */
   demandBirthSlot(scope: VaultScope): Vault | null {
     this.demandEnabled()
+    verifyConsistent(scope, this.world.scope, { kind: 'bad_scope', message: Phrases.otherScope })
     const held = this.at(scope)
     if (held?.isPresent === true) { throw alreadyHeldError() }
     return held

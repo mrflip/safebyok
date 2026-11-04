@@ -1,5 +1,6 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the watch on storage, and every storage call made for that kind of thing. */
 
+import { verifyConsistent } from '../checks/validator'
 import { randomId } from '../crypto'
 import { VaultError, isVaultError } from '../errors'
 import type { Answer, GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
@@ -234,7 +235,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Demands a `record` whose scope is `scope`, the one the answer that carries it names. */
   #demandRecordOfScope(record: Fetched<RecordT, SparseT>, scope: ScopeT): void {
-    if (this.scopepathOf(this.scopeOf(record)) !== this.scopepathOf(scope)) { throw new VaultError('bad_record', Phrases.RecordOfOtherScope) }
+    verifyConsistent(this.scopeOf(record), scope, { kind: 'bad_record', message: Phrases.RecordOfOtherScope })
   }
 
   /** SLOPDOC: A new instance for `record`, born of its sparse form so `receive` adopts it like any newer record. */

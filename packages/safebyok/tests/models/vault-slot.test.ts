@@ -59,7 +59,7 @@ describe("a tombstone over a live vault", () => {
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(box.isDisabled).to.be.true
     await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
-    TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
+    expect(vault.boxListing).to.eq(boxes)
   })
 
   it("tells a refused erase as bad news, not a panic, and the tombstone stands", async () => {
@@ -240,6 +240,14 @@ describe("building over a tombstone", () => {
     expect(listing.openGating).to.be.null
     expect(deriveKeyBytes).not.toHaveBeenCalled()
     expect(storedNow()).to.deep.equal(before)
+  })
+
+  it("Vault.launchBirth refuses 'bad_scope' a scope of another user, nobody asked", async () => {
+    const { listing } = makeVaultWorld()
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    await TH.expectRefusal(Vault.launchBirth(listing, { ...Dna, user_id: 'another_user' }), 'bad_scope')
+    expect(dialog).not.toHaveBeenCalled()
   })
 
   it("Vault.launchBirth refuses 'bad_option' what is no listing, and 'bad_scope' what is no scope, nobody asked", async () => {

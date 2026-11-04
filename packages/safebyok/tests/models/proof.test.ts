@@ -362,8 +362,9 @@ describe("the proof", () => {
     world.advance(StaleMillis)
     world.vaultDB._cheat_refuseGets('storage_error')
     // A vault too stale to know whether it deserves its lease refuses the ask, and keeps the lease it has.
-    await TH.expectRefusal(vault.ensureUnlocked(), 'storage_error')
+    await TH.expectRefusal(vault.unlock(), 'storage_error')
     expect(vault.isUnlocked).to.be.true
+    await expect(vault.ensureUnlocked()).resolves.to.eq(vault)
     await TH.expectRefusal(bank.hello(), 'storage_error')
     bankUi.expectRenders(['refused: main unlocked'])
     expect(bank.snapshot.err?.refusalkind).to.eq('storage_error')

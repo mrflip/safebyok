@@ -86,6 +86,13 @@ describe("BoxListing", () => {
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 
+    it("refuses 'bad_option' a dna naming another vault, sealing and storing nothing", async () => {
+      const listing = boxListingOf(held.mw)
+      await TH.expectRefusal(listing.create({ ...dna(), vaultlabel: 'another_vault' }), 'bad_option')
+      expect(listing.things).to.deep.equal([])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
+    })
+
     it("refuses 'bad_option' a scope already held, sealing and storing nothing", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.create(dna())

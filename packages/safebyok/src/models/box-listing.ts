@@ -1,9 +1,11 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
 import { type CipherCtxRecord, makeLifeTok } from '../crypto'
+import { verifyConsistent } from '../checks/validator'
 import { VaultError } from '../errors'
 import { absentBoxError, lockedError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
+import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
@@ -80,11 +82,13 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
   async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
     const dna = boxDna.parse(input)
-    await this.#ensureCreatable(); this.#demandCreatable()
+    await this.#ensureCreatable()
+    this.#demandCreatable(dna)
     this.demandNotHeld(dna)
     const { whisper, sidecar, ...sparse } = this.stampDna(dna)
     const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
-    await this.#ensureCreatable(); this.#demandCreatable()
+    await this.#ensureCreatable()
+    this.#demandCreatable(dna)
     return this.putDraft(draft, null, opts)
   }
 
@@ -92,9 +96,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   #ensureCreatable(): Promise<void> { return this.ensureTimelyWorld() }
 
-  /** A birth needs this listing enabled and the vault unlocked. */
-  #demandCreatable(): void {
+  /** A birth needs this listing enabled and the vault unlocked, and its `dna` to name this vault. */
+  #demandCreatable(dna: Boxscope): void {
     this.demandEnabled()
+    verifyConsistent(dna, this.world.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     if (this.lockState() === 'locked') { throw lockedError() }
   }
   // --

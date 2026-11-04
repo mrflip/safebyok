@@ -287,6 +287,9 @@ export const BoxPatchAdvice = "Nothing was stored. An update of a box names its 
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to store."
 
 /** Why an update of a box whose patch names another's scope stores nothing. */
+/** Why a seal verb refuses a stamp, or an attach a lease, of another vault. */
+export const otherVaultsBag = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than this vault's, so nothing was sealed, opened or attached: a bug in the package.`
+
 export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`
 
 /** Why LOCKED, which a locked box answers for its whisper, is refused where a whisper is wanted. */
