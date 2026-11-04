@@ -49,7 +49,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Starting]: hello, damaged_records, damagedAt, del
 
-  /** Start the watch, and take what the vault's get listed, if given: each box built sparse, a tombstone among them, each damaged row set aside, and any instance held under a damaged row vacated, as nothing acts on one. */
+  /** Start the watch and take what the vault's get listed, if given: its boxes held sparse, its damaged rows set aside. */
   override async hello(listed?: BoxesListed): Promise<void> {
     await super.hello()
     if (listed === undefined) { return }
@@ -68,7 +68,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return this.#damagedRecords.find((damaged) => damaged.boxlabel === boxlabel) ?? null
   }
 
-  /** As the base's `del`; landed, the row is no longer set aside as damaged. */
+  /** Delete the box `duck` names, and stop setting its row aside as damaged. */
   override async del(duck: BoxSparse | Box): Promise<Box | null> {
     const thing = await super.del(duck)
     const { boxlabel } = this.scopeOf(duck)

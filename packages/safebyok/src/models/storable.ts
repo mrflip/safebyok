@@ -242,7 +242,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return outcomeOf(() => this.fetch(opts))
   }
 
-  /** Make the world timely, as its answer may lock the vault or take the thing away, and fetch the record unless it is timely within `opts.maxMillisSinceRefresh`, by default the thing's horizon. */
+  /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
@@ -252,7 +252,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone is deleted again, over its tombstone's revision. */
+  /** Delete this thing through its listing. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureDeletable(MSX.timelyOpts.parse(opts)); this.demandDeletable()
     await this.listing.del(this)
@@ -264,7 +264,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Discards]: lock, sweep, vacate, sweepContents, vacateContents, disable
 
-  /** Settle, as the lock has moved, which a snapshot showing the lock tells its listeners: past a discard, a no-op. Never throws. */
+  /** Tell the listeners the lock has moved. A no-op past a discard; never throws. */
   lock(): this {
     if (! this.#isDisabled) { this.settle() }
     return this

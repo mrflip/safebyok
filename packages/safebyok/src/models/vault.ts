@@ -144,7 +144,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryRevokePasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey()) }
 
-  /** The commit, then a lease under the epoch it landed, whatever record has arrived since. The old lease stays in force for the moments between, safely, as the vaultKey did not change. */
+  // The old lease stays in force for the moments between: the vaultKey did not change.
+  /** Run the commit, then attach a lease under the epoch it landed. */
   async #landGate(proved: Proving, commit: () => Promise<VS.VaultRecord>): Promise<this> {
     const heldLease = this.#lease
     const stored = await commit()
@@ -161,14 +162,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryDelVault(): Promise<Outcome<this>> { return outcomeOf(() => this.delVault()) }
 
-  /** The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. */
+  // The lock first: no box opens under a lease while the tombstone goes out.
+  /** Lock this vault and store its tombstone; the answer delivered vacates its boxes. */
   async #runDelVault(ante: VaultRecord): Promise<this> {
     this.lock()
     await this.listing.del(ante)
     return this
   }
 
-  /** As {@link delVault}: a vault's delete takes the passphrase's proof, so the base's has no way past it. */
+  /** Delete this vault by {@link delVault}, which takes the passphrase's proof. */
   override del(): Promise<this> { return this.delVault() }
   // --
 
@@ -294,7 +296,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! cached.ok) { this.listing.tellBadNews([cached.err]) }
   }
 
-  /** Attach a new lease under `gate_epoch`, where `heldLease` is still in force: a vault locked at the start stays locked, and a lock crossing the change wins, the new lease vacated. */
+  /** Attach a new lease under `gate_epoch` where `heldLease` is in force. A lock crossing the change wins. */
   async #renewLease(proved: Proving, gate_epoch: number, heldLease: Lease | null): Promise<void> {
     if (heldLease === null) { return }
     const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
@@ -326,7 +328,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! vacated.ok) { this.listing.tellBadNews([vacated.err]) }
   }
 
-  /** Tell of a cached lease that survived a lock: the host's `onPanic` hears it, and a rejection goes no further than the platform; with none, the refusal goes to the platform and this vault is vacated. */
+  /** Tell `onPanic` that a cached lease survived a lock; with none, tell the platform and vacate this vault. */
   async #panic(refusal: VaultError): Promise<void> {
     const { onPanic } = this.world
     if (onPanic === undefined) {
@@ -341,7 +343,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     }
   }
 
-  /** Lock the vault: it reads locked before this returns, its boxes with it, and the row this device has cached is erased. A refused erase is a panic, not a throw. On a vault discarded, a no-op. */
+  /** Lock the vault and its boxes before returning, and erase the row cached on this device.
+   * A refused erase panics and does not throw. A no-op on a vault discarded. */
   override lock(): this {
     if (this.isDisabled) { return this }
     void this.#vacateLease()
@@ -430,7 +433,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#boxListing
   }
 
-  /** A tombstone taken in is a delete's end state, here or elsewhere: locked, the row cached erased, the boxes vacated, and the vault staying in its slot. A refused erase is bad news, and the tombstone stands. */
+  /** Take in `central`. A tombstone locks the vault, erases the cached row and vacates the boxes, the vault keeping its slot.
+   * A refused erase is bad news, and the tombstone stands. */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)
     if (this.isPresent) { return }

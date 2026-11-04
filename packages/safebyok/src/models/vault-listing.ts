@@ -142,7 +142,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     if (this.#openGating?.vault === vault) { this.#openGating.declineAtDiscard() }
   }
 
-  /** A goodbye settles the open gating too, whatever vault it asks for, once any attempt under way has run. */
+  /** Sweep this listing's vaults, and decline the open gating whatever vault it asks for. */
   override sweep(): this {
     this.#openGating?.declineAtDiscard()
     return super.sweep()

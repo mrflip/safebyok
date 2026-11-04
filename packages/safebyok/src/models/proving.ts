@@ -54,7 +54,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     Object.freeze(this)
   }
 
-  /** The strengthChecker's verdict. What it throws is replaced, as it heard the passphrase. */
+  /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
   static async checkStrength(passphraseClear: VX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<VX.PassphraseVerdict> {
     strengthArgs.parse({ passphraseClear, scope, world })
     const verdict = await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope)
