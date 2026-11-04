@@ -7,7 +7,7 @@ import { DefaultLeaseMillis, Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultAndFriend, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockTyping } from '../test-helpers/vault-world'
+import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultAndFriend, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -119,6 +119,16 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const vault = await listing.build(listing.sparseOf(record))
     expect(vault.isLocked).to.be.true
     await unlockTyping(vault, byPassphrase(Passphrase))
+    expect(vault.isUnlocked).to.be.true
+    expect(vault.isFull).to.be.true
+  })
+
+  it("vault.unlock on a vault held sparse fetches its full record, where the gating it launches would refuse 'bad_option'", async () => {
+    const { demandStored } = await makeBornVault()
+    const record = demandStored()
+    const { listing } = makeVaultWorld(record)
+    const vault = await listing.build(listing.sparseOf(record))
+    await unlockVerbTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
     expect(vault.isFull).to.be.true
   })

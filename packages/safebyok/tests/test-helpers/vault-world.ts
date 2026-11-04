@@ -64,6 +64,9 @@ export const buildTyping = (listing: VaultListing, scope: VaultScope, typing: Ty
 /** `vault.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
 export const unlockTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.ensureUnlocked())
 
+/** `vault.unlock()` itself, the user doing `typing` at the dialog. */
+export const unlockVerbTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.unlock())
+
 /** `vault.replacePassphrase()`, the user typing the passphrase and the next at the dialog. */
 export const replaceTyping = (vault: Vault, ante: string, next: string): Promise<Vault> => askTyping(vault.world, { antePassphraseClear: ante, nextPassphraseClear: next }, () => vault.replacePassphrase())
 

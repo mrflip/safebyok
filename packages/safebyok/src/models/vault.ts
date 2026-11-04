@@ -210,7 +210,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Ask the user for proof, and unlock by it. */
   async unlock(): Promise<this> {
-    this.demandAttachable()
+    await this.ensureAttachable(); this.demandAttachable()
     if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
     await Gating.launch('unlock_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ proved }) => this.#unlockByProof(proved) })
     return this
@@ -238,7 +238,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lease]: leaseFriend, demandAttachable, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
+  // == [The lease]: leaseFriend, ensureAttachable, demandAttachable, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
 
   /** All a lease or a proving hears of this vault, made once. */
   #leaseFriend(): LeaseFriend {
@@ -262,6 +262,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       tryUncacheLease: () => deviceDB.tryVacate(asked),
     }
   }
+
+  ensureAttachable(): Promise<this> { return this.ensureUsable() }
 
   /** An attach needs the vault enabled and present, and a `lease` given to be of this vault. */
   demandAttachable(lease: object = {}): this {
