@@ -1,4 +1,3 @@
-import { verifyConsistent } from '../checks/validator'
 import { type CipherCtxRecord, makeLifeTok, randomId } from '../crypto'
 import { VaultError } from '../errors'
 import { absentBoxError } from '../helpers/throwers'
@@ -86,7 +85,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The parsed `patch`, once it names this box, the box is enabled, the vault usable and the record whole. */
   demandPuttable(patch: BoxPatch): BoxPatchGiven {
-    const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     this.demandEnabled()
     this.world.demandBoxesUsable()
     this.demandWhole()
