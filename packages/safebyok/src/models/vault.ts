@@ -354,26 +354,33 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
 
-  /** The box under `boxlabel`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
+  /** Hydrate and return the box listed at `boxlabel` (i.e. fetch if stale). A missing box is null for `ifAbsent: 'nil'`, or refused for `ifAbsent: 'fail'`. */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
     return this.boxListing.get({ ...this.scope, boxlabel }, opts)
   }
 
+  /** Non-throwing form of {@link getBox}. */
   tryGetBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(boxlabel, opts)) }
 
-  /** As {@link getBox}, the box's record fetched whatever its age. */
+  /** {@link getBox}, the box's record fetched whatever its age. */
   fetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> { return this.getBox(boxlabel, { ...opts, maxMillisSinceRefresh: 0 }) }
 
+  /** Non-throwing form of {@link fetchBox}. */
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Seals `patch` and stores it in the box it names, answering the box listed. */
+  /** Returns box after applying `patch`, sealing the new revision, and storing it. See {@link BoxListing.put} for important details on refusals and options */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
-    return this.boxListing.puttable({ ...patch, ...this.scope }, opts).put(patch, opts)
+    const box = this.boxListing.puttable({ ...patch, ...this.scope }, opts)
+    return box.put(patch, opts)
   }
 
+  /** Non-throwing form of {@link putBox}. */
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** SLOPDOC: Deletes the box under `boxlabel`, a damaged row included, answering its tombstone if one was stored. */
+  /** Return the (tombstoned) box listed at `boxlabel` -- see {@link BoxListing.del} for important details on refusals and options
+   * Boxes considered "damaged" (failed validation after reading back) are
+   * treated as missing, not tombstoned -- you must use {@link tryDelDamagedBox} to remove them.
+   */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const timely = MSX.timelyOpts.parse(opts)
     const boxes = this.boxListing
