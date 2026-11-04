@@ -12,7 +12,7 @@ the code. Reviewing against it:
   the wording here can still undo something ruled.
 
 **Status** covers the sites named, not the whole codebase, so a fault marked *Fixed* can still live elsewhere. *Fixed* is
-merged or on #470. *Planned* is ruled or proposed for a later thread in `whiteboard/20261102-newdesign/newput-plan.md`, not
+merged or on #470. *Planned* is ruled or proposed for a later thread in `whiteboard/20261104-newput/newput-plan.md`, not
 built. *Open* is a live case that has no thread and needs a ruling.
 
 Contents:
