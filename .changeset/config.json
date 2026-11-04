@@ -5,5 +5,5 @@
   "changelog": ["@changesets/changelog-github", { "repo": "mrflip/safebyok" }],
   "commit": false,
   "fixed": [["safebyok", "safebyok-react", "safebyok-convex", "safebyok-postgres", "safebyok-graphql", "safebyok-fastkey", "safebyok-indexeddb"]],
-  "privatePackages": { "version": false, "tag": false }
+  "privatePackages": { "version": true, "tag": false }
 }
