@@ -80,8 +80,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
   async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
     const dna = boxDna.parse(input)
+    this.scopeOf(dna)
     await this.#ensureCreatable(); this.#demandCreatable()
-    this.demandNotHeld(dna)
     const { whisper, sidecar, ...sparse } = this.stampDna(dna)
     const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
     await this.#ensureCreatable(); this.#demandCreatable()

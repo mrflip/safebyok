@@ -108,12 +108,10 @@ describe("BoxListing", () => {
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
-    it("refuses 'bad_option' a scope already held, sealing and storing nothing", async () => {
+    it("over a scope already stored hears the vaultDB's 'stale_write', the box held kept", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.create(dna())
-      held.mw.clearCalls()
-      await TH.expectRefusal(listing.create(dna()), 'bad_option')
-      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
+      await TH.expectRefusal(listing.create(dna()), 'stale_write')
       expect(listing.at(box.scope)).to.eq(box)
     })
 

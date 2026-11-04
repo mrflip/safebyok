@@ -6,7 +6,7 @@ import { VaultError, isVaultError } from '../errors'
 import type { Answer, GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { alreadyHeldError, disabledError } from '../helpers/throwers'
+import { disabledError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
@@ -117,7 +117,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Listing verbs]: at, things, build, demandNotHeld
+  // == [Listing verbs]: at, things, build
 
   /** The instance held under `scope`, or null. Calls nothing. */
   at(scope: ScopeT): ThingT | null {
@@ -131,11 +131,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.demandEnabled()
     this.sparseOf(record)
     return this.#buildOrReceive(this.scopeOf(record), record)
-  }
-
-  /** Demands that no instance be held under `scope`, for a birth. A box's `send` brings one deleted back to life. */
-  protected demandNotHeld(scope: ScopeT): void {
-    if (this.at(scope) !== null) { throw alreadyHeldError() }
   }
   // --
 

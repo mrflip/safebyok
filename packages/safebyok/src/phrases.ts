@@ -277,8 +277,8 @@ export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make th
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
-/** Why `create` makes nothing of a dna for a scope the listing already holds. */
-export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so create made nothing of the dna: listing.at(scope) answers it, and a box's send also brings a deleted or damaged box back to life."
+/** Why a birth makes nothing of a dna for a scope the listing already holds alive. */
+export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
 export const BoxPatchAdvice = "Nothing was stored. An update of a box names its whisper, as { val }, its sidecar, or both: the half left out is kept."

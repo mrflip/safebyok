@@ -292,14 +292,13 @@ describe("Listing's pipeline: what every answer takes", () => {
 
   describe("one instance for each scope", () => {
     for (const [blurb, record] of [["alive", fullBoxRecord()], ["deleted", tombstoneBoxRecord({ revision_seq: 2 })]] as const) {
-      it(`refuses a create(dna) over the scope of a box held ${blurb} as 'bad_option': the box held kept, nothing put`, async () => {
+      it(`a create(dna) over the scope of a box stored and held ${blurb} hears the vaultDB's 'stale_write': the box held kept`, async () => {
         const listing = boxListingOf(held.mw)
+        held.mw.seedStore(record)
         const box = await listing.build(record)
-        held.mw.clearCalls()
-        await TH.expectRefusal(listing.create(dnaOf()), 'bad_option')
+        await TH.expectRefusal(listing.create(dnaOf()), 'stale_write')
         expect(listing.at(scopeOf())).to.eq(box)
         expect(box.revision_seq).to.eq(record.revision_seq)
-        expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
       })
     }
 
