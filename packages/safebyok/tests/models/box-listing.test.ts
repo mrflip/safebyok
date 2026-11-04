@@ -90,7 +90,7 @@ describe("BoxListing", () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.create({ ...dna(), vaultlabel: 'another_vault' }), 'bad_scope')
       expect(listing.things).to.deep.equal([])
-      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal([])
     })
 
     it("refuses 'bad_scope' to answer for another vault's box, asking storage nothing", async () => {
