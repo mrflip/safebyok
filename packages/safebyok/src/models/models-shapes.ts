@@ -193,7 +193,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
 export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
 
 /** A host's patch for `put`: one or both {@link BoxHalves}, the other kept; any other prop of the box's record is ignored. */
-export type BoxPatch = { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
+export type BoxPatch = Z.input<typeof boxPatch>
 
 /** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
 export type BoxPut = BoxPatch & { boxlabel: string }
