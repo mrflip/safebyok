@@ -55,7 +55,7 @@ export const makeBankWorld = () => {
   const deviceDB = new MemoryDeviceDB()
   const dialog = { typing: byPassphrase(Passphrase) as object }
   const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing as never) }
-  const baseOpts: BankOpts = { ...BankBag, vaultDB, deviceDB, keyDeriver: testDeriver as BankOpts['keyDeriver'], strengthChecker: anyStrengthChecker, clock, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
+  const baseOpts: BankOpts = { ...BankBag, vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, clock, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
   /** A bank over this world's stores: called twice, two pages on one device. */
   const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
     const bank = Bank.make({ ...baseOpts, ...overrides })

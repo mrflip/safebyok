@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as KX from '../../src/shapes/key-deriver-spec'
-import { Argon2idWebV1 } from '../../src/key-deriver-spec'
+import { Argon2idWebV1 } from '../../src/deriver/shapes'
 import * as TH from '../test-helpers'
 
 describe("keyDeriverSpec", () => {
