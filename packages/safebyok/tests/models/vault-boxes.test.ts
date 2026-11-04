@@ -79,13 +79,14 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     expect(tryGetVault).toHaveBeenCalledOnce()
   })
 
-  it("lists the boxes of a vault still locked, as nothing it holds is secret; a box verb still refuses", async () => {
+  it("lists the boxes of a vault still locked; getBox answers one, and its whisper refuses", async () => {
     const world = await makeWorldWithBox()
     const next = await world.anotherSession().build(world.demandStored())
     expect(next.isLocked).to.be.true
     await next.hello()
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
-    await TH.expectRefusal(next.getBox(boxlabel), 'vault_locked')
+    const box = (await next.getBox(boxlabel))!
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
 
   it("starts the box listing's watch, so another session's put reaches the box held", async () => {
@@ -123,18 +124,20 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
 
 describe("the box verbs refuse a vault locked, or gone", () => {
   const Verbs = [
-    ['getBox',   (vault) => vault.getBox(boxlabel)],
-    ['fetchBox', (vault) => vault.fetchBox(boxlabel)],
-    ['putBox',   (vault) => vault.putBox({ boxlabel, whisper: Whisper })],
-    ['delBox',   (vault) => vault.delBox(boxlabel)],
-  ] as const satisfies readonly (readonly [string, (vault: Awaited<ReturnType<typeof makeWorld>>['vault']) => Promise<unknown>])[]
+    ['getBox',   false, (vault) => vault.getBox(boxlabel)],
+    ['fetchBox', false, (vault) => vault.fetchBox(boxlabel)],
+    ['putBox',   true,  (vault) => vault.putBox({ boxlabel, whisper: Whisper })],
+    ['delBox',   true,  (vault) => vault.delBox(boxlabel)],
+  ] as const satisfies readonly (readonly [string, boolean, (vault: Awaited<ReturnType<typeof makeWorld>>['vault']) => Promise<unknown>])[]
 
-  for (const [verb, call] of Verbs) {
-    it(`${verb} refuses 'vault_locked' while locked`, async () => {
-      const { vault } = await makeWorld()
-      vault.lock()
-      await TH.expectRefusal(call(vault), 'vault_locked')
-    })
+  for (const [verb, refusesLocked, call] of Verbs) {
+    if (refusesLocked) {
+      it(`${verb} refuses 'vault_locked' while locked`, async () => {
+        const { vault } = await makeWorld()
+        vault.lock()
+        await TH.expectRefusal(call(vault), 'vault_locked')
+      })
+    }
 
     it(`${verb} refuses 'vault_gone' on a vault deleted, as gone beats locked`, async () => {
       const { vault } = await makeWorld()
@@ -142,6 +145,13 @@ describe("the box verbs refuse a vault locked, or gone", () => {
       await TH.expectRefusal(call(vault), 'vault_gone')
     })
   }
+
+  it("getBox and fetchBox answer the box while locked", async () => {
+    const { vault, box } = await makeWorldWithBox()
+    vault.lock()
+    await expect(vault.getBox(boxlabel)).resolves.to.eq(box)
+    await expect(vault.fetchBox(boxlabel)).resolves.to.eq(box)
+  })
 
   it("a whisper a refusal was handed is not in the refusal", async () => {
     const { vault } = await makeWorld()
@@ -402,35 +412,32 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     expect(await reborn.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
   })
 
-  it("has getBox ask storage, as only a present box hydrates, and hears the box stored, keeping the instance", async () => {
+  it("as a void held within its horizon, has getBox ask nothing, and fetchBox hear the box stored, keeping the instance", async () => {
     const { next, box, tryGetBox } = await nextUnlisted()
     const shell = next.boxListing.puttable({ ...next.scope, boxlabel })
     expect(shell.isPresent).to.eq(false)
-    const got = await next.getBox(boxlabel)
+    await TH.expectRefusal(next.getBox(boxlabel), 'absent_box')
+    await expect(next.getBox(boxlabel, { ifAbsent: 'nil' })).resolves.to.eq(null)
+    expect(tryGetBox).not.toHaveBeenCalled()
+    const got = await next.fetchBox(boxlabel)
     expect(tryGetBox).toHaveBeenCalledOnce()
     expect(got).to.eq(shell)
     expect(got?.revision_seq).to.eq(box.revision_seq)
     expect(await got?.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("as a tombstone held, has getBox ask storage, and hear a box reborn elsewhere", async () => {
+  it("as a tombstone held within its horizon, has getBox ask nothing, and fetchBox hear a box reborn elsewhere", async () => {
     const { vault, box, openNextSession, tryGetBox } = await makeWorldWithBox()
     await vault.delBox(boxlabel)
     const next = await openNextSession()
     await TH.expectRefusal(next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } }), 'stale_write')
     await next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } })
     tryGetBox.mockClear()
-    await expect(vault.getBox(boxlabel)).resolves.to.eq(box)
-    expect(tryGetBox).toHaveBeenCalledOnce()
-    expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
-  })
-
-  it("with nothing stored, has getBox ask storage each time, and refuse 'absent_box' or answer null", async () => {
-    const { vault, tryGetBox } = await makeWorld()
-    vault.boxListing.puttable({ ...vault.scope, boxlabel })
     await TH.expectRefusal(vault.getBox(boxlabel), 'absent_box')
     await expect(vault.getBox(boxlabel, { ifAbsent: 'nil' })).resolves.to.eq(null)
-    expect(tryGetBox).toHaveBeenCalledTimes(2)
+    expect(tryGetBox).not.toHaveBeenCalled()
+    await expect(vault.fetchBox(boxlabel)).resolves.to.eq(box)
+    expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
   })
 
   it("under ifAbsent 'fail', refuses 'absent_box' with the sentence naming vault.hello, storing nothing", async () => {

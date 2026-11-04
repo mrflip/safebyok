@@ -166,7 +166,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     await this.ensureTimelyWorld()
     this.demandEnabled()
     const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
-    await this.deliver(vaultRowOf(answer), 'nil')
+    await this.deliver(vaultRowOf(answer))
     return MSX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
   }
 

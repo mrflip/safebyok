@@ -78,28 +78,17 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
   // --
 
-  // == [Finding]: get, tryGet, demandUsable
+  // == [Finding]: get, tryGet
 
-  /** The present box under `scoped`, as fresh as asked: one held present hydrates, anything else asks storage. */
+  /** The box under `scoped`, as fresh as asked, or null under `ifAbsent: 'nil'`. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
+    const held = this.at(scoped)
+    if (held === null) { return this.fetch(scoped, opts) }
     const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
-    const scope = this.scopeOf(scoped)
-    this.demandUsable()
-    const held = this.at(scope)
-    const box = await ((held?.isPresent === true) ? held.hydrate(timely) : this.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
-    this.demandUsable()
-    if (box?.isPresent === true) { return box }
-    if (ifAbsent === 'nil') { return null }
-    throw this.nothingStoredError(scope)
+    return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
   }
 
   tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
-
-  /** What a box verb needs: the vault usable and unlocked, and this listing enabled. */
-  demandUsable(): this {
-    this.world.demandBoxesUsable()
-    return this.demandEnabled()
-  }
   // --
 
   // == [Putting]: puttable, create, tryCreate, shellFor

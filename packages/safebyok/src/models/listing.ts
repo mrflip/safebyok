@@ -133,7 +133,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Storage verbs]: fetch, put, tryPut, del, delOver
+  // == [Storage verbs]: fetch, tryFetch, handleIfAbsent, put, tryPut, del, delOver
 
   /** SLOPDOC: The instance under `scope` as storage now holds it, built where none was held. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
@@ -141,10 +141,19 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const asked = this.scopeOf(scope)
     await this.ensureTimelyWorld(maxWorldMillis)
     this.demandEnabled()
-    return this.deliver(await this.tryGetRow(asked), ifAbsent)
+    return this.handleIfAbsent(await this.deliver(await this.tryGetRow(asked)), asked, ifAbsent)
   }
 
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
+
+  /** `found` when present. Anything else is refused under `ifAbsent: 'fail'`, and null under `ifAbsent: 'nil'`. */
+  protected handleIfAbsent(found: ThingT | null, scoped: ScopeT, ifAbsent: IfAbsent): ThingT | null {
+    if (ifAbsent === 'fail') {
+      if (found === null) { throw this.nothingStoredError(scoped) }
+      found.demandPresent()
+    }
+    return (found?.isPresent === true) ? found : null
+  }
 
   /** Stores `record` over the revision `prior`, and answers the instance held once storage's answer is delivered. */
   async put(record: RecordT, opts: PutListingOpts): Promise<ThingT> {
@@ -179,9 +188,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive, demandRecordOfScope, makeThingOf, hold
 
   /** SLOPDOC: The pipeline every storage answer takes, from its world through the instance held to the caller. */
-  protected async deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
+  protected async deliver(answer: ListingAnswer<RecordT, SparseT>): Promise<ThingT | null> {
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
-    if (answer.ok) { return this.#deliverGood(answer, ifAbsent) }
+    if (answer.ok) { return this.#deliverGood(answer) }
     const stored = (answer.dbhas ?? null) as Fetched<RecordT, SparseT> | null
     if ((stored !== null) && this.isRefusalOfRow(answer.err)) {
       const delivered = await outcomeOf(() => {
@@ -194,17 +203,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     throw answer.err
   }
 
-  /** The instance a good answer leaves held, or null where `ifAbsent` says or nothing is; `ifAbsent: 'fail'` refuses an absent one. */
-  #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>, ifAbsent?: IfAbsent): ThingT | null {
+  /** The instance a good answer leaves held, or null where none is. */
+  #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>): ThingT | null {
     const scope = this.scopeOf(answer.req_params)
     const record = recordOfAnswer<RecordT, SparseT>(answer)
     if (record !== null) { this.#demandRecordOfScope(record, scope) }
-    const thing = (record === null) ? this.#receiveNothing(scope) : this.buildOrReceive(record)
-    if (ifAbsent === 'fail') {
-      if (thing === null) { throw this.nothingStoredError(scope) }
-      thing.demandPresent()
-    }
-    return (ifAbsent === 'nil' && thing?.isPresent !== true) ? null : thing
+    return (record === null) ? this.#receiveNothing(scope) : this.buildOrReceive(record)
   }
 
   /** The instance held under `scope`, once it hears that storage holds nothing there; null where none is held, as nothing is made of an absence. */

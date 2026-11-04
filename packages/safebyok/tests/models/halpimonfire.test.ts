@@ -58,20 +58,21 @@ describe("A lock that lands while an unlock proves", () => {
 })
 
 describe("A lock that lands during a box verb", () => {
-  it("during hello leaves the list made and the next getBox refusing 'vault_locked', opening nothing", async () => {
+  it("during hello leaves the list made and the next putBox refusing 'vault_locked', storing nothing", async () => {
     const { vault, vaultDB } = await makeBornVault()
     const tryGetVault = vaultDB.tryGetVault.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetVault').mockImplementationOnce((...args) => { vault.lock(); return tryGetVault(...args) })
     await expect(vault.hello()).resolves.to.eq(vault)
-    await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'vault_locked')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' } }), 'vault_locked')
   })
 
-  it("during getBox's get refuses 'vault_locked' though the box came back", async () => {
+  it("during getBox's get answers the box, with its whisper refusing 'vault_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
     await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' } })
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
-    await TH.expectRefusal(vault.fetchBox('anthropic_api_key'), 'vault_locked')
+    const box = (await vault.fetchBox('anthropic_api_key'))!
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
 })
 

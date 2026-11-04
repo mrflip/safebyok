@@ -404,12 +404,13 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(await listing.get(box.scope, { ifAbsent: 'nil' })).to.be.null
   })
 
-  it("refuses 'vault_locked' before asking storage for anything", async () => {
+  it("answers the box stored while the vault is locked", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord())
     held.mw.setLockState('locked')
-    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)), 'vault_locked')
-    expect(held.mw.calls).to.deep.equal([])
+    const box = await listing.get(held.mw.boxscope(Label))
+    expect(box?.boxlabel).to.eq(Label)
+    expect(box?.isPresent).to.be.true
   })
 
   it("refuses 'bad_option' fed a put's ifAbsent, and 'disabled' once vacated", async () => {

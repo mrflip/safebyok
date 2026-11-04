@@ -154,7 +154,7 @@ describe("the proof", () => {
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders(['locked'])
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
-    await TH.expectRefusal(vault.getBox(ApiKey.boxlabel), 'vault_locked')
+    await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
 
     // The user closes the dialog: the unlock refuses declined, and nothing moves.
     dialog.typing = []
