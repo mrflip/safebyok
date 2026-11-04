@@ -194,7 +194,7 @@ describe("packedManifest", () => {
     expect(packed.exitCode, packed.stderr).to.eq(0)
     const manifest = await Release.packedManifest(Release.processRunner(scratch), tarball)
     expect(Release.workspaceRanges(manifest)).to.deep.equal([])
-    expect((manifest['peerDependencies'] as Record<string, string>)['safebyok']).to.match(/^\^\d+\.\d+\.\d+/)
+    expect((manifest['peerDependencies'] as Record<string, string>)['safebyok-old']).to.match(/^\^\d+\.\d+\.\d+/)
   }, 30_000)
 
   it("ships the dist-only exports: the workspace's source condition never leaves the repo", async () => {
