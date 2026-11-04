@@ -392,6 +392,26 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     expect(await reborn.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
   })
 
+  it("left by a refused put has heard nothing from storage, so getBox fetches the box stored, keeping the instance", async () => {
+    const { next, box, tryGetBox } = await nextUnlisted()
+    await TH.expectRefusal(next.putBox({ boxlabel, sidecar: Sidecar }), 'no_whisper')
+    const shell = next.boxListing.at({ ...next.scope, boxlabel })
+    expect(shell?.isPresent).to.eq(false)
+    const got = await next.getBox(boxlabel)
+    expect(tryGetBox).toHaveBeenCalledOnce()
+    expect(got).to.eq(shell)
+    expect(got?.revision_seq).to.eq(box.revision_seq)
+    expect(await got?.extractWhisper()).to.deep.equal(Whisper)
+  })
+
+  it("left by a refused put with nothing stored, has getBox ask storage, and refuse 'absent_box' or answer null", async () => {
+    const { vault, tryGetBox } = await makeWorld()
+    await TH.expectRefusal(vault.putBox({ boxlabel, sidecar: Sidecar }), 'no_whisper')
+    await TH.expectRefusal(vault.getBox(boxlabel), 'absent_box')
+    await expect(vault.getBox(boxlabel, { ifAbsent: 'nil' })).resolves.to.eq(null)
+    expect(tryGetBox).toHaveBeenCalledTimes(2)
+  })
+
   it("under ifAbsent 'fail', refuses 'absent_box' with the sentence naming vault.hello, storing nothing", async () => {
     const { next, tryPutBox } = await nextUnlisted()
     const err = await TH.expectRefusal(next.putBox({ boxlabel, whisper: Whisper }, { ifAbsent: 'fail' }), 'absent_box')

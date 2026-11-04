@@ -80,12 +80,14 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Finding]: get, tryGet, demandUsable
 
-  /** The present box under `scoped`, as fresh as asked: one held hydrates, any other is fetched. */
+  /** The present box under `scoped`, as fresh as asked: one storage has told of hydrates, any other, a void one included, is fetched. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
     const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
     const scope = this.scopeOf(scoped)
     this.demandUsable()
-    const box = await (this.at(scope)?.hydrate(timely) ?? this.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
+    const held = this.at(scope)
+    const isHeard = (held !== null) && (held.revision_seq !== VS.VoidRevisionSeq)
+    const box = await (isHeard ? held.hydrate(timely) : this.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
     this.demandUsable()
     if (box?.isPresent === true) { return box }
     if (ifAbsent === 'nil') { return null }
