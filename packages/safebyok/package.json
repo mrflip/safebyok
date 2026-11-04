@@ -58,7 +58,6 @@
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-sonarjs": "^4.2.2",
     "eslint-plugin-unicorn": "^79.0.0",
-    "fake-indexeddb": "^6.2.6",
     "publint": "^0.3.25",
     "tsdown": "^0.23.3",
     "typescript": "6.0.3",
@@ -75,35 +74,17 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./browser": {
-      "@safebyok/source": "./src/browser.ts",
-      "import": "./dist/browser.js",
-      "require": "./dist/browser.cjs"
-    },
-    "./idb": {
-      "@safebyok/source": "./src/idb.ts",
-      "import": "./dist/idb.js",
-      "require": "./dist/idb.cjs"
-    },
     "./testing": {
       "@safebyok/source": "./tests/test-helpers.ts",
       "import": "./dist/testing.js",
       "require": "./dist/testing.cjs"
-    },
-    "./utils": {
-      "@safebyok/source": "./src/utils.ts",
-      "import": "./dist/utils.js",
-      "require": "./dist/utils.cjs"
     },
     "./package.json": "./package.json"
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
-    "@zxcvbn-ts/core": "^4.2.0",
-    "@zxcvbn-ts/language-common": "^4.1.3",
     "es-toolkit": "^1.53.0",
-    "idb-keyval": "^6.3.0",
     "safe-stable-stringify": "^3.0.0"
   },
   "peerDependencies": {
@@ -112,17 +93,8 @@
   },
   "typesVersions": {
     "*": {
-      "browser": [
-        "./dist/browser.d.cts"
-      ],
-      "idb": [
-        "./dist/idb.d.cts"
-      ],
       "testing": [
         "./dist/testing.d.cts"
-      ],
-      "utils": [
-        "./dist/utils.d.cts"
       ]
     }
   },
@@ -132,21 +104,9 @@
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
       },
-      "./browser": {
-        "import": "./dist/browser.js",
-        "require": "./dist/browser.cjs"
-      },
-      "./idb": {
-        "import": "./dist/idb.js",
-        "require": "./dist/idb.cjs"
-      },
       "./testing": {
         "import": "./dist/testing.js",
         "require": "./dist/testing.cjs"
-      },
-      "./utils": {
-        "import": "./dist/utils.js",
-        "require": "./dist/utils.cjs"
       },
       "./package.json": "./package.json"
     }
