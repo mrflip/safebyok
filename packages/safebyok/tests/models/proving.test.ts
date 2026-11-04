@@ -1,7 +1,7 @@
 import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes } from '../../src/consts'
 import { fromB64, randomBytes, toB64 } from '../../src/crypto'
-import type { KeyDeriver } from '../../src/key-deriver'
+import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
 import { type ProvingWorld, FirstGateEpoch } from '../../src/models/models-shapes'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from '../../src/models/proving'

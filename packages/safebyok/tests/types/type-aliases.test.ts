@@ -7,11 +7,10 @@ import { cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../../src/cry
 import type { VaultError } from '../../src/errors'
 import * as FX from '../../src/shapes/fields'
 import type { Ciphered, BoxKeyWrapped, PassphraseSalt, PrfSalt, RevisionTok, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, VaultTok, WhisperCiphered } from '../../src/shapes/fields'
-import type { ConsistencyWith, Lifecycled, Refused } from '../../src/types/type-aliases'
+import type { Lifecycled, Refused } from '../../src/types/type-aliases'
 import type { PassphraseCleartext, PasskeyWayinRecord, PassphraseWayinRecord } from '../../src/shapes/vault'
 import * as VX from '../../src/shapes/vault'
 import type { LeaseRecord } from '../../src/shapes/device'
-import type { Vault } from '../../src/vault'
 import * as TH from '../test-helpers'
 
 describe("the names a host writes by hand", () => {
@@ -131,13 +130,5 @@ describe("Lifecycled and Refused", () => {
     }
     expectTypeOf(showTrouble).returns.toEqualTypeOf<VaultError | null>()
     expectTypeOf<Refused<BankScope>>().toExtend<BankScope>()
-  })
-})
-
-describe("ConsistencyWith", () => {
-  it("is what a collaborator takes, and a Vault object is one, as its example shows", () => {
-    expectTypeOf<ConsistencyWith<VaultScope>>().toHaveProperty('demandConsistentWith')
-    expectTypeOf<Vault>().toExtend<ConsistencyWith<VaultScope>>()
-    expectTypeOf<VaultScope>().not.toExtend<ConsistencyWith<VaultScope>>()
   })
 })

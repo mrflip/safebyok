@@ -1,13 +1,11 @@
 /** The shapes of the code a host hands in: the stores and libraries Bank.make takes, a logger, what `localVaultDB` is handed, and a callback. Each `parse` refuses 'bad_option', and only checks: what was handed in goes on as it came, prototype, `this` and all. */
 
-import type * as Z from 'zod'
 import { MaxSaltBytes } from '../consts'
-import type { KeyDeriver } from '../key-deriver'
-import type { LocalVaultDBOpts } from '../local-vault-db'
+import type { KeyDeriver } from '../deriver/basederiver'
 import type { VaultLogger } from '../logger'
 import type { Clock } from './bank-opts'
 import * as Phrases from '../phrases'
-import { Checker, Checkers, objCheck } from '../checks/validator'
+import { Checker, Checkers } from '../checks/validator'
 import * as FX from './fields'
 
 // == [Stores and libraries]: vaultDBShape, deviceDBShape, clockShape, keyDeriverShape
@@ -39,15 +37,6 @@ export const { vaultDBShape, deviceDBShape, clockShape, keyDeriverShape } = Chec
 export const loggerShape = Checker(({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
-}, 'bad_option')
-
-/** The check of what `localVaultDB` is handed: a `store` carrying a StringStore's five calls, and a `logger`, which the VaultDB checks, and nothing else. Its `parse` refuses 'bad_option'. Only checked: `opts` goes on as it came. */
-export const localVaultDBOpts = objCheck(({ obj, fn, unk }) => {
-  const call = fn()
-  return {
-    store:  obj({ get: call, put: call, del: call, scopepaths: call, subscribe: call }, Phrases.StringStoreShape),
-    logger: unk.optional(),
-  } satisfies Record<keyof LocalVaultDBOpts, Z.ZodType>
 }, 'bad_option')
 
 /** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.

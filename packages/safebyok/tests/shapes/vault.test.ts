@@ -1,4 +1,3 @@
-import 'fake-indexeddb/auto'
 import { runInNewContext } from 'node:vm'
 import { omit } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it } from 'vitest'
@@ -249,12 +248,6 @@ describe("the stamps, taken from whatever carries them", () => {
   it("take a vault's stamp from its record, with and without its format, as vaultStampButFormat's example shows", () => {
     expect(VX.vaultStamp.parse(record)).to.deep.equal(stamp)
     expect(VX.vaultStampButFormat.parse(record)).to.deep.equal(omit(stamp, ['format']))
-  })
-
-  it("take a vault's stamp from a Vault object", async () => {
-    const vault = await TH.settledVault(TH.memoryVaultOpts())
-    expect(VX.vaultStamp.parse(vault)).to.deep.equal(vault.stamp)
-    TH.closeVault(vault)
   })
 
   it("refuse 'bad_record' a stamp missing a field it binds", () => {

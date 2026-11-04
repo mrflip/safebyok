@@ -15,7 +15,7 @@ import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/provi
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/outcome'
-import type { KeyDeriver } from '../../src/key-deriver'
+import type { KeyDeriver } from '../../src/deriver/basederiver'
 import * as VX from '../../src/shapes/vault'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { type LoggedCall, spyLogger } from './logging'
