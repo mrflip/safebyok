@@ -250,7 +250,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Make the world timely, as its answer may lock the vault or take the thing away, and fetch the record unless it is timely within `opts.maxMillisSinceRefresh`, by default the thing's horizon. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
-    this.demandEnabled()
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
     return this.fetch({ ifAbsent: 'nil' })

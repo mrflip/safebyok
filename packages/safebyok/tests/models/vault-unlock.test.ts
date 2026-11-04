@@ -456,6 +456,16 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(vault.gate.gate_epoch).to.eq(demandStored().gate.gate_epoch)
   })
 
+  it("a hydrate past a discard refuses only where it fetches: a timely record answers the instance, a stale one 'disabled'", async () => {
+    const { vault, box } = await makeVaultWithBox()
+    box.sweep()
+    await expect(box.hydrate()).resolves.to.eq(box)
+    await TH.expectRefusal(box.hydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+    vault.sweep()
+    await expect(vault.hydrate()).resolves.to.eq(vault)
+    await TH.expectRefusal(vault.hydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+  })
+
   it("a sweep crossing ensureUnlocked's peek at the cached lease refuses 'disabled', nobody asked", async () => {
     const { vault, listing, deviceDB } = await makeBornVault()
     vault.lock()

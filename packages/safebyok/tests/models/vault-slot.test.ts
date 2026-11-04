@@ -55,7 +55,7 @@ describe("a tombstone over a live vault", () => {
     restoreRow(tombstoneOver(demandStored()))
     expect(await listing.fetch(Dna, { ifAbsent: 'nil' })).to.be.null
     await expectLandedGone(vault, world)
-    await TH.expectRefusal(boxes.hello(), 'disabled')
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(box.isDisabled).to.be.true
     await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
     TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
@@ -93,7 +93,7 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
     await delTyping(bornVault)
     await erased()
     expect(vault.isPresent).to.be.false
-    await TH.expectRefusal(boxes.hello(), 'disabled')
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(onBadNews).not.toHaveBeenCalled()
   })
 })
@@ -104,7 +104,7 @@ describe("vault.del()", () => {
     const boxes = world.vault.boxListing
     await delTyping(world.vault)
     await expectLandedGone(world.vault, world)
-    await TH.expectRefusal(boxes.hello(), 'disabled')
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
     await TH.expectRefusal(world.vault.ensureTimely(0), 'vault_gone')
   })

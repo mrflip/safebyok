@@ -127,6 +127,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** The instance of `record`, sparse, full or a tombstone, once it is delivered as a fetch's answer would be, and held; a thing already held under its scope receives it. Stores nothing. */
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
+    this.demandEnabled()
     this.sparseOf(record)
     return this.#buildOrReceive(this.scopeOf(record), record)
   }
@@ -143,6 +144,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
+    this.demandEnabled()
     await this.ensureTimelyWorld(maxWorldMillis)
     return this.deliver(await this.tryGetRow(asked), ifAbsent)
   }
