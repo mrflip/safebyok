@@ -690,6 +690,11 @@ rows with it.
   `refusalkind` to branch on. Actionable: what to do next. Empathetic: a failure (misuse, bad
   news) speaks to the developer integrating the package; a condition speaks, calmly, to the user
   who will see it.
+* **A guard lives in what an entrypoint calls** (the Coach, 2026-11-04). A public entrypoint's
+  `demandFooable` carries `demandEnabled` and whatever else that entrypoint needs. A primitive, a
+  private helper or a method that only prepares another carries none. Demand again only at a
+  critical seam, synchronously before the critical call (an unseal, a put). A guard upstream of
+  one already on the path is noise.
 
 ## Comments and doc blocks
 
