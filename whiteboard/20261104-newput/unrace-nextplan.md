@@ -1,6 +1,6 @@
 # Next sprint: what the planner starts from
 
-The core resources, all but the last in this directory unless named:
+Moved here from `whiteboard/20261102-newdesign/` on 2026-11-04. The core resources, all but the last in that directory unless named:
 
 1. This file: what the Coach has ruled, and what's left to them.
 2. `whiteboard/20261103-unrace/unrace-resolutions.md`: every ruling word for word, and the orchestrator's calls.
