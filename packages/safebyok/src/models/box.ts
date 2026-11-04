@@ -8,7 +8,7 @@ import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
 import * as VS from '../storage/vault-db-shapes'
 import type { BoxListing, BoxWorld } from './box-listing'
-import { type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type LockState, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import { type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 
@@ -23,7 +23,6 @@ export type BoxSnapshot = Boxscope & Readonly<{
   full:          boolean
   present:       boolean
   exposed:       boolean
-  lockState:     LockState
 }>
 
 /** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
@@ -200,7 +199,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       full:          this.isFull,
       present:       this.isPresent,
       exposed:       this.#exposed !== null,
-      lockState:     this.listing.lockState(),
     })
   }
   // --

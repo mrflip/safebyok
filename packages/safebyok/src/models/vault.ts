@@ -301,7 +301,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease = lease
     if (displaced !== null && displaced !== lease) { displaced.evict() }
     this.settle()
-    this.#boxListing?.settleThings()
     const cached = await caching
     if (! cached.ok) { this.listing.tellBadNews([cached.err]) }
   }
