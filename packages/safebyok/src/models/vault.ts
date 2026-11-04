@@ -195,7 +195,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Unlocking]: isUnlocked, ensureUnlocked, tryEnsureUnlocked, unlock, tryUnlock, unlockByProof, attachCachedLease
+  // == [Unlocking]: isUnlocked, ensureUnlocked, tryEnsureUnlocked, unlock, tryUnlock, unlockByProof
 
   get isUnlocked(): boolean { return this.#lease !== null }
 
@@ -203,7 +203,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async ensureUnlocked(): Promise<this> {
     await this.ensureTimely(); this.demandEnabled()
     if (this.isUnlocked) { return this }
-    if (await this.#attachCachedLease()) { return this }
+    const cached = await Lease.buildFromCache(this.#leaseFriend(), this.gate.gate_epoch)
+    if (cached) { await this.#attachLease(cached); return this }
     return this.unlock()
   }
 
@@ -224,14 +225,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const lease = await proved.buildLease(this.#leaseFriend())
     await this.#attachLease(lease)
     return this
-  }
-
-  /** True where the lease this device has cached for this gate is now attached. */
-  async #attachCachedLease(): Promise<boolean> {
-    const cached = await Lease.buildFromCache(this.#leaseFriend(), this.gate.gate_epoch)
-    if (cached === null) { return false }
-    await this.#attachLease(cached)
-    return true
   }
   // --
 
