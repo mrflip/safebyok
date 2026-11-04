@@ -110,8 +110,10 @@ describe("the README Yoga recipe", () => {
   it("pushes another device's write to a subscriber, over server-sent events", async () => {
     const route = await routeOver()
     const elsewhere = browserFor(route, 'u1')
+    // The vault first, as it takes two writes and a subscriber may hear them as one change or two.
+    const { vault_tok } = await TH.ensureGated(elsewhere, TH.vaultRecordOf('u1'))
     const { heard, unsubscribe } = await TH.liveWatch(browserFor(route, 'u1'), TH.scopeOf('u1'))
-    await TH.ensureGated(elsewhere, TH.vaultRecordOf('u1'))
+    await TH.expectingGood(elsewhere).tryPutBox(TH.scopeOf('u1'), { vault_tok, revision_tok: null }, TH.boxOf('openai', 'r1'))
     await TH.eventually(() => heard.count > 0)
     unsubscribe()
     expect(heard.count).to.eq(1)
