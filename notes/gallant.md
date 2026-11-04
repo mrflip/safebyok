@@ -471,7 +471,7 @@ verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), 
 **Gallant:**
 
 ```ts
-MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
 ```
 
 **Goofus:** `deliver` asks whether a refusal's `dbhas` belongs to this listing by listing refusal kinds. Each new case adds an
