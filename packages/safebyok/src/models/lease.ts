@@ -3,7 +3,7 @@ import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey
 import { tattoo } from '../helpers'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import { damagedLease, leaseNotInForce, unopenedWhisper } from '../helpers/throwers'
-import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseFromCacheArgs, leaseGrantArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
 
 // == [Lease]
 
@@ -39,7 +39,7 @@ export class Lease implements LeaseStamp {
     Object.freeze(this)
   }
 
-  // == [Making one]: buildFromCache, grant
+  // == [Making one]: buildFromCache, buildGranted
 
   /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is uncached;
    * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
@@ -68,8 +68,8 @@ export class Lease implements LeaseStamp {
   }
 
   /** A new lease under a fresh leaseKey. The vault holds it, and caches it. */
-  static async grant(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
-    const { opts: { gate_epoch, wayinkind } } = leaseGrantArgs.parse({ friend, vaultKey, opts })
+  static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
+    const { opts: { gate_epoch, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
     const held     = vaultStamp.parse(friend)
     const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, gate_epoch, proved_at: friend.clock.now(), wayinkind })
     const leaseKey = await makeLeaseKey()

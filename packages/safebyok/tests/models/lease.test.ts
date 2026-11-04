@@ -24,7 +24,7 @@ const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseF
   return { friend, lease }
 }
 
-describe("Lease.grant(friend, vaultKey, opts)", () => {
+describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
   it("makes a record of the vault: fmt 7001, the vault's stamp, the epoch, proved_at and wayinkind, a leaseKey handle and the wrapped vaultKey", async () => {
     const { friend } = await grantedWorld({ gate_epoch: 3, wayinkind: 'passkey' })
     const record = friend.cached as LeaseRecord
@@ -71,7 +71,7 @@ describe("Lease.grant(friend, vaultKey, opts)", () => {
     it(`${blurb}, as 'bad_option'`, async () => {
       const { friend = fakeLeaseFriendOf(), vaultKey = makeVaultKey(), opts = GrantedAs } = argsOf() as Record<string, unknown>
       const handed = await (vaultKey as Promise<unknown>)
-      await TH.expectRefusal(Lease.grant(friend as FakeLeaseFriend, handed as CryptoKey, opts as LeaseGrantOpts), 'bad_option')
+      await TH.expectRefusal(Lease.buildGranted(friend as FakeLeaseFriend, handed as CryptoKey, opts as LeaseGrantOpts), 'bad_option')
     })
   }
 })

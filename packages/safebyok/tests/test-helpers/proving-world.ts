@@ -95,7 +95,7 @@ export const GrantedAs: LeaseGrantOpts = Object.freeze({ gate_epoch: FirstGateEp
 
 /** A lease under a fresh vaultKey: no two share a key. Not cached. */
 export const makeGrantedLease = async (friend: FakeLeaseFriend, opts: LeaseGrantOpts = GrantedAs): Promise<Lease> => (
-  Lease.grant(friend, await makeVaultKey(), opts)
+  Lease.buildGranted(friend, await makeVaultKey(), opts)
 )
 
 /** The two stamps a box hands the lease to seal its whisper under, its own fields, flat: `boxlabel` and `box_tok` for the boxKey's wrap, the same and `revision_seq` for the whisper's cipher. `overrides` lays fields over both. */

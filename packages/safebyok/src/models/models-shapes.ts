@@ -462,7 +462,7 @@ export type StampedGate = Z.infer<typeof stampedGate>
 export type Novel = typeof NOVEL
 // --
 
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
+// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
 export const LeaseFormat = ModelsLeaseFormat
 
@@ -520,16 +520,16 @@ const isCtxStamp = (val: unknown): boolean => (
 )
 
 /** SLOPDOC: The arguments of each lease verb, and the flat stamp binding what a lease seals to its caller's record. */
-export const { ctxStamp, leaseFromCacheArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
+export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
   return {
     ctxStamp,
-    leaseFromCacheArgs:obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
-    leaseGrantArgs:    obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
-    provingLeaseArgs:  obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
-    leaseSealArgs:     obj({ whisperText: str, stamp: ctxStamp }),
-    leaseUnsealArgs:   obj({ sealed: sealedWhisper, stamp: ctxStamp }),
+    leaseFromCacheArgs: obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
+    leaseGrantedArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
+    provingLeaseArgs:   obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
+    leaseSealArgs:      obj({ whisperText: str, stamp: ctxStamp }),
+    leaseUnsealArgs:    obj({ sealed: sealedWhisper, stamp: ctxStamp }),
   }
 }, [FX])
 // --

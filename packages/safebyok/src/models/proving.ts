@@ -76,7 +76,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     provingLeaseArgs.parse({ friend, gate_epoch })
     vaultStamp.parseConsistent(friend, this.stamp, { kind: 'bad_option', message: Phrases.LeaseOfOtherVault })
     const vaultKey = await this.#unwrapVaultKey()
-    return Lease.grant(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
+    return Lease.buildGranted(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
   }
 
   /** Unwrap the stored wayin's vaultKey and drop it, to learn that the key opens the wrap (guarantees.md, G3). */

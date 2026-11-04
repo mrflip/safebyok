@@ -104,10 +104,10 @@ describe("An ending that lands while box.expose unseals", () => {
   })
 })
 
-/** The next `Lease.grant` runs `crossing` once its lease is made, as a slow wrap would let it. */
+/** The next `Lease.buildGranted` runs `crossing` once its lease is made, as a slow wrap would let it. */
 const crossingGrant = (crossing: () => unknown) => {
-  const grant = Lease.grant.bind(Lease)
-  vi.spyOn(Lease, 'grant').mockImplementationOnce(async (...args) => {
+  const grant = Lease.buildGranted.bind(Lease)
+  vi.spyOn(Lease, 'buildGranted').mockImplementationOnce(async (...args) => {
     const lease = await grant(...args)
     await crossing()
     return lease
