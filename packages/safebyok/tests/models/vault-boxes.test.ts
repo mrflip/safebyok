@@ -278,18 +278,18 @@ describe("the box's birth: vault.putBox with no box listed", () => {
   })
 
   const PatchCases = [
-    [{ whisper: Whisper },                               'a patch with no boxlabel'],
-    [{ boxlabel },                                       'a patch naming neither half'],
-    [{ boxlabel, whisper: { val: null } },               'a whisper that fails its check'],
-    [{ boxlabel, whisper: Whisper, sidecar: 'note' },    'a sidecar that fails its check'],
-    [{ boxlabel, whisper: Whisper, vaultlabel: 'other' }, "the scope of another vault"],
-    [undefined,                                          'no patch at all'],
+    [{ whisper: Whisper },                                'bad_scope',  'a patch with no boxlabel'],
+    [undefined,                                           'bad_scope',  'no patch at all'],
+    [{ boxlabel },                                        'bad_option', 'a patch naming neither half'],
+    [{ boxlabel, whisper: { val: null } },                'bad_option', 'a whisper that fails its check'],
+    [{ boxlabel, whisper: Whisper, sidecar: 'note' },     'bad_option', 'a sidecar that fails its check'],
+    [{ boxlabel, whisper: Whisper, vaultlabel: 'other' }, 'bad_option', "the scope of another vault"],
   ] as const
 
-  for (const [patch, blurb] of PatchCases) {
-    it(`refuses ${blurb} as 'bad_option', storing nothing`, async () => {
+  for (const [patch, kind, blurb] of PatchCases) {
+    it(`refuses ${blurb} as '${kind}', storing nothing`, async () => {
       const { vault, tryPutBox } = await makeWorld()
-      await TH.expectRefusal(vault.putBox(patch as never), 'bad_option')
+      await TH.expectRefusal(vault.putBox(patch as never), kind)
       expect(tryPutBox).not.toHaveBeenCalled()
     })
   }

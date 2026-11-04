@@ -399,7 +399,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** As {@link BoxListing.puttable} then {@link Box.put}, for the box `patch` names. */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
-    MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
     return this.boxListing.puttable({ ...patch, ...this.scope }, opts).put(patch, opts)
   }
 

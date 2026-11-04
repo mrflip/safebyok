@@ -114,7 +114,7 @@ export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, 
 export type Settled = Z.infer<typeof settled>
 // --
 
-// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxPut, boxesListed, boxlabelArg, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven, BoxPutGiven, BoxesListed
+// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxesListed, boxlabelArg, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven, BoxesListed
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const { BoxFormat } = VS
@@ -136,7 +136,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
 /** SLOPDOC: The checks of what a caller hands to make or update a box: for `create`, `put` and `putBox`. */
-export const { boxDna, boxPatch, boxPut } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
+export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
@@ -145,12 +145,9 @@ export const { boxDna, boxPatch, boxPut } = Checkers('bad_option', ({ lit, oneof
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const patchProps = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(amVals).optional(), whisper: whisperHolder.optional(), sidecar: sidecar.optional() })
-  const boxPatch = patchProps.strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(amVals).optional(), whisper: whisperHolder.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
-  const boxPut = patchProps.extend({ boxlabel }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
-    .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
-  return { boxDna, boxPatch, boxPut }
+  return { boxDna, boxPatch }
 })
 
 /** A box's dna as {@link boxDna} hands it back: the scope, the whisper and the sidecar, and the record's own props with their defaults filled. */
@@ -158,9 +155,6 @@ export type BoxDnaFilled = Z.output<typeof boxDna>
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchGiven = Z.output<typeof boxPatch>
-
-/** What `vault.putBox` is told, as {@link boxPut} hands it back: a {@link BoxPatchGiven} under its `boxlabel`. */
-export type BoxPutGiven = Z.output<typeof boxPut>
 
 /** The check of what a vault's get lists of its boxes: `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check, whose boxlabel is whatever storage has it under. */
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {

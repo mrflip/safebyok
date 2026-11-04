@@ -670,18 +670,6 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
     })
   })
 
-  describe("boxPut", () => {
-    holdsCases(MSX.boxPut, 'bad_option', [
-      [{ boxlabel: scope.boxlabel, whisper },                                true,  'passes a boxlabel and a whisper, as its example shows'],
-      [{ boxlabel: scope.boxlabel, sidecar: {} },                            true,  'passes a boxlabel and a sidecar'],
-      [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with both halves'],
-      [{ whisper, sidecar: {} },                                             false, 'refuses a patch with no boxlabel'],
-      [{ boxlabel: scope.boxlabel },                                         false, 'refuses a boxlabel naming neither half'],
-      [{ boxlabel: '', whisper },                                            false, 'refuses an empty boxlabel'],
-      [{ boxlabel: scope.boxlabel, whisper, sidecarr: {} },                  false, 'refuses a field no box record has'],
-    ])
-  })
-
   describe("boxPatch", () => {
     holdsCases(MSX.boxPatch, 'bad_option', [
       [{ whisper, sidecar: {} },                                             true,  'passes the whisper and the sidecar alone'],
