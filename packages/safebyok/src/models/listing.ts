@@ -144,8 +144,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
-    this.demandEnabled()
     await this.ensureTimelyWorld(maxWorldMillis)
+    this.demandEnabled()
     return this.deliver(await this.tryGetRow(asked), ifAbsent)
   }
 

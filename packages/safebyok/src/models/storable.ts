@@ -221,10 +221,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return full
   }
 
-  async ensureDeletable(opts: TimelyOpts = {}): Promise<this> {
-    await this.hydrate(opts)
-    return this.demandDeletable()
-  }
+  ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
   /** A delete needs the thing enabled and the vault unlocked, and no more: a thing gone is deleted again. */
   demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
@@ -235,8 +232,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** SLOPDOC: Refreshes this thing from storage through the listing, joining any fetch under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
-    this.demandEnabled()
     await this.listing.ensureTimelyWorld(maxWorldMillis)
+    this.demandEnabled()
     const isStored = await this.#oneFetchAtATime()
     this.demandEnabled()
     if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
@@ -260,6 +257,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureDeletable(MSX.timelyOpts.parse(opts))
+    this.demandDeletable()
     await this.listing.del(this)
     return this
   }

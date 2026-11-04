@@ -69,18 +69,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Guards]: ensureUnsealable, demandUnsealable, ensureSendable, demandSendable, demandExposable
 
-  async ensureUnsealable(opts: TimelyOpts = {}): Promise<this> {
-    await this.hydrate(opts)
-    return this.demandUnsealable()
-  }
+  ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
   /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
   demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
-  async ensureSendable(opts: TimelyOpts = {}): Promise<this> {
-    await this.hydrate(opts)
-    return this.demandSendable()
-  }
+  ensureSendable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
   /** A send needs the box enabled and the vault unlocked, and no more: a box gone is sent back to life. */
   demandSendable(): this { return this.demandEnabled().demandUnlocked() }
@@ -108,6 +102,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
     await this.ensureUnsealable(opts)
+    this.demandUnsealable()
     return this.#unseal(this.demandFullProps())
   }
 
@@ -138,6 +133,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     await this.ensureSendable(timely)
+    this.demandSendable()
     const ante = this.central
     const record = await this.#edit(given, ante)
     this.demandSendable()

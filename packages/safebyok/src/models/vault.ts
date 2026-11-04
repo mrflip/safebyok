@@ -72,10 +72,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   override get isLocked(): boolean { return this.lockState() === 'locked' }
 
   /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. */
-  async ensureTimely(maxMillis?: number): Promise<this> {
-    await this.hydrate({ maxMillisSinceRefresh: maxMillis })
-    return this.demandUsable()
-  }
+  ensureTimely(maxMillis?: number): Promise<this> { return this.hydrate({ maxMillisSinceRefresh: maxMillis }) }
 
   /** What every verb of a vault needs: the vault enabled and present. */
   demandUsable(): this { return this.demandEnabled().demandPresent() }
@@ -106,6 +103,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrase(): Promise<this> {
     await this.ensureTimely()
+    this.demandUsable()
     await Gating.launch('replace_passphrase', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runReplacePassphrase(provings) })
     return this
   }
@@ -120,6 +118,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Add a passkey through an add_passkey gating. */
   async addPasskey(): Promise<this> {
     await this.ensureTimely(MSX.Promptly)
+    this.demandUsable()
     this.gate.demandPasskeyAddable()
     await Gating.launch('add_passkey', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runAddPasskey(provings) })
     return this
@@ -135,6 +134,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
   async revokePasskey(): Promise<this> {
     await this.ensureTimely(MSX.Promptly)
+    this.demandUsable()
     if (this.gate.pkWayin === null) { return this }
     await Gating.launch('revoke_passkey', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante, proved }) => this.#landGate(proved, () => this.listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })) })
     return this
@@ -153,6 +153,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: Deletes this vault through a gating, leaving a tombstone in its slot and nothing of it on this device. */
   async delVault(): Promise<this> {
     await this.ensureTimely()
+    this.demandUsable()
     await Gating.launch('del_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante }) => this.#runDelVault(ante) })
     return this
   }
@@ -198,6 +199,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: This vault, unlocked: as it stands, else by the lease cached on this device, else by asking the user. */
   async ensureUnlocked(): Promise<this> {
     await this.ensureTimely()
+    this.demandUsable()
     if (this.isUnlocked) { return this }
     if (! this.isFull) { await this.fetch() }
     if (await this.#attachCachedLease()) { return this }
@@ -373,7 +375,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
     const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
     const scope = this.#boxscopeOf(boxlabel)
-    const boxes = await this.#ensureBoxesUsable()
+    this.demandBoxesUsable()
+    await this.#ensureBoxesUsable()
+    this.demandBoxesUsable()
+    const boxes = this.boxListing
     const box = await (boxes.at(scope)?.hydrate(timely) ?? boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
     this.demandBoxesUsable()
     if (box?.isPresent === true) { return box }
@@ -394,11 +399,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     verifyConsistent(named, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     const scope = this.#boxscopeOf(named.boxlabel)
-    const boxes = await this.#ensureBoxesUsable()
+    this.demandBoxesUsable()
+    await this.#ensureBoxesUsable()
+    this.demandBoxesUsable()
+    const boxes = this.boxListing
     const held = boxes.at(scope) ?? ((whisper === undefined) ? await boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }) : null)
     if (held !== null) { return held.send({ whisper, sidecar }, opts) }
     if (whisper === undefined) { throw noWhisperToKeep() }
     await this.ensureTimely(timely.maxWorldMillis)
+    this.demandBoxesUsable()
     return boxes.create({ ...scope, whisper, sidecar: sidecar ?? {} }, { ifPresent })
   }
 
@@ -408,10 +417,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const timely = MSX.timelyOpts.parse(opts)
     const scope = this.#boxscopeOf(boxlabel)
-    const boxes = await this.#ensureBoxesUsable()
+    this.demandBoxesUsable()
+    await this.#ensureBoxesUsable()
+    this.demandBoxesUsable()
+    const boxes = this.boxListing
     const held = boxes.at(scope)
     if (held !== null) { return held.del(timely) }
     await this.ensureTimely(timely.maxWorldMillis)
+    this.demandBoxesUsable()
     return boxes.del(boxes.damagedAt(scope) ?? VS.sentinelBoxOf(scope, this.vault_tok))
   }
 
@@ -420,14 +433,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** A box verb needs the vault present and unlocked. */
   demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }
 
-  /** The box listing, this vault having said hello. */
-  async #ensureBoxesUsable(): Promise<BoxListing> {
-    this.demandBoxesUsable()
-    if (! this.#isGreeted) {
-      await this.hello()
-      this.demandBoxesUsable()
-    }
-    return this.boxListing
+  /** This vault having said hello. */
+  async #ensureBoxesUsable(): Promise<void> {
+    if (! this.#isGreeted) { await this.hello() }
   }
 
   #boxscopeOf(boxlabel: string): Boxscope { return { ...this.scope, boxlabel: MSX.boxlabelArg.parse(boxlabel) } }

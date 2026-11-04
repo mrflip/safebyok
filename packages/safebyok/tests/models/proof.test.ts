@@ -185,7 +185,7 @@ describe("the proof", () => {
     boxesUi.expectRenders(['anthropic_api_key', 'no boxes'])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} locked', 'anthropic_api_key {"nickname":"work"} locked'])
     revealUi.expectRenders(['locked', 'locked'])
-    await TH.expectRefusal(box.extractWhisper(), 'vault_gone')
+    await TH.expectRefusal(box.extractWhisper(), 'disabled')
 
     // Rebuild over the tombstone: a new life, a new instance, a new vault_tok.
     const reborn = await bank.ensureVault(VaultBag)

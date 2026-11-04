@@ -1012,6 +1012,13 @@ describe("Storable send guards: ensureSendable, demandSendable", () => {
     TH.expectSyncRefusal(() => box.demandSendable(), 'vault_locked')
   })
 
+  it("ensureSendable refreshes and demands nothing: it resolves while locked, where send refuses", async () => {
+    const box = await builtBoxOf()
+    held.mw.setLockState('locked')
+    await expect(box.ensureSendable()).resolves.to.eq(box)
+    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
+  })
+
   it("send checks the patch before its guard, and establishes the guard once", async () => {
     const box = await builtBoxOf()
     const sendGuard = vi.spyOn(Box.prototype, 'ensureSendable')
