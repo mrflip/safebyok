@@ -1,7 +1,7 @@
 import { verifyConsistent } from '../checks/validator'
 import type { CipherCtxRecord } from '../crypto'
 import { VaultError } from '../errors'
-import { deletedVaultError } from '../helpers/throwers'
+import { alreadyHeldError, deletedVaultError } from '../helpers/throwers'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { reportToPlatform } from '../report-error'
@@ -187,7 +187,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
     if (! MSX.isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
-    const prior = listing.demandBirthSlot(checked) ?? VS.VoidRevision
+    listing.demandEnabled()
+    const held = listing.at(checked)
+    if (held?.isPresent === true) { throw alreadyHeldError() }
+    const prior = VS.revisionOf(held ?? VS.VoidRevision)
     return Gating.launch('build_vault', { listing, scope: checked, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
   }
 
@@ -196,7 +199,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null
     const record = recordOfBirth(Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin), prior, listing.clock.now())
-    const vault = await listing.ensureVault(record, prior)
+    const vault = await listing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
     if (vault.vault_tok === record.vault_tok) { await vault.#unlockByProof(passphraseProving) }
     return vault
   }

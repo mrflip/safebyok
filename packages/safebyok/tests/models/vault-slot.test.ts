@@ -34,7 +34,7 @@ const deleted = async () => {
   return { ...world, tombstone: VS.revisionOf(world.demandStored()) }
 }
 
-/** The record of a vault's birth over `prior`, as `listing.ensureVault` is handed it. */
+/** The record of a vault's birth over `prior`, as a birth's `listing.put` is handed it. */
 const birthOver = async (prior: VS.Revision): Promise<VaultRecord> => ({ ...await storedVaultRecord(), ...VS.nextRevisionOf(prior, Date.now()) })
 
 const expectLandedGone = async (vault: Vault, { listing, deviceDB }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing' | 'deviceDB'>) => {
@@ -282,49 +282,49 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.include({ vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
-  it("listing.ensureVault, landed: a new vault of the record in the slot, locked", async () => {
+  it("a birth's listing.put, landed: a new vault of the record in the slot, locked", async () => {
     const { vault, listing, tombstone } = await deleted()
     const record = await birthOver(tombstone)
-    const reborn = await listing.ensureVault(record, tombstone)
+    const reborn = await listing.put(record, { prior: tombstone, ifAbsent: 'add', ifPresent: 'get' })
     expect(reborn.vault_tok).to.eq(record.vault_tok)
     expect(reborn.isLocked).to.be.true
     expect(listing.at(Dna)).to.eq(reborn)
     expect(vault.isEnabled).to.be.false
   })
 
-  it("listing.ensureVault, nothing ever stored: lands over never stored", async () => {
+  it("a birth's listing.put, nothing ever stored: lands over never stored", async () => {
     const { listing } = makeVaultWorld()
     const record = await birthOver(VS.VoidRevision)
-    const born = await listing.ensureVault(record, VS.VoidRevision)
+    const born = await listing.put(record, { prior: VS.VoidRevision, ifAbsent: 'add', ifPresent: 'get' })
     expect(born.vault_tok).to.eq(record.vault_tok)
   })
 
-  it("listing.ensureVault, another won: the vault stored is held and answered, locked, and the record dropped", async () => {
+  it("a birth's listing.put, another won: the vault stored is held and answered, locked, and the record dropped", async () => {
     const { listing, tombstone, restoreRow } = await deleted()
     const theirs = await otherLifeAt(2)
     restoreRow(theirs)
     const record = await birthOver(tombstone)
-    const won = await listing.ensureVault(record, tombstone)
+    const won = await listing.put(record, { prior: tombstone, ifAbsent: 'add', ifPresent: 'get' })
     expect(won.vault_tok).to.eq(theirs.vault_tok)
     expect(won.isLocked).to.be.true
     expect(listing.at(Dna)).to.eq(won)
   })
 
-  it("listing.ensureVault, refused: a newer tombstone stored delivers, and nothing of the record is held", async () => {
+  it("a birth's listing.put, refused: a newer tombstone stored delivers, and nothing of the record is held", async () => {
     const { vault, listing, tombstone, demandStored, restoreRow } = await deleted()
     const record = await birthOver(tombstone)
     const stored = demandStored()
     restoreRow(tombstoneOver({ ...stored, gate: null as never }))
-    await TH.expectBad(listing.tryEnsureVault(record, tombstone), 'stale_write')
+    await TH.expectBad(listing.tryPut(record, { prior: tombstone, ifAbsent: 'add', ifPresent: 'get' }), 'stale_write')
     expect(listing.at(Dna)).to.eq(vault)
     expect(vault.revision_seq).to.eq(2)
   })
 })
 
 describe("the entrypoints, handed rubble", () => {
-  it("listing.ensureVault refuses a record that is no record, storing nothing", async () => {
+  it("a birth's listing.put refuses a record that is no record, storing nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(listing.ensureVault({ garbage: true } as never, VS.VoidRevision), 'bad_record')
+    await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: VS.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }), 'bad_record')
     expect(storedNow()).to.be.null
   })
 

@@ -10,11 +10,11 @@ import type { DeviceDB } from '../storage/device-db-new'
 import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { absentVaultError, alreadyHeldError } from '../helpers/throwers'
+import { absentVaultError } from '../helpers/throwers'
 import { BoxListing } from './box-listing'
 import { type DelTombstone, type SlotFate, Listing } from './listing'
 import { type AnyGating, type RequestCleartext, alreadyAsking } from './gating'
-import { type BoxesListed, type Fetched, type ListingOpts, type ListingWorld, type ProvingWorld, type Revision, type VaultRecord, type VaultSparse, vaultRecord, vaultSparse } from './models-shapes'
+import { type BoxesListed, type Fetched, type ListingOpts, type ListingWorld, type ProvingWorld, type VaultRecord, type VaultSparse, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { cmpRevisions } from './storable'
 import { type VaultSnapshot, Vault } from './vault'
@@ -56,21 +56,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope) }
 
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
-
-  /** SLOPDOC: Stores `record` as a birth over `prior`, resolving the vault held: its own, or the slot's winner. */
-  ensureVault(record: VaultRecord, prior: Revision): Promise<Vault> {
-    return this.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
-  }
-
-  tryEnsureVault(record: VaultRecord, prior: Revision): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(record, prior)) }
-
-  /** SLOPDOC: The tombstone a birth under `scope` goes over, or null where the slot holds none. */
-  demandBirthSlot(scope: VaultScope): Vault | null {
-    this.demandEnabled()
-    const held = this.at(scope)
-    if (held?.isPresent === true) { throw alreadyHeldError() }
-    return held
-  }
 
   /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
   async fetchBank(): Promise<void> {
