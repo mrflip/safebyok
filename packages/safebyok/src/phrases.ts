@@ -239,7 +239,7 @@ export const DemandOptionsAdvice = "demandConsistentWith()'s only option is `lea
 export const BoxAbsent = "No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds."
 
 /** Why putBox() with no whisper, over a box the vault does not hold, refuses. */
-export const NoWhisperToKeep = "No box is listed under that boxlabel, so there is no whisper to keep: hand over the whisper to store, or call vault.hello() to list what is stored."
+export const NoWhisperToKeep = "No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store."
 
 /** Why a put told to only create refuses a whole record: what it would store is recycled. */
 export const RecordForNewBox = "A put that only creates was handed a whole record, sealed whisper and all: hand it the whisper and the sidecar, so that no stored data is recycled."
