@@ -6,6 +6,7 @@ import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
+import * as VS from '../storage/vault-db-shapes'
 import type { BoxListing, BoxWorld } from './box-listing'
 import { type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type LockState, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
@@ -157,7 +158,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.put(patch, opts)) }
 
   /** The next record `patch` makes of the record in hand on entry, sealed and not yet stored, with that revision it was sealed over. */
-  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: Fetched<BoxRecord, BoxSparse> }> {
+  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: VS.Revision }> {
     const prior = this.central
     const isBirthday = this.isTombstoneRecord(prior)
     const sidecarGiven = sidecar ?? (isBirthday ? {} : this.demandFullProps().sidecar)
@@ -173,7 +174,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       box_tok:       isBirthday ? makeLifeTok() : prior.box_tok,
       am:            'a',
     }, sidecarGiven, whisperGiven)
-    return { record, prior }
+    return { record, prior: VS.revisionOf(prior) }
   }
 
   /** The whisper a patch left out, opened from the record in hand. */
