@@ -363,7 +363,7 @@ export const LeaseOfOtherVault = "This proving is of another vault: a lease is g
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, damagedBoxAbsent, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
@@ -393,6 +393,9 @@ export const boxAbsent = (boxlabel: string): string => `No box is stored under t
 
 /** Why a put that must find a box refuses where none is listed, with nothing fetched. */
 export const boxNotListed = (boxlabel: string): string => `No box is listed under the label ${boxlabel}, though one may be stored: call vault.hello() to list what is stored.`
+
+/** Why a delete of a damaged box refuses where none is listed damaged, whether the box is healthy or nothing is listed. */
+export const damagedBoxAbsent = (boxlabel: string): string => `No damaged box is listed under the label ${boxlabel}, so nothing was deleted.`
 
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --

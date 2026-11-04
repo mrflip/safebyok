@@ -7,7 +7,7 @@ import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import * as VS from '../storage/vault-db-shapes'
-import { alreadyHeldError, deletedVaultError, listingExpected, noProofToUnlock, unlockFirst } from '../helpers/throwers'
+import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, listingExpected, noProofToUnlock, unlockFirst } from '../helpers/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -342,7 +342,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form
+  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form
 
   /** List this vault's boxes and start their watch. */
   async hello(): Promise<this> {
@@ -389,10 +389,24 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const held = boxes.at(scope)
     if (held !== null) { return held.del(timely) }
     await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
-    return boxes.del(boxes.damagedAt(scope) ?? VS.sentinelBoxOf(scope, this.vault_tok))
+    return boxes.del(VS.sentinelBoxOf(scope, this.vault_tok))
   }
 
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
+
+  /** Delete the damaged box listed at `boxlabel`, the only verb that does. Refuses 'absent_box' for a healthy box or none listed. */
+  tryDelDamagedBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> {
+    return outcomeOf(async () => { // this method does not offer a throwing (delDamagedBox) form
+      const timely = MSX.timelyOpts.parse(opts)
+      const boxes = this.boxListing
+      const scope = boxes.scopeOf({ ...this.scope, boxlabel })
+      this.demandUnlocked()
+      await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
+      const damaged = boxes.damagedAt(scope)
+      if (damaged === null) { throw absentDamagedBoxError(scope) }
+      return boxes.del(damaged)
+    })
+  }
 
   // --
 

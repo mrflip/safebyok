@@ -101,12 +101,14 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Box Throwers]: recordForNewBox, undecodedWhisper
+// == [Box Throwers]: recordForNewBox, undecodedWhisper, absentDamagedBoxError
 
 /** The refusal of a put that said only-if-new, handed a whole record. */
 export const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
 
 export const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
+
+export const absentDamagedBoxError = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.damagedBoxAbsent(boxlabel))
 // --
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
