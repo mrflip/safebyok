@@ -1019,12 +1019,12 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
   })
 
-  it("put checks the patch before its guard, and ensures the guard on each side of its seal", async () => {
+  it("put checks the patch before its guard, and ensures the guard once, before its seal", async () => {
     const box = await builtBoxOf()
     const putGuard = vi.spyOn(Box.prototype, 'ensurePuttable')
     await TH.expectRefusal(box.put({}), 'bad_option')
     expect(putGuard).not.toHaveBeenCalled()
     await expect(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)
-    expect(putGuard).toHaveBeenCalledTimes(2)
+    expect(putGuard).toHaveBeenCalledOnce()
   })
 })

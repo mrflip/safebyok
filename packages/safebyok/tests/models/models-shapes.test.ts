@@ -532,6 +532,20 @@ describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
   })
 })
 
+describe("MSX.boxCreateOpts", () => {
+  it("fills what a create means: add where nothing stands, fail over a live record", () => {
+    expect(MSX.boxCreateOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'fail' })
+  })
+
+  it("takes a caller's ifPresent and the timely options, stripping the rest", () => {
+    expect(MSX.boxCreateOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxWorldMillis: 5 })
+  })
+
+  it("holds ifAbsent to 'add': a create that must find a box is not a create", () => {
+    TH.expectSyncRefusal(() => MSX.boxCreateOpts.parse({ ifAbsent: 'fail' }), 'bad_option')
+  })
+})
+
 describe("MSX.ifPresentVals, MSX.ifPresent and MSX.boxPutOpts", () => {
   it("name the three policies", () => {
     expect(MSX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
@@ -554,8 +568,16 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.boxPutOpts", () => {
     [{ maxMillisSinceRefresh: -1, ifPresent: 'repl' },  false, 'refuses a negative horizon, as timelyOpts does'],
   ])
 
-  it("keeps ifPresent and the timely options and strips the rest", () => {
-    expect(MSX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'nil', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5 })
+  it("keeps ifPresent, ifAbsent and the timely options and strips the rest", () => {
+    expect(MSX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add' })
+  })
+
+  it("leaves the defaults to box.put: nothing given, nothing filled", () => {
+    expect(MSX.boxPutOpts.parse({})).to.deep.equal({})
+  })
+
+  it("refuses a fetch's ifAbsent: 'nil' is no answer to a put", () => {
+    TH.expectSyncRefusal(() => MSX.boxPutOpts.parse({ ifAbsent: 'nil' }), 'bad_option')
   })
 
   it("name the failing field", () => {

@@ -307,7 +307,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
-    demandBoxesUsable: () => { if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.UnlockFirst) } },
+    demandBoxesUsable: () => { if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.VaultLocked) } },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()
@@ -426,6 +426,8 @@ export class TestableBoxListing extends BoxListing {
   }
 
   override async build(...args: Parameters<BoxListing['build']>): Promise<TestableBox> { return testableOf(await super.build(...args)) }
+
+  override puttable(...args: Parameters<BoxListing['puttable']>): TestableBox { return testableOf(super.puttable(...args)) }
 
   override async create(...args: Parameters<BoxListing['create']>): Promise<TestableBox> { return testableOf(await super.create(...args)) }
 

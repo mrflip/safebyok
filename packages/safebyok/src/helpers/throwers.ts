@@ -22,6 +22,8 @@ export const disabledError    = () => new VaultError('disabled', Phrases.LetGoIn
 
 export const absentBoxError   = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.boxAbsent(boxlabel))
 
+export const notListedBoxError = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.boxNotListed(boxlabel))
+
 export const absentVaultError = ({ vaultlabel }: { vaultlabel: string }) => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
 
 export const deletedVaultError = () => new VaultError('vault_gone', Phrases.VaultDeleted)

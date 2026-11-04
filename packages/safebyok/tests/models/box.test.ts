@@ -539,6 +539,15 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2 })
   })
 
+  it("seals over the revision it took on entry: a frontier received during the seal is met as 'stale_write', not sealed over", async () => {
+    const rival = fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-rival' })
+    const listing = fakeSealBoxListingOf(held.mw, {}, () => { held.mw.seedStore(rival); box.receive(rival) })
+    const box = await listing.build(fullBoxRecord())
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }), 'stale_write')
+    expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-rival', revision_seq: 2 })
+    expect(box.revision_tok).to.eq('rev-rival')
+  })
+
   it("refuses 'camped' with ifPresent 'fail' over a live record, saving nothing", async () => {
     const box = await builtOf(fullBoxRecord())
     await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fail', ...asBuilt }), 'camped')

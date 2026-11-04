@@ -1,17 +1,18 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
-import { type CipherCtxRecord, makeLifeTok } from '../crypto'
+import type { CipherCtxRecord } from '../crypto'
 import { VaultError } from '../errors'
-import { absentBoxError, lockedError } from '../helpers/throwers'
+import { absentBoxError, notListedBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
+import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { type BoxSnapshot, Box, sealedRecordOf } from './box'
+import { type BoxSnapshot, Box } from './box'
 import { type DelTombstone, Listing } from './listing'
-import { type BoxesListed, type BoxRecord, type BoxSparse, type Dna, type Fetched, type FetchOpts, type ListingOpts, type ListingWorld, type PutListingOpts, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import { type BoxesListed, type BoxPutOpts, type BoxRecord, type BoxSparse, type BoxCreateOpts, type Dna, type Fetched, type FetchOpts, type ListingOpts, type ListingWorld, type SealedWhisper, type WhisperHolder, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
@@ -100,28 +101,30 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
   // --
 
-  // == [Birth]: create, tryCreate, ensureCreatable, demandCreatable
+  // == [Putting]: puttable, create, tryCreate, shellFor
 
-  /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
-  async create(input: BoxDna, opts: Pick<PutListingOpts, 'ifPresent'> = {}): Promise<Box> {
+  /** The box a put of `scoped` goes through, taking this listing as timely: the one held, or a void one made for the slot. */
+  puttable(scoped: object, opts: BoxPutOpts = {}): Box {
+    const { ifAbsent, ifPresent } = MSX.boxPutOpts.parse(opts)
+    const scope = this.scopeOf(scoped)
+    this.demandUsable()
+    if ((ifPresent === 'fail') && ('whisper_ciphered' in scoped)) { throw recordForNewBox() }
+    const held = this.at(scope)
+    if ((ifAbsent === 'fail') && (held?.isPresent !== true)) { throw notListedBoxError(scope) }
+    return held ?? this.#shellFor(scope)
+  }
+
+  /** Seals a new box and stores it where no live record stands, answering the box listed. */
+  async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
+    const filled = MSX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
-    this.scopeOf(dna)
-    await this.#ensureCreatable(); this.#demandCreatable()
-    const { whisper, sidecar, ...sparse } = this.stampDna(dna)
-    const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
-    await this.#ensureCreatable(); this.#demandCreatable()
-    return this.put(draft, { ...opts, prior: VS.VoidRevision })
+    return this.puttable(input, filled).put(dna, filled)
   }
 
-  tryCreate(input: BoxDna, opts: Pick<PutListingOpts, 'ifPresent'> = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
+  tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  #ensureCreatable(): Promise<void> { return this.ensureTimelyWorld() }
-
-  /** A birth needs this listing enabled and the vault unlocked. */
-  #demandCreatable(): void {
-    this.demandEnabled()
-    if (this.lockState() === 'locked') { throw lockedError() }
-  }
+  /** A void box held under `scope`, timely as it received its own void revision, so a put on it fetches nothing. */
+  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(VS.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 
   // == [Defined by the box listing]
@@ -157,4 +160,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected isOwnRow(row: VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (row.vault_tok === this.world.vault_tok) }
   // --
 }
+// --
+
+// == [Refusals]: recordForNewBox
+
+/** A put that said only-if-new, handed a whole record: what it would store is recycled. */
+const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
 // --

@@ -1,7 +1,6 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the watch on storage, and every storage call made for that kind of thing. */
 
 import { verifyConsistent } from '../checks/validator'
-import { randomId } from '../crypto'
 import { VaultError, isVaultError } from '../errors'
 import type { Answer, GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
@@ -11,7 +10,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type Revision, type SparseBase, type Times, IsListing } from './models-shapes'
+import { type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type SparseBase, IsListing } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -119,9 +118,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Listing verbs]: at, things, build
 
-  /** The instance held under `scope`, or null. Calls nothing. */
-  at(scope: ScopeT): ThingT | null {
-    return this.#things.get(this.scopepathOf(this.scopeOf(scope))) ?? null
+  /** The instance held under the scope of `duck`, or null. Calls nothing. */
+  at(duck: unknown): ThingT | null {
+    return this.#things.get(this.scopepathOf(this.scopeOf(duck))) ?? null
   }
 
   get things(): readonly ThingT[] { return [...this.#things.values()] }
@@ -130,7 +129,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     this.demandEnabled()
     this.sparseOf(record)
-    return this.#buildOrReceive(record)
+    return this.buildOrReceive(record)
   }
   // --
 
@@ -187,7 +186,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if ((stored !== null) && this.isRefusalOfRow(answer.err)) {
       const delivered = await outcomeOf(() => {
         this.#demandRecordOfScope(stored, this.scopeOf(answer.req_params))
-        return this.#buildOrReceive(stored)
+        return this.buildOrReceive(stored)
       })
       if (! delivered.ok) { this.tellBadNews([delivered.err]) }
     }
@@ -200,7 +199,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const scope = this.scopeOf(answer.req_params)
     const record = recordOfAnswer<RecordT, SparseT>(answer)
     if (record !== null) { this.#demandRecordOfScope(record, scope) }
-    const thing = (record === null) ? this.#receiveNothing(scope) : this.#buildOrReceive(record)
+    const thing = (record === null) ? this.#receiveNothing(scope) : this.buildOrReceive(record)
     if (ifAbsent === 'fail') {
       if (thing === null) { throw this.nothingStoredError(scope) }
       thing.demandPresent()
@@ -220,7 +219,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // The one place an instance is made and held: `#makeThingOf` is called from here alone, and only where no instance is held.
   /** SLOPDOC: Brings the instance under the scope of `record` up to it, building or replacing it as the record's fate says. */
-  #buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
+  protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
     const held = this.at(this.scopeOf(record))
     const fate = (held === null) ? 'replace' : this.fateOver(held, record)
@@ -265,7 +264,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     void (async () => {
       const { ok, err } = await outcomeOf(() => {
         this.world.takeWorld(world)
-        return this.#isDisabled ? null : this.#buildOrReceive(val)
+        return this.#isDisabled ? null : this.buildOrReceive(val)
       })
       if (! ok) { this.tellBadNews([err]) }
     })()
@@ -323,15 +322,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is news to the bank as well, heard before the caller hears it. */
   protected tellIfRevoked(refusal: VaultError): void {
     if (isVaultError(refusal, 'identity_revoked')) { this.tellBadNews([refusal]) }
-  }
-  // --
-
-  // == [Helpers]: stampDna
-
-  /** `dna` under revision 0, the first a thing earns, and the times of now. */
-  protected stampDna<DnaT extends object>(dna: DnaT): DnaT & Revision & Times {
-    const now = this.clock.now()
-    return { ...dna, revision_tok: randomId(), revision_seq: 0, registered_at: now, written_at: now }
   }
   // --
 

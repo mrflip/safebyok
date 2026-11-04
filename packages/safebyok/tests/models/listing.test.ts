@@ -307,16 +307,26 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("one instance for each scope", () => {
-    for (const [blurb, record] of [["alive", fullBoxRecord()], ["deleted", tombstoneBoxRecord({ revision_seq: 2 })]] as const) {
-      it(`a create(dna) over the scope of a box stored and held ${blurb} hears the vaultDB's 'stale_write': the box held kept`, async () => {
-        const listing = boxListingOf(held.mw)
-        held.mw.seedStore(record)
-        const box = await listing.build(record)
-        await TH.expectRefusal(listing.create(dnaOf()), 'stale_write')
-        expect(listing.at(scopeOf())).to.eq(box)
-        expect(box.revision_seq).to.eq(record.revision_seq)
-      })
-    }
+    it("a create(dna) over the scope of a box stored and held alive hears the vaultDB's 'camped': the box held kept", async () => {
+      const listing = boxListingOf(held.mw)
+      const record = fullBoxRecord()
+      held.mw.seedStore(record)
+      const box = await listing.build(record)
+      await TH.expectRefusal(listing.create(dnaOf()), 'camped')
+      expect(listing.at(scopeOf())).to.eq(box)
+      expect(box.revision_seq).to.eq(record.revision_seq)
+    })
+
+    it("a create(dna) over the scope of a box stored and held deleted brings it back on the instance held, at the next seq", async () => {
+      const listing = boxListingOf(held.mw)
+      const record = tombstoneBoxRecord({ revision_seq: 2 })
+      held.mw.seedStore(record)
+      const box = await listing.build(record)
+      await expect(listing.create(dnaOf())).resolves.to.eq(box)
+      expect(listing.at(scopeOf())).to.eq(box)
+      expect(box.isPresent).to.be.true
+      expect(box.revision_seq).to.eq(3)
+    })
 
     it("makes each scope's instance once, however it arrives: a build, a fetch, a put, a del, a notice", async () => {
       const made = vi.spyOn(TestableBoxListing.prototype as unknown as { makeThing: () => TestableBox }, 'makeThing')

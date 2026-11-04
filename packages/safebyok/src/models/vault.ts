@@ -8,7 +8,7 @@ import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
 import type { Boxscope, VaultScope } from '../shapes/scopes'
 import * as VS from '../storage/vault-db-shapes'
-import { type Box, type BoxPut, noWhisperToKeep } from './box'
+import type { Box, BoxPut } from './box'
 import type { BoxListing, BoxWorld } from './box-listing'
 import { Gate } from './gate'
 import { type ProvingsForGatingkind, Gating } from './gating'
@@ -397,18 +397,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** SLOPDOC: Seals and stores the box `patch` names: by its `put` where one is listed, as a birth where none is. */
+  /** As {@link BoxListing.puttable} then {@link Box.put}, for the box `patch` names. */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
-    const { whisper, sidecar, ...named } = MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
-    const { ifPresent, ...timely } = MSX.boxPutOpts.parse(opts)
-    const scope = this.#boxscopeOf(named.boxlabel)
-    this.demandBoxesUsable(named)
-    const boxes = this.boxListing
-    const held = boxes.at(scope) ?? ((whisper === undefined) ? await boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }) : null)
-    if (held !== null) { return held.put({ whisper, sidecar }, opts) }
-    if (whisper === undefined) { throw noWhisperToKeep() }
-    await this.ensureTimely(timely.maxWorldMillis); this.demandBoxesUsable()
-    return boxes.create({ ...scope, whisper, sidecar: sidecar ?? {} }, { ifPresent })
+    MSX.boxPut.parse(patch, { advice: Phrases.BoxPatchAdvice })
+    return this.boxListing.puttable({ ...patch, ...this.scope }, opts).put(patch, opts)
   }
 
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
@@ -427,11 +419,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
 
-  /** A box verb needs the vault enabled, present and unlocked, and a `bag` given to name this vault. */
-  demandBoxesUsable(bag: object = {}): this {
-    verifyConsistent(bag, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
-    return this.demandUsable().demandUnlocked()
-  }
+  /** A box verb needs the vault enabled, present and unlocked. */
+  demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }
 
   #boxscopeOf(boxlabel: string): Boxscope { return { ...this.scope, boxlabel: MSX.boxlabelArg.parse(boxlabel) } }
   // --

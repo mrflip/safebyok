@@ -233,13 +233,16 @@ export const RenewPastLease = "ensureUnlocked()'s renewMinutes is as long as the
 export const DemandOptionsAdvice = "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force."
 // --
 
-// == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, BoxDamagedBeyondNaming, whisperTooLarge, vaultFullOfBoxes, noRoomForBox, VaultGoneWhileGettingBox, VaultDeletedWhilePuttingBox
+// == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, RecordForNewBox, BoxDamagedBeyondNaming, whisperTooLarge, vaultFullOfBoxes, noRoomForBox, VaultGoneWhileGettingBox, VaultDeletedWhilePuttingBox
 
 /** Why a call naming a box the vault does not hold refuses. */
 export const BoxAbsent = "No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds."
 
 /** Why putBox() with no whisper, over a box the vault does not hold, refuses. */
-export const NoWhisperToKeep = "No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store."
+export const NoWhisperToKeep = "No box is listed under that boxlabel, so there is no whisper to keep: hand over the whisper to store, or call vault.hello() to list what is stored."
+
+/** Why a put told to only create refuses a whole record: what it would store is recycled. */
+export const RecordForNewBox = "A put that only creates was handed a whole record, sealed whisper and all: hand it the whisper and the sidecar, so that no stored data is recycled."
 
 /** Why nothing is written over a damaged box whose stored record names no revision. */
 export const BoxDamagedBeyondNaming = "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again."
@@ -361,7 +364,7 @@ export const LeaseOfOtherVault = "This proving is of another vault: a lease is g
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LetGoInstance, vaultAbsent, VaultDeleted
+// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, NoProofToUnlock, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
@@ -388,6 +391,9 @@ export const LetGoInstance = "This object was let go, by a sweep, a vacate or a 
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
 
 export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
+
+/** Why a put that must find a box refuses where none is listed: nothing was fetched to say so. */
+export const boxNotListed = (boxlabel: string): string => `No box is listed under the label ${boxlabel}, though one may be stored: call vault.hello() to list what is stored.`
 
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
