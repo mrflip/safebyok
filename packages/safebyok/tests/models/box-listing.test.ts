@@ -315,13 +315,19 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(listing.puttable(box.scope, { ifPresent: 'fail' })).to.eq(box)
   })
 
-  it("refuses 'vault_locked', 'bad_scope' and a bad option, making no void box", () => {
+  it("refuses 'bad_scope' and a bad option, making no void box", () => {
     const listing = boxListingOf(held.mw)
     TH.expectSyncRefusal(() => listing.puttable({ ...held.mw.boxscope(Label), vaultlabel: 'mary' }), 'bad_scope')
     TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label), { ifAbsent: 'nil' } as never), 'bad_option')
-    held.mw.setLockState('locked')
-    TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label)), 'vault_locked')
     expect(listing.things).to.deep.equal([])
+  })
+
+  it("demands nothing of the vault, as only the put it prepares has side effects: that put refuses 'vault_locked'", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.setLockState('locked')
+    const shell = listing.puttable(held.mw.boxscope(Label))
+    await TH.expectRefusal(shell.put({ whisper: { val: 'sk-test-0000' } }), 'vault_locked')
+    expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
   it("refuses 'disabled' once vacated", () => {
@@ -689,12 +695,12 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     expect(box.isFull).to.be.true
   })
 
-  it("refuses 'vault_locked' while the vault is locked, holding and sealing nothing", async () => {
+  it("refuses 'vault_locked' while the vault is locked, listing and sealing nothing", async () => {
     held.mw.setLockState('locked')
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.create({ ...dna(), whisper: { val: 'sk-test-0000' } }), 'vault_locked')
-    expect(listing.things).to.deep.equal([])
-    expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal([])
+    expect(listing.snapshot).to.deep.equal([])
+    expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
   it("builds of a record while the vault is locked, as a record needs no seal", async () => {
@@ -813,7 +819,7 @@ describe("BoxListing and Listing entries: arguments checked first of all, before
     const listing = boxListingOf(held.mw)
     held.mw.setLockState('locked')
     await TH.expectRefusal(listing.create(dna()), 'vault_locked')
-    expect(listing.things).to.deep.equal([])
+    expect(listing.snapshot).to.deep.equal([])
   })
 
   it("says LOCKED is no whisper, naming whisper, for a dna that hands it as the whisper", async () => {

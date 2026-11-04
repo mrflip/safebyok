@@ -84,8 +84,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  /** A put needs the box enabled and the vault unlocked, and no more: a box gone comes back to life. */
-  demandPuttable(): this { return this.demandEnabled().demandUnlocked() }
+  /** A put needs the box enabled and the vault present and unlocked, and no more: a box gone comes back to life. */
+  demandPuttable(): this {
+    this.demandEnabled()
+    this.world.demandBoxesUsable()
+    return this
+  }
 
   /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
   demandExposable(): this { return this.demandEnabled().demandUnlocked() }

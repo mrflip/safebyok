@@ -107,7 +107,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   puttable(scoped: object, opts: BoxPutOpts = {}): Box {
     const { ifAbsent, ifPresent } = MSX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
-    this.demandUsable()
     if ((ifPresent === 'fail') && ('whisper_ciphered' in scoped)) { throw recordForNewBox() }
     const held = this.at(scope)
     if ((ifAbsent === 'fail') && (held?.isPresent !== true)) { throw notListedBoxError(scope) }
