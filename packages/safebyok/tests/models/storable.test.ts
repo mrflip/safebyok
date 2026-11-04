@@ -1038,18 +1038,6 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     expect(box.demandPuttable(Patch, { ifPresent: 'fail' })).to.deep.include(Patch)
   })
 
-  it("demandPuttable under ifAbsent 'fail' refuses a void record and a tombstone as 'absent_box'", async () => {
-    const listing = boxListingOf(held.mw)
-    const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
-    const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
-    const shell = listing.puttable(held.mw.boxscope('void_one'))
-    expect(alive.demandPuttable(Patch, { ifAbsent: 'fail' })).to.deep.include(Patch)
-    for (const box of [gone, shell]) {
-      const err = TH.expectSyncRefusal(() => box.demandPuttable(Patch, { ifAbsent: 'fail' }), 'absent_box')
-      expect(err.message).to.eq(Phrases.boxAbsent(box.boxlabel))
-    }
-  })
-
   it("demandPuttable takes a void record and a tombstone as whole", async () => {
     const listing = boxListingOf(held.mw)
     const shell = listing.puttable(held.mw.boxscope('anthropic_api_key'))

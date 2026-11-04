@@ -85,13 +85,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
   /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
-  demandPuttable(patch: BoxPatch, { ifAbsent, ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
+  demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
     const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
     this.demandEnabled()
     this.world.demandUnlocked()
     this.demandWhole()
-    if (ifAbsent === 'fail') { this.demandPresent() }
     return given
   }
 
@@ -149,9 +148,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
     const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = MSX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
-    const given = this.demandPuttable(patch, { ifAbsent, ifPresent })
+    const given = this.demandPuttable(patch, { ifPresent })
     const { record, prior } = await this.#edit(given)
-    this.demandPuttable(patch, { ifAbsent, ifPresent })
+    this.demandPuttable(patch, { ifPresent })
     return this.listing.put(record, { prior, ifAbsent, ifPresent })
   }
 

@@ -458,6 +458,18 @@ describe("vault.putBox over a live box", () => {
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 
+  it("under ifAbsent 'fail' on a tombstone held, over a box reborn elsewhere, leaves it to the vaultDB: 'stale_write' with the frontier delivered", async () => {
+    const { next, box } = await nextUnlisted()
+    const elsewhere = await next.getBox(boxlabel)
+    await elsewhere?.del()
+    await box.fetch({ ifAbsent: 'nil' })
+    const reborn = await elsewhere?.put({ whisper: Whisper })
+    expect(box.isPresent).to.eq(false)
+    await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'stale_write')
+    expect(box.isPresent).to.eq(true)
+    expect(box.revision_seq).to.eq(reborn?.revision_seq)
+  })
+
   it("under ifAbsent 'fail' over a box deleted elsewhere, refuses 'absent_box' with the tombstone delivered", async () => {
     const { next, box } = await nextUnlisted()
     const elsewhere = await next.getBox(boxlabel)
