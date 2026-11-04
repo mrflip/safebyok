@@ -97,3 +97,6 @@ not as a settled ruling, and check it against the current design before relying 
   vacate leaves tab B unlocked, and nothing tells it.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **a put can land though its answer is lost.**
+* 2026-11-04 (the Coach, on `Lease.buildFromCache` rejecting where a clock throws): **anything to do with a host clock.**
+  `clock` exists only for test injection. A clock that throws, jumps or runs backward is undefined
+  behaviour. Today a throw rejects from whichever verb reads it first.
