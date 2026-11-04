@@ -46,7 +46,7 @@ export const FriendLeaseMillis = 24 * 60 * 60_000
 /** A fake of a vault as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one slot. */
 export type FakeLeaseFriend = LeaseFriend & {
   lock:            Mock<() => void>
-  peekLease:       Mock<LeaseFriend['peekLease']>
+  tryPeekLease:    Mock<LeaseFriend['tryPeekLease']>
   tryCacheLease:   Mock<LeaseFriend['tryCacheLease']>
   tryUncacheLease: Mock<LeaseFriend['tryUncacheLease']>
   tellBadNews:     Mock<LeaseFriend['tellBadNews']>
@@ -74,7 +74,7 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
     cached:          null,
     lock:            vi.fn<() => void>(),
     tellBadNews:     vi.fn(),
-    peekLease:       vi.fn(() => Promise.resolve(friend.cached)),
+    tryPeekLease:    vi.fn(() => Promise.resolve(good(friend.cached))),
     tryCacheLease:   vi.fn((record: LeaseRecord) => {
       friend.cached = record
       return Promise.resolve(good(record))

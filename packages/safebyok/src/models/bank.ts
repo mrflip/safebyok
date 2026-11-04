@@ -136,7 +136,7 @@ export class Bank implements VaultWorld {
   // == [Ending]: autolock, lock, vacate, sweep, scanOwnLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
 
   /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
-   * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.peek` leaves such a row for it.
+   * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
    */
   async autolock(): Promise<void> {
     const cutoff = Math.floor(this.clock.now() - this.leaseMillis)

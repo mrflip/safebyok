@@ -228,13 +228,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** True where the lease this device has cached for this gate is now attached. */
   async #attachCachedLease(): Promise<boolean> {
-    const peeked = await Lease.tryPeek(this.#leaseFriend(), this.gate.gate_epoch)
-    if (! peeked.ok) {
-      this.listing.tellBadNews([peeked.err])
-      return false
-    }
-    if (peeked.val === null) { return false }
-    await this.#attachLease(peeked.val)
+    const cached = await Lease.buildFromCache(this.#leaseFriend(), this.gate.gate_epoch)
+    if (cached === null) { return false }
+    await this.#attachLease(cached)
     return true
   }
   // --
@@ -257,7 +253,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       logger,
       leaseMillis,
       lock:            () => { this.lock() },
-      peekLease:       () => deviceDB.peek(asked),
+      tryPeekLease:    () => deviceDB.tryPeek(asked),
       tryCacheLease:   (record) => deviceDB.tryCache(record),
       tryUncacheLease: () => deviceDB.tryVacate(asked),
       tellBadNews:     (badnews) => { this.listing.tellBadNews(badnews) },

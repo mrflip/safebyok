@@ -462,7 +462,7 @@ export type StampedGate = Z.infer<typeof stampedGate>
 export type Novel = typeof NOVEL
 // --
 
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
+// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
 export const LeaseFormat = ModelsLeaseFormat
 
@@ -497,7 +497,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
-  peekLease:       fn<() => Promise<unknown>>(),
+  tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
@@ -520,16 +520,16 @@ const isCtxStamp = (val: unknown): boolean => (
 )
 
 /** SLOPDOC: The arguments of each lease verb, and the flat stamp binding what a lease seals to its caller's record. */
-export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
+export const { ctxStamp, leaseFromCacheArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
   return {
     ctxStamp,
-    leasePeekArgs:    obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
-    leaseGrantArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
-    provingLeaseArgs: obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
-    leaseSealArgs:    obj({ whisperText: str, stamp: ctxStamp }),
-    leaseUnsealArgs:  obj({ sealed: sealedWhisper, stamp: ctxStamp }),
+    leaseFromCacheArgs:obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
+    leaseGrantArgs:    obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
+    provingLeaseArgs:  obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
+    leaseSealArgs:     obj({ whisperText: str, stamp: ctxStamp }),
+    leaseUnsealArgs:   obj({ sealed: sealedWhisper, stamp: ctxStamp }),
   }
 }, [FX])
 // --
@@ -537,7 +537,7 @@ export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseS
 // == [The vault's world]: deviceDBDuck, vaultListingOpts
 
 /** A deviceDB, as far as a duck can tell: the verbs a vault's lease friend binds. */
-export const deviceDBDuck = Checker(({ obj, fn }) => obj({ peek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
+export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn }) => ({

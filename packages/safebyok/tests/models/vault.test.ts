@@ -75,8 +75,8 @@ describe("VaultListing.build of a record, and its constructor", () => {
 
   it("refuses 'bad_option' a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
     const { opts } = makeVaultWorld()
-    for (const verb of ['peek', 'tryCache', 'tryVacate']) {
-      const missing = { peek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
+    for (const verb of ['tryPeek', 'tryCache', 'tryVacate']) {
+      const missing = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
       TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, deviceDB: missing as never } }), 'bad_option')
     }
     TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, onPanic: 'call me' as never } }), 'bad_option')
@@ -113,7 +113,7 @@ describe("vault.takeWorld(world)", () => {
 describe("the friend a vault hands its leases", () => {
   it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
-    await friend.peekLease()
+    await friend.tryPeekLease()
     await friend.tryUncacheLease()
     const asked = { ...vault.scope, vault_tok: vault.vault_tok }
     expect(deviceDB.peek).toHaveBeenCalledWith(asked)

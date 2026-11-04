@@ -293,7 +293,7 @@ describe("the proof", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
     expect(vault.isUnlocked).to.be.false
 
-    // A page opened late whose host never calls autolock asks all the same: Lease.peek leaves the row and reads as no row.
+    // A page opened late whose host never calls autolock asks all the same: Lease.buildFromCache leaves the row and reads as no row.
     await vault.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])

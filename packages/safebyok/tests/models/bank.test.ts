@@ -284,7 +284,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("past autolock, a lease held stays held: ensureUnlocked peeks at no row, erases nothing and asks nothing", async () => {
+  it("past autolock, a lease held stays held: ensureUnlocked looks at no row, erases nothing and asks nothing", async () => {
     const world = makeBankWorld()
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
     const { vault } = await makeBankWithVault(world, { requestCleartext })
