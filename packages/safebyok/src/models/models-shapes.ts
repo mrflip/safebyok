@@ -25,7 +25,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, putAnte, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, VoidRevisionSeq, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, VoidRevisionSeq, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check, and is set aside in `damaged_records`) or gone (`x`: deleted). */
 export const { amVals } = VS
@@ -43,9 +43,6 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } =
   sparseBase: VS.sparseBase,
   tombstone:  VS.sparseBase.extend({ am: oneof(tombstoneAmVals) }),
 }))
-
-/** The check of the revision `listing.put` lays a record over: a revision, or null for no record. */
-export const putAnte = Checker(() => revision.nullable(), 'bad_option')
 
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
 export type Am = Z.infer<typeof am>
@@ -178,7 +175,7 @@ export type BoxesListed = Z.output<typeof boxesListed>
 export const boxlabelArg = Checker(({ boxlabel }) => boxlabel, 'bad_option')
 // --
 
-// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, StorableOpts
+// == [Options]: ifPresentVals, ifAbsentVals, putIfAbsentVals, ifPresent, ifAbsent, putIfAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener, IfPresent, IfAbsent, PutIfAbsent, TimelyOpts, FetchOpts, SendOpts, StorableOpts
 
 /** The policies when sending a record to a place that already holds a live one: `repl`, the default, replaces it; `fail` refuses `camped`; `get` saves nothing and takes up the live record. Storage decides, atomically. */
 export const { ifPresentVals } = VS
@@ -186,13 +183,17 @@ export const { ifPresentVals } = VS
 /** The policies when fetching a thing that is absent, never stored or deleted: `fail` with the absent refusal, or resolve `nil`. */
 export const { ifAbsentVals } = VS
 
+/** The policies when putting over a thing that is absent, never stored or deleted: `add`, the default, stores it; `fail` refuses. */
+export const { putIfAbsentVals } = VS
+
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
 
 /** SLOPDOC: The checks of the options a storable and its verbs take. */
-export const { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
+export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
   const ifPresent     = oneof(ifPresentVals)
   const ifAbsent      = oneof(ifAbsentVals)
+  const putIfAbsent   = oneof(putIfAbsentVals)
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
   const maxMillis     = horizonMillis.optional()
   const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
@@ -203,7 +204,7 @@ export const { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchO
     maxMillisSinceRefresh: horizonMillis,
   })
   const listener      = fn<() => void>()
-  return { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener }
+  return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener }
 })
 
 /** How `send` meets a live record storage holds, as {@link ifPresent} checks it: one of {@link ifPresentVals}. */
@@ -211,6 +212,9 @@ export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
 export type IfAbsent = Z.infer<typeof ifAbsent>
+
+/** How a put treats a thing that is absent, as {@link putIfAbsent} checks it: one of {@link putIfAbsentVals}. */
+export type PutIfAbsent = Z.infer<typeof putIfAbsent>
 
 /** How fresh the record in hand and the world must be before a verb goes on. The world heeds `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
@@ -286,8 +290,8 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
   onBadNews:             fn().optional(),
 }), 'bad_option')
 
-/** The check of what `listing.put` is told of a live record storage may hold: `ifPresent`, `repl` where left out. */
-export const putListingOpts = objCheck(() => ({ ifPresent: ifPresent.optional() }), 'bad_option')
+/** The check of what `listing.put` is told: the revision `prior` it goes over, and how it meets a row absent or live, an upcreate where left out. */
+export const putListingOpts = objCheck(() => ({ prior: revision, ifAbsent: putIfAbsent.optional(), ifPresent: ifPresent.optional() }), 'bad_option')
 
 export type PutListingOpts = Z.infer<typeof putListingOpts>
 

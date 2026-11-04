@@ -59,7 +59,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** SLOPDOC: Stores `record` as a birth over `prior`, resolving the vault held: its own, or the slot's winner. */
   ensureVault(record: VaultRecord, prior: Revision): Promise<Vault> {
-    return this.putDraft(record, prior, { ifPresent: 'get' })
+    return this.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
   }
 
   tryEnsureVault(record: VaultRecord, prior: Revision): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(record, prior)) }

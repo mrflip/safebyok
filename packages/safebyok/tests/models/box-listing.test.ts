@@ -4,6 +4,7 @@ import { type BoxDna, type BoxListingOpts, BoxListing } from '../../src/models/b
 import * as MSX from '../../src/models/models-shapes'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import * as VS from '../../src/storage/vault-db-shapes'
 
 const held = useModelsWorld()
 
@@ -104,7 +105,7 @@ describe("BoxListing", () => {
 
     it("refuses 'bad_record' a put of another vault's record, storing nothing", async () => {
       const listing = boxListingOf(held.mw)
-      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, null), 'bad_record')
+      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: VS.VoidRevision }), 'bad_record')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
@@ -403,7 +404,7 @@ describe("BoxListing: an absent box", () => {
       const record = fullBoxRecord({ ...stored, sidecar: { note: 'theirs' } })
       const stale = held.mw.staleWriteOf(box.scope, record)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box.revision_seq).to.eq(5)
       expect(box.isFull).to.be.true
       expect(box.sidecar).to.deep.equal({ note: 'theirs' })
@@ -413,7 +414,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, sparseBoxRecord(stored))
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box.revision_seq).to.eq(5)
       expect(box.isFull).to.be.false
       expect(box.sidecar).to.be.null
@@ -423,7 +424,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, tombstoneBoxRecord(stored))
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box.isPresent).to.be.false
     })
 
@@ -439,7 +440,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, undefined)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box._cheat_central.revision_seq).to.eq(1)
     })
 
@@ -447,14 +448,14 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, null)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
     })
 
     it("throws 'stale_write' with nothing delivered for a box_stored that fails its check", async () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, { junk: 1 } as never)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box._cheat_central.revision_seq).to.eq(1)
     })
 
@@ -462,7 +463,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(held.mw)
       const stale = held.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), null), 'stale_write')
+      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: VS.VoidRevision }), 'stale_write')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 

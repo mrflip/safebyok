@@ -145,7 +145,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const ante = this.central
     const record = await this.#edit(given, ante)
     await this.ensureSendable(); this.demandSendable()
-    await this.listing.put(record, ante, { ifPresent })
+    await this.listing.put(record, { prior: ante, ifPresent })
     return this
   }
 

@@ -105,7 +105,7 @@ export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'takeWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
-  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifPresent: PutOpts['ifPresent'] }
+  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
   | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
   | { verb: 'watch',        onNotice: (notice: Notice) => void }
   | { verb: 'unwatch' }
@@ -211,7 +211,7 @@ class Script<CallT> {
 }
 
 type GetCall = { scope: Boxscope }
-type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifPresent: PutOpts['ifPresent'] }
+type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
 type DelCall = { scope: Boxscope, priorRevisionTok: string | null }
 
 /** The `revision_tok` a call goes over: null for a birth. */
@@ -237,7 +237,7 @@ export class TestableVaultDB extends MemoryVaultDB {
   }
 
   override async tryPutBox(record: BoxRecord, opts: PutOpts) {
-    const call: PutCall = { record, priorRevisionTok: priorTokOf(opts.prior), ifPresent: opts.ifPresent }
+    const call: PutCall = { record, priorRevisionTok: priorTokOf(opts.prior), ifAbsent: opts.ifAbsent, ifPresent: opts.ifPresent }
     this.#calls.push({ verb: 'put', ...call })
     const { scripted, answer } = this.scripts.put.take(call)
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryPutBox']>>) : super.tryPutBox(record, opts)
@@ -430,7 +430,7 @@ export class TestableBoxListing extends BoxListing {
 
   override async fetch(...args: Parameters<BoxListing['fetch']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.fetch(...args)) }
 
-  override async put(...args: Parameters<BoxListing['put']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.put(...args)) }
+  override async put(...args: Parameters<BoxListing['put']>): Promise<TestableBox> { return testableOf(await super.put(...args)) }
 
   override async del(...args: Parameters<BoxListing['del']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.del(...args)) }
 

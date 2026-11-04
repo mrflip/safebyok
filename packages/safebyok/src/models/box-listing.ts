@@ -8,6 +8,7 @@ import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
+import * as VS from '../storage/vault-db-shapes'
 import { type BoxSnapshot, Box, sealedRecordOf } from './box'
 import { type DelTombstone, Listing } from './listing'
 import { type BoxesListed, type BoxRecord, type BoxSparse, type Dna, type Fetched, type ListingOpts, type ListingWorld, type PutListingOpts, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
@@ -78,17 +79,17 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   // == [Birth]: create, tryCreate, ensureCreatable, demandCreatable
 
   /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
-  async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
+  async create(input: BoxDna, opts: Pick<PutListingOpts, 'ifPresent'> = {}): Promise<Box> {
     const dna = boxDna.parse(input)
     this.scopeOf(dna)
     await this.#ensureCreatable(); this.#demandCreatable()
     const { whisper, sidecar, ...sparse } = this.stampDna(dna)
     const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
     await this.#ensureCreatable(); this.#demandCreatable()
-    return this.putDraft(draft, null, opts)
+    return this.put(draft, { ...opts, prior: VS.VoidRevision })
   }
 
-  tryCreate(input: BoxDna, opts: PutListingOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
+  tryCreate(input: BoxDna, opts: Pick<PutListingOpts, 'ifPresent'> = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   #ensureCreatable(): Promise<void> { return this.ensureTimelyWorld() }
 

@@ -280,6 +280,8 @@ export const PartialLoad = "The record in hand is not full, so it cannot be open
 /** Why a birth makes nothing of a dna for a scope the listing already holds alive. */
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
+export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
+
 /** What to do about an update of a box whose patch fails its check, said after the failures. */
 export const BoxPatchAdvice = "Nothing was stored. An update of a box names its whisper, as { val }, its sidecar, or both: the half left out is kept."
 
