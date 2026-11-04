@@ -1,7 +1,6 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { omit } from 'es-toolkit'
-import { verifyConsistent } from '../checks/validator'
 import { VaultError } from '../errors'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
@@ -68,7 +67,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** SLOPDOC: The tombstone a birth under `scope` goes over, or null where the slot holds none. */
   demandBirthSlot(scope: VaultScope): Vault | null {
     this.demandEnabled()
-    verifyConsistent(scope, this.world.scope, { kind: 'bad_scope', message: Phrases.otherScope })
     const held = this.at(scope)
     if (held?.isPresent === true) { throw alreadyHeldError() }
     return held
@@ -194,11 +192,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
   }
 
-  scopeOf(duck: unknown):  VaultScope  { return vaultScope.parse(duck) }
+  /** The scope of `duck`, held to this bank: no listing answers for another's. */
+  scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
   sparseOf(duck: unknown): VaultSparse { return vaultSparse.parse(duck) }
 
-  recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
+  recordOf(duck: unknown): VaultRecord { return vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
     return new Vault(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })

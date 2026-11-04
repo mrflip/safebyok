@@ -35,14 +35,27 @@ describe("proving.buildWayin: one wayin per proving, of its own vault", () => {
 })
 
 describe("Vault.ensureUnlocked and the vault's lock", () => {
-  it("ensureUnlocked leaves a vault unlocked as it stands, where unlock refreshes it first", async () => {
-    const { vault, opts: { vaultDB } } = await makeBornVault()
-    const gets = vi.spyOn(vaultDB, 'tryGetVault')
-    gets.mockClear()
+  it("ensureUnlocked asks nobody of a vault unlocked, where unlock asks the user for proof", async () => {
+    const { vault, listing } = await makeBornVault()
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
     await expect(vault.ensureUnlocked()).resolves.to.eq(vault)
-    expect(gets).not.toHaveBeenCalled()
-    await expect(vault.tryUnlock()).resolves.to.include({ ok: true })
-    expect(vault.isUnlocked).to.be.true
+    expect(dialog).not.toHaveBeenCalled()
+    await TH.expectBad(vault.tryUnlock(), 'declined')
+    expect(dialog).toHaveBeenCalledOnce()
+  })
+
+  it("the lease cached is ensureUnlocked's to take up: unlock asks for proof past it", async () => {
+    const { opts, demandStored } = await makeBornVault()
+    const dialog = vi.fn()
+    opts.world.requestCleartext = dialog
+    const next = await new VaultListing(opts).build(demandStored())
+    await TH.expectBad(next.tryUnlock(), 'declined')
+    expect(next.isUnlocked).to.be.false
+    expect(dialog).toHaveBeenCalledOnce()
+    await next.ensureUnlocked()
+    expect(next.isUnlocked).to.be.true
+    expect(dialog).toHaveBeenCalledOnce()
   })
 
   it("the seal verbs refuse 'bad_option' a stamp of another vault or another life of it", async () => {

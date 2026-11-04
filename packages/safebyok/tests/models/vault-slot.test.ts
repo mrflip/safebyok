@@ -242,6 +242,12 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.deep.equal(before)
   })
 
+  it("a vault listing refuses 'bad_scope' to answer for another user, where another vault of this user is plainly not held", () => {
+    const { listing } = makeVaultWorld()
+    TH.expectSyncRefusal(() => listing.at({ ...Dna, user_id: 'another_user' }), 'bad_scope')
+    expect(listing.at({ ...Dna, vaultlabel: 'another_vault' })).to.be.null
+  })
+
   it("Vault.launchBirth refuses 'bad_scope' a scope of another user, nobody asked", async () => {
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()

@@ -200,22 +200,21 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   get isUnlocked(): boolean { return this.#lease !== null }
 
-  /** Unlock this vault if it is locked, and nothing else: the caller demands. */
+  /** This vault timely and unlocked: as it stands, else by the lease cached on this device, else by {@link unlock}. */
   async ensureUnlocked(): Promise<this> {
-    if (! this.isUnlocked) { await this.unlock() }
-    return this
-  }
-
-  tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
-
-  /** Unlock this vault by the lease cached on this device, else by asking the user. */
-  async unlock(): Promise<this> {
     await this.ensureUsable(); this.demandUsable()
     if (this.isUnlocked) { return this }
     if (! this.isFull) { await this.fetch() }
     if (await this.#attachCachedLease()) { return this }
-    if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
+    return this.unlock()
+  }
+
+  tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
+
+  /** Ask the user for proof, and unlock by it. */
+  async unlock(): Promise<this> {
     await this.ensureAttachable(); this.demandAttachable()
+    if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
     await Gating.launch('unlock_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ proved }) => this.#unlockByProof(proved) })
     return this
   }

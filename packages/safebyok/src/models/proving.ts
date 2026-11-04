@@ -1,4 +1,4 @@
-import { Checkers, consistent } from '../checks/validator'
+import { Checkers, verifyConsistent } from '../checks/validator'
 import { PassphraseKeyBytes } from '../consts'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
 import { VaultError } from '../errors'
@@ -66,7 +66,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
-    if (checked !== NOVEL && ! consistent(checked.stamp, this.stamp)) { throw provingOfOtherVault() }
+    if (checked !== NOVEL) { verifyConsistent(checked.stamp, this.stamp, { kind: 'bad_option', message: Phrases.ProvingOfOtherVault }) }
     const vaultKey = checked === NOVEL ? await makeVaultKey() : await checked.#unwrapVaultKey()
     return this.#wrapVaultKey(vaultKey)
   }
@@ -74,7 +74,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     provingLeaseArgs.parse({ friend, gate_epoch })
-    if (! consistent(vaultStamp.parse(friend), this.stamp)) { throw leaseOfOtherVault() }
+    vaultStamp.parseConsistent(friend, this.stamp, { kind: 'bad_option', message: Phrases.LeaseOfOtherVault })
     const vaultKey = await this.#unwrapVaultKey()
     return Lease.grant(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
   }
@@ -217,17 +217,13 @@ const passphraseKeyOf = async (keyDeriver: ProvingWorld['keyDeriver'], passphras
 }
 // --
 
-// == [Refusals]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, provingOfOtherVault, leaseOfOtherVault, keyDeriverThrew, strengthCheckerThrew, notAVerdict, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
+// == [Refusals]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, strengthCheckerThrew, notAVerdict, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
 const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
 
 const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', Phrases.WayinNotMadeYet)
 
 const wayinMadeAlready = (): VaultError => new VaultError('unexpected_error', Phrases.WayinMadeAlready)
-
-const provingOfOtherVault = (): VaultError => new VaultError('bad_option', Phrases.ProvingOfOtherVault)
-
-const leaseOfOtherVault = (): VaultError => new VaultError('bad_option', Phrases.LeaseOfOtherVault)
 
 const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverThrew)
 
