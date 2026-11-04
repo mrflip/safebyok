@@ -8,7 +8,6 @@ import type { Outcome } from '../outcome'
 import * as Phrases from '../phrases'
 import * as HX from '../shapes/host-code'
 import type { CipherCtxRecord } from '../crypto'
-import type { Lease } from './lease'
 import type { Gating } from './gating'
 import type { Listing } from './listing'
 import type { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
@@ -497,8 +496,6 @@ export const leaseFriend = objCheck(({ fn }) => ({
   leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
   lock:            fn<() => unknown>(),
-  /** Hold a lease as the vault's: what `lease.attach()` calls. */
-  attachLease:     fn<(lease: Lease) => Promise<void>>(),
   /** The record this device has cached, or null for none. */
   peekLease:       fn<() => Promise<unknown>>(),
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),

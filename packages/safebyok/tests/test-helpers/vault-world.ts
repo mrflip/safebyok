@@ -173,13 +173,14 @@ export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), w
   return { ...world, vault }
 }
 
-/** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on, caught by a spy, as nothing of a vault hands it out. */
+/** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on and the lease it holds, caught by a spy, as nothing of a vault hands them out. */
 export const makeBornVaultAndFriend = async () => {
   const buildLease = vi.spyOn(Proving.prototype, 'buildLease')
   const born = await makeBornVault()
   const [friend] = buildLease.mock.calls[0]!
+  const lease = await buildLease.mock.results[0]!.value as Lease
   buildLease.mockRestore()
-  return { ...born, friend }
+  return { ...born, friend, lease }
 }
 
 /** A vault born as {@link makeBornVault} makes it, with the passkey of the `laptop` beside the passphrase. */

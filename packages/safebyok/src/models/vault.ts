@@ -222,7 +222,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Past the enter key: a lock crossing this is answered by the next `lock()`, as the proof says this user may have the vault unlocked. */
   async #unlockByProof(proved: Proving): Promise<this> {
     const lease = await proved.buildLease(this.#leaseFriend())
-    await lease.attach()
+    await this.#attachLease(lease)
     return this
   }
 
@@ -234,7 +234,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       return false
     }
     if (peeked.val === null) { return false }
-    await peeked.val.attach()
+    await this.#attachLease(peeked.val)
     return true
   }
   // --
@@ -257,7 +257,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       logger,
       leaseMillis,
       lock:            () => { this.lock() },
-      attachLease:     (lease) => this.#attachLease(lease),
       peekLease:       () => deviceDB.peek(asked),
       tryCacheLease:   (record) => deviceDB.tryCache(record),
       tryUncacheLease: () => deviceDB.tryVacate(asked),
@@ -289,7 +288,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       await this.#vacateUnattached(lease)
       return
     }
-    await lease.attach()
+    await this.#attachLease(lease)
   }
 
   #dropLease(): void {

@@ -63,7 +63,7 @@ export class Lease implements LeaseStamp {
     return outcomeOf(() => this.peek(friend, gate_epoch))
   }
 
-  /** A new lease under a fresh leaseKey. {@link Lease.attach} holds and caches it. */
+  /** A new lease under a fresh leaseKey. The vault holds it, and caches it. */
   static async grant(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate_epoch, wayinkind } } = leaseGrantArgs.parse({ friend, vaultKey, opts })
     const held     = vaultStamp.parse(friend)
@@ -74,10 +74,7 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Taking hold]: attach, cache, tryCache, cacheAsCacheCan
-
-  /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. */
-  async attach(): Promise<void> { await this.#friend.attachLease(this) }
+  // == [Taking hold]: cache, tryCache, cacheAsCacheCan
 
   /** Put this lease in the deviceDB's cache; one peeked from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
   async cache(): Promise<void> {

@@ -149,47 +149,45 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   })
 })
 
-const makeFreshLease = async ({ vault, friend, opts: { world } }: Awaited<ReturnType<typeof makeBornVaultAndFriend>>) => {
-  const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
-  return proving.buildLease(friend)
-}
-
-describe("lease.attach: the one way a vault comes to hold a lease", () => {
+describe("The vault holds a lease: by unlock, or by the cache", () => {
 
   it("holds the lease, reading unlocked, and caches its row, in place of the lease it displaces", async () => {
-    const born = await makeBornVaultAndFriend()
-    const { vault, deviceDB } = born
-    const first = await makeFreshLease(born)
-    const second = await makeFreshLease(born)
-    await first.attach()
-    await second.attach()
-    expect(second.isInForce).to.be.true
+    const { vault, deviceDB, advance } = await makeBornVault()
+    const bornRow = deviceDB.cachedNow() as { proved_at: number }
+    advance(1)
+    await unlockVerbTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
-    expect(deviceDB.cachedNow()).to.deep.include({ proved_at: second.proved_at })
+    expect(deviceDB.cachedNow()).to.deep.include({ proved_at: bornRow.proved_at + 1 })
   })
 
   it("past a sweep refuses, leaving the vault locked and the row the sweep kept", async () => {
-    const born = await makeBornVaultAndFriend()
-    const { vault, deviceDB } = born
-    const lease = await makeFreshLease(born)
-    vault.sweep()
+    const { demandStored, anotherSession, deviceDB } = await makeBornVault()
+    const vault = await anotherSession().build(demandStored())
     const kept = deviceDB.cachedNow()
     expect(kept).not.to.be.null
-    await TH.expectRefusal(lease.attach(), 'disabled')
+    const peeked = TH.holdNextAnswer(deviceDB.memoryDB, 'peek')
+    const ensuring = vault.ensureUnlocked()
+    await peeked.reached
+    vault.sweep()
+    peeked.release()
+    await TH.expectRefusal(ensuring, 'disabled')
     expect(vault.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.deep.equal(kept)
   })
 
-  it("loses to a lock made straight after it: the vault locked, and no row left cached", async () => {
-    const born = await makeBornVaultAndFriend()
-    const { vault, deviceDB } = born
-    const lease = await makeFreshLease(born)
-    const attaching = lease.attach()
+  it("loses to a lock made while its row is being cached: the vault locked, and no row left cached", async () => {
+    const { vault, deviceDB } = await makeBornVault()
     vault.lock()
-    await attaching
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const cached = TH.holdNextAnswer(deviceDB.memoryDB, 'tryCache')
+    const unlocking = unlockTyping(vault, byPassphrase(Passphrase))
+    await cached.reached
+    expect(vault.isUnlocked).to.be.true
+    vault.lock()
+    cached.release()
+    await unlocking
     await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(vault.isLocked).to.be.true
-    expect(lease.isForgotten).to.be.true
   })
 
   it("holds the lease where the deviceDB refuses its row, told as bad news: it costs the next session a proof, not this one its lease", async () => {
@@ -598,10 +596,7 @@ const valuesShownBy = (holder: object): unknown[] => {
 
 describe("a vault and a lease show neither the lease friend nor the lease key handle, one level deep, by identity", () => {
   it("no field or getter of a vault or its lease shows either, nor Object.keys or JSON.stringify", async () => {
-    const born = await makeBornVaultAndFriend()
-    const { vault, deviceDB, friend } = born
-    const lease = await makeFreshLease(born)
-    await lease.attach()
+    const { vault, deviceDB, friend, lease } = await makeBornVaultAndFriend()
     const row = deviceDB.cachedNow() as Record<string, unknown>
     expect(row['lease_key']).to.be.an.instanceof(CryptoKey)
     for (const holder of [vault, lease]) {
