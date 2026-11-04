@@ -357,7 +357,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   override lock(): this {
     if (! this.isEnabled) { return this }
     void this.#vacateLease()
-    this.#boxListing?.lock()
     this.listing.declineGatingAtLock(this)
     return this
   }
