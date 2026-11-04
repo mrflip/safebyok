@@ -5,8 +5,10 @@
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "workspaceMount": "source=${localWorkspaceFolder}/..,target=/workspace,type=bind",
   // The databases beside the container (services.yaml): started on the host before it, at every
-  // start, and waited on until healthy; the container joins their network.
-  "initializeCommand": "docker compose -f ${localWorkspaceFolder}/.devcontainer/services.yaml -p ${localWorkspaceFolderBasename}-services up -d --wait",
+  // start, and waited on until healthy; the container joins their network. Only the tests that
+  // use them need them, so one that will not come up warns and lets the container start: --no-start
+  // makes the network first, as the container cannot start without it.
+  "initializeCommand": "docker compose -f ${localWorkspaceFolder}/.devcontainer/services.yaml -p ${localWorkspaceFolderBasename}-services up --no-start && docker compose -f ${localWorkspaceFolder}/.devcontainer/services.yaml -p ${localWorkspaceFolderBasename}-services up -d --wait || echo 'WARNING: the dev container services did not start; tests that use them will fail. See .devcontainer/services.yaml'",
   "runArgs": ["--network=${localWorkspaceFolderBasename}-services_default"],
   "mounts": [
     "source=byok-${devcontainerId}-claude,target=/home/node/.claude,type=volume",
