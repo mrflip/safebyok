@@ -479,6 +479,14 @@ describe("extractWhisper", () => {
 })
 
 describe("vault.delBox", () => {
+  it("of a box stored and not held hears 'stale_write' over the sentinel, the frontier delivered, and the retry lands", async () => {
+    const { next, boxrows } = await nextUnlisted()
+    await TH.expectRefusal(next.delBox(boxlabel), 'stale_write')
+    expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
+    await next.delBox(boxlabel)
+    expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
+  })
+
   it("leaves the box held in its tombstone, a get then absent, the whisper refused", async () => {
     const { vault, boxrows } = await makeWorldWithBox()
     const dead = await vault.delBox(boxlabel)
