@@ -212,7 +212,7 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   lockState:    () => vault.lockState(),
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
-  demandBoxesUsable:   () => vault.demandBoxesUsable(),
+  demandUnlocked:   () => vault.demandUnlocked(),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
   unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
 })

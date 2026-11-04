@@ -89,7 +89,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
     this.demandEnabled()
-    this.world.demandBoxesUsable()
+    this.world.demandUnlocked()
     this.demandWhole()
     if (ifAbsent === 'fail') { this.demandPresent() }
     return given

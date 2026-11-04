@@ -127,7 +127,7 @@ describe("vault.del()", () => {
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
     await world.vault.ensureTimely(0)
-    TH.expectSyncRefusal(() => world.vault.demandUsable(), 'vault_gone')
+    TH.expectSyncRefusal(() => world.vault.demandEnabled(), 'vault_gone')
   })
 })
 

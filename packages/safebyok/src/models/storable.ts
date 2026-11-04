@@ -205,13 +205,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** False past a sweep, a vacate or a delete, and from then on. */
   get isEnabled(): boolean { return this.#isEnabled }
 
-  demandEnabled():  this { if (! this.#isEnabled) { throw disabledError() }                            return this }
+  demandEnabled():  this { this.#demandInstanceEnabled();                                                     return this }
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
   demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 
   demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
+
+  // Not `demandEnabled`, which a Vault widens to refuse a vault gone: a fetch is how a thing gone hears its slot has moved on.
+  #demandInstanceEnabled(): void { if (! this.#isEnabled) { throw disabledError() } }
 
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
@@ -231,9 +234,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
-    this.demandEnabled()
+    this.#demandInstanceEnabled()
     await this.#oneFetchAtATime()
-    this.demandEnabled()
+    this.#demandInstanceEnabled()
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }

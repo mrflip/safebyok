@@ -307,7 +307,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
-    demandBoxesUsable: () => { if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.VaultLocked) } },
+    demandUnlocked: () => { if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.VaultLocked) } },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()

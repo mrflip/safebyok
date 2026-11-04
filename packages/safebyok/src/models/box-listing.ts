@@ -20,7 +20,7 @@ import * as MSX from './models-shapes'
 export type BoxWorld = ListingWorld & {
   scope:     VaultScope
   vault_tok: string
-  demandBoxesUsable(): unknown
+  demandUnlocked(): unknown
   sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
   unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
 }
