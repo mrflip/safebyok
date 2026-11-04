@@ -603,6 +603,12 @@ describe("box.put(patch): a patch naming a half", () => {
     })
   }
 
+  it("tells a patch that fails its check how an update of a box is written", async () => {
+    const box = await builtOf(fullBoxRecord())
+    const err = await TH.expectRefusal(box.put({ whisper: 'sk-test-0000' } as never), 'bad_option')
+    expect(err.message).to.contain(Phrases.BoxPatchAdvice)
+  })
+
   it("refuses 'bad_option' before its guards: a patch naming neither refuses so while the vault is locked, too", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')

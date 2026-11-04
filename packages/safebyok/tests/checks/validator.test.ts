@@ -240,6 +240,14 @@ describe("Checkers", () => {
     TH.expectSyncRefusal(() => boxSparse.parseConsistent({ ...sparse, written_at: -1 }, scope, { kind: 'corrupt_record' }), 'bad_record')
   })
 
+  it("frames a failed parse with the where and advice handed to parseConsistent, and leaves a disagreement's message as it is", () => {
+    const story = { where: 'In the box', advice: 'Name a whole number.', message: 'Another user' }
+    const failed = TH.expectSyncRefusal(() => boxSparse.parseConsistent({ ...sparse, written_at: -1 }, scope, story), 'bad_record')
+    expect(failed.message).to.match(/^In the box: .*\. Name a whole number\.$/u)
+    const apart = TH.expectSyncRefusal(() => boxSparse.parseConsistent(sparse, { user_id: 'u2' }, story), 'bad_record')
+    expect(apart.message).to.eq('Another user')
+  })
+
   it("gives parseConsistent only to a validator of an object, by its type", () => {
     const { checked } = Checkers('bad_option', ({ str }) => ({ checked: str }))
     expectTypeOf(boxSparse.parseConsistent).returns.toEqualTypeOf<Zod.output<typeof boxSparse>>()

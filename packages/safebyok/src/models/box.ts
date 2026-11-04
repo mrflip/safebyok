@@ -86,7 +86,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
   demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
-    const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
     if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
     this.demandEnabled()
     this.world.demandUnlocked()
