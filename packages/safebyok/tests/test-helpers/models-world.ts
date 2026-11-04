@@ -100,7 +100,7 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer, ModelsWatch
 
-/** One call made to the world or the vaultDB, as {@link ModelsWorld.calls} logs it, in the order made. `priorRevisionTok` is null for a birth, over {@link VS.VoidRevision}. */
+/** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `priorRevisionTok` is null for a birth. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'takeWorld',    world: unknown }
@@ -466,7 +466,7 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose world fakes the seal further, for a test that wants sealed parts it can tell apart by revision, or acts while a `put` is sealing: the whisper given to `put` comes out as the fake ciphered bags named for the revision it is sealed under, and `duringSeal` runs once the real seal is done.
+/** A {@link boxListingOf} whose sealed parts are fake bags named for the revision, `duringSeal` running after the real seal.
  *
  * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal

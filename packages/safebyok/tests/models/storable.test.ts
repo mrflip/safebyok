@@ -454,7 +454,7 @@ describe("storable.receive(null)", () => {
   })
 })
 
-/** A box holding `record` (the full box record `anthropic_api_key` at revision 1, by default) as received, which storage holds too, so that a put lays its revision over it. */
+/** A box holding `record`, by default the full box record `anthropic_api_key` at revision 1, with the same in storage. */
 const builtBoxOf = (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<TestableBox> => {
   held.mw.seedStore(record)
   return boxListingOf(held.mw).build(record)

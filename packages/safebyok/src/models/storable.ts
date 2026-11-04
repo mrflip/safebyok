@@ -50,7 +50,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Set by a sweep, a vacate or a delete, and never cleared. */
   #isDisabled = false
 
-  /** The latest record this device knows storage holds: full, sparse, or a tombstone. A thing never stored is born with a tombstone at VoidRevision. */
+  /** The latest record this device knows storage holds: full, sparse or a tombstone, void on a new instance. */
   #central: Fetched<RecordT, SparseT>
   /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null

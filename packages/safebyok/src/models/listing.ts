@@ -118,7 +118,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Listing verbs]: at, things, build
 
-  /** The instance held under the scope of `duck`, or null. Calls nothing. */
+  /** The instance held under the scope of `duck`, or null. */
   at(duck: unknown): ThingT | null {
     return this.#things.get(this.scopepathOf(this.scopeOf(duck))) ?? null
   }
@@ -155,7 +155,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (found?.isPresent === true) ? found : null
   }
 
-  /** Stores `record` over the revision `prior`, and answers the instance held once storage's answer is delivered. */
+  /** Stores `record` over the revision `prior`, answering the instance held. */
   async put(record: RecordT, opts: PutListingOpts): Promise<ThingT> {
     const checked = this.recordOf(record)
     const { prior, ifAbsent = 'add', ifPresent = 'repl' } = MSX.putListingOpts.parse(opts)
@@ -211,7 +211,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (record === null) ? this.#receiveNothing(scope) : this.buildOrReceive(record)
   }
 
-  /** The instance held under `scope`, once it hears that storage holds nothing there; null where none is held, as nothing is made of an absence. */
+  /** The instance held under `scope`, told that storage holds nothing there. */
   #receiveNothing(scope: ScopeT): ThingT | null {
     this.demandEnabled()
     const held = this.at(scope)
@@ -222,7 +222,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   // The one place an instance is made and held: `#makeThingOf` is called from here alone, and only where no instance is held.
-  /** SLOPDOC: Brings the instance under the scope of `record` up to it, building or replacing it as the record's fate says. */
+  /** The instance under the scope of `record`: built, brought up to it or replaced, by the record's fate. */
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
     const held = this.at(this.scopeOf(record))

@@ -1,4 +1,4 @@
-/** A vault's box verbs, from the host's side, on real seals: `hello`, `getBox`, `putBox`, `delBox`, a box's `extractWhisper`, and the sidecar-only `put`. */
+/** A vault's box verbs, from the host's side, on real seals. */
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'

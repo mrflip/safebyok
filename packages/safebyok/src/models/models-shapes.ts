@@ -71,7 +71,7 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 /** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
-/** The `revision_seq` of a central never stored: a thing is born with a tombstone here as its central, so that any record received is newer, and nothing stored is what it expects. */
+/** The `revision_seq` of a void row, and of a birth's prior: every populated row holds 0 or more. */
 export const { VoidRevisionSeq } = VS
 
 /** True for a record whose `am` says damaged or gone. */
@@ -135,7 +135,7 @@ export type BoxRecord = Z.infer<typeof boxRecord>
 /** True where a patch names a half of its box. */
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
-/** SLOPDOC: The checks of what a caller hands to make or update a box: for `create`, `put` and `putBox`. */
+/** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`). */
 export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
@@ -168,13 +168,13 @@ export type BoxesListed = Z.output<typeof boxesListed>
 
 // == [Options]: ifPresentVals, ifAbsentVals, putIfAbsentVals, ifPresent, ifAbsent, putIfAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, storableOpts, listener, IfPresent, IfAbsent, PutIfAbsent, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts, StorableOpts
 
-/** The policies when putting a record to a place that already holds a live one: `repl`, the default, replaces it; `fail` refuses `camped`; `get` saves nothing and takes up the live record. Storage decides, atomically. */
+/** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` takes it up. */
 export const { ifPresentVals } = VS
 
 /** The policies when fetching a thing that is absent, never stored or deleted: `fail` with the absent refusal, or resolve `nil`. */
 export const { ifAbsentVals } = VS
 
-/** The policies when putting over a thing that is absent, never stored or deleted: `add`, the default, stores it; `fail` refuses. */
+/** The policies for a put over a thing absent, never stored or deleted: `add`, the default, stores it; `fail` refuses. */
 export const { putIfAbsentVals } = VS
 
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
@@ -199,13 +199,13 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, storableOpts, listener }
 })
 
-/** How `put` meets a live record storage holds, as {@link ifPresent} checks it: one of {@link ifPresentVals}. */
+/** How `put` meets a live record storage holds: one of {@link ifPresentVals}. */
 export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
 export type IfAbsent = Z.infer<typeof ifAbsent>
 
-/** How a put treats a thing that is absent, as {@link putIfAbsent} checks it: one of {@link putIfAbsentVals}. */
+/** How a put treats a thing absent: one of {@link putIfAbsentVals}. */
 export type PutIfAbsent = Z.infer<typeof putIfAbsent>
 
 /** How fresh the record in hand and the world must be before a verb goes on. The world heeds `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
@@ -217,7 +217,7 @@ export type FetchOpts = Z.infer<typeof fetchOpts>
 /** `box.put`'s options: its {@link TimelyOpts}, and an upcreate unless `ifAbsent` or `ifPresent` says otherwise. */
 export type BoxPutOpts = Z.infer<typeof boxPutOpts>
 
-/** `create`'s options: as {@link BoxPutOpts}, with `ifPresent` defaulting to `fail`, and `ifAbsent` always `add`. */
+/** `create`'s options: {@link BoxPutOpts}, with `ifPresent` defaulting to `fail`, and `ifAbsent` always `add`. */
 export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 /** The options a storable is made with, after its world, listing and records: its refresh horizon. */
@@ -285,7 +285,7 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
   onBadNews:             fn().optional(),
 }), 'bad_option')
 
-/** The check of what `listing.put` is told: the revision `prior` it goes over, and how it meets a row absent or live, an upcreate where left out. */
+/** The check of what `listing.put` is told: the revision `prior` it goes over, and how it meets a row absent or live. */
 export const putListingOpts = objCheck(() => ({ prior: revision, ifAbsent: putIfAbsent.optional(), ifPresent: ifPresent.optional() }), 'bad_option')
 
 export type PutListingOpts = Z.infer<typeof putListingOpts>

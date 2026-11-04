@@ -15,11 +15,11 @@ export const VoidRevisionTok = '00000000-0000-0000-0000-000000000000'
 export const VoidRevisionSeq = -1
 /** The `box_tok` or `vault_tok` of a void row: no life ever minted holds it. */
 export const VoidLifeTok = '00000000-0000-0000-0000-000000000000'
-/** The `registered_at` and `written_at` of a void row, 2008-08-08T08:08:08.777Z: a date that says so on sight. */
+/** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, plain on sight. */
 export const VoidTime = 1_218_182_888_777
 export const BoxFormat = 5001
 export const VaultFormat = 6001
-/** What a void row stands at: the prior of a birth over a row never stored. */
+/** The revision of a void row, and of a birth's prior. */
 export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
 // --
 
@@ -40,7 +40,7 @@ export const {
 } = Checkers('invalid_input', ({ obj, lit, int, uint, num, unk, oneof, discrim, applabel, user_id, vaultlabel, boxlabel, epochMillis, revision_tok, vault_tok, box_tok, device_id, key_deriver_label, credential_id, salt_b64, prfSalt, vault_key_wayin_wrapped, box_key_wrapped, whisper_ciphered }) => {
   const revision = obj({
     revision_tok,
-    /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. {@link VoidRevisionSeq} marks a row never stored. */
+    /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. */
     revision_seq: int,
   })
   const am = oneof(amVals)

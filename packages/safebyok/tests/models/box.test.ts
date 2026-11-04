@@ -219,7 +219,7 @@ describe("box.whisper while the vault is locked", () => {
 // --
 
 /** A box holding `record` (the full box record `anthropic_api_key` at revision 1, by default) as received, through a listing over the test world. */
-/** A box built of `record`, which storage holds too, so that a put lays its revision over it. */
+/** A box built of `record`, with the same record in storage. */
 const builtOf = (record: Fetched<BoxRecord, BoxSparse>, listing: TestableBoxListing = boxListingOf(held.mw)): Promise<TestableBox> => {
   held.mw.seedStore(record)
   return listing.build(record)

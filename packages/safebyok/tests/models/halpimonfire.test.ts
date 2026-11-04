@@ -1,4 +1,4 @@
-/** Crossings pinned as the code meets them: a `lock()` in a put, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
+/** A `lock()` crossing a put, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'

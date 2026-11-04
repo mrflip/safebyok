@@ -16,7 +16,7 @@ import * as MSX from './models-shapes'
 
 // == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
 
-/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
+/** The vault's face to its boxes: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
 export type BoxWorld = ListingWorld & {
   scope:     VaultScope
   vault_tok: string
@@ -79,7 +79,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Finding]: get, tryGet
 
-  /** The box under `scoped`, as fresh as asked, or null under `ifAbsent: 'nil'`. */
+  /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
     const held = this.at(scoped)
     if (held === null) { return this.fetch(scoped, opts) }
@@ -110,7 +110,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  /** A void box held under `scope`, timely as it received its own void revision, so a put on it fetches nothing. */
+  /** A void box held under `scope`. */
   #shellFor(scope: Boxscope): Box { return this.buildOrReceive(VS.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 

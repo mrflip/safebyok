@@ -29,7 +29,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
 /** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
 export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
 
-/** A host's patch for `put`: either of the {@link BoxHalves} or both, the half left out being kept, and any other prop of the box's record, which the box controls and ignores, so `{ ...record, whisper, sidecar }` will do. `boxPatch` checks it. */
+/** A host's patch for `put`: one or both {@link BoxHalves}, the other kept; any other prop of the box's record is ignored. */
 export type BoxPatch = { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
 
 /** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
@@ -50,7 +50,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly listing: BoxListing
 
-  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: a `put` seals the whisper it is given. */
+  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until the host sets it null. */
   #exposed: WhisperHolder | null = null
 
   // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
@@ -145,7 +145,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, edit
 
-  /** Seals `patch` over the record in hand and stores it, answering the box listed; a box gone comes back. */
+  /** Seals `patch` over the record in hand and stores it, answering the box listed; a deleted box is reborn. */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
     const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = MSX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
@@ -157,7 +157,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.put(patch, opts)) }
 
-  /** The next record `patch` makes of the record in hand on entry, sealed and not yet stored, with that revision it was sealed over. */
+  /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: VS.Revision }> {
     const prior = this.central
     const isBirthday = this.isTombstoneRecord(prior)
@@ -241,7 +241,7 @@ const parseJsonOrNull = (text: string): unknown => {
 
 // == [Refusals]: recordForNewBox, undecodedWhisper
 
-/** A put that said only-if-new, handed a whole record. */
+/** The refusal of a put that said only-if-new, handed a whole record. */
 const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
 
 const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)

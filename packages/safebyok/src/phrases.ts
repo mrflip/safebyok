@@ -283,7 +283,7 @@ export const PartialLoad = "The record in hand is not full, so it cannot be open
 /** Why a birth makes nothing of a dna for a scope the listing already holds alive. */
 export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
-/** Why a put that storage answered with no record refuses: only a broken adapter does so. */
+/** Why a put that storage answered with no record refuses: only a broken adapter answers that. */
 export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
 
 /** Why an update of a box naming neither its whisper nor its sidecar stores nothing. */
@@ -390,7 +390,7 @@ export const vaultAbsent = (vaultlabel: string): string => `No vault is stored u
 
 export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
 
-/** Why a put that must find a box refuses where none is listed: nothing was fetched to say so. */
+/** Why a put that must find a box refuses where none is listed, with nothing fetched. */
 export const boxNotListed = (boxlabel: string): string => `No box is listed under the label ${boxlabel}, though one may be stored: call vault.hello() to list what is stored.`
 
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."

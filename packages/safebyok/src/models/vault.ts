@@ -375,7 +375,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form, demandBoxesUsable
 
-  /** Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. No box verb needs it; the host runs it for the list and the pushes. */
+  /** List this vault's boxes and start their watch. */
   async hello(): Promise<this> {
     const listed = await this.listing.fetchListed(this)
     this.demandUsable()
@@ -385,7 +385,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
 
-  /** As {@link BoxListing.get}, for the box under `boxlabel`. */
+  /** The box under `boxlabel`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
     return this.boxListing.get({ ...this.scope, boxlabel }, opts)
   }
@@ -397,7 +397,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** As {@link BoxListing.puttable} then {@link Box.put}, for the box `patch` names. */
+  /** Seals `patch` and stores it in the box it names, answering the box listed. */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
     return this.boxListing.puttable({ ...patch, ...this.scope }, opts).put(patch, opts)
   }
@@ -418,7 +418,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
 
-  /** A box verb needs the vault enabled, present and unlocked. */
+  /** Refuses unless the vault is enabled, present and unlocked. */
   demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }
   // --
 
