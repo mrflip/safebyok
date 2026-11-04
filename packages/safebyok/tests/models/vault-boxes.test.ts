@@ -602,7 +602,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     boxrows.set(boxlabel, { garbage: true })
     await vault.hello()
     expect(vault.boxListing.at(held.scope)).to.be.null
-    expect(held.isDisabled).to.be.true
+    expect(held.isEnabled).to.be.false
     await vault.delBox(boxlabel)
     expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
   })

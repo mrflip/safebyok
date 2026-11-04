@@ -413,7 +413,7 @@ describe("A refused erase of the row: the panic", () => {
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
     expect(onPanic).toHaveBeenCalledWith(Refusal)
-    expect(vault.isDisabled).to.be.false
+    expect(vault.isEnabled).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
@@ -421,7 +421,7 @@ describe("A refused erase of the row: the panic", () => {
     const { vault, deviceDB } = await makeBornVault()
     deviceDB.tryVacate.mockResolvedValue(TH.bad(Refusal))
     vault.lock()
-    await TH.eventually(() => vault.isDisabled)
+    await TH.eventually(() => ! vault.isEnabled)
     expect(deviceDB.tryVacate).toHaveBeenCalledTimes(2)
   })
 
@@ -432,7 +432,7 @@ describe("A refused erase of the row: the panic", () => {
     vault.lock()
     await TH.eventually(() => reported.mock.calls.length === 2)
     expect(reported).toHaveBeenCalledWith(Refusal)
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     expect(deviceDB.tryVacate).toHaveBeenCalledTimes(2)
   })
@@ -457,8 +457,8 @@ describe("The discards: sweep and vacate, down the chain", () => {
     await box.expose()
     expect(vault.sweep()).to.equal(vault)
     expect(vault.isLocked).to.be.true
-    expect(vault.isDisabled).to.be.true
-    expect(box.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
+    expect(box.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     expect(boxListing.at(box.scope)).to.be.null
     expect(box.whisper).to.equal(LOCKED)
@@ -472,7 +472,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const stored = demandStored()
     vault.vacate()
     expect(vault.isLocked).to.be.true
-    expect(box.isDisabled).to.be.true
+    expect(box.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(demandStored()).to.eq(stored)
@@ -566,7 +566,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const record = demandStored()
     await listing.hello()
     expect(listing.sweep()).to.equal(listing)
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(listing.things).to.have.lengthOf(0)
     await TH.expectRefusal(listing.hello(), 'disabled')
     await TH.expectRefusal(listing.fetch(vault.scope), 'disabled')

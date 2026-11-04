@@ -346,7 +346,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Lock the vault and its boxes before returning, and erase the row cached on this device.
    * A refused erase panics and does not throw. A no-op on a vault discarded. */
   override lock(): this {
-    if (this.isDisabled) { return this }
+    if (! this.isEnabled) { return this }
     void this.#vacateLease()
     this.#boxListing?.lock()
     this.listing.declineGatingAtLock(this)

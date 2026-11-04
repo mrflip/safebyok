@@ -92,7 +92,7 @@ describe("An ending that lands while box.expose unseals", () => {
   it.each(['sweep', 'vacate'] as const)("a %s refuses 'disabled', and leaves nothing exposed", async (ending) => {
     const box = await boxCrossingUnseal((crossed) => crossed[ending]())
     await TH.expectRefusal(box.expose(), 'disabled')
-    expect(box.isDisabled).to.be.true
+    expect(box.isEnabled).to.be.false
     expect(box.whisper).to.be.null
   })
 

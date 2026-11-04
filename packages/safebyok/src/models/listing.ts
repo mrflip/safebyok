@@ -41,7 +41,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #snapshot: readonly SnapshotT[] = Object.freeze([])
   #unwatch:  (() => void) | null = null
   /** Set by a sweep or a vacate, and never cleared. */
-  #isDisabled = false
+  #isEnabled = true
 
   constructor(opts: ListingOpts) {
     MSX.listingOpts.parse(opts)
@@ -93,8 +93,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   vacate(): this { return this.#disable((thing) => { thing.vacate() }) }
 
   #disable(discard: (thing: ThingT) => void): this {
-    if (this.#isDisabled) { return this }
-    this.#isDisabled = true
+    if (! this.#isEnabled) { return this }
+    this.#isEnabled = false
     this.goodbye()
     for (const thing of this.things) { discard(thing) }
     return this
@@ -111,7 +111,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Demands that this listing be enabled: not past a sweep or a vacate. */
   demandEnabled(): this {
-    if (this.#isDisabled) { throw disabledError() }
+    if (! this.#isEnabled) { throw disabledError() }
     return this
   }
   // --
@@ -263,11 +263,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** SLOPDOC: Delivers a watch notice of this listing's kind like a good answer, making any refusal bad news. */
   readonly #onNotice = (notice: VaultDBNotice): void => {
     const { val, world } = notice
-    if (this.#isDisabled || ! this.isOwnRow(val)) { return }
+    if ((! this.#isEnabled) || (! this.isOwnRow(val))) { return }
     void (async () => {
       const { ok, err } = await outcomeOf(() => {
         this.world.takeWorld(world)
-        return this.#isDisabled ? null : this.buildOrReceive(val)
+        return this.#isEnabled ? this.buildOrReceive(val) : null
       })
       if (! ok) { this.tellBadNews([err]) }
     })()

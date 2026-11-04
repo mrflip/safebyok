@@ -42,7 +42,7 @@ const expectLandedGone = async (vault: Vault, { listing, deviceDB }: Pick<Awaite
   expect(listing.at(Dna)).to.eq(vault)
   expect(vault.isPresent).to.be.false
   expect(vault.isLocked).to.be.true
-  expect(vault.isDisabled).to.be.false
+  expect(vault.isEnabled).to.be.true
   expect(deviceDB.cachedNow()).to.be.null
   expect(listing.snapshot).to.deep.equal([])
 }
@@ -57,7 +57,7 @@ describe("a tombstone over a live vault", () => {
     expect(await listing.fetch(Dna, { ifAbsent: 'nil' })).to.be.null
     await expectLandedGone(vault, world)
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
-    expect(box.isDisabled).to.be.true
+    expect(box.isEnabled).to.be.false
     await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
     expect(vault.boxListing).to.eq(boxes)
   })
@@ -151,7 +151,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     expect(rebuilt?.isLocked).to.be.true
     expect(listing.at(Dna)).to.eq(rebuilt)
     expect(listing.things).to.deep.equal([rebuilt])
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     await erased()
     expect(deviceDB.cachedNow()).to.be.null
   })
@@ -163,7 +163,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
     expect(listing.at(Dna)?.vault_tok).to.eq(other.vault_tok)
     expect(listing.at(Dna)?.isPresent).to.be.false
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
   })
 })
 
@@ -214,7 +214,7 @@ describe("building over a tombstone", () => {
     expect(reborn.revision_seq).to.eq(2)
     expect(reborn.isLocked).to.be.false
     expect(listing.at(Dna)).to.eq(reborn)
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(storedNow()).to.include({ am: 'a', vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
@@ -289,7 +289,7 @@ describe("building over a tombstone", () => {
     expect(reborn.vault_tok).to.eq(record.vault_tok)
     expect(reborn.isLocked).to.be.true
     expect(listing.at(Dna)).to.eq(reborn)
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
   })
 
   it("listing.ensureVault, nothing ever stored: lands over never stored", async () => {

@@ -129,6 +129,9 @@ thing's stage in its life is its `stage`.
 **`isFoo` is a boolean. A function returning a predicate ends in `Pred`**:
 `withinVaultScopepathPred(scope)`.
 
+**A boolean says the positive**: `isEnabled`, never `isDisabled`. Each read of a negative one is a double negative
+(`selfDestructPreventionDisabled`).
+
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
 `vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
 `Input` appended** (`dragForceInput`). A shape's validator checks no one parameter, and takes its

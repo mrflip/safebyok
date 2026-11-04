@@ -48,7 +48,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare written_at:    number
 
   /** Set by a sweep, a vacate or a delete, and never cleared. */
-  #isDisabled = false
+  #isEnabled = true
 
   /** The latest record this device knows storage holds: full, sparse or a tombstone, void on a new instance. */
   #central: Fetched<RecordT, SparseT>
@@ -200,12 +200,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandWhole, demandFullProps, ensureDeletable, demandDeletable
+  // == [Guards]: isEnabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandWhole, demandFullProps, ensureDeletable, demandDeletable
 
-  /** True past a sweep, a vacate or a delete, and from then on. */
-  get isDisabled(): boolean { return this.#isDisabled }
+  /** False past a sweep, a vacate or a delete, and from then on. */
+  get isEnabled(): boolean { return this.#isEnabled }
 
-  demandEnabled():  this { if (this.#isDisabled) { throw disabledError() }                             return this }
+  demandEnabled():  this { if (! this.#isEnabled) { throw disabledError() }                            return this }
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
@@ -266,7 +266,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Tell the listeners the lock has moved. A no-op past a discard; never throws. */
   lock(): this {
-    if (! this.#isDisabled) { this.settle() }
+    if (this.#isEnabled) { this.settle() }
     return this
   }
 
@@ -282,8 +282,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // Marked first, so that a repeat met on the way finds the work done.
   #disable(dropContents: () => void): this {
-    if (this.#isDisabled) { return this }
-    this.#isDisabled = true
+    if (! this.#isEnabled) { return this }
+    this.#isEnabled = false
     dropContents()
     this.listing.unlist(this)
     this.settle()
@@ -295,7 +295,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** SLOPDOC: Takes in what storage said: judges it against the record in hand, adopts and settles what it takes. */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
-    if (this.#isDisabled) { return { badnews: [] } }
+    if (! this.#isEnabled) { return { badnews: [] } }
     const answer = rcvd ?? this.tombstoneFor(this.#central)
     const { central, policy } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
     const isTaken = central !== this.#central
