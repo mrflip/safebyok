@@ -48,6 +48,13 @@ Given the seam and the row, everything to its right is guaranteed.
 * Right of the seam: act, the outcome where it has a name; ok; post, the listing then the object, and whether each changed and to what; ret, the return or its properties where they matter; note.
 * Only the rows and columns with something to say are here. Proving and Gate store nothing, so they have no post column.
 
+VaultDB calls are handled by Listing.
+The caller dispatches a proposal (a staged record or tombstone, or just a curiosity to get).
+What comes back might be that the proposal was accepted;  but it may instead be a deleted vault;
+or that the put can't succeed as there was an intervening write; or a refusal of some large or small kind.
+The caller hears one thing: (a) this, meaning it is now at the frontier state and the proposal succeeded;
+or (b) a refusal or a failed receive of the row it asked about. Everything else is bad news.
+
 ## Preconditions
 
 What a call can fail with before its own row is reached. Each table below shows a call's results when all of these preconditions are met: past a sweep everything throws, whatever its row says.

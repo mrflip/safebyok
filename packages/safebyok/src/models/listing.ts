@@ -190,7 +190,18 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Delivering an answer]: deliver, buildOrReceive, makeThingOf, hold, neverStoredOf
 
-  /** SLOPDOC: The pipeline every storage answer takes, from its world through the instance held to the caller. */
+  /** Delivers each part of a VaultDB answer to the correct `receive`r: `world` is sent to bank/vault, and a newest record/tombstone/etc to the listing.
+   *
+   * First, `world` is sent to takeWorld before proceeding. Each following step will assume timeliness but demand consistency (if the world changes it will fail, but there's no need to check)
+   * Next, if the answer holds a frontier (most-recent-stored) value, as either
+   * * `val` -- the return of a successful fetch or put (the typical case)
+   * * `dbhas` -- the actual frontier record sent on a stale_write, or a put with ifPresent=fail
+   * Route it using buildOrReceive (adding a new instance if necessary)
+   *
+   * In the very unlikely case of a damaged row coming out of the VaultDB, `damaged_row`
+   * holds a sentinel object. That instance is unlisted -- its value otherwise ignored --
+   * and the bad_news shared. No further action is safe or desired: we will not use it.
+  */
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (answer.ok) {
@@ -214,9 +225,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // The one place an instance is made and held: `#makeThingOf` is called from here alone, and only where no instance is held.
   /** SLOPDOC: Brings the instance under `scope` up to `record`, building or replacing it as the record's fate says. */
+
+  /** Deliver to record's instance if we list it; otherwise, build and list a new one */
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT>): ThingT
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null
   #buildOrReceive(scope: ScopeT, record: Fetched<RecordT, SparseT> | null): ThingT | null {
+    // FFS FIXMEs: why does this take scope separately from record?
     this.demandEnabled()
     const held = this.at(scope)
     if (record !== null) { this.#demandRecordOfScope(record, scope) }

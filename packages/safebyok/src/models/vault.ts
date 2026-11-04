@@ -277,6 +277,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** What a seal's stamp or a lease has to agree with: this vault's scope and this life of it. */
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
 
+  // FIXME this is paranoia
   /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
     if (lease.isForgotten) { throw leaseNotInForce() }
