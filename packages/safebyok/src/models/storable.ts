@@ -297,11 +297,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
     if (this.#isDisabled) { return { badnews: [] } }
     const answer = rcvd ?? this.tombstoneFor(this.#central)
-    const { central } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
-    const older = cmpRevisions(this.#central, answer) === 'older'
+    const { central, policy } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
     const isTaken = central !== this.#central
     if (isTaken) { this.adopt(central) }
-    if (! older && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
+    if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
     return isTaken ? this.settle() : { badnews: [] }
   }
 
