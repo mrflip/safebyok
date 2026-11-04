@@ -6,7 +6,7 @@ import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import type { Boxscope, VaultScope } from '../shapes/scopes'
+import type { VaultScope } from '../shapes/scopes'
 import * as VS from '../storage/vault-db-shapes'
 import type { Box, BoxPut } from './box'
 import type { BoxListing, BoxWorld } from './box-listing'
@@ -387,7 +387,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** As {@link BoxListing.get}, for the box under `boxlabel`. */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
-    return this.boxListing.get(this.#boxscopeOf(boxlabel), opts)
+    return this.boxListing.get({ ...this.scope, boxlabel }, opts)
   }
 
   tryGetBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(boxlabel, opts)) }
@@ -407,9 +407,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: Deletes the box under `boxlabel`, a damaged row included, answering its tombstone if one was stored. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const timely = MSX.timelyOpts.parse(opts)
-    const scope = this.#boxscopeOf(boxlabel)
-    this.demandBoxesUsable()
     const boxes = this.boxListing
+    const scope = boxes.scopeOf({ ...this.scope, boxlabel })
+    this.demandBoxesUsable()
     const held = boxes.at(scope)
     if (held !== null) { return held.del(timely) }
     await this.ensureTimely(timely.maxWorldMillis); this.demandBoxesUsable()
@@ -420,8 +420,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** A box verb needs the vault enabled, present and unlocked. */
   demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }
-
-  #boxscopeOf(boxlabel: string): Boxscope { return { ...this.scope, boxlabel: MSX.boxlabelArg.parse(boxlabel) } }
   // --
 
   // == [Children and discards]: boxListing, adopt, sweepContents, vacateContents

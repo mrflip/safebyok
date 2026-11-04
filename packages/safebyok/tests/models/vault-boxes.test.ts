@@ -235,10 +235,10 @@ describe("vault.getBox", () => {
     expect(tryGetBox).toHaveBeenCalledOnce()
   })
 
-  it("refuses a boxlabel or opts that fail their checks as 'bad_option'", async () => {
+  it("refuses a boxlabel that fails its check as 'bad_scope', and opts that fail theirs as 'bad_option'", async () => {
     const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.getBox('Not A Label'), 'bad_option')
-    await TH.expectRefusal(vault.getBox(42 as never), 'bad_option')
+    await TH.expectRefusal(vault.getBox('Not A Label'), 'bad_scope')
+    await TH.expectRefusal(vault.getBox(42 as never), 'bad_scope')
     await TH.expectRefusal(vault.getBox(boxlabel, { ifAbsent: 'shrug' } as never), 'bad_option')
   })
 })
@@ -569,9 +569,9 @@ describe("vault.delBox", () => {
     expect(boxrows.has(boxlabel)).to.be.false
   })
 
-  it("refuses a boxlabel that fails its check as 'bad_option'", async () => {
+  it("refuses a boxlabel that fails its check as 'bad_scope'", async () => {
     const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.delBox('Not A Label'), 'bad_option')
+    await TH.expectRefusal(vault.delBox('Not A Label'), 'bad_scope')
     expect(await vault.tryDelBox('Not A Label')).to.deep.include({ ok: false })
   })
 })

@@ -114,7 +114,7 @@ export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, 
 export type Settled = Z.infer<typeof settled>
 // --
 
-// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxesListed, boxlabelArg, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven, BoxesListed
+// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxesListed, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven, BoxesListed
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const { BoxFormat } = VS
@@ -164,9 +164,6 @@ export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
 
 /** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */
 export type BoxesListed = Z.output<typeof boxesListed>
-
-/** The check of a boxlabel a box verb is handed. */
-export const boxlabelArg = Checker(({ boxlabel }) => boxlabel, 'bad_option')
 // --
 
 // == [Options]: ifPresentVals, ifAbsentVals, putIfAbsentVals, ifPresent, ifAbsent, putIfAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, storableOpts, listener, IfPresent, IfAbsent, PutIfAbsent, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts, StorableOpts
