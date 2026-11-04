@@ -27,7 +27,7 @@ export type BoxWorld = ListingWorld & {
 }
 
 /** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
-export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper: WhisperHolder, sidecar: Sidecar }
+export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper?: WhisperHolder, sidecar?: Sidecar }
 
 export type BoxListingOpts = ListingOpts & { world: BoxWorld }
 // --
@@ -80,14 +80,13 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Finding]: get, tryGet, demandUsable
 
-  /** The present box under `scoped`, as fresh as asked: one storage has told of hydrates, any other, a void one included, is fetched. */
+  /** The present box under `scoped`, as fresh as asked: one held present hydrates, anything else asks storage. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
     const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
     const scope = this.scopeOf(scoped)
     this.demandUsable()
     const held = this.at(scope)
-    const isHeard = (held !== null) && (held.revision_seq !== VS.VoidRevisionSeq)
-    const box = await (isHeard ? held.hydrate(timely) : this.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
+    const box = await ((held?.isPresent === true) ? held.hydrate(timely) : this.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
     this.demandUsable()
     if (box?.isPresent === true) { return box }
     if (ifAbsent === 'nil') { return null }

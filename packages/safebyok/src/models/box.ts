@@ -161,7 +161,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const isBirthday = this.isTombstoneRecord(prior)
     const sidecarGiven = sidecar ?? (isBirthday ? {} : this.demandFullProps().sidecar)
     // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
-    const whisperGiven = whisper ?? await this.#keptWhisper(isBirthday)
+    const whisperGiven = whisper ?? (isBirthday ? { val: {} } : await this.#keptWhisper())
     const written_at = this.world.clock.now()
     const record = await sealedRecordOf(this.world, {
       ...prior,
@@ -175,11 +175,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return { record, prior }
   }
 
-  /** The whisper a patch left out, opened from the record in hand; 'no_whisper' over a tombstone, which has none to keep. */
-  #keptWhisper(isBirthday: boolean): Promise<WhisperHolder> {
-    if (isBirthday) { throw noWhisperToKeep() }
-    return this.#unseal(this.demandFullProps())
-  }
+  /** The whisper a patch left out, opened from the record in hand. */
+  #keptWhisper(): Promise<WhisperHolder> { return this.#unseal(this.demandFullProps()) }
   // --
 
   // == [Discards]: sweepContents, vacateContents
@@ -240,10 +237,8 @@ const parseJsonOrNull = (text: string): unknown => {
 }
 // --
 
-// == [Refusals]: undecodedWhisper, noWhisperToKeep
+// == [Refusals]: undecodedWhisper
 
-/** A whisper left out of an update, where no box is stored to keep one of. */
-const noWhisperToKeep = (): VaultError => new VaultError('no_whisper', Phrases.NoWhisperToKeep)
 
 const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --

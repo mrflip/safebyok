@@ -739,27 +739,25 @@ describe("boxListing.create(dna): no secret material", () => {
 
 // == [A whisper and a sidecar at birth]: create, boxDna
 
-describe("boxListing.create(dna): a whisper and a sidecar, both required", () => {
+describe("boxListing.create(dna): a whisper and a sidecar, each defaulting", () => {
   const DnaCases = [
-    [{ whisper: undefined },                     ["whisper"],            'a whisper given as undefined'],
-    [{ sidecar: undefined },                     ["sidecar"],            'a sidecar given as undefined'],
-    [{ whisper: undefined, sidecar: undefined }, ["sidecar", "whisper"], 'neither'],
+    [{ whisper: undefined },                     'a whisper given as undefined'],
+    [{ sidecar: undefined },                     'a sidecar given as undefined'],
+    [{ whisper: undefined, sidecar: undefined }, 'neither'],
   ] as const
 
-  for (const [lacks, fieldnames, blurb] of DnaCases) {
-    it(`refuses a dna with ${blurb} as 'bad_option', naming the field, holding, saving and sealing nothing`, async () => {
-      const listing = boxListingOf(held.mw)
-      const err = await TH.expectRefusal(listing.create({ ...dna(), ...lacks } as unknown as BoxDna), 'bad_option')
-      expect(err.meta?.fieldnames).to.have.members([...fieldnames])
-      expect(listing.things).to.deep.equal([])
-      expect(held.mw.calls).to.deep.equal([])
+  for (const [lacks, blurb] of DnaCases) {
+    it(`makes a box present of a dna with ${blurb}`, async () => {
+      const box = await boxListingOf(held.mw).create({ ...dna(), ...lacks } as unknown as BoxDna)
+      expect(box.isPresent).to.be.true
+      expect(held.mw.callsOf('put')).to.have.lengthOf(1)
     })
   }
 
-  it("refuses a dna of the scope alone as 'bad_option'", async () => {
-    const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.create(held.mw.boxscope('anthropic_api_key') as unknown as BoxDna), 'bad_option')
-    expect(listing.things).to.deep.equal([])
+  it("makes a box present of a dna of the scope alone, its sidecar {}", async () => {
+    const box = await boxListingOf(held.mw).create(held.mw.boxscope('anthropic_api_key'))
+    expect(box.isPresent).to.be.true
+    expect(box.sidecar).to.deep.equal({})
   })
 })
 // --
@@ -796,12 +794,12 @@ describe("boxListing.create(dna): the whisper given as { val }", () => {
 
 // == [Arguments first]: every entry of BoxListing and Listing checks its arguments before any guard
 
-describe("BoxListing and Listing entries: arguments checked first of all, before any guard (the Coach, 2026-10-31)", () => {
+describe("BoxListing and Listing entries: arguments checked before any demand (the Coach, 2026-10-31)", () => {
   const BadDnaCases = [
     [() => undefined,                           'undefined'],
     [() => null,                                'null'],
     [() => 'anthropic_api_key',                 'a bare boxlabel'],
-    [() => ({ ...dna(), sidecar: undefined }),  'a dna with no sidecar'],
+    [() => ({ ...dna(), sidecar: 'note' }),     'a dna whose sidecar fails its check'],
     [() => ({ ...dna(), whisper: MSX.LOCKED }), 'a dna whose whisper is LOCKED'],
   ] as const
 

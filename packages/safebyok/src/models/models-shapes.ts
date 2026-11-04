@@ -137,11 +137,11 @@ const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown
 
 /** SLOPDOC: The checks of what a caller hands to make or update a box: for `create`, `put` and `putBox`. */
 export const { boxDna, boxPatch, boxPut } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
-  const halves  = { whisper: whisperHolder, sidecar }
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
-    ...halves,
+    whisper: whisperHolder.default({ val: {} }),
+    sidecar: sidecar.default({}),
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))

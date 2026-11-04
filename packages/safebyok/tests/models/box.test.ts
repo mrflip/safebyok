@@ -184,11 +184,13 @@ describe("box.put(patch): rebirth over a tombstone", () => {
       expect(box._cheat_central).to.deep.include({ am: 'a', revision_seq: 3, registered_at: T0 + 5000, box_tok: box.box_tok })
     })
 
-    it(`refuses a sidecar put with no whisper over ${blurb} as 'no_whisper', putting nothing`, async () => {
+    it(`puts a sidecar with no whisper over ${blurb} alive, sealing an empty whisper`, async () => {
       const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am), fakeSealBoxListingOf(held.mw))
       held.mw.clearCalls()
-      await TH.expectRefusal(box.put({ sidecar: { note: 'no whisper' } }), 'no_whisper')
-      expect(held.mw.callsOf('put')).to.deep.equal([])
+      await box.put({ sidecar: { note: 'no whisper' } })
+      expect(held.mw.callsOf('put')).to.have.lengthOf(1)
+      expect(box.isPresent).to.be.true
+      expect(box.sidecar).to.deep.equal({ note: 'no whisper' })
     })
   }
 })
@@ -741,7 +743,7 @@ describe("box.whisper and box.put: the whisper given as { val }", () => {
 
 // == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and put take a duckish
 
-describe("Box and Storable entries: arguments checked first of all, before any guard (the Coach, 2026-10-31)", () => {
+describe("Box and Storable entries: arguments checked before any demand (the Coach, 2026-10-31)", () => {
   const whisper = { val: 'sk-test-0000' }
   const BadArgCases = [
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
