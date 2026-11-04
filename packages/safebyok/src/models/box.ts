@@ -1,4 +1,4 @@
-import { type CipherCtxRecord, makeLifeTok, randomId } from '../crypto'
+import { type CipherCtxRecord, makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
 import { absentBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
@@ -160,20 +160,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: VS.Revision }> {
     const prior = this.central
-    const isBirthday = this.isTombstoneRecord(prior)
-    const sidecarGiven = sidecar ?? (isBirthday ? {} : this.demandFullProps().sidecar)
-    // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
-    const whisperGiven = whisper ?? (isBirthday ? { val: {} } : await this.#keptWhisper())
     const written_at = this.world.clock.now()
-    const record = await sealedRecordOf(this.world, {
-      ...prior,
-      revision_tok:  randomId(),
-      revision_seq:  prior.revision_seq + 1,
-      registered_at: isBirthday ? written_at : prior.registered_at,
-      written_at,
-      box_tok:       isBirthday ? makeLifeTok() : prior.box_tok,
-      am:            'a',
-    }, sidecarGiven, whisperGiven)
+    const next = { ...prior, ...VS.nextRevisionOf(prior, written_at), am: 'a' as const }
+    // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
+    const record = this.isTombstoneRecord(prior)
+      ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? { val: {} })
+      : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
     return { record, prior: VS.revisionOf(prior) }
   }
 
