@@ -110,8 +110,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The record in hand where it is the full record, else null. */
   protected get full(): RecordT | null {
-    const central = this.#central
-    return this.isFullRecord(central) ? central : null
+    return this.isFullRecord(this.#central) ? this.#central : null
   }
 
   /** The sparse form of central: everything but what only the full record carries. */
@@ -216,9 +215,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
-    const { full } = this
-    if (full === null) { throw partialLoadError() }
-    return full
+    if (this.full !== null) { return this.full }
+    throw partialLoadError()
   }
 
   ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }

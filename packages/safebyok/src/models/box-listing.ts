@@ -137,9 +137,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   protected nothingStoredError(scope: Boxscope): VaultError { return absentBoxError(scope) }
 
-  /** A put under `ifAbsent: 'fail'` hears `absent_box` over a tombstone, which is delivered as any row it missed is. */
-  protected override isRefusalOfRow(err: VaultError): boolean { return super.isRefusalOfRow(err) || (err.refusalkind === 'absent_box') }
-
   protected tryGetRow(scope: Boxscope) { return this.vaultDB.tryGetBox({ ...scope, vault_tok: this.world.vault_tok }, { ifAbsent: 'nil' }) }
 
   protected tryPutRow(record: BoxRecord, opts: PutOpts) { return this.vaultDB.tryPutBox(record, opts) }

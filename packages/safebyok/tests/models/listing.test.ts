@@ -539,11 +539,11 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
     expect(listing.at(scopeOf('other_box'))).to.be.null
   })
 
-  it("refuses it for a stale_write refusal's stored record, telling that one to onBadNews and throwing the stale_write", async () => {
+  it("leaves undelivered a stale_write refusal's stored record of another vault_tok, throwing the stale_write", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willPut(held.mw.staleWriteOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault, revision_seq: 5 })))
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: VS.VoidRevision }), 'stale_write')
-    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(held.mw.badnews).to.deep.equal([])
     expect(listing.things).to.deep.equal([])
   })
 

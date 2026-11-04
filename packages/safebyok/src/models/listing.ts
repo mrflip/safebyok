@@ -191,8 +191,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>): Promise<ThingT | null> {
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (answer.ok) { return this.#deliverGood(answer) }
-    const stored = (answer.dbhas ?? null) as Fetched<RecordT, SparseT> | null
-    if ((stored !== null) && this.isRefusalOfRow(answer.err)) {
+    const stored = (answer.dbhas ?? null) as VaultRow | BoxRow | null
+    if ((stored !== null) && this.isOwnRow(stored)) {
       const delivered = await outcomeOf(() => {
         this.#demandRecordOfScope(stored, this.scopeOf(answer.req_params))
         return this.buildOrReceive(stored)
@@ -334,8 +334,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The fate of `record` meeting `held`, the thing in its slot: by default its `receive` takes it in. */
   protected fateOver(_held: ThingT, _record: Fetched<RecordT, SparseT>): SlotFate { return 'receive' }
 
-  /** True where `err` is about this very row, so the `dbhas` it carries is delivered before it is thrown. */
-  protected isRefusalOfRow({ refusalkind }: VaultError): boolean { return (refusalkind === 'stale_write') || (refusalkind === 'camped') }
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null
   protected abstract scopepathOf(scope: ScopeT): string
