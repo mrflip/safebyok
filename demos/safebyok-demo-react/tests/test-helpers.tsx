@@ -7,13 +7,13 @@
 import type { ReactNode } from 'react'
 import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
+import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok-old'
 import { BankProvider, useVault, useVaultSnapshot } from 'safebyok-react'
-import { closeVault, memoryVaultOpts, settledVault, stateOf, unlock } from 'safebyok/testing'
+import { closeVault, memoryVaultOpts, settledVault, stateOf, unlock } from 'safebyok-old/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
 
-export * from 'safebyok/testing'
+export * from 'safebyok-old/testing'
 
 /** The passphrase every vault in the demo's tests is made with: an obvious fake. */
 export const Passphrase = 'correct horse battery staple'

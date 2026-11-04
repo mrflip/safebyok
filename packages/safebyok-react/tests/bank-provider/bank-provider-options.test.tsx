@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type KeyDeriver, type PassphraseVerdict, type VaultScope } from 'safebyok'
+import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type KeyDeriver, type PassphraseVerdict, type VaultScope } from 'safebyok-old'
 import * as TH from '../test-helpers'
 import { BankProvider, type BankProviderProps } from '../../src/bank-provider'
 import { Probe, grabber, makeWorld, refuseAcme, shownState, expectShown, CatchingBoundary, hushConsole, lockedWorld, providerOf, twelveOrMore } from './world'

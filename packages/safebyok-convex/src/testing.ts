@@ -4,7 +4,7 @@ import { makeFunctionReference } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
 import type { JSONValue, Value } from 'convex/values'
-import { Checkers } from 'safebyok'
+import { Checkers } from 'safebyok-old'
 
 /** A Convex deployment in memory that the real Convex clients talk to, unmodified, over a fake WebSocket.
  * A `ConvexClient` connects through {@link FakeDeployment.client}, and any other client, such as

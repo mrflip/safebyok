@@ -241,12 +241,12 @@ importers:
       react-dom:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
-      safebyok:
-        specifier: workspace:*
-        version: link:../../packages/safebyok
       safebyok-indexeddb:
         specifier: workspace:*
         version: link:../../packages/safebyok-indexeddb
+      safebyok-old:
+        specifier: workspace:*
+        version: link:../../packages/safebyok-old
       safebyok-react:
         specifier: workspace:*
         version: link:../../packages/safebyok-react
@@ -389,12 +389,12 @@ importers:
       react:
         specifier: ^19.3.1
         version: 19.3.1
-      safebyok:
-        specifier: workspace:*
-        version: link:../packages/safebyok
       safebyok-convex:
         specifier: workspace:*
         version: link:../packages/safebyok-convex
+      safebyok-old:
+        specifier: workspace:*
+        version: link:../packages/safebyok-old
       safebyok-postgres:
         specifier: workspace:*
         version: link:../packages/safebyok-postgres
@@ -546,9 +546,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok:
+      safebyok-old:
         specifier: workspace:*
-        version: link:../safebyok
+        version: link:../safebyok-old
       tsdown:
         specifier: ^0.23.3
         version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
@@ -616,9 +616,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok:
+      safebyok-old:
         specifier: workspace:*
-        version: link:../safebyok
+        version: link:../safebyok-old
       tsdown:
         specifier: ^0.23.3
         version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
@@ -697,9 +697,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok:
+      safebyok-old:
         specifier: workspace:*
-        version: link:../safebyok
+        version: link:../safebyok-old
       safebyok-postgres:
         specifier: workspace:*
         version: link:../safebyok-postgres
@@ -770,9 +770,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok:
+      safebyok-old:
         specifier: workspace:*
-        version: link:../safebyok
+        version: link:../safebyok-old
       tsdown:
         specifier: ^0.23.3
         version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
@@ -785,6 +785,91 @@ importers:
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1))
+
+  packages/safebyok-old:
+    dependencies:
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@scure/base':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@zxcvbn-ts/core':
+        specifier: ^4.2.0
+        version: 4.2.0
+      '@zxcvbn-ts/language-common':
+        specifier: ^4.1.3
+        version: 4.1.3
+      es-toolkit:
+        specifier: ^1.52.0
+        version: 1.52.0
+      idb-keyval:
+        specifier: ^6.3.0
+        version: 6.3.0
+      safe-stable-stringify:
+        specifier: ^3.0.0
+        version: 3.0.0
+    devDependencies:
+      '@arethetypeswrong/core':
+        specifier: ^0.18.5
+        version: 0.18.5
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.13.0)
+      '@stylistic/eslint-plugin':
+        specifier: ^5.10.0
+        version: 5.10.0(eslint@10.13.0)
+      '@types/node':
+        specifier: ^24.19.2
+        version: 24.19.2
+      '@vitest/coverage-v8':
+        specifier: ^5.0.5
+        version: 5.0.5(vitest@5.0.5)
+      '@vitest/eslint-plugin':
+        specifier: ^1.6.28
+        version: 1.6.28(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.72.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)(typescript@6.0.3)(vitest@5.0.5)
+      eslint:
+        specifier: ^10.13.0
+        version: 10.13.0
+      eslint-import-resolver-typescript:
+        specifier: ^4.4.5
+        version: 4.4.5(eslint-plugin-import-x@4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0))(eslint@10.13.0)
+      eslint-plugin-chai-expect:
+        specifier: ^4.1.1
+        version: 4.1.1(eslint@10.13.0)
+      eslint-plugin-chai-friendly:
+        specifier: ^1.2.1
+        version: 1.2.1(eslint@10.13.0)
+      eslint-plugin-import-x:
+        specifier: ^4.17.1
+        version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-sonarjs:
+        specifier: ^4.2.2
+        version: 4.2.2(eslint@10.13.0)
+      eslint-plugin-unicorn:
+        specifier: ^78.0.0
+        version: 78.0.0(eslint@10.13.0)(typescript@6.0.3)
+      fake-indexeddb:
+        specifier: ^6.2.6
+        version: 6.2.6
+      publint:
+        specifier: ^0.3.25
+        version: 0.3.25
+      tsdown:
+        specifier: ^0.23.3
+        version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8.72.1
+        version: 8.72.1(eslint@10.13.0)(typescript@6.0.3)
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1))
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
 
   packages/safebyok-postgres:
     devDependencies:
@@ -836,9 +921,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok:
+      safebyok-old:
         specifier: workspace:*
-        version: link:../safebyok
+        version: link:../safebyok-old
       tsdown:
         specifier: ^0.23.3
         version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
@@ -926,9 +1011,9 @@ importers:
       react-dom:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
-      safebyok:
+      safebyok-old:
         specifier: workspace:*
-        version: link:../safebyok
+        version: link:../safebyok-old
       tsdown:
         specifier: ^0.23.3
         version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)

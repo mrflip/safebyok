@@ -1,4 +1,4 @@
-import { epochMillis, label, wallClock, type Clock, type StringStore } from 'safebyok'
+import { epochMillis, label, wallClock, type Clock, type StringStore } from 'safebyok-old'
 
 /**
  * SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex

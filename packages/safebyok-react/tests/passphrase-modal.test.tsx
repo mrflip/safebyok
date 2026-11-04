@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type RequestCleartext, type Vault } from 'safebyok'
+import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type RequestCleartext, type Vault } from 'safebyok-old'
 import type { DialogAnswer, PassphraseAdvice } from '../src/modal'
 import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'

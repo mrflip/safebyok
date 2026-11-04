@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VaultError } from 'safebyok'
+import { VaultError } from 'safebyok-old'
 import { parseDbName, type IdbVaultDBOpts } from '../src/idb-opts'
 
 const DbNameCases = [

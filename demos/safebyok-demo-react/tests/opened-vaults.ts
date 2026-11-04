@@ -1,5 +1,5 @@
-import type { Vault } from 'safebyok'
-import { closeVault } from 'safebyok/testing'
+import type { Vault } from 'safebyok-old'
+import { closeVault } from 'safebyok-old/testing'
 
 /** The vaults a test has opened from outside the page, not yet let go. */
 const opened: Vault[] = []

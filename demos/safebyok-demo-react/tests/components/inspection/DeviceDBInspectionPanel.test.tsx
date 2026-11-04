@@ -3,7 +3,7 @@
 import 'fake-indexeddb/auto'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { idbDeviceDB } from 'safebyok/idb'
+import { idbDeviceDB } from 'safebyok-old/idb'
 import { DeviceDBInspectionPanel } from '../../../src/components/inspection/DeviceDBInspectionPanel'
 import { Applabel, deviceDbInspector, deviceStore } from '../../../src/lib/stores'
 import * as TH from '../../test-helpers'

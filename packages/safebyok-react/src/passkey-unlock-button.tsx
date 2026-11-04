@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import type { UnlockVaultGating, VaultSnapshot } from 'safebyok'
+import type { UnlockVaultGating, VaultSnapshot } from 'safebyok-old'
 import { attemptRefusalFlavor } from './attempt-refusals'
 import { Boundary, forBoundary, useRoundFor } from './boundary'
 import { Messages } from './messages'

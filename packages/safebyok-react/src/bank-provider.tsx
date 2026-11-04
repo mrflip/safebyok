@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Bank, type BankVault, type Gating, type RequestCleartext, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultLogger, type VaultSnapshot } from 'safebyok'
+import { Bank, type BankVault, type Gating, type RequestCleartext, parseLogger, type BadNewsHandler, type MakeBankOpts, type Vault, type VaultDB, type VaultLogger, type VaultSnapshot } from 'safebyok-old'
 import { GatingModal } from './gating-modal'
 import type { PassphraseAdvice } from './modal'
 

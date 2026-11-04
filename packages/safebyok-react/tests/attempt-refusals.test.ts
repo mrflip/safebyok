@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { correctableKindVals, VaultError, type RefusalKind } from 'safebyok'
+import { correctableKindVals, VaultError, type RefusalKind } from 'safebyok-old'
 import { attemptRefusalFlavor } from '../src/attempt-refusals'
 
 const FlavorCases: readonly (readonly [RefusalKind, string, string])[] = [

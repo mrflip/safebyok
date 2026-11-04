@@ -1,4 +1,4 @@
-import { Scopepath, type VaultScope } from 'safebyok'
+import { Scopepath, type VaultScope } from 'safebyok-old'
 
 /** Each record is one row on the shelf, under the scopepath the core's `Scopepath` makes from its scope.
  * These scopepaths are a stored contract: a vault already written is found by them. A key-value

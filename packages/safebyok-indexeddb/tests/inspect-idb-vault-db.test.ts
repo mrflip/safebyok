@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from 'safebyok'
+import { VaultError } from 'safebyok-old'
 import { idbVaultDB } from '../src/idb-vault-db'
 import type { IdbVaultDBOpts } from '../src/idb-opts'
 import { inspectIdbVaultDB } from '../src/inspect-idb-vault-db'

@@ -1,5 +1,5 @@
 import { Component, useState, type ReactNode } from 'react'
-import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok'
+import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok-old'
 
 /** What a {@link Boundary} is handed: what to show once something broke, and whom to tell. */
 export type BoundaryProps = {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { StringStore } from 'safebyok'
-import type { IdbRow } from 'safebyok/idb'
+import type { StringStore } from 'safebyok-old'
+import type { IdbRow } from 'safebyok-old/idb'
 
 /**
  * Shared machinery for the two inspection panels, and nothing else uses it: deleting the

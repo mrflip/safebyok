@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   Argon2idWebV1, VaultError, argon2idDeriver, argon2idWebV1Deriver, isVaultError, localVaultDB, memoryDeviceDB, memoryStore,
   type KeyDeriver, type KeyDeriverSpec,
-} from 'safebyok'
-import { anyStrengthChecker } from 'safebyok/testing'
-import * as TH from 'safebyok/testing'
+} from 'safebyok-old'
+import { anyStrengthChecker } from 'safebyok-old/testing'
+import * as TH from 'safebyok-old/testing'
 import { argon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
 
 /** A spec of the host's own, cheap to derive under; no two of its counts alike, so a swap shows. */
@@ -275,7 +275,7 @@ describe("where WebAssembly cannot run", () => {
     vi.resetModules()
     const Fresh = await import('../src/wasm-deriver')
     // A fresh import brings a fresh safebyok, whose VaultError is the one thrown.
-    const FreshCore = await import('safebyok')
+    const FreshCore = await import('safebyok-old')
     const refusal = await rejectionOf(Fresh.argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16)))
     expect(FreshCore.isVaultError(refusal, 'bad_option')).to.be.true
     expect((refusal as VaultError).message).to.include("'wasm-unsafe-eval'")

@@ -2,11 +2,11 @@ import { beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
-import type { VaultDBOpts } from 'safebyok'
+import type { VaultDBOpts } from 'safebyok-old'
 import { VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-old/testing'
 
 const made: { db?: Promise<PGlite> } = {}
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { isVaultError } from 'safebyok'
+import { isVaultError } from 'safebyok-old'
 import { passkeysAvailable, useVault, useVaultSnapshot } from 'safebyok-react'
 
 /**
