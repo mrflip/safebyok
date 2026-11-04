@@ -13,6 +13,7 @@ import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { LeaseSparse } from '../storage/device-db-shapes'
+import { deviceRecordRewritten, helloFirst, insecureContext } from '../helpers/throwers'
 import type { BankOpts, BankSnapshot, BankStage, LockState, RequestCleartext, StrengthChecker, VaultWorld } from './models-shapes'
 import * as MSX from './models-shapes'
 import { DefaultLeaseMillis, type Vault } from './vault'
@@ -295,13 +296,4 @@ const stageOf = (hello: Outcome<void> | null): BankStage => {
 const checkSecureContext = (): void => {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }
 }
-// --
-
-// == [Refusals]: insecureContext, helloFirst, deviceRecordRewritten
-
-const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
-
-const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
-
-const deviceRecordRewritten = (): VaultError => new VaultError('damaged_record', Phrases.DeviceRecordRewritten)
 // --

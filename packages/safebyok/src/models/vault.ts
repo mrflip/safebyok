@@ -1,13 +1,13 @@
 import { verifyConsistent } from '../checks/validator'
 import type { CipherCtxRecord } from '../crypto'
 import { VaultError } from '../errors'
-import { alreadyHeldError, deletedVaultError } from '../helpers/throwers'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
 import type { VaultScope } from '../shapes/scopes'
 import * as VS from '../storage/vault-db-shapes'
+import { alreadyHeldError, deletedVaultError, listingExpected, noProofToUnlock, unlockFirst } from '../helpers/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -471,14 +471,4 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 const recordOfBirth = (gate: Gate, prior: MSX.Revision, now: number): VaultRecord => (
   { ...gate.stamp, fmt: MSX.VaultFormat, am: 'a', ...VS.nextRevisionOf(prior, now), gate: gate.pickle() }
 )
-// --
-
-// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock
-
-const listingExpected = (): VaultError => new VaultError('bad_option', Phrases.ListingExpected)
-
-const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
-
-const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
-
 // --

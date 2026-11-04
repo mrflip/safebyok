@@ -7,6 +7,7 @@ import { outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type VaultScope, vaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
+import { keyDeriverThrew, noPasskeyWayin, notAVerdict, notKeyBytes, otherPasskey, otherPrfSalt, strengthCheckerThrew, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../helpers/throwers'
 import { Lease } from './lease'
 import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, type WayinKind, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from './models-shapes'
 import { Wayin, wayinCtxOf } from './wayin'
@@ -214,33 +215,4 @@ const passphraseKeyOf = async (keyDeriver: ProvingWorld['keyDeriver'], passphras
     keyBytes.fill(0)
   }
 }
-// --
-
-// == [Refusals]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, strengthCheckerThrew, notAVerdict, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
-
-const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
-
-const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', Phrases.WayinNotMadeYet)
-
-const wayinMadeAlready = (): VaultError => new VaultError('unexpected_error', Phrases.WayinMadeAlready)
-
-const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverThrew)
-
-const strengthCheckerThrew = (): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerThrew)
-
-const notAVerdict = (): VaultError => new VaultError('bad_option', Phrases.NotAVerdict)
-
-const weakPassphrase = (reason: string): VaultError => new VaultError('weak_passphrase', reason)
-
-const wrongPassphrase = (): VaultError => new VaultError('wrong_passphrase', Phrases.WrongPassphrase)
-
-const wrongPasskey = (): VaultError => new VaultError('wrong_passkey', Phrases.WrongPasskey)
-
-const noPasskeyWayin = (): VaultError => new VaultError('absent_wayin', Phrases.NoPasskeyWayin)
-
-const otherPasskey = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPasskey)
-
-const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPrfSalt)
-
-const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_deriver', Phrases.UnknownKeyDeriver)
 // --

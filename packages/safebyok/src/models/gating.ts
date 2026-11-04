@@ -5,6 +5,7 @@ import { type Outcome, bad, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { VaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
+import { attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../helpers/throwers'
 import type { AnyGating, ClearsForGatingkind, GatingKind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, VaultRecord, VaultWorld, WayinHeader } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Gate } from './gate'
@@ -211,25 +212,4 @@ const spendClears = (clears: unknown): void => {
     if (Object.prototype.toString.call(prfBytes) === '[object ArrayBuffer]') { new Uint8Array(prfBytes as ArrayBuffer).fill(0) }
   } catch { /* nothing left to spend */ }
 }
-// --
-
-// == [Refusals]: alreadyAsking, noRequestCleartext, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight
-
-export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
-
-const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrases.NoRequestCleartext)
-
-const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
-
-const clearsThrew = (): VaultError => new VaultError('unexpected_error', Phrases.ClearsThrew)
-
-const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)
-
-const gatingDeclined = (): VaultError => new VaultError('declined', Phrases.GatingDeclined)
-
-const lockedWhileAsking = (): VaultError => new VaultError('locked_while_asking', Phrases.LockedWhileAsking)
-
-const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)
-
-const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
 // --

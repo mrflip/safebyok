@@ -1,12 +1,11 @@
 import { type CipherCtxRecord, makeLifeTok } from '../crypto'
-import { VaultError } from '../errors'
-import { absentBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
 import * as VS from '../storage/vault-db-shapes'
+import { absentBoxError, recordForNewBox, undecodedWhisper } from '../helpers/throwers'
 import type { BoxListing } from './box-listing'
 import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
@@ -203,12 +202,4 @@ const parseJsonOrNull = (text: string): unknown => {
     return null
   }
 }
-// --
-
-// == [Refusals]: recordForNewBox, undecodedWhisper
-
-/** The refusal of a put that said only-if-new, handed a whole record. */
-const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
-
-const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --

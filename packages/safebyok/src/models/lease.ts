@@ -1,9 +1,8 @@
 import { consistent } from '../checks/validator'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
-import { VaultError } from '../errors'
 import { tattoo } from '../helpers'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
-import * as Phrases from '../phrases'
+import { damagedLease, leaseNotInForce, unopenedWhisper } from '../helpers/throwers'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseGrantArgs, leasePeekArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
 
 // == [Lease]
@@ -204,13 +203,4 @@ const uncacheForgotten = async (friend: LeaseFriend): Promise<void> => {
   const del = await friend.tryUncacheLease()
   if (! del.ok) { friend.logger.warn("This device's lease could not be erased: the next lease is written over it.", { call: 'Lease.peek', refusalkind: del.err.refusalkind }) }
 }
-// --
-
-// == [Refusals]: damagedLease, unopenedWhisper, leaseNotInForce
-
-const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
-
-const unopenedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UnopenedWhisper)
-
-const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --

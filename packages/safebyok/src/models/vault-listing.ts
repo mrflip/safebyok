@@ -8,10 +8,9 @@ import { type VaultScope, vaultScope } from '../shapes/scopes'
 import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { absentVaultError } from '../helpers/throwers'
+import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../helpers/throwers'
 import { BoxListing } from './box-listing'
 import { Listing } from './listing'
-import { alreadyAsking } from './gating'
 import { type AnyGating, type BoxesListed, type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from './models-shapes'
 import * as MSX from './models-shapes'
 import { cmpRevisions } from './storable'
@@ -187,11 +186,4 @@ const NothingListed: BoxesListed = Object.freeze({ boxes: [], damaged_records: [
 const vaultRowOf = (answer: Awaited<ReturnType<VaultDB['tryGetVault']>>) => (
   (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_records']) } : answer
 )
-// --
-
-// == [Refusals]: delOfOtherLife, vaultStoredDamaged
-
-const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
-
-const vaultStoredDamaged = ({ vaultlabel }: VS.DamagedVault): VaultError => new VaultError('damaged_record', Phrases.vaultStoredDamaged(vaultlabel))
 // --
