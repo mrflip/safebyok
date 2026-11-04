@@ -21,7 +21,7 @@ Contents:
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#no-second-ensure`
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`
-* **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`
+* **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`
 * **Words:** `#purpose-not-process`
 * **Reading the Coach:** `#a-fact-is-not-a-ruling`, `#dont-overstretch-a-request`
 
@@ -214,7 +214,7 @@ async build(record) {
 async put(patch, opts = {}) {
   const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = MSX.boxPutOpts.parse(opts)
   await this.ensurePuttable(timely)
-  const given = this.demandPuttable(patch, { ifAbsent, ifPresent })
+  const given = this.demandPuttable(patch, { ifPresent })
 ```
 
 **Gallant again:** the one parse sits where its result is used, so every route gets it and `build` has nothing left to do.
@@ -293,11 +293,20 @@ puttable(scoped, opts = {}) {
 demandPuttable(patch, choices) { /* parses the patch, then demands enabled, vault usable, whole */ }
 ```
 
-**Don't just delete these:** `#receiveNothing` and `buildOrReceive` carry a `demandEnabled`, which looks like this fault. They are
-the only enabled check after the `await` on a store's answer, so without them an answer arriving after `goodbye` builds into a
-disabled listing.
+**Enabled is a special guard:** one monkeywrench is enough. The code that ends a listing is synchronous: it disables the listing,
+disables every thing in it, and removes them, so nothing crosses it halfway. The one check after a store's answer is at the top of
+`deliver`, before it takes the answer's world.
 
-*Status: `puttable`, Fixed. `#receiveNothing`, `buildOrReceive`, Open: where that one check belongs.*
+```ts
+protected async deliver(answer) {
+  this.demandEnabled()
+  if (answer.world !== null) { this.world.takeWorld(answer.world) }
+```
+
+**Not this fault:** guards and ensures with the same body. `ensurePuttable`, `ensureUnsealable` and `ensureDeletable` all call
+`hydrate`, and `demandExposable` and `demandDeletable` match. Each is named for its call site, and they stay, by the Coach's decision.
+
+*Status: `puttable`, `deliver`, Fixed. `#receiveNothing` and `buildOrReceive` still carry a demand, Planned, Thread 4, with `fate`.*
 
 ## An ensure is for when you want a refresh `#no-second-ensure`
 
@@ -318,32 +327,8 @@ const { record, prior } = await this.#edit(given)
 this.demandPuttable(patch, choices)
 ```
 
-**Goofus again:** a `hydrate` that missed asked the world three times. Only the first carried the caller's bound, so the others
-overrode a looser `maxWorldMillis` with the default horizon: a test saw `[Infinity, undefined, undefined]`.
-
-```ts
-// Storable
-readonly #oneFetchAtATime = oneAtATime(() => this.listing.fetch(this.scope, { ifAbsent: 'nil' }))   // ensures the world
-async hydrate(opts = {}) {
-  const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
-  await this.listing.ensureTimelyWorld(maxWorldMillis)
-  if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
-  return this.fetch({ ifAbsent: 'nil' })                                                            // ensures the world
-}
-```
-
-**Gallant again:** each entry point ensures once, and what it calls leaves the world as it stands.
-
-```ts
-// Storable
-readonly #oneFetchAtATime = oneAtATime(() => this.listing.fetchRow(this.scope))
-async hydrate(opts = {}) {
-  const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
-  await this.listing.ensureTimelyWorld(maxWorldMillis)
-  if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
-  return this.#fetchRow()
-}
-```
+**Not this fault:** `fetch` and `hydrate` check the world again at each step, on the way to storage. A check that is timely costs
+nothing, and the one cost is that a caller's looser `maxWorldMillis` can still earn a refresh. We leave them.
 
 *Status: Fixed.*
 
@@ -367,8 +352,19 @@ protected demandNotHeld(scope) {
 **Gallant:** delete it. A `create` over a live box refuses `camped`, and over a stored, unlisted box `stale_write`, each with
 the row that was in the way.
 
-*Status: `demandNotHeld`, Fixed. `VaultListing.demandBirthSlot` throws the same refusal, which may be there to spare a passphrase
-dialog that could only fail: Open.*
+**Goofus again:** `demandPuttable` refused a held tombstone under `ifAbsent: 'fail'`, though the vaultDB is told `ifAbsent` too. Over a box
+reborn elsewhere, the local check said absent, where the vaultDB's `stale_write` delivers the frontier.
+
+```ts
+if (ifAbsent === 'fail') { this.demandPresent() }
+```
+
+**Gallant again:** delete it, and the vaultDB's `absent_box` or `stale_write` answers.
+
+**Not this fault:** a birth's refusal of a vault held. No backend is asked yet: it spares the user a passphrase dialog and a KDF that
+could only fail.
+
+*Status: Fixed.*
 
 ## The impossible is one line `#impossible-is-a-crash`
 
@@ -571,8 +567,9 @@ const record = this.isTombstoneRecord(prior)
   : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
 ```
 
-*Status: `deliver`, `BoxListing.get`, `receive`, `#edit`, Fixed. `Storable.fetch` keeps its own `ifAbsent` test, as it answers the thing
-rather than found-or-null: Open.*
+**Not this fault:** `Storable.fetch` keeps its own `ifAbsent` test, as it answers the thing rather than found-or-null.
+
+*Status: `deliver`, `BoxListing.get`, `receive`, `#edit`, Fixed.*
 
 ## Use what you parsed `#use-what-you-parse`
 
@@ -701,7 +698,62 @@ settle() {
 
 **Gallant again:** `settle` and `receive` answer nothing, and `Settled.badnews` goes.
 
-*Status: the whisper, Planned, Thread 1b. `Settled.badnews`, Planned, Thread 4.*
+**Goofus a third time:** a one-line precondition spread across three methods and a listing verb with a birth-only name.
+
+```ts
+// Vault.launchBirth
+const prior = listing.demandBirthSlot(checked) ?? VS.VoidRevision
+
+// VaultListing
+demandBirthSlot(scope) {
+  this.demandEnabled()
+  const held = this.at(scope)
+  if (held?.isPresent === true) { throw alreadyHeldError() }
+  return held
+}
+ensureVault(record, prior) { return this.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' }) }
+```
+
+**Gallant a third time:** the precondition sits where the birth starts, and the birth calls `put`.
+
+```ts
+// Vault.launchBirth
+listing.demandEnabled()
+const held = listing.at(checked)
+if (held?.isPresent === true) { throw alreadyHeldError() }
+const prior = VS.revisionOf(held ?? VS.VoidRevision)
+```
+
+*Status: the whisper, Planned, Thread 1b. `Settled.badnews`, Planned, Thread 4. `demandBirthSlot`, Fixed.*
+
+## A boolean says the positive `#say-the-positive`
+
+Every read of a negative boolean is a double negative, and guards read worst of all: `selfDestructPreventionDisabled`. A name that says
+what a guard doesn't check misleads too: when the vault's check is widened, widen `demandEnabled`, rather than add `demandUsable` beside it.
+
+**Goofus:**
+
+```ts
+#isDisabled = false
+if (! this.#isDisabled) { this.settle() }
+
+demandUsable(): this { return this.demandEnabled().demandPresent() }
+demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }     // the vault, holding logic about boxes
+```
+
+**Gallant:**
+
+```ts
+#isEnabled = true
+if (this.#isEnabled) { this.settle() }
+
+override demandEnabled(): this {
+  super.demandEnabled()
+  return this.demandPresent()
+}
+```
+
+*Status: Fixed.*
 
 ---
 
