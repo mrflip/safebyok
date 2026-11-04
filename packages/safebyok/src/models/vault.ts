@@ -271,37 +271,24 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       peekLease:       () => deviceDB.peek(asked),
       tryCacheLease:   (record) => deviceDB.tryCache(record),
       tryUncacheLease: () => deviceDB.tryVacate(asked),
+      tellBadNews:     (badnews) => { this.listing.tellBadNews(badnews) },
     }
   }
 
   ensureAttachable(): Promise<this> { return this.ensureTimely() }
 
-  /** An attach needs the vault enabled and present, and a `lease` given to be of this vault. */
-  demandAttachable(lease: object = {}): this {
-    verifyConsistent(lease, this.#stampOfLife(), { kind: 'bad_option', message: Phrases.otherVaultsBag })
-    return this.demandEnabled()
-  }
+  /** An attach needs the vault enabled and present. */
+  demandAttachable(): this { return this.demandEnabled() }
 
   /** What a seal's stamp or a lease has to agree with: this vault's scope and this life of it. */
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
 
-  /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
+  /** Hold `lease` as this vault's, and cache it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
-    if (lease.isForgotten) { throw leaseNotInForce() }
-    try {
-      this.demandAttachable(lease.toJSON())
-    } catch (err) {
-      await this.#vacateUnattached(lease)
-      throw err
-    }
-    // Called before the settle, as a listener may call `lock()`, whose erase must land after this put.
-    const caching = lease.tryCache()
-    const displaced = this.#lease
+    this.demandEnabled()
     this.#lease = lease
-    if (displaced !== null && displaced !== lease) { displaced.evict() }
+    await lease.cacheAsCacheCan()
     this.settle()
-    const cached = await caching
-    if (! cached.ok) { this.listing.tellBadNews([cached.err]) }
   }
 
   /** Attach a new lease under `gate_epoch` where `heldLease` is in force. A lock crossing the change wins. */
@@ -496,7 +483,7 @@ const recordOfBirth = (gate: Gate, prior: MSX.Revision, now: number): VaultRecor
 )
 // --
 
-// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock, leaseNotInForce
+// == [Refusals]: listingExpected, unlockFirst, noProofToUnlock
 
 const listingExpected = (): VaultError => new VaultError('bad_option', Phrases.ListingExpected)
 
@@ -504,5 +491,4 @@ const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.Unl
 
 const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
 
-const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --

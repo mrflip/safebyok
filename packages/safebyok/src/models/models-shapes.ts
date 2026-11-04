@@ -438,6 +438,8 @@ export const leaseFriend = objCheck(({ fn }) => ({
   peekLease:       fn<() => Promise<unknown>>(),
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
+  /** Tell the host what went wrong in a lease's cache put. */
+  tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 
 export type LeaseFriend = Z.infer<typeof leaseFriend>

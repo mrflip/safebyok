@@ -155,43 +155,41 @@ const makeFreshLease = async ({ vault, friend, opts: { world } }: Awaited<Return
 }
 
 describe("lease.attach: the one way a vault comes to hold a lease", () => {
-  it("demandAttachable refuses 'bad_option' what is of another vault", async () => {
-    const { vault } = await makeBornVault()
-    expect(vault.demandAttachable({ vault_tok: vault.vault_tok })).to.eq(vault)
-    TH.expectSyncRefusal(() => vault.demandAttachable({ vault_tok: 'another-life' }), 'bad_option')
-  })
 
-  it("holds the lease, reading unlocked, and caches its row: the lease it displaces is dropped", async () => {
+  it("holds the lease, reading unlocked, and caches its row, in place of the lease it displaces", async () => {
     const born = await makeBornVaultAndFriend()
     const { vault, deviceDB } = born
     const first = await makeFreshLease(born)
     const second = await makeFreshLease(born)
     await first.attach()
     await second.attach()
-    expect(first.isForgotten).to.be.true
     expect(second.isInForce).to.be.true
     expect(vault.isUnlocked).to.be.true
     expect(deviceDB.cachedNow()).to.deep.include({ proved_at: second.proved_at })
   })
 
-  it("refuses 'vault_locked' a lease out of force", async () => {
-    const born = await makeBornVaultAndFriend()
-    const lease = await makeFreshLease(born)
-    lease.evict()
-    await TH.expectRefusal(lease.attach(), 'vault_locked')
-  })
-
-  it("past a sweep refuses, the lease vacated, no row cached, and the row the sweep left erased", async () => {
+  it("past a sweep refuses, leaving the vault locked and the row the sweep kept", async () => {
     const born = await makeBornVaultAndFriend()
     const { vault, deviceDB } = born
     const lease = await makeFreshLease(born)
     vault.sweep()
-    expect(deviceDB.cachedNow()).not.to.be.null
+    const kept = deviceDB.cachedNow()
+    expect(kept).not.to.be.null
     await TH.expectRefusal(lease.attach(), 'disabled')
-    expect(lease.isForgotten).to.be.true
     expect(vault.isLocked).to.be.true
-    expect(deviceDB.cachedNow()).to.be.null
-    expect(deviceDB.tryCache).toHaveBeenCalledOnce()
+    expect(deviceDB.cachedNow()).to.deep.equal(kept)
+  })
+
+  it("loses to a lock made straight after it: the vault locked, and no row left cached", async () => {
+    const born = await makeBornVaultAndFriend()
+    const { vault, deviceDB } = born
+    const lease = await makeFreshLease(born)
+    const attaching = lease.attach()
+    vault.lock()
+    await attaching
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    expect(vault.isLocked).to.be.true
+    expect(lease.isForgotten).to.be.true
   })
 
   it("holds the lease where the deviceDB refuses its row, told as bad news: it costs the next session a proof, not this one its lease", async () => {

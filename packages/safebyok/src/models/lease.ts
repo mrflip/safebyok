@@ -75,7 +75,7 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Taking hold]: attach, cache, tryCache
+  // == [Taking hold]: attach, cache, tryCache, cacheAsCacheCan
 
   /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. */
   async attach(): Promise<void> { await this.#friend.attachLease(this) }
@@ -87,6 +87,12 @@ export class Lease implements LeaseStamp {
   }
 
   tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
+
+  /** Cache this lease if it can. A refusal is bad news: it costs the next session a proof, not this one its lease. */
+  async cacheAsCacheCan(): Promise<void> {
+    const cached = await this.tryCache()
+    if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
+  }
   // --
 
   // == [Ending one]: vacate, tryVacate, evict, isForgotten, isInForce
