@@ -193,7 +193,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
 export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
 
 /** A host's patch for `put`: one or both {@link BoxHalves}, the other kept; any other prop of the box's record is ignored. */
-export type BoxPatch = Z.input<typeof boxPatch>
+export type BoxPatch = Omit<Z.input<typeof boxPatch>, keyof BoxHalves> & { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined }
 
 /** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
 export type BoxPut = BoxPatch & { boxlabel: string }
@@ -560,7 +560,7 @@ export type BoxWorld = ListingWorld & {
 }
 
 /** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
-export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper?: WhisperHolder, sidecar?: Sidecar }
+export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<BoxHalves>
 
 export type BoxListingOpts = ListingOpts & { world: BoxWorld }
 // --

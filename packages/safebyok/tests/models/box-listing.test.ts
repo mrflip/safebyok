@@ -226,7 +226,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
 
   it("ignores the props the factory controls: the box is born alive, in the world's vault, at revision 0, under the clock's time", async () => {
     held.mw.setNow(T0 + 5000)
-    const box = await boxListingOf(held.mw).create({ ...dna(), am: 'x' as never, vault_tok: 'vault-tok-other', box_tok: 'box-tok-given', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
+    const box = await boxListingOf(held.mw).create({ ...dna(), am: 'x', vault_tok: 'vault-tok-other', box_tok: 'box-tok-given', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
     expect(box.am).to.eq('a')
     expect(box.box_tok).to.be.a('string').and.not.eq('box-tok-given')
     expect(box.isPresent).to.be.true
@@ -237,7 +237,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
   })
 
   it("refuses a revision_seq in the dna, as the factory has none to give", async () => {
-    await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), revision_seq: 3 }), 'bad_option')
+    await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), revision_seq: 3 } as never), 'bad_option')
   })
 
   it("gives each box born a box_tok of its own, its birthday gift", async () => {
