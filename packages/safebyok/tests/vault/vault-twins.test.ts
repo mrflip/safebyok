@@ -10,9 +10,6 @@ import { makeWorld, vaultWithPasskey, u1VaultScopepath, storedVaultRecordOf } fr
 /** Every call that comes in two forms, by its throwing name. */
 type TwinName = 'hello' | 'ensureUnlocked' | 'lock' | 'putWayin' | 'delWayin' | 'putBox' | 'getBox' | 'getWhisper' | 'delBox' | 'del'
 
-/** A vault's calls by name, each taking any arguments: how a table row reaches either form. */
-type CallsByName = Record<string, (...args: unknown[]) => Promise<unknown>>
-
 /**
  * A vault unlocked with `pw`, holding the box `anthropic` and the passkey `laptop`: a vault every
  * pair can be both refused and answered on.
@@ -57,6 +54,9 @@ const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unkn
 
 /** `callname`'s two forms on `vault`: its `try` form and its throwing one. */
 const twinsOf = (vault: Vault, callname: TwinName) => {
+  /** A vault's calls by name, each taking any arguments: how a table row reaches either form. */
+  type CallsByName = Record<string, (...args: unknown[]) => Promise<unknown>>
+
   const calls = vault as unknown as CallsByName
   const tryCall = calls[`try${callname[0]!.toUpperCase()}${callname.slice(1)}`]!.bind(vault) as (...args: unknown[]) => Promise<Outcome<unknown>>
   return { tryCall, call: calls[callname]!.bind(vault) }

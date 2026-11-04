@@ -17,8 +17,6 @@ const AutolockMillis = AutolockMinutes * 60_000
 
 const OtherBag = Object.freeze({ vaultlabel: 'other' })
 
-type Vacating = Awaited<ReturnType<typeof makeBankWithVault>>
-
 const labelsOf = ({ vaults }: BankSnapshot): string[] => vaults.map(({ vaultlabel }) => vaultlabel)
 
 /** A lease row of this bank, as `world`'s one cached row but under `vaultlabel` and another life, proved long before the clock's first reading. */
@@ -576,6 +574,8 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
 })
 
 describe("a bank past a vacate", () => {
+  type Vacating = Awaited<ReturnType<typeof makeBankWithVault>>
+
   it.each([
     ['a plain vacate', ({ bank }: Vacating) => { bank.vacate() }],
     ['identity_revoked', async ({ world, vault }: Vacating) => {

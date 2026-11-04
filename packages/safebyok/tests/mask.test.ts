@@ -48,9 +48,9 @@ const randomCodePoints = (count: number, seed: number): string => {
   return Array.from({ length: count }, () => String.fromCodePoint(next() % 0x11_00_00)).join('')
 }
 
-type MaskCase = readonly [whisper: string, opts: MaskOpts | undefined, expected: string, blurb: string]
-
 describe("mask", () => {
+  type MaskCase = readonly [whisper: string, opts: MaskOpts | undefined, expected: string, blurb: string]
+
   const Cases: readonly MaskCase[] = [
     // the doc block's examples:
     ["sk-ant-api03-abcdefghijklmnopqrstuvwxyz", undefined,             "sk***...***wxyz",  'a long key collapses to its ends around ***...***'],
