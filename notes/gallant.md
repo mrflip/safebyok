@@ -19,7 +19,7 @@ Contents:
 
 * **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#no-second-ensure`
-* **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`
+* **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`
 * **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`
 * **Words:** `#purpose-not-process`
@@ -450,6 +450,54 @@ refused put on a box stored but not listed, `get` can say absent until the horiz
 const held = this.at(scoped)
 if (held === null) { return this.fetch(scoped, opts) }
 ```
+
+*Status: Fixed.*
+
+## Normal operations don't do repairs `#no-repair-in-normal-ops`
+
+Normal operations don't perform repairs or remediation when the system is in an incoherent state. A repair gets its own narrow
+verb, which looks only at what's broken and refuses otherwise.
+
+**Goofus:** `delBox` that also deletes a damaged row, if it finds one.
+
+```ts
+async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
+  const timely = MSX.timelyOpts.parse(opts)
+  const boxes = this.boxListing
+  const scope = boxes.scopeOf({ ...this.scope, boxlabel })
+  this.demandUnlocked()
+  const held = boxes.at(scope)
+  if (held !== null) { return held.del(timely) }
+  await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
+  return boxes.del(boxes.damagedAt(scope) ?? VS.sentinelBoxOf(scope, this.vault_tok))
+}
+```
+
+**Gallant:** `delBox` treats a damaged row as missing. `tryDelDamagedBox` looks only in the damaged rows, and refuses if the
+box is healthy or not listed. It has only the try form, which says so.
+
+```ts
+async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
+  /* ... as above ... */
+  return boxes.del(VS.sentinelBoxOf(scope, this.vault_tok))
+}
+
+tryDelDamagedBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> {
+  return outcomeOf(async () => { // this method does not offer a throwing (delDamagedBox) form
+    const timely = MSX.timelyOpts.parse(opts)
+    const boxes = this.boxListing
+    const scope = boxes.scopeOf({ ...this.scope, boxlabel })
+    this.demandUnlocked()
+    await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
+    const damaged = boxes.damagedAt(scope)
+    if (damaged === null) { throw absentDamagedBoxError(scope) }
+    return boxes.del(damaged)
+  })
+}
+```
+
+The two aren't DRYed: each is short, and they should be free to differ. A damaged row with no readable revision is the one
+exception today: storage can't tell `delBox`'s sentinel from it, which Thread 3 owns.
 
 *Status: Fixed.*
 
