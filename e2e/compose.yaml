@@ -16,7 +16,7 @@ services:
   # tests/postgres/ is postgres://postgres@127.0.0.1:54320/postgres. The role is a superuser, as
   # the tests make a database of their own for each file.
   postgres:
-    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    image: postgres:18@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
