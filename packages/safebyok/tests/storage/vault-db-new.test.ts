@@ -50,6 +50,14 @@ const storeWith = async (opts: { box?: boolean } = {}) => {
   return { vaultDB, vault, box }
 }
 
+/** A box deleted, and the rebirth that would stand on its tombstone. */
+const withBoxTombstone = async () => {
+  const { vaultDB, vault, box } = await storeWith({ box: true })
+  const tombstone = boxTombstoneOf(box)
+  await vaultDB.delBox(tombstone, { prior: priorOf(box) })
+  return { vaultDB, vault, tombstone, reborn: boxAt(tombstone.revision_seq + 1, 'life1', { box_tok: 'box2' }) }
+}
+
 describe("MemoryVaultDB", () => {
   describe("getBank", () => {
     it("answers gotvoid over a bank with no vaults, its world the scope", async () => {
@@ -297,6 +305,89 @@ describe("MemoryVaultDB", () => {
       expect(full).to.deep.include({ ok: false, act: 'vault_full' })
       expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
       expect(full.req_params).to.include({ boxlabel: 'other' })
+    })
+  })
+
+  describe("what a put hears, by the row it finds and its ifAbsent and ifPresent", () => {
+    const anyIfPresent = ['repl', 'fail', 'get'] as const
+    const anyIfAbsent  = ['add', 'fail'] as const
+
+    it.each(anyIfPresent)("refuses absent_box over a void box row with ifAbsent fail and ifPresent %s", async (ifPresent) => {
+      const { vaultDB, vault, box } = await storeWith()
+      expect(await vaultDB.tryPutBox(box, { prior: VS.VoidRevision, ifAbsent: 'fail', ifPresent })).to.deep.include({ ok: false, act: 'void', dbhas: null, world: vault })
+      expect(vaultDB._cheat_boxRowsOf(boxscope, 'life1').size).to.eq(0)
+    })
+
+    it.each(anyIfPresent)("refuses absent_box over a box tombstone with ifAbsent fail and ifPresent %s, at its revision or not", async (ifPresent) => {
+      const { vaultDB, vault, tombstone, reborn } = await withBoxTombstone()
+      for (const prior of [priorOf(tombstone), { ...stale, revision_seq: reborn.revision_seq - 1 }]) {
+        const answer = await vaultDB.tryPutBox(reborn, { prior, ifAbsent: 'fail', ifPresent })
+        expect(answer).to.deep.include({ ok: false, act: 'gone', dbhas: tombstone, world: vault })
+        expect(isVaultError(answer.err, 'absent_box')).to.be.true
+      }
+    })
+
+    it.each(anyIfAbsent)("refuses camped over a live box with ifAbsent %s and ifPresent fail, at its revision or not", async (ifAbsent) => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      expect(await vaultDB.tryPutBox(boxAt(1), { prior: priorOf(box), ifAbsent, ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: box, world: vault })
+      expect(await vaultDB.tryPutBox(boxAt(8), { prior: stale, ifAbsent, ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: box, world: vault })
+    })
+
+    it.each(anyIfAbsent)("answers declined with the live box under ifAbsent %s and ifPresent get, at its revision or not", async (ifAbsent) => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      expect(await vaultDB.putBox(boxAt(1), { prior: priorOf(box), ifAbsent, ifPresent: 'get' })).to.deep.include({ act: 'declined', val: box, world: vault })
+      expect(await vaultDB.putBox(boxAt(8), { prior: stale, ifAbsent, ifPresent: 'get' })).to.deep.include({ act: 'declined', val: box, world: vault })
+    })
+
+    it.each(anyIfAbsent)("replaces a live box at its revision under ifAbsent %s and ifPresent repl, and refuses stale_write past it", async (ifAbsent) => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      const next = boxAt(1)
+      expect(await vaultDB.tryPutBox(boxAt(8), { prior: stale, ifAbsent, ifPresent: 'repl' })).to.deep.include({ ok: false, act: 'stale_write', dbhas: box, world: vault })
+      expect(await vaultDB.putBox(next, { prior: priorOf(box), ifAbsent, ifPresent: 'repl' })).to.deep.include({ act: 'replaced', val: next, world: vault })
+    })
+
+    it.each(anyIfPresent)("adds over a void box row or a tombstone at its revision under ifAbsent add and ifPresent %s", async (ifPresent) => {
+      const { vaultDB, vault, box } = await storeWith()
+      expect(await vaultDB.putBox(box, { prior: VS.VoidRevision, ifAbsent: 'add', ifPresent })).to.deep.include({ act: 'born', val: box, world: vault })
+      const { vaultDB: other, tombstone, reborn } = await withBoxTombstone()
+      expect(await other.putBox(reborn, { prior: priorOf(tombstone), ifAbsent: 'add', ifPresent })).to.deep.include({ act: 'reborn', val: reborn })
+    })
+
+    it.each(anyIfPresent)("refuses stale_write over a void box row or a tombstone a prior misses, under ifAbsent add and ifPresent %s", async (ifPresent) => {
+      const { vaultDB } = await storeWith()
+      expect(await vaultDB.tryPutBox(boxAt(8), { prior: stale, ifAbsent: 'add', ifPresent })).to.deep.include({ ok: false, act: 'stale_write', dbhas: null })
+      const { vaultDB: other, tombstone, reborn } = await withBoxTombstone()
+      const prior = { ...stale, revision_seq: reborn.revision_seq - 1 }
+      expect(await other.tryPutBox(reborn, { prior, ifAbsent: 'add', ifPresent })).to.deep.include({ ok: false, act: 'stale_write', dbhas: tombstone })
+    })
+
+    it("takes ifAbsent add by default, and refuses invalid_input for fetch's nil", async () => {
+      const { vaultDB, vault, box } = await storeWith()
+      expect(await vaultDB.tryPutBox(box, { prior: VS.VoidRevision, ifAbsent: 'nil' } as never)).to.deep.include({ ok: false, act: 'invalid_input' })
+      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault), ifAbsent: 'nil' } as never)).to.deep.include({ ok: false, act: 'invalid_input' })
+      expect(await vaultDB.putBox(box, { prior: VS.VoidRevision })).to.deep.include({ act: 'born' })
+    })
+
+    it.each(['fail', 'get'] as const)("refuses vault_empty over a void vault row and vault_gone over a tombstone, with ifAbsent fail and ifPresent %s", async (ifPresent) => {
+      const empty = new MemoryVaultDB()
+      const answer = await empty.tryPutVault(vaultAt(), { prior: VS.VoidRevision, ifAbsent: 'fail', ifPresent })
+      expect(answer).to.deep.include({ ok: false, act: 'vault_empty', dbhas: null })
+      expect(empty._cheat_vaultRowsOf(bankScope).size).to.eq(0)
+      const { vaultDB, vault } = await storeWith()
+      const tombstone = vaultTombstoneOf(vault)
+      await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
+      expect(await vaultDB.tryPutVault(vaultAt(2, 'life2'), { prior: priorOf(tombstone), ifAbsent: 'fail', ifPresent })).to.deep.include({ ok: false, act: 'vault_gone', dbhas: tombstone, world: tombstone })
+    })
+
+    it("over a live vault row, ifAbsent changes nothing: fail is camped and get is declined", async () => {
+      const { vaultDB, vault } = await storeWith()
+      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault), ifAbsent: 'fail', ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: vault })
+      expect(await vaultDB.putVault(vaultAt(1), { prior: priorOf(vault), ifAbsent: 'fail', ifPresent: 'get' })).to.deep.include({ act: 'declined', val: vault })
+    })
+
+    it("lands a gate verb, which takes no ifAbsent, over the live row it moves", async () => {
+      const { vaultDB, vault } = await storeWith()
+      expect(await vaultDB.tryRevokePasskey(paramsOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: true })
     })
   })
 

@@ -23,10 +23,11 @@ export const VaultFormat = 6001
 export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
 // --
 
-// == [Checkers]: amVals, ifAbsentVals, ifPresentVals, damagekindVals, Damagekind, DamagedVault, DamagedBox, am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
+// == [Checkers]: amVals, ifAbsentVals, putIfAbsentVals, ifPresentVals, damagekindVals, Damagekind, DamagedVault, DamagedBox, am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
 
 export const amVals = ['a', 'd', 'x'] as const
 export const ifAbsentVals = ['fail', 'nil'] as const
+export const putIfAbsentVals = ['add', 'fail'] as const
 export const ifPresentVals = ['repl', 'fail', 'get'] as const
 export const damagekindVals = ['format_mismatch', 'damaged_record'] as const
 
@@ -95,8 +96,9 @@ export const {
   const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null), passphrase_wayin: unk.optional() }).strict() }).strict()
 
   const ifAbsentOpts = obj({ ifAbsent: oneof(ifAbsentVals).default('fail') })
-  const putOpts = obj({ prior: revision, ifPresent: oneof(ifPresentVals).default('repl') })
-  const putVaultOpts = obj({ prior: revision, ifPresent: oneof(['fail', 'get']).default('fail') })
+  const putIfAbsent = oneof(putIfAbsentVals).default('add')
+  const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(ifPresentVals).default('repl') })
+  const putVaultOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(['fail', 'get']).default('fail') })
   const delOpts = obj({ prior: revision })
 
   const reqParams = obj({ applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, ...revision.shape, prior: revision }).partial()
@@ -135,6 +137,7 @@ export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseP
 export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
 export type IfPresent = typeof ifPresentVals[number]
+export type PutIfAbsent = typeof putIfAbsentVals[number]
 /** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_record`, anything else. */
 export type Damagekind = typeof damagekindVals[number]
 export type DamagedVault = VaultSparse & Readonly<{ damagekind: Damagekind }>
