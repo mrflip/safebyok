@@ -1005,11 +1005,38 @@ describe("storable.hydrate(opts): timeliness asks of the record in hand alone", 
 // --
 
 describe("Storable put guards: ensurePuttable, demandPuttable", () => {
-  it("demandPuttable answers the box while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
+  const Patch = { whisper: { val: 'sk-test-0000' } }
+
+  it("demandPuttable answers the patch as parsed while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
     const box = await builtBoxOf()
-    expect(box.demandPuttable()).to.eq(box)
+    expect(box.demandPuttable({ ...box.scope, sidecar: { note: 'sent' } })).to.deep.include({ sidecar: { note: 'sent' } })
     held.mw.setLockState('locked')
-    TH.expectSyncRefusal(() => box.demandPuttable(), 'vault_locked')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
+  })
+
+  it("demandPuttable refuses a bad patch first, 'bad_option' while locked and over a record not whole", async () => {
+    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
+    held.mw.setLockState('locked')
+    TH.expectSyncRefusal(() => box.demandPuttable({}), 'bad_option')
+    TH.expectSyncRefusal(() => box.demandPuttable({ ...Patch, boxlabel: 'openai_api_key' }), 'bad_option')
+  })
+
+  it("demandPuttable refuses 'disabled' before the lock, and the lock before a record not whole", async () => {
+    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'bad_option')
+    held.mw.setLockState('locked')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
+    box.vacate()
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'disabled')
+  })
+
+  it("demandPuttable takes a void record and a tombstone as whole", async () => {
+    const listing = boxListingOf(held.mw)
+    const shell = listing.puttable(held.mw.boxscope('anthropic_api_key'))
+    expect(shell.demandPuttable(Patch)).to.deep.include(Patch)
+    const tomb = await listing.build(held.mw.tombstoneBoxRecord({ boxlabel: 'openai_api_key' }))
+    expect(tomb.demandPuttable(Patch)).to.deep.include(Patch)
+    expect(held.mw.callsOf('get')).to.deep.equal([])
   })
 
   it("ensurePuttable refreshes and demands nothing: it resolves while locked, where put refuses", async () => {
@@ -1019,11 +1046,13 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
   })
 
-  it("put checks the patch before its guard, and ensures the guard once, before its seal", async () => {
+  it("put ensures once, before its seal, and a bad patch heard after that ensure puts nothing", async () => {
     const box = await builtBoxOf()
     const putGuard = vi.spyOn(Box.prototype, 'ensurePuttable')
     await TH.expectRefusal(box.put({}), 'bad_option')
-    expect(putGuard).not.toHaveBeenCalled()
+    expect(putGuard).toHaveBeenCalledOnce()
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+    putGuard.mockClear()
     await expect(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)
     expect(putGuard).toHaveBeenCalledOnce()
   })

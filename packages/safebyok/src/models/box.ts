@@ -84,11 +84,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  /** A put needs the box enabled and the vault present and unlocked, and no more: a box gone comes back to life. */
-  demandPuttable(): this {
+  /** The parsed `patch`, once it names this box, the box is enabled, the vault usable and the record whole. */
+  demandPuttable(patch: BoxPatch): BoxPatchGiven {
+    const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     this.demandEnabled()
     this.world.demandBoxesUsable()
-    return this
+    this.demandWhole()
+    return given
   }
 
   /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
@@ -144,11 +146,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seals `patch` over the record in hand and stores it, answering the box listed; a box gone comes back. */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
     const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = MSX.boxPutOpts.parse(opts)
-    const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     this.listing.puttable({ ...patch, ...this.scope }, { ifAbsent, ifPresent })
-    await this.ensurePuttable(timely); this.demandPuttable()
+    await this.ensurePuttable(timely); const given = this.demandPuttable(patch)
     const { record, prior } = await this.#edit(given)
-    this.demandPuttable()
+    this.demandPuttable(patch)
     return this.listing.put(record, { prior, ifAbsent, ifPresent })
   }
 

@@ -487,14 +487,19 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
     expect(box.revision_seq).to.eq(3)
   })
 
-  it("seals the sidecar given over a live box still sparse once hydrated", async () => {
+  it("fetches the full record of a box held sparse before its seal", async () => {
+    const box = await builtOf(sparseBoxRecord())
     held.mw.seedStore(fullBoxRecord())
+    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } })
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(box.sidecar).to.deep.equal({ account: 'home' })
+  })
+
+  it("refuses a live box still sparse once hydrated as 'bad_option', saying so, putting nothing", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
-    held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
-    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } })
-    expect(box.isFull).to.be.true
-    expect(box.sidecar).to.deep.equal({ account: 'home' })
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } }), 'bad_option')
+    expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("holds nothing that carries the whisper, in the record in hand or the snapshot", async () => {
@@ -592,7 +597,7 @@ describe("box.put(patch): a patch naming a half", () => {
       const box = await builtOf(fullBoxRecord())
       held.mw.clearCalls()
       await TH.expectRefusal(box.put(patch as unknown as BoxHalves), 'bad_option')
-      expect(held.mw.calls).to.deep.equal([])
+      expect(held.mw.callsOf('put')).to.deep.equal([])
     })
   }
 
@@ -701,7 +706,7 @@ describe("box.whisper and box.put: the whisper given as { val }", () => {
       const box = await builtOf(fullBoxRecord())
       held.mw.clearCalls()
       await TH.expectRefusal(box.put({ whisper: whisper as never, sidecar: {} }), 'bad_option')
-      expect(held.mw.calls).to.deep.equal([])
+      expect(held.mw.callsOf('put')).to.deep.equal([])
     })
   }
 
@@ -739,7 +744,6 @@ describe("box.whisper and box.put: the whisper given as { val }", () => {
 describe("Box and Storable entries: arguments checked first of all, before any guard (the Coach, 2026-10-31)", () => {
   const whisper = { val: 'sk-test-0000' }
   const BadArgCases = [
-    [(box: TestableBox) => box.put({ whisper, sidecar: [] as never }),                           'put with a sidecar that fails its check'],
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
     [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not take'],
     [(box: TestableBox) => box.hydrate({ maxMillisSinceRefresh: -1 }),                            'hydrate with opts out of range'],
@@ -758,6 +762,13 @@ describe("Box and Storable entries: arguments checked first of all, before any g
     })
   }
 
+  it("refuses put with a sidecar that fails its check as 'bad_option' while the vault is locked, putting nothing", async () => {
+    const box = await builtOf(fullBoxRecord())
+    held.mw.setLockState('locked')
+    await TH.expectRefusal(box.put({ whisper, sidecar: [] as never }), 'bad_option')
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+  })
+
   it("refuses subscribing anything but a function as 'bad_option'", async () => {
     const box = await builtOf(fullBoxRecord())
     TH.expectSyncRefusal(() => box.subscribe('call me' as never), 'bad_option')
@@ -773,7 +784,7 @@ describe("Box and Storable entries: arguments checked first of all, before any g
       expect(err.message).to.include('LOCKED is not a whisper: unseal or expose one first')
       expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
     }
-    expect(held.mw.calls).to.deep.equal([])
+    expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("refuses a put whose scope fields name another box as 'bad_option', naming them, putting nothing", async () => {
@@ -781,7 +792,7 @@ describe("Box and Storable entries: arguments checked first of all, before any g
     held.mw.clearCalls()
     const err = await TH.expectRefusal(box.put({ ...fullBoxRecord({ boxlabel: 'openai_api_key' }), whisper, sidecar: {} }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
-    expect(held.mw.calls).to.deep.equal([])
+    expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("refuses a put whose factory field fails its check as 'bad_option', naming it, though the field would be ignored", async () => {
@@ -815,13 +826,20 @@ describe("Box and Storable entries: arguments checked first of all, before any g
 })
 // --
 
-describe("box.put holds its patch to boxPatch first of all (the Coach, 2026-10-31)", () => {
+describe("box.put holds its patch to boxPatch before any demand (the Coach, 2026-10-31)", () => {
   it("refuses a patch that names neither half before it looks at the lock", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
-    held.mw.clearCalls()
     await TH.expectRefusal(box.put({}), 'bad_option')
-    expect(held.mw.calls).to.deep.equal([])
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+  })
+
+  it("refuses it after the one fetch its ensure asks of a box held sparse", async () => {
+    const box = await builtOf(sparseBoxRecord())
+    held.mw.seedStore(fullBoxRecord())
+    await TH.expectRefusal(box.put({}), 'bad_option')
+    expect(held.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("lays only the whisper and the sidecar of a full patch over the record, whatever else it carries", async () => {

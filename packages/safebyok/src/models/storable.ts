@@ -201,7 +201,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandFullProps, ensureDeletable, demandDeletable
+  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandWhole, demandFullProps, ensureDeletable, demandDeletable
 
   /** True past a sweep, a vacate or a delete, and from then on. */
   get isDisabled(): boolean { return this.#isDisabled }
@@ -211,6 +211,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
   demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
+
+  demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
 
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
