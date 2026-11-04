@@ -299,7 +299,7 @@ describe("Box snapshot", () => {
       })
     })
 
-    it("sent: the record put is the record in hand, so the sidecar and the revision are the put's", async () => {
+    it("put: the record put is the record in hand, so the sidecar and the revision are the put's", async () => {
       const box = await boxOf()
       held.mw.setNow(T0 + 500)
       await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
