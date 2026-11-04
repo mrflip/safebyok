@@ -421,6 +421,15 @@ describe("a void instance, then a put: no hello, no fetch", () => {
 })
 
 describe("vault.putBox over a live box", () => {
+  it("under ifAbsent 'fail' over a box deleted elsewhere, refuses 'absent_box' with the tombstone delivered", async () => {
+    const { next, box } = await nextUnlisted()
+    const elsewhere = await next.getBox(boxlabel)
+    const deleted = await elsewhere?.del()
+    await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'absent_box')
+    expect(box.isPresent).to.eq(false)
+    expect(box.revision_seq).to.eq(deleted?.revision_seq)
+  })
+
   const IfPresentCases = [
     [undefined, 'sk-test-0001', 'replaces it by default'],
     ['get',     'sk-test-0000', "resolves the box as stored under 'get', the patch discarded"],
