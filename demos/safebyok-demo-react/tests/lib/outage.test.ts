@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Scopepath, isVaultError, localVaultDB, memoryStore } from 'safebyok'
-import * as TH from 'safebyok/testing'
+import { Scopepath, isVaultError, localVaultDB, memoryStore } from 'safebyok-old'
+import * as TH from 'safebyok-old/testing'
 import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 
 const scope = TH.scopeOf('u1')

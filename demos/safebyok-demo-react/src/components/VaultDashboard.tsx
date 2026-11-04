@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { isVaultError } from 'safebyok'
+import { isVaultError } from 'safebyok-old'
 import { useBank, useListedVault, useVault, useVaultSnapshot } from 'safebyok-react'
-import { WhisperFieldAttributes } from 'safebyok/utils'
+import { WhisperFieldAttributes } from 'safebyok-old/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
 import { PsstModal } from './PsstModal'
-import type { BoxDamaged, BoxSparse, Sidecar, Whisper, VaultSnapshot } from 'safebyok'
+import type { BoxDamaged, BoxSparse, Sidecar, Whisper, VaultSnapshot } from 'safebyok-old'
 
 /**
  * Direct manipulation of the vault's boxes: add, view, edit, remove, use. The lines that

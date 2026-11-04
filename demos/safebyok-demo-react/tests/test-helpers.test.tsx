@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { localVaultDB, memoryStore, type Vault } from 'safebyok'
+import { localVaultDB, memoryStore, type Vault } from 'safebyok-old'
 import { tellKnockKnockJoke } from '../src/lib/anthropic'
 import * as TH from './test-helpers'
 

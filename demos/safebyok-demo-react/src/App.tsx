@@ -1,4 +1,4 @@
-import { browserOpts } from 'safebyok/browser'
+import { browserOpts } from 'safebyok-old/browser'
 import { BankProvider } from 'safebyok-react'
 import { KnockKnock } from './components/KnockKnock'
 import { SessionBar } from './components/SessionBar'

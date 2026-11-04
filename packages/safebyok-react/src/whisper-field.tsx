@@ -1,5 +1,5 @@
 import { useId, type ComponentPropsWithRef } from 'react'
-import { WhisperFieldAttributes } from 'safebyok/utils'
+import { WhisperFieldAttributes } from 'safebyok-old/utils'
 import { Messages } from './messages'
 import { useRevealToggle } from './reveal-toggle'
 

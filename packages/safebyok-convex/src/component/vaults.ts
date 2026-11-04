@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 import type { Infer } from 'convex/values'
-import { Expectations } from 'safebyok'
+import { Expectations } from 'safebyok-old'
 import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'

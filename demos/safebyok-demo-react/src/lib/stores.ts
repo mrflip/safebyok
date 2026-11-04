@@ -1,5 +1,5 @@
-import { domStore, memoryStore, type StringStore } from 'safebyok'
-import { inspectIdbDeviceDB } from 'safebyok/idb'
+import { domStore, memoryStore, type StringStore } from 'safebyok-old'
+import { inspectIdbDeviceDB } from 'safebyok-old/idb'
 import { idbVaultDB, inspectIdbVaultDB } from 'safebyok-indexeddb'
 import { OutageVaultDB, makeOutage } from './outage'
 

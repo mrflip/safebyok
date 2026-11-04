@@ -1,6 +1,6 @@
 import { zodToConvex, zodToConvexFields } from 'convex-helpers/server/zod4'
 import { v } from 'convex/values'
-import * as Safebyok from 'safebyok'
+import * as Safebyok from 'safebyok-old'
 import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 
 /** Convex validators for safebyok's stored records, each made from the core's Zod validator its doc block names by convex-helpers' `zodToConvex`.

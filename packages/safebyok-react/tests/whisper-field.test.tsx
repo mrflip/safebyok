@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { createRef, useState } from 'react'
 import { describe, expect, it } from 'vitest'
-import { WhisperFieldAttributes } from 'safebyok/utils'
+import { WhisperFieldAttributes } from 'safebyok-old/utils'
 import { WhisperField } from '../src/whisper-field'
 
 /** A host hearing the whisper as typed through onChange, as the field's first examples do, and showing how long it is. */

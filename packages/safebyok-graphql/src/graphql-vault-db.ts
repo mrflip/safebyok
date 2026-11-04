@@ -1,5 +1,5 @@
-import { Refusals, HostErrorSanitizer, VaultDB, VaultError, refusalKindVals } from 'safebyok'
-import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok'
+import { Refusals, HostErrorSanitizer, VaultDB, VaultError, refusalKindVals } from 'safebyok-old'
+import type { VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, StoredVault, VaultRecord, RefusalKind, RefusalMeta, VaultScope, VaultDraft } from 'safebyok-old'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultRecordFields, BoxSparseFields, BoxDamagedFields, BoxFields, ScopeFields, VaultTombstoneFields, recordOf, selectionOf } from './fields'
 

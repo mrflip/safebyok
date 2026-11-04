@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Scopepath, VaultError, localVaultDB, memoryStore } from 'safebyok'
+import { Scopepath, VaultError, localVaultDB, memoryStore } from 'safebyok-old'
 import { VaultDashboard } from '../../src/components/VaultDashboard'
 import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 import * as TH from '../test-helpers'

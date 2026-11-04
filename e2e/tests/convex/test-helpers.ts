@@ -3,10 +3,10 @@ import { defineTestApp } from 'convex-test'
 import { SafebyokComponent } from 'safebyok-convex/server'
 import type { GetUserId } from 'safebyok-convex/server'
 import { register } from 'safebyok-convex/test'
-import { boxOf, type FakeCiphered } from 'safebyok/testing'
+import { boxOf, type FakeCiphered } from 'safebyok-old/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-old/testing'
 
 /**
  * A host app as the README has it: no tables of its own, the component installed as `safebyok`,

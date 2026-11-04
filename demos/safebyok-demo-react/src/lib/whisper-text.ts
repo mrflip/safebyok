@@ -1,4 +1,4 @@
-import type { Whisper, WhisperJson } from 'safebyok'
+import type { Whisper, WhisperJson } from 'safebyok-old'
 
 /** A whisper as the UI prints it: strings bare, everything else as JSON. */
 export const showWhisper = (whisper: Whisper): string => (

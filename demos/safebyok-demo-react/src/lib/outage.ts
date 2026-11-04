@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type StoredVault, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok'
+import { VaultDB, VaultError, type VaultRecordExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type BoxDamaged, type BoxSparse, type StoredVault, type VaultTombstone, type VaultRecord, type VaultScope, type VaultDraft } from 'safebyok-old'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so

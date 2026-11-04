@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql'
-import { VaultError, storageTroubleOf, isVaultError } from 'safebyok'
-import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok'
+import { VaultError, storageTroubleOf, isVaultError } from 'safebyok-old'
+import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok-old'
 import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, in their `try` forms, the ones handing on records in place of those handing back summaries.

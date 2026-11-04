@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
-import { Scopepath } from 'safebyok'
+import { Scopepath } from 'safebyok-old'
 import { boxRange } from '../src/box-range'
 import * as TH from './test-helpers'
 

@@ -4,7 +4,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema'
 import { Client, cacheExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import type { GraphQLSchema } from 'graphql'
-import type { VaultDB, VaultDBOpts } from 'safebyok'
+import type { VaultDB, VaultDBOpts } from 'safebyok-old'
 import { VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import { graphqlVaultDB } from '../src/index'
@@ -12,7 +12,7 @@ import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 import type { ServedVaultDB } from '../src/server'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-old/testing'
 
 const made: { db?: Promise<PGlite> } = {}
 

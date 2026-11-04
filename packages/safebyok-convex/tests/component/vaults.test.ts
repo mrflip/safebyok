@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
-import { boxSparse, type GatedVaultRecord, memoryStore } from 'safebyok'
+import { boxSparse, type GatedVaultRecord, memoryStore } from 'safebyok-old'
 import * as TH from '../test-helpers'
 import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
 

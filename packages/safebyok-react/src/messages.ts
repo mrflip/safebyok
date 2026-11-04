@@ -7,7 +7,7 @@
  * it.
  */
 
-import type { GatingKind } from 'safebyok'
+import type { GatingKind } from 'safebyok-old'
 
 /** The locale the dialog formats its relative times in, and the language of every message here. */
 export const Locale = 'en'

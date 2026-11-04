@@ -1,5 +1,5 @@
 import { useRef, useSyncExternalStore } from 'react'
-import type { ChangePassphraseGating, DelPasskeyGating, DelVaultGating, Gating, PutPasskeyGating, Vault } from 'safebyok'
+import type { ChangePassphraseGating, DelPasskeyGating, DelVaultGating, Gating, PutPasskeyGating, Vault } from 'safebyok-old'
 import { useRoundFor } from './boundary'
 import { Messages } from './messages'
 import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'

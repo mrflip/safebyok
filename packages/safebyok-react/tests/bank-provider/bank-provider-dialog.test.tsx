@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Bank, isVaultError, type Vault, memoryDeviceDB, type Gating, type Outcome, type RequestCleartext, type VaultError } from 'safebyok'
+import { Bank, isVaultError, type Vault, memoryDeviceDB, type Gating, type Outcome, type RequestCleartext, type VaultError } from 'safebyok-old'
 import { useLayoutEffect } from 'react'
 import * as TH from '../test-helpers'
 import { BankProvider, useVault } from '../../src/bank-provider'

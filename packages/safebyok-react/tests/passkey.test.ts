@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type GateSparse, type PasskeyAnswer, type PasskeyWayinSparse, type PrfSalt, type VaultDB } from 'safebyok'
-import { fromB64, toB64 } from 'safebyok/utils'
+import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type GateSparse, type PasskeyAnswer, type PasskeyWayinSparse, type PrfSalt, type VaultDB } from 'safebyok-old'
+import { fromB64, toB64 } from 'safebyok-old/utils'
 import { askPasskey, createPasskey, passkeysAvailable } from '../src/passkey'
 import * as TH from './test-helpers'
 

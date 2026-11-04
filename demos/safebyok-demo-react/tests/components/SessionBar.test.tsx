@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, memoryStore, type RequestCleartext } from 'safebyok'
+import { VaultError, memoryStore, type RequestCleartext } from 'safebyok-old'
 import { BankProvider } from 'safebyok-react'
 import { SessionBar } from '../../src/components/SessionBar'
 import { createAuth } from '../../src/lib/auth'

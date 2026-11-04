@@ -1,5 +1,5 @@
-import { VaultError } from 'safebyok'
-import { ChangeBell } from 'safebyok/idb'
+import { VaultError } from 'safebyok-old'
+import { ChangeBell } from 'safebyok-old/idb'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
 import { inOneTransaction, settle, shelfOf } from './shelf'
 

@@ -8,12 +8,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSparse, type Vault, type VaultSnapshot } from 'safebyok'
-import { answering, asKind, heldDialog, scopeOf, settledVault, stateOf, type BornVaultOpts } from 'safebyok/testing'
+import { LeaseHours, VaultError, outcomeOf, type Gating, type GatingKind, type Outcome, type PasskeyAnswer, type PasskeyWayinSparse, type Vault, type VaultSnapshot } from 'safebyok-old'
+import { answering, asKind, heldDialog, scopeOf, settledVault, stateOf, type BornVaultOpts } from 'safebyok-old/testing'
 import type { PassphraseGating } from '../src/passphrase-modal'
-import { fromB64, toB64 } from 'safebyok/utils'
+import { fromB64, toB64 } from 'safebyok-old/utils'
 
-export * from 'safebyok/testing'
+export * from 'safebyok-old/testing'
 export * from './test-helpers-react'
 
 /**

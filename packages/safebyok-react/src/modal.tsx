@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import { ForeverMillis, MinuteMillis, HostErrorSanitizer, type Gating, type Outcome, type Vault } from 'safebyok'
+import { ForeverMillis, MinuteMillis, HostErrorSanitizer, type Gating, type Outcome, type Vault } from 'safebyok-old'
 import { attemptRefusalFlavor } from './attempt-refusals'
 import { Boundary, forBoundary, type BoundarySource } from './boundary'
 import { Doing, Locale, Messages } from './messages'

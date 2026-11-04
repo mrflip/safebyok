@@ -4,11 +4,11 @@ import { defineTestApp } from 'convex-test'
 import { defineSchema } from 'convex/server'
 import { v } from 'convex/values'
 import type { GenericValidator, Infer } from 'convex/values'
-import * as Safebyok from 'safebyok'
+import * as Safebyok from 'safebyok-old'
 import type {
   VaultRecordExpectation as CoreVaultRecordExpectation, VaultDelExpectation as CoreVaultDelExpectation, BoxGetExpectation as CoreBoxGetExpectation, BoxExpectation as CoreBoxExpectation,
   BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
-} from 'safebyok'
+} from 'safebyok-old'
 import * as CVX from '../../src/component/validators'
 import * as TH from '../test-helpers'
 

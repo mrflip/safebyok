@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import { memoryDeviceDB } from 'safebyok'
+import { memoryDeviceDB } from 'safebyok-old'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import * as TH from './test-helpers'

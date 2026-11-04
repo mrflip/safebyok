@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
-import { VaultError } from 'safebyok'
+import { VaultError } from 'safebyok-old'
 import { Boundary, forBoundary, useRoundFor } from '../src/boundary'
 import * as TH from './test-helpers'
 

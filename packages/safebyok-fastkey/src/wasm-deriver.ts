@@ -1,5 +1,5 @@
 import { argon2id } from 'hash-wasm'
-import { Argon2idWebV1, VaultError, checkSaltFits, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok'
+import { Argon2idWebV1, VaultError, checkSaltFits, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok-old'
 
 /** A frozen deriver of a spec already checked: Argon2idWebV1, or one parseKeyDeriverSpec passed. */
 const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => Object.freeze({

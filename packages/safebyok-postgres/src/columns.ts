@@ -1,4 +1,4 @@
-import type { BoxRecord, GateRecord, VaultRecord, VaultTombstone } from 'safebyok'
+import type { BoxRecord, GateRecord, VaultRecord, VaultTombstone } from 'safebyok-old'
 
 /** How one field is stored: `text` as given, `bigint` for a whole number, `jsonb` for an opaque structured value.
  * jsonb reorders keys, which is harmless for a Ciphered, a way in or a box's sidecar: safebyok

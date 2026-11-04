@@ -1,5 +1,5 @@
 import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
-import { Refusals } from 'safebyok'
+import { Refusals } from 'safebyok-old'
 
 /** The shelf is the one object store, `records` in the database `<dbName>:vault_db`, holding every row.
  * Its name is a stored contract, like the scopepaths: a vault already written is found there.

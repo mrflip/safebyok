@@ -1,4 +1,4 @@
-import type { RefusalKind } from 'safebyok'
+import type { RefusalKind } from 'safebyok-old'
 
 /** Every refusal safebyok's Convex functions throw, as the `kind` in a `ConvexError`'s `data`; the host's `getUserId` may throw them too.
  * Each is the `VaultError` kind of the same name. A failed expectation, and a box write with no

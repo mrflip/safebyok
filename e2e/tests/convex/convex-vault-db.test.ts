@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConvexReactClient } from 'convex/react'
 import { ConvexError } from 'convex/values'
-import { Bank, VaultError, memoryDeviceDB } from 'safebyok'
+import { Bank, VaultError, memoryDeviceDB } from 'safebyok-old'
 import * as TH from './test-helpers'
 import { convexVaultDB } from 'safebyok-convex'
 import type { ConvexVaultClient, SafebyokApi } from 'safebyok-convex'

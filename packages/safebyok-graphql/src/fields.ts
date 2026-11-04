@@ -1,4 +1,4 @@
-import type { BoxDamaged, BoxRecord, VaultRecord, VaultScope, VaultTombstone } from 'safebyok'
+import type { BoxDamaged, BoxRecord, VaultRecord, VaultScope, VaultTombstone } from 'safebyok-old'
 
 /** How one field crosses the wire: `plain`, as it is; `ciphered`, a Ciphered sent as its own two fields; or `gate`, a vault record's gate sent as its two ways in.
  * A plain field is text, a number, or a way in, opaque JSON. A gate may be null, for a novel vault.

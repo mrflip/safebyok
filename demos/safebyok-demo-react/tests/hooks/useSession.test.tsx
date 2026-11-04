@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { memoryStore } from 'safebyok'
+import { memoryStore } from 'safebyok-old'
 import { useSession } from '../../src/hooks/useSession'
 import { createAuth } from '../../src/lib/auth'
 
