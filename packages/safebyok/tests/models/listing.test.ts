@@ -223,6 +223,18 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
   })
 
+  describe("an answer arriving past the listing's end", () => {
+    it("refuses 'disabled', a refusal among them, its world not taken", async () => {
+      const listing = boxListingOf(held.mw)
+      held.mw.willGet(() => {
+        listing.vacate()
+        return held.mw.refusalOf(scopeOf(), new VaultError('not_permitted', "No."), 'a world')
+      })
+      await TH.expectRefusal(listing.fetch(scopeOf()), 'disabled')
+      expect(held.mw.callsOf('takeWorld')).to.deep.equal([])
+    })
+  })
+
   describe("a refusal met in delivering a record", () => {
     it("is thrown to a fetch, which cannot have the record it asked for: the box as it was, nothing told", async () => {
       const listing = boxListingOf(held.mw)

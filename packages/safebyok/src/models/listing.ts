@@ -187,6 +187,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** SLOPDOC: The pipeline every storage answer takes, from its world through the instance held to the caller. */
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>): Promise<ThingT | null> {
+    this.demandEnabled()
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (answer.ok) { return this.#deliverGood(answer) }
     const stored = (answer.dbhas ?? null) as VaultRow | BoxRow | null
