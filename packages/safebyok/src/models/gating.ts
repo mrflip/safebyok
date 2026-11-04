@@ -188,8 +188,9 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
     const { passphraseClear, passkeyClear } = checkedClears(MSX.vaultUnlockClears, clears)
     await vault.ensureUsable(MSX.Promptly); vault.demandUsable()
     const { gate } = vault
-    const proved = (passphraseClear === undefined) ? await PasskeyProving.buildStored(gate, passkeyClear!) : await PassphraseProving.buildStored(gate, passphraseClear, world)
-    return { proved }
+    if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
+    if (! passkeyClear) { throw new VaultError('unexpected_error', Phrases.ProofMissing) }
+    return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
   },
   replace_passphrase: async ({ vault, world }, clears) => {
     const { antePassphraseClear, nextPassphraseClear } = checkedClears(MSX.passphraseReplaceClears, clears)
