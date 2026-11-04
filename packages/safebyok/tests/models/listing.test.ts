@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
+import * as VS from '../../src/storage/vault-db-shapes'
 import * as TH from '../test-helpers'
 import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
+
+const sentinel = () => VS.sentinelBoxOf(held.mw.boxscope('anthropic_api_key'), held.mw.world.vault_tok)
 
 describe("listing.fetch(scope): nothing stored for a thing held alive", () => {
   it("refuses 'record_conflict' by the same-revision row same | gone | alive, the box as it was", async () => {
@@ -267,6 +270,24 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.badnews).to.deep.equal([])
     })
 
+  })
+
+  describe("a void row, delivered", () => {
+    it("builds an instance that is held, gone, and not in the snapshot", async () => {
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(sentinel())
+      expect(listing.things).to.deep.equal([box])
+      expect(box.isPresent).to.be.false
+      expect(listing.snapshot).to.deep.equal([])
+    })
+
+    it("is the same revision however often it comes, not one revision under two toks", async () => {
+      const listing = boxListingOf(held.mw)
+      const box = await listing.build(sentinel())
+      expect(await listing.build(sentinel())).to.eq(box)
+      expect(box.revision_tok).to.eq(VS.VoidRevisionTok)
+      expect(box.revision_seq).to.eq(VS.VoidRevisionSeq)
+    })
   })
 
   describe("one instance for each scope", () => {

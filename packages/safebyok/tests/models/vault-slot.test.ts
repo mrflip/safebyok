@@ -294,8 +294,8 @@ describe("building over a tombstone", () => {
 
   it("listing.ensureVault, nothing ever stored: lands over never stored", async () => {
     const { listing } = makeVaultWorld()
-    const record = await birthOver(VS.NeverStored)
-    const born = await listing.ensureVault(record, VS.NeverStored)
+    const record = await birthOver(VS.VoidRevision)
+    const born = await listing.ensureVault(record, VS.VoidRevision)
     expect(born.vault_tok).to.eq(record.vault_tok)
   })
 
@@ -324,7 +324,7 @@ describe("building over a tombstone", () => {
 describe("the entrypoints, handed rubble", () => {
   it("listing.ensureVault refuses a record that is no record, storing nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(listing.ensureVault({ garbage: true } as never, VS.NeverStored), 'bad_record')
+    await TH.expectRefusal(listing.ensureVault({ garbage: true } as never, VS.VoidRevision), 'bad_record')
     expect(storedNow()).to.be.null
   })
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
 import * as MSX from '../../src/models/models-shapes'
+import * as VS from '../../src/storage/vault-db-shapes'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import * as TH from '../test-helpers'
 
@@ -61,7 +62,7 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     holdsCases(MSX.revision, 'bad_record', [
       // good:
       [revision,                                   true,  'passes a tok and a seq'],
-      [{ ...revision, revision_seq: MSX.NeverStoredSeq }, true, 'passes the seq of a central never stored'],
+      [{ ...revision, revision_seq: MSX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
       [{ ...revision, am: 'a', extra: 1 },         true,  'passes a bag carrying more, stripping the rest'],
       // bad:
       [{ revision_seq: 1 },                        false, 'refuses a missing tok'],
@@ -141,7 +142,7 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
   })
 
-  describe("MSX.isTombstone and MSX.NeverStoredSeq", () => {
+  describe("MSX.isTombstone and MSX.VoidRevisionSeq", () => {
     it("tells a damaged or gone record from an alive one, whatever its form", () => {
       expect(MSX.isTombstone(gone)).to.be.true
       expect(MSX.isTombstone(ouch)).to.be.true
@@ -150,7 +151,16 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     })
 
     it("marks a central never stored with a seq below any a store puts", () => {
-      expect(MSX.NeverStoredSeq).to.be.lessThan(0)
+      expect(MSX.VoidRevisionSeq).to.be.lessThan(0)
+    })
+
+    it("passes the void row a sentinel makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
+      const scope = { applabel: 'testapp', user_id: 'u1', vaultlabel: 'default', boxlabel: 'anthropic_api_key' }
+      const sentinel = VS.sentinelBoxOf(scope, 'vault-tok-1')
+      expect(VS.boxTombstone.parse(sentinel)).to.deep.include({ ...VS.VoidRevision, box_tok: VS.VoidLifeTok, registered_at: VS.VoidTime, written_at: VS.VoidTime, am: 'x' })
+      expect(new Date(VS.VoidTime).toISOString()).to.eq('2008-08-08T08:08:08.777Z')
+      expect(VS.VoidRevisionTok).to.eq('00000000-0000-0000-0000-000000000000')
+      expect(VS.VoidLifeTok).to.eq('00000000-0000-0000-0000-000000000000')
     })
   })
 })

@@ -427,7 +427,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
 
     it("other | newer | full | never stored takes 'adopt': a box born elsewhere first is the one storage holds", () => {
-      const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.NeverStoredSeq, revision_tok: 'rev-never' }))
+      const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.VoidRevisionSeq, revision_tok: 'rev-never' }))
       const rcvd = fullBoxRecord({ revision_seq: 0, revision_tok: 'rev-b0', ...OtherLife })
       box.receive(rcvd)
       expect(box._cheat_central).to.deep.equal(rcvd)
@@ -438,8 +438,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
 
 describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with", () => {
-    const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.NeverStoredSeq, revision_tok: 'rev-never' }))
-    expect(box._cheat_central.revision_seq).to.eq(MSX.NeverStoredSeq)
+    const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.VoidRevisionSeq, revision_tok: 'rev-never' }))
+    expect(box._cheat_central.revision_seq).to.eq(MSX.VoidRevisionSeq)
     expectReceivedUnchanged(box, null, 'same')
   })
 

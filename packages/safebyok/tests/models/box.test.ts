@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { BoxProps, BoxSnapshot } from '../../src/models/box'
+import type { BoxHalves, BoxSnapshot } from '../../src/models/box'
 import type { BoxWorld } from '../../src/models/box-listing'
 import { type BoxRecord, type BoxSparse, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
@@ -582,7 +582,7 @@ describe("box.send(patch): a patch naming a half", () => {
     it(`refuses a send of ${blurb} as 'bad_option', putting nothing`, async () => {
       const box = await builtOf(fullBoxRecord())
       held.mw.clearCalls()
-      await TH.expectRefusal(box.send(patch as unknown as BoxProps), 'bad_option')
+      await TH.expectRefusal(box.send(patch as unknown as BoxHalves), 'bad_option')
       expect(held.mw.calls).to.deep.equal([])
     })
   }

@@ -181,7 +181,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
     if (! MSX.isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
-    const prior = listing.demandBirthSlot(checked) ?? VS.NeverStored
+    const prior = listing.demandBirthSlot(checked) ?? VS.VoidRevision
     return Gating.launch('build_vault', { listing, scope: checked, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
   }
 

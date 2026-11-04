@@ -100,7 +100,7 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer, ModelsWatch
 
-/** One call made to the world or the vaultDB, as {@link ModelsWorld.calls} logs it, in the order made. `priorRevisionTok` is null for a birth, over {@link VS.NeverStored}. */
+/** One call made to the world or the vaultDB, as {@link ModelsWorld.calls} logs it, in the order made. `priorRevisionTok` is null for a birth, over {@link VS.VoidRevision}. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'takeWorld',    world: unknown }
@@ -215,7 +215,7 @@ type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifPresent: 
 type DelCall = { scope: Boxscope, priorRevisionTok: string | null }
 
 /** The `revision_tok` a call goes over: null for a birth. */
-const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === VS.NeverStoredTok) ? null : revision_tok)
+const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === VS.VoidRevisionTok) ? null : revision_tok)
 
 /** A {@link MemoryVaultDB} whose box verbs and watch log each call, and answer what a test scripts in place of their own. */
 export class TestableVaultDB extends MemoryVaultDB {

@@ -11,7 +11,7 @@ import * as Phrases from '../phrases'
 import { type Outcome, outcomeOf } from '../outcome'
 import { reportToPlatform } from '../report-error'
 import type { Clock } from '../shapes/bank-opts'
-import { type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type Revision, type SparseBase, type Times, type Tombstone, IsListing, NeverStoredSeq } from './models-shapes'
+import { type Fetched, type FetchOpts, type IfAbsent, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type Revision, type SparseBase, type Times, IsListing } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'
 
@@ -188,7 +188,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   tryDel(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.del(duck)) }
   // --
 
-  // == [Delivering an answer]: deliver, buildOrReceive, makeThingOf, hold, neverStoredOf
+  // == [Delivering an answer]: deliver, buildOrReceive, makeThingOf, hold
 
   /** SLOPDOC: The pipeline every storage answer takes, from its world through the instance held to the caller. */
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>, ifAbsent?: IfAbsent): Promise<ThingT | null> {
@@ -244,7 +244,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const sparse = this.sparseOf(record)
     const vault_tok = this.vaultTokOfWorld()
     if (vault_tok !== null && sparse.vault_tok !== vault_tok) { throw new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth) }
-    return this.makeThing(this.#neverStoredOf(sparse))
+    return this.makeThing({ ...sparse, ...VS.VoidRevision, am: 'x' })
   }
 
   /** Hold `thing`, born here, under its scope, and make the listing's snapshot again on each change of the thing's. */
@@ -252,11 +252,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#things.set(this.scopepathOf(thing.scope), thing)
     thing.becomeNotifiable()
     thing.subscribe(() => { this.#remakeSnapshot() })
-  }
-
-  /** A central never stored: a tombstone at `NeverStoredSeq` under a new tok, of `sparse`'s props. */
-  #neverStoredOf(sparse: SparseT): Tombstone<SparseT> {
-    return { ...sparse, revision_tok: randomId(), revision_seq: NeverStoredSeq, am: 'x' }
   }
   // --
 
@@ -372,8 +367,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
 // == [Helpers]: priorOf, recordOfAnswer
 
-/** The revision a vaultDB verb goes over: `ante`'s, or never stored for none. */
-const priorOf = (ante: Revision | null): Revision => ((ante === null || ante.revision_seq === NeverStoredSeq) ? VS.NeverStored : VS.revisionOf(ante))
+/** The revision a vaultDB verb goes over: `ante`'s, or the void one for none. */
+const priorOf = (ante: Revision | null): Revision => ((ante === null) ? VS.VoidRevision : VS.revisionOf(ante))
 
 /** The record a good answer delivers: its `val`, or the tombstone in `dbhas` where it answers null; null for nothing stored, as a del's `void` is, whose `val` is a sentinel. */
 const recordOfAnswer = <RecordT, SparseT>(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>): Fetched<RecordT, SparseT> | null => {

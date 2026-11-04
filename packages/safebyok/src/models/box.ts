@@ -12,7 +12,7 @@ import { type BoxPatchGiven, type BoxRecord, type BoxSparse, type Fetched, type 
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
 
-// == [Record forms]: BoxSnapshot, BoxProps, BoxPatch, BoxPut
+// == [Record forms]: BoxSnapshot, BoxHalves, BoxPatch, BoxPut
 
 export type BoxSnapshot = Boxscope & Readonly<{
   revision_tok:  string
@@ -27,10 +27,10 @@ export type BoxSnapshot = Boxscope & Readonly<{
 }>
 
 /** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
-export type BoxProps = { whisper: WhisperHolder, sidecar: Sidecar }
+export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
 
-/** A host's patch for `send`: either of the {@link BoxProps} or both, the half left out being kept, and any other prop of the box's record, which the box controls and ignores, so `{ ...record, whisper, sidecar }` will do. `boxPatch` checks it. */
-export type BoxPatch = { [Prop in keyof BoxProps]?: BoxProps[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
+/** A host's patch for `send`: either of the {@link BoxHalves} or both, the half left out being kept, and any other prop of the box's record, which the box controls and ignores, so `{ ...record, whisper, sidecar }` will do. `boxPatch` checks it. */
+export type BoxPatch = { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
 
 /** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
 export type BoxPut = BoxPatch & { boxlabel: string }

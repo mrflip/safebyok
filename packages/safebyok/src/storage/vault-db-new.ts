@@ -51,7 +51,7 @@ export type Landing = { landed: boolean, ante: unknown }
 /** A box write's {@link Landing}, with the vault row as read in the same step. */
 export type BoxLanding = Landing & { vault: unknown }
 
-/** `prior` is the revision the row must stand at, void matching {@link VS.NeverStored}. With `mayReplaceLive` false, a live row stops the write whatever its revision. */
+/** `prior` is the revision the row must stand at, void matching {@link VS.VoidRevision}. With `mayReplaceLive` false, a live row stops the write whatever its revision. */
 export type PutTerms = { prior: Revision, mayReplaceLive: boolean }
 
 export type RowOfVault = { vaultlabel: string, vault: unknown }
