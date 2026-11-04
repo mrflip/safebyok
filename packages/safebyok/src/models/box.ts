@@ -67,26 +67,26 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
   // --
 
-  // == [Guards]: ensureReadyToUnsealWhisper, demandReadyToUnsealWhisper, ensureReadyToSend, demandReadyToSend, demandReadyToExpose
+  // == [Guards]: ensureUnsealable, demandUnsealable, ensureSendable, demandSendable, demandExposable
 
-  async ensureReadyToUnsealWhisper(opts: TimelyOpts = {}): Promise<this> {
+  async ensureUnsealable(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
-    return this.demandReadyToUnsealWhisper()
+    return this.demandUnsealable()
   }
 
   /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
-  demandReadyToUnsealWhisper(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
+  demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
-  async ensureReadyToSend(opts: TimelyOpts = {}): Promise<this> {
+  async ensureSendable(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
-    return this.demandReadyToSend()
+    return this.demandSendable()
   }
 
   /** A send needs the box enabled and the vault unlocked, and no more: a box gone is sent back to life. */
-  demandReadyToSend(): this { return this.demandEnabled().demandUnlocked() }
+  demandSendable(): this { return this.demandEnabled().demandUnlocked() }
 
   /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
-  demandReadyToExpose(): this { return this.demandEnabled().demandUnlocked() }
+  demandExposable(): this { return this.demandEnabled().demandUnlocked() }
   // --
 
   // == [The whisper]: whisper, extractWhisper, tryExtractWhisper, expose
@@ -100,14 +100,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   set whisper(whisper: WhisperHolder | LockedBag | null) {
     const forgets = (whisper === null) || Storable.isLockedFUBag(whisper)
     const exposed = forgets ? null : whisperHolder.parse(whisper)
-    if (! forgets) { this.demandReadyToExpose() }
+    if (! forgets) { this.demandExposable() }
     this.#exposed = exposed
     this.settle()
   }
 
   /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
-    await this.ensureReadyToUnsealWhisper(opts)
+    await this.ensureUnsealable(opts)
     return this.#unseal(this.demandFullProps())
   }
 
@@ -137,10 +137,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   async send(patch: BoxPatch, opts: SendOpts = {}): Promise<this> {
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
-    await this.ensureReadyToSend(timely)
+    await this.ensureSendable(timely)
     const ante = this.central
     const record = await this.#edit(given, ante)
-    this.demandReadyToSend()
+    this.demandSendable()
     await this.listing.put(record, ante, { ifPresent })
     return this
   }

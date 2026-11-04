@@ -62,7 +62,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   get fmt(): number { return this.central.fmt }
   // --
 
-  // == [The world of its boxes]: clock, lockState, isLocked, ensureTimely, demandReady, takeWorld
+  // == [The world of its boxes]: clock, lockState, isLocked, ensureTimely, demandUsable, takeWorld
 
   get clock(): Clock { return this.world.clock }
 
@@ -74,11 +74,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. */
   async ensureTimely(maxMillis?: number): Promise<this> {
     await this.hydrate({ maxMillisSinceRefresh: maxMillis })
-    return this.demandReady()
+    return this.demandUsable()
   }
 
   /** What every verb of a vault needs: the vault enabled and present. */
-  demandReady(): this { return this.demandEnabled().demandPresent() }
+  demandUsable(): this { return this.demandEnabled().demandPresent() }
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   takeWorld(world: unknown): void {
@@ -202,7 +202,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! this.isFull) { await this.fetch() }
     if (await this.#attachCachedLease()) { return this }
     if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
-    this.demandReadyToAttach()
+    this.demandAttachable()
     await Gating.launch('unlock_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ proved }) => this.#unlockByProof(proved) })
     return this
   }
@@ -229,7 +229,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lease]: leaseFriend, demandReadyToAttach, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
+  // == [The lease]: leaseFriend, demandAttachable, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
 
   /** All a lease or a proving hears of this vault, made once. */
   #leaseFriend(): LeaseFriend {
@@ -255,13 +255,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** An attach needs the vault enabled and present. */
-  demandReadyToAttach(): this { return this.demandReady() }
+  demandAttachable(): this { return this.demandUsable() }
 
   /** SLOPDOC: Holds `lease` as this vault's, in place of any it displaces, and caches it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
     if (lease.isForgotten) { throw leaseNotInForce() }
     try {
-      this.demandReadyToAttach()
+      this.demandAttachable()
     } catch (err) {
       await this.#vacateUnattached(lease)
       throw err
@@ -355,13 +355,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form, demandReadyForBoxes, ensureReadyForBoxes
+  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, each with its try form, demandBoxesUsable, ensureBoxesUsable
 
   /** Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. The first box call runs it; a host may run it sooner. */
   async hello(): Promise<this> {
     this.demandEnabled()
     const listed = await this.listing.fetchListed(this)
-    this.demandReady()
+    this.demandUsable()
     await this.boxListing.hello(listed)
     this.#isGreeted = true
     return this
@@ -373,9 +373,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
     const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
     const scope = this.#boxscopeOf(boxlabel)
-    const boxes = await this.#ensureReadyForBoxes()
+    const boxes = await this.#ensureBoxesUsable()
     const box = await (boxes.at(scope)?.hydrate(timely) ?? boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }))
-    this.demandReadyForBoxes()
+    this.demandBoxesUsable()
     if (box?.isPresent === true) { return box }
     if (ifAbsent === 'nil') { return null }
     throw boxes.absentRefusal(scope)
@@ -394,7 +394,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     verifyConsistent(named, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     const scope = this.#boxscopeOf(named.boxlabel)
-    const boxes = await this.#ensureReadyForBoxes()
+    const boxes = await this.#ensureBoxesUsable()
     const held = boxes.at(scope) ?? ((whisper === undefined) ? await boxes.fetch(scope, { ifAbsent: 'nil', maxWorldMillis: timely.maxWorldMillis }) : null)
     if (held !== null) { return held.send({ whisper, sidecar }, opts) }
     if (whisper === undefined) { throw noWhisperToKeep() }
@@ -408,7 +408,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const timely = MSX.timelyOpts.parse(opts)
     const scope = this.#boxscopeOf(boxlabel)
-    const boxes = await this.#ensureReadyForBoxes()
+    const boxes = await this.#ensureBoxesUsable()
     const held = boxes.at(scope)
     if (held !== null) { return held.del(timely) }
     await this.ensureTimely(timely.maxWorldMillis)
@@ -418,14 +418,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
 
   /** A box verb needs the vault present and unlocked. */
-  demandReadyForBoxes(): this { return this.demandReady().demandUnlocked() }
+  demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }
 
   /** The box listing, this vault having said hello. */
-  async #ensureReadyForBoxes(): Promise<BoxListing> {
-    this.demandReadyForBoxes()
+  async #ensureBoxesUsable(): Promise<BoxListing> {
+    this.demandBoxesUsable()
     if (! this.#isGreeted) {
       await this.hello()
-      this.demandReadyForBoxes()
+      this.demandBoxesUsable()
     }
     return this.boxListing
   }
@@ -437,7 +437,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The listing of this vault's boxes, made once, on first asking. */
   get boxListing(): BoxListing {
-    this.demandReady()
+    this.demandUsable()
     this.#boxListing ??= this.listing.boxListingOf(this)
     return this.#boxListing
   }

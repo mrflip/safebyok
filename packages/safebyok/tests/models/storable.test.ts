@@ -1004,17 +1004,17 @@ describe("storable.hydrate(opts): timeliness asks of the record in hand alone", 
 })
 // --
 
-describe("Storable send guards: ensureReadyToSend, demandReadyToSend", () => {
-  it("demandReadyToSend answers the box while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
+describe("Storable send guards: ensureSendable, demandSendable", () => {
+  it("demandSendable answers the box while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
     const box = await builtBoxOf()
-    expect(box.demandReadyToSend()).to.eq(box)
+    expect(box.demandSendable()).to.eq(box)
     held.mw.setLockState('locked')
-    TH.expectSyncRefusal(() => box.demandReadyToSend(), 'vault_locked')
+    TH.expectSyncRefusal(() => box.demandSendable(), 'vault_locked')
   })
 
   it("send checks the patch before its guard, and establishes the guard once", async () => {
     const box = await builtBoxOf()
-    const sendGuard = vi.spyOn(Box.prototype, 'ensureReadyToSend')
+    const sendGuard = vi.spyOn(Box.prototype, 'ensureSendable')
     await TH.expectRefusal(box.send({}), 'bad_option')
     expect(sendGuard).not.toHaveBeenCalled()
     await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)

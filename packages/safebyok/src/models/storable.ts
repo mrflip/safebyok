@@ -201,7 +201,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToDel, demandReadyToDel
+  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandFullProps, ensureDeletable, demandDeletable
 
   /** True past a sweep, a vacate or a delete, and from then on. */
   get isDisabled(): boolean { return this.#isDisabled }
@@ -221,13 +221,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return full
   }
 
-  async ensureReadyToDel(opts: TimelyOpts = {}): Promise<this> {
+  async ensureDeletable(opts: TimelyOpts = {}): Promise<this> {
     await this.hydrate(opts)
-    return this.demandReadyToDel()
+    return this.demandDeletable()
   }
 
   /** A delete needs the thing enabled and the vault unlocked, and no more: a thing gone is deleted again. */
-  demandReadyToDel(): this { return this.demandEnabled().demandUnlocked() }
+  demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
   // --
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
@@ -259,7 +259,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
-    await this.ensureReadyToDel(MSX.timelyOpts.parse(opts))
+    await this.ensureDeletable(MSX.timelyOpts.parse(opts))
     await this.listing.del(this)
     return this
   }

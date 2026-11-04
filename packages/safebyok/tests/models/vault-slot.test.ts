@@ -154,7 +154,7 @@ describe("an old instance, replaced by the very call it made", () => {
     await TH.expectRefusal(vault.fetch(), 'disabled')
     await TH.expectRefusal(vault.del(), 'disabled')
     expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
-    TH.expectSyncRefusal(() => vault.demandReadyToDel(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandDeletable(), 'disabled')
   })
 })
 
