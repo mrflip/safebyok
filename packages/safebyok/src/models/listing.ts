@@ -125,10 +125,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   get things(): readonly ThingT[] { return [...this.#things.values()] }
 
-  /** The instance of `record`, sparse, full or a tombstone, once it is delivered as a fetch's answer would be, and held; a thing already held under its scope receives it. Stores nothing. */
+  /** The instance of `record`, built or brought up to it, and held. Stores nothing. */
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
-    this.demandEnabled()
-    this.sparseOf(record)
     return this.buildOrReceive(record)
   }
   // --
@@ -225,10 +223,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The instance under the scope of `record`: built, brought up to it or replaced, by the record's fate. */
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
-    const held = this.at(this.scopeOf(record))
+    const sparse = this.sparseOf(record)
+    const held = this.at(this.scopeOf(sparse))
     const fate = (held === null) ? 'replace' : this.fateOver(held, record)
     if ((held !== null) && (fate === 'lose')) { return held }
-    const thing = ((fate === 'replace') ? null : held) ?? this.#makeThingOf(record)
+    const thing = ((fate === 'replace') ? null : held) ?? this.#makeThingOf(sparse)
     this.tellBadNews(thing.receive(record).badnews)
     if (thing !== held) {
       this.#hold(thing)
@@ -243,9 +242,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     verifyConsistent(this.scopeOf(record), scope, { kind: 'bad_record', message: Phrases.RecordOfOtherScope })
   }
 
-  /** SLOPDOC: A new instance for `record`, born of its sparse form so `receive` adopts it like any newer record. */
-  #makeThingOf(record: Fetched<RecordT, SparseT>): ThingT {
-    const sparse = this.sparseOf(record)
+  /** SLOPDOC: A new instance born of `sparse`, void, for `receive` to adopt its record like any newer one. */
+  #makeThingOf(sparse: SparseT): ThingT {
     const vault_tok = this.vaultTokOfWorld()
     if (vault_tok !== null && sparse.vault_tok !== vault_tok) { throw new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth) }
     return this.makeThing({ ...sparse, ...VS.VoidRevision, am: 'x' })
