@@ -213,7 +213,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async ensureUnlocked(): Promise<this> {
     await this.ensureTimely(); this.demandEnabled()
     if (this.isUnlocked) { return this }
-    if (! this.isFull) { await this.fetch() }
     if (await this.#attachCachedLease()) { return this }
     return this.unlock()
   }
