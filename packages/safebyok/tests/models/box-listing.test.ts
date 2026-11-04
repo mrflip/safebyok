@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
-import { type BoxDna, type BoxListingOpts, BoxListing } from '../../src/models/box-listing'
+import { BoxListing } from '../../src/models/box-listing'
 import * as MSX from '../../src/models/models-shapes'
+import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import * as VS from '../../src/storage/vault-db-shapes'
+import type { BoxDna, BoxListingOpts } from '../../src/models/models-shapes'
 
 const held = useModelsWorld()
 
@@ -64,25 +67,28 @@ describe("BoxListing", () => {
       expect(listing.snapshot[0]).to.include({ boxlabel: 'anthropic_api_key' })
     })
 
-    it("refreshes the world at each guard, puts once, and fetches nothing, then takes the world", async () => {
+    it("refreshes the world once, puts once, and fetches nothing, then takes the world", async () => {
       await boxListingOf(held.mw).create(dna())
-      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'ensureTimely', 'put', 'takeWorld'])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'put', 'takeWorld'])
     })
 
-    it("holds nothing where the put is refused with no record, and leaves the scope free for another create", async () => {
+    it("leaves a void box in the slot where the put is refused with no record, out of the snapshot, and the scope free for another create", async () => {
       const listing = boxListingOf(held.mw)
       held.mw.willPut(held.mw.staleWriteOf(scope(), undefined))
       await TH.expectRefusal(listing.create(dna()), 'stale_write')
-      expect(listing.at(scope())).to.be.null
+      const shell = listing.at(scope())
+      expect(shell?.isPresent).to.be.false
+      expect(listing.things).to.deep.equal([shell])
       expect(listing.snapshot).to.deep.equal([])
       const again = await listing.create(dna())
+      expect(again).to.eq(shell)
       expect(again.revision_seq).to.eq(0)
     })
 
-    it("holds what storage holds where the put meets it, delivered before 'stale_write' is thrown", async () => {
+    it("hears the vaultDB's 'camped' over a live row it does not hold, delivered before it is thrown", async () => {
       const listing = boxListingOf(held.mw)
       held.mw.seedStore(fullBoxRecord(stored))
-      await TH.expectRefusal(listing.create(dna()), 'stale_write')
+      await TH.expectRefusal(listing.create(dna()), 'camped')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 
@@ -90,7 +96,7 @@ describe("BoxListing", () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.create({ ...dna(), vaultlabel: 'another_vault' }), 'bad_scope')
       expect(listing.things).to.deep.equal([])
-      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal([])
     })
 
     it("refuses 'bad_scope' to answer for another vault's box, asking storage nothing", async () => {
@@ -104,17 +110,16 @@ describe("BoxListing", () => {
 
     it("refuses 'bad_record' a put of another vault's record, storing nothing", async () => {
       const listing = boxListingOf(held.mw)
-      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, null), 'bad_record')
+      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: VS.VoidRevision }), 'bad_record')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
-    it("refuses 'bad_option' a scope already held, sealing and storing nothing", async () => {
+    it("over a live box held hears the vaultDB's 'camped', the box held kept", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.create(dna())
-      held.mw.clearCalls()
-      await TH.expectRefusal(listing.create(dna()), 'bad_option')
-      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
+      await TH.expectRefusal(listing.create(dna()), 'camped')
       expect(listing.at(box.scope)).to.eq(box)
+      expect(box.revision_seq).to.eq(0)
     })
 
     it("fills the record's defaults beside the dna's scope: the format, the vault's tok, an empty sidecar, sealed", async () => {
@@ -221,7 +226,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
 
   it("ignores the props the factory controls: the box is born alive, in the world's vault, at revision 0, under the clock's time", async () => {
     held.mw.setNow(T0 + 5000)
-    const box = await boxListingOf(held.mw).create({ ...dna(), am: 'x' as never, vault_tok: 'vault-tok-other', box_tok: 'box-tok-given', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
+    const box = await boxListingOf(held.mw).create({ ...dna(), am: 'x', vault_tok: 'vault-tok-other', box_tok: 'box-tok-given', revision_tok: 'rev-given', registered_at: T0, written_at: T0 })
     expect(box.am).to.eq('a')
     expect(box.box_tok).to.be.a('string').and.not.eq('box-tok-given')
     expect(box.isPresent).to.be.true
@@ -232,7 +237,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
   })
 
   it("refuses a revision_seq in the dna, as the factory has none to give", async () => {
-    await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), revision_seq: 3 }), 'bad_option')
+    await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), revision_seq: 3 } as never), 'bad_option')
   })
 
   it("gives each box born a box_tok of its own, its birthday gift", async () => {
@@ -265,6 +270,160 @@ const heldBox = async () => {
   return { listing, box }
 }
 
+
+const Label = 'anthropic_api_key'
+
+describe("boxListing.puttable(scoped, opts)", () => {
+  it("makes one void box for a slot with nothing held, timely, in things and not the snapshot, asking storage nothing", () => {
+    const listing = boxListingOf(held.mw)
+    const shell = listing.puttable(held.mw.boxscope(Label))
+    expect(shell.isPresent).to.be.false
+    expect(shell.revision_seq).to.eq(VS.VoidRevisionSeq)
+    expect(shell.revision_tok).to.eq(VS.VoidRevisionTok)
+    expect(listing.things).to.deep.equal([shell])
+    expect(listing.snapshot).to.deep.equal([])
+    expect(listing.puttable(held.mw.boxscope(Label))).to.eq(shell)
+    expect(held.mw.calls).to.deep.equal([])
+  })
+
+  it("answers the box held, alive or deleted, as it stands", async () => {
+    const listing = boxListingOf(held.mw)
+    const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
+    const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
+    expect(listing.puttable(alive.scope)).to.eq(alive)
+    expect(listing.puttable(gone.scope)).to.eq(gone)
+  })
+
+  it("under ifAbsent 'fail', answers the box held, alive or deleted, and refuses an empty slot as 'absent_box', naming vault.hello", async () => {
+    const listing = boxListingOf(held.mw)
+    const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
+    const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
+    expect(listing.puttable(alive.scope, { ifAbsent: 'fail' })).to.eq(alive)
+    expect(listing.puttable(gone.scope, { ifAbsent: 'fail' })).to.eq(gone)
+    const scope = held.mw.boxscope('void_one')
+    const err = TH.expectSyncRefusal(() => listing.puttable(scope, { ifAbsent: 'fail' }), 'absent_box')
+    expect(err.message).to.eq(Phrases.boxNotListed(scope.boxlabel))
+    expect(err.message).to.contain('vault.hello')
+    expect(listing.at(scope)).to.be.null
+  })
+
+  it("refuses 'bad_scope' and a bad option, making no void box", () => {
+    const listing = boxListingOf(held.mw)
+    TH.expectSyncRefusal(() => listing.puttable({ ...held.mw.boxscope(Label), vaultlabel: 'mary' }), 'bad_scope')
+    TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label), { ifAbsent: 'nil' } as never), 'bad_option')
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("demands nothing of the vault, as only the put it prepares has side effects: that put refuses 'vault_locked'", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.setLockState('locked')
+    const shell = listing.puttable(held.mw.boxscope(Label))
+    await TH.expectRefusal(shell.put({ whisper: { val: 'sk-test-0000' } }), 'vault_locked')
+    expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
+  })
+
+  it("refuses 'disabled' once vacated", () => {
+    const listing = boxListingOf(held.mw)
+    listing.vacate()
+    TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label)), 'disabled')
+  })
+})
+
+describe("boxListing.create(dna, opts)", () => {
+  it("refuses a whole record as 'bad_option', storing nothing", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.create({ ...fullBoxRecord() }), 'bad_option')
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("refuses ifAbsent 'fail' as 'bad_option': a create that must find a box is not a create", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.create(dna(), { ifAbsent: 'fail' } as never), 'bad_option')
+    expect(listing.things).to.deep.equal([])
+  })
+
+  it("replaces a live box where told ifPresent 'repl', asking nothing first", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.create(dna())
+    held.mw.clearCalls()
+    await expect(listing.create(dna(), { ifPresent: 'repl' })).resolves.to.eq(box)
+    expect(box.revision_seq).to.eq(1)
+    expect(held.mw.callsOf('get')).to.deep.equal([])
+  })
+
+  it("answers its refusal through tryCreate as an Outcome", async () => {
+    const listing = boxListingOf(held.mw)
+    await listing.create(dna())
+    expect(await listing.tryCreate(dna())).to.deep.include({ ok: false })
+  })
+})
+
+describe("boxListing.get(scoped, opts)", () => {
+  it("hydrates a box held, answering that instance", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(sparseBoxRecord())
+    held.mw.seedStore(fullBoxRecord())
+    held.mw.clearCalls()
+    await expect(listing.get(box.scope)).resolves.to.eq(box)
+    expect(box.isFull).to.be.true
+    expect(held.mw.callsOf('get')).to.have.length(1)
+  })
+
+  it("asks nothing of a full box held within its horizon, and asks again given a horizon of 0", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(fullBoxRecord())
+    held.mw.seedStore(fullBoxRecord())
+    held.mw.clearCalls()
+    await listing.get(box.scope)
+    expect(held.mw.callsOf('get')).to.deep.equal([])
+    await listing.get(box.scope, { maxMillisSinceRefresh: 0 })
+    expect(held.mw.callsOf('get')).to.have.length(1)
+  })
+
+  it("fetches a box not held, and holds what it finds", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.seedStore(fullBoxRecord())
+    const box = await listing.get(held.mw.boxscope(Label))
+    expect(box?.isFull).to.be.true
+    expect(listing.at(held.mw.boxscope(Label))).to.eq(box)
+  })
+
+  it("refuses a box absent as 'absent_box', or answers null where asked for nil", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)), 'absent_box')
+    expect(await listing.get(held.mw.boxscope(Label), { ifAbsent: 'nil' })).to.be.null
+  })
+
+  it("refuses a box whose tombstone it finds as absent, or answers null where asked for nil", async () => {
+    const listing = boxListingOf(held.mw)
+    const box = await listing.build(tombstoneBoxRecord())
+    held.mw.seedStore(tombstoneBoxRecord())
+    await TH.expectRefusal(listing.get(box.scope), 'absent_box')
+    expect(await listing.get(box.scope, { ifAbsent: 'nil' })).to.be.null
+  })
+
+  it("answers the box stored while the vault is locked", async () => {
+    const listing = boxListingOf(held.mw)
+    held.mw.seedStore(fullBoxRecord())
+    held.mw.setLockState('locked')
+    const box = await listing.get(held.mw.boxscope(Label))
+    expect(box?.boxlabel).to.eq(Label)
+    expect(box?.isPresent).to.be.true
+  })
+
+  it("refuses 'bad_option' fed a put's ifAbsent, and 'disabled' once vacated", async () => {
+    const listing = boxListingOf(held.mw)
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label), { ifAbsent: 'add' } as never), 'bad_option')
+    listing.vacate()
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)), 'disabled')
+  })
+
+  it("tryGet answers the outcome", async () => {
+    const outcome = await boxListingOf(held.mw).tryGet(held.mw.boxscope(Label))
+    expect(outcome.ok).to.be.false
+  })
+})
 
 describe("BoxListing: an absent box", () => {
   describe("listing.fetch(scope) of nothing stored", () => {
@@ -405,7 +564,7 @@ describe("BoxListing: an absent box", () => {
       const record = fullBoxRecord({ ...stored, sidecar: { note: 'theirs' } })
       const stale = held.mw.staleWriteOf(box.scope, record)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box.revision_seq).to.eq(5)
       expect(box.isFull).to.be.true
       expect(box.sidecar).to.deep.equal({ note: 'theirs' })
@@ -415,7 +574,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, sparseBoxRecord(stored))
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box.revision_seq).to.eq(5)
       expect(box.isFull).to.be.false
       expect(box.sidecar).to.be.null
@@ -425,7 +584,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, tombstoneBoxRecord(stored))
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box.isPresent).to.be.false
     })
 
@@ -441,7 +600,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, undefined)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box._cheat_central.revision_seq).to.eq(1)
     })
 
@@ -449,14 +608,14 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, null)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
     })
 
     it("throws 'stale_write' with nothing delivered for a box_stored that fails its check", async () => {
       const { listing, box } = await heldBox()
       const stale = held.mw.staleWriteOf(box.scope, { junk: 1 } as never)
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(box, box), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(box._cheat_central.revision_seq).to.eq(1)
     })
 
@@ -464,7 +623,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(held.mw)
       const stale = held.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), null), 'stale_write')
+      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: VS.VoidRevision }), 'stale_write')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 
@@ -504,12 +663,12 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     expect(listing.snapshot[0]).to.include({ present: true, full: false, sidecar: null })
   })
 
-  it("follows the box through a send: the listing shows the sidecar `box.sidecar` now gives", async () => {
+  it("follows the box through a put: the listing shows the sidecar `box.sidecar` now gives", async () => {
     const listing = boxListingOf(held.mw)
     const record = fullBoxRecord({ sidecar: { uncle: 'Bob' } })
     held.mw.seedStore(record)
     const box = await listing.build(record)
-    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { uncle: 'Robert' } })
+    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { uncle: 'Robert' } })
     expect(box.sidecar).to.deep.equal({ uncle: 'Robert' })
     expect(listing.snapshot[0]?.sidecar).to.deep.equal({ uncle: 'Robert' })
   })
@@ -536,11 +695,11 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     expect(box.isFull).to.be.true
   })
 
-  it("refuses 'vault_locked' while the vault is locked, holding and sealing nothing", async () => {
+  it("refuses 'vault_locked' while the vault is locked, listing and sealing nothing", async () => {
     held.mw.setLockState('locked')
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.create({ ...dna(), whisper: { val: 'sk-test-0000' } }), 'vault_locked')
-    expect(listing.things).to.deep.equal([])
+    expect(listing.snapshot).to.deep.equal([])
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
@@ -580,27 +739,25 @@ describe("boxListing.create(dna): no secret material", () => {
 
 // == [A whisper and a sidecar at birth]: create, boxDna
 
-describe("boxListing.create(dna): a whisper and a sidecar, both required", () => {
+describe("boxListing.create(dna): a whisper and a sidecar, each defaulting", () => {
   const DnaCases = [
-    [{ whisper: undefined },                     ["whisper"],            'a whisper given as undefined'],
-    [{ sidecar: undefined },                     ["sidecar"],            'a sidecar given as undefined'],
-    [{ whisper: undefined, sidecar: undefined }, ["sidecar", "whisper"], 'neither'],
+    [{ whisper: undefined },                     'a whisper given as undefined'],
+    [{ sidecar: undefined },                     'a sidecar given as undefined'],
+    [{ whisper: undefined, sidecar: undefined }, 'neither'],
   ] as const
 
-  for (const [lacks, fieldnames, blurb] of DnaCases) {
-    it(`refuses a dna with ${blurb} as 'bad_option', naming the field, holding, saving and sealing nothing`, async () => {
-      const listing = boxListingOf(held.mw)
-      const err = await TH.expectRefusal(listing.create({ ...dna(), ...lacks } as unknown as BoxDna), 'bad_option')
-      expect(err.meta?.fieldnames).to.have.members([...fieldnames])
-      expect(listing.things).to.deep.equal([])
-      expect(held.mw.calls).to.deep.equal([])
+  for (const [lacks, blurb] of DnaCases) {
+    it(`makes a box present of a dna with ${blurb}`, async () => {
+      const box = await boxListingOf(held.mw).create({ ...dna(), ...lacks } as unknown as BoxDna)
+      expect(box.isPresent).to.be.true
+      expect(held.mw.callsOf('put')).to.have.lengthOf(1)
     })
   }
 
-  it("refuses a dna of the scope alone as 'bad_option'", async () => {
-    const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.create(held.mw.boxscope('anthropic_api_key') as unknown as BoxDna), 'bad_option')
-    expect(listing.things).to.deep.equal([])
+  it("makes a box present of a dna of the scope alone, its sidecar {}", async () => {
+    const box = await boxListingOf(held.mw).create(held.mw.boxscope('anthropic_api_key'))
+    expect(box.isPresent).to.be.true
+    expect(box.sidecar).to.deep.equal({})
   })
 })
 // --
@@ -637,12 +794,12 @@ describe("boxListing.create(dna): the whisper given as { val }", () => {
 
 // == [Arguments first]: every entry of BoxListing and Listing checks its arguments before any guard
 
-describe("BoxListing and Listing entries: arguments checked first of all, before any guard (the Coach, 2026-10-31)", () => {
+describe("BoxListing and Listing entries: arguments checked before any demand (the Coach, 2026-10-31)", () => {
   const BadDnaCases = [
     [() => undefined,                           'undefined'],
     [() => null,                                'null'],
     [() => 'anthropic_api_key',                 'a bare boxlabel'],
-    [() => ({ ...dna(), sidecar: undefined }),  'a dna with no sidecar'],
+    [() => ({ ...dna(), sidecar: 'note' }),     'a dna whose sidecar fails its check'],
     [() => ({ ...dna(), whisper: MSX.LOCKED }), 'a dna whose whisper is LOCKED'],
   ] as const
 
@@ -660,7 +817,7 @@ describe("BoxListing and Listing entries: arguments checked first of all, before
     const listing = boxListingOf(held.mw)
     held.mw.setLockState('locked')
     await TH.expectRefusal(listing.create(dna()), 'vault_locked')
-    expect(listing.things).to.deep.equal([])
+    expect(listing.snapshot).to.deep.equal([])
   })
 
   it("says LOCKED is no whisper, naming whisper, for a dna that hands it as the whisper", async () => {
@@ -683,7 +840,7 @@ describe("BoxListing and Listing entries: arguments checked first of all, before
 
   it("refuses at() a scope that fails its check as 'bad_scope'", () => {
     const listing = boxListingOf(held.mw)
-    TH.expectSyncRefusal(() => listing.at(undefined as never), 'bad_scope')
+    TH.expectSyncRefusal(() => listing.at(undefined), 'bad_scope')
     TH.expectSyncRefusal(() => listing.at({ ...held.mw.boxscope('anthropic_api_key'), boxlabel: 'B' }), 'bad_scope')
   })
 

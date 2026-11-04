@@ -2,28 +2,32 @@
 
 import type * as Z from 'zod'
 import { Checkers, objCheck } from '../checks/validator'
-import { FarPast } from '../consts'
 import { randomId } from '../crypto'
 import { sidecar } from '../shapes/box'
 import * as FX from '../shapes/fields'
 import * as HX from '../shapes/host-code'
 
-// == [Sentinels and formats]: NeverStoredTok, NeverStoredSeq, BoxFormat, VaultFormat, NeverStored
+// == [Sentinels and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
 
-/** The `revision_tok` a birth names as its prior: no populated row ever holds it. */
-export const NeverStoredTok = 'deadbeef-never-stored'
-/** The `revision_seq` a birth names as its prior: every populated row holds 0 or more. */
-export const NeverStoredSeq = -1
+/** The `revision_tok` of a void row, and of a birth's prior: no populated row ever holds it. */
+export const VoidRevisionTok = '00000000-0000-0000-0000-000000000000'
+/** The `revision_seq` of a void row, and of a birth's prior: every populated row holds 0 or more. */
+export const VoidRevisionSeq = -1
+/** The `box_tok` or `vault_tok` of a void row: no life ever minted holds it. */
+export const VoidLifeTok = '00000000-0000-0000-0000-000000000000'
+/** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, plain on sight. */
+export const VoidTime = 1_218_182_888_777
 export const BoxFormat = 5001
 export const VaultFormat = 6001
-/** What a void row matches: the prior of a birth over a row never stored. */
-export const NeverStored = { revision_tok: NeverStoredTok, revision_seq: NeverStoredSeq } as const
+/** The revision of a void row, and of a birth's prior. */
+export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
 // --
 
-// == [Checkers]: amVals, ifAbsentVals, ifPresentVals, damagekindVals, Damagekind, DamagedVault, DamagedBox, am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
+// == [Checkers]: amVals, ifAbsentVals, putIfAbsentVals, ifPresentVals, damagekindVals, Damagekind, DamagedVault, DamagedBox, am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
 
 export const amVals = ['a', 'd', 'x'] as const
 export const ifAbsentVals = ['fail', 'nil'] as const
+export const putIfAbsentVals = ['add', 'fail'] as const
 export const ifPresentVals = ['repl', 'fail', 'get'] as const
 export const damagekindVals = ['format_mismatch', 'damaged_record'] as const
 
@@ -36,7 +40,7 @@ export const {
 } = Checkers('invalid_input', ({ obj, lit, int, uint, num, unk, oneof, discrim, applabel, user_id, vaultlabel, boxlabel, epochMillis, revision_tok, vault_tok, box_tok, device_id, key_deriver_label, credential_id, salt_b64, prfSalt, vault_key_wayin_wrapped, box_key_wrapped, whisper_ciphered }) => {
   const revision = obj({
     revision_tok,
-    /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. {@link NeverStoredSeq} marks a row never stored. */
+    /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. */
     revision_seq: int,
   })
   const am = oneof(amVals)
@@ -92,8 +96,9 @@ export const {
   const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null), passphrase_wayin: unk.optional() }).strict() }).strict()
 
   const ifAbsentOpts = obj({ ifAbsent: oneof(ifAbsentVals).default('fail') })
-  const putOpts = obj({ prior: revision, ifPresent: oneof(ifPresentVals).default('repl') })
-  const putVaultOpts = obj({ prior: revision, ifPresent: oneof(['fail', 'get']).default('fail') })
+  const putIfAbsent = oneof(putIfAbsentVals).default('add')
+  const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(ifPresentVals).default('repl') })
+  const putVaultOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(['fail', 'get']).default('fail') })
   const delOpts = obj({ prior: revision })
 
   const reqParams = obj({ applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, ...revision.shape, prior: revision }).partial()
@@ -132,6 +137,7 @@ export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseP
 export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
 export type IfPresent = typeof ifPresentVals[number]
+export type PutIfAbsent = typeof putIfAbsentVals[number]
 /** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_record`, anything else. */
 export type Damagekind = typeof damagekindVals[number]
 export type DamagedVault = VaultSparse & Readonly<{ damagekind: Damagekind }>
@@ -165,7 +171,7 @@ const peekOf = (raw: unknown) => {
 
 /** True when `raw`, a stored row or null for a void one, stands at `prior`. A store's conditional put is atomic on this. */
 export const isRowAt = (raw: unknown, prior: Revision): boolean => {
-  if (raw === null) { return (prior.revision_tok === NeverStoredTok) && (prior.revision_seq === NeverStoredSeq) }
+  if (raw === null) { return (prior.revision_tok === VoidRevisionTok) && (prior.revision_seq === VoidRevisionSeq) }
   const peek = peekOf(raw)
   return (peek?.revision_tok === prior.revision_tok) && (peek.revision_seq === prior.revision_seq)
 }
@@ -190,16 +196,16 @@ export const isLifeOver = (raw: unknown, vault_tok: string): boolean => {
 
 export const isTombstoneRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'x')
 
-const sentinelTimes = { registered_at: FarPast, written_at: FarPast }
+const sentinelTimes = { registered_at: VoidTime, written_at: VoidTime }
 
 /** The tombstone of a vault row nothing holds. A damaged listing's label comes from storage, and is not checked here: it is part of what is reported. */
-export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = NeverStoredTok): VaultTombstone => ({
-  applabel, user_id, vaultlabel, fmt: VaultFormat, ...NeverStored, ...sentinelTimes, am: 'x', vault_tok,
+export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
+  applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok,
 })
 
 /** The tombstone of a box row nothing holds. */
 export const sentinelBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone => ({
-  applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...NeverStored, ...sentinelTimes, am: 'x', vault_tok, box_tok: NeverStoredTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
+  applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
 })
 
 /** True when `raw` names a format past `ownFormat`: a row a newer version of the app wrote. */

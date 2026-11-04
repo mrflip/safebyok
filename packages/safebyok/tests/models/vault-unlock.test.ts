@@ -7,7 +7,7 @@ import { DefaultLeaseMillis, Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
-import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultAndFriend, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockTyping } from '../test-helpers/vault-world'
+import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultAndFriend, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -123,6 +123,16 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.isFull).to.be.true
   })
 
+  it("vault.unlock on a vault held sparse fetches its full record, where the gating it launches would refuse 'bad_option'", async () => {
+    const { demandStored } = await makeBornVault()
+    const record = demandStored()
+    const { listing } = makeVaultWorld(record)
+    const vault = await listing.build(listing.sparseOf(record))
+    await unlockVerbTyping(vault, byPassphrase(Passphrase))
+    expect(vault.isUnlocked).to.be.true
+    expect(vault.isFull).to.be.true
+  })
+
   it("refuses a seal or an unseal crossed by a lock, handing nothing back", async () => {
     const { vault } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
@@ -139,49 +149,45 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   })
 })
 
-const makeFreshLease = async ({ vault, friend, opts: { world } }: Awaited<ReturnType<typeof makeBornVaultAndFriend>>) => {
-  const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
-  return proving.buildLease(friend)
-}
+describe("The vault holds a lease: by unlock, or by the cache", () => {
 
-describe("lease.attach: the one way a vault comes to hold a lease", () => {
-  it("demandAttachable refuses 'bad_option' what is of another vault", async () => {
-    const { vault } = await makeBornVault()
-    expect(vault.demandAttachable({ vault_tok: vault.vault_tok })).to.eq(vault)
-    TH.expectSyncRefusal(() => vault.demandAttachable({ vault_tok: 'another-life' }), 'bad_option')
-  })
-
-  it("holds the lease, reading unlocked, and caches its row: the lease it displaces is dropped", async () => {
-    const born = await makeBornVaultAndFriend()
-    const { vault, deviceDB } = born
-    const first = await makeFreshLease(born)
-    const second = await makeFreshLease(born)
-    await first.attach()
-    await second.attach()
-    expect(first.isForgotten).to.be.true
-    expect(second.isInForce).to.be.true
+  it("holds the lease, reading unlocked, and caches its row, in place of the lease it displaces", async () => {
+    const { vault, deviceDB, advance } = await makeBornVault()
+    const bornRow = deviceDB.cachedNow() as { proved_at: number }
+    advance(1)
+    await unlockVerbTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
-    expect(deviceDB.cachedNow()).to.deep.include({ proved_at: second.proved_at })
+    expect(deviceDB.cachedNow()).to.deep.include({ proved_at: bornRow.proved_at + 1 })
   })
 
-  it("refuses 'vault_locked' a lease out of force", async () => {
-    const born = await makeBornVaultAndFriend()
-    const lease = await makeFreshLease(born)
-    lease.evict()
-    await TH.expectRefusal(lease.attach(), 'vault_locked')
-  })
-
-  it("past a sweep refuses, the lease vacated, no row cached, and the row the sweep left erased", async () => {
-    const born = await makeBornVaultAndFriend()
-    const { vault, deviceDB } = born
-    const lease = await makeFreshLease(born)
+  it("past a sweep refuses, leaving the vault locked and the row the sweep kept", async () => {
+    const { demandStored, anotherSession, deviceDB } = await makeBornVault()
+    const vault = await anotherSession().build(demandStored())
+    const kept = deviceDB.cachedNow()
+    expect(kept).not.to.be.null
+    const peeked = TH.holdNextAnswer(deviceDB.memoryDB, 'peek')
+    const ensuring = vault.ensureUnlocked()
+    await peeked.reached
     vault.sweep()
-    expect(deviceDB.cachedNow()).not.to.be.null
-    await TH.expectRefusal(lease.attach(), 'disabled')
-    expect(lease.isForgotten).to.be.true
+    peeked.release()
+    await TH.expectRefusal(ensuring, 'disabled')
     expect(vault.isLocked).to.be.true
-    expect(deviceDB.cachedNow()).to.be.null
-    expect(deviceDB.tryCache).toHaveBeenCalledOnce()
+    expect(deviceDB.cachedNow()).to.deep.equal(kept)
+  })
+
+  it("loses to a lock made while its row is being cached: the vault locked, and no row left cached", async () => {
+    const { vault, deviceDB } = await makeBornVault()
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const cached = TH.holdNextAnswer(deviceDB.memoryDB, 'tryCache')
+    const unlocking = unlockTyping(vault, byPassphrase(Passphrase))
+    await cached.reached
+    expect(vault.isUnlocked).to.be.true
+    vault.lock()
+    cached.release()
+    await unlocking
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    expect(vault.isLocked).to.be.true
   })
 
   it("holds the lease where the deviceDB refuses its row, told as bad news: it costs the next session a proof, not this one its lease", async () => {
@@ -403,7 +409,7 @@ describe("A refused erase of the row: the panic", () => {
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
     expect(onPanic).toHaveBeenCalledWith(Refusal)
-    expect(vault.isDisabled).to.be.false
+    expect(vault.isEnabled).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
@@ -411,7 +417,7 @@ describe("A refused erase of the row: the panic", () => {
     const { vault, deviceDB } = await makeBornVault()
     deviceDB.tryVacate.mockResolvedValue(TH.bad(Refusal))
     vault.lock()
-    await TH.eventually(() => vault.isDisabled)
+    await TH.eventually(() => ! vault.isEnabled)
     expect(deviceDB.tryVacate).toHaveBeenCalledTimes(2)
   })
 
@@ -422,7 +428,7 @@ describe("A refused erase of the row: the panic", () => {
     vault.lock()
     await TH.eventually(() => reported.mock.calls.length === 2)
     expect(reported).toHaveBeenCalledWith(Refusal)
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     expect(deviceDB.tryVacate).toHaveBeenCalledTimes(2)
   })
@@ -447,8 +453,8 @@ describe("The discards: sweep and vacate, down the chain", () => {
     await box.expose()
     expect(vault.sweep()).to.equal(vault)
     expect(vault.isLocked).to.be.true
-    expect(vault.isDisabled).to.be.true
-    expect(box.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
+    expect(box.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     expect(boxListing.at(box.scope)).to.be.null
     expect(box.whisper).to.equal(LOCKED)
@@ -462,7 +468,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const stored = demandStored()
     vault.vacate()
     expect(vault.isLocked).to.be.true
-    expect(box.isDisabled).to.be.true
+    expect(box.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(demandStored()).to.eq(stored)
@@ -472,9 +478,8 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const { vault, box, deviceDB } = await makeVaultWithBox()
     vault.sweep()
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
-    TH.expectSyncRefusal(() => vault.demandUsable(), 'disabled')
-    TH.expectSyncRefusal(() => vault.demandBoxesUsable(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandSendable(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandUnlocked(), 'disabled')
+    TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { val: 'sk-test' } }), 'disabled')
     TH.expectSyncRefusal(() => box.demandUnsealable(), 'disabled')
     TH.expectSyncRefusal(() => { box.whisper = { val: 'sk-test' } }, 'disabled')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')
@@ -539,7 +544,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const { listing, demandStored } = await makeBornVault()
     const stored = demandStored()
     listing.sweep()
-    await TH.expectRefusal(listing.put(stored, stored), 'disabled')
+    await TH.expectRefusal(listing.put(stored, { prior: stored }), 'disabled')
     await TH.expectRefusal(listing.del(stored), 'disabled')
     expect(demandStored()).to.eq(stored)
   })
@@ -556,7 +561,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const record = demandStored()
     await listing.hello()
     expect(listing.sweep()).to.equal(listing)
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(listing.things).to.have.lengthOf(0)
     await TH.expectRefusal(listing.hello(), 'disabled')
     await TH.expectRefusal(listing.fetch(vault.scope), 'disabled')
@@ -591,10 +596,7 @@ const valuesShownBy = (holder: object): unknown[] => {
 
 describe("a vault and a lease show neither the lease friend nor the lease key handle, one level deep, by identity", () => {
   it("no field or getter of a vault or its lease shows either, nor Object.keys or JSON.stringify", async () => {
-    const born = await makeBornVaultAndFriend()
-    const { vault, deviceDB, friend } = born
-    const lease = await makeFreshLease(born)
-    await lease.attach()
+    const { vault, deviceDB, friend, lease } = await makeBornVaultAndFriend()
     const row = deviceDB.cachedNow() as Record<string, unknown>
     expect(row['lease_key']).to.be.an.instanceof(CryptoKey)
     for (const holder of [vault, lease]) {

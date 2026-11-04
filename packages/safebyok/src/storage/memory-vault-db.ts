@@ -12,6 +12,10 @@ type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
 
 const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 
+const meetsTerms = (ante: unknown, { prior, mayReplaceLive, mayAdd }: PutTerms): boolean => (
+  VS.isRowAt(ante, prior) && (VS.isLiveRow(ante) ? mayReplaceLive : mayAdd)
+)
+
 export class MemoryVaultDB extends VaultDB {
   readonly #vaultrowsOfBank = new Map<string, Map<string, unknown>>()
   readonly #boxLives = new Map<string, BoxLife>()
@@ -41,18 +45,18 @@ export class MemoryVaultDB extends VaultDB {
     return { vault: structuredClone(this.#vaultRowOf(asked)), box: structuredClone(this._cheat_boxRowsOf(asked, asked.vault_tok).get(asked.boxlabel) ?? null) }
   }
 
-  protected doPutVault(record: VaultRecord, { prior, mayReplaceLive }: PutTerms): Landing {
+  protected doPutVault(record: VaultRecord, terms: PutTerms): Landing {
     const ante = this.#vaultRowOf(record)
-    const landed = VS.isRowAt(ante, prior) && (mayReplaceLive || (! VS.isLiveRow(ante)))
+    const landed = meetsTerms(ante, terms)
     if (landed) { this.#storeVaultRow(record) }
     return { landed, ante: structuredClone(ante) }
   }
 
-  protected doPutBox(record: BoxRecord, { prior, mayReplaceLive }: PutTerms): BoxLanding {
+  protected doPutBox(record: BoxRecord, terms: PutTerms): BoxLanding {
     const vault = this.#vaultRowOf(record)
     const boxrows = this._cheat_boxRowsOf(record, record.vault_tok)
     const ante = boxrows.get(record.boxlabel) ?? null
-    const landed = VS.isCheckedLiveVault(vault, record.vault_tok) && VS.isRowAt(ante, prior) && (mayReplaceLive || (! VS.isLiveRow(ante)))
+    const landed = VS.isCheckedLiveVault(vault, record.vault_tok) && meetsTerms(ante, terms)
     if (landed) {
       this.#demandRoom(boxrows, ante)
       this.#storeBoxRow(boxrows, vault, record)

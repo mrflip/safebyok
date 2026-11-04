@@ -74,7 +74,8 @@ export type Merged<SourcesT extends readonly object[]> =
  *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
  * holds the result to `other` as {@link verifyConsistent} does, and returns the result. Where they
- * disagree it refuses `kind`, or the `refusal` given: its `kind`, its `message`, or both.
+ * disagree it refuses `kind`, or the `refusal` given: its `kind`, its `message`, or both. A
+ * `refusal` can also carry a `where` and `advice`, which frame a failed parse as `parse`'s do.
  *
  * @param sources - Modules of validators, each a star import, spread into the kit beneath it: a
  *   name the kit gives wins. A bundler keeps or drops a call whole.
@@ -160,7 +161,7 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
   parse: (val: unknown, story?: Story) => Z.output<SchemaT>
 } & (Z.output<SchemaT> extends object ? {
   /** `val`, parsed, once each field it holds that `other` holds too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
-  parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal>) => Z.output<SchemaT>
+  parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal> & Story) => Z.output<SchemaT>
 } : unknown)
 // --
 
@@ -174,8 +175,8 @@ const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT)
     if (result.success) { return result.data }
     throw refusalOf(kind, result.error, framing)
   }
-  const parseConsistent = (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal>): Z.output<SchemaT> => (
-    verifyConsistent(parse(val) as Z.output<SchemaT> & object, other, { kind, ...refusal })
+  const parseConsistent = (val: unknown, other: object, { where, advice, ...refusal }: Partial<ConsistencyRefusal> & Story = {}): Z.output<SchemaT> => (
+    verifyConsistent(parse(val, { where, advice }) as Z.output<SchemaT> & object, other, { kind, ...refusal })
   )
   // A clone, not `Object.create`: Zod binds each schema's own methods to it, so a schema that only
   // inherited them would render to JSON Schema as the one it came from, losing a pipe's or a lazy's place.

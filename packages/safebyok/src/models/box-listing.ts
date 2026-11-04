@@ -1,33 +1,16 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
-import { type CipherCtxRecord, makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
-import { absentBoxError, lockedError } from '../helpers/throwers'
+import { absentBoxError, notListedBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
-import type { Sidecar } from '../shapes/box'
-import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
+import { type Boxscope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
-import { type BoxSnapshot, Box, sealedRecordOf } from './box'
-import { type DelTombstone, Listing } from './listing'
-import { type BoxesListed, type BoxRecord, type BoxSparse, type Dna, type Fetched, type ListingOpts, type ListingWorld, type PutListingOpts, type SealedWhisper, type WhisperHolder, BoxFormat, boxDna, boxRecord, boxSparse } from './models-shapes'
+import * as VS from '../storage/vault-db-shapes'
+import { Box } from './box'
+import { Listing } from './listing'
+import { type BoxCreateOpts, type BoxDna, type BoxesListed, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from './models-shapes'
 import * as MSX from './models-shapes'
-
-// == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
-
-/** The vault, as far as its boxes need it: a {@link ListingWorld}, the vault's scope and token, and its seal verbs. */
-export type BoxWorld = ListingWorld & {
-  scope:     VaultScope
-  vault_tok: string
-  sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
-  unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
-}
-
-/** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
-export type BoxDna = Omit<Dna<Boxscope, BoxRecord>, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'> & { whisper: WhisperHolder, sidecar: Sidecar }
-
-export type BoxListingOpts = ListingOpts & { world: BoxWorld }
-// --
 
 // == [BoxListing]
 
@@ -47,7 +30,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Starting]: hello, damaged_records, damagedAt, del
 
-  /** Start the watch, and take what the vault's get listed, if given: each box built sparse, a tombstone among them, each damaged row set aside, and any instance held under a damaged row vacated, as nothing acts on one. */
+  /** Start the watch and take what the vault's get listed, if given: its boxes held sparse, its damaged rows set aside. */
   override async hello(listed?: BoxesListed): Promise<void> {
     await super.hello()
     if (listed === undefined) { return }
@@ -66,7 +49,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return this.#damagedRecords.find((damaged) => damaged.boxlabel === boxlabel) ?? null
   }
 
-  /** As the base's `del`; landed, the row is no longer set aside as damaged. */
+  /** Delete the box `duck` names, and stop setting its row aside as damaged. */
   override async del(duck: BoxSparse | Box): Promise<Box | null> {
     const thing = await super.del(duck)
     const { boxlabel } = this.scopeOf(duck)
@@ -75,28 +58,41 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
   // --
 
-  // == [Birth]: create, tryCreate, ensureCreatable, demandCreatable
+  // == [Finding]: get, tryGet
 
-  /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
-  async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
+  /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
+  async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
+    const held = this.at(scoped)
+    if (held === null) { return this.fetch(scoped, opts) }
+    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
+    return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
+  }
+
+  tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
+  // --
+
+  // == [Putting]: puttable, create, tryCreate, shellFor
+
+  /** The box a put of `scoped` goes through: the one held, or a void one made for an empty slot. */
+  puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
+    const { ifAbsent } = MSX.boxPutOpts.parse(opts)
+    const scope = this.scopeOf(scoped)
+    const held = this.at(scope)
+    if ((held === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
+    return held ?? this.#shellFor(scope)
+  }
+
+  /** Seals a new box and stores it where no live record stands, answering the box listed. */
+  async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
+    const filled = MSX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
-    await this.#ensureCreatable(); this.#demandCreatable()
-    this.demandNotHeld(dna)
-    const { whisper, sidecar, ...sparse } = this.stampDna(dna)
-    const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
-    await this.#ensureCreatable(); this.#demandCreatable()
-    return this.putDraft(draft, null, opts)
+    return this.puttable(input, filled).put(dna, filled)
   }
 
-  tryCreate(input: BoxDna, opts: PutListingOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
+  tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  #ensureCreatable(): Promise<void> { return this.ensureTimelyWorld() }
-
-  /** A birth needs this listing enabled and the vault unlocked. */
-  #demandCreatable(): void {
-    this.demandEnabled()
-    if (this.lockState() === 'locked') { throw lockedError() }
-  }
+  /** A void box held under `scope`. */
+  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(VS.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 
   // == [Defined by the box listing]

@@ -1,10 +1,9 @@
 import { consistent } from '../checks/validator'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
-import { VaultError } from '../errors'
 import { tattoo } from '../helpers'
 import { type Outcome, outcomeOf, valOf } from '../outcome'
-import * as Phrases from '../phrases'
-import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseGrantArgs, leasePeekArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
+import { damagedLease, leaseNotInForce, unopenedWhisper } from '../helpers/throwers'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
 
 // == [Lease]
 
@@ -29,29 +28,37 @@ export class Lease implements LeaseStamp {
   readonly #vaultStamp: VaultStamp
 
   /** True where this lease came from the cache, so caching it has nothing to do. */
-  readonly #isPeeked: boolean
+  readonly #isFromCache: boolean
 
-  private constructor(friend: LeaseFriend, record: LeaseRecord, isPeeked: boolean) {
+  private constructor(friend: LeaseFriend, record: LeaseRecord, isFromCache: boolean) {
     this.#record = leaseRecord.parse(record)
     tattoo(this, leaseStamp.parse(record), { writable: false, configurable: false })
     this.#friend = friend
     this.#vaultStamp = vaultStamp.parse(friend)
-    this.#isPeeked = isPeeked
+    this.#isFromCache = isFromCache
     Object.freeze(this)
   }
 
-  // == [Making one]: peek, tryPeek, grant
+  // == [Making one]: buildFromCache, buildGranted
 
   /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is uncached;
    * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
+   * A store that refuses, or a row that will not read, is bad news and null, the row left standing.
    */
-  static async peek(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
-    leasePeekArgs.parse({ friend, gate_epoch })
-    const cached = await friend.peekLease()
-    if (cached === null) { return null }
-    const checked = leaseRecord.safeParse(cached)
+  static async buildFromCache(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
+    leaseFromCacheArgs.parse({ friend, gate_epoch })
+    const peeked = await friend.tryPeekLease()
+    if (! peeked.ok) {
+      friend.tellBadNews([peeked.err])
+      return null
+    }
+    if (peeked.val === null) { return null }
+    const checked = leaseRecord.safeParse(peeked.val)
     // The damaged row stands until the next lease is cached over it.
-    if (! checked.success) { throw damagedLease() }
+    if (! checked.success) {
+      friend.tellBadNews([damagedLease()])
+      return null
+    }
     if (checked.data.gate_epoch !== gate_epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
       await uncacheForgotten(friend)
       return null
@@ -60,13 +67,9 @@ export class Lease implements LeaseStamp {
     return new Lease(friend, checked.data, true)
   }
 
-  static tryPeek(friend: LeaseFriend, gate_epoch: number): Promise<Outcome<Lease | null>> {
-    return outcomeOf(() => this.peek(friend, gate_epoch))
-  }
-
-  /** A new lease under a fresh leaseKey. {@link Lease.attach} holds and caches it. */
-  static async grant(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
-    const { opts: { gate_epoch, wayinkind } } = leaseGrantArgs.parse({ friend, vaultKey, opts })
+  /** A new lease under a fresh leaseKey. The vault holds it, and caches it. */
+  static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
+    const { opts: { gate_epoch, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
     const held     = vaultStamp.parse(friend)
     const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, gate_epoch, proved_at: friend.clock.now(), wayinkind })
     const leaseKey = await makeLeaseKey()
@@ -75,18 +78,21 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Taking hold]: attach, cache, tryCache
+  // == [Taking hold]: cache, tryCache, cacheAsCacheCan
 
-  /** Hold this lease as its vault's: the vault reads unlocked, and it is cached on this device. */
-  async attach(): Promise<void> { await this.#friend.attachLease(this) }
-
-  /** Put this lease in the deviceDB's cache; one peeked from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
+  /** Put this lease in the deviceDB's cache; one built from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
   async cache(): Promise<void> {
-    if (this.#isPeeked) { return }
+    if (this.#isFromCache) { return }
     valOf(await this.#friend.tryCacheLease(this.#demandRecord()))
   }
 
   tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
+
+  /** Cache this lease if it can. A refusal is bad news: it costs the next session a proof, not this one its lease. */
+  async cacheAsCacheCan(): Promise<void> {
+    const cached = await this.tryCache()
+    if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
+  }
   // --
 
   // == [Ending one]: vacate, tryVacate, evict, isForgotten, isInForce
@@ -196,15 +202,6 @@ const isPastAutolock = ({ proved_at }: LeaseStamp, { clock, leaseMillis }: Lease
 /** Uncache a record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
 const uncacheForgotten = async (friend: LeaseFriend): Promise<void> => {
   const del = await friend.tryUncacheLease()
-  if (! del.ok) { friend.logger.warn("This device's lease could not be erased: the next lease is written over it.", { call: 'Lease.peek', refusalkind: del.err.refusalkind }) }
+  if (! del.ok) { friend.logger.warn("This device's lease could not be erased: the next lease is written over it.", { call: 'Lease.buildFromCache', refusalkind: del.err.refusalkind }) }
 }
-// --
-
-// == [Refusals]: damagedLease, unopenedWhisper, leaseNotInForce
-
-const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
-
-const unopenedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UnopenedWhisper)
-
-const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --

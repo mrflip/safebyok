@@ -3,14 +3,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import * as Phrases from '../../src/phrases'
-import type { BankSnapshot } from '../../src/models/bank'
-import type { RequestCleartext } from '../../src/models/gating'
 import { makeLifeTok } from '../../src/crypto'
 import type { LeaseRow } from '../../src/storage/device-db-shapes'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, BankBag, VaultBag, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
+import type { BankSnapshot, RequestCleartext } from '../../src/models/models-shapes'
 
 useBankWorlds()
 
@@ -72,7 +71,7 @@ describe("bank.hello", () => {
     const reborn = bank.vaultOf(VaultBag)
     expect(reborn).not.to.equal(held)
     expect(reborn?.isPresent).to.be.true
-    expect(held?.isDisabled).to.be.true
+    expect(held?.isEnabled).to.be.false
   })
 
   it("tombstones the vault held where the row is deleted, the vault staying in its slot and gone from the snapshot, and a rebuild goes over it", async () => {
@@ -285,7 +284,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("past autolock, a lease held stays held: ensureUnlocked peeks at no row, erases nothing and asks nothing", async () => {
+  it("past autolock, a lease held stays held: ensureUnlocked looks at no row, erases nothing and asks nothing", async () => {
     const world = makeBankWorld()
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
     const { vault } = await makeBankWithVault(world, { requestCleartext })
@@ -433,7 +432,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const seen = vi.fn()
     bank.subscribe(seen)
     bank.vacate()
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(() => vault.demandEnabled()).to.throw(VaultError)
     expect(bank.snapshot).to.include({ stage: 'made', err: null })
     expect(bank.snapshot.vaults).to.deep.equal([])
@@ -521,7 +520,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     bank.sweep()
     expect(bank.snapshot).to.include({ stage: 'made' })
     expect(bank.snapshot.vaults).to.deep.equal([])
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(vault.isUnlocked).to.be.false
     expect(world.leaseRows()).to.have.lengthOf(1)
     await TH.expectRefusal(bank.ensureVault(VaultBag), 'bad_option')
@@ -617,7 +616,7 @@ describe("'identity_revoked' and bad news", () => {
     const { world, bank, vault } = await makeBankWithVault()
     world.vaultDB._cheat_refuseGets('identity_revoked')
     await TH.expectRefusal(vault.fetch(), 'identity_revoked')
-    expect(vault.isDisabled).to.be.true
+    expect(vault.isEnabled).to.be.false
     expect(bank.snapshot.vaults).to.deep.equal([])
     await TH.eventually(() => world.leaseRows().length === 0)
     expect(bank.snapshot.stage).to.eq('made')
@@ -630,7 +629,7 @@ describe("'identity_revoked' and bad news", () => {
     const news = new VaultError('damaged_record', 'something stored is damaged')
     bank.vaultListing.tellBadNews([news])
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
-    expect(vault.isDisabled).to.be.false
+    expect(vault.isEnabled).to.be.true
   })
 })
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
 import * as MSX from '../../src/models/models-shapes'
+import * as VS from '../../src/storage/vault-db-shapes'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import * as TH from '../test-helpers'
 
@@ -61,7 +62,7 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     holdsCases(MSX.revision, 'bad_record', [
       // good:
       [revision,                                   true,  'passes a tok and a seq'],
-      [{ ...revision, revision_seq: MSX.NeverStoredSeq }, true, 'passes the seq of a central never stored'],
+      [{ ...revision, revision_seq: MSX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
       [{ ...revision, am: 'a', extra: 1 },         true,  'passes a bag carrying more, stripping the rest'],
       // bad:
       [{ revision_seq: 1 },                        false, 'refuses a missing tok'],
@@ -141,7 +142,7 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
   })
 
-  describe("MSX.isTombstone and MSX.NeverStoredSeq", () => {
+  describe("MSX.isTombstone and MSX.VoidRevisionSeq", () => {
     it("tells a damaged or gone record from an alive one, whatever its form", () => {
       expect(MSX.isTombstone(gone)).to.be.true
       expect(MSX.isTombstone(ouch)).to.be.true
@@ -150,7 +151,16 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     })
 
     it("marks a central never stored with a seq below any a store puts", () => {
-      expect(MSX.NeverStoredSeq).to.be.lessThan(0)
+      expect(MSX.VoidRevisionSeq).to.be.lessThan(0)
+    })
+
+    it("passes the void row a sentinel makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
+      const scope = { applabel: 'testapp', user_id: 'u1', vaultlabel: 'default', boxlabel: 'anthropic_api_key' }
+      const sentinel = VS.sentinelBoxOf(scope, 'vault-tok-1')
+      expect(VS.boxTombstone.parse(sentinel)).to.deep.include({ ...VS.VoidRevision, box_tok: VS.VoidLifeTok, registered_at: VS.VoidTime, written_at: VS.VoidTime, am: 'x' })
+      expect(new Date(VS.VoidTime).toISOString()).to.eq('2008-08-08T08:08:08.777Z')
+      expect(VS.VoidRevisionTok).to.eq('00000000-0000-0000-0000-000000000000')
+      expect(VS.VoidLifeTok).to.eq('00000000-0000-0000-0000-000000000000')
     })
   })
 })
@@ -293,7 +303,7 @@ describe("The checks of options", () => {
     ])
   })
 
-  describe("MSX.timelyOpts and MSX.sendOpts", () => {
+  describe("MSX.timelyOpts and MSX.boxPutOpts", () => {
     holdsCases(MSX.timelyOpts, 'bad_option', [
       [{},                                          true,  'passes no options'],
       [{ maxMillisSinceRefresh: 0, maxWorldMillis: Infinity }, true, 'passes both horizons'],
@@ -302,7 +312,7 @@ describe("The checks of options", () => {
       [{ maxWorldMillis: '5' },                     false, 'refuses a world horizon that is text'],
       [{ maxWorldMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
     ])
-    holdsCases(MSX.sendOpts, 'bad_option', [
+    holdsCases(MSX.boxPutOpts, 'bad_option', [
       [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
       [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon, as timelyOpts does'],
@@ -310,7 +320,7 @@ describe("The checks of options", () => {
 
     it("take their fields from the bag given and strip the rest", () => {
       expect(MSX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
-      expect(MSX.sendOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
+      expect(MSX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
     })
 
     it("name the failing field", () => {
@@ -432,12 +442,12 @@ describe("MSX.boxDna", () => {
     [{ ...dna, sidecar: { account: 'work' } },              true,  'passes a sidecar with a field'],
     [{ ...dna, whisper_codec: undefined },                  true,  'passes optional props given as undefined'],
     [{ ...dna, ...factoryProps, fmt: MSX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
-    // the whisper and the sidecar, both required:
-    [scope,                                                 false, 'refuses the scope alone'],
-    [{ ...scope, whisper: { val: 'sk-ant-fake' } },         false, 'refuses a whisper with no sidecar, as its third example shows'],
-    [{ ...scope, sidecar: {} },                             false, 'refuses a sidecar with no whisper, as its fourth example shows'],
-    [{ ...dna, whisper: undefined },                        false, 'refuses a whisper given as undefined'],
-    [{ ...dna, sidecar: undefined },                        false, 'refuses a sidecar given as undefined'],
+    // the whisper and the sidecar, each defaulting:
+    [scope,                                                 true,  'passes the scope alone'],
+    [{ ...scope, whisper: { val: 'sk-ant-fake' } },         true,  'passes a whisper with no sidecar'],
+    [{ ...scope, sidecar: {} },                             true,  'passes a sidecar with no whisper'],
+    [{ ...dna, whisper: undefined },                        true,  'passes a whisper given as undefined'],
+    [{ ...dna, sidecar: undefined },                        true,  'passes a sidecar given as undefined'],
     // the scope refused:
     [{ ...dna, boxlabel: undefined },                       false, 'refuses a dna with no boxlabel'],
     [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label, as its sixth example shows'],
@@ -489,9 +499,8 @@ describe("MSX.boxDna", () => {
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
   })
 
-  it("names the missing sidecar, and the missing whisper, as its third and fourth examples show", () => {
-    expect(TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, whisper: { val: 'sk-ant-fake' } }), 'bad_option').meta?.fieldnames).to.deep.equal(['sidecar'])
-    expect(TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper'])
+  it("fills a whisper of { val: {} } and a sidecar of {} where left out", () => {
+    expect(MSX.boxDna.parse(scope)).to.deep.equal({ ...scope, whisper: { val: {} }, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
   })
 
   it("refuses without quoting its input", () => {
@@ -522,7 +531,21 @@ describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
   })
 })
 
-describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
+describe("MSX.boxCreateOpts", () => {
+  it("fills what a create means: add where nothing stands, fail over a live record", () => {
+    expect(MSX.boxCreateOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'fail' })
+  })
+
+  it("takes a caller's ifPresent and the timely options, stripping the rest", () => {
+    expect(MSX.boxCreateOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxWorldMillis: 5 })
+  })
+
+  it("holds ifAbsent to 'add': a create that must find a box is not a create", () => {
+    TH.expectSyncRefusal(() => MSX.boxCreateOpts.parse({ ifAbsent: 'fail' }), 'bad_option')
+  })
+})
+
+describe("MSX.ifPresentVals, MSX.ifPresent and MSX.boxPutOpts", () => {
   it("name the three policies", () => {
     expect(MSX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
   })
@@ -532,10 +555,10 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],
     ["replace",  false, 'refuses replace, which it does not spell'],
-    [undefined,  false, 'refuses undefined: sendOpts makes it optional, not the check'],
+    [undefined,  false, 'refuses undefined: boxPutOpts makes it optional, not the check'],
   ])
 
-  holdsCases(MSX.sendOpts, 'bad_option', [
+  holdsCases(MSX.boxPutOpts, 'bad_option', [
     [{},                                                true,  'passes no options'],
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
@@ -544,12 +567,20 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.sendOpts", () => {
     [{ maxMillisSinceRefresh: -1, ifPresent: 'repl' },  false, 'refuses a negative horizon, as timelyOpts does'],
   ])
 
-  it("keeps ifPresent and the timely options and strips the rest", () => {
-    expect(MSX.sendOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'nil', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5 })
+  it("keeps ifPresent, ifAbsent and the timely options and strips the rest", () => {
+    expect(MSX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add' })
+  })
+
+  it("leaves the defaults to box.put: nothing given, nothing filled", () => {
+    expect(MSX.boxPutOpts.parse({})).to.deep.equal({})
+  })
+
+  it("refuses a fetch's ifAbsent: 'nil' is no answer to a put", () => {
+    TH.expectSyncRefusal(() => MSX.boxPutOpts.parse({ ifAbsent: 'nil' }), 'bad_option')
   })
 
   it("name the failing field", () => {
-    const err = TH.expectSyncRefusal(() => MSX.sendOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => MSX.boxPutOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['ifPresent'])
   })
 })
@@ -626,7 +657,7 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
     holdsCases(MSX.boxDna, 'bad_option', [
       [{ ...scope, whisper, sidecar: {} },                                   true,  'passes the scope, whisper and sidecar, as its first example shows'],
       [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls, as its second example shows'],
-      [{ ...scope, whisper },                                                false, 'refuses a dna with no sidecar, as its third example shows'],
+      [{ ...scope, whisper },                                                true,  'passes a dna with no sidecar, which defaults'],
       [{ ...scope, whisper, sidecar: {}, revision_seq: 3 },                  false, 'refuses a revision_seq, as its fourth example shows'],
       [{ ...scope, whisper, sidecar: {}, whisper_ciphered: full.whisper_ciphered }, false, 'refuses a sealed part, as its fifth example shows'],
       [{ ...scope, whisper, sidecar: {}, am: 'q' },                          false, 'refuses a factory prop that fails its check'],
@@ -637,18 +668,6 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
       const given = { ...scope, whisper, sidecar: {}, fmt: MSX.BoxFormat, am: 'x', vault_tok: 'tok-u1', revision_tok: 'rev-given', registered_at: T0, written_at: T0 }
       expect(MSX.boxDna.parse(given)).to.deep.equal({ ...scope, whisper, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
     })
-  })
-
-  describe("boxPut", () => {
-    holdsCases(MSX.boxPut, 'bad_option', [
-      [{ boxlabel: scope.boxlabel, whisper },                                true,  'passes a boxlabel and a whisper, as its example shows'],
-      [{ boxlabel: scope.boxlabel, sidecar: {} },                            true,  'passes a boxlabel and a sidecar'],
-      [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with both halves'],
-      [{ whisper, sidecar: {} },                                             false, 'refuses a patch with no boxlabel'],
-      [{ boxlabel: scope.boxlabel },                                         false, 'refuses a boxlabel naming neither half'],
-      [{ boxlabel: '', whisper },                                            false, 'refuses an empty boxlabel'],
-      [{ boxlabel: scope.boxlabel, whisper, sidecarr: {} },                  false, 'refuses a field no box record has'],
-    ])
   })
 
   describe("boxPatch", () => {

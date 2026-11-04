@@ -1,4 +1,4 @@
-/** Crossings pinned as the code meets them: a `lock()` in a send, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
+/** A `lock()` crossing a put, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
@@ -7,21 +7,22 @@ import { Lease } from '../../src/models/lease'
 import { Proving } from '../../src/models/proving'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import type { BoxWorld } from '../../src/models/models-shapes'
 
 const held = useModelsWorld()
 useVaultWorlds()
 
-describe("a lock() landing during a send", () => {
-  it("during the seal refuses 'vault_locked', putting nothing: send checks the lock at both ends of the seal", async () => {
+describe("a lock() landing during a put", () => {
+  it("during the seal refuses 'vault_locked', putting nothing: put checks the lock at both ends of the seal", async () => {
     const lock = { during: false }
     const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLockState('locked') } })
     const record = fullBoxRecord()
     held.mw.seedStore(record)
     const box = await listing.build(record)
     lock.during = true
-    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -33,7 +34,7 @@ describe("a lock() landing during a send", () => {
       held.mw.setLockState('locked')
       return held.mw.answerOf(box.scope, sent)
     })
-    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
+    await expect(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
     expect(box.sidecar).to.deep.equal({ note: 'sent while locking' })
   })
@@ -57,26 +58,56 @@ describe("A lock that lands while an unlock proves", () => {
 })
 
 describe("A lock that lands during a box verb", () => {
-  it("during the first box call's hello refuses 'vault_locked', opening nothing", async () => {
+  it("during hello leaves the list made and the next putBox refusing 'vault_locked', storing nothing", async () => {
     const { vault, vaultDB } = await makeBornVault()
     const tryGetVault = vaultDB.tryGetVault.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetVault').mockImplementationOnce((...args) => { vault.lock(); return tryGetVault(...args) })
-    await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'vault_locked')
+    await expect(vault.hello()).resolves.to.eq(vault)
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' } }), 'vault_locked')
   })
 
-  it("during getBox's get refuses 'vault_locked' though the box came back", async () => {
+  it("during getBox's get answers the box, with its whisper refusing 'vault_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
     await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' } })
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
-    await TH.expectRefusal(vault.fetchBox('anthropic_api_key'), 'vault_locked')
+    const box = (await vault.fetchBox('anthropic_api_key'))!
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
 })
 
-/** The next `Lease.grant` runs `crossing` once its lease is made, as a slow wrap would let it. */
+/** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
+const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
+  const unsealStampedString: BoxWorld['unsealStampedString'] = async (sealed, stamp) => {
+    const whisperText = await held.mw.world.unsealStampedString(sealed, stamp)
+    crossing(box)
+    return whisperText
+  }
+  const listing = boxListingOf(held.mw, { world: { ...held.mw.world, unsealStampedString } })
+  const box = await listing.create(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
+  return box
+}
+
+describe("An ending that lands while box.expose unseals", () => {
+  it.each(['sweep', 'vacate'] as const)("a %s refuses 'disabled', and leaves nothing exposed", async (ending) => {
+    const box = await boxCrossingUnseal((crossed) => crossed[ending]())
+    await TH.expectRefusal(box.expose(), 'disabled')
+    expect(box.isEnabled).to.be.false
+    expect(box.whisper).to.be.null
+  })
+
+  it("a lock() refuses 'vault_locked', and leaves nothing exposed", async () => {
+    const box = await boxCrossingUnseal(() => { held.mw.setLockState('locked') })
+    await TH.expectRefusal(box.expose(), 'vault_locked')
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.be.null
+  })
+})
+
+/** The next `Lease.buildGranted` runs `crossing` once its lease is made, as a slow wrap would let it. */
 const crossingGrant = (crossing: () => unknown) => {
-  const grant = Lease.grant.bind(Lease)
-  vi.spyOn(Lease, 'grant').mockImplementationOnce(async (...args) => {
+  const grant = Lease.buildGranted.bind(Lease)
+  vi.spyOn(Lease, 'buildGranted').mockImplementationOnce(async (...args) => {
     const lease = await grant(...args)
     await crossing()
     return lease
@@ -108,7 +139,17 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: 1 })
   })
 
-  it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is vacated unattached, and demandAttachable is never met", async () => {
+  it("a lock crossing the renewal drops the new lease with no second erase, which could take a later lease's row", async () => {
+    const { vault, deviceDB } = await makeBornVault()
+    deviceDB.tryVacate.mockClear()
+    crossingGrant(() => { vault.lock() })
+    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
+    expect(vault.isUnlocked).to.be.false
+    expect(deviceDB.cachedNow()).to.be.null
+    expect(deviceDB.tryVacate).toHaveBeenCalledOnce()
+  })
+
+  it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is dropped unattached, and demandAttachable is never met", async () => {
     const { vault, demandStored, deviceDB, anotherSession } = await makeBornVault()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()), NewPassphrase)
@@ -120,7 +161,7 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("a tombstone crossing a birth's lease refuses 'vault_gone' at demandAttachable, the lease vacated", async () => {
+  it("a tombstone crossing a birth's lease refuses 'vault_gone' as it attaches, and leaves no row", async () => {
     const { listing, demandStored, deviceDB, anotherSession } = makeVaultWorld()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()))

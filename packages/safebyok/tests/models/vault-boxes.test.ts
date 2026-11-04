@@ -1,8 +1,10 @@
-/** A vault's box verbs, from the host's side, on real seals: `hello`, `getBox`, `putBox`, `delBox`, a box's `extractWhisper`, and the sidecar-only `send`. */
+/** A vault's box verbs, from the host's side, on real seals. */
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultListing } from '../../src/models/vault-listing'
+import * as Phrases from '../../src/phrases'
+import * as VS from '../../src/storage/vault-db-shapes'
 import * as TH from '../test-helpers'
 import { Passphrase, byPassphrase, delTyping, makeBornVault, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
@@ -35,6 +37,15 @@ const makeWorldWithBox = async () => {
   return { ...world, box }
 }
 
+/** A next session that has listed nothing and fetched nothing, and spies cleared of the one before. */
+const nextUnlisted = async () => {
+  const world = await makeWorldWithBox()
+  const next = await world.openNextSession()
+  world.tryGetBox.mockClear()
+  world.tryPutBox.mockClear()
+  return { ...world, next }
+}
+
 /** A vault whose box row a next session finds failing its checks. */
 const makeWorldWithRubble = async () => {
   const world = await makeWorldWithBox()
@@ -42,21 +53,22 @@ const makeWorldWithRubble = async () => {
   return world
 }
 
-describe("vault.hello: the first box call lists the boxes", () => {
-  it("runs on the first box call and no other, holding each box listed sparse", async () => {
-    const { openNextSession, tryGetVault } = await makeWorldWithBox()
+describe("vault.hello: the host's call for the list and the pushes", () => {
+  it("is run by no box verb, a getBox fetching only its own box and holding only that one", async () => {
+    const { openNextSession, tryGetVault, tryGetBox } = await makeWorldWithBox()
     const next = await openNextSession()
     tryGetVault.mockClear()
+    tryGetBox.mockClear()
     expect(next.boxListing.things).to.deep.equal([])
     const box = await next.getBox(boxlabel)
-    expect(tryGetVault).toHaveBeenCalledOnce()
     expect(box).to.eq(next.boxListing.at({ ...next.scope, boxlabel }))
-    await next.getBox(boxlabel)
-    await next.fetchBox(boxlabel, { ifAbsent: 'nil' })
-    expect(tryGetVault).toHaveBeenCalledOnce()
+    expect(box?.isFull).to.be.true
+    expect(next.boxListing.things).to.deep.equal([box])
+    expect(tryGetBox).toHaveBeenCalledOnce()
+    expect(tryGetVault).not.toHaveBeenCalled()
   })
 
-  it("may be run sooner by the host: the box is listed sparse, a get then hydrating it", async () => {
+  it("lists each box sparse, a get then hydrating it", async () => {
     const { openNextSession, tryGetVault } = await makeWorldWithBox()
     const next = await openNextSession()
     tryGetVault.mockClear()
@@ -68,18 +80,20 @@ describe("vault.hello: the first box call lists the boxes", () => {
     expect(tryGetVault).toHaveBeenCalledOnce()
   })
 
-  it("lists the boxes of a vault still locked, as nothing it holds is secret; a box verb still refuses", async () => {
+  it("lists the boxes of a vault still locked; getBox answers one, and its whisper refuses", async () => {
     const world = await makeWorldWithBox()
     const next = await world.anotherSession().build(world.demandStored())
     expect(next.isLocked).to.be.true
     await next.hello()
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
-    await TH.expectRefusal(next.getBox(boxlabel), 'vault_locked')
+    const box = (await next.getBox(boxlabel))!
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
 
   it("starts the box listing's watch, so another session's put reaches the box held", async () => {
     const { vault, openNextSession } = await makeWorldWithBox()
     const next = await openNextSession()
+    await next.hello()
     const box = await next.getBox(boxlabel)
     await vault.putBox({ boxlabel, sidecar: { note: 'moved' } })
     await TH.eventually(() => box?.revision_seq === 1)
@@ -94,12 +108,13 @@ describe("vault.hello: the first box call lists the boxes", () => {
     await TH.expectRefusal(next.getBox(boxlabel), 'vault_gone')
   })
 
-  it("passes a get's failure up, and the next box call says hello again", async () => {
+  it("passes a get's failure up, and the next hello lists the boxes", async () => {
     const { openNextSession, tryGetVault } = await makeWorldWithBox()
     const next = await openNextSession()
     tryGetVault.mockRejectedValueOnce(new Error('the wire is down'))
-    await expect(next.getBox(boxlabel)).rejects.toThrow('the wire is down')
-    await expect(next.getBox(boxlabel)).resolves.to.have.property('boxlabel', boxlabel)
+    await expect(next.hello()).rejects.toThrow('the wire is down')
+    await expect(next.hello()).resolves.to.eq(next)
+    expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
   })
 
   it("refuses a boxListing.hello given a list that fails its check as 'bad_record'", async () => {
@@ -110,18 +125,20 @@ describe("vault.hello: the first box call lists the boxes", () => {
 
 describe("the box verbs refuse a vault locked, or gone", () => {
   const Verbs = [
-    ['getBox',   (vault) => vault.getBox(boxlabel)],
-    ['fetchBox', (vault) => vault.fetchBox(boxlabel)],
-    ['putBox',   (vault) => vault.putBox({ boxlabel, whisper: Whisper })],
-    ['delBox',   (vault) => vault.delBox(boxlabel)],
-  ] as const satisfies readonly (readonly [string, (vault: Awaited<ReturnType<typeof makeWorld>>['vault']) => Promise<unknown>])[]
+    ['getBox',   false, (vault) => vault.getBox(boxlabel)],
+    ['fetchBox', false, (vault) => vault.fetchBox(boxlabel)],
+    ['putBox',   true,  (vault) => vault.putBox({ boxlabel, whisper: Whisper })],
+    ['delBox',   true,  (vault) => vault.delBox(boxlabel)],
+  ] as const satisfies readonly (readonly [string, boolean, (vault: Awaited<ReturnType<typeof makeWorld>>['vault']) => Promise<unknown>])[]
 
-  for (const [verb, call] of Verbs) {
-    it(`${verb} refuses 'vault_locked' while locked`, async () => {
-      const { vault } = await makeWorld()
-      vault.lock()
-      await TH.expectRefusal(call(vault), 'vault_locked')
-    })
+  for (const [verb, refusesLocked, call] of Verbs) {
+    if (refusesLocked) {
+      it(`${verb} refuses 'vault_locked' while locked`, async () => {
+        const { vault } = await makeWorld()
+        vault.lock()
+        await TH.expectRefusal(call(vault), 'vault_locked')
+      })
+    }
 
     it(`${verb} refuses 'vault_gone' on a vault deleted, as gone beats locked`, async () => {
       const { vault } = await makeWorld()
@@ -129,6 +146,13 @@ describe("the box verbs refuse a vault locked, or gone", () => {
       await TH.expectRefusal(call(vault), 'vault_gone')
     })
   }
+
+  it("getBox and fetchBox answer the box while locked", async () => {
+    const { vault, box } = await makeWorldWithBox()
+    vault.lock()
+    await expect(vault.getBox(boxlabel)).resolves.to.eq(box)
+    await expect(vault.fetchBox(boxlabel)).resolves.to.eq(box)
+  })
 
   it("a whisper a refusal was handed is not in the refusal", async () => {
     const { vault } = await makeWorld()
@@ -211,10 +235,10 @@ describe("vault.getBox", () => {
     expect(tryGetBox).toHaveBeenCalledOnce()
   })
 
-  it("refuses a boxlabel or opts that fail their checks as 'bad_option'", async () => {
+  it("refuses a boxlabel that fails its check as 'bad_scope', and opts that fail theirs as 'bad_option'", async () => {
     const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.getBox('Not A Label'), 'bad_option')
-    await TH.expectRefusal(vault.getBox(42 as never), 'bad_option')
+    await TH.expectRefusal(vault.getBox('Not A Label'), 'bad_scope')
+    await TH.expectRefusal(vault.getBox(42 as never), 'bad_scope')
     await TH.expectRefusal(vault.getBox(boxlabel, { ifAbsent: 'shrug' } as never), 'bad_option')
   })
 })
@@ -224,7 +248,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const { vault, boxrows, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
-    expect(tryPutBox.mock.calls[0]?.[1]).to.deep.include({ prior: { revision_tok: 'deadbeef-never-stored', revision_seq: -1 } })
+    expect(tryPutBox.mock.calls[0]?.[1]).to.deep.include({ prior: VS.VoidRevision })
     expect(box.isPresent).to.be.true
     expect(box.sidecar).to.deep.equal(Sidecar)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
@@ -237,25 +261,35 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     expect(box.sidecar).to.deep.equal({})
   })
 
-  it("refuses a birth with no whisper as 'no_whisper', storing nothing", async () => {
+  it("takes a whisper of { val: {} } where left out, and it opens under a real seal", async () => {
     const { vault, tryPutBox } = await makeWorld()
-    await TH.expectRefusal(vault.putBox({ boxlabel, sidecar: Sidecar }), 'no_whisper')
-    expect(tryPutBox).not.toHaveBeenCalled()
+    const box = await vault.putBox({ boxlabel, sidecar: Sidecar })
+    expect(tryPutBox).toHaveBeenCalledOnce()
+    expect(box.sidecar).to.deep.equal(Sidecar)
+    expect(await box.extractWhisper()).to.deep.equal({ val: {} })
+  })
+
+  it("under create, takes neither half, and the box opens to { val: {} } and a sidecar of {}", async () => {
+    const { vault } = await makeWorld()
+    const box = await vault.boxListing.create({ ...vault.scope, boxlabel })
+    expect(box.isPresent).to.be.true
+    expect(box.sidecar).to.deep.equal({})
+    expect(await box.extractWhisper()).to.deep.equal({ val: {} })
   })
 
   const PatchCases = [
-    [{ whisper: Whisper },                               'a patch with no boxlabel'],
-    [{ boxlabel },                                       'a patch naming neither half'],
-    [{ boxlabel, whisper: { val: null } },               'a whisper that fails its check'],
-    [{ boxlabel, whisper: Whisper, sidecar: 'note' },    'a sidecar that fails its check'],
-    [{ boxlabel, whisper: Whisper, vaultlabel: 'other' }, "the scope of another vault"],
-    [undefined,                                          'no patch at all'],
+    [{ whisper: Whisper },                                'bad_scope',  'a patch with no boxlabel'],
+    [undefined,                                           'bad_scope',  'no patch at all'],
+    [{ boxlabel },                                        'bad_option', 'a patch naming neither half'],
+    [{ boxlabel, whisper: { val: null } },                'bad_option', 'a whisper that fails its check'],
+    [{ boxlabel, whisper: Whisper, sidecar: 'note' },     'bad_option', 'a sidecar that fails its check'],
+    [{ boxlabel, whisper: Whisper, vaultlabel: 'other' }, 'bad_option', "the scope of another vault"],
   ] as const
 
-  for (const [patch, blurb] of PatchCases) {
-    it(`refuses ${blurb} as 'bad_option', storing nothing`, async () => {
+  for (const [patch, kind, blurb] of PatchCases) {
+    it(`refuses ${blurb} as '${kind}', storing nothing`, async () => {
       const { vault, tryPutBox } = await makeWorld()
-      await TH.expectRefusal(vault.putBox(patch as never), 'bad_option')
+      await TH.expectRefusal(vault.putBox(patch as never), kind)
       expect(tryPutBox).not.toHaveBeenCalled()
     })
   }
@@ -266,6 +300,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const oldLife = old?.box_tok
     await vault.delBox(boxlabel)
     const next = await openNextSession()
+    await next.hello()
     const reborn = await next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } })
     expect(reborn.isPresent).to.be.true
     expect(reborn.box_tok).not.to.eq(oldLife)
@@ -274,11 +309,13 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
   })
 
-  it("refuses a rebirth with no whisper as 'no_whisper', the tombstone standing", async () => {
+  it("is reborn with an empty whisper from a sidecar alone over the tombstone, the deleted whisper gone", async () => {
     const { vault, boxrows } = await makeWorldWithBox()
     await vault.delBox(boxlabel)
-    await TH.expectRefusal(vault.putBox({ boxlabel, sidecar: Sidecar }), 'no_whisper')
-    expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
+    const reborn = await vault.putBox({ boxlabel, sidecar: Sidecar })
+    expect(reborn.sidecar).to.deep.equal(Sidecar)
+    expect(await reborn.extractWhisper()).to.deep.equal({ val: {} })
+    expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
   })
 
   it("hears 'stale_write' where another session's box landed since hello, the record delivered", async () => {
@@ -293,19 +330,17 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     expect(await delivered?.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("asks storage before refusing a sidecar alone: another session's box landed since hello takes the sidecar, the whisper kept", async () => {
-    const { boxrows, openNextSession } = await makeWorldWithBox()
-    const row = boxrows.get(boxlabel)
-    boxrows.delete(boxlabel)
-    const next = await openNextSession()
-    await next.hello()
-    boxrows.set(boxlabel, row)
+  it("hears 'stale_write' for a sidecar alone on a box stored but not listed, asking no getBox, and its retry keeps the whisper", async () => {
+    const { next, tryGetBox, tryPutBox } = await nextUnlisted()
+    await TH.expectRefusal(next.putBox({ boxlabel, sidecar: { note: 'home' } }), 'stale_write')
+    expect(tryGetBox).not.toHaveBeenCalled()
+    expect(tryPutBox).toHaveBeenCalledOnce()
     const box = await next.putBox({ boxlabel, sidecar: { note: 'home' } })
     expect(box.sidecar).to.deep.equal({ note: 'home' })
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("refuses a sidecar alone over a damaged row as 'damaged_record', not as no box stored", async () => {
+  it("hears 'damaged_record' for a sidecar alone over a damaged row not listed, fetching nothing: a damaged row is the host's", async () => {
     const { boxrows, openNextSession } = await makeWorldWithRubble()
     const next = await openNextSession()
     await TH.expectRefusal(next.putBox({ boxlabel: 'rubble', sidecar: Sidecar }), 'damaged_record')
@@ -313,7 +348,137 @@ describe("the box's birth: vault.putBox with no box listed", () => {
   })
 })
 
+describe("a void instance, then a put: no hello, no fetch", () => {
+  it("with nothing stored, lands at seq 0 under a real box_tok, and the whisper opens", async () => {
+    const { vault, tryGetBox } = await makeWorld()
+    const box = await vault.boxListing.puttable({ ...vault.scope, boxlabel }).put({ whisper: Whisper })
+    expect(box.revision_seq).to.eq(0)
+    expect(box.box_tok).not.to.eq(VS.VoidLifeTok)
+    expect(await box.extractWhisper()).to.deep.equal(Whisper)
+    expect(tryGetBox).not.toHaveBeenCalled()
+  })
+
+  it("with a sidecar alone, lands an empty whisper at seq 0, and the same instance takes a whisper after", async () => {
+    const { vault, tryGetBox } = await makeWorld()
+    const shell = vault.boxListing.puttable({ ...vault.scope, boxlabel })
+    await expect(shell.put({ sidecar: Sidecar })).resolves.to.eq(shell)
+    expect(shell.revision_seq).to.eq(0)
+    expect(await shell.extractWhisper()).to.deep.equal({ val: {} })
+    await shell.put({ whisper: Whisper })
+    expect(shell.revision_seq).to.eq(1)
+    expect(await shell.extractWhisper()).to.deep.equal(Whisper)
+    expect(tryGetBox).not.toHaveBeenCalled()
+  })
+
+  it("is held in things and left out of the snapshot until it lands", async () => {
+    const { vault } = await makeWorld()
+    const shell = vault.boxListing.puttable({ ...vault.scope, boxlabel })
+    expect(vault.boxListing.things).to.deep.equal([shell])
+    expect(vault.boxListing.snapshot).to.deep.equal([])
+    await shell.put({ whisper: Whisper })
+    expect(vault.boxListing.snapshot).to.have.lengthOf(1)
+  })
+
+  it("over a row stored, hears 'stale_write' with the frontier delivered, and the next put on that instance lands", async () => {
+    const { next, box, boxrows, tryGetBox, tryPutBox } = await nextUnlisted()
+    await TH.expectRefusal(next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } }), 'stale_write')
+    const delivered = next.boxListing.at({ ...next.scope, boxlabel })
+    expect(delivered?.revision_seq).to.eq(box.revision_seq)
+    expect(delivered?.box_tok).to.eq(box.box_tok)
+    expect(tryPutBox).toHaveBeenCalledOnce()
+    const landed = await next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } })
+    expect(landed).to.eq(delivered)
+    expect(landed.revision_seq).to.eq(box.revision_seq + 1)
+    expect(boxrows.get(boxlabel)).to.have.property('revision_seq', box.revision_seq + 1)
+    expect(tryGetBox).not.toHaveBeenCalled()
+  })
+
+  it("over a row stored, hears 'camped' under ifPresent 'fail', the row standing", async () => {
+    const { next, box, boxrows } = await nextUnlisted()
+    const before = boxrows.get(boxlabel)
+    await TH.expectRefusal(next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } }, { ifPresent: 'fail' }), 'camped')
+    expect(boxrows.get(boxlabel)).to.deep.equal(before)
+    expect(next.boxListing.at({ ...next.scope, boxlabel })?.revision_seq).to.eq(box.revision_seq)
+  })
+
+  it("over a box deleted, comes back on a plain put at the next seq, under a new box_tok", async () => {
+    const { vault, box } = await makeWorldWithBox()
+    const oldLife = box.box_tok
+    await vault.delBox(boxlabel)
+    const tombSeq = box.revision_seq
+    const reborn = await box.put({ whisper: { val: 'sk-test-0001' } })
+    expect(reborn).to.eq(box)
+    expect(reborn.revision_seq).to.eq(tombSeq + 1)
+    expect(reborn.box_tok).not.to.eq(oldLife)
+    expect(await reborn.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
+  })
+
+  it("as a void held within its horizon, has getBox ask nothing, and fetchBox hear the box stored, keeping the instance", async () => {
+    const { next, box, tryGetBox } = await nextUnlisted()
+    const shell = next.boxListing.puttable({ ...next.scope, boxlabel })
+    expect(shell.isPresent).to.eq(false)
+    await TH.expectRefusal(next.getBox(boxlabel), 'absent_box')
+    await expect(next.getBox(boxlabel, { ifAbsent: 'nil' })).resolves.to.eq(null)
+    expect(tryGetBox).not.toHaveBeenCalled()
+    const got = await next.fetchBox(boxlabel)
+    expect(tryGetBox).toHaveBeenCalledOnce()
+    expect(got).to.eq(shell)
+    expect(got?.revision_seq).to.eq(box.revision_seq)
+    expect(await got?.extractWhisper()).to.deep.equal(Whisper)
+  })
+
+  it("as a tombstone held within its horizon, has getBox ask nothing, and fetchBox hear a box reborn elsewhere", async () => {
+    const { vault, box, openNextSession, tryGetBox } = await makeWorldWithBox()
+    await vault.delBox(boxlabel)
+    const next = await openNextSession()
+    await TH.expectRefusal(next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } }), 'stale_write')
+    await next.putBox({ boxlabel, whisper: { val: 'sk-test-0001' } })
+    tryGetBox.mockClear()
+    await TH.expectRefusal(vault.getBox(boxlabel), 'absent_box')
+    await expect(vault.getBox(boxlabel, { ifAbsent: 'nil' })).resolves.to.eq(null)
+    expect(tryGetBox).not.toHaveBeenCalled()
+    await expect(vault.fetchBox(boxlabel)).resolves.to.eq(box)
+    expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
+  })
+
+  it("under ifAbsent 'fail', refuses 'absent_box' with the sentence naming vault.hello, storing nothing", async () => {
+    const { next, tryPutBox } = await nextUnlisted()
+    const err = await TH.expectRefusal(next.putBox({ boxlabel, whisper: Whisper }, { ifAbsent: 'fail' }), 'absent_box')
+    expect(err.message).to.contain('vault.hello')
+    expect(tryPutBox).not.toHaveBeenCalled()
+  })
+})
+
 describe("vault.putBox over a live box", () => {
+  it("under ifPresent 'fail', refuses a whole record, saying its data would be recycled, and stores nothing", async () => {
+    const { vault, boxrows, tryPutBox } = await makeWorldWithBox()
+    tryPutBox.mockClear()
+    const err = await TH.expectRefusal(vault.putBox(boxrows.get(boxlabel) as never, { ifPresent: 'fail' }), 'bad_option')
+    expect(err.message).to.eq(Phrases.RecordForNewBox)
+    expect(tryPutBox).not.toHaveBeenCalled()
+  })
+
+  it("under ifAbsent 'fail' on a tombstone held, over a box reborn elsewhere, leaves it to the vaultDB: 'stale_write' with the frontier delivered", async () => {
+    const { next, box } = await nextUnlisted()
+    const elsewhere = await next.getBox(boxlabel)
+    await elsewhere?.del()
+    await box.fetch({ ifAbsent: 'nil' })
+    const reborn = await elsewhere?.put({ whisper: Whisper })
+    expect(box.isPresent).to.eq(false)
+    await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'stale_write')
+    expect(box.isPresent).to.eq(true)
+    expect(box.revision_seq).to.eq(reborn?.revision_seq)
+  })
+
+  it("under ifAbsent 'fail' over a box deleted elsewhere, refuses 'absent_box' with the tombstone delivered", async () => {
+    const { next, box } = await nextUnlisted()
+    const elsewhere = await next.getBox(boxlabel)
+    const deleted = await elsewhere?.del()
+    await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'absent_box')
+    expect(box.isPresent).to.eq(false)
+    expect(box.revision_seq).to.eq(deleted?.revision_seq)
+  })
+
   const IfPresentCases = [
     [undefined, 'sk-test-0001', 'replaces it by default'],
     ['get',     'sk-test-0000', "resolves the box as stored under 'get', the patch discarded"],
@@ -334,11 +499,11 @@ describe("vault.putBox over a live box", () => {
   })
 })
 
-describe("a sidecar-only send", () => {
+describe("a sidecar-only put", () => {
   it("unseals and reseals: the sidecar moves, the whisper opens as it was, sealed anew under the new stamp", async () => {
     const { box, boxrows } = await makeWorldWithBox()
     const before = boxrows.get(boxlabel) as { whisper_ciphered: unknown }
-    await box.send({ sidecar: { note: 'home' } })
+    await box.put({ sidecar: { note: 'home' } })
     const after = boxrows.get(boxlabel) as { whisper_ciphered: unknown }
     expect(box.sidecar).to.deep.equal({ note: 'home' })
     expect(after.whisper_ciphered).not.to.deep.equal(before.whisper_ciphered)
@@ -348,7 +513,7 @@ describe("a sidecar-only send", () => {
   it("opens the stored whisper, never the one exposed", async () => {
     const { box } = await makeWorldWithBox()
     box.whisper = { val: 'sk-test-exposed' }
-    await box.send({ sidecar: { note: 'home' } })
+    await box.put({ sidecar: { note: 'home' } })
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
@@ -359,9 +524,9 @@ describe("a sidecar-only send", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("a whisper-only send keeps the sidecar", async () => {
+  it("a whisper-only put keeps the sidecar", async () => {
     const { box } = await makeWorldWithBox()
-    await box.send({ whisper: { val: 'sk-test-0001' } })
+    await box.put({ whisper: { val: 'sk-test-0001' } })
     expect(box.sidecar).to.deep.equal(Sidecar)
     expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
   })
@@ -370,7 +535,7 @@ describe("a sidecar-only send", () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     vault.lock()
     tryPutBox.mockClear()
-    await TH.expectRefusal(box.send({ sidecar: { note: 'home' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ sidecar: { note: 'home' } }), 'vault_locked')
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 })
@@ -392,6 +557,14 @@ describe("extractWhisper", () => {
 })
 
 describe("vault.delBox", () => {
+  it("of a box stored and not held hears 'stale_write' over the sentinel, the frontier delivered, and the retry lands", async () => {
+    const { next, boxrows } = await nextUnlisted()
+    await TH.expectRefusal(next.delBox(boxlabel), 'stale_write')
+    expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
+    await next.delBox(boxlabel)
+    expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
+  })
+
   it("leaves the box held in its tombstone, a get then absent, the whisper refused", async () => {
     const { vault, boxrows } = await makeWorldWithBox()
     const dead = await vault.delBox(boxlabel)
@@ -408,9 +581,9 @@ describe("vault.delBox", () => {
     expect(boxrows.has(boxlabel)).to.be.false
   })
 
-  it("refuses a boxlabel that fails its check as 'bad_option'", async () => {
+  it("refuses a boxlabel that fails its check as 'bad_scope'", async () => {
     const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.delBox('Not A Label'), 'bad_option')
+    await TH.expectRefusal(vault.delBox('Not A Label'), 'bad_scope')
     expect(await vault.tryDelBox('Not A Label')).to.deep.include({ ok: false })
   })
 })
@@ -430,6 +603,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     const { openNextSession, boxrows } = await makeWorldWithBox()
     boxrows.set('Not A Label', { garbage: true })
     const next = await openNextSession()
+    await next.hello()
     const box = await next.getBox(boxlabel)
     expect(await box?.extractWhisper()).to.deep.equal(Whisper)
     expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['Not A Label'])
@@ -440,8 +614,8 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     boxrows.set(boxlabel, { garbage: true })
     await vault.hello()
     expect(vault.boxListing.at(held.scope)).to.be.null
-    expect(held.isDisabled).to.be.true
-    await vault.delBox(boxlabel)
+    expect(held.isEnabled).to.be.false
+    expect(await vault.tryDelDamagedBox(boxlabel)).to.deep.include({ ok: true })
     expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
   })
 
@@ -452,14 +626,50 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
   })
 
-  it("is deleted by its label: the tombstone lands, the entry clears, a birth then goes over it", async () => {
+  it("is not deleted by tryDelBox when it names a revision: 'damaged_record', the row and its listing standing, tryDelDamagedBox then deleting it", async () => {
+    const { openNextSession, boxrows } = await makeWorldWithBox()
+    boxrows.set('revised', { ...boxrows.get(boxlabel) as object, boxlabel: 'revised', whisper_ciphered: 'garbled' })
+    const next = await openNextSession()
+    await next.hello()
+    await TH.expectBad(next.tryDelBox('revised'), 'damaged_record')
+    expect(boxrows.get('revised')).to.have.property('am', 'a')
+    expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['revised'])
+    await TH.expectGood(next.tryDelDamagedBox('revised'))
+    expect(boxrows.get('revised')).to.have.property('am', 'x')
+    expect(next.boxListing.damaged_records).to.deep.equal([])
+  })
+
+  it("is deleted by tryDelDamagedBox: the tombstone lands, the entry clears, a birth then goes over it", async () => {
     const { openNextSession, boxrows } = await makeWorldWithRubble()
     const next = await openNextSession()
     await next.hello()
-    await next.delBox('rubble')
+    expect(await next.tryDelDamagedBox('rubble')).to.deep.include({ ok: true })
     expect(boxrows.get('rubble')).to.have.property('am', 'x')
     expect(next.boxListing.damaged_records).to.deep.equal([])
     const reborn = await next.putBox({ boxlabel: 'rubble', whisper: Whisper })
     expect(await reborn.extractWhisper()).to.deep.equal(Whisper)
+  })
+})
+
+describe("vault.tryDelDamagedBox", () => {
+  it("refuses a healthy box as 'absent_box', leaving the box alone", async () => {
+    const { vault, boxrows } = await makeWorldWithBox()
+    const err = await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'absent_box')
+    expect(err.message).to.equal(Phrases.damagedBoxAbsent(boxlabel))
+    expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
+    expect(vault.boxListing.at({ ...vault.scope, boxlabel })).not.to.be.null
+  })
+
+  it("refuses a boxlabel nothing is listed under as 'absent_box', storing nothing", async () => {
+    const { vault, boxrows } = await makeWorld()
+    await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'absent_box')
+    expect(boxrows.has(boxlabel)).to.be.false
+  })
+
+  it("never throws: a boxlabel that fails its check, and a locked vault, answer a bad Outcome", async () => {
+    const { vault } = await makeWorld()
+    await TH.expectBad(vault.tryDelDamagedBox('Not A Label'), 'bad_scope')
+    vault.lock()
+    await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'vault_locked')
   })
 })

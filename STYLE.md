@@ -129,6 +129,9 @@ thing's stage in its life is its `stage`.
 **`isFoo` is a boolean. A function returning a predicate ends in `Pred`**:
 `withinVaultScopepathPred(scope)`.
 
+**A boolean says the positive**: `isEnabled`, never `isDisabled`. Each read of a negative one is a double negative
+(`selfDestructPreventionDisabled`).
+
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
 `vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
 `Input` appended** (`dragForceInput`). A shape's validator checks no one parameter, and takes its
@@ -193,8 +196,8 @@ is named for the act.
 | `putFoo` | Stores foo, resolving it as stored. |
 | `delFoo` | Deletes foo. |
 | `ensureFoo` | Has foo or makes it so, idempotently, and hands it back. |
-| `makeThing`, `Thing.make` | Synchronous: gives the thing, in memory. Stores nothing. |
-| `buildThing`, `Thing.build` | The same, asynchronous. |
+| `makeThing`, `Thing.make` | Synchronous: gives the thing, in memory. Stores nothing. Where a `build` exists too, `make` is what it calls, and `make` calls `new`. |
+| `buildThing`, `Thing.build` | The same, asynchronous. Where a `make` exists too, it goes `build`, then `make`, then `new`. |
 | `checkFoo` | Refuses a bad foo. Returns nothing. |
 | `checkedFoo` | Refuses a bad foo, else returns it, typed. What `optionsCheck` makes. |
 | `parseFoo` | Refuses a bad foo, else returns it cleaned or converted (*Validation*). |
@@ -690,6 +693,11 @@ rows with it.
   `refusalkind` to branch on. Actionable: what to do next. Empathetic: a failure (misuse, bad
   news) speaks to the developer integrating the package; a condition speaks, calmly, to the user
   who will see it.
+* **A guard lives in what an entrypoint calls** (the Coach, 2026-11-04). A public entrypoint's
+  `demandFooable` carries `demandEnabled` and whatever else that entrypoint needs. A primitive, a
+  private helper or a method that only prepares another carries none. Demand again only at a
+  critical seam, synchronously before the critical call (an unseal, a put). A guard upstream of
+  one already on the path is noise.
 
 ## Comments and doc blocks
 

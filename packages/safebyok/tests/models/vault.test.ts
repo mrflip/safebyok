@@ -75,8 +75,8 @@ describe("VaultListing.build of a record, and its constructor", () => {
 
   it("refuses 'bad_option' a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
     const { opts } = makeVaultWorld()
-    for (const verb of ['peek', 'tryCache', 'tryVacate']) {
-      const missing = { peek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
+    for (const verb of ['tryPeek', 'tryCache', 'tryVacate']) {
+      const missing = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
       TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, deviceDB: missing as never } }), 'bad_option')
     }
     TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, onPanic: 'call me' as never } }), 'bad_option')
@@ -113,7 +113,7 @@ describe("vault.takeWorld(world)", () => {
 describe("the friend a vault hands its leases", () => {
   it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
-    await friend.peekLease()
+    await friend.tryPeekLease()
     await friend.tryUncacheLease()
     const asked = { ...vault.scope, vault_tok: vault.vault_tok }
     expect(deviceDB.peek).toHaveBeenCalledWith(asked)
@@ -168,12 +168,12 @@ describe("vault.ensureTimely(maxMillis)", () => {
     expect(vault.revision_tok).to.eq(landed.revision_tok)
   })
 
-  it("resolves over a vault its fetch finds gone, leaving demandUsable to refuse 'vault_gone'", async () => {
+  it("resolves over a vault its fetch finds gone, leaving demandEnabled to refuse 'vault_gone'", async () => {
     const { vault, demandStored, restoreRow } = await bornWithGets()
     const stored = demandStored()
     restoreRow({ ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' })
     await expect(vault.ensureTimely(0)).resolves.to.equal(vault)
-    TH.expectSyncRefusal(() => vault.demandUsable(), 'vault_gone')
+    TH.expectSyncRefusal(() => vault.demandEnabled(), 'vault_gone')
   })
 
   it("refuses a maxMillis out of range as 'bad_option'", async () => {

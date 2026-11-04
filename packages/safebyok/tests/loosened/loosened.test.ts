@@ -17,12 +17,12 @@ useVaultWorlds()
 // == [Creation and re-creation]: registered_at over a rebirth, the tombstone's registered_at
 
 describe("registered_at over a rebirth", () => {
-  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's send, not its first store", async () => {
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's put, not its first store", async () => {
     held.mw.seedStore(fullBoxRecord())
     const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
     await box.del()
     held.mw.setNow(T0 + 5000)
-    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
+    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
 
@@ -30,7 +30,7 @@ describe("registered_at over a rebirth", () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
     held.mw.setNow(T0 + 5000)
     held.mw.willPut(({ record }) => held.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
-    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
+    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ registered_at: T0 })
     expect(box.registered_at).to.eq(T0)
     expect(held.mw.badnews).to.deep.equal([])

@@ -1,7 +1,6 @@
 import { Checkers } from '../checks/validator'
-import { VaultError } from '../errors'
 import { decorate, tattoo } from '../helpers'
-import * as Phrases from '../phrases'
+import { passkeyHeldAlready } from '../helpers/throwers'
 import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultStamp, type WayinHeader, FirstGateEpoch, gateProps, vaultStamp } from './models-shapes'
 import { Wayin } from './wayin'
 
@@ -52,9 +51,4 @@ export class Gate {
     return { gate_epoch: this.gate_epoch, passphrase_wayin: this.ppWayin.toJSON(), passkey_wayin: this.pkWayin?.toJSON() ?? null }
   }
 }
-// --
-
-// == [Refusals]: passkeyHeldAlready
-
-const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
 // --

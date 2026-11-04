@@ -427,7 +427,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
 
     it("other | newer | full | never stored takes 'adopt': a box born elsewhere first is the one storage holds", () => {
-      const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.NeverStoredSeq, revision_tok: 'rev-never' }))
+      const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.VoidRevisionSeq, revision_tok: 'rev-never' }))
       const rcvd = fullBoxRecord({ revision_seq: 0, revision_tok: 'rev-b0', ...OtherLife })
       box.receive(rcvd)
       expect(box._cheat_central).to.deep.equal(rcvd)
@@ -438,8 +438,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
 
 describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with", () => {
-    const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.NeverStoredSeq, revision_tok: 'rev-never' }))
-    expect(box._cheat_central.revision_seq).to.eq(MSX.NeverStoredSeq)
+    const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.VoidRevisionSeq, revision_tok: 'rev-never' }))
+    expect(box._cheat_central.revision_seq).to.eq(MSX.VoidRevisionSeq)
     expectReceivedUnchanged(box, null, 'same')
   })
 
@@ -454,7 +454,7 @@ describe("storable.receive(null)", () => {
   })
 })
 
-/** A box holding `record` (the full box record `anthropic_api_key` at revision 1, by default) as received, which storage holds too, so that a send lays its revision over it. */
+/** A box holding `record`, by default the full box record `anthropic_api_key` at revision 1, with the same in storage. */
 const builtBoxOf = (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<TestableBox> => {
   held.mw.seedStore(record)
   return boxListingOf(held.mw).build(record)
@@ -491,7 +491,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot).to.eq(box.getSnapshot)
       const { getSnapshot } = box
       const first = getSnapshot()
-      await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'changed' } })
+      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'changed' } })
       expect(getSnapshot()).to.not.eq(first)
       expect(getSnapshot()).to.eq(box.snapshot)
     })
@@ -575,12 +575,12 @@ describe("Storable snapshot and subscription", () => {
       expect(seen).to.deep.equal([2])
     })
 
-    it("notifies on a send and on a del, each a change", async () => {
+    it("notifies on a put and on a del, each a change", async () => {
       const box = await builtBoxOf()
       box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
       const afterEdit = listener.mock.calls.length
       expect(afterEdit).to.be.greaterThan(0)
       await box.del()
@@ -721,10 +721,10 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a3', revision_seq: 3, written_at: T0 + 30 })
     })
 
-    it("follow the record a send lands, which is one revision on, written now", async () => {
+    it("follow the record a put lands, which is one revision on, written now", async () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
-      await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
       expect(box.revision_seq).to.eq(2)
       expect(box.revision_tok).to.not.eq('rev-a1')
       expect(box.written_at).to.eq(T0 + 500)
@@ -746,9 +746,9 @@ describe("Storable own props", () => {
   })
 })
 
-// == [Send]: seal, then put
+// == [Put]: seal, then put
 
-describe("storable.send(patch): seal, then put", () => {
+describe("storable.put(patch): seal, then put", () => {
   it("puts the record sealed over central's revision, resolving this once storage's answer is adopted", async () => {
     const { box } = await timelyBoxOf()
     const hold = holdOf()
@@ -757,8 +757,8 @@ describe("storable.send(patch): seal, then put", () => {
       return held.mw.answerOf(box.scope, record)
     })
     let resolved = false
-    const sending = (async () => {
-      const sent = await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+    const putting = (async () => {
+      const sent = await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
       resolved = true
       return sent
     })()
@@ -769,7 +769,7 @@ describe("storable.send(patch): seal, then put", () => {
     expect(put?.priorRevisionTok).to.equal('rev-a1')
     expect(resolved).to.be.false
     hold.open()
-    expect(await sending).to.eq(box)
+    expect(await putting).to.eq(box)
     expect(box._cheat_central).to.deep.equal(put?.record)
   })
 })
@@ -823,7 +823,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
 
 describe("storable verbs while the vault is locked", () => {
   const EntryCases = [
-    [(box: TestableBox) => box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'locked' } }), 'send'],
+    [(box: TestableBox) => box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'locked' } }), 'put'],
     [(box: TestableBox) => box.del(),                                                          'del'],
   ] as const
   for (const [verb, verbname] of EntryCases) {
@@ -855,7 +855,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
     [(box: TestableBox) => box.tryFetch(),                                                   'tryFetch of a stored record'],
     [(box: TestableBox) => box.tryHydrate(),                                                 'tryHydrate of a timely record'],
-    [(box: TestableBox) => box.trySend({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'trySend that storage takes'],
+    [(box: TestableBox) => box.tryPut({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage takes'],
     [(box: TestableBox) => box.tryDel(),                                                     'tryDel that storage takes'],
   ] as const
   for (const [tryVerb, blurb] of GoodCases) {
@@ -869,7 +869,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
     [(box: TestableBox) => box.tryFetch(),                                                   (box: TestableBox) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
     [(box: TestableBox) => box.tryFetch(),                                                   () => { held.mw.willGet(() => { throw new Error("socket closed") }) },         "unexpected_error",    'tryFetch whose store throws a plain Error'],
     [(box: TestableBox) => box.tryHydrate(),                                                 () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
-    [(box: TestableBox) => box.trySend({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'trySend that storage refuses as stale'],
+    [(box: TestableBox) => box.tryPut({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
     [(box: TestableBox) => box.tryDel(),                                                     () => { held.mw.setLockState('locked') },                                      "vault_locked",        'tryDel while locked'],
   ] as const
   for (const [tryVerb, arrange, refusalkind, blurb] of BadCases) {
@@ -934,14 +934,14 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
 
 // --
 
-// == [Rebirth, sentences]: a deletion arriving again after a send, phrases.ts
+// == [Rebirth, sentences]: a deletion arriving again after a put, phrases.ts
 
-describe("storable.receive(rcvd): after a send over a box held gone", () => {
+describe("storable.receive(rcvd): after a put over a box held gone", () => {
   it("keeps a rebirth landed over a box held gone when the deletion held arrives again: an older record says nothing new", async () => {
     const gone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' })
     held.mw.seedStore(gone)
     const box = await fakeSealBoxListingOf(held.mw).build(gone)
-    await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
+    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
     box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     expect(box.isPresent).to.be.true
   })
@@ -960,10 +960,10 @@ describe("storable refusal sentences, from phrases.ts", () => {
     }
   })
 
-  it("refuses a locked send and a record not full with the sentences phrases.ts holds", async () => {
+  it("refuses a locked put and a record not full with the sentences phrases.ts holds", async () => {
     const { box } = await timelyBoxOf()
     held.mw.setLockState('locked')
-    const locked = await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
+    const locked = await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
     expect(locked.message).to.eq(Phrases.VaultLocked)
     held.mw.setLockState('unlocked')
     const sparse = await boxListingOf(held.mw).build(sparseBoxRecord({ boxlabel: 'sparse_one' }))
@@ -1004,27 +1004,64 @@ describe("storable.hydrate(opts): timeliness asks of the record in hand alone", 
 })
 // --
 
-describe("Storable send guards: ensureSendable, demandSendable", () => {
-  it("demandSendable answers the box while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
+describe("Storable put guards: ensurePuttable, demandPuttable", () => {
+  const Patch = { whisper: { val: 'sk-test-0000' } }
+
+  it("demandPuttable answers the patch as parsed while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
     const box = await builtBoxOf()
-    expect(box.demandSendable()).to.eq(box)
+    expect(box.demandPuttable({ ...box.scope, sidecar: { note: 'sent' } })).to.deep.include({ sidecar: { note: 'sent' } })
     held.mw.setLockState('locked')
-    TH.expectSyncRefusal(() => box.demandSendable(), 'vault_locked')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
   })
 
-  it("ensureSendable refreshes and demands nothing: it resolves while locked, where send refuses", async () => {
-    const box = await builtBoxOf()
+  it("demandPuttable refuses a bad patch first, 'bad_option' while locked and over a record not whole", async () => {
+    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
     held.mw.setLockState('locked')
-    await expect(box.ensureSendable()).resolves.to.eq(box)
-    await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
+    TH.expectSyncRefusal(() => box.demandPuttable({}), 'bad_option')
+    TH.expectSyncRefusal(() => box.demandPuttable({ ...Patch, boxlabel: 'openai_api_key' }), 'bad_option')
   })
 
-  it("send checks the patch before its guard, and ensures the guard on each side of its seal", async () => {
+  it("demandPuttable refuses 'disabled' before the lock, and the lock before a record not whole", async () => {
+    const box = await boxListingOf(held.mw).build(sparseBoxRecord())
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'bad_option')
+    held.mw.setLockState('locked')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
+    box.vacate()
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'disabled')
+  })
+
+  it("demandPuttable under ifPresent 'fail' refuses a whole record as 'bad_option', saying its data would be recycled", async () => {
+    const box = await boxListingOf(held.mw).build(fullBoxRecord())
+    const err = TH.expectSyncRefusal(() => box.demandPuttable({ ...fullBoxRecord() }, { ifPresent: 'fail' }), 'bad_option')
+    expect(err.message).to.eq(Phrases.RecordForNewBox)
+    expect(box.demandPuttable({ ...fullBoxRecord() })).to.deep.include({ sidecar: fullBoxRecord().sidecar })
+    expect(box.demandPuttable(Patch, { ifPresent: 'fail' })).to.deep.include(Patch)
+  })
+
+  it("demandPuttable takes a void record and a tombstone as whole", async () => {
+    const listing = boxListingOf(held.mw)
+    const shell = listing.puttable(held.mw.boxscope('anthropic_api_key'))
+    expect(shell.demandPuttable(Patch)).to.deep.include(Patch)
+    const tomb = await listing.build(held.mw.tombstoneBoxRecord({ boxlabel: 'openai_api_key' }))
+    expect(tomb.demandPuttable(Patch)).to.deep.include(Patch)
+    expect(held.mw.callsOf('get')).to.deep.equal([])
+  })
+
+  it("ensurePuttable refreshes and demands nothing: it resolves while locked, where put refuses", async () => {
     const box = await builtBoxOf()
-    const sendGuard = vi.spyOn(Box.prototype, 'ensureSendable')
-    await TH.expectRefusal(box.send({}), 'bad_option')
-    expect(sendGuard).not.toHaveBeenCalled()
-    await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)
-    expect(sendGuard).toHaveBeenCalledTimes(2)
+    held.mw.setLockState('locked')
+    await expect(box.ensurePuttable()).resolves.to.eq(box)
+    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
+  })
+
+  it("put ensures once, before its seal, and a bad patch heard after that ensure puts nothing", async () => {
+    const box = await builtBoxOf()
+    const putGuard = vi.spyOn(Box.prototype, 'ensurePuttable')
+    await TH.expectRefusal(box.put({}), 'bad_option')
+    expect(putGuard).toHaveBeenCalledOnce()
+    expect(held.mw.callsOf('put')).to.deep.equal([])
+    putGuard.mockClear()
+    await expect(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)
+    expect(putGuard).toHaveBeenCalledOnce()
   })
 })

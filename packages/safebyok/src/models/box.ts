@@ -1,40 +1,15 @@
-import { verifyConsistent } from '../checks/validator'
-import { type CipherCtxRecord, makeLifeTok, randomId } from '../crypto'
-import { VaultError } from '../errors'
-import { absentBoxError } from '../helpers/throwers'
+import { type CipherCtxRecord, makeLifeTok } from '../crypto'
 import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../stable-jsonify'
-import type { BoxWorld } from './box-listing'
-import { type BoxPatchGiven, type BoxRecord, type BoxSparse, type Fetched, type LockedBag, type LockState, type SendOpts, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
+import * as VS from '../storage/vault-db-shapes'
+import { absentBoxError, recordForNewBox, undecodedWhisper } from '../helpers/throwers'
+import type { BoxListing } from './box-listing'
+import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
 import * as MSX from './models-shapes'
 import { Storable } from './storable'
-
-// == [Record forms]: BoxSnapshot, BoxProps, BoxPatch, BoxPut
-
-export type BoxSnapshot = Boxscope & Readonly<{
-  revision_tok:  string
-  revision_seq:  number
-  registered_at: number
-  written_at:    number
-  sidecar:       Sidecar | null
-  full:          boolean
-  present:       boolean
-  exposed:       boolean
-  lockState:     LockState
-}>
-
-/** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
-export type BoxProps = { whisper: WhisperHolder, sidecar: Sidecar }
-
-/** A host's patch for `send`: either of the {@link BoxProps} or both, the half left out being kept, and any other prop of the box's record, which the box controls and ignores, so `{ ...record, whisper, sidecar }` will do. `boxPatch` checks it. */
-export type BoxPatch = { [Prop in keyof BoxProps]?: BoxProps[Prop] | undefined } & { [Prop in Exclude<keyof BoxRecord, 'sidecar'>]?: BoxRecord[Prop] | undefined }
-
-/** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
-export type BoxPut = BoxPatch & { boxlabel: string }
-// --
 
 // == [Box]
 
@@ -48,7 +23,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly world: BoxWorld
 
-  /** The whisper the host asked to keep open on the instance, as its frozen {@link WhisperHolder}, kept while the vault locks and unlocks until the host sets it null. Nothing seals it: a `send` seals the whisper it is given. */
+  declare readonly listing: BoxListing
+
+  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until the host sets it null. */
   #exposed: WhisperHolder | null = null
 
   // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
@@ -68,7 +45,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
   // --
 
-  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensureSendable, demandSendable, ensureExposable, demandExposable
+  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensurePuttable, demandPuttable, demandExposable
 
   demandPresent(): this {
     if (! this.isPresent) { throw absentBoxError(this) }
@@ -80,12 +57,17 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
   demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
-  ensureSendable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
+  ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  /** A send needs the box enabled and the vault unlocked, and no more: a box gone is sent back to life. */
-  demandSendable(): this { return this.demandEnabled().demandUnlocked() }
-
-  ensureExposable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
+  /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
+  demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
+    const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
+    if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
+    this.demandEnabled()
+    this.world.demandUnlocked()
+    this.demandWhole()
+    return given
+  }
 
   /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
   demandExposable(): this { return this.demandEnabled().demandUnlocked() }
@@ -118,7 +100,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** SLOPDOC: Opens the stored whisper and holds it on the instance, where `box.whisper` offers it until forgotten. */
   async expose(opts: TimelyOpts = {}): Promise<this> {
     const exposed = await this.extractWhisper(opts)
-    await this.ensureExposable(); this.demandExposable()
+    this.demandExposable()
     this.#exposed = exposed
     this.settle()
     return this
@@ -135,45 +117,34 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Sending]: send, trySend, edit
+  // == [Putting]: put, tryPut, edit
 
-  /** SLOPDOC: Seals `patch` over the record in hand and stores it, or brings a gone box back to life. */
-  async send(patch: BoxPatch, opts: SendOpts = {}): Promise<this> {
-    const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
-    const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
-    await this.ensureSendable(timely); this.demandSendable()
-    const ante = this.central
-    const record = await this.#edit(given, ante)
-    await this.ensureSendable(); this.demandSendable()
-    await this.listing.put(record, ante, { ifPresent })
-    return this
+  /** Seals `patch` over the record in hand and stores it, answering the box listed; a deleted box is reborn. */
+  async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
+    const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = MSX.boxPutOpts.parse(opts)
+    await this.ensurePuttable(timely)
+    const given = this.demandPuttable(patch, { ifPresent })
+    const { record, prior } = await this.#edit(given)
+    this.demandPuttable(patch, { ifPresent })
+    return this.listing.put(record, { prior, ifAbsent, ifPresent })
   }
 
-  trySend(patch: BoxPatch, opts: SendOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.send(patch, opts)) }
+  tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.put(patch, opts)) }
 
-  /** SLOPDOC: The next record `patch` makes of `ante`, sealed through the vault and not yet stored. */
-  async #edit({ whisper, sidecar }: BoxPatchGiven, ante: Fetched<BoxRecord, BoxSparse>): Promise<BoxRecord> {
-    const isBirthday = this.isTombstoneRecord(ante)
-    const sidecarGiven = sidecar ?? (isBirthday ? {} : this.demandFullProps().sidecar)
-    // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
-    const whisperGiven = whisper ?? await this.#keptWhisper(isBirthday)
+  /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
+  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: VS.Revision }> {
+    const prior = this.central
     const written_at = this.world.clock.now()
-    return sealedRecordOf(this.world, {
-      ...ante,
-      revision_tok:  randomId(),
-      revision_seq:  ante.revision_seq + 1,
-      registered_at: isBirthday ? written_at : ante.registered_at,
-      written_at,
-      box_tok:       isBirthday ? makeLifeTok() : ante.box_tok,
-      am:            'a',
-    }, sidecarGiven, whisperGiven)
+    const next = { ...prior, ...VS.nextRevisionOf(prior, written_at), am: 'a' as const }
+    // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
+    const record = this.isTombstoneRecord(prior)
+      ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? { val: {} })
+      : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
+    return { record, prior: VS.revisionOf(prior) }
   }
 
-  /** The whisper a patch left out, opened from the record in hand; 'no_whisper' over a tombstone, which has none to keep. */
-  #keptWhisper(isBirthday: boolean): Promise<WhisperHolder> {
-    if (isBirthday) { throw noWhisperToKeep() }
-    return this.#unseal(this.demandFullProps())
-  }
+  /** The whisper a patch left out, opened from the record in hand. */
+  #keptWhisper(): Promise<WhisperHolder> { return this.#unseal(this.demandFullProps()) }
   // --
 
   // == [Discards]: sweepContents, vacateContents
@@ -204,7 +175,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       full:          this.isFull,
       present:       this.isPresent,
       exposed:       this.#exposed !== null,
-      lockState:     this.listing.lockState(),
     })
   }
   // --
@@ -214,7 +184,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 // == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
 
 /** The full record of `base` with `sidecar`, `whisper` sealed through `world`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
-export const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
+const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
   const sparse = MSX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
   const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper) ?? '', stamp)
@@ -232,12 +202,4 @@ const parseJsonOrNull = (text: string): unknown => {
     return null
   }
 }
-// --
-
-// == [Refusals]: undecodedWhisper, noWhisperToKeep
-
-/** A whisper left out of an update, where no box is stored to keep one of. */
-export const noWhisperToKeep = (): VaultError => new VaultError('no_whisper', Phrases.NoWhisperToKeep)
-
-const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
 // --

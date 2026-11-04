@@ -5,39 +5,13 @@ import { type Outcome, bad, outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { VaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
-import type { ClearsForGatingkind, GatingKind, VaultRecord, WayinHeader } from './models-shapes'
+import { attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../helpers/throwers'
+import type { AnyGating, ClearsForGatingkind, GatingKind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, VaultRecord, VaultWorld, WayinHeader } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Gate } from './gate'
 import { PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
-import type { VaultListing, VaultWorld } from './vault-listing'
-
-// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs
-
-/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
-export type RequestCleartext = (gating: AnyGating) => unknown
-
-export type AnyGating = { [KindT in GatingKind]: Gating<KindT> }[GatingKind]
-
-export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
-
-/** What an attempt makes of the clears it is handed, for its `run`. */
-export type ProvingsForGatingkind = {
-  build_vault:        { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
-  unlock_vault:       { proved: Proving }
-  replace_passphrase: { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
-  add_passkey:        { ante: VaultRecord, proved: PassphraseProving, passkeyProving: PasskeyProving }
-  revoke_passkey:     { ante: VaultRecord, proved: PassphraseProving }
-  del_vault:          { ante: VaultRecord, proved: PassphraseProving }
-}
-
-/** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
-export type Run<KindT extends GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
-
-export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
-
-export type LaunchArgs<KindT extends GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
-// --
+import type { VaultListing } from './vault-listing'
 
 // == [Gating]: launch, isOpen, whenSettled, checkStrength, attempt, decline, declineAtLock, declineAtDiscard, toJSON
 
@@ -171,10 +145,6 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 
 // == [An attempt's provings]: Prove, ProveForGatingkind, timelyAnte, provePassphrase, checkedClears, isCorrectable, spendClears
 
-type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
-
-type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
-
 /** Past the enter key, the last to hear the clears. A birth's stamp is minted here, one per attempt. */
 const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   build_vault: async ({ scope, world }, clears) => {
@@ -186,10 +156,11 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   },
   unlock_vault: async ({ vault, world }, clears) => {
     const { passphraseClear, passkeyClear } = checkedClears(MSX.vaultUnlockClears, clears)
-    await vault.ensureUsable(MSX.Promptly); vault.demandUsable()
+    await vault.ensureTimely(MSX.Promptly); vault.demandEnabled()
     const { gate } = vault
-    const proved = (passphraseClear === undefined) ? await PasskeyProving.buildStored(gate, passkeyClear!) : await PassphraseProving.buildStored(gate, passphraseClear, world)
-    return { proved }
+    if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
+    if (! passkeyClear) { throw new VaultError('unexpected_error', Phrases.ProofMissing) }
+    return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
   },
   replace_passphrase: async ({ vault, world }, clears) => {
     const { antePassphraseClear, nextPassphraseClear } = checkedClears(MSX.passphraseReplaceClears, clears)
@@ -212,7 +183,7 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
 
 /** The attempt's one record and the gate it holds, read once, after its timeliness request. */
 const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
-  await vault.ensureUsable(MSX.Promptly); vault.demandUsable()
+  await vault.ensureTimely(MSX.Promptly); vault.demandEnabled()
   return { ante: vault.fullRecord, gate: vault.gate }
 }
 
@@ -241,25 +212,4 @@ const spendClears = (clears: unknown): void => {
     if (Object.prototype.toString.call(prfBytes) === '[object ArrayBuffer]') { new Uint8Array(prfBytes as ArrayBuffer).fill(0) }
   } catch { /* nothing left to spend */ }
 }
-// --
-
-// == [Refusals]: alreadyAsking, noRequestCleartext, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight
-
-export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
-
-const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrases.NoRequestCleartext)
-
-const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
-
-const clearsThrew = (): VaultError => new VaultError('unexpected_error', Phrases.ClearsThrew)
-
-const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)
-
-const gatingDeclined = (): VaultError => new VaultError('declined', Phrases.GatingDeclined)
-
-const lockedWhileAsking = (): VaultError => new VaultError('locked_while_asking', Phrases.LockedWhileAsking)
-
-const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)
-
-const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
 // --

@@ -6,8 +6,7 @@ import { reportToPlatform } from '../report-error'
 import { stableJsonify } from '../stable-jsonify'
 import { disabledError, lockedError, partialLoadError } from '../helpers/throwers'
 import * as Phrases from '../phrases'
-import type { Listing } from './listing'
-import type { Age, Am, Fetched, FetchOpts, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
+import type { Age, Am, Fetched, FetchOpts, ListingOf, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
 // == [Revisions]: cmpRevisions
@@ -24,10 +23,6 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 // --
 
 // == [Storable]
-
-/** The listing a storable is made in, as it sees it: its own kind of thing, whatever snapshot the concrete class makes. */
-export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> =
-  Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown>>
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
   // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, snapshot, horizonMillis, refreshedAt, listeners
@@ -48,9 +43,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare written_at:    number
 
   /** Set by a sweep, a vacate or a delete, and never cleared. */
-  #isDisabled = false
+  #isEnabled = true
 
-  /** The latest record this device knows storage holds: full, sparse, or a tombstone. A thing never stored is born with a tombstone at NeverStoredSeq. */
+  /** The latest record this device knows storage holds: full, sparse or a tombstone, void on a new instance. */
   #central: Fetched<RecordT, SparseT>
   /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
@@ -110,8 +105,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The record in hand where it is the full record, else null. */
   protected get full(): RecordT | null {
-    const central = this.#central
-    return this.isFullRecord(central) ? central : null
+    return this.isFullRecord(this.#central) ? this.#central : null
   }
 
   /** The sparse form of central: everything but what only the full record carries. */
@@ -201,22 +195,26 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandFullProps, ensureDeletable, demandDeletable
+  // == [Guards]: isEnabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandWhole, demandFullProps, ensureDeletable, demandDeletable
 
-  /** True past a sweep, a vacate or a delete, and from then on. */
-  get isDisabled(): boolean { return this.#isDisabled }
+  /** False past a sweep, a vacate or a delete, and from then on. */
+  get isEnabled(): boolean { return this.#isEnabled }
 
-  demandEnabled():  this { if (this.#isDisabled) { throw disabledError() }                             return this }
+  demandEnabled():  this { this.#demandInstanceEnabled();                                                     return this }
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
   demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 
+  demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
+
+  // Not `demandEnabled`, which a Vault widens to refuse a vault gone: a fetch is how a thing gone hears its slot has moved on.
+  #demandInstanceEnabled(): void { if (! this.#isEnabled) { throw disabledError() } }
+
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
-    const { full } = this
-    if (full === null) { throw partialLoadError() }
-    return full
+    if (this.full !== null) { return this.full }
+    throw partialLoadError()
   }
 
   ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
@@ -231,9 +229,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
-    this.demandEnabled()
+    this.#demandInstanceEnabled()
     await this.#oneFetchAtATime()
-    this.demandEnabled()
+    this.#demandInstanceEnabled()
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
@@ -242,7 +240,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return outcomeOf(() => this.fetch(opts))
   }
 
-  /** Make the world timely, as its answer may lock the vault or take the thing away, and fetch the record unless it is timely within `opts.maxMillisSinceRefresh`, by default the thing's horizon. */
+  /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
@@ -252,7 +250,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone is deleted again, over its tombstone's revision. */
+  /** Delete this thing through its listing. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureDeletable(MSX.timelyOpts.parse(opts)); this.demandDeletable()
     await this.listing.del(this)
@@ -264,9 +262,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Discards]: lock, sweep, vacate, sweepContents, vacateContents, disable
 
-  /** Settle, as the lock has moved, which a snapshot showing the lock tells its listeners: past a discard, a no-op. Never throws. */
+  /** Tell the listeners the lock has moved. A no-op past a discard; never throws. */
   lock(): this {
-    if (! this.#isDisabled) { this.settle() }
+    if (this.#isEnabled) { this.settle() }
     return this
   }
 
@@ -282,8 +280,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // Marked first, so that a repeat met on the way finds the work done.
   #disable(dropContents: () => void): this {
-    if (this.#isDisabled) { return this }
-    this.#isDisabled = true
+    if (! this.#isEnabled) { return this }
+    this.#isEnabled = false
     dropContents()
     this.listing.unlist(this)
     this.settle()
@@ -295,13 +293,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** SLOPDOC: Takes in what storage said: judges it against the record in hand, adopts and settles what it takes. */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
-    if (this.#isDisabled) { return { badnews: [] } }
+    if (! this.#isEnabled) { return { badnews: [] } }
     const answer = rcvd ?? this.tombstoneFor(this.#central)
-    const { central } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
-    const older = cmpRevisions(this.#central, answer) === 'older'
+    const { central, policy } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
     const isTaken = central !== this.#central
     if (isTaken) { this.adopt(central) }
-    if (! older && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
+    if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
     return isTaken ? this.settle() : { badnews: [] }
   }
 

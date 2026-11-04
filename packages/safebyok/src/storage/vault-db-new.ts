@@ -5,7 +5,7 @@ import { type BadOutcome, type GoodOutcome, outcomeOf } from '../outcome'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import * as Refuse from './vault-db-refusals'
 import * as VS from './vault-db-shapes'
-import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, IfPresent, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
+import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, IfPresent, PutIfAbsent, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'
 
 // == [Answers]: AnswerFacts, GoodAnswer, BadAnswer, Answer, Said, BankListed, VaultListed, Tidied, Notice, answerOf
 
@@ -24,6 +24,7 @@ export type PutAct = 'born' | 'reborn' | 'replaced' | 'declined'
 export type DelAct = 'deleted' | 'gone' | 'void'
 
 type Said<ValT, ActT extends string, WorldT> = { act: ActT, val: ValT, world: WorldT, dbhas?: unknown }
+type PutChoices = { prior: Revision, ifAbsent: PutIfAbsent, ifPresent: IfPresent }
 
 export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_records: DamagedVault[] }
 export type VaultListed = VaultRecord & { boxes: BoxSparse[], damaged_records: DamagedBox[] }
@@ -51,8 +52,8 @@ export type Landing = { landed: boolean, ante: unknown }
 /** A box write's {@link Landing}, with the vault row as read in the same step. */
 export type BoxLanding = Landing & { vault: unknown }
 
-/** `prior` is the revision the row must stand at, void matching {@link VS.NeverStored}. With `mayReplaceLive` false, a live row stops the write whatever its revision. */
-export type PutTerms = { prior: Revision, mayReplaceLive: boolean }
+/** A put's terms: the revision `prior` the row must stand at, and whether it may replace a live row or add over an absent one. */
+export type PutTerms = { prior: Revision, mayReplaceLive: boolean, mayAdd: boolean }
 
 export type RowOfVault = { vaultlabel: string, vault: unknown }
 export type RowOfBox   = { boxlabel: string, box: unknown }
@@ -62,6 +63,8 @@ export type Heard = { vault: unknown, box?: unknown }
 // --
 
 const noUnwatching = (): void => undefined
+
+const putTermsOf = ({ prior, ifAbsent, ifPresent }: PutChoices): PutTerms => ({ prior, mayReplaceLive: (ifPresent === 'repl'), mayAdd: (ifAbsent === 'add') })
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
 export abstract class VaultDB {
@@ -157,9 +160,9 @@ export abstract class VaultDB {
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     return this.#call<VaultRow, PutAct, VaultRow>('putVault', { ...record, ...opts }, async () => {
       const vaultRecord = VS.vaultRecord.parse(record)
-      const { prior, ifPresent } = VS.putVaultOpts.parse(opts)
-      demandNextSeq(vaultRecord, prior)
-      return this.#landVault(vaultRecord, prior, ifPresent)
+      const terms = VS.putVaultOpts.parse(opts)
+      demandNextSeq(vaultRecord, terms.prior)
+      return this.#landVault(vaultRecord, terms)
     })
   }
 
@@ -167,17 +170,19 @@ export abstract class VaultDB {
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
     return this.#call<BoxRow, PutAct, VaultRow>('putBox', { ...record, ...opts }, async () => {
       const boxRecord = VS.boxRecord.parse(record)
-      const { prior, ifPresent } = VS.putOpts.parse(opts)
+      const { prior, ifAbsent, ifPresent } = VS.putOpts.parse(opts)
       demandNextSeq(boxRecord, prior)
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-      const { landed, ante, vault } = await adapted(() => this.doPutBox(boxRecord, { prior, mayReplaceLive: (ifPresent === 'repl') }))
+      const { landed, ante, vault } = await adapted(() => this.doPutBox(boxRecord, putTermsOf({ prior, ifAbsent, ifPresent })))
       const world = checkedVaultLife(vaultRowOf(vault), boxRecord, boxRecord.vault_tok)
       if (landed) { return { act: landingActOf(ante), val: boxRecord, world } }
       const stored = boxRowOf(ante)
       if (stored?.am === 'a') {
         if (ifPresent === 'fail') { throw Refuse.camped(world, stored) }
         if (ifPresent === 'get')  { return { act: 'declined', val: stored, world } }
+      } else if (ifAbsent === 'fail') {
+        throw Refuse.absentBox(world, stored)
       }
       throw Refuse.staleWrite(world, stored)
     })
@@ -186,13 +191,15 @@ export abstract class VaultDB {
   async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
   async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
 
-  async #landVault(record: VaultRecord, prior: Revision, ifPresent: IfPresent): Promise<Said<VaultRow, PutAct, VaultRow>> {
-    const { landed, ante } = await adapted(() => this.doPutVault(record, { prior, mayReplaceLive: (ifPresent === 'repl') }))
+  async #landVault(record: VaultRecord, { prior, ifAbsent, ifPresent }: PutChoices): Promise<Said<VaultRow, PutAct, VaultRow>> {
+    const { landed, ante } = await adapted(() => this.doPutVault(record, putTermsOf({ prior, ifAbsent, ifPresent })))
     if (landed) { return { act: landingActOf(ante), val: record, world: record } }
     const stored = vaultRowOf(ante)
     if (stored?.am === 'a') {
       if (ifPresent === 'fail') { throw Refuse.camped(stored, stored) }
       if (ifPresent === 'get')  { return { act: 'declined', val: stored, world: stored } }
+    } else if (ifAbsent === 'fail') {
+      throw (stored === null) ? Refuse.vaultEmpty(VS.sentinelVaultOf(record, record.vault_tok)) : Refuse.vaultGone(stored)
     }
     throw Refuse.staleWrite(stored ?? VS.sentinelVaultOf(record, record.vault_tok), stored)
   }
@@ -251,7 +258,7 @@ export abstract class VaultDB {
       ...VS.nextRevisionOf(stored, this.#clock.now()),
       gate: { ...stored.gate, ...wayin, gate_epoch: stored.gate.gate_epoch + 1 },
     }
-    await this.#landVault(record, VS.revisionOf(stored), 'repl')
+    await this.#landVault(record, { prior: VS.revisionOf(stored), ifAbsent: 'add', ifPresent: 'repl' })
     return { act, val: record, world: record }
   }
   // --

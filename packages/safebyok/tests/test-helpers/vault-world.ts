@@ -1,10 +1,8 @@
 /** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a {@link MemoryDeviceDB} with its lease verbs spied on, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
-import type { BoxWorld } from '../../src/models/box-listing'
 import type { Lease } from '../../src/models/lease'
-import type { RequestCleartext } from '../../src/models/gating'
-import type { VaultRecord } from '../../src/models/models-shapes'
+import type { BoxWorld, RequestCleartext, VaultListingOpts, VaultRecord, VaultWorld } from '../../src/models/models-shapes'
 import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
@@ -12,7 +10,7 @@ import type { Outcome } from '../../src/outcome'
 import type { VaultScope } from '../../src/shapes/scopes'
 import type * as VX from '../../src/shapes/vault'
 import { passphraseCleartext } from '../../src/shapes/vault'
-import { type VaultListingOpts, type VaultWorld, VaultListing } from '../../src/models/vault-listing'
+import { VaultListing } from '../../src/models/vault-listing'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { quietLogger } from './logging'
@@ -63,6 +61,9 @@ export const buildTyping = (listing: VaultListing, scope: VaultScope, typing: Ty
 
 /** `vault.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
 export const unlockTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.ensureUnlocked())
+
+/** `vault.unlock()` itself, the user doing `typing` at the dialog. */
+export const unlockVerbTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.unlock())
 
 /** `vault.replacePassphrase()`, the user typing the passphrase and the next at the dialog. */
 export const replaceTyping = (vault: Vault, ante: string, next: string): Promise<Vault> => askTyping(vault.world, { antePassphraseClear: ante, nextPassphraseClear: next }, () => vault.replacePassphrase())
@@ -172,13 +173,14 @@ export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), w
   return { ...world, vault }
 }
 
-/** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on, caught by a spy, as nothing of a vault hands it out. */
+/** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on and the lease it holds, caught by a spy, as nothing of a vault hands them out. */
 export const makeBornVaultAndFriend = async () => {
   const buildLease = vi.spyOn(Proving.prototype, 'buildLease')
   const born = await makeBornVault()
   const [friend] = buildLease.mock.calls[0]!
+  const lease = await buildLease.mock.results[0]!.value as Lease
   buildLease.mockRestore()
-  return { ...born, friend }
+  return { ...born, friend, lease }
 }
 
 /** A vault born as {@link makeBornVault} makes it, with the passkey of the `laptop` beside the passphrase. */
@@ -209,6 +211,7 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   lockState:    () => vault.lockState(),
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
+  demandUnlocked:   () => vault.demandUnlocked(),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
   unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
 })

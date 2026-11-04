@@ -8,13 +8,22 @@ import type { Outcome } from '../outcome'
 import * as Phrases from '../phrases'
 import * as HX from '../shapes/host-code'
 import type { CipherCtxRecord } from '../crypto'
-import type { Lease } from './lease'
+import type { Gating } from './gating'
+import type { Listing } from './listing'
+import type { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
+import type { Storable } from './storable'
+import type { Vault } from './vault'
+import type { VaultListing } from './vault-listing'
 import * as VX from '../shapes/vault'
 import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
-import { vaultScope } from '../shapes/scopes'
-import { sidecar, whisper } from '../shapes/box'
+import { type BankScope, type Boxscope, type VaultScope, vaultScope } from '../shapes/scopes'
+import { type Sidecar, sidecar, whisper } from '../shapes/box'
 import * as FX from '../shapes/fields'
-import type { VaultDB } from '../storage/vault-db-new'
+import type { KeyDeriver } from '../deriver/basederiver'
+import type { VaultLogger } from '../logger'
+import type { Clock } from '../shapes/bank-opts'
+import type { DeviceDB } from '../storage/device-db-new'
+import type { Answer, VaultDB } from '../storage/vault-db-new'
 import * as VS from '../storage/vault-db-shapes'
 
 // == [Checks]: Checks
@@ -25,7 +34,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 }))
 // --
 
-// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, putAnte, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, NeverStoredSeq, isTombstone
+// == [Record forms]: amVals, tombstoneAmVals, am, revision, times, liveness, vaulted, sparseBase, tombstone, Am, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna, VoidRevisionSeq, isTombstone
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check, and is set aside in `damaged_records`) or gone (`x`: deleted). */
 export const { amVals } = VS
@@ -43,9 +52,6 @@ export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } =
   sparseBase: VS.sparseBase,
   tombstone:  VS.sparseBase.extend({ am: oneof(tombstoneAmVals) }),
 }))
-
-/** The check of the revision `listing.put` lays a record over: a revision, or null for no record. */
-export const putAnte = Checker(() => revision.nullable(), 'bad_option')
 
 /** Whether a record is alive, damaged or gone, as {@link am} checks it: one of {@link amVals}. */
 export type Am = Z.infer<typeof am>
@@ -74,8 +80,8 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 /** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
-/** The `revision_seq` of a central never stored: a thing is born with a tombstone here as its central, so that any record received is newer, and nothing stored is what it expects. */
-export const { NeverStoredSeq } = VS
+/** The `revision_seq` of a void row, and of a birth's prior: every populated row holds 0 or more. */
+export const { VoidRevisionSeq } = VS
 
 /** True for a record whose `am` says damaged or gone. */
 export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
@@ -117,7 +123,7 @@ export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, 
 export type Settled = Z.infer<typeof settled>
 // --
 
-// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxPut, boxesListed, boxlabelArg, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven, BoxPutGiven, BoxesListed
+// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxesListed, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven, BoxesListed
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const { BoxFormat } = VS
@@ -138,22 +144,19 @@ export type BoxRecord = Z.infer<typeof boxRecord>
 /** True where a patch names a half of its box. */
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
-/** SLOPDOC: The checks of what a caller hands to make or update a box: for `create`, `send` and `putBox`. */
-export const { boxDna, boxPatch, boxPut } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
-  const halves  = { whisper: whisperHolder, sidecar }
+/** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`). */
+export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
-    ...halves,
+    whisper: whisperHolder.default({ val: {} }),
+    sidecar: sidecar.default({}),
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const patchProps = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(amVals).optional(), whisper: whisperHolder.optional(), sidecar: sidecar.optional() })
-  const boxPatch = patchProps.strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(amVals).optional(), whisper: whisperHolder.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
-  const boxPut = patchProps.extend({ boxlabel }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
-    .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
-  return { boxDna, boxPatch, boxPut }
+  return { boxDna, boxPatch }
 })
 
 /** A box's dna as {@link boxDna} hands it back: the scope, the whisper and the sidecar, and the record's own props with their defaults filled. */
@@ -161,9 +164,6 @@ export type BoxDnaFilled = Z.output<typeof boxDna>
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchGiven = Z.output<typeof boxPatch>
-
-/** What `vault.putBox` is told, as {@link boxPut} hands it back: a {@link BoxPatchGiven} under its `boxlabel`. */
-export type BoxPutGiven = Z.output<typeof boxPut>
 
 /** The check of what a vault's get lists of its boxes: `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check, whose boxlabel is whatever storage has it under. */
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
@@ -173,44 +173,72 @@ export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
 
 /** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */
 export type BoxesListed = Z.output<typeof boxesListed>
-
-/** The check of a boxlabel a box verb is handed. */
-export const boxlabelArg = Checker(({ boxlabel }) => boxlabel, 'bad_option')
 // --
 
-// == [Options]: ifPresentVals, ifAbsentVals, ifPresent, ifAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener, IfPresent, IfAbsent, TimelyOpts, FetchOpts, SendOpts, StorableOpts
+// == [The box's snapshot and patch]: BoxSnapshot, BoxHalves, BoxPatch, BoxPut
 
-/** The policies when sending a record to a place that already holds a live one: `repl`, the default, replaces it; `fail` refuses `camped`; `get` saves nothing and takes up the live record. Storage decides, atomically. */
+export type BoxSnapshot = Boxscope & Readonly<{
+  revision_tok:  string
+  revision_seq:  number
+  registered_at: number
+  written_at:    number
+  sidecar:       Sidecar | null
+  full:          boolean
+  present:       boolean
+  exposed:       boolean
+}>
+
+/** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
+export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
+
+/** A host's patch for `put`: one or both {@link BoxHalves}, the other kept; any other prop of the box's record is ignored. */
+export type BoxPatch = Omit<Z.input<typeof boxPatch>, keyof BoxHalves> & { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined }
+
+/** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
+export type BoxPut = BoxPatch & { boxlabel: string }
+// --
+
+// == [Options]: ifPresentVals, ifAbsentVals, putIfAbsentVals, ifPresent, ifAbsent, putIfAbsent, Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, storableOpts, listener, IfPresent, IfAbsent, PutIfAbsent, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts, StorableOpts
+
+/** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` takes it up. */
 export const { ifPresentVals } = VS
 
 /** The policies when fetching a thing that is absent, never stored or deleted: `fail` with the absent refusal, or resolve `nil`. */
 export const { ifAbsentVals } = VS
 
+/** The policies for a put over a thing absent, never stored or deleted: `add`, the default, stores it; `fail` refuses. */
+export const { putIfAbsentVals } = VS
+
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
 
 /** SLOPDOC: The checks of the options a storable and its verbs take. */
-export const { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
+export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, storableOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
   const ifPresent     = oneof(ifPresentVals)
   const ifAbsent      = oneof(ifAbsentVals)
+  const putIfAbsent   = oneof(putIfAbsentVals)
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
   const maxMillis     = horizonMillis.optional()
   const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
   const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.optional() })
-  const sendOpts      = timelyOpts.extend({ ifPresent: ifPresent.optional() })
+  const boxPutOpts    = timelyOpts.extend({ ifAbsent: putIfAbsent.optional(), ifPresent: ifPresent.optional() })
+  const boxCreateOpts = timelyOpts.extend({ ifAbsent: lit('add').default('add'), ifPresent: ifPresent.default('fail') })
   const storableOpts  = obj({
     /** The refresh horizon: how long after its last refresh the record in hand stays timely. */
     maxMillisSinceRefresh: horizonMillis,
   })
   const listener      = fn<() => void>()
-  return { ifPresent, ifAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, sendOpts, storableOpts, listener }
+  return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, storableOpts, listener }
 })
 
-/** How `send` meets a live record storage holds, as {@link ifPresent} checks it: one of {@link ifPresentVals}. */
+/** How `put` meets a live record storage holds: one of {@link ifPresentVals}. */
 export type IfPresent = Z.infer<typeof ifPresent>
 
 /** How `fetch` treats a thing that is absent, as {@link ifAbsent} checks it: one of {@link ifAbsentVals}. */
 export type IfAbsent = Z.infer<typeof ifAbsent>
+
+/** How a put treats a thing absent: one of {@link putIfAbsentVals}. */
+export type PutIfAbsent = Z.infer<typeof putIfAbsent>
 
 /** How fresh the record in hand and the world must be before a verb goes on. The world heeds `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
@@ -218,8 +246,11 @@ export type TimelyOpts = Z.infer<typeof timelyOpts>
 /** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
 export type FetchOpts = Z.infer<typeof fetchOpts>
 
-/** `send`'s options: its {@link TimelyOpts}, and `ifPresent`, optional, one of {@link ifPresentVals}: `repl` by default. */
-export type SendOpts = Z.infer<typeof sendOpts>
+/** `box.put`'s options: its {@link TimelyOpts}, and an upcreate unless `ifAbsent` or `ifPresent` says otherwise. */
+export type BoxPutOpts = Z.infer<typeof boxPutOpts>
+
+/** `create`'s options: {@link BoxPutOpts}, with `ifPresent` defaulting to `fail`, and `ifAbsent` always `add`. */
+export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 /** The options a storable is made with, after its world, listing and records: its refresh horizon. */
 export type StorableOpts = Z.infer<typeof storableOpts>
@@ -286,8 +317,8 @@ export const listingOpts = objCheck(({ obj, fn }) => ({
   onBadNews:             fn().optional(),
 }), 'bad_option')
 
-/** The check of what `listing.put` is told of a live record storage may hold: `ifPresent`, `repl` where left out. */
-export const putListingOpts = objCheck(() => ({ ifPresent: ifPresent.optional() }), 'bad_option')
+/** The check of what `listing.put` is told: the revision `prior` it goes over, and how it meets a row absent or live. */
+export const putListingOpts = objCheck(() => ({ prior: revision, ifAbsent: putIfAbsent.optional(), ifPresent: ifPresent.optional() }), 'bad_option')
 
 export type PutListingOpts = Z.infer<typeof putListingOpts>
 
@@ -307,6 +338,25 @@ export const storableArgs = objCheck(({ custom }) => ({
   opts:    storableOpts,
 }), 'bad_option')
 // --
+
+// == [Given to a listing]: Thing, ListingAnswer, DelTombstone, SlotFate, ListingOf
+
+export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
+
+/** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
+export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, string, unknown>
+
+/** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
+export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
+
+/** The fate of a record meeting the thing in its slot: `receive` takes it in, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */
+export type SlotFate = 'receive' | 'lose' | 'replace'
+
+/** The listing a storable is made in, as it sees it: its own kind of thing, whatever snapshot the concrete class makes. */
+export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> =
+  Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown>>
+// --
+
 
 // == [The vault's stamp]: vaultStamp, VaultStamp
 
@@ -363,7 +413,7 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse
+// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse, VaultSnapshot
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
 export const { VaultFormat } = VS
@@ -373,9 +423,19 @@ export const { vaultRecord, vaultSparse, vaultRow } = Checkers('bad_record', () 
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>
+
+export type VaultSnapshot = VaultScope & Readonly<{
+  vault_tok:     string
+  revision_tok:  string
+  revision_seq:  number
+  registered_at: number
+  written_at:    number
+  present:       boolean
+  lockState:     LockState
+}>
 // --
 
-// == [What a proving is handed]: provingWorld, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate
+// == [What a proving is handed]: provingWorld, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
 export const { provingWorld } = Checkers('bad_option', ({ obj, clockShape, keyDeriverShape, strengthChecker, device_id }) => ({
   provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
@@ -397,9 +457,12 @@ export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseSto
 }, [VX])
 
 export type StampedGate = Z.infer<typeof stampedGate>
+
+/** What `Proving.buildWayin` is passed for a wayin over a vaultKey made new: the type of `NOVEL`. */
+export type Novel = typeof NOVEL
 // --
 
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
+// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
 export const LeaseFormat = ModelsLeaseFormat
 
@@ -433,12 +496,12 @@ export const leaseFriend = objCheck(({ fn }) => ({
   leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
   lock:            fn<() => unknown>(),
-  /** Hold a lease as the vault's: what `lease.attach()` calls. */
-  attachLease:     fn<(lease: Lease) => Promise<void>>(),
   /** The record this device has cached, or null for none. */
-  peekLease:       fn<() => Promise<unknown>>(),
+  tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
+  /** Tell the host what went wrong in a lease's cache put. */
+  tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 
 export type LeaseFriend = Z.infer<typeof leaseFriend>
@@ -457,16 +520,16 @@ const isCtxStamp = (val: unknown): boolean => (
 )
 
 /** SLOPDOC: The arguments of each lease verb, and the flat stamp binding what a lease seals to its caller's record. */
-export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
+export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
   return {
     ctxStamp,
-    leasePeekArgs:    obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
-    leaseGrantArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
-    provingLeaseArgs: obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
-    leaseSealArgs:    obj({ whisperText: str, stamp: ctxStamp }),
-    leaseUnsealArgs:  obj({ sealed: sealedWhisper, stamp: ctxStamp }),
+    leaseFromCacheArgs: obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
+    leaseGrantedArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
+    provingLeaseArgs:   obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
+    leaseSealArgs:      obj({ whisperText: str, stamp: ctxStamp }),
+    leaseUnsealArgs:    obj({ sealed: sealedWhisper, stamp: ctxStamp }),
   }
 }, [FX])
 // --
@@ -474,12 +537,48 @@ export const { ctxStamp, leasePeekArgs, leaseGrantArgs, provingLeaseArgs, leaseS
 // == [The vault's world]: deviceDBDuck, vaultListingOpts
 
 /** A deviceDB, as far as a duck can tell: the verbs a vault's lease friend binds. */
-export const deviceDBDuck = Checker(({ obj, fn }) => obj({ peek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
+export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn }) => ({
   world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn().optional() }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
+// --
+
+// == [Given to a box listing]: BoxWorld, BoxDna, BoxListingOpts
+
+/** The vault's face to its boxes: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
+export type BoxWorld = ListingWorld & {
+  scope:     VaultScope
+  vault_tok: string
+  demandUnlocked(): unknown
+  sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
+  unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
+}
+
+/** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
+export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<BoxHalves>
+
+export type BoxListingOpts = ListingOpts & { world: BoxWorld }
+// --
+
+// == [Given to a vault listing]: VaultWorld, VaultListingOpts
+
+/** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
+export type VaultWorld = ListingWorld & ProvingWorld & {
+  scope:       BankScope
+  logger:      VaultLogger
+  leaseMillis?: number
+  deviceDB:    DeviceDB
+  /** Hears a refused erase of the cached lease, and no secret material. */
+  onPanic?:    ((refusal: VaultError) => unknown) | undefined
+  /** The host's dialog, if the host gave one. */
+  requestCleartext?: RequestCleartext | undefined
+  /** The horizon of a vault's boxes, by default the vault's own. */
+  boxRefreshMillis?: number
+}
+
+export type VaultListingOpts = ListingOpts & { world: VaultWorld }
 // --
 
 // == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, GatingKind, ClearsForGatingkind, StrengthChecker
@@ -518,6 +617,37 @@ export type ClearsForGatingkind = {
 export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
 // --
 
+// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
+
+/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
+export type RequestCleartext = (gating: AnyGating) => unknown
+
+export type AnyGating = { [KindT in GatingKind]: Gating<KindT> }[GatingKind]
+
+export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
+
+/** What an attempt makes of the clears it is handed, for its `run`. */
+export type ProvingsForGatingkind = {
+  build_vault:        { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
+  unlock_vault:       { proved: Proving }
+  replace_passphrase: { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
+  add_passkey:        { ante: VaultRecord, proved: PassphraseProving, passkeyProving: PasskeyProving }
+  revoke_passkey:     { ante: VaultRecord, proved: PassphraseProving }
+  del_vault:          { ante: VaultRecord, proved: PassphraseProving }
+}
+
+/** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
+export type Run<KindT extends GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
+
+export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
+
+export type LaunchArgs<KindT extends GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
+
+export type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
+
+export type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
+// --
+
 // == [The bank's forms]: positiveMinutes, refreshMinutes, bankOpts
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
@@ -542,4 +672,31 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   onBadNews:           fn().optional(),
   onPanic:             fn().optional(),
 }), { refuseAs: 'bad_option' }, [FX])
+// --
+
+// == [Given to a bank]: BankOpts, BankStage, BankSnapshot
+
+export type BankOpts = {
+  applabel:             string
+  user_id:              string
+  device_id?:           string | undefined
+  vaultDB:              VaultDB
+  deviceDB:             DeviceDB
+  keyDeriver:           KeyDeriver
+  requestCleartext?:    RequestCleartext | undefined
+  strengthChecker?:     StrengthChecker | undefined
+  clock?:               Clock | undefined
+  logger?:              VaultLogger | undefined
+  autolockMinutes?:     number | undefined
+  vaultRefreshMinutes?: number | undefined
+  boxRefreshMinutes?:   number | undefined
+  onBadNews?:           ((news: VaultError) => unknown) | undefined
+  /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
+  onPanic?:             ((refusal: VaultError) => unknown) | undefined
+}
+
+/** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
+export type BankStage = 'made' | 'ready' | 'refused'
+
+export type BankSnapshot = BankScope & Readonly<{ stage: BankStage, err: VaultError | null, device_id: string, vaults: readonly VaultSnapshot[] }>
 // --

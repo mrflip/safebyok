@@ -42,7 +42,7 @@ not as a settled ruling, and check it against the current design before relying 
   `revision_tok`) prevents a lost update, not a reordering: a host that needs an order awaits each
   call before making the next.
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused erase of a cached lease is not
-  retried.** `Lease.peek` meeting a row of another epoch erases the deviceDB's record
+  retried.** `Lease.buildFromCache` meeting a row of another epoch erases the deviceDB's record
   once (`tryUncacheLease`); a refusal is warned of and left. The record is unusable either way, and
   the next grant writes over it. A `lock()`'s own refused erase is told as a panic (`vault.#panic`).
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **no autolock timer past the Trigger's cap.**
@@ -53,7 +53,7 @@ not as a settled ruling, and check it against the current design before relying 
   is not retried.** `vacate()` drops the lease's keys and record, then erases the deviceDB's record
   once (`tryUncacheLease`); a refusal is thrown from `vacate()`, and a second `vacate()` on the same
   lease erases nothing, as it already dropped its record. The entry on a refused erase of a cached
-  lease covers the refused erase on `Lease.peek`; this one covers `vacate()` itself. The deviceDB is
+  lease covers the refused erase on `Lease.buildFromCache`; this one covers `vacate()` itself. The deviceDB is
   a cache, and the next session asks for the passphrase. Pinned by
   `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
   retrying a refused erase.
@@ -64,13 +64,13 @@ not as a settled ruling, and check it against the current design before relying 
   delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
 * 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
-  the cache's `lease.peek` loses.** The vault reads unlocked on the lease peeked, the lock's erase
+  the cache's `Lease.buildFromCache` loses.** The vault reads unlocked on the lease built from the cache, the lock's erase
   stands, and the next session asks for a proof. The next `lock()` ends that session.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here):
   **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
   the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
-  gets it from `lease.peek` and attaches it, asking nothing, so a vault the user locked reopens with no
+  gets it from `Lease.buildFromCache` and attaches it, asking nothing, so a vault the user locked reopens with no
   passphrase. With no `onPanic`, the panic's vacate stops that in the tab that locked; with one, stopping it is the
   host's. Either way the row can survive for other tabs and later sessions. The Coach, 2026-11-02: won't fix, but
   "one I worry about"; and, 2026-11-03: "This is why the panic button exists, there is no fix we can apply if the
@@ -97,3 +97,6 @@ not as a settled ruling, and check it against the current design before relying 
   vacate leaves tab B unlocked, and nothing tells it.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **a put can land though its answer is lost.**
+* 2026-11-04 (the Coach, on `Lease.buildFromCache` rejecting where a clock throws): **anything to do with a host clock.**
+  `clock` exists only for test injection. A clock that throws, jumps or runs backward is undefined
+  behaviour. Today a throw rejects from whichever verb reads it first.

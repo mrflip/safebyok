@@ -20,9 +20,8 @@
 import { afterEach, beforeEach, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
 import { Box } from '../../src/models/box'
-import { BoxListing, type BoxDna, type BoxListingOpts, type BoxWorld } from '../../src/models/box-listing'
-import type { ListingAnswer } from '../../src/models/listing'
-import { type BoxRecord, type BoxSparse, type Fetched, type LockState, type Tombstone, BoxFormat } from '../../src/models/models-shapes'
+import { BoxListing } from '../../src/models/box-listing'
+import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type LockState, type Tombstone, BoxFormat } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import * as Phrases from '../../src/phrases'
 import type * as FX from '../../src/shapes/fields'
@@ -100,12 +99,12 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer, ModelsWatch
 
-/** One call made to the world or the vaultDB, as {@link ModelsWorld.calls} logs it, in the order made. `priorRevisionTok` is null for a birth, over {@link VS.NeverStored}. */
+/** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `priorRevisionTok` is null for a birth. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'takeWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
-  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifPresent: PutOpts['ifPresent'] }
+  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
   | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
   | { verb: 'watch',        onNotice: (notice: Notice) => void }
   | { verb: 'unwatch' }
@@ -211,11 +210,11 @@ class Script<CallT> {
 }
 
 type GetCall = { scope: Boxscope }
-type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifPresent: PutOpts['ifPresent'] }
+type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
 type DelCall = { scope: Boxscope, priorRevisionTok: string | null }
 
 /** The `revision_tok` a call goes over: null for a birth. */
-const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === VS.NeverStoredTok) ? null : revision_tok)
+const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === VS.VoidRevisionTok) ? null : revision_tok)
 
 /** A {@link MemoryVaultDB} whose box verbs and watch log each call, and answer what a test scripts in place of their own. */
 export class TestableVaultDB extends MemoryVaultDB {
@@ -237,7 +236,7 @@ export class TestableVaultDB extends MemoryVaultDB {
   }
 
   override async tryPutBox(record: BoxRecord, opts: PutOpts) {
-    const call: PutCall = { record, priorRevisionTok: priorTokOf(opts.prior), ifPresent: opts.ifPresent }
+    const call: PutCall = { record, priorRevisionTok: priorTokOf(opts.prior), ifAbsent: opts.ifAbsent, ifPresent: opts.ifPresent }
     this.#calls.push({ verb: 'put', ...call })
     const { scripted, answer } = this.scripts.put.take(call)
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryPutBox']>>) : super.tryPutBox(record, opts)
@@ -307,6 +306,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
+    demandUnlocked: () => { if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.VaultLocked) } },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()
@@ -426,11 +426,15 @@ export class TestableBoxListing extends BoxListing {
 
   override async build(...args: Parameters<BoxListing['build']>): Promise<TestableBox> { return testableOf(await super.build(...args)) }
 
+  override puttable(...args: Parameters<BoxListing['puttable']>): TestableBox { return testableOf(super.puttable(...args)) }
+
   override async create(...args: Parameters<BoxListing['create']>): Promise<TestableBox> { return testableOf(await super.create(...args)) }
 
   override async fetch(...args: Parameters<BoxListing['fetch']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.fetch(...args)) }
 
-  override async put(...args: Parameters<BoxListing['put']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.put(...args)) }
+  override async get(...args: Parameters<BoxListing['get']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.get(...args)) }
+
+  override async put(...args: Parameters<BoxListing['put']>): Promise<TestableBox> { return testableOf(await super.put(...args)) }
 
   override async del(...args: Parameters<BoxListing['del']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.del(...args)) }
 
@@ -461,9 +465,9 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 // == [Faked seal]: fakeSealBoxListingOf
 
-/** A {@link boxListingOf} whose world fakes the seal further, for a test that wants sealed parts it can tell apart by revision, or acts while a `send` is sealing: the whisper given to `send` comes out as the fake ciphered bags named for the revision it is sealed under, and `duringSeal` runs once the real seal is done.
+/** A {@link boxListingOf} whose sealed parts are fake bags named for the revision, `duringSeal` running after the real seal.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.send({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {

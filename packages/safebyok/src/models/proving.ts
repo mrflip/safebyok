@@ -7,15 +7,15 @@ import { outcomeOf, valOf } from '../outcome'
 import * as Phrases from '../phrases'
 import { type VaultScope, vaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
+import { keyDeriverThrew, noPasskeyWayin, notAVerdict, notKeyBytes, otherPasskey, otherPrfSalt, strengthCheckerThrew, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../helpers/throwers'
 import { Lease } from './lease'
-import { type LeaseFriend, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, type WayinKind, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from './models-shapes'
+import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, type WayinKind, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from './models-shapes'
 import { Wayin, wayinCtxOf } from './wayin'
 
-// == [NOVEL and the checks]: NOVEL, Novel, RewrapUsage, CheckUsage, Checks
+// == [NOVEL and the checks]: NOVEL, RewrapUsage, CheckUsage, Checks
 
 /** Pass to {@link Proving.buildWayin} for a wayin over a vaultKey made new. */
 export const NOVEL: unique symbol = Symbol('NOVEL')
-export type Novel = typeof NOVEL
 
 /** What the vaultKey is unwrapped as, inside a proving: extractable only so it can be wrapped again, and dropped when the method ends. */
 const RewrapUsage = Object.freeze({ extractable: true, usage: ['wrapKey'] as const })
@@ -54,7 +54,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     Object.freeze(this)
   }
 
-  /** The strengthChecker's verdict. What it throws is replaced, as it heard the passphrase. */
+  /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
   static async checkStrength(passphraseClear: VX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<VX.PassphraseVerdict> {
     strengthArgs.parse({ passphraseClear, scope, world })
     const verdict = await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope)
@@ -76,7 +76,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     provingLeaseArgs.parse({ friend, gate_epoch })
     vaultStamp.parseConsistent(friend, this.stamp, { kind: 'bad_option', message: Phrases.LeaseOfOtherVault })
     const vaultKey = await this.#unwrapVaultKey()
-    return Lease.grant(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
+    return Lease.buildGranted(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
   }
 
   /** Unwrap the stored wayin's vaultKey and drop it, to learn that the key opens the wrap (guarantees.md, G3). */
@@ -215,33 +215,4 @@ const passphraseKeyOf = async (keyDeriver: ProvingWorld['keyDeriver'], passphras
     keyBytes.fill(0)
   }
 }
-// --
-
-// == [Refusals]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, strengthCheckerThrew, notAVerdict, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
-
-const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
-
-const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', Phrases.WayinNotMadeYet)
-
-const wayinMadeAlready = (): VaultError => new VaultError('unexpected_error', Phrases.WayinMadeAlready)
-
-const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverThrew)
-
-const strengthCheckerThrew = (): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerThrew)
-
-const notAVerdict = (): VaultError => new VaultError('bad_option', Phrases.NotAVerdict)
-
-const weakPassphrase = (reason: string): VaultError => new VaultError('weak_passphrase', reason)
-
-const wrongPassphrase = (): VaultError => new VaultError('wrong_passphrase', Phrases.WrongPassphrase)
-
-const wrongPasskey = (): VaultError => new VaultError('wrong_passkey', Phrases.WrongPasskey)
-
-const noPasskeyWayin = (): VaultError => new VaultError('absent_wayin', Phrases.NoPasskeyWayin)
-
-const otherPasskey = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPasskey)
-
-const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPrfSalt)
-
-const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_deriver', Phrases.UnknownKeyDeriver)
 // --

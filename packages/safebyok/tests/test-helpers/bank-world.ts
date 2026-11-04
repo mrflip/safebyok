@@ -2,14 +2,14 @@
 
 import { afterEach } from 'vitest'
 import { VaultError, type RefusalKind } from '../../src/errors'
-import { type BankOpts, Bank } from '../../src/models/bank'
-import type { RequestCleartext } from '../../src/models/gating'
+import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BankScope, VaultScope } from '../../src/storage/vault-db-shapes'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { quietLogger } from './logging'
 import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
+import type { BankOpts, RequestCleartext } from '../../src/models/models-shapes'
 
 export const AutolockMinutes = 60
 

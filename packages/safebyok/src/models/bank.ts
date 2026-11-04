@@ -13,40 +13,15 @@ import { type Clock, wallClock } from '../shapes/bank-opts'
 import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/scopes'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { LeaseSparse } from '../storage/device-db-shapes'
-import type { VaultDB } from '../storage/vault-db-new'
-import type { RequestCleartext } from './gating'
-import type { LockState, StrengthChecker } from './models-shapes'
+import { deviceRecordRewritten, helloFirst, insecureContext } from '../helpers/throwers'
+import type { BankOpts, BankSnapshot, BankStage, LockState, RequestCleartext, StrengthChecker, VaultWorld } from './models-shapes'
 import * as MSX from './models-shapes'
-import { DefaultLeaseMillis, type Vault, type VaultSnapshot } from './vault'
-import { type VaultWorld, VaultListing } from './vault-listing'
+import { DefaultLeaseMillis, type Vault } from './vault'
+import { VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultRefreshMillis, BankOpts, BankStage, BankSnapshot, RefusingStrengthChecker
+// == [Given to a bank]: DefaultRefreshMillis, RefusingStrengthChecker
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
-
-export type BankOpts = {
-  applabel:             string
-  user_id:              string
-  device_id?:           string | undefined
-  vaultDB:              VaultDB
-  deviceDB:             DeviceDB
-  keyDeriver:           KeyDeriver
-  requestCleartext?:    RequestCleartext | undefined
-  strengthChecker?:     StrengthChecker | undefined
-  clock?:               Clock | undefined
-  logger?:              VaultLogger | undefined
-  autolockMinutes?:     number | undefined
-  vaultRefreshMinutes?: number | undefined
-  boxRefreshMinutes?:   number | undefined
-  onBadNews?:           ((news: VaultError) => unknown) | undefined
-  /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
-  onPanic?:             ((refusal: VaultError) => unknown) | undefined
-}
-
-/** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
-export type BankStage = 'made' | 'ready' | 'refused'
-
-export type BankSnapshot = BankScope & Readonly<{ stage: BankStage, err: VaultError | null, device_id: string, vaults: readonly VaultSnapshot[] }>
 
 const RefusingStrengthChecker: StrengthChecker = () => ({ strong: false, reason: Phrases.NoStrengthChecker })
 // --
@@ -161,7 +136,7 @@ export class Bank implements VaultWorld {
   // == [Ending]: autolock, lock, vacate, sweep, scanOwnLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
 
   /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
-   * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.peek` leaves such a row for it.
+   * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
    */
   async autolock(): Promise<void> {
     const cutoff = Math.floor(this.clock.now() - this.leaseMillis)
@@ -321,13 +296,4 @@ const stageOf = (hello: Outcome<void> | null): BankStage => {
 const checkSecureContext = (): void => {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }
 }
-// --
-
-// == [Refusals]: insecureContext, helloFirst, deviceRecordRewritten
-
-const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
-
-const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
-
-const deviceRecordRewritten = (): VaultError => new VaultError('damaged_record', Phrases.DeviceRecordRewritten)
 // --

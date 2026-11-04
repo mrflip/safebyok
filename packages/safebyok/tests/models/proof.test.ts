@@ -3,12 +3,9 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import type { VaultError } from '../../src/errors'
-import type { BankSnapshot } from '../../src/models/bank'
-import type { Box, BoxSnapshot } from '../../src/models/box'
-import type { RequestCleartext } from '../../src/models/gating'
-import type { GatingKind } from '../../src/models/models-shapes'
+import type { Box } from '../../src/models/box'
+import type { BankSnapshot, BoxSnapshot, GatingKind, RequestCleartext, VaultSnapshot } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
-import type { VaultSnapshot } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultBag, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { ticks } from '../test-helpers/timing'
@@ -58,7 +55,7 @@ const vaultStatus = ({ vaultlabel, present, lockState }: VaultSnapshot): string 
 
 const boxList = (boxes: readonly BoxSnapshot[]): string => boxes.map(({ boxlabel }) => boxlabel).join(', ') || 'no boxes'
 
-const boxRow = ({ boxlabel, present, sidecar, lockState }: BoxSnapshot): string => `${boxlabel} ${present ? JSON.stringify(sidecar) : 'deleted'} ${lockState}`
+const boxRow = ({ boxlabel, present, sidecar }: BoxSnapshot): string => `${boxlabel} ${present ? JSON.stringify(sidecar) : 'deleted'}`
 
 /** The component that shows the whisper itself: `box.whisper`, read afresh at each paint, as a snapshot never holds it. */
 const whisperReveal = (box: Box) => (): string => {
@@ -129,9 +126,12 @@ describe("the proof", () => {
     const box = await vault.putBox(ApiKey)
     boxesUi.expectRenders(['anthropic_api_key'])
     const boxUi = mountComponent(box, boxRow)
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} unlocked'])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
+    // The whisper's component watches the box for what's exposed, and the vault for the lock its getter checks.
     const revealUi = mountComponent(box, whisperReveal(box))
+    const revealOfLockUi = mountComponent(vault, whisperReveal(box))
     revealUi.expectRenders(['hidden'])
+    revealOfLockUi.expectRenders(['hidden'])
     const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
     expect(boxRows).to.have.lengthOf(1)
     expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper.val)
@@ -140,21 +140,22 @@ describe("the proof", () => {
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
     boxUi.expectRenders([])
     await box.expose()
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} unlocked'])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
     const snapshots = [bank.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
     expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.val)
 
-    // Lock: every component is told before lock() returns, the whisper leaves the screen, and the box refuses.
+    // Lock: every component watching the vault is told before lock() returns, the whisper leaves the screen, and the box refuses.
     vault.lock()
     bankUi.expectRenders(['ready: main locked'])
     vaultUi.expectRenders(['main locked'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} locked'])
-    boxesUi.expectRenders(['anthropic_api_key'])
-    revealUi.expectRenders(['locked'])
+    boxUi.expectRenders([])
+    boxesUi.expectRenders([])
+    revealUi.expectRenders([])
+    revealOfLockUi.expectRenders(['locked'])
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
-    await TH.expectRefusal(vault.getBox(ApiKey.boxlabel), 'vault_locked')
+    await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
 
     // The user closes the dialog: the unlock refuses declined, and nothing moves.
     dialog.typing = []
@@ -169,9 +170,10 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
     vaultUi.expectRenders(['main unlocked'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} unlocked'])
-    boxesUi.expectRenders(['anthropic_api_key'])
-    revealUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
+    boxUi.expectRenders([])
+    boxesUi.expectRenders([])
+    revealUi.expectRenders([])
+    revealOfLockUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
     // Delete: the user proves it, the list empties, and the vault says it is gone.
@@ -182,9 +184,10 @@ describe("the proof", () => {
     vaultUi.expectRenders(['main locked', 'main deleted'])
     await TH.expectRefusal(vault.fetch(), 'vault_gone')
     expect(bank.vaultOf(VaultBag)).to.eq(vault)
-    boxesUi.expectRenders(['anthropic_api_key', 'no boxes'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"} locked', 'anthropic_api_key {"nickname":"work"} locked'])
-    revealUi.expectRenders(['locked', 'locked'])
+    boxesUi.expectRenders(['no boxes'])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
+    revealUi.expectRenders(['locked'])
+    revealOfLockUi.expectRenders(['locked', 'locked'])
     await TH.expectRefusal(box.extractWhisper(), 'disabled')
 
     // Rebuild over the tombstone: a new life, a new instance, a new vault_tok.
@@ -290,7 +293,7 @@ describe("the proof", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
     expect(vault.isUnlocked).to.be.false
 
-    // A page opened late whose host never calls autolock asks all the same: Lease.peek leaves the row and reads as no row.
+    // A page opened late whose host never calls autolock asks all the same: Lease.buildFromCache leaves the row and reads as no row.
     await vault.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
@@ -378,6 +381,7 @@ describe("the proof", () => {
   it("a second device: what it does reaches this one's components through the watch, with nobody asked and no lock", async () => {
     const { world, bank, vault, dialog } = await buildHost()
     const box = await vault.putBox(ApiKey)
+    await vault.hello()
     const bankUi = mountComponent(bank, bankStatus)
     const boxesUi = mountComponent(vault.boxListing, boxList)
     bankUi.expectRenders(['ready: main unlocked'])

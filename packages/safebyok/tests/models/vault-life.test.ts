@@ -93,7 +93,7 @@ describe("Locking, and the sessions after it on this device", () => {
     const second = await openNextSession()
     await unlockTyping(second.vault, byPassphrase(Passphrase))
     const theirs = await boxIn(second.vault)
-    await theirs.send({ whisper: NewWhisper, sidecar: Sidecar })
+    await theirs.put({ whisper: NewWhisper, sidecar: Sidecar })
     await vault.ensureUnlocked()
     expect(vault.isUnlocked).to.be.true
     expect(await unsealIn(vault)).to.deep.equal(NewWhisper)
@@ -132,7 +132,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     await replaceTyping(vault, Passphrase, NewPassphrase)
     expect(vault.isUnlocked).to.be.true
-    await box.send({ whisper: NewWhisper, sidecar: Sidecar })
+    await box.put({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const second = await openNextSession()
@@ -163,7 +163,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     await unlockTyping(vault, byPasskey('laptop'))
     await revokeTyping(vault, Passphrase)
     expect(vault.isUnlocked).to.be.true
-    await box.send({ whisper: NewWhisper, sidecar: Sidecar })
+    await box.put({ whisper: NewWhisper, sidecar: Sidecar })
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
@@ -201,7 +201,7 @@ describe("Another device, over the same vaultDB and boxes", () => {
     const other = await openOtherDevice(demandStored())
     await unlockTyping(other.vault, byPassphrase(Passphrase))
     const theirs = await boxIn(other.vault)
-    await theirs.send({ whisper: NewWhisper, sidecar: Sidecar })
+    await theirs.put({ whisper: NewWhisper, sidecar: Sidecar })
     expect(await unsealIn(vault)).to.deep.equal(NewWhisper)
   })
 })

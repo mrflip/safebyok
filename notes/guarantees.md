@@ -28,7 +28,7 @@ guarantees until shown otherwise.
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
 | `packages/safebyok/src/types/types.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
-| `packages/safebyok/src/models/proving.ts` | the wayinKey, and the vaultKey unwrapped per call and moved from proving to proving inside `buildWayin(source)`, handed only to `Lease.grant`; the PRF bytes, read to derive the passkeyKey and left for the gating to zero |
+| `packages/safebyok/src/models/proving.ts` | the wayinKey, and the vaultKey unwrapped per call and moved from proving to proving inside `buildWayin(source)`, handed only to `Lease.buildGranted`; the PRF bytes, read to derive the passkeyKey and left for the gating to zero |
 | `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedClears`; `spendClears`, the one place the PRF bytes are zeroed |
 | `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `vacate` |
 | `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; the passphrase proving a birth's gating made is dropped after `Vault.launchBirth`'s lease |
@@ -243,8 +243,8 @@ memory for the lease's life, dropped at its
 `ask_passphrase_at`, at `lock()`, when it proves damaged, or when the Vault object goes, and
 erased from the store at `lock()`. In `src/models/` no lease is dropped at a time, and **autolock is a best-effort reminder process, not a
 guarantee**: a lease held in a page stays held until something locks it. Two things answer to the autolock duration, against a row cached on
-this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` erases it. `Lease.peek`, at the
-door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.peek` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the host's clock: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
+this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` erases it. `Lease.buildFromCache`, at the
+door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.buildFromCache` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the host's clock: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
 algorithm, or for another use reads as `corrupt_record` (`isLeaseKey`, `types.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
 vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease
@@ -301,7 +301,7 @@ refusal (passed as itself), the vault's demand, or a bug's own throw from this p
 never WebCrypto's error, a host function's throw or the device store's, each replaced before it
 gets there. The Vault and Bank forms map a bug in their `try` form. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will
-not read is warned of without its record. *Host obligation, documented:* a `strengthChecker`'s
+not read is warned of without its record (`Lease.buildFromCache` tells the friend a `damagedLease()` built from nothing of the row, as bad news, and answers null). *Host obligation, documented:* a `strengthChecker`'s
 `reason` becomes the `weak_passphrase` message, so it must not quote the passphrase
 (CUSTOMIZATION.md).
 
@@ -323,7 +323,7 @@ reaches the vault's tools through a package-private route (the Symbol-keyed acce
 route reaches is no key and yields none. Neither class has a getter, field, spread, JSON or Symbol
 that yields a key, and no module exports a route to one: `leaseRecordOf`, which did, is gone
 ([#305](https://github.com/mrflip/safebyok/pull/305)). In `src/models/`, the `LeaseFriend` whose
-`peekLease` answers the cached row with its leaseKey handle is held in `Lease.#friend` and made in
+`tryPeekLease` answers the cached row, as an Outcome, with its leaseKey handle is held in `Lease.#friend` and made in
 `Vault.#leaseFriend`; no public `Vault` method takes a proving, as a birth runs inside the class
 (`Vault.launchBirth`); nothing public on a `Vault` or a `Lease` hands the friend out, and a test catches
 it with a spy on `Proving.prototype.buildLease`. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export `Lease` and
