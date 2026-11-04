@@ -3,6 +3,7 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
+import type { Box } from '../../src/models/box'
 import type { AnyGating } from '../../src/models/gating'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import { Vault } from '../../src/models/vault'
@@ -95,6 +96,25 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
     expect(vault.isPresent).to.be.false
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(onBadNews).not.toHaveBeenCalled()
+  })
+})
+
+describe("a box verb over a vault deleted elsewhere", () => {
+  const WorldNow = { maxWorldMillis: 0 }
+  const Verbs = [
+    ['box.extractWhisper', ({ box }) => box.extractWhisper(WorldNow)],
+    ['box.send',           ({ box }) => box.send({ whisper: { val: 'sk-new' }, sidecar: {} }, WorldNow)],
+    ['box.del',            ({ box }) => box.del(WorldNow)],
+    ['vault.getBox',       ({ vault, box }) => vault.getBox(box.boxlabel, { ...WorldNow, maxMillisSinceRefresh: 0 })],
+    ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, WorldNow)],
+  ] as const satisfies readonly (readonly [string, (world: { vault: Vault, box: Box }) => Promise<unknown>])[]
+
+  it.each(Verbs)("%s refuses 'disabled', as the refresh that finds the tombstone vacates the box before the box's guard runs", async (_verb, call) => {
+    const { vault, demandStored, restoreRow } = await makeBornVault()
+    const box = await vault.boxListing.create({ ...vault.scope, ...BoxDna })
+    await vault.hello()
+    restoreRow(tombstoneOver(demandStored()))
+    await TH.expectRefusal(call({ vault, box }), 'disabled')
   })
 })
 

@@ -2,7 +2,7 @@
 
 import { type CipherCtxRecord, makeLifeTok } from '../crypto'
 import { VaultError } from '../errors'
-import { lockedError } from '../helpers/throwers'
+import { absentBoxError, lockedError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
 import type { Sidecar } from '../shapes/box'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/scopes'
@@ -75,20 +75,22 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
   // --
 
-  // == [Birth]: create, tryCreate, demandCreatable
+  // == [Birth]: create, tryCreate, ensureCreatable, demandCreatable
 
   /** SLOPDOC: Seals a new box and stores it where no record stands, resolving the instance held once it lands. */
   async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box> {
     const dna = boxDna.parse(input)
-    this.#demandCreatable()
+    await this.#ensureCreatable(); this.#demandCreatable()
     this.demandNotHeld(dna)
     const { whisper, sidecar, ...sparse } = this.stampDna(dna)
     const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
-    this.#demandCreatable()
+    await this.#ensureCreatable(); this.#demandCreatable()
     return this.putDraft(draft, null, opts)
   }
 
   tryCreate(input: BoxDna, opts: PutListingOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
+
+  #ensureCreatable(): Promise<void> { return this.ensureTimelyWorld() }
 
   /** A birth needs this listing enabled and the vault unlocked. */
   #demandCreatable(): void {
@@ -115,9 +117,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return new Box(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
 
-  absentRefusal(scope: Boxscope): VaultError {
-    return new VaultError('absent_box', `No box is stored under the label ${this.scopeOf(scope).boxlabel}.`)
-  }
+  protected nothingStoredError(scope: Boxscope): VaultError { return absentBoxError(scope) }
 
   protected tryGetRow(scope: Boxscope) { return this.vaultDB.tryGetBox({ ...scope, vault_tok: this.world.vault_tok }, { ifAbsent: 'nil' }) }
 

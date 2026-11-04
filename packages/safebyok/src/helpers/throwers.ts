@@ -19,4 +19,10 @@ export const partialLoadError = () => new VaultError('bad_option', Phrases.Parti
 export const alreadyHeldError    = () => new VaultError('bad_option', Phrases.AlreadyHeld)
 
 export const disabledError    = () => new VaultError('disabled', Phrases.LetGoInstance)
+
+export const absentBoxError   = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.boxAbsent(boxlabel))
+
+export const absentVaultError = ({ vaultlabel }: { vaultlabel: string }) => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
+
+export const deletedVaultError = () => new VaultError('vault_gone', Phrases.VaultDeleted)
 // --

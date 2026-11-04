@@ -382,6 +382,8 @@ export const LetGoInstance = "This object was let go, by a sweep, a vacate or a 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
 
+export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
+
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
 

@@ -58,8 +58,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   readonly #horizonMillis: number
   /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
   #refreshedAt: number | null = null
-  /** The fetch under way, which every `fetch` made meanwhile joins, resolving whether storage held a record. */
-  readonly #oneFetchAtATime = oneAtATime(async () => (await this.listing.fetch(this.scope, { ifAbsent: 'nil' })) !== null)
+  /** The fetch under way, which every `fetch` made meanwhile joins. */
+  readonly #oneFetchAtATime = oneAtATime(() => this.listing.fetch(this.scope, { ifAbsent: 'nil' }))
   readonly #listeners = new Set<() => void>()
   // --
 
@@ -210,8 +210,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
-  demandPresent():  this { if (! this.isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
-
   demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 
   /** The full record in hand. */
@@ -234,9 +232,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     this.demandEnabled()
-    const isStored = await this.#oneFetchAtATime()
+    await this.#oneFetchAtATime()
     this.demandEnabled()
-    if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
+    if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
 
@@ -256,8 +254,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
-    await this.ensureDeletable(MSX.timelyOpts.parse(opts))
-    this.demandDeletable()
+    await this.ensureDeletable(MSX.timelyOpts.parse(opts)); this.demandDeletable()
     await this.listing.del(this)
     return this
   }
@@ -366,7 +363,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Concrete Subclass Required Methods]: isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Concrete Subclass Required Methods]: demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
+
+  abstract demandPresent(): this
 
   /** Whether `fetched` is a full record, alive: a tombstone never is. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT

@@ -186,8 +186,7 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   },
   unlock_vault: async ({ vault, world }, clears) => {
     const { passphraseClear, passkeyClear } = checkedClears(MSX.vaultUnlockClears, clears)
-    await vault.ensureTimely(MSX.Promptly)
-    vault.demandUsable()
+    await vault.ensureUsable(MSX.Promptly); vault.demandUsable()
     const { gate } = vault
     const proved = (passphraseClear === undefined) ? await PasskeyProving.buildStored(gate, passkeyClear!) : await PassphraseProving.buildStored(gate, passphraseClear, world)
     return { proved }
@@ -213,8 +212,7 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
 
 /** The attempt's one record and the gate it holds, read once, after its timeliness request. */
 const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
-  await vault.ensureTimely(MSX.Promptly)
-  vault.demandUsable()
+  await vault.ensureUsable(MSX.Promptly); vault.demandUsable()
   return { ante: vault.fullRecord, gate: vault.gate }
 }
 

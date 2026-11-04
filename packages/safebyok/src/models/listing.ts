@@ -165,7 +165,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Put `draft`, a birth, over `ante`: the instance it makes is held once it lands, and a refused put holds only what its answer delivered. */
   protected async putDraft(draft: RecordT, ante: Revision | null = null, opts: PutListingOpts = {}): Promise<ThingT> {
     const thing = await this.put(draft, ante, opts)
-    if (thing === null) { throw this.absentRefusal(this.scopeOf(draft)) }
+    if (thing === null) { throw this.nothingStoredError(this.scopeOf(draft)) }
     return thing
   }
 
@@ -196,9 +196,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       const scope = this.scopeOf(answer.req_params)
       const record = recordOfAnswer<RecordT, SparseT>(answer)
       const thing = this.#buildOrReceive(scope, record)
-      const isAbsent = thing?.isPresent !== true
-      if (ifAbsent === 'fail' && isAbsent) { throw this.absentRefusal(scope) }
-      return (ifAbsent === 'nil' && isAbsent) ? null : thing
+      if (ifAbsent === 'fail') {
+        if (thing === null) { throw this.nothingStoredError(scope) }
+        thing.demandPresent()
+      }
+      return (ifAbsent === 'nil' && thing?.isPresent !== true) ? null : thing
     }
     const stored = (answer.dbhas ?? null) as Fetched<RecordT, SparseT> | null
     if ((stored !== null) && this.isRefusalOfRow(answer.err)) {
@@ -336,7 +338,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: fateOver, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, absentRefusal, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
+  // == [Defined by the concrete listing]: fateOver, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
 
   /** The fate of `record` meeting `held`, the thing in its slot: by default its `receive` takes it in. */
   protected fateOver(_held: ThingT, _record: Fetched<RecordT, SparseT>): SlotFate { return 'receive' }
@@ -353,7 +355,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The full record `duck` is, as a plain copy. */
   abstract recordOf(duck: unknown): RecordT
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
-  abstract absentRefusal(scope: ScopeT): VaultError
+  /** The refusal for a scope where storage holds no row and no instance is held. */
+  protected abstract nothingStoredError(scope: ScopeT): VaultError
   /** The vaultDB's get of this kind of thing, answering null for nothing stored. */
   protected abstract tryGetRow(scope: ScopeT): Promise<ListingAnswer<RecordT, SparseT>>
   protected abstract tryPutRow(record: RecordT, opts: PutOpts): Promise<ListingAnswer<RecordT, SparseT>>

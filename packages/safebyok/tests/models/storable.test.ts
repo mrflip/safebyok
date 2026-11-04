@@ -1019,12 +1019,12 @@ describe("Storable send guards: ensureSendable, demandSendable", () => {
     await TH.expectRefusal(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
   })
 
-  it("send checks the patch before its guard, and establishes the guard once", async () => {
+  it("send checks the patch before its guard, and ensures the guard on each side of its seal", async () => {
     const box = await builtBoxOf()
     const sendGuard = vi.spyOn(Box.prototype, 'ensureSendable')
     await TH.expectRefusal(box.send({}), 'bad_option')
     expect(sendGuard).not.toHaveBeenCalled()
     await expect(box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)
-    expect(sendGuard).toHaveBeenCalledOnce()
+    expect(sendGuard).toHaveBeenCalledTimes(2)
   })
 })

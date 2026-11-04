@@ -3,7 +3,7 @@ import { makeLeaseKey } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { LOCKED } from '../../src/models/models-shapes'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
-import { DefaultLeaseMillis } from '../../src/models/vault'
+import { DefaultLeaseMillis, Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
@@ -464,6 +464,17 @@ describe("The discards: sweep and vacate, down the chain", () => {
     vault.sweep()
     await expect(vault.hydrate()).resolves.to.eq(vault)
     await TH.expectRefusal(vault.hydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+  })
+
+  it("a sweep crossing expose's unseal refuses 'disabled', and no whisper stays on the box", async () => {
+    const { box } = await makeVaultWithBox()
+    vi.spyOn(Vault.prototype, 'unsealStampedString').mockImplementationOnce(() => {
+      box.sweep()
+      return Promise.resolve('{"val":"sk-test"}')
+    })
+    await TH.expectRefusal(box.expose(), 'disabled')
+    expect(box.whisper).to.be.null
+    expect(box.snapshot.exposed).to.be.false
   })
 
   it("a sweep crossing ensureUnlocked's peek at the cached lease refuses 'disabled', nobody asked", async () => {

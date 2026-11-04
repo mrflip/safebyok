@@ -1,6 +1,7 @@
 import { verifyConsistent } from '../checks/validator'
 import { type CipherCtxRecord, makeLifeTok, randomId } from '../crypto'
 import { VaultError } from '../errors'
+import { absentBoxError } from '../helpers/throwers'
 import { type Outcome, outcomeOf } from '../outcome'
 import * as Phrases from '../phrases'
 import type { Sidecar } from '../shapes/box'
@@ -67,7 +68,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
   // --
 
-  // == [Guards]: ensureUnsealable, demandUnsealable, ensureSendable, demandSendable, demandExposable
+  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensureSendable, demandSendable, ensureExposable, demandExposable
+
+  demandPresent(): this {
+    if (! this.isPresent) { throw absentBoxError(this) }
+    return this
+  }
 
   ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
@@ -78,6 +84,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** A send needs the box enabled and the vault unlocked, and no more: a box gone is sent back to life. */
   demandSendable(): this { return this.demandEnabled().demandUnlocked() }
+
+  ensureExposable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
   /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
   demandExposable(): this { return this.demandEnabled().demandUnlocked() }
@@ -101,8 +109,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
-    await this.ensureUnsealable(opts)
-    this.demandUnsealable()
+    await this.ensureUnsealable(opts); this.demandUnsealable()
     return this.#unseal(this.demandFullProps())
   }
 
@@ -110,7 +117,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** SLOPDOC: Opens the stored whisper and holds it on the instance, where `box.whisper` offers it until forgotten. */
   async expose(opts: TimelyOpts = {}): Promise<this> {
-    this.#exposed = await this.extractWhisper(opts)
+    const exposed = await this.extractWhisper(opts)
+    await this.ensureExposable(); this.demandExposable()
+    this.#exposed = exposed
     this.settle()
     return this
   }
@@ -132,11 +141,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   async send(patch: BoxPatch, opts: SendOpts = {}): Promise<this> {
     const { ifPresent, ...timely } = MSX.sendOpts.parse(opts)
     const given = verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
-    await this.ensureSendable(timely)
-    this.demandSendable()
+    await this.ensureSendable(timely); this.demandSendable()
     const ante = this.central
     const record = await this.#edit(given, ante)
-    this.demandSendable()
+    await this.ensureSendable(); this.demandSendable()
     await this.listing.put(record, ante, { ifPresent })
     return this
   }
