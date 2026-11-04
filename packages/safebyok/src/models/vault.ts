@@ -228,7 +228,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lease]: leaseFriend, ensureAttachable, demandAttachable, attachLease, renewLease, dropLease, vacateLease, vacateUnattached, panic, lock
+  // == [The lease]: leaseFriend, ensureAttachable, demandAttachable, attachLease, renewLease, dropLease, vacateLease, panic, lock
 
   /** All a lease or a proving hears of this vault, made once. */
   #leaseFriend(): LeaseFriend {
@@ -274,7 +274,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (heldLease === null) { return }
     const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
     if (heldLease.isForgotten) {
-      await this.#vacateUnattached(lease)
+      lease.evict()
       return
     }
     await this.#attachLease(lease)
@@ -293,12 +293,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.settle()
     const vacated = await vacating
     if (! vacated.ok) { await onRefused(vacated.err) }
-  }
-
-  /** Drop a lease this vault did not attach, and its row. */
-  async #vacateUnattached(lease: Lease): Promise<void> {
-    const vacated = await lease.tryVacate()
-    if (! vacated.ok) { this.listing.tellBadNews([vacated.err]) }
   }
 
   /** Tell `onPanic` that a cached lease survived a lock; with none, tell the platform and vacate this vault. */
