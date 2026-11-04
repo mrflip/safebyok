@@ -168,11 +168,12 @@ describe("vault.ensureTimely(maxMillis)", () => {
     expect(vault.revision_tok).to.eq(landed.revision_tok)
   })
 
-  it("refuses 'vault_gone' a vault its fetch finds gone", async () => {
+  it("resolves over a vault its fetch finds gone, leaving demandUsable to refuse 'vault_gone'", async () => {
     const { vault, demandStored, restoreRow } = await bornWithGets()
     const stored = demandStored()
     restoreRow({ ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' })
-    await TH.expectRefusal(vault.ensureTimely(0), 'vault_gone')
+    await expect(vault.ensureTimely(0)).resolves.to.equal(vault)
+    TH.expectSyncRefusal(() => vault.demandUsable(), 'vault_gone')
   })
 
   it("refuses a maxMillis out of range as 'bad_option'", async () => {

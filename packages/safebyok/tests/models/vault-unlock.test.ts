@@ -3,7 +3,7 @@ import { makeLeaseKey } from '../../src/crypto'
 import { VaultError } from '../../src/errors'
 import { LOCKED } from '../../src/models/models-shapes'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
-import { DefaultLeaseMillis } from '../../src/models/vault'
+import { DefaultLeaseMillis, Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
@@ -35,6 +35,36 @@ describe("proving.buildWayin: one wayin per proving, of its own vault", () => {
 })
 
 describe("Vault.ensureUnlocked and the vault's lock", () => {
+  it("ensureUnlocked asks nobody of a vault unlocked, where unlock asks the user for proof", async () => {
+    const { vault, listing } = await makeBornVault()
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    await expect(vault.ensureUnlocked()).resolves.to.eq(vault)
+    expect(dialog).not.toHaveBeenCalled()
+    await TH.expectBad(vault.tryUnlock(), 'declined')
+    expect(dialog).toHaveBeenCalledOnce()
+  })
+
+  it("the lease cached is ensureUnlocked's to take up: unlock asks for proof past it", async () => {
+    const { opts, demandStored } = await makeBornVault()
+    const dialog = vi.fn()
+    opts.world.requestCleartext = dialog
+    const next = await new VaultListing(opts).build(demandStored())
+    await TH.expectBad(next.tryUnlock(), 'declined')
+    expect(next.isUnlocked).to.be.false
+    expect(dialog).toHaveBeenCalledOnce()
+    await next.ensureUnlocked()
+    expect(next.isUnlocked).to.be.true
+    expect(dialog).toHaveBeenCalledOnce()
+  })
+
+  it("the seal verbs refuse 'bad_option' a stamp of another vault or another life of it", async () => {
+    const { vault } = await makeBornVault()
+    const sealed = await vault.sealStampedString('sk-test', Stamp)
+    await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'bad_option')
+    await TH.expectRefusal(vault.unsealStampedString(sealed, { ...Stamp, vault_tok: 'another-life' }), 'bad_option')
+  })
+
   it("is born unlocked, under the lease its passphrase proving grants and the deviceDB caches; ensureUnlocked answers the vault and asks nothing", async () => {
     const { vault, deviceDB } = await makeBornVault()
     expect(vault.isUnlocked).to.be.true
@@ -115,6 +145,12 @@ const makeFreshLease = async ({ vault, friend, opts: { world } }: Awaited<Return
 }
 
 describe("lease.attach: the one way a vault comes to hold a lease", () => {
+  it("demandAttachable refuses 'bad_option' what is of another vault", async () => {
+    const { vault } = await makeBornVault()
+    expect(vault.demandAttachable({ vault_tok: vault.vault_tok })).to.eq(vault)
+    TH.expectSyncRefusal(() => vault.demandAttachable({ vault_tok: 'another-life' }), 'bad_option')
+  })
+
   it("holds the lease, reading unlocked, and caches its row: the lease it displaces is dropped", async () => {
     const born = await makeBornVaultAndFriend()
     const { vault, deviceDB } = born
@@ -436,14 +472,83 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const { vault, box, deviceDB } = await makeVaultWithBox()
     vault.sweep()
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
-    TH.expectSyncRefusal(() => vault.demandPresent(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandUnlocked(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandUsable(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandBoxesUsable(), 'disabled')
+    TH.expectSyncRefusal(() => box.demandSendable(), 'disabled')
+    TH.expectSyncRefusal(() => box.demandUnsealable(), 'disabled')
+    TH.expectSyncRefusal(() => { box.whisper = { val: 'sk-test' } }, 'disabled')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')
     await TH.expectRefusal(vault.fetch(), 'disabled')
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'disabled')
     expect(vault.lock().sweep().vacate()).to.equal(vault)
     expect(box.lock().sweep().vacate()).to.equal(box)
     expect(deviceDB.tryVacate).not.toHaveBeenCalled()
+  })
+
+  it("past a discard vault.boxListing answers the listing it held, its verbs refusing", async () => {
+    const { vault } = await makeVaultWithBox()
+    const boxes = vault.boxListing
+    vault.sweep()
+    expect(vault.boxListing).to.eq(boxes)
+    await TH.expectRefusal(boxes.hello(), 'disabled')
+  })
+
+  it("past a discard a vault's record stays readable, for a log or a debugger", async () => {
+    const { vault, demandStored } = await makeBornVault()
+    vault.sweep()
+    expect(vault.fullRecord).to.deep.equal(demandStored())
+    expect(vault.gate.gate_epoch).to.eq(demandStored().gate.gate_epoch)
+  })
+
+  it("a hydrate past a discard refuses only where it fetches: a timely record answers the instance, a stale one 'disabled'", async () => {
+    const { vault, box } = await makeVaultWithBox()
+    box.sweep()
+    await expect(box.hydrate()).resolves.to.eq(box)
+    await TH.expectRefusal(box.hydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+    vault.sweep()
+    await expect(vault.hydrate()).resolves.to.eq(vault)
+    await TH.expectRefusal(vault.hydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+  })
+
+  it("a sweep crossing expose's unseal refuses 'disabled', and no whisper stays on the box", async () => {
+    const { box } = await makeVaultWithBox()
+    vi.spyOn(Vault.prototype, 'unsealStampedString').mockImplementationOnce(() => {
+      box.sweep()
+      return Promise.resolve('{"val":"sk-test"}')
+    })
+    await TH.expectRefusal(box.expose(), 'disabled')
+    expect(box.whisper).to.be.null
+    expect(box.snapshot.exposed).to.be.false
+  })
+
+  it("a sweep crossing ensureUnlocked's peek at the cached lease refuses 'disabled', nobody asked", async () => {
+    const { vault, listing, deviceDB } = await makeBornVault()
+    vault.lock()
+    await TH.eventually(() => deviceDB.cachedNow() === null)
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    deviceDB.peek.mockImplementationOnce(() => {
+      vault.sweep()
+      return Promise.resolve(null)
+    })
+    await TH.expectRefusal(vault.ensureUnlocked(), 'disabled')
+    expect(dialog).not.toHaveBeenCalled()
+  })
+
+  it("a swept listing stores nothing: a put or a delete refuses 'disabled' before reaching the vaultDB", async () => {
+    const { listing, demandStored } = await makeBornVault()
+    const stored = demandStored()
+    listing.sweep()
+    await TH.expectRefusal(listing.put(stored, stored), 'disabled')
+    await TH.expectRefusal(listing.del(stored), 'disabled')
+    expect(demandStored()).to.eq(stored)
+  })
+
+  it("a box listing swept with its vault refuses a birth 'disabled', ahead of the lock the sweep left", async () => {
+    const { vault, box } = await makeVaultWithBox()
+    const boxes = vault.boxListing
+    vault.sweep()
+    await TH.expectRefusal(boxes.create({ ...box.scope, ...BoxDna, boxlabel: 'other_key' }), 'disabled')
   })
 
   it("a listing past a sweep or a vacate takes no further call, and answers a late notice with nothing", async () => {

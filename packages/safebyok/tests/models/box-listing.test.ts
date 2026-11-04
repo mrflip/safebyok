@@ -64,9 +64,9 @@ describe("BoxListing", () => {
       expect(listing.snapshot[0]).to.include({ boxlabel: 'anthropic_api_key' })
     })
 
-    it("puts once, and fetches nothing, then takes the world", async () => {
+    it("refreshes the world at each guard, puts once, and fetches nothing, then takes the world", async () => {
       await boxListingOf(held.mw).create(dna())
-      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['put', 'takeWorld'])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'ensureTimely', 'put', 'takeWorld'])
     })
 
     it("holds nothing where the put is refused with no record, and leaves the scope free for another create", async () => {
@@ -86,12 +86,34 @@ describe("BoxListing", () => {
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 
+    it("refuses 'bad_scope' a dna naming another vault, sealing and storing nothing", async () => {
+      const listing = boxListingOf(held.mw)
+      await TH.expectRefusal(listing.create({ ...dna(), vaultlabel: 'another_vault' }), 'bad_scope')
+      expect(listing.things).to.deep.equal([])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
+    })
+
+    it("refuses 'bad_scope' to answer for another vault's box, asking storage nothing", async () => {
+      const listing = boxListingOf(held.mw)
+      const { whisper: _whisper, sidecar: _sidecar, ...scope } = dna()
+      const mary = { ...scope, vaultlabel: 'mary' }
+      TH.expectSyncRefusal(() => listing.at(mary), 'bad_scope')
+      await TH.expectRefusal(listing.fetch(mary), 'bad_scope')
+      expect(held.mw.callsOf('get')).to.deep.equal([])
+    })
+
+    it("refuses 'bad_record' a put of another vault's record, storing nothing", async () => {
+      const listing = boxListingOf(held.mw)
+      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, null), 'bad_record')
+      expect(held.mw.callsOf('put')).to.deep.equal([])
+    })
+
     it("refuses 'bad_option' a scope already held, sealing and storing nothing", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.create(dna())
       held.mw.clearCalls()
       await TH.expectRefusal(listing.create(dna()), 'bad_option')
-      expect(held.mw.calls).to.deep.equal([])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
       expect(listing.at(box.scope)).to.eq(box)
     })
 
@@ -519,7 +541,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.create({ ...dna(), whisper: { val: 'sk-test-0000' } }), 'vault_locked')
     expect(listing.things).to.deep.equal([])
-    expect(held.mw.calls).to.deep.equal([])
+    expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
   it("builds of a record while the vault is locked, as a record needs no seal", async () => {
@@ -669,9 +691,5 @@ describe("BoxListing and Listing entries: arguments checked first of all, before
     TH.expectSyncRefusal(() => boxListingOf(held.mw).subscribe(null as never), 'bad_option')
   })
 
-  it("refuses absentRefusal a scope that fails its check as 'bad_scope', quoting nothing of it", () => {
-    const err = TH.expectSyncRefusal(() => boxListingOf(held.mw).absentRefusal({ boxlabel: 'SECRET' } as never), 'bad_scope')
-    expect(TH.thrownText(err)).to.not.include('SECRET')
-  })
 })
 // --

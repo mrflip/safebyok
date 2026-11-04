@@ -491,6 +491,7 @@ describe("box.send(patch): the vault's lease seals the whisper and the sidecar",
     held.mw.seedStore(fullBoxRecord())
     const box = await builtOf(sparseBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
+    held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
     await box.send({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } })
     expect(box.isFull).to.be.true
     expect(box.sidecar).to.deep.equal({ account: 'home' })

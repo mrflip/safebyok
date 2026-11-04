@@ -3,6 +3,7 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/errors'
+import type { Box } from '../../src/models/box'
 import type { AnyGating } from '../../src/models/gating'
 import type { VaultRecord } from '../../src/models/models-shapes'
 import { Vault } from '../../src/models/vault'
@@ -58,7 +59,7 @@ describe("a tombstone over a live vault", () => {
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(box.isDisabled).to.be.true
     await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
-    TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
+    expect(vault.boxListing).to.eq(boxes)
   })
 
   it("tells a refused erase as bad news, not a panic, and the tombstone stands", async () => {
@@ -98,6 +99,25 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
   })
 })
 
+describe("a box verb over a vault deleted elsewhere", () => {
+  const WorldNow = { maxWorldMillis: 0 }
+  const Verbs = [
+    ['box.extractWhisper', ({ box }) => box.extractWhisper(WorldNow)],
+    ['box.send',           ({ box }) => box.send({ whisper: { val: 'sk-new' }, sidecar: {} }, WorldNow)],
+    ['box.del',            ({ box }) => box.del(WorldNow)],
+    ['vault.getBox',       ({ vault, box }) => vault.getBox(box.boxlabel, { ...WorldNow, maxMillisSinceRefresh: 0 })],
+    ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, WorldNow)],
+  ] as const satisfies readonly (readonly [string, (world: { vault: Vault, box: Box }) => Promise<unknown>])[]
+
+  it.each(Verbs)("%s refuses 'disabled', as the refresh that finds the tombstone vacates the box before the box's guard runs", async (_verb, call) => {
+    const { vault, demandStored, restoreRow } = await makeBornVault()
+    const box = await vault.boxListing.create({ ...vault.scope, ...BoxDna })
+    await vault.hello()
+    restoreRow(tombstoneOver(demandStored()))
+    await TH.expectRefusal(call({ vault, box }), 'disabled')
+  })
+})
+
 describe("vault.del()", () => {
   it("lands on that same end state, the tombstone stored", async () => {
     const world = await makeBornVault()
@@ -106,7 +126,8 @@ describe("vault.del()", () => {
     await expectLandedGone(world.vault, world)
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
-    await TH.expectRefusal(world.vault.ensureTimely(0), 'vault_gone')
+    await world.vault.ensureTimely(0)
+    TH.expectSyncRefusal(() => world.vault.demandUsable(), 'vault_gone')
   })
 })
 
@@ -154,7 +175,7 @@ describe("an old instance, replaced by the very call it made", () => {
     await TH.expectRefusal(vault.fetch(), 'disabled')
     await TH.expectRefusal(vault.del(), 'disabled')
     expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
-    TH.expectSyncRefusal(() => vault.demandReadyToDel(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandDeletable(), 'disabled')
   })
 })
 
@@ -219,6 +240,20 @@ describe("building over a tombstone", () => {
     expect(listing.openGating).to.be.null
     expect(deriveKeyBytes).not.toHaveBeenCalled()
     expect(storedNow()).to.deep.equal(before)
+  })
+
+  it("a vault listing refuses 'bad_scope' to answer for another user, where another vault of this user is plainly not held", () => {
+    const { listing } = makeVaultWorld()
+    TH.expectSyncRefusal(() => listing.at({ ...Dna, user_id: 'another_user' }), 'bad_scope')
+    expect(listing.at({ ...Dna, vaultlabel: 'another_vault' })).to.be.null
+  })
+
+  it("Vault.launchBirth refuses 'bad_scope' a scope of another user, nobody asked", async () => {
+    const { listing } = makeVaultWorld()
+    const dialog = vi.fn()
+    listing.world.requestCleartext = dialog
+    await TH.expectRefusal(Vault.launchBirth(listing, { ...Dna, user_id: 'another_user' }), 'bad_scope')
+    expect(dialog).not.toHaveBeenCalled()
   })
 
   it("Vault.launchBirth refuses 'bad_option' what is no listing, and 'bad_scope' what is no scope, nobody asked", async () => {

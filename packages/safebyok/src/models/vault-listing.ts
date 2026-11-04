@@ -10,7 +10,7 @@ import type { DeviceDB } from '../storage/device-db-new'
 import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { alreadyHeldError } from '../helpers/throwers'
+import { absentVaultError, alreadyHeldError } from '../helpers/throwers'
 import { BoxListing } from './box-listing'
 import { type DelTombstone, type SlotFate, Listing } from './listing'
 import { type AnyGating, type RequestCleartext, alreadyAsking } from './gating'
@@ -113,7 +113,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
   override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
-    this.demandEnabled()
     const held = this.at(this.scopeOf(ante))
     if ((held !== null) && (ante.am !== 'd') && (held.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
     return this.delOver(this.sparseOf(ante))
@@ -164,8 +163,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. */
   async fetchListed(vault: Vault): Promise<BoxesListed> {
     const asked = this.scopeOf(vault)
-    this.demandEnabled()
     await this.ensureTimelyWorld()
+    this.demandEnabled()
     const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
     await this.deliver(vaultRowOf(answer), 'nil')
     return MSX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
@@ -193,20 +192,18 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
   }
 
-  scopeOf(duck: unknown):  VaultScope  { return vaultScope.parse(duck) }
+  /** The scope of `duck`, held to this bank: no listing answers for another's. */
+  scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
   sparseOf(duck: unknown): VaultSparse { return vaultSparse.parse(duck) }
 
-  recordOf(duck: unknown): VaultRecord { return vaultRecord.parse(duck) }
+  recordOf(duck: unknown): VaultRecord { return vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
     return new Vault(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
   }
 
-  /** A vault gone, one in the slot and tombstoned, is 'vault_gone', as the vaultDB says of it to a box verb; nothing held is 'absent_vault'. */
-  absentRefusal(scope: VaultScope): VaultError {
-    return (this.at(scope) === null) ? vaultAbsent(scope) : vaultGone()
-  }
+  protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }
 
   /** The vault row alone: the boxes `getVault` lists with it are the vault's box listing's to take. */
   protected async tryGetRow(scope: VaultScope) { return vaultRowOf(await this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' })) }
@@ -233,11 +230,7 @@ const vaultRowOf = (answer: Awaited<ReturnType<VaultDB['tryGetVault']>>) => (
 )
 // --
 
-// == [Refusals]: vaultAbsent, vaultGone, delOfOtherLife, vaultStoredDamaged
-
-const vaultAbsent = ({ vaultlabel }: VaultScope): VaultError => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
-
-const vaultGone = (): VaultError => new VaultError('vault_gone', Phrases.VaultDeleted)
+// == [Refusals]: delOfOtherLife, vaultStoredDamaged
 
 const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
 

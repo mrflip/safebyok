@@ -58,8 +58,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   readonly #horizonMillis: number
   /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
   #refreshedAt: number | null = null
-  /** The fetch under way, which every `fetch` made meanwhile joins, resolving whether storage held a record. */
-  readonly #oneFetchAtATime = oneAtATime(async () => (await this.listing.fetch(this.scope, { ifAbsent: 'nil' })) !== null)
+  /** The fetch under way, which every `fetch` made meanwhile joins. */
+  readonly #oneFetchAtATime = oneAtATime(() => this.listing.fetch(this.scope, { ifAbsent: 'nil' }))
   readonly #listeners = new Set<() => void>()
   // --
 
@@ -201,33 +201,28 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandFullProps, ensureReadyToDel, demandReadyToDel
+  // == [Guards]: isDisabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandFullProps, ensureDeletable, demandDeletable
 
   /** True past a sweep, a vacate or a delete, and from then on. */
   get isDisabled(): boolean { return this.#isDisabled }
 
   demandEnabled():  this { if (this.#isDisabled) { throw disabledError() }                             return this }
 
-  demandUnlocked(): this { if (this.demandEnabled().isLocked)    { throw lockedError() }                               return this }
+  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
-  demandPresent():  this { if (! this.demandEnabled().isPresent) { throw this.listing.absentRefusal(this.scope) }      return this }
-
-  demandFull():     this { if (! this.demandEnabled().isFull)    { throw partialLoadError() }                          return this }
+  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
-    const { full } = this.demandEnabled()
+    const { full } = this
     if (full === null) { throw partialLoadError() }
     return full
   }
 
-  async ensureReadyToDel(opts: TimelyOpts = {}): Promise<this> {
-    await this.hydrate(opts)
-    return this.demandReadyToDel()
-  }
+  ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  /** A delete needs the vault unlocked, and no more: a thing gone is deleted again. */
-  demandReadyToDel(): this { return this.demandUnlocked() }
+  /** A delete needs the thing enabled and the vault unlocked, and no more: a thing gone is deleted again. */
+  demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
   // --
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
@@ -235,11 +230,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** SLOPDOC: Refreshes this thing from storage through the listing, joining any fetch under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
-    this.demandEnabled()
     await this.listing.ensureTimelyWorld(maxWorldMillis)
-    const isStored = await this.#oneFetchAtATime()
     this.demandEnabled()
-    if (ifAbsent === 'fail' && ! isStored) { throw this.listing.absentRefusal(this.scope) }
+    await this.#oneFetchAtATime()
+    this.demandEnabled()
+    if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
 
@@ -250,7 +245,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Make the world timely, as its answer may lock the vault or take the thing away, and fetch the record unless it is timely within `opts.maxMillisSinceRefresh`, by default the thing's horizon. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
-    this.demandEnabled()
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
     return this.fetch({ ifAbsent: 'nil' })
@@ -260,7 +254,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Hand this thing to `listing.del`; its answer, the stored tombstone, makes the thing gone once it lands. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
-    await this.ensureReadyToDel(MSX.timelyOpts.parse(opts))
+    await this.ensureDeletable(MSX.timelyOpts.parse(opts)); this.demandDeletable()
     await this.listing.del(this)
     return this
   }
@@ -369,7 +363,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Concrete Subclass Required Methods]: isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Concrete Subclass Required Methods]: demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
+
+  abstract demandPresent(): this
 
   /** Whether `fetched` is a full record, alive: a tombstone never is. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT

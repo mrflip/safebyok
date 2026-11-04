@@ -278,7 +278,7 @@ describe("Listing's pipeline: what every answer takes", () => {
         await TH.expectRefusal(listing.create(dnaOf()), 'bad_option')
         expect(listing.at(scopeOf())).to.eq(box)
         expect(box.revision_seq).to.eq(record.revision_seq)
-        expect(held.mw.calls).to.deep.equal([])
+        expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
       })
     }
 

@@ -143,7 +143,6 @@ export class Bank implements VaultWorld {
     await listing.fetchBank()
     await this.#cacheDeviceRecord()
     await listing.hello()
-    listing.demandEnabled()
   }
 
   /** The first `device_id` cached for this scope wins, and is the bank's. A damaged record written over is bad news. */

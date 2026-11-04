@@ -108,7 +108,7 @@ describe("vault.hello: the first box call lists the boxes", () => {
   })
 })
 
-describe("the box verbs refuse a vault locked, or gone, before they touch storage", () => {
+describe("the box verbs refuse a vault locked, or gone", () => {
   const Verbs = [
     ['getBox',   (vault) => vault.getBox(boxlabel)],
     ['fetchBox', (vault) => vault.fetchBox(boxlabel)],
@@ -117,14 +117,10 @@ describe("the box verbs refuse a vault locked, or gone, before they touch storag
   ] as const satisfies readonly (readonly [string, (vault: Awaited<ReturnType<typeof makeWorld>>['vault']) => Promise<unknown>])[]
 
   for (const [verb, call] of Verbs) {
-    it(`${verb} refuses 'vault_locked' while locked, with no vaultDB call`, async () => {
-      const { vault, tryGetVault, tryPutBox, tryGetBox } = await makeWorld()
+    it(`${verb} refuses 'vault_locked' while locked`, async () => {
+      const { vault } = await makeWorld()
       vault.lock()
-      tryGetVault.mockClear()
       await TH.expectRefusal(call(vault), 'vault_locked')
-      expect(tryGetVault).not.toHaveBeenCalled()
-      expect(tryGetBox).not.toHaveBeenCalled()
-      expect(tryPutBox).not.toHaveBeenCalled()
     })
 
     it(`${verb} refuses 'vault_gone' on a vault deleted, as gone beats locked`, async () => {

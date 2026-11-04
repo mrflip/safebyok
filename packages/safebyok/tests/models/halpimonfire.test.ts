@@ -108,7 +108,7 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: 1 })
   })
 
-  it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is vacated unattached, and demandReadyToAttach is never met", async () => {
+  it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is vacated unattached, and demandAttachable is never met", async () => {
     const { vault, demandStored, deviceDB, anotherSession } = await makeBornVault()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()), NewPassphrase)
@@ -120,7 +120,7 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("a tombstone crossing a birth's lease refuses 'vault_gone' at demandReadyToAttach, the lease vacated", async () => {
+  it("a tombstone crossing a birth's lease refuses 'vault_gone' at demandAttachable, the lease vacated", async () => {
     const { listing, demandStored, deviceDB, anotherSession } = makeVaultWorld()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()))
@@ -131,7 +131,7 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("a sweep crossing a birth's lease refuses 'disabled' at demandReadyToAttach, the row stored, no lease cached", async () => {
+  it("a sweep crossing a birth's lease refuses 'disabled' at demandAttachable, the row stored, no lease cached", async () => {
     const { listing, storedNow, deviceDB } = makeVaultWorld()
     crossingGrant(() => listing.sweep())
     await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)), 'disabled')
