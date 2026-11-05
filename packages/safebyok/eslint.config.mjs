@@ -11,9 +11,13 @@ import stylistic                       from '@stylistic/eslint-plugin'
 import vitest                          from '@vitest/eslint-plugin'
 import chaiExpect                      from 'eslint-plugin-chai-expect'
 import chaiFriendly                    from 'eslint-plugin-chai-friendly'
+import jsdoc                           from 'eslint-plugin-jsdoc'
 
 /** Everything we lint. */
 const SourceFiles = ['**/*.{js,mjs,cjs,ts,mts,cts}']
+
+/** A quoted snake_case refusal kind, such as `'stale_write'`: the underscore keeps out option values (`'gone'`). */
+const QuotedKind = "'[a-z]+_[a-z_]+'"
 
 /**
  * Every assertion method `expect` carries in `tests/`, read from vitest's chai registry
@@ -339,6 +343,74 @@ export default defineConfig([
     },
   },
 
+  // == [Doc blocks] ==
+  // STYLE.md *Comments and doc blocks*: only rules that remove content or fix the shape; no count caps. Every rule is at
+  // warn until the documentarian sweep has brought the code up to them.
+  {
+    name: 'safebyok/doc-blocks',
+    files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
+    plugins: { jsdoc },
+    rules: {
+      // #a-helper-gets-a-phrase: every export has a block -- functions, classes and their public methods and getters,
+      // consts, type aliases (one derived by `typeof`, beside the const or checker it names, is exempt), interfaces.
+      // publicOnly leaves out protected members: a subclass's author reads the code.
+      'jsdoc/require-jsdoc': ['warn', {
+        publicOnly:        true,
+        enableFixer:       false,   // the fixer inserts an empty block, which no-blank-blocks then refuses
+        checkConstructors: false,   // the class doc covers it
+        require:  { FunctionDeclaration: true, ClassDeclaration: true, MethodDefinition: true },
+        contexts: [
+          'ExportNamedDeclaration > VariableDeclaration',
+          'ExportNamedDeclaration > TSTypeAliasDeclaration:not(:has(TSTypeQuery))',
+          'ExportNamedDeclaration > TSInterfaceDeclaration',
+          'TSMethodSignature',
+        ],
+      }],
+      // The first line rests on the /** (never a bare /** on its own line), so the block reads with the code folded.
+      'jsdoc/no-restricted-syntax': ['warn', { contexts: [{
+        comment: String.raw`JsdocBlock[delimiterLineBreak="\n"]`,
+        message: 'The first line rests on the /**, so the block reads folded: STYLE.md, Comments and doc blocks',
+      }] }],
+      // The same shape at the other end: a multi-line block closes on a line of its own. noZeroLineText must be false:
+      // its default, true, refuses exactly the first-line-on-the-/** shape the house writes.
+      'jsdoc/multiline-blocks': ['warn', { noZeroLineText: false, noFinalLineText: true }],
+      // #no-refusal-catalog: no two quoted snake_case kinds in a member's description; class and module docs are not
+      // listed. The underscore misses the one-word kinds, a price paid to keep the config off src/.
+      'jsdoc/match-description': ['warn', {
+        mainDescription: {
+          match:   String.raw`^(?![\s\S]*${QuotedKind}[\s\S]*${QuotedKind})`,
+          message: 'A doc block names no refusal catalog; one kind a caller branches on may stay: STYLE.md #no-refusal-catalog',
+        },
+        contexts: [
+          'MethodDefinition', 'FunctionDeclaration', 'VariableDeclaration', 'PropertyDefinition',
+          'TSPropertySignature', 'TSMethodSignature',
+        ],
+      }],
+      // #name-the-act: a block opens with its sentence, not with a tag; and a block is never empty.
+      'jsdoc/require-description': ['warn', { contexts: ['any'] }],
+      'jsdoc/no-blank-blocks':     'warn',
+      // #three-questions: a block that only restates the member's name says nothing a caller needs.
+      'jsdoc/informative-docs':    'warn',
+      // The {@link} bullet and #point-dont-redefine: a {@link} names something in scope in its file.
+      'jsdoc/no-undefined-types':  'warn',
+      // The @param/@returns bullet: no {Type} in a tag (TypeScript holds the types), and no misspelt or invented tag.
+      'jsdoc/no-types':            ['warn', { contexts: ['any'] }],
+      'jsdoc/check-tag-names':     ['warn', { typed: true }],
+      // Later lines start with ` * `, aligned under the first asterisk.
+      'jsdoc/require-asterisk-prefix': 'warn',
+      'jsdoc/check-alignment':         'warn',
+    },
+  },
+
+  // A phrase's string is its own documentation, and the module doc covers the file.
+  {
+    name: 'safebyok/doc-blocks-phrases',
+    files: ['src/helpers/phrases.ts'],
+    rules: {
+      'jsdoc/require-jsdoc': 'off',
+    },
+  },
+
   // This file and any other loose script sit outside the TS project, so the
   // type-aware rules above cannot run on them. Last, so it wins.
   {
@@ -370,9 +442,12 @@ export default defineConfig([
       // Same ground as vitest/expect-expect above, but with no way to name our own assertion
       // helpers. One rule enforcing this is enough, and that one is the one we can configure.
       'sonarjs/assertions-in-tests': 'off',
-      // STYLE.md mandates bulk example lists, whose `it(blurb, ...)` title is a variable by
-      // construction.
-      'vitest/valid-title': 'off',
+      // STYLE.md *Tests*: a title is one plain clause, and quotes no refusal kind; the assertions carry it. A bulk
+      // example list's `it(blurb, ...)` title is a variable by construction, which allowArguments lets pass.
+      'vitest/valid-title': ['warn', {
+        allowArguments: true,
+        mustNotMatch:   [QuotedKind, 'A title quotes no refusal kind; the assertions carry it: STYLE.md, Tests'],
+      }],
     },
   },
 
