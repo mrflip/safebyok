@@ -266,7 +266,7 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     const record = fullBoxRecord({ sidecar: { uncle: 'Bob' } })
     held.mw.seedStore(record)
     const box = await listing.build(record)
-    await box.put({ whisper: 'sk-test-0000', sidecar: { uncle: 'Robert' } })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { uncle: 'Robert' } })
     expect(box.sidecar).to.deep.equal({ uncle: 'Robert' })
     expect(listing.snapshot[0]?.sidecar).to.deep.equal({ uncle: 'Robert' })
   })

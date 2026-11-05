@@ -104,7 +104,7 @@ describe("VX.boxRecord and VX.boxSparse", () => {
 })
 
 describe("VX.boxDna", () => {
-  const dna = { ...scope, whisper: 'sk-ant-fake', sidecar: {} }
+  const dna = { ...scope, whisper: { apiKey: 'sk-ant-fake' }, sidecar: {} }
   const filled = { ...dna, whisper_codec: 'json_v1', whisper_schema_version: 1 }
   const { box_key_wrapped, whisper_ciphered } = full
   // A dna carries no revision_seq, so the factory's props stop at the rest.
@@ -119,7 +119,7 @@ describe("VX.boxDna", () => {
     [{ ...dna, ...factoryProps, fmt: VX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
     // the whisper and the sidecar, each defaulting:
     [scope,                                                 true,  'passes the scope alone'],
-    [{ ...scope, whisper: 'sk-ant-fake' },         true,  'passes a whisper with no sidecar'],
+    [{ ...scope, whisper: { apiKey: 'sk-ant-fake' } },         true,  'passes a whisper with no sidecar'],
     [{ ...scope, sidecar: {} },                             true,  'passes a sidecar with no whisper'],
     [{ ...dna, whisper: undefined },                        true,  'passes a whisper given as undefined'],
     [{ ...dna, sidecar: undefined },                        true,  'passes a sidecar given as undefined'],
@@ -127,7 +127,7 @@ describe("VX.boxDna", () => {
     [{ ...dna, boxlabel: undefined },                       false, 'refuses a dna with no boxlabel'],
     [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label'],
     [{ boxlabel: 'anthropic_api_key' },                     false, 'refuses a boxlabel without its vault'],
-    [{ whisper: 'sk-ant-fake', sidecar: {} },      false, 'refuses a dna with no scope'],
+    [{ whisper: { apiKey: 'sk-ant-fake' }, sidecar: {} },      false, 'refuses a dna with no scope'],
     // the record's own props refused:
     [{ ...dna, sidecar: 'work account' },                   false, 'refuses a sidecar that is no object'],
     [{ ...dna, whisper_codec: 'json_v2' },                  false, 'refuses a codec it does not know'],
@@ -184,7 +184,7 @@ describe("VX.boxDna", () => {
 })
 
 describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch", () => {
-  const whisper = 'sk-ant-fake'
+  const whisper = { apiKey: 'sk-ant-fake' }
   const { sidecar: _sidecar, ...sealedless } = full
 
   describe("boxDna", () => {
@@ -226,7 +226,7 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
 
     it("names the failing field, quoting nothing of a whisper or a field's name", () => {
       expect(TH.expectSyncRefusal(() => VX.boxPatch.parse({ whisper: null, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper'])
-      for (const marked of [{ whisper: { SECRET: undefined }, sidecar: {} }, { whisper: 'SECRET-VAL', sidecar: {}, SECRET_FIELD: 1 }]) {
+      for (const marked of [{ whisper: { SECRET: undefined }, sidecar: {} }, { whisper: { apiKey: 'SECRET-VAL' }, sidecar: {}, SECRET_FIELD: 1 }]) {
         const err = TH.expectSyncRefusal(() => VX.boxPatch.parse(marked), 'bad_option')
         expect(TH.thrownText(err)).to.not.include('SECRET')
         expect(JSON.stringify(err.meta)).to.not.include('SECRET')

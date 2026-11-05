@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import { never, record } from 'zod'
-import { LOCKED, MaxSaltBytes, PasskeySaltBytes } from '../helpers/consts'
+import { MaxSaltBytes, PasskeySaltBytes, isWhisperedBag } from '../helpers/consts'
 import { fromB64OrNull } from '../helpers/crypto'
 import type { VaultLogger } from '../helpers/logger'
 import * as Phrases from '../helpers/phrases'
@@ -72,19 +72,17 @@ export type VaultKeyLeaseWrapped = Z.infer<typeof vault_key_lease_wrapped>
 
 // == [Whisper and sidecar]: WhisperJson, Whisper, isPlainBag, whisper, whisperBag, sidecar, Sidecar
 
-/** The JSON a whisper is made of, `null` included inside an array or object: a whole {@link Whisper} cannot be null. */
+/** The JSON a whisper is made of, inside its object, `null` included. */
 export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [ckey: string]: WhisperJson }
 
-/** The secret kept in a box: a JSON value, a string, number, boolean, array or plain object.
- * `undefined` anywhere in it is refused, as JSON cannot carry it. A bare `null` is refused too:
- * emptying a box is `delBox`'s job.
+/** The secret kept in a box: always a plain JSON object, typed loosely so that `box.whisper.org` and `box.put({ whisper: box.whisper })` compile.
  *
- * @example 'sk-ant-api03-...'
+ * @example { apiKey: 'sk-ant-api03-...' }
  * @example { apiKey: 'sk-ant-...', orgId: null }
  */
-export type Whisper = Exclude<WhisperJson, null>
+export type Whisper = Record<string, any>
 
-/** True for a plain object, built by a literal or `Object.create(null)`: never a Date or Map, which JSON would flatten, nor one with a symbol key, such as LOCKED, which it would drop. */
+/** True for a plain object, built by a literal or `Object.create(null)`: never a Date or Map, which JSON would flatten, nor one with a symbol key, such as a bag marked `Whispered`, which it would drop. */
 export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
   if (typeof val !== 'object' || val === null) { return false }
   if (Object.getOwnPropertySymbols(val).length > 0) { return false }
@@ -92,11 +90,12 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
   return proto === Object.prototype || proto === null
 }
 
-/** The check for a {@link Whisper}, exactly what JSON can carry, never what it would mangle, and never a bare null; and `whisperBag`, the plain JSON object a whisper or a {@link Sidecar} may be.
+/** The check for a {@link Whisper}, a plain JSON object with no symbol key at any depth; and `whisperBag`, the same with no word on a bag marked `Whispered`, for a {@link Sidecar}.
  * Its `parse` refuses 'bad_option', quoting none of it, and naming none of an object's keys: an
  * object that is not plain JSON fails whole.
  *
- * @example whisper.parse('sk-ant-...')                  // a string passes through
+ * @example whisper.parse({ apiKey: 'sk-ant-...' })      // an object passes through, copied
+ * @example whisper.safeParse('sk-ant-...').success      // false: a whisper is an object -- { apiKey: 'sk-ant-...' }
  * @example whisper.safeParse(new Date()).success        // false: JSON would flatten it to {}
  * @example whisper.safeParse(undefined).success         // false: undefined cannot be stored
  * @example whisper.safeParse(null).success              // false: emptying a box is delBox's job
@@ -111,8 +110,9 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
   // A judged object is the caller's own, so each check hands back a copy, as a parse of an object does:
   // a box freezes its record through, and must never freeze, or share, the caller's sidecar.
   const whisperBag = plainBag.overwrite((bag) => structuredClone(bag))
-  const whisper: Z.ZodType<Whisper> = custom((val) => val !== LOCKED, Phrases.LockedIsNoWhisper)
-    .pipe(union([str, num, bool, whisperArr, plainBag], Phrases.WhisperShape).overwrite((whisper) => structuredClone(whisper)))
+  const whisper: Z.ZodType<Whisper> = custom((val) => ! isWhisperedBag(val), Phrases.WhisperedIsNoWhisper)
+    .pipe(custom((val) => (typeof val === 'object') && (val !== null) && (! Array.isArray(val)), Phrases.WhisperShape))
+    .pipe(whisperBag)
   return { whisper, whisperBag }
 })
 

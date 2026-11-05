@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { LOCKED } from '../../src/helpers/consts'
+import { ENCRYPTED } from '../../src/helpers/consts'
 import { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultAndFriend, replaceTyping, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
@@ -127,7 +127,7 @@ describe("A refused erase of the row: the panic", () => {
 })
 
 describe("The discards: sweep and vacate, down the chain", () => {
-  const BoxDna = { boxlabel: 'anthropic_api_key', whisper: 'sk-test', sidecar: {} }
+  const BoxDna = { boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test' }, sidecar: {} }
   const makeVaultWithBox = async () => {
     const born = await makeBornVault()
     const box = await born.vault.boxListing.create({ ...born.vault.scope, ...BoxDna })
@@ -136,7 +136,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
 
   it("seals a box through the vault and opens it, end to end", async () => {
     const { box } = await makeVaultWithBox()
-    expect(await box.extractWhisper()).to.deep.equal('sk-test')
+    expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test' })
   })
 
   it("sweep leaves the row, drops the lease, disables and unlists all the way down", async () => {
@@ -149,7 +149,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(box.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     expect(boxListing.at(box.scope)).to.be.null
-    expect(box.whisper).to.equal(LOCKED)
+    expect(box.whisper).to.equal(ENCRYPTED)
     expect(deviceDB.cachedNow()).not.to.be.null
     expect(deviceDB.tryVacate).not.toHaveBeenCalled()
     expect(deviceDB.peek).not.toHaveBeenCalled()
@@ -171,7 +171,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     vault.sweep()
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
     TH.expectSyncRefusal(() => vault.demandUnlocked(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandPuttable({ whisper: 'sk-test' }), 'disabled')
+    TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { apiKey: 'sk-test' } }), 'disabled')
     TH.expectSyncRefusal(() => box.demandUnsealable(), 'disabled')
     TH.expectSyncRefusal(() => box.demandExposable(), 'disabled')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')
@@ -211,10 +211,10 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const { box } = await makeVaultWithBox()
     vi.spyOn(Vault.prototype, 'unsealStampedString').mockImplementationOnce(() => {
       box.sweep()
-      return Promise.resolve('"sk-test"')
+      return Promise.resolve('{"apiKey":"sk-test"}')
     })
     await TH.expectRefusal(box.expose(), 'disabled')
-    expect(box.whisper).to.be.null
+    expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.snapshot.exposed).to.be.false
   })
 

@@ -13,8 +13,8 @@ useVaultWorlds()
 const modelsWorlds: ModelsWorld[] = []
 afterEach(() => { for (const mw of modelsWorlds.splice(0)) { mw.dispose() } })
 
-const Whisper    = 'sk-test-0000'
-const NewWhisper = 'sk-test-1111'
+const Whisper    = { apiKey: 'sk-test-0000' }
+const NewWhisper = { apiKey: 'sk-test-1111' }
 const Sidecar    = Object.freeze({ account: 'work' })
 const BoxDna     = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: Sidecar }
 

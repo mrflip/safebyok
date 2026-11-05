@@ -1,5 +1,6 @@
 /** A Box's put: rebirth over a tombstone, the lease's seal, the versioned replace, and a patch naming a half. */
 
+import { ENCRYPTED, VEILED } from '../../src/helpers/consts'
 import { describe, expect, it } from 'vitest'
 import { type BoxHalves, type BoxRecord, type BoxSparse, type Fetched } from '../../src/shapes/shapes-vaultish'
 import * as Phrases from '../../src/helpers/phrases'
@@ -24,7 +25,7 @@ describe("box.put(patch): rebirth over a tombstone", () => {
     it(`puts ${blurb} alive at the next revision, registered now under a new box_tok, over the tombstone's revision`, async () => {
       const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am), fakeSealBoxListingOf(held.mw))
       held.mw.setNow(T0 + 5000)
-      await expect(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'reborn' } })).resolves.to.eq(box)
+      await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'reborn' } })).resolves.to.eq(box)
       expect(box.isPresent).to.be.true
       expect(box.box_tok).to.not.eq('box-tok-a')
       expect(box.registered_at).to.eq(T0 + 5000)
@@ -51,7 +52,7 @@ describe("box.put(patch): rebirth over a tombstone", () => {
 describe("box.put(patch): the vault's lease seals the whisper and the sidecar", () => {
   it("seals a whisper with its sidecar over a full box at the next revision, its sealed parts the fake lease's", async () => {
     const box = await builtOf(fullBoxRecord({ sidecar: { account: 'work' } }))
-    await box.put({ whisper: 'sk-test-0000', sidecar: { account: 'work' } })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'work' } })
     expect(box.revision_seq).to.eq(2)
     expect(box.sidecar).to.deep.equal({ account: 'work' })
     expect(box.box_key_wrapped).to.deep.equal(FakeBoxKeyWrapped)
@@ -60,13 +61,13 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
 
   it("seals the sidecar given in place of the one the box carries", async () => {
     const box = await builtOf(fullBoxRecord({ sidecar: { account: 'work' } }))
-    await box.put({ whisper: 'sk-test-0000', sidecar: { account: 'home' } })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } })
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
   it("seals a deleted box back to life with the sidecar given", async () => {
     const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2 }))
-    await box.put({ whisper: 'sk-test-0000', sidecar: {} })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box.isPresent).to.be.true
     expect(box.isFull).to.be.true
     expect(box.sidecar).to.deep.equal({})
@@ -76,7 +77,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
   it("never seals over a sparse record", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.seedStore(fullBoxRecord())
-    await box.put({ whisper: 'sk-test-0000', sidecar: { account: 'home' } })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } })
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
@@ -84,7 +85,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
   it("refuses a live box still sparse once hydrated, saying so, putting nothing", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { account: 'home' } }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }), 'bad_option')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -107,7 +108,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
       const box = await builtOf(fullBoxRecord())
       held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
       held.mw.clearCalls()
-      await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       const [put] = held.mw.callsOf('put')
       expect(put?.priorRevisionTok).to.eq('rev-a1')
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
@@ -118,14 +119,14 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
       const box = await builtOf(fullBoxRecord())
       held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-gone' }))
       held.mw.clearCalls()
-      await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
+      await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 1 })
     })
   }
 
   it("puts over the revision in hand, with ifPresent 'repl'", async () => {
     const box = await builtOf(fullBoxRecord())
-    await expect(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'repl', ...asBuilt })).resolves.to.eq(box)
+    await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'repl', ...asBuilt })).resolves.to.eq(box)
     expect(box.revision_seq).to.eq(2)
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2 })
   })
@@ -134,28 +135,28 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     const rival = fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-rival' })
     const listing = fakeSealBoxListingOf(held.mw, {}, () => { held.mw.seedStore(rival); box.receive(rival) })
     const box = await listing.build(fullBoxRecord())
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }), 'stale_write')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }), 'stale_write')
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-rival', revision_seq: 2 })
     expect(box.revision_tok).to.eq('rev-rival')
   })
 
   it("refuses 'camped' with ifPresent 'fail' over a live record, saving nothing", async () => {
     const box = await builtOf(fullBoxRecord())
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'fail', ...asBuilt }), 'camped')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fail', ...asBuilt }), 'camped')
     expect(box.revision_seq).to.eq(1)
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-a1', revision_seq: 1 })
   })
 
   it("resolves itself with ifPresent 'get' over a live record, holding that record and saving nothing", async () => {
     const box = await builtOf(fullBoxRecord())
-    await expect(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'get', ...asBuilt })).resolves.to.eq(box)
+    await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'get', ...asBuilt })).resolves.to.eq(box)
     expect(box.revision_seq).to.eq(1)
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-a1', revision_seq: 1 })
   })
 
   it("takes the timely options beside ifPresent, handing the world its maxWorldMillis", async () => {
     const box = await builtOf(fullBoxRecord())
-    await expect(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'repl', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
+    await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'repl', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
     expect(held.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
   })
 
@@ -163,7 +164,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     const box = await builtOf(fullBoxRecord())
     const before = box._cheat_central
     held.mw.clearCalls()
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
     expect(box._cheat_central).to.deep.equal(before)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
@@ -175,7 +176,7 @@ describe("box.put(patch): a patch naming a half", () => {
   const PatchCases = [
     [{},                                                       'neither'],
     [{ whisper: null, sidecar: { note: 'x' } },                'a whisper given as null'],
-    [{ whisper: 'sk-test-0000', sidecar: null },      'a sidecar given as null'],
+    [{ whisper: { apiKey: 'sk-test-0000' }, sidecar: null },      'a sidecar given as null'],
   ] as const
 
   for (const [patch, blurb] of PatchCases) {
@@ -199,22 +200,24 @@ describe("box.put(patch): a patch naming a half", () => {
     await TH.expectRefusal(box.put({}), 'bad_option')
   })
 
-  it("seals nothing at an expose or a veil: they move only what the instance holds", async () => {
+  it("seals nothing at an expose, a veil or an unexpose: they move only what the instance holds", async () => {
     const box = await builtOf(fullBoxRecord())
-    await box.put({ whisper: 'sk-test-0000' })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' } })
     const { revision_seq } = box
     held.mw.clearCalls()
     await box.expose()
-    expect(box.whisper).to.deep.equal('sk-test-0000')
+    expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-0000' })
     box.veil()
-    expect(box.whisper).to.be.null
+    expect(box.whisper).to.eq(VEILED)
+    box.unexpose()
+    expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.revision_seq).to.eq(revision_seq)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("seals the sidecar given over a full box, carrying none over from the record in hand", async () => {
     const box = await builtOf(fullBoxRecord({ sidecar: { account: 'work' } }))
-    await box.put({ whisper: 'sk-test-0000', sidecar: {} })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box.sidecar).to.deep.equal({})
   })
 })
@@ -238,7 +241,7 @@ describe("box.put checks its patch before it asks the lock", () => {
 
   it("lays only the whisper and the sidecar of a full patch over the record, whatever else it carries", async () => {
     const box = await builtOf(fullBoxRecord())
-    await box.put({ ...fullBoxRecord(), sidecar: { note: 'new' }, whisper: 'sk-test-0001', box_key_wrapped: undefined })
+    await box.put({ ...fullBoxRecord(), sidecar: { note: 'new' }, whisper: { apiKey: 'sk-test-0001' }, box_key_wrapped: undefined })
     expect(box._cheat_central).to.include({ revision_seq: 2, am: 'a' })
     expect(box.sidecar).to.deep.equal({ note: 'new' })
   })

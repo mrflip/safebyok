@@ -1,20 +1,21 @@
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
-import { type LockedBag, LOCKED } from '../helpers/consts'
+import { ENCRYPTED, LOCKED, VEILED } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import * as CX from '../shapes/shapes-core'
 import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
+import type { LockState } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
+import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
 import { stableJsonify } from '../helpers/stable-jsonify'
-import { absentBoxError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
+import { absentBoxError, notExposedError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 
 /** A box as this device holds it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed
+  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled, #subscribeWithVault
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -26,11 +27,24 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly listing: BoxListing
 
-  /** The whisper the host asked to keep open on the instance, a plain object it may edit: hidden while the vault is locked, kept until {@link veil} or a vault modification clears the box. */
+  /** The whisper the host asked to keep open on the instance, a plain object it may edit: hidden while the vault is locked, kept until {@link unexpose} or a vault modification clears the box. */
   #exposed: Whisper | null = null
+  /** Whether {@link veil} is hiding the whisper exposed. */
+  #isVeiled = false
+
+  /** Unbound callback to enroll the given listener for this box's changes and its vault's. */
+  readonly #subscribeWithVault = (listener: () => void): (() => void) => {
+    const unsubscribeBox = this.subscribeOwn(listener)
+    // Its own function, as a vault's listeners are a set: a listener on two boxes must survive leaving one.
+    const unsubscribeVault = this.world.subscribe(() => { listener() })
+    return () => {
+      unsubscribeBox()
+      unsubscribeVault()
+    }
+  }
   // --
 
-  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper
+  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, snapshot, subscribe
 
   get fmt(): number { return this.central.fmt }
 
@@ -46,14 +60,31 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_schema_version(): 1 | null                             { return this.full?.whisper_schema_version ?? null }
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
 
-  /** SLOPDOC: The whisper exposed on this instance, LOCKED while the vault is. */
-  get whisper(): Whisper | LockedBag | null {
-    if (this.isLocked) { return LOCKED }
+  /** The whisper exposed on this instance, or the bag saying why it will not show: encrypted, locked or veiled. */
+  get whisper(): Whisper {
+    if (this.#exposed === null) { return ENCRYPTED }
+    if (this.isLocked)          { return LOCKED }
+    if (this.#isVeiled)         { return VEILED }
     return this.#exposed
   }
+
+  /** The snapshot, made again when the live lockState has moved on from it. */
+  override get snapshot(): BoxSnapshot {
+    if (super.snapshot.lockState !== this.lockState()) { this.remakeSnapshot() }
+    return super.snapshot
+  }
+
+  /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
+  override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
   // --
 
-  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, veil, unseal
+  // == [The vault's lock]: lockState
+
+  /** Whether the vault is locked, read live, as `vault.lockState()` is. */
+  lockState(): LockState { return this.listing.lockState() }
+  // --
+
+  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, veil, unveil, unseal
 
   /** The timely stored whisper, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper> {
@@ -63,18 +94,34 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
-  /** SLOPDOC: Opens the stored whisper and holds it on the instance, where `box.whisper` offers it until forgotten. */
+  /** Open the stored whisper and hold it on the instance, showing, where `box.whisper` offers it until {@link unexpose}. */
   async expose(opts: TimelyOpts = {}): Promise<this> {
     const exposed = await this.extractWhisper(opts)
     this.demandExposable()
     this.#exposed = exposed
+    this.#isVeiled = false
     this.settle()
     return this
   }
 
-  /** Overwrite the whisper held on this instance, locked or not. */
-  veil(): this {
+  /** Discard the whisper held on the instance, from any state. */
+  unexpose(): this {
     this.#exposed = null
+    this.settle()
+    return this
+  }
+
+  /** Hide the whisper exposed, keeping it, from any state. */
+  veil(): this {
+    this.#isVeiled = true
+    this.settle()
+    return this
+  }
+
+  /** Stop hiding the whisper exposed; a locked vault still hides it. */
+  unveil(): this {
+    if (this.#exposed === null) { throw notExposedError() }
+    this.#isVeiled = false
     this.settle()
     return this
   }
@@ -90,7 +137,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Putting]: put, tryPut, edit, keptWhisper
+  // == [Putting]: put, tryPut, putExposed, tryPutExposed, edit, keptWhisper
 
   /** Seals `patch` over the record in hand and stores it, answering this box; a deleted box is reborn.
    *
@@ -107,6 +154,15 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
 
   tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.put(patch, opts)) }
+
+  /** Seal the whisper exposed, veiled or not, and store it; `patch` may name a sidecar, never a whisper. */
+  async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {
+    const { sidecar } = VX.boxExposedPatch.parse(patch)
+    if (this.#exposed === null) { throw notExposedError() }
+    return this.put({ whisper: this.#exposed, sidecar }, opts)
+  }
+
+  tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
   /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: SX.Revision }> {
@@ -152,7 +208,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
   // --
 
-  // == [Protected, overriding Storable's]: sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
+
+  /** A record gone takes the whisper exposed with it. */
+  protected override adopt(central: Fetched<BoxRecord, BoxSparse>): void {
+    super.adopt(central)
+    if (this.isTombstoneRecord(central)) { this.#exposed = null }
+  }
 
   protected override sweepContents(): void { this.#exposed = null }
 
@@ -177,6 +239,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       full:          this.isFull,
       present:       this.isPresent,
       exposed:       this.#exposed !== null,
+      veiled:        this.#isVeiled,
+      lockState:     this.lockState(),
     })
   }
   // --

@@ -31,8 +31,8 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     const box = await boxes.create(BoxDna)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
     expect(JSON.stringify(box._cheat_central)).to.not.include('sk-test-0000')
-    await box.put({ whisper: 'sk-test-1111', sidecar: { account: 'home' } })
-    expect(await box.extractWhisper()).to.deep.equal('sk-test-1111')
+    await box.put({ whisper: { apiKey: 'sk-test-1111' }, sidecar: { account: 'home' } })
+    expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-1111' })
   })
 
   it("opens the sealed record in another listing, and refuses 'damaged_box' for it with its sidecar altered", async () => {
@@ -50,6 +50,6 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     const box = await boxes.create(BoxDna)
     vault.lock()
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-1111', sidecar: { account: 'home' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-1111' }, sidecar: { account: 'home' } }), 'vault_locked')
   })
 })
