@@ -220,7 +220,7 @@ describe("box.put(patch): a patch naming a half", () => {
 })
 // --
 
-describe("box.put holds its patch to boxPatch before any demand", () => {
+describe("box.put checks its patch before it asks the lock", () => {
   it("refuses a patch that names neither half before it looks at the lock", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
