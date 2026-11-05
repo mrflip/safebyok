@@ -285,19 +285,26 @@ replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverTh
 logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In `src/models/` `invokeStrengthChecker` (`helpers/passphrase-strength.ts`) does the same for a `strengthChecker`, and the gating's `checkedClears` does the same for a getter or proxy of
 the host's that throws as an attempt's clears are read: `clearsThrew`, `unexpected_error`, with no cause, and a `requestCleartext`
 that throws is `requestCleartextThrew`, `unexpected_error`; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`). A WebCrypto
-failure is caught and replaced, its error never kept: `wrongProof`, `damaged_lease` and
-`damaged_box` where a wrong key or an altered record explains it. Each such catch holds only WebCrypto calls, their ctx
-built before it (`Proving.#unwrap`, `Lease.#vaultKeyOrNull`, `Lease.#openedOrNull`, the cipher step
-of `Lease.cipheredWith`), so a bug in building the ctx never reads as a wrong proof or a damaged
-box. A device-store failure's cause never crosses to the host: `deviceTrouble` (`device-db.ts`)
+failure that a wrong key or an altered record explains is caught and replaced, its error never
+kept: the unwrap that proves a wayin (`Proving.checkOpens`, `wrongProof`), the unwrap of a lease's
+vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a whisper
+(`Lease.#opened`, `damaged_box`). Each such catch holds only WebCrypto calls, their ctx built before
+it, so a bug in building the ctx never reads as a wrong proof or a damaged box. Where no wrong key or
+altered record can explain a failure, a WebCrypto error is not caught where it is thrown: sealing a
+whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
+(`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`) and making a wayin or a lease from a proving
+(`Proving.buildWayin`, `Proving.buildLease`: `makeVaultKey`, and the unwrap and wrap of a vaultKey
+already proved) let it reach the verb's `outcomeOf`, which makes it an `unexpected_error` with the
+DOMException as its `cause`. That keeps no secret: a WebCrypto error carries a name and a message,
+never key material. A device-store failure's cause never crosses to the host: `deviceTrouble` (`device-db.ts`)
 keeps neither what the store threw nor its message, only its `name`, as a `DeviceDB` is handed
 every lease record and the logger hands a condition to the host whole (`tests/device-db.test.ts`,
 *keeps nothing of a store's throw that quotes the record*). `unexpectedError` keeps a foreign throw
 as `cause` only where the thrower heard no secret. The invariant at the one catch that ends each
 Lease and Box throwing form (`refusalOf`, `outcome.ts`) is checkable by reading what can reach it: a
 refusal (passed as itself), the vault's demand, or a bug's own throw from this package's lines;
-never WebCrypto's error, a host function's throw or the device store's, each replaced before it
-gets there. The Vault and Bank forms map a bug in their `try` form. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
+never a host function's throw or the device store's, each replaced before it gets there, and a
+WebCrypto error only from the seal, grant and wayin paths named above. The Vault and Bank forms map a bug in their `try` form. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will
 not read is warned of without its record (`Lease.buildFromCache` tells the friend a `damagedLease()` built from nothing of the row, as bad news, and answers null). *Host obligation, documented:* a `strengthChecker`'s
 `reason` becomes the `weak_passphrase` message, so it must not quote the passphrase
