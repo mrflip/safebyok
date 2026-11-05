@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import type { BoxRecord, BoxSparse, CentralPolicy, Fetched, RecordShape, Reconciled } from '../../src/models/models-shapes'
-import * as MSX from '../../src/models/models-shapes'
+import * as VX from '../../src/shapes/vaultish-shapes'
+import type { BoxRecord, BoxSparse, CentralPolicy, Fetched, RecordShape, Reconciled } from '../../src/shapes/vaultish-shapes'
 import { Box } from '../../src/models/box'
 import { cmpRevisions, Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'
@@ -427,7 +427,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
 
     it("other | newer | full | never stored takes 'adopt': a box born elsewhere first is the one storage holds", () => {
-      const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.VoidRevisionSeq, revision_tok: 'rev-never' }))
+      const box = boxOf(tombstoneBoxRecord({ revision_seq: VX.VoidRevisionSeq, revision_tok: 'rev-never' }))
       const rcvd = fullBoxRecord({ revision_seq: 0, revision_tok: 'rev-b0', ...OtherLife })
       box.receive(rcvd)
       expect(box._cheat_central).to.deep.equal(rcvd)
@@ -438,8 +438,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
 
 describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with", () => {
-    const box = boxOf(tombstoneBoxRecord({ revision_seq: MSX.VoidRevisionSeq, revision_tok: 'rev-never' }))
-    expect(box._cheat_central.revision_seq).to.eq(MSX.VoidRevisionSeq)
+    const box = boxOf(tombstoneBoxRecord({ revision_seq: VX.VoidRevisionSeq, revision_tok: 'rev-never' }))
+    expect(box._cheat_central.revision_seq).to.eq(VX.VoidRevisionSeq)
     expectReceivedUnchanged(box, null, 'same')
   })
 

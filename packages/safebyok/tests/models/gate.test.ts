@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Gate } from '../../src/models/gate'
-import { type GateProps, FirstGateEpoch } from '../../src/models/models-shapes'
+import { type GateProps, FirstGateEpoch } from '../../src/shapes/gateish-shapes'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
 import { builtGateOf, passkeyAnswerOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'

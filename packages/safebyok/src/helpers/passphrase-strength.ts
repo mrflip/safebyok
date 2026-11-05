@@ -1,7 +1,7 @@
 import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
 import * as HostErrorSanitizer from '../refusals/host-error-sanitizer'
-import type { PassphraseVerdict } from '../shapes/vault'
-import * as VX from '../shapes/vault'
+import * as GX from '../shapes/gateish-shapes'
+import type { PassphraseVerdict } from '../shapes/gateish-shapes'
 import type { VaultScope } from '../shapes/scopes'
 import * as CX from '../shapes/scopes'
 
@@ -75,10 +75,10 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultS
   const told = CX.vaultScope.parse(scope)
   const check = async (passphrase: string): Promise<PassphraseVerdict> => {
     if (! passphrase.trim()) { return BlankVerdict }
-    let checked: ReturnType<typeof VX.passphraseVerdict.safeParse>
+    let checked: ReturnType<typeof GX.passphraseVerdict.safeParse>
     try {
       // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
-      checked = VX.passphraseVerdict.safeParse(await hostChecker(passphrase, told))
+      checked = GX.passphraseVerdict.safeParse(await hostChecker(passphrase, told))
     } catch (err) {
       throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
     }

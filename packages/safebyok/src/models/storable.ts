@@ -4,8 +4,8 @@ import { oneAtATime } from '../helpers/one-at-a-time'
 import { reportToPlatform } from '../refusals/report-error'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
-import type { Age, Am, Fetched, FetchOpts, ListingOf, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
-import * as MSX from './models-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import type { Age, Am, Fetched, FetchOpts, ListingOf, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from '../shapes/vaultish-shapes'
 
 // == [Revisions]: cmpRevisions
 
@@ -58,15 +58,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Statics]: isLockedFUBag
 
-  /** True for {@link MSX.LOCKED}, the bag a storable answers in place of what the locked vault hides, and for nothing else: not a copy of it, nor any bag a host builds, nor `Symbol.for('LOCKED')`. */
-  static isLockedFUBag(val: unknown): val is MSX.LockedBag { return val === MSX.LOCKED }
+  /** True for {@link VX.LOCKED}, the bag a storable answers in place of what the locked vault hides, and for nothing else: not a copy of it, nor any bag a host builds, nor `Symbol.for('LOCKED')`. */
+  static isLockedFUBag(val: unknown): val is VX.LockedBag { return val === VX.LOCKED }
   // --
 
   // == [Constructor]: constructor, assignInitialProps, assign
 
   /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
   constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, opts: StorableOpts) {
-    MSX.storableArgs.parse({ world, listing, central, opts })
+    VX.storableArgs.parse({ world, listing, central, opts })
     this.#horizonMillis = opts.maxMillisSinceRefresh
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
@@ -126,7 +126,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get isLocked(): boolean { return this.listing.lockState() === 'locked' }
 
   /** The record in hand is not a tombstone: the thing is not gone. */
-  get isPresent(): boolean { return ! MSX.isTombstone(this.#central) }
+  get isPresent(): boolean { return ! VX.isTombstone(this.#central) }
 
   /** True where the record in hand has every field filled; false for a sparse view, as a listing's query hands back, or for a tombstone. */
   get isFull(): boolean { return this.isFullRecord(this.#central) }
@@ -141,7 +141,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Whether `record` is a tombstone. */
   protected isTombstoneRecord(record: Fetched<RecordT, SparseT>): record is Tombstone<SparseT> {
-    return MSX.isTombstone(record)
+    return VX.isTombstone(record)
   }
   // --
 
@@ -163,7 +163,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * Invoke the returned unsubscribe function to unenroll the listener
    */
   readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(MSX.listener.parse(listener))
+    this.#listeners.add(VX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
   }
 
@@ -225,7 +225,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** SLOPDOC: Refreshes this thing from storage through the listing, joining any fetch under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
-    const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
+    const { ifAbsent = 'fail', maxWorldMillis } = VX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     this.#demandInstanceEnabled()
     await this.#oneFetchAtATime()
@@ -240,7 +240,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
-    const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = MSX.timelyOpts.parse(opts)
+    const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
     return this.fetch({ ifAbsent: 'nil' })
@@ -250,7 +250,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Delete this thing through its listing. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
-    await this.ensureDeletable(MSX.timelyOpts.parse(opts)); this.demandDeletable()
+    await this.ensureDeletable(VX.timelyOpts.parse(opts)); this.demandDeletable()
     await this.listing.del(this)
     return this
   }

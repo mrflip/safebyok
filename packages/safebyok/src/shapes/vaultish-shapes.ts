@@ -1,30 +1,25 @@
-/** SLOPDOC: The shapes the models share, imported as `MSX`; each section banner names the forms it holds. */
+/** The checks and types of what's stored and listed: records, options, listings, boxes, vaults and banks, imported as `VX`. */
 
 import { deepFreeze, omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import { type VaultError, isVaultError } from '../refusals/errors'
-import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import * as HX from '../shapes/host-code'
 import type { CipherCtxRecord } from '../helpers/crypto'
-import type { Gating } from './gating'
-import type { Listing } from './listing'
-import type { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
-import type { Storable } from './storable'
-import type { Vault } from './vault'
-import type { VaultListing } from './vault-listing'
-import * as VX from '../shapes/vault'
-import { ModelsLeaseFormat, isLeaseKey } from '../shapes/device'
-import { type BankScope, type Boxscope, type VaultScope, vaultScope } from '../shapes/scopes'
-import { type Sidecar, sidecar, whisper } from '../shapes/fields'
-import * as FX from '../shapes/fields'
 import type { KeyDeriver } from '../deriver/basederiver'
 import type { VaultLogger } from '../helpers/logger'
-import type { Clock } from '../shapes/host-code'
+import type { Listing } from '../models/listing'
+import type { Storable } from '../models/storable'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { Answer, VaultDB } from '../storage/vault-db-new'
 import * as VS from '../storage/vault-db-shapes'
+import * as FX from './fields'
+import { type Sidecar, sidecar, whisper } from './fields'
+import * as GX from './gateish-shapes'
+import type { ProvingWorld, RequestCleartext, SealedWhisper, StrengthChecker } from './gateish-shapes'
+import * as HX from './host-code'
+import type { Clock } from './host-code'
+import type { BankScope, Boxscope, VaultScope } from './scopes'
 
 // == [Checks]: Checks
 
@@ -357,62 +352,6 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
   Listing<ScopeT, RecordT, SparseT, unknown, Storable<ScopeT, RecordT, SparseT, unknown>>
 // --
 
-
-// == [The vault's stamp]: vaultStamp, VaultStamp
-
-/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, and strips the rest. */
-export const vaultStamp = objCheck(({ applabel, user_id, vaultlabel, vault_tok, epochMillis }) => ({
-  applabel,
-  user_id,
-  vaultlabel,
-  vault_tok,
-  registered_at: epochMillis,
-}), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
-
-export type VaultStamp = Z.infer<typeof vaultStamp>
-// --
-
-// == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, WayinKind
-
-export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
-  const passphraseWayinHeader = VS.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  const passkeyWayinHeader    = VS.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  return {
-    passphraseWayinHeader,
-    passkeyWayinHeader,
-    wayinHeader: discrim('wayinkind', [passphraseWayinHeader, passkeyWayinHeader]),
-    passphraseWayinRecord: VS.passphraseWayin,
-    passkeyWayinRecord:    VS.passkeyWayin,
-    wayinRecord: discrim('wayinkind', [VS.passphraseWayin, VS.passkeyWayin]),
-  }
-})
-
-export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
-export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
-export type WayinHeader           = Z.infer<typeof wayinHeader>
-export type PassphraseWayinRecord = Z.infer<typeof passphraseWayinRecord>
-export type PasskeyWayinRecord    = Z.infer<typeof passkeyWayinRecord>
-export type WayinRecord           = Z.infer<typeof wayinRecord>
-export type WayinKind             = WayinRecord['wayinkind']
-// --
-
-// == [The gate's forms]: FirstGateEpoch, gateEpoch, gateProps, GateProps
-
-/** The `gate_epoch` of a vault's first gate. */
-export const FirstGateEpoch = 1
-
-/** Which gate of its vault a gate is: bound into every lease, which a gate of another epoch does not honour. */
-export const gateEpoch = Checker(({ int }) => int.positive(), 'bad_record')
-
-export const gateProps = objCheck(() => ({
-  gate_epoch:       gateEpoch,
-  passphrase_wayin: passphraseWayinRecord,
-  passkey_wayin:    passkeyWayinRecord.nullable(),
-}), 'bad_record')
-
-export type GateProps = Z.infer<typeof gateProps>
-// --
-
 // == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse, VaultSnapshot
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
@@ -435,105 +374,6 @@ export type VaultSnapshot = VaultScope & Readonly<{
 }>
 // --
 
-// == [What a proving is handed]: provingWorld, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
-
-export const { provingWorld } = Checkers('bad_option', ({ obj, clockShape, keyDeriverShape, strengthChecker, device_id }) => ({
-  provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
-}), [FX, HX, VX])
-
-export type ProvingWorld = Z.infer<typeof provingWorld>
-
-/** The arguments of the provings' statics. A `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one; a `gate` is whatever carries a {@link vaultStamp} as `stamp`, and {@link gateProps}, as a `Gate` does. */
-export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs } = Checkers('bad_option', ({ obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer }) => {
-  const stampedGate = obj({ stamp: vaultStamp, ...gateProps.shape })
-  return {
-    stampedGate,
-    passphraseNovelArgs:   obj({ stamp: vaultStamp, passphraseClear: passphraseCleartext, world: provingWorld }),
-    passkeyNovelArgs:      obj({ stamp: vaultStamp, passkeyClear: freshPasskeyAnswer, world: provingWorld }),
-    passphraseStoredArgs:  obj({ gate: stampedGate, passphraseClear: passphraseCleartext, world: provingWorld }),
-    passkeyStoredArgs:     obj({ gate: stampedGate, passkeyClear: passkeyAnswer }),
-    strengthArgs:          obj({ passphraseClear: passphraseCleartext, scope: vaultScope, world: provingWorld }),
-  }
-}, [VX])
-
-export type StampedGate = Z.infer<typeof stampedGate>
-
-/** What `Proving.buildWayin` is passed for a wayin over a vaultKey made new: the type of `NOVEL`. */
-export type Novel = typeof NOVEL
-// --
-
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
-
-export const LeaseFormat = ModelsLeaseFormat
-
-/** `leaseStamp` is what the wrap of a lease's vaultKey is bound to; `leaseRecord` adds its keys. */
-export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, custom, epochMillis, vault_key_lease_wrapped }) => {
-  const leaseStamp  = obj({ fmt: lit(LeaseFormat), ...vaultStamp.shape, gate_epoch: gateEpoch, proved_at: epochMillis, wayinkind: VX.wayinkind })
-  const leaseRecord = leaseStamp.extend({
-    lease_key:               custom<CryptoKey>(isLeaseKey, Phrases.LeaseKeyExpected),
-    vault_key_lease_wrapped: vault_key_lease_wrapped.readonly(),
-  }).strict().readonly()
-  return { leaseStamp, leaseRecord }
-}, [FX])
-
-export type LeaseStamp  = Z.infer<typeof leaseStamp>
-export type LeaseSparse = LeaseStamp
-export type LeaseRecord = Z.infer<typeof leaseRecord>
-
-export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refuseAs: 'bad_record', extras: 'strip' }, [FX])
-
-export type SealedWhisper = Z.infer<typeof sealedWhisper>
-
-/** The autolock duration in milliseconds, Infinity for none. */
-const leaseMillis = Checker(({ int, lit, union }) => union([int.positive(), lit(Infinity)]), 'bad_option')
-
-/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
-export const leaseFriend = objCheck(({ fn }) => ({
-  ...vaultStamp.shape,
-  clock:           HX.clockShape,
-  logger:          HX.loggerShape,
-  /** The autolock duration: a cached row proved longer ago than this is due for locking. */
-  leaseMillis,
-  /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
-  lock:            fn<() => unknown>(),
-  /** The record this device has cached, or null for none. */
-  tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
-  tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
-  tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
-  /** Tell the host what went wrong in a lease's cache put. */
-  tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
-}), { refuseAs: 'bad_option', extras: 'strip' })
-
-export type LeaseFriend = Z.infer<typeof leaseFriend>
-
-export const leaseGrantOpts = objCheck(() => ({
-  gate_epoch: gateEpoch,
-  wayinkind:  VX.wayinkind,
-}), 'bad_option')
-
-export type LeaseGrantOpts = Z.infer<typeof leaseGrantOpts>
-
-/** True for a stamp a caller hands the lease as additional data: a flat object of strings and finite numbers, at least one. */
-const isCtxStamp = (val: unknown): boolean => (
-  typeof val === 'object' && val !== null && ! Array.isArray(val) && Object.keys(val).length > 0
-    && Object.values(val).every((field) => typeof field === 'string' || Number.isFinite(field))
-)
-
-/** SLOPDOC: The arguments of each lease verb, and the flat stamp binding what a lease seals to its caller's record. */
-export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
-  const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
-  const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
-  return {
-    ctxStamp,
-    leaseFromCacheArgs: obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
-    leaseGrantedArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
-    provingLeaseArgs:   obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
-    leaseSealArgs:      obj({ whisperText: str, stamp: ctxStamp }),
-    leaseUnsealArgs:    obj({ sealed: sealedWhisper, stamp: ctxStamp }),
-  }
-}, [FX])
-// --
-
 // == [The vault's world]: deviceDBDuck, vaultListingOpts
 
 /** A deviceDB, as far as a duck can tell: the verbs a vault's lease friend binds. */
@@ -541,7 +381,7 @@ export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCac
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn }) => ({
-  world: obj({ ...provingWorld.shape, logger: HX.loggerShape, leaseMillis: leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn().optional() }),
+  world: obj({ ...GX.provingWorld.shape, logger: HX.loggerShape, leaseMillis: GX.leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn().optional() }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 // --
 
@@ -581,73 +421,6 @@ export type VaultWorld = ListingWorld & ProvingWorld & {
 export type VaultListingOpts = ListingOpts & { world: VaultWorld }
 // --
 
-// == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, GatingKind, ClearsForGatingkind, StrengthChecker
-
-export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey', 'del_vault'] as const
-
-/** The refusals an attempt leaves its gating open under, for the user to try again. */
-export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
-
-/** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
-export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj, passphraseCleartext, passkeyAnswer, freshPasskeyAnswer }) => ({
-  gatingkind:              oneof(gatingKindVals),
-  vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
-  vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
-    .refine(({ passphraseClear, passkeyClear = null }) => passphraseClear !== undefined || passkeyClear !== null, Phrases.ProofMissing),
-  passphraseReplaceClears: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
-  passkeyAddClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
-  passkeyRevokeClears:     obj({ passphraseClear: passphraseCleartext }).strict(),
-  vaultDelClears:          obj({ passphraseClear: passphraseCleartext }).strict(),
-}), [VX])
-
-/** The check of what launches a gating. */
-export const gatingLaunchArgs = objCheck(({ fn }) => ({ gatingkind, scope: vaultScope, run: fn() }), { refuseAs: 'bad_option', extras: 'strip' })
-
-export type GatingKind = typeof gatingKindVals[number]
-
-export type ClearsForGatingkind = {
-  build_vault:        Z.input<typeof vaultBuildClears>
-  unlock_vault:       Z.input<typeof vaultUnlockClears>
-  replace_passphrase: Z.input<typeof passphraseReplaceClears>
-  add_passkey:        Z.input<typeof passkeyAddClears>
-  revoke_passkey:     Z.input<typeof passkeyRevokeClears>
-  del_vault:          Z.input<typeof vaultDelClears>
-}
-
-export type StrengthChecker = Z.infer<typeof VX.strengthChecker>
-// --
-
-// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
-
-/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
-export type RequestCleartext = (gating: AnyGating) => unknown
-
-export type AnyGating = { [KindT in GatingKind]: Gating<KindT> }[GatingKind]
-
-export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
-
-/** What an attempt makes of the clears it is handed, for its `run`. */
-export type ProvingsForGatingkind = {
-  build_vault:        { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
-  unlock_vault:       { proved: Proving }
-  replace_passphrase: { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
-  add_passkey:        { ante: VaultRecord, proved: PassphraseProving, passkeyProving: PasskeyProving }
-  revoke_passkey:     { ante: VaultRecord, proved: PassphraseProving }
-  del_vault:          { ante: VaultRecord, proved: PassphraseProving }
-}
-
-/** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
-export type Run<KindT extends GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
-
-export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
-
-export type LaunchArgs<KindT extends GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
-
-export type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
-
-export type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
-// --
-
 // == [The bank's forms]: positiveMinutes, refreshMinutes, bankOpts
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
@@ -663,7 +436,7 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   deviceDB:            deviceDBDuck,
   keyDeriver:          HX.keyDeriverShape,
   requestCleartext:    fn().optional(),
-  strengthChecker:     VX.strengthChecker.optional(),
+  strengthChecker:     GX.strengthChecker.optional(),
   clock:               HX.clockShape.optional(),
   logger:              HX.loggerShape.optional(),
   autolockMinutes:     positiveMinutes.optional(),

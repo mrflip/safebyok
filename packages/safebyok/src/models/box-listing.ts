@@ -9,8 +9,8 @@ import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/
 import * as VS from '../storage/vault-db-shapes'
 import { Box } from './box'
 import { Listing } from './listing'
-import { type BoxCreateOpts, type BoxDna, type BoxesListed, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from './models-shapes'
-import * as MSX from './models-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import { type BoxCreateOpts, type BoxDna, type BoxesListed, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from '../shapes/vaultish-shapes'
 
 // == [BoxListing]
 
@@ -23,7 +23,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check. */
   constructor(opts: BoxListingOpts) {
-    MSX.boxListingOpts.parse(opts)
+    VX.boxListingOpts.parse(opts)
     super(opts)
     Object.freeze(this)
   }
@@ -34,7 +34,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   override async hello(listed?: BoxesListed): Promise<void> {
     await super.hello()
     if (listed === undefined) { return }
-    const { boxes, damaged_records } = MSX.boxesListed.parse(listed)
+    const { boxes, damaged_records } = VX.boxesListed.parse(listed)
     this.#damagedRecords = Object.freeze(damaged_records)
     for (const { boxlabel } of damaged_records) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
@@ -64,7 +64,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
     const held = this.at(scoped)
     if (held === null) { return this.fetch(scoped, opts) }
-    const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
+    const { ifAbsent = 'fail', ...timely } = VX.fetchOpts.parse(opts)
     return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
   }
 
@@ -75,7 +75,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   /** The box a put of `scoped` goes through: the one held, or a void one made for an empty slot. */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
-    const { ifAbsent } = MSX.boxPutOpts.parse(opts)
+    const { ifAbsent } = VX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
     const held = this.at(scope)
     if ((held === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
@@ -84,7 +84,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   /** Seals a new box and stores it where no live record stands, answering the box listed. */
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
-    const filled = MSX.boxCreateOpts.parse(opts)
+    const filled = VX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
     return this.puttable(input, filled).put(dna, filled)
   }

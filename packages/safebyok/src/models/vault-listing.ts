@@ -11,8 +11,9 @@ import * as VS from '../storage/vault-db-shapes'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import { Listing } from './listing'
-import { type AnyGating, type BoxesListed, type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from './models-shapes'
-import * as MSX from './models-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import type { AnyGating } from '../shapes/gateish-shapes'
+import { type BoxesListed, type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from '../shapes/vaultish-shapes'
 import { cmpRevisions } from './storable'
 import { Vault } from './vault'
 
@@ -26,7 +27,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   constructor(opts: VaultListingOpts) {
     super(opts)
-    MSX.vaultListingOpts.parse(opts)
+    VX.vaultListingOpts.parse(opts)
     Object.freeze(this)
   }
 
@@ -130,7 +131,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     this.demandEnabled()
     const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
     await this.deliver(vaultRowOf(answer))
-    return MSX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
+    return VX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
   }
 
   // == [Defined by the vault listing]
@@ -142,7 +143,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     const age = cmpRevisions(held, record)
     if (age === 'older') { return 'lose' }
     const isOtherLife = record.vault_tok !== held.vault_tok
-    const isRebirth = (! held.isPresent) && (! MSX.isTombstone(record))
+    const isRebirth = (! held.isPresent) && (! VX.isTombstone(record))
     return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
   }
 

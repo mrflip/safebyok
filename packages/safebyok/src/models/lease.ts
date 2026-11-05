@@ -3,7 +3,7 @@ import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey
 import { tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
-import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/gateish-shapes'
 
 // == [Lease]
 

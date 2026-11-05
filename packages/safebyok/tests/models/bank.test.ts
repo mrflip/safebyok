@@ -9,7 +9,8 @@ import * as TH from '../test-helpers'
 import { AutolockMinutes, BankBag, VaultBag, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
-import type { BankSnapshot, RequestCleartext } from '../../src/models/models-shapes'
+import type { RequestCleartext } from '../../src/shapes/gateish-shapes'
+import type { BankSnapshot } from '../../src/shapes/vaultish-shapes'
 
 useBankWorlds()
 

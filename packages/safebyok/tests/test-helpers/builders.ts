@@ -1,6 +1,5 @@
 import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered }                                                                                                                              from '../../src/shapes/fields'
-import type { PasskeyAnswer } from '../../src/shapes/vault'
-import type { PassphraseWayinRecord } from '../../src/models/models-shapes'
+import type { PasskeyAnswer, PassphraseWayinRecord } from '../../src/shapes/gateish-shapes'
 import      * as FX                                 from '../../src/shapes/fields'
 import      { toB64 }                               from '../../src/helpers/crypto'
 import type { KeyDeriver }                          from '../../src/deriver/basederiver'

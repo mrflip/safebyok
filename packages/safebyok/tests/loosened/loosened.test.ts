@@ -9,7 +9,7 @@ import * as TH from '../test-helpers'
 import { fakeSealBoxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 import { Dna, Passphrase, byPassphrase, makeVaultWorld, replaceTyping, useVaultWorlds, vaultRoundTrip, unlockTyping, buildTyping } from '../test-helpers/vault-world'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
-import { passphraseCleartext } from '../../src/shapes/vault'
+import { passphraseCleartext } from '../../src/shapes/gateish-shapes'
 
 const held = useModelsWorld()
 useVaultWorlds()

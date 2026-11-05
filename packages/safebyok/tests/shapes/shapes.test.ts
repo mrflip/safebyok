@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
-import * as MSX from '../../src/models/models-shapes'
+import * as GX from '../../src/shapes/gateish-shapes'
+import * as VX from '../../src/shapes/vaultish-shapes'
 import * as VS from '../../src/storage/vault-db-shapes'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import * as TH from '../test-helpers'
@@ -38,14 +39,14 @@ const holdsCases = (check: { parse: (val: unknown) => unknown }, kind: VaultErro
   }
 }
 
-describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows of a record", () => {
+describe("VX.amVals, VX.tombstoneAmVals and the checks of what the base knows of a record", () => {
   it("name alive, damaged and gone, a tombstone's am being never alive", () => {
-    expect(MSX.amVals).to.deep.equal(['a', 'd', 'x'])
-    expect(MSX.tombstoneAmVals).to.deep.equal(['d', 'x'])
+    expect(VX.amVals).to.deep.equal(['a', 'd', 'x'])
+    expect(VX.tombstoneAmVals).to.deep.equal(['d', 'x'])
   })
 
-  describe("MSX.am", () => {
-    holdsCases(MSX.am, 'bad_record', [
+  describe("VX.am", () => {
+    holdsCases(VX.am, 'bad_record', [
       // each am:
       ["a",       true,  'passes alive'],
       ["d",       true,  'passes damaged'],
@@ -58,11 +59,11 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
   })
 
-  describe("MSX.revision", () => {
-    holdsCases(MSX.revision, 'bad_record', [
+  describe("VX.revision", () => {
+    holdsCases(VX.revision, 'bad_record', [
       // good:
       [revision,                                   true,  'passes a tok and a seq'],
-      [{ ...revision, revision_seq: MSX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
+      [{ ...revision, revision_seq: VX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
       [{ ...revision, am: 'a', extra: 1 },         true,  'passes a bag carrying more, stripping the rest'],
       // bad:
       [{ revision_seq: 1 },                        false, 'refuses a missing tok'],
@@ -74,12 +75,12 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
 
     it("hands back the two fields and no more", () => {
-      expect(MSX.revision.parse({ ...revision, am: 'a', extra: 1 })).to.deep.equal(revision)
+      expect(VX.revision.parse({ ...revision, am: 'a', extra: 1 })).to.deep.equal(revision)
     })
   })
 
-  describe("MSX.times", () => {
-    holdsCases(MSX.times, 'bad_record', [
+  describe("VX.times", () => {
+    holdsCases(VX.times, 'bad_record', [
       [{ registered_at: T0, written_at: T0 },       true,  'passes two epoch milliseconds'],
       [{ registered_at: T0 },                       false, 'refuses a missing written_at'],
       [{ registered_at: 5, written_at: T0 },        false, 'refuses a small number, seconds or a count'],
@@ -89,20 +90,20 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
   })
 
-  describe("MSX.liveness and MSX.vaulted", () => {
-    holdsCases(MSX.liveness, 'bad_record', [
+  describe("VX.liveness and VX.vaulted", () => {
+    holdsCases(VX.liveness, 'bad_record', [
       [{ am: 'a' },  true,  'passes liveness with an am'],
       [{},           false, 'refuses liveness without an am'],
     ])
-    holdsCases(MSX.vaulted, 'bad_record', [
+    holdsCases(VX.vaulted, 'bad_record', [
       [{ vault_tok: 'vault-tok-u1' }, true,  'passes a vault_tok'],
       [{ vault_tok: '' },             false, 'refuses an empty vault_tok'],
       [{},                            false, 'refuses a missing vault_tok'],
     ])
   })
 
-  describe("MSX.sparseBase", () => {
-    holdsCases(MSX.sparseBase, 'bad_record', [
+  describe("VX.sparseBase", () => {
+    holdsCases(VX.sparseBase, 'bad_record', [
       // each form of a record:
       [full,                                  true,  'passes a full record'],
       [sparse,                                true,  'passes a sparse record'],
@@ -119,22 +120,22 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
 
     it("takes the six props from a record and strips the rest, as its example shows", () => {
-      expect(MSX.sparseBase.parse(full)).to.deep.equal(baseProps)
+      expect(VX.sparseBase.parse(full)).to.deep.equal(baseProps)
     })
 
     it("takes the six props from a box, which ducks as its record", async () => {
       const box = await boxListingOf(mw).build(full)
-      expect(MSX.sparseBase.parse(box)).to.deep.equal(baseProps)
+      expect(VX.sparseBase.parse(box)).to.deep.equal(baseProps)
     })
 
     it("refuses without quoting its input", () => {
-      const err = TH.expectSyncRefusal(() => MSX.sparseBase.parse({ ...baseProps, vault_tok: 'SECRET-TOK', am: 'SECRET-AM' }), 'bad_record')
+      const err = TH.expectSyncRefusal(() => VX.sparseBase.parse({ ...baseProps, vault_tok: 'SECRET-TOK', am: 'SECRET-AM' }), 'bad_record')
       expect(err.message).to.not.include('SECRET')
     })
   })
 
-  describe("MSX.tombstone", () => {
-    holdsCases(MSX.tombstone, 'bad_record', [
+  describe("VX.tombstone", () => {
+    holdsCases(VX.tombstone, 'bad_record', [
       [gone,   true,  'passes a deletion tombstone'],
       [ouch,   true,  'passes a damaged one\'s tombstone'],
       [sparse, false, 'refuses an alive sparse record'],
@@ -142,16 +143,16 @@ describe("MSX.amVals, MSX.tombstoneAmVals and the checks of what the base knows 
     ])
   })
 
-  describe("MSX.isTombstone and MSX.VoidRevisionSeq", () => {
+  describe("VX.isTombstone and VX.VoidRevisionSeq", () => {
     it("tells a damaged or gone record from an alive one, whatever its form", () => {
-      expect(MSX.isTombstone(gone)).to.be.true
-      expect(MSX.isTombstone(ouch)).to.be.true
-      expect(MSX.isTombstone(sparse)).to.be.false
-      expect(MSX.isTombstone(full)).to.be.false
+      expect(VX.isTombstone(gone)).to.be.true
+      expect(VX.isTombstone(ouch)).to.be.true
+      expect(VX.isTombstone(sparse)).to.be.false
+      expect(VX.isTombstone(full)).to.be.false
     })
 
     it("marks a central never stored with a seq below any a store puts", () => {
-      expect(MSX.VoidRevisionSeq).to.be.lessThan(0)
+      expect(VX.VoidRevisionSeq).to.be.lessThan(0)
     })
 
     it("passes the void row a sentinel makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
@@ -171,18 +172,18 @@ describe("The checks of what reconciling passes", () => {
     for (const val of bads) { it(`refuses ${JSON.stringify(val)} as 'unexpected_error'`, () => { TH.expectSyncRefusal(() => check.parse(val), 'unexpected_error') }) }
   }
 
-  describe("MSX.recordShape", () => { checkSet(MSX.recordShape, MSX.recordShapeVals, ['empty', null, 'older']) })
-  describe("MSX.age",         () => { checkSet(MSX.age, MSX.ageVals, ['skip', null, 'fill']) })
-  describe("MSX.centralPolicy", () => { checkSet(MSX.centralPolicy, MSX.centralPolicyVals, ['edit', 'del', null]) })
+  describe("VX.recordShape", () => { checkSet(VX.recordShape, VX.recordShapeVals, ['empty', null, 'older']) })
+  describe("VX.age",         () => { checkSet(VX.age, VX.ageVals, ['skip', null, 'fill']) })
+  describe("VX.centralPolicy", () => { checkSet(VX.centralPolicy, VX.centralPolicyVals, ['edit', 'del', null]) })
 
   it("list the kinds of the table", () => {
-    expect(MSX.centralPolicyVals).to.deep.equal(['older', 'same', 'fill', 'adopt', 'gone'])
-    expect(MSX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone'])
-    expect(MSX.ageVals).to.deep.equal(['older', 'same', 'newer'])
+    expect(VX.centralPolicyVals).to.deep.equal(['older', 'same', 'fill', 'adopt', 'gone'])
+    expect(VX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone'])
+    expect(VX.ageVals).to.deep.equal(['older', 'same', 'newer'])
   })
 
-  describe("MSX.reconciled", () => {
-    holdsCases(MSX.reconciled, 'unexpected_error', [
+  describe("VX.reconciled", () => {
+    holdsCases(VX.reconciled, 'unexpected_error', [
       [{ central: sparse, policy: 'same' },  true,  'passes a central and the policy that chose it'],
       [{ central: gone,   policy: 'gone' },  true,  'passes a tombstone central'],
       [{ central: sparse },                  false, 'refuses a missing policy'],
@@ -191,8 +192,8 @@ describe("The checks of what reconciling passes", () => {
     ])
   })
 
-  describe("MSX.settled", () => {
-    holdsCases(MSX.settled, 'unexpected_error', [
+  describe("VX.settled", () => {
+    holdsCases(VX.settled, 'unexpected_error', [
       [{ badnews: [] },                                       true,  'passes no bad news'],
       [{ badnews: [new VaultError('stale_write', 'x')] },     true,  'passes bad news of VaultErrors'],
       [{ badnews: [new Error('plain')] },                     false, 'refuses bad news that is no VaultError'],
@@ -201,9 +202,9 @@ describe("The checks of what reconciling passes", () => {
   })
 })
 
-describe("MSX.boxRecord and MSX.boxSparse", () => {
-  describe("MSX.boxRecord", () => {
-    holdsCases(MSX.boxRecord, 'bad_record', [
+describe("VX.boxRecord and VX.boxSparse", () => {
+  describe("VX.boxRecord", () => {
+    holdsCases(VX.boxRecord, 'bad_record', [
       [full,                                            true,  'passes a full record'],
       [{ ...full, sidecar: {} },                        true,  'passes an empty sidecar'],
       [sparse,                                          false, 'refuses a sparse record: it is the full one'],
@@ -220,36 +221,36 @@ describe("MSX.boxRecord and MSX.boxSparse", () => {
     ])
 
     it("hands back a plain copy of a full record", () => {
-      const parsed = MSX.boxRecord.parse(full)
+      const parsed = VX.boxRecord.parse(full)
       expect(parsed).to.deep.equal(full)
       expect(parsed).to.not.eq(full)
     })
 
     it("passes a Box instance as a duck, and hands back a pojo of its fields", async () => {
       const box = await boxListingOf(mw).build(full)
-      const parsed = MSX.boxRecord.parse(box)
+      const parsed = VX.boxRecord.parse(box)
       expect(parsed).to.deep.equal(full)
       expect(parsed).to.not.be.instanceOf(Box)
     })
 
     it("refuses a plain object carrying a field the Box ducks without", async () => {
       const box = await boxListingOf(mw).build(full)
-      TH.expectSyncRefusal(() => MSX.boxRecord.parse({ ...MSX.boxRecord.parse(box), extra: 1 }), 'bad_record')
+      TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...VX.boxRecord.parse(box), extra: 1 }), 'bad_record')
     })
 
     it("refuses a Box that is not full, as it ducks as the sparse form", async () => {
       const box = await boxListingOf(mw).build(sparse)
-      TH.expectSyncRefusal(() => MSX.boxRecord.parse(box), 'bad_record')
+      TH.expectSyncRefusal(() => VX.boxRecord.parse(box), 'bad_record')
     })
 
     it("refuses without quoting its input", () => {
-      const err = TH.expectSyncRefusal(() => MSX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }), 'bad_record')
+      const err = TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }), 'bad_record')
       expect(err.message).to.not.include('SECRET')
     })
   })
 
-  describe("MSX.boxSparse", () => {
-    holdsCases(MSX.boxSparse, 'bad_record', [
+  describe("VX.boxSparse", () => {
+    holdsCases(VX.boxSparse, 'bad_record', [
       [sparse,                                  true,  'passes a sparse record'],
       [full,                                    true,  'passes a full record, stripping what is not sparse'],
       [gone,                                    true,  'passes a tombstone'],
@@ -261,36 +262,36 @@ describe("MSX.boxRecord and MSX.boxSparse", () => {
     ])
 
     it("strips the sidecar and the sealed parts, which only the full record carries", () => {
-      const parsed = MSX.boxSparse.parse(full)
+      const parsed = VX.boxSparse.parse(full)
       expect(parsed).to.not.have.any.keys('sidecar', 'box_key_wrapped', 'whisper_ciphered')
       expect(parsed).to.deep.equal(sparse)
     })
 
     it("keeps the whisper's codec and schema version, so a sparse record can be sealed over as it is", () => {
-      const parsed = MSX.boxSparse.parse(full)
+      const parsed = VX.boxSparse.parse(full)
       expect(parsed.whisper_codec).to.eq('json_v1')
       expect(parsed.whisper_schema_version).to.eq(1)
     })
 
     it("strips a field it does not take, where boxRecord refuses it", () => {
-      expect(MSX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
+      expect(VX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
     })
 
     it("takes its fields from a Box, which ducks as its record", async () => {
       const box = await boxListingOf(mw).build(full)
-      expect(MSX.boxSparse.parse(box)).to.deep.equal(sparse)
+      expect(VX.boxSparse.parse(box)).to.deep.equal(sparse)
     })
   })
 
   it("name the format of the box the models describe", () => {
-    expect(MSX.BoxFormat).to.eq(5001)
-    expect(full.fmt).to.eq(MSX.BoxFormat)
+    expect(VX.BoxFormat).to.eq(5001)
+    expect(full.fmt).to.eq(VX.BoxFormat)
   })
 })
 
 describe("The checks of options", () => {
-  describe("MSX.horizonMillis", () => {
-    holdsCases(MSX.horizonMillis, 'bad_option', [
+  describe("VX.horizonMillis", () => {
+    holdsCases(VX.horizonMillis, 'bad_option', [
       [0,         true,  'passes zero: nothing is timely'],
       [60_000,    true,  'passes a span of milliseconds'],
       [0.5,       true,  'passes a fraction of a millisecond'],
@@ -303,8 +304,8 @@ describe("The checks of options", () => {
     ])
   })
 
-  describe("MSX.timelyOpts and MSX.boxPutOpts", () => {
-    holdsCases(MSX.timelyOpts, 'bad_option', [
+  describe("VX.timelyOpts and VX.boxPutOpts", () => {
+    holdsCases(VX.timelyOpts, 'bad_option', [
       [{},                                          true,  'passes no options'],
       [{ maxMillisSinceRefresh: 0, maxWorldMillis: Infinity }, true, 'passes both horizons'],
       [{ maxMillisSinceRefresh: undefined },        true,  'passes a horizon left undefined'],
@@ -312,39 +313,39 @@ describe("The checks of options", () => {
       [{ maxWorldMillis: '5' },                     false, 'refuses a world horizon that is text'],
       [{ maxWorldMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
     ])
-    holdsCases(MSX.boxPutOpts, 'bad_option', [
+    holdsCases(VX.boxPutOpts, 'bad_option', [
       [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
       [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon, as timelyOpts does'],
     ])
 
     it("take their fields from the bag given and strip the rest", () => {
-      expect(MSX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
-      expect(MSX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
+      expect(VX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
+      expect(VX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
     })
 
     it("name the failing field", () => {
-      const err = TH.expectSyncRefusal(() => MSX.timelyOpts.parse({ maxMillisSinceRefresh: -1 }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.timelyOpts.parse({ maxMillisSinceRefresh: -1 }), 'bad_option')
       expect(err.meta?.fieldnames).to.deep.equal(['maxMillisSinceRefresh'])
     })
   })
 
-  describe("MSX.storableOpts", () => {
-    holdsCases(MSX.storableOpts, 'bad_option', [
+  describe("VX.storableOpts", () => {
+    holdsCases(VX.storableOpts, 'bad_option', [
       [{ maxMillisSinceRefresh: 60_000 },                    true,  'passes the horizon alone'],
       [{},                                                   false, 'refuses a missing horizon'],
       [{ maxMillisSinceRefresh: -5 },                        false, 'refuses a negative horizon'],
     ])
 
     it("strips a field it does not take", () => {
-      expect(MSX.storableOpts.parse({ maxMillisSinceRefresh: 5, extra: 1 })).to.deep.equal({ maxMillisSinceRefresh: 5 })
+      expect(VX.storableOpts.parse({ maxMillisSinceRefresh: 5, extra: 1 })).to.deep.equal({ maxMillisSinceRefresh: 5 })
     })
   })
 })
 
 describe("The checks of the world and the listing", () => {
-  describe("MSX.lockState", () => {
-    holdsCases(MSX.lockState, 'unexpected_error', [
+  describe("VX.lockState", () => {
+    holdsCases(VX.lockState, 'unexpected_error', [
       ["unlocked", true,  'passes unlocked'],
       ["locked",   true,  'passes locked'],
       ["LOCKED",   false, 'refuses another spelling: a world that answers it is a bug'],
@@ -353,8 +354,8 @@ describe("The checks of the world and the listing", () => {
     ])
   })
 
-  describe("MSX.world", () => {
-    holdsCases(MSX.world, 'bad_option', [
+  describe("VX.world", () => {
+    holdsCases(VX.world, 'bad_option', [
       [{ clock: { now: () => T0 } },  true,  'passes a world carrying a clock'],
       [mw.world,                      true,  'passes the test world'],
       [{ clock: {} },                 false, 'refuses a clock without now'],
@@ -363,27 +364,27 @@ describe("The checks of the world and the listing", () => {
     ])
 
     it("takes the clock from whatever carries it and strips the rest", () => {
-      const parsed = MSX.world.parse(mw.world)
+      const parsed = VX.world.parse(mw.world)
       expect(Object.keys(parsed)).to.deep.equal(['clock'])
       expect(parsed.clock.now()).to.eq(T0)
     })
   })
 
-  describe("MSX.isListing and MSX.IsListing", () => {
+  describe("VX.isListing and VX.IsListing", () => {
     it("tell a listing from anything else, by its tag", () => {
-      expect(MSX.isListing(boxListingOf(mw))).to.be.true
-      expect(MSX.isListing({ [MSX.IsListing]: true })).to.be.true
-      expect(MSX.isListing({ [MSX.IsListing]: 1 })).to.be.false
-      expect(MSX.isListing({})).to.be.false
-      expect(MSX.isListing(null)).to.be.false
-      expect(MSX.isListing(undefined)).to.be.false
-      expect(MSX.isListing('listing')).to.be.false
+      expect(VX.isListing(boxListingOf(mw))).to.be.true
+      expect(VX.isListing({ [VX.IsListing]: true })).to.be.true
+      expect(VX.isListing({ [VX.IsListing]: 1 })).to.be.false
+      expect(VX.isListing({})).to.be.false
+      expect(VX.isListing(null)).to.be.false
+      expect(VX.isListing(undefined)).to.be.false
+      expect(VX.isListing('listing')).to.be.false
     })
   })
 
-  describe("MSX.listingOpts", () => {
+  describe("VX.listingOpts", () => {
     const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, onBadNews: mw.onBadNews }
-    holdsCases(MSX.listingOpts, 'bad_option', [
+    holdsCases(VX.listingOpts, 'bad_option', [
       [opts,                                                     true,  'passes the test world and vaultDB'],
       [{ ...opts, onBadNews: undefined },                        true,  'passes no onBadNews'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
@@ -400,15 +401,15 @@ describe("The checks of the world and the listing", () => {
     ])
 
     it("names the failing field", () => {
-      const err = TH.expectSyncRefusal(() => MSX.listingOpts.parse({ ...opts, maxMillisSinceRefresh: -1 }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.listingOpts.parse({ ...opts, maxMillisSinceRefresh: -1 }), 'bad_option')
       expect(err.meta?.fieldnames).to.deep.equal(['maxMillisSinceRefresh'])
     })
   })
 
-  describe("MSX.storableArgs", () => {
+  describe("VX.storableArgs", () => {
     const listing = boxListingOf(mw)
     const args = { world: mw.world, listing, central: sparse, opts: { maxMillisSinceRefresh: 1000 } }
-    holdsCases(MSX.storableArgs, 'bad_option', [
+    holdsCases(VX.storableArgs, 'bad_option', [
       [args,                                           true,  'passes a world, a listing, a central and the options'],
       [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
@@ -422,26 +423,26 @@ describe("The checks of the world and the listing", () => {
     ])
 
     it("names the failing field", () => {
-      const err = TH.expectSyncRefusal(() => MSX.storableArgs.parse({ ...args, listing: {} }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.storableArgs.parse({ ...args, listing: {} }), 'bad_option')
       expect(err.meta?.fieldnames).to.deep.equal(['listing'])
     })
   })
 })
 
-describe("MSX.boxDna", () => {
+describe("VX.boxDna", () => {
   const dna = { ...scope, whisper: { val: 'sk-ant-fake' }, sidecar: {} }
   const filled = { ...dna, whisper_codec: 'json_v1', whisper_schema_version: 1 }
   const { box_key_wrapped, whisper_ciphered } = full
   // A dna carries no revision_seq, so the factory's props stop at the rest.
   const { revision_seq: _revision_seq, ...factoryProps } = baseProps
 
-  holdsCases(MSX.boxDna, 'bad_option', [
+  holdsCases(VX.boxDna, 'bad_option', [
     // the scope, the whisper and the sidecar, and what a caller may give beside them:
     [dna,                                                   true,  'passes the scope, a whisper and a sidecar'],
     [{ ...dna, whisper: { val: { key: 'sk-ant-fake', orgId: null } } }, true, 'passes a whisper that is an object, null inside it'],
     [{ ...dna, sidecar: { account: 'work' } },              true,  'passes a sidecar with a field'],
     [{ ...dna, whisper_codec: undefined },                  true,  'passes optional props given as undefined'],
-    [{ ...dna, ...factoryProps, fmt: MSX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
+    [{ ...dna, ...factoryProps, fmt: VX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
     // the whisper and the sidecar, each defaulting:
     [scope,                                                 true,  'passes the scope alone'],
     [{ ...scope, whisper: { val: 'sk-ant-fake' } },         true,  'passes a whisper with no sidecar'],
@@ -476,48 +477,48 @@ describe("MSX.boxDna", () => {
   ])
 
   it("hands back the whisper and the sidecar given, with the codec and the schema version filled, as its first example shows", () => {
-    expect(MSX.boxDna.parse(dna)).to.deep.equal(filled)
+    expect(VX.boxDna.parse(dna)).to.deep.equal(filled)
   })
 
   it("strips the props the factory controls, as its second example shows", () => {
-    const parsed = MSX.boxDna.parse({ ...dna, ...factoryProps, fmt: MSX.BoxFormat })
+    const parsed = VX.boxDna.parse({ ...dna, ...factoryProps, fmt: VX.BoxFormat })
     expect(parsed).to.deep.equal(filled)
     expect(parsed).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'registered_at', 'written_at')
   })
 
   it("fills a default for a prop given as undefined", () => {
-    expect(MSX.boxDna.parse({ ...dna, whisper_codec: undefined, whisper_schema_version: undefined })).to.deep.equal(filled)
+    expect(VX.boxDna.parse({ ...dna, whisper_codec: undefined, whisper_schema_version: undefined })).to.deep.equal(filled)
   })
 
   it("keeps the sidecar given", () => {
     const sidecar = { account: 'work' }
-    expect(MSX.boxDna.parse({ ...dna, sidecar })).to.deep.equal({ ...filled, sidecar })
+    expect(VX.boxDna.parse({ ...dna, sidecar })).to.deep.equal({ ...filled, sidecar })
   })
 
   it("names the failing field", () => {
-    const err = TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...dna, boxlabel: 'B' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.boxDna.parse({ ...dna, boxlabel: 'B' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
   })
 
   it("fills a whisper of { val: {} } and a sidecar of {} where left out", () => {
-    expect(MSX.boxDna.parse(scope)).to.deep.equal({ ...scope, whisper: { val: {} }, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
+    expect(VX.boxDna.parse(scope)).to.deep.equal({ ...scope, whisper: { val: {} }, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
   })
 
   it("refuses without quoting its input", () => {
-    const err = TH.expectSyncRefusal(() => MSX.boxDna.parse({ ...scope, sidecar: 'SECRET-SIDECAR', whisper: null, extra: 'SECRET-EXTRA' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.boxDna.parse({ ...scope, sidecar: 'SECRET-SIDECAR', whisper: null, extra: 'SECRET-EXTRA' }), 'bad_option')
     expect(err.message).to.not.include('SECRET')
   })
 })
 
-describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
-  holdsCases(MSX.ifAbsent, 'bad_option', [
+describe("VX.ifAbsentVals, VX.ifAbsent and VX.fetchOpts", () => {
+  holdsCases(VX.ifAbsent, 'bad_option', [
     ["fail",     true,  'passes fail'],
     ["nil",      true,  'passes nil'],
     ["create",   false, 'refuses create, which fetch does not offer'],
     [undefined,  false, 'refuses undefined: the default is applied by the caller, not the check'],
   ])
 
-  holdsCases(MSX.fetchOpts, 'bad_option', [
+  holdsCases(VX.fetchOpts, 'bad_option', [
     [{},                                                true,  'passes no options'],
     [{ ifAbsent: 'nil' },                               true,  'passes ifAbsent nil'],
     [{ ifAbsent: undefined },                           true,  'passes ifAbsent undefined, as a caller spreading options may leave it'],
@@ -527,30 +528,30 @@ describe("MSX.ifAbsentVals, MSX.ifAbsent and MSX.fetchOpts", () => {
   ])
 
   it("keeps ifAbsent and the timely options and strips the rest", () => {
-    expect(MSX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
+    expect(VX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
   })
 })
 
-describe("MSX.boxCreateOpts", () => {
+describe("VX.boxCreateOpts", () => {
   it("fills what a create means: add where nothing stands, fail over a live record", () => {
-    expect(MSX.boxCreateOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'fail' })
+    expect(VX.boxCreateOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'fail' })
   })
 
   it("takes a caller's ifPresent and the timely options, stripping the rest", () => {
-    expect(MSX.boxCreateOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxWorldMillis: 5 })
+    expect(VX.boxCreateOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxWorldMillis: 5 })
   })
 
   it("holds ifAbsent to 'add': a create that must find a box is not a create", () => {
-    TH.expectSyncRefusal(() => MSX.boxCreateOpts.parse({ ifAbsent: 'fail' }), 'bad_option')
+    TH.expectSyncRefusal(() => VX.boxCreateOpts.parse({ ifAbsent: 'fail' }), 'bad_option')
   })
 })
 
-describe("MSX.ifPresentVals, MSX.ifPresent and MSX.boxPutOpts", () => {
+describe("VX.ifPresentVals, VX.ifPresent and VX.boxPutOpts", () => {
   it("name the three policies", () => {
-    expect(MSX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
+    expect(VX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
   })
 
-  holdsCases(MSX.ifPresent, 'bad_option', [
+  holdsCases(VX.ifPresent, 'bad_option', [
     ["repl",     true,  'passes repl'],
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],
@@ -558,7 +559,7 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.boxPutOpts", () => {
     [undefined,  false, 'refuses undefined: boxPutOpts makes it optional, not the check'],
   ])
 
-  holdsCases(MSX.boxPutOpts, 'bad_option', [
+  holdsCases(VX.boxPutOpts, 'bad_option', [
     [{},                                                true,  'passes no options'],
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
@@ -568,25 +569,25 @@ describe("MSX.ifPresentVals, MSX.ifPresent and MSX.boxPutOpts", () => {
   ])
 
   it("keeps ifPresent, ifAbsent and the timely options and strips the rest", () => {
-    expect(MSX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add' })
+    expect(VX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add' })
   })
 
   it("leaves the defaults to box.put: nothing given, nothing filled", () => {
-    expect(MSX.boxPutOpts.parse({})).to.deep.equal({})
+    expect(VX.boxPutOpts.parse({})).to.deep.equal({})
   })
 
   it("refuses a fetch's ifAbsent: 'nil' is no answer to a put", () => {
-    TH.expectSyncRefusal(() => MSX.boxPutOpts.parse({ ifAbsent: 'nil' }), 'bad_option')
+    TH.expectSyncRefusal(() => VX.boxPutOpts.parse({ ifAbsent: 'nil' }), 'bad_option')
   })
 
   it("name the failing field", () => {
-    const err = TH.expectSyncRefusal(() => MSX.boxPutOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.boxPutOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['ifPresent'])
   })
 })
 
-describe("MSX.whisperHolder", () => {
-  holdsCases(MSX.whisperHolder, 'bad_option', [
+describe("VX.whisperHolder", () => {
+  holdsCases(VX.whisperHolder, 'bad_option', [
     // a whisper as its val, any JSON a whisper can carry:
     [{ val: 'sk-ant-fake' },                                true,  'passes a string, as its first example shows'],
     [{ val: { apiKey: 'sk-ant-fake', orgId: null } },       true,  'passes a plain object, null inside it, as its second example shows'],
@@ -610,7 +611,7 @@ describe("MSX.whisperHolder", () => {
 
   it("hands back a frozen copy, never the object it was given, nor the whisper inside it", () => {
     const given = { val: { apiKey: 'sk-ant-fake' } }
-    const parsed = MSX.whisperHolder.parse(given)
+    const parsed = VX.whisperHolder.parse(given)
     expect(parsed).to.deep.equal(given)
     expect(parsed).to.not.eq(given)
     expect(parsed.val).to.not.eq(given.val)
@@ -621,8 +622,8 @@ describe("MSX.whisperHolder", () => {
   })
 
   it("names the failing field: val for a val no whisper may be, none for a whisper not given as { val }", () => {
-    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse({ val: null }), 'bad_option').meta?.fieldnames).to.deep.equal(['val'])
-    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse('sk-ant-fake'), 'bad_option').meta?.fieldnames).to.deep.equal([])
+    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse({ val: null }), 'bad_option').meta?.fieldnames).to.deep.equal(['val'])
+    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse('sk-ant-fake'), 'bad_option').meta?.fieldnames).to.deep.equal([])
   })
 
   it("quotes nothing of what it was handed, a val's secret or a field's name, in its message, meta, cause or stack", () => {
@@ -635,26 +636,26 @@ describe("MSX.whisperHolder", () => {
       { SECRET_FIELD: 'SECRET-VAL' },
     ]
     for (const marked of Marked) {
-      const err = TH.expectSyncRefusal(() => MSX.whisperHolder.parse(marked), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.whisperHolder.parse(marked), 'bad_option')
       expect(TH.thrownText(err)).to.not.include('SECRET')
       expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     }
   })
 })
 
-describe("MSX.whisperHolder and LOCKED", () => {
+describe("VX.whisperHolder and LOCKED", () => {
   it("refuses LOCKED as 'bad_option' with a sentence that names it, and a copy of it as no { val }", () => {
-    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse(MSX.LOCKED), 'bad_option').message).to.include('LOCKED is not a whisper: unseal or expose one first')
-    expect(TH.expectSyncRefusal(() => MSX.whisperHolder.parse({ ...MSX.LOCKED }), 'bad_option').message).to.not.include('LOCKED')
+    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse(VX.LOCKED), 'bad_option').message).to.include('LOCKED is not a whisper: unseal or expose one first')
+    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse({ ...VX.LOCKED }), 'bad_option').message).to.not.include('LOCKED')
   })
 })
 
-describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its patch", () => {
+describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch", () => {
   const whisper = { val: 'sk-ant-fake' }
   const { sidecar: _sidecar, ...sealedless } = full
 
   describe("boxDna", () => {
-    holdsCases(MSX.boxDna, 'bad_option', [
+    holdsCases(VX.boxDna, 'bad_option', [
       [{ ...scope, whisper, sidecar: {} },                                   true,  'passes the scope, whisper and sidecar, as its first example shows'],
       [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls, as its second example shows'],
       [{ ...scope, whisper },                                                true,  'passes a dna with no sidecar, which defaults'],
@@ -665,13 +666,13 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
     ])
 
     it("strips the props the factory controls and fills the whisper's codec", () => {
-      const given = { ...scope, whisper, sidecar: {}, fmt: MSX.BoxFormat, am: 'x', vault_tok: 'tok-u1', revision_tok: 'rev-given', registered_at: T0, written_at: T0 }
-      expect(MSX.boxDna.parse(given)).to.deep.equal({ ...scope, whisper, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
+      const given = { ...scope, whisper, sidecar: {}, fmt: VX.BoxFormat, am: 'x', vault_tok: 'tok-u1', revision_tok: 'rev-given', registered_at: T0, written_at: T0 }
+      expect(VX.boxDna.parse(given)).to.deep.equal({ ...scope, whisper, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
     })
   })
 
   describe("boxPatch", () => {
-    holdsCases(MSX.boxPatch, 'bad_option', [
+    holdsCases(VX.boxPatch, 'bad_option', [
       [{ whisper, sidecar: {} },                                             true,  'passes the whisper and the sidecar alone'],
       [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with its whisper and a sidecar, as its sixth example shows'],
       [{ ...sparse, whisper, sidecar: {} },                                  true,  'passes a sparse record given back so'],
@@ -679,7 +680,7 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
       [{ whisper },                                                          true,  'passes a whisper alone, the sidecar kept'],
       [{ sidecar: {} },                                                      true,  'passes a sidecar alone, the whisper kept, as its example shows'],
       [{},                                                                   false, 'refuses a patch naming neither, as its example shows'],
-      [{ whisper: MSX.LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper, as its seventh example shows'],
+      [{ whisper: VX.LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper, as its seventh example shows'],
       [{ whisper: 'sk-ant-fake', sidecar: {} },                              false, 'refuses a bare whisper'],
       [{ whisper, sidecar: 'note' },                                         false, 'refuses a sidecar that fails its check'],
       [{ ...full, revision_seq: 'one', whisper, sidecar: {} },               false, 'refuses a factory prop that fails its check'],
@@ -689,14 +690,14 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
     ])
 
     it("hands back the whisper, the sidecar, and the scope's fields as given, stripping the rest", () => {
-      expect(MSX.boxPatch.parse({ ...full, whisper, sidecar: { note: 'new' } })).to.deep.equal({ ...scope, whisper, sidecar: { note: 'new' } })
-      expect(MSX.boxPatch.parse({ whisper, sidecar: {} })).to.deep.equal({ whisper, sidecar: {}, applabel: undefined, user_id: undefined, vaultlabel: undefined, boxlabel: undefined })
+      expect(VX.boxPatch.parse({ ...full, whisper, sidecar: { note: 'new' } })).to.deep.equal({ ...scope, whisper, sidecar: { note: 'new' } })
+      expect(VX.boxPatch.parse({ whisper, sidecar: {} })).to.deep.equal({ whisper, sidecar: {}, applabel: undefined, user_id: undefined, vaultlabel: undefined, boxlabel: undefined })
     })
 
     it("names the failing field, quoting nothing of a whisper or a field's name", () => {
-      expect(TH.expectSyncRefusal(() => MSX.boxPatch.parse({ whisper: { val: null }, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper.val'])
+      expect(TH.expectSyncRefusal(() => VX.boxPatch.parse({ whisper: { val: null }, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper.val'])
       for (const marked of [{ whisper: { val: { SECRET: undefined } }, sidecar: {} }, { whisper: { val: 'SECRET-VAL' }, sidecar: {}, SECRET_FIELD: 1 }]) {
-        const err = TH.expectSyncRefusal(() => MSX.boxPatch.parse(marked), 'bad_option')
+        const err = TH.expectSyncRefusal(() => VX.boxPatch.parse(marked), 'bad_option')
         expect(TH.thrownText(err)).to.not.include('SECRET')
         expect(JSON.stringify(err.meta)).to.not.include('SECRET')
       }
@@ -704,13 +705,13 @@ describe("MSX.boxDna and MSX.boxPatch: the duckish of a box's dna and of its pat
   })
 })
 
-describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault record, and nowhere in the sparse form", () => {
+describe("VX.vaultRecord and VX.vaultSparse: the gate rides in the vault record, and nowhere in the sparse form", () => {
   const { boxlabel: _boxlabel, ...vaultscope } = scope
-  const sparseVault = { ...vaultscope, fmt: MSX.VaultFormat, ...baseProps }
+  const sparseVault = { ...vaultscope, fmt: VX.VaultFormat, ...baseProps }
 
-  const gate = { gate_epoch: MSX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
+  const gate = { gate_epoch: GX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
-  holdsCases(MSX.vaultRecord, 'bad_record', [
+  holdsCases(VX.vaultRecord, 'bad_record', [
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
     [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
     [sparseVault,                    false, 'refuses a record without its gate'],
@@ -720,6 +721,6 @@ describe("MSX.vaultRecord and MSX.vaultSparse: the gate rides in the vault recor
   ])
 
   it("strips the gate from the sparse form", () => {
-    expect(MSX.vaultSparse.parse({ ...sparseVault, gate })).to.deep.equal(sparseVault)
+    expect(VX.vaultSparse.parse({ ...sparseVault, gate })).to.deep.equal(sparseVault)
   })
 })

@@ -7,8 +7,8 @@ import { stableJsonify } from '../helpers/stable-jsonify'
 import * as VS from '../storage/vault-db-shapes'
 import { absentBoxError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
-import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from './models-shapes'
-import * as MSX from './models-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from '../shapes/vaultish-shapes'
 import { Storable } from './storable'
 
 // == [Box]
@@ -61,7 +61,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
   demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
-    const given = MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
+    const given = VX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
     if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
     this.demandEnabled()
     this.world.demandUnlocked()
@@ -109,7 +109,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}. */
   async #unseal(record: BoxRecord): Promise<WhisperHolder> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
-    const stamp = boxStampOf(MSX.boxSparse.parse(record), sidecar)
+    const stamp = boxStampOf(VX.boxSparse.parse(record), sidecar)
     const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
     const held = whisperHolder.safeParse(parseJsonOrNull(whisperText))
     if (! held.success) { throw undecodedWhisper() }
@@ -121,7 +121,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** Seals `patch` over the record in hand and stores it, answering the box listed; a deleted box is reborn. */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
-    const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = MSX.boxPutOpts.parse(opts)
+    const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = VX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
     const given = this.demandPuttable(patch, { ifPresent })
     const { record, prior } = await this.#edit(given)
@@ -185,10 +185,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
 /** The full record of `base` with `sidecar`, `whisper` sealed through `world`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
 const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
-  const sparse = MSX.boxSparse.parse(base)
+  const sparse = VX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
   const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper) ?? '', stamp)
-  return MSX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
+  return VX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
 }
 
 /** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */

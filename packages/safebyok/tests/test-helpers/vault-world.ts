@@ -2,14 +2,14 @@
 
 import { afterEach, vi } from 'vitest'
 import type { Lease } from '../../src/models/lease'
-import type { BoxWorld, RequestCleartext, VaultListingOpts, VaultRecord, VaultWorld } from '../../src/models/models-shapes'
+import type * as GX from '../../src/shapes/gateish-shapes'
+import { type RequestCleartext, passphraseCleartext } from '../../src/shapes/gateish-shapes'
+import type { BoxWorld, VaultListingOpts, VaultRecord, VaultWorld } from '../../src/shapes/vaultish-shapes'
 import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/refusals/outcome'
 import type { VaultScope } from '../../src/shapes/scopes'
-import type * as VX from '../../src/shapes/vault'
-import { passphraseCleartext } from '../../src/shapes/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -36,7 +36,7 @@ export const byPasskey = async (tag: string): Promise<Typed> => ({ passkeyClear:
 /** What the user hands a gating's attempt at the dialog, whatever its kind, or what is about to make it. */
 export type Typing = Typed | Promise<Typed>
 
-type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: VX.PasskeyAnswer | null }
+type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: GX.PasskeyAnswer | null }
 
 /** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
 const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
