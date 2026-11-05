@@ -8,8 +8,8 @@ folders, or the files a PR changes. CLAUDE.md, and the documents it names, bind 
 "chat" is the report you return to whoever spawned you. Every run writes a `human/` entry
 (`human/README.md`), whether or not you are asked to: it is where the detail goes (*Done*).
 
-Your goal is documentation that is **customer-first** (serves the caller, not the maintainer)
-and **token efficient** (don't repeat what's in training, common sense, the module header, etc).
+Your goal is documentation that answers the caller's three questions and no others: when do I
+call it, what do I get, what would I otherwise get wrong.
 
 **Examine every sentence: is it clear and plainly stated**?
 
@@ -28,37 +28,28 @@ exported or not.
 
 The target, and optionally a worktree already cut for it. With none, cut one:
 `scripts/cut-thread docblocks_<short target name>` (PROCESS.md, *A worktree per thread*), and
-work only there.
+work only there. **One file per spawn**: a target of several files is a spawn for each.
 
 ## The pass
 
-* **Gather first.** For each class, module or interface, find what holds for every member, check
-  it against each, and write it once in that doc (STYLE.md, *Say a thing once*). Candidates, a
-  start rather than the set:
-  - a malformed argument or option refuses 'bad_option' before anything is read, asked for or
-    written, its message naming the field, never the value;
-  - a call refuses with what storage beneath it refuses, as it came, unless its doc says
-    otherwise;
-  - a refusal every call gives in one state (the object gone, a lock landing mid-call);
-  - a precondition every member runs first (an awaited call, a check): list each one you write
-    in the open questions, as your reading of the code;
-  - what the class doc already says of the two forms, bad news and event handlers stays,
-    tightened by the same rules.
-* **Then each member**, reading it and what it calls, no more.
+* **Each member**, reading it and what it calls, no more.
 * **Names stay.** Where you cannot write a first line the name keeps (STYLE.md, *Naming*),
   propose a rename in the open questions.
 * **Disagreements are reported.** Where code and old prose disagree, write what the code does and
-  list it in the open questions. Keep every security-relevant statement unless the code shows it
-  false.
+  list it in the open questions. The guarantee stays; the mechanism goes.
+* **A test is not a source.** Read a test file only to find `@example`s; a test title is never a
+  source.
 * **Dropped facts are listed.** Every fact you drop that STYLE.md does not plainly cut goes in the
   `human/` entry, so a Coach can put back what matters.
 
 A long file has a table of contents in `rg -n '// == ' <file>`. Do not read `whiteboard/`,
-`winboard/` or `human/`. STYLE.md's two before-and-afters (`hello`, `#storedBase`) are the
-worked examples.
+`winboard/` or `human/`. STYLE.md's two pairs and `notes/gallant.md` *Words* are the worked
+examples; `notes/gallant-docblocks.md` is the bestiary.
 
 ## Done
 
+* `pnpm --filter safebyok lint`, which flags a refusal catalog and a bare `/**`; then read each
+  block aloud and ask whether every sentence has a verb.
 * `pnpm justify` green.
 * Squash commits revisiting a file an earlier one changed. Many files go into a few commits
   grouped by folder, four at most.
