@@ -17,9 +17,9 @@ export const wayinCtxOf = (stamp: VaultStamp, header: WayinHeader): Uint8Array =
 }
 // --
 
-// == [Wayin]
-
 export class Wayin {
+  // == [Props]: wayinkind, device_id, registered_at, vault_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
+
   declare readonly wayinkind:               WayinKind
   declare readonly device_id:               string
   declare readonly registered_at:           number
@@ -30,6 +30,9 @@ export class Wayin {
   declare readonly prf_salt_b64?:           CX.PrfSalt
 
   readonly #pickle: WayinRecord
+  // --
+
+  // == [Construction]: constructor
 
   constructor(record: unknown) {
     const parsed = wayinRecord.parse(record)
@@ -38,6 +41,9 @@ export class Wayin {
     tattoo(this, this.#pickle, { writable: false })
     Object.freeze(this)
   }
+  // --
+
+  // == [Methods]: pickle, toJSON
 
   pickle(): WayinRecord { return this.#pickle }
 
@@ -45,5 +51,5 @@ export class Wayin {
     const { vault_key_wayin_wrapped: _wrapped, ...header } = this.#pickle
     return header
   }
+  // --
 }
-// --
