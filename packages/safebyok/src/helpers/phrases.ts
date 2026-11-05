@@ -454,3 +454,75 @@ export const DeviceRecordRewritten = "This device's record for the bank was dama
 /** Bad news of a vault row `getBank` set aside. */
 export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --
+
+// == [Refusals: outcomes and helpers]: NoErrorGiven, StorageUnavailable, UnexpectedError, NothingThrown, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed
+
+/** The cause's message where a backend failed without giving an error. */
+export const NoErrorGiven = "The storage backend failed without giving an error."
+
+/** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
+export const StorageUnavailable = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
+
+/** A bug, in safebyok or in a function the app handed it. */
+export const UnexpectedError = "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause."
+
+/** The cause's message where an unexpected error came with nothing thrown. */
+export const NothingThrown = "Nothing was thrown with it."
+
+/** A cipher ctx handed no stamp, or a part or field that is undefined or null. */
+export const UnboundCipherCtx = "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it."
+
+/** The host's strengthChecker answering no verdict. */
+export const StrengthCheckerMisanswered = "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
+
+/** The strengthChecker's load() failing at bank.hello(). */
+export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
+// --
+
+// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, boxTooLarge, VaultFull, DamagedRecord, NewerFormat, SeqNotNext, StorageError, storeFailed, storeThrew
+
+/** No row stored for this life of the vault, where one was. */
+export const VaultEmpty = "Nothing is stored for this life of the vault: read the vault again by its scope."
+
+/** A live vault stored under another vault_tok than the call names. */
+export const VaultMismatch = "A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope."
+
+/** A vault deleted, its tombstone stored. */
+export const VaultGone = "This vault was deleted."
+
+/** What is stored moved since the revision the call names. */
+export const StaleWrite = "What is stored moved since this revision was read, so nothing was written: read it again."
+
+/** A live record stored where the call was told not to replace one. */
+export const Camped = "A live record is already stored here, and this call was told not to replace it."
+
+/** No box stored under the label asked. */
+export const AbsentBox = "No box is stored under that label."
+
+/** A change of the gate refused, `why` saying which check it failed. */
+export const gateIssue = (why: string): string => `This change of the gate was refused: ${why}`
+
+/** A box record over the bytes its storage holds in one record. */
+export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage holds in one record.`
+
+/** A vault holding as many boxes as its storage allows. */
+export const VaultFull = "This vault holds as many boxes as its storage allows."
+
+/** A stored row that failed its checks, set aside. */
+export const DamagedRecord = "The stored record failed its checks, so it is set aside."
+
+/** A stored row in a format newer than this package reads. */
+export const NewerFormat = "The stored record is in a format newer than this version of the package reads."
+
+/** A put whose revision_seq is not one past its prior's. */
+export const SeqNotNext = "A record's revision_seq must be one past its prior's."
+
+/** A vaultDB's store failing, its own error the cause. */
+export const StorageError = "The vault's storage failed: its own error is this error's cause."
+
+/** A device store's failure in `call`, `named` the sentence naming what it threw, or blank. */
+export const storeFailed = (call: string, named: string): string => `This device's own storage failed in ${call}: try again.${named}`
+
+/** The sentence naming what a device store threw, by its `name` alone. */
+export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
+// --

@@ -5,14 +5,8 @@ import type * as SX from '../shapes/shapes-storage'
 
 // == [Outcome Throwers]: storageUnavailable, unexpectedError
 
-/** The message of the cause given a backend that failed without an error. */
-const NoErrorGiven = 'The storage backend failed without giving an error.'
-
 /** A cause as a refusal keeps it: never null or undefined. */
-const causeOf = (cause: unknown): unknown => cause ?? new Error(NoErrorGiven)
-
-/** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
-export const StorageTroubleMessage = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
+const causeOf = (cause: unknown): unknown => cause ?? new Error(Phrases.NoErrorGiven)
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
  * @param cause - What the backend threw, as it came, kept for debugging. It holds only what the
@@ -26,7 +20,7 @@ export const StorageTroubleMessage = "The vault's storage could not be reached, 
  *   try { return await client.query(text, params) } catch (err) { throw storageUnavailable(err) }
  * @example throw storageUnavailable(err, "This device's own storage failed reading its mark of this vault: try again.")
  */
-export const storageUnavailable = (cause: unknown, message: string = StorageTroubleMessage): VaultError => (
+export const storageUnavailable = (cause: unknown, message: string = Phrases.StorageUnavailable): VaultError => (
   new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
 )
 
@@ -35,7 +29,7 @@ export const storageUnavailable = (cause: unknown, message: string = StorageTrou
  * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
  */
 export const unexpectedError = (thrown: unknown): VaultError => (
-  new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
+  new VaultError('unexpected_error', Phrases.UnexpectedError, { cause: thrown ?? new Error(Phrases.NothingThrown) })
 )
 // --
 
@@ -174,11 +168,11 @@ export const unknownKeyDeriver = (): VaultError => new VaultError('newer_format'
 
 // == [Helper Throwers]: unboundCipherCtx, strengthCheckerMisanswered, strengthCheckerLoadFailed
 
-export const unboundCipherCtx = (): VaultError => new VaultError('unexpected_error', "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
+export const unboundCipherCtx = (): VaultError => new VaultError('unexpected_error', Phrases.UnboundCipherCtx)
 
-export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
+export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_option', Phrases.StrengthCheckerMisanswered)
 
-export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause })
+export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerLoadFailed, { cause })
 // --
 
 // == [Deriver Throwers]: reservedLabel, suppliedSpecChanged, saltDoesNotFit
@@ -195,48 +189,48 @@ export const saltDoesNotFit = (expectedCount: number, handedCount: number): Vaul
 /* The refusals of a vaultDB, each read the same in an answer and an error: `meta` holds the `world` and `dbhas` the answer carries. */
 
 export const vaultEmpty = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_empty', 'Nothing is stored for this life of the vault: read the vault again by its scope.', { meta: { world, dbhas: null } })
+  new VaultError('vault_empty', Phrases.VaultEmpty, { meta: { world, dbhas: null } })
 )
 
 export const vaultMismatch = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_remade', 'A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope.', { meta: { world, dbhas: world } })
+  new VaultError('vault_remade', Phrases.VaultMismatch, { meta: { world, dbhas: world } })
 )
 
 export const vaultGone = (tombstone: SX.VaultRow): VaultError => (
-  new VaultError('vault_gone', 'This vault was deleted.', { meta: { world: tombstone, dbhas: tombstone } })
+  new VaultError('vault_gone', Phrases.VaultGone, { meta: { world: tombstone, dbhas: tombstone } })
 )
 
 export const staleWrite = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow | null): VaultError => (
-  new VaultError('stale_write', 'What is stored moved since this revision was read, so nothing was written: read it again.', { meta: { world, dbhas } })
+  new VaultError('stale_write', Phrases.StaleWrite, { meta: { world, dbhas } })
 )
 
 export const camped = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow): VaultError => (
-  new VaultError('camped', 'A live record is already stored here, and this call was told not to replace it.', { meta: { world, dbhas } })
+  new VaultError('camped', Phrases.Camped, { meta: { world, dbhas } })
 )
 
 export const absentBox = (world: SX.VaultRow, dbhas: SX.BoxRow | null): VaultError => (
-  new VaultError('absent_box', 'No box is stored under that label.', { meta: { act: (dbhas === null) ? 'void' : 'gone', world, dbhas } })
+  new VaultError('absent_box', Phrases.AbsentBox, { meta: { act: (dbhas === null) ? 'void' : 'gone', world, dbhas } })
 )
 
 export const gateIssue = (world: SX.VaultRow, why: string): VaultError => (
-  new VaultError('gate_issue', `This change of the gate was refused: ${why}`, { meta: { world, dbhas: world } })
+  new VaultError('gate_issue', Phrases.gateIssue(why), { meta: { world, dbhas: world } })
 )
 
 export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): VaultError => (
-  new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage holds in one record.`)
+  new VaultError('box_too_large', Phrases.boxTooLarge(recordBytes, maxRecordBytes))
 )
 
 export const vaultFull = (capacity: SX.Capacity): VaultError => (
-  new VaultError('vault_full', 'This vault holds as many boxes as its storage allows.', { meta: { capacity } })
+  new VaultError('vault_full', Phrases.VaultFull, { meta: { capacity } })
 )
 
-export const damagedRecord = (): VaultError => new VaultError('damaged_row', 'The stored record failed its checks, so it is set aside.')
+export const damagedRecord = (): VaultError => new VaultError('damaged_row', Phrases.DamagedRecord)
 
-export const newerFormat = (): VaultError => new VaultError('newer_format', 'The stored record is in a format newer than this version of the package reads.')
+export const newerFormat = (): VaultError => new VaultError('newer_format', Phrases.NewerFormat)
 
-export const seqNotNext = (): VaultError => new VaultError('bad_option', "A record's revision_seq must be one past its prior's.")
+export const seqNotNext = (): VaultError => new VaultError('bad_option', Phrases.SeqNotNext)
 
-export const storageError = (cause: unknown): VaultError => new VaultError('storage_unavailable', "The vault's storage failed: its own error is this error's cause.", { cause })
+export const storageError = (cause: unknown): VaultError => new VaultError('storage_unavailable', Phrases.StorageError, { cause })
 // --
 
 // == [DeviceDB Throwers]: storeFailed
@@ -244,7 +238,7 @@ export const storageError = (cause: unknown): VaultError => new VaultError('stor
 /** A store's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the store is handed every lease row, and what it throws may quote one. */
 export const storeFailed = (call: string, thrown: unknown): VaultError => {
   const thrownName = thrownNameOf(thrown)
-  const named = (thrownName === null) ? '' : ` It threw ${thrownName}.`
-  return new VaultError('storage_unavailable', `This device's own storage failed in ${call}: try again.${named}`)
+  const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
+  return new VaultError('storage_unavailable', Phrases.storeFailed(call, named))
 }
 // --
