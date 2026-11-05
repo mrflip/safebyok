@@ -77,8 +77,22 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* To show a whisper, `box.expose()` holds it on `box.whisper`. Its component subscribes to the box
-  for the exposing and to the vault for the lock.
+* To show a whisper, `box.expose()` holds it on `box.whisper`, a plain object of the box's to edit,
+  until `box.veil()`. A lock does not tell the box: `box.whisper` answers `LOCKED` until the vault
+  unlocks, then the same object again. So its component subscribes to the box for the exposing and
+  to the vault for the lock:
+
+  ```tsx
+  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
+  const { lockState } = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
+  if (lockState === 'locked') { return <button onClick={() => vault.ensureUnlocked()}>Unlock</button> }
+  if (! exposed) { return <button onClick={() => box.expose()}>Show</button> }
+  return <WhisperForm initial={box.whisper} onSave={(next) => box.put({ whisper: next })} />
+  ```
+
+  A script edits it in place, and a put stores a copy:
+  `await box.expose(); box.whisper.org = 'acme'; await box.put({ whisper: box.whisper })`.
+  `box.whisper`'s type holds `LOCKED` and null too, so TypeScript asks you to narrow it first.
 * `bank.vacate()` is sign-out: it erases this device's leases and leaves the vaultDB alone.
 
 ## Not done yet

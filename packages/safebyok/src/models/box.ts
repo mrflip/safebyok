@@ -1,4 +1,3 @@
-import { deepFreeze } from 'es-toolkit'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { type LockedBag, LOCKED } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -27,7 +26,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly listing: BoxListing
 
-  /** The frozen whisper the host asked to keep open on the instance: hidden while the vault is locked, kept until {@link veil} or a vault modification clears the box. */
+  /** The whisper the host asked to keep open on the instance, a plain object it may edit: hidden while the vault is locked, kept until {@link veil} or a vault modification clears the box. */
   #exposed: Whisper | null = null
   // --
 
@@ -56,7 +55,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [The whisper]: extractWhisper, tryExtractWhisper, expose, veil, unseal
 
-  /** The timely stored whisper, frozen, keeping nothing on the instance. */
+  /** The timely stored whisper, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper> {
     await this.ensureUnsealable(opts); this.demandUnsealable()
     return this.#unseal(this.demandFullProps())
@@ -87,7 +86,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
     const held = CX.whisper.safeParse(parseJsonOrNull(whisperText))
     if (! held.success) { throw undecodedWhisper() }
-    return deepFreeze(held.data)
+    return held.data
   }
   // --
 

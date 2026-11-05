@@ -367,7 +367,7 @@ Each is a Coach's call; none breaks a guarantee above.
    as a test of the Vault object's surface asserts no `Lease` is reachable from it without a method call.
 2. **The exposed whisper** (`src/models/box.ts`, `Box.expose` and `box.whisper`) is a whisper
    kept on the instance, a new form of a secret, which G7 says this note names first: the models' `Box` holds
-   it after `expose` until the host calls `box.veil()`, and keeps it while the vault locks,
+   it, a plain object the host may edit, after `expose` until the host calls `box.veil()`, and keeps it while the vault locks,
    answering `LOCKED` in its place until it unlocks. It is the host's decision, which a host would
    otherwise make for itself without the guard. "whisper is unsafe by design and its
    implementation may change as we tune its unsafeness" (the Coach, 2026-10-31). The core's `Box`
