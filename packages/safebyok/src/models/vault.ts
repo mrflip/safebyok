@@ -11,7 +11,7 @@ import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
-import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, listingExpected, noProofToUnlock, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
+import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, listingExpected, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -155,7 +155,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Ask the user for proof, and unlock by it. */
   async unlock(): Promise<this> {
     await this.ensureAttachable(); this.demandAttachable()
-    if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
     await Gating.launch('unlock_vault', this.#launchArgs)
     return this
   }

@@ -9,6 +9,8 @@ import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
 
 useBankWorlds()
+const nothing = (): void => undefined
+
 
 describe("bank.hello", () => {
   it("readies a bank over empty stores, loading its plugins, telling its listeners, and answering the same snapshot until something changes", async () => {
@@ -174,9 +176,9 @@ describe("bank.ensureVault", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("refuses 'already_asking' while a gating is open, and refuses with no dialog given", async () => {
+  it("refuses 'already_asking' while a gating is open", async () => {
     const world = makeBankWorld()
-    let closeDialog = (): void => undefined
+    let closeDialog = nothing
     const bank = world.bankOn({ requestCleartext: async (gating) => {
       await new Promise<void>((resolve) => { closeDialog = resolve })
       await gating.attempt(byPassphrase(Passphrase) as never)
@@ -186,9 +188,10 @@ describe("bank.ensureVault", () => {
     await TH.expectRefusal(bank.ensureVault(OtherScopeGiven), 'already_asking')
     closeDialog()
     await asking
-    const silent = world.bankOnAnotherDevice({ requestCleartext: undefined })
-    await silent.hello()
-    await TH.expectRefusal(silent.ensureVault(OtherScopeGiven), 'bad_option')
+  })
+
+  it("can never ask with no dialog, as Bank.make refuses 'bad_option' without a requestCleartext", () => {
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }), 'bad_option')
   })
 
   it("answers tryEnsureVault's refusal as an Outcome", async () => {

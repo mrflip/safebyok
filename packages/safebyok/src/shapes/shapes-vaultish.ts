@@ -334,7 +334,7 @@ export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCac
 
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn }) => ({
-  world: obj({ ...GX.provingWorld.shape, logger: CX.loggerShape, leaseMillis: GX.leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn().optional() }),
+  world: obj({ ...GX.provingWorld.shape, logger: CX.loggerShape, leaseMillis: GX.leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn() }),
 }), { refuseAs: 'bad_option', extras: 'strip' })
 
 /** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
@@ -345,8 +345,8 @@ export type VaultWorld = ListingWorld & ProvingWorld & {
   deviceDB:    DeviceDB
   /** Hears a refused erase of the cached lease, and no secret material. */
   onPanic?:    ((refusal: VaultError) => unknown) | undefined
-  /** The host's dialog, if the host gave one. */
-  requestCleartext?: RequestCleartext | undefined
+  /** The host's dialog. */
+  requestCleartext: RequestCleartext
   /** The horizon of a vault's boxes, by default the vault's own. */
   boxRefreshMillis?: number
 }
@@ -369,7 +369,7 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   vaultDB:             vaultDBDuck,
   deviceDB:            deviceDBDuck,
   keyDeriver:          CX.keyDeriverShape,
-  requestCleartext:    fn().optional(),
+  requestCleartext:    fn(),
   strengthChecker:     GX.strengthChecker.optional(),
   clock:               CX.clockShape.optional(),
   logger:              CX.loggerShape.optional(),
@@ -387,7 +387,7 @@ export type BankOpts = {
   vaultDB:              VaultDB
   deviceDB:             DeviceDB
   keyDeriver:           KeyDeriver
-  requestCleartext?:    RequestCleartext | undefined
+  requestCleartext:     RequestCleartext
   strengthChecker?:     StrengthChecker | undefined
   clock?:               Clock | undefined
   logger?:              VaultLogger | undefined
