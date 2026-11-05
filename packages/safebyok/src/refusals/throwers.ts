@@ -9,7 +9,10 @@
  * eliding its words; and all three read naturally at the call site. A caller passes what it has on hand and trusts the
  * thrower to sanitize and cherry-pick. A name carries no "error" or "refusal", ends in "issue" at a loss, and is
  * empathetic and frank to the person who trusted us with their data, and readable to the coder. Reuse is welcome, never
- * forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged. */
+ * forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged.
+ *
+ * A refusal's `meta` holds what reads at a glance, and an adapter may hand a bag of its own beside the cause: props to
+ * depth two only; no arrays, which are kept as their JSON text; an object past depth two replaced by the string '{...}'. */
 
 import { PassphraseKeyBytes } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
@@ -17,9 +20,6 @@ import * as Phrases   from '../helpers/phrases'
 import type * as SX from '../shapes/shapes-storage'
 
 // == [Outcome Throwers]: storageUnavailable, unexpectedError
-
-/** A cause as a refusal keeps it: never null or undefined. */
-const causeOf = (cause: unknown): unknown => cause ?? new Error(Phrases.NoErrorGiven)
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
  * @param cause - What the backend threw, as it came, kept for debugging. It holds only what the
@@ -34,7 +34,7 @@ const causeOf = (cause: unknown): unknown => cause ?? new Error(Phrases.NoErrorG
  * @example throw storageUnavailable(err, "This device's own storage failed reading its mark of this vault: try again.")
  */
 export const storageUnavailable = (cause: unknown, message: string = Phrases.StorageUnavailable): VaultError => (
-  new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
+  new VaultError('storage_unavailable', message, { cause: cause ?? new Error(Phrases.NoErrorGiven) })
 )
 
 /** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it.
