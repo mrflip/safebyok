@@ -67,7 +67,7 @@ describe("MemoryVaultDB", () => {
   })
 
   describe("delVault over a row past reading", () => {
-    it("refuses 'damaged_record' or 'newer_format', and tombstones no box", async () => {
+    it("refuses 'damaged_row' or 'newer_format', and tombstones no box", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       const tombstone = vaultTombstoneOf(vaultAt())
       const prior = priorOf(vaultAt())
@@ -80,7 +80,7 @@ describe("MemoryVaultDB", () => {
   })
 
   describe("a damaged row named as damaged_records lists it", () => {
-    it("delVault deletes rubble at the sentinels and cascades over nothing else; any other prior refuses 'damaged_record'", async () => {
+    it("delVault deletes rubble at the sentinels and cascades over nothing else; any other prior refuses 'damaged_row'", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       const rows = vaultDB._cheat_vaultRowsOf(bankScope)
       rows.set('main', { garbage: true })

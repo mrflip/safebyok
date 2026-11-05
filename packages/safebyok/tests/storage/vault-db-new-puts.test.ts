@@ -204,7 +204,7 @@ describe("MemoryVaultDB", () => {
   })
 
   describe("box writes under a vault row failing its checks", () => {
-    it("refuse 'damaged_record' or 'newer_format', and change nothing", async () => {
+    it("refuse 'damaged_row' or 'newer_format', and change nothing", async () => {
       const { vaultDB, vault, box } = await storeWith({ box: true })
       const boxRows = vaultDB._cheat_boxRowsOf(vaultScope, 'life1')
       vaultDB._cheat_vaultRowsOf(bankScope).set('main', { ...vault, gate: 'rubble' })
