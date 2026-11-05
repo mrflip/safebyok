@@ -14,8 +14,6 @@ export type { FakeCiphered } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, makeLatch, beforeNextCall,
   holdNextCall, holdNextAnswer, readAfresh } from './test-helpers/timing'
 export type { AsyncVerbOf } from './test-helpers/timing'
-export { throughTurnstile, raceEveryWay } from './test-helpers/racing'
-export type { Turnstile, RaceOutcome, MakeDevices, Race } from './test-helpers/racing'
 export { spyLogger, quietLogger, loggedText, thrownText, leafTexts, shownOf, jsonOf } from './test-helpers/logging'
 export type { LoggedCall } from './test-helpers/logging'
 export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad, good, bad, omitting } from './test-helpers/refusals'
