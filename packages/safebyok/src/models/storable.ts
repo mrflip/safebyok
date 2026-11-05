@@ -21,13 +21,8 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 }
 // --
 
-// == [Storable]
-
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Declarations]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, central, snapshot, horizonMillis, refreshedAt, listeners
-
-  /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
-  readonly #scope: ScopeT
+  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #horizonMillis, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isLockedFUBag
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
   declare readonly world:   World
@@ -40,6 +35,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare revision_seq:  number
   declare registered_at: number
   declare written_at:    number
+
+  /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
+  readonly #scope: ScopeT
 
   /** Set by a sweep, a vacate or a delete, and never cleared. */
   #isEnabled = true
@@ -55,15 +53,55 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The fetch under way, which every `fetch` made meanwhile joins. */
   readonly #oneFetchAtATime = oneAtATime(() => this.listing.fetch(this.scope, { ifAbsent: 'nil' }))
   readonly #listeners = new Set<() => void>()
-  // --
 
-  // == [Statics]: isLockedFUBag
+  /** Unbound callback to acquire the snapshot */
+  readonly #getSnapshot = (): SnapshotT => this.snapshot
+
+  /** Unbound callback to enroll the given listener for push notifications
+   * Invoke the returned unsubscribe function to unenroll the listener
+   */
+  readonly #subscribe = (listener: () => void): (() => void) => {
+    this.#listeners.add(VX.listener.parse(listener))
+    return () => { this.#listeners.delete(listener) }
+  }
 
   /** True for {@link VX.LOCKED}, the bag a storable answers in place of what the locked vault hides, and for nothing else: not a copy of it, nor any bag a host builds, nor `Symbol.for('LOCKED')`. */
   static isLockedFUBag(val: unknown): val is VX.LockedBag { return val === VX.LOCKED }
   // --
 
-  // == [Constructor]: constructor, assignInitialProps, assign
+  // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe
+
+  get scope(): ScopeT { return this.#scope }
+
+  /** The most recent view of the stored record. */
+  protected get central(): Fetched<RecordT, SparseT> { return this.#central }
+
+  /** The record in hand where it is the full record, else null. */
+  protected get full(): RecordT | null {
+    return this.isFullRecord(this.#central) ? this.#central : null
+  }
+
+  /** The sparse form of central: everything but what only the full record carries. */
+  get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
+
+  get am(): Am { return this.#central.am }
+
+  toJSON(): SparseT { return this.sparse }
+
+  /** Direct public access to the snapshot */
+  get snapshot(): SnapshotT {
+    if (this.#snapshot === null) { this.#snapshot = this.makeSnapshot() }
+    return this.#snapshot
+  }
+
+  /** Public access to the unbound "hand over yer snapshot" callback */
+  get       getSnapshot(): () => SnapshotT { return this.#getSnapshot }
+
+  /** Public access to the unbound "make me a subscriber" callback */
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+  // --
+
+  // == [Construction]: constructor, assignInitialProps, assign
 
   /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
   constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, opts: StorableOpts) {
@@ -93,133 +131,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.revision_seq = revision_seq
     this.written_at   = written_at
   }
-  // --
-
-  // == [Forms]: scope, central, full, sparse, am, toJSON
-
-  get scope(): ScopeT { return this.#scope }
-
-  /** The most recent view of the stored record. */
-  protected get central(): Fetched<RecordT, SparseT> { return this.#central }
-
-  /** The record in hand where it is the full record, else null. */
-  protected get full(): RecordT | null {
-    return this.isFullRecord(this.#central) ? this.#central : null
-  }
-
-  /** The sparse form of central: everything but what only the full record carries. */
-  get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
-
-  get am(): Am { return this.#central.am }
-
-  toJSON(): SparseT { return this.sparse }
-  // --
-
-  // == [States]: isTimely, isLocked, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord
-
-  /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
-  get isTimely(): boolean { return this.#isRefreshedWithin(this.#horizonMillis) }
-
-  #isRefreshedWithin(maxMillis: number): boolean {
-    return this.#refreshedAt !== null && this.world.clock.now() - this.#refreshedAt < maxMillis
-  }
-
-  get isLocked(): boolean { return this.listing.lockState() === 'locked' }
-
-  /** The record in hand is not a tombstone: the thing is not gone. */
-  get isPresent(): boolean { return ! VX.isTombstone(this.#central) }
-
-  /** True where the record in hand has every field filled; false for a sparse view, as a listing's query hands back, or for a tombstone. */
-  get isFull(): boolean { return this.isFullRecord(this.#central) }
-
-  /** True where the record in hand is whole: {@link isFull}, or a tombstone; only a sparse record is not. */
-  get #isWhole(): boolean { return this.isWholeRecord(this.#central) }
-
-  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone. A sparse record is not. */
-  protected isWholeRecord(record: Fetched<RecordT, SparseT>): record is RecordT | Tombstone<SparseT> {
-    return this.isTombstoneRecord(record) || this.isFullRecord(record)
-  }
-
-  /** Whether `record` is a tombstone. */
-  protected isTombstoneRecord(record: Fetched<RecordT, SparseT>): record is Tombstone<SparseT> {
-    return VX.isTombstone(record)
-  }
-  // --
-
-  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, becomeNotifiable
-
-  /** Direct public access to the snapshot */
-  get snapshot(): SnapshotT {
-    if (this.#snapshot === null) { this.#snapshot = this.makeSnapshot() }
-    return this.#snapshot
-  }
-  /** Public access to the unbound "hand over yer snapshot" callback */
-  get       getSnapshot(): () => SnapshotT { return this.#getSnapshot }
-  /** Unbound callback to acquire the snapshot */
-  readonly #getSnapshot = (): SnapshotT => this.snapshot
-
-  /** Public access to the unbound "make me a subscriber" callback */
-  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
-  /** Unbound callback to enroll the given listener for push notifications
-   * Invoke the returned unsubscribe function to unenroll the listener
-   */
-  readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(VX.listener.parse(listener))
-    return () => { this.#listeners.delete(listener) }
-  }
-
-  /** Make the snapshot now, if not yet made, so that each change from here on notifies the subscribers: until then there is none to replace. */
-  becomeNotifiable(): this {
-    this.#snapshot ??= this.makeSnapshot()
-    return this
-  }
-
-  /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */
-  #replaceSnapshot(): void {
-    if (this.#snapshot === null) { return }
-    const nextSnapshot = this.makeSnapshot()
-    if (this.sameSnapshot(nextSnapshot, this.#snapshot)) { return }
-    this.#snapshot = nextSnapshot
-    this.#listeners.forEach((listener) => {
-      try {
-        listener()
-      } catch (err) {
-        reportToPlatform(err)
-      }
-    })
-  }
-  /** Compare two snapshots for equality: notifications are not sent if old and new are the same */
-  protected sameSnapshot(next: SnapshotT, current: SnapshotT): boolean {
-    return stableJsonify(next) === stableJsonify(current)
-  }
-  // --
-
-  // == [Guards]: isEnabled, demandEnabled, demandUnlocked, demandPresent, demandFull, demandWhole, demandFullProps, ensureDeletable, demandDeletable
-
-  /** False past a sweep, a vacate or a delete, and from then on. */
-  get isEnabled(): boolean { return this.#isEnabled }
-
-  demandEnabled():  this { this.#demandInstanceEnabled();                                                     return this }
-
-  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
-
-  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
-
-  demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
-
-  // Not `demandEnabled`, which a Vault widens to refuse a vault gone: a fetch is how a thing gone hears its slot has moved on.
-  #demandInstanceEnabled(): void { if (! this.#isEnabled) { throw disabledError() } }
-
-  /** The full record in hand. */
-  protected demandFullProps(): RecordT {
-    if (this.full !== null) { return this.full }
-    throw partialLoadError()
-  }
-
-  ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
-
-  /** A delete needs the thing enabled and the vault unlocked, and no more: a thing gone is deleted again. */
-  demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
   // --
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
@@ -259,36 +170,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
-  // == [Discards]: lock, sweep, vacate, sweepContents, vacateContents, disable
-
-  /** Tell the listeners the lock has moved. A no-op past a discard; never throws. */
-  lock(): this {
-    if (this.#isEnabled) { this.settle() }
-    return this
-  }
-
-  /** Drop what this instance holds of secrets, leave what this device has cached, and answer nothing from here on, unlisted. A repeat is a no-op. Never throws. */
-  sweep(): this { return this.#disable(() => { this.sweepContents() }) }
-
-  /** As `sweep`, and what this device has cached of it goes too. Storage is untouched. A repeat is a no-op. Never throws. */
-  vacate(): this { return this.#disable(() => { this.vacateContents() }) }
-
-  protected sweepContents(): void { /* a thing of no contents has none to drop */ }
-
-  protected vacateContents(): void { /* a thing of no contents has none to drop */ }
-
-  // Marked first, so that a repeat met on the way finds the work done.
-  #disable(dropContents: () => void): this {
-    if (! this.#isEnabled) { return this }
-    this.#isEnabled = false
-    dropContents()
-    this.listing.unlist(this)
-    this.settle()
-    return this
-  }
-  // --
-
-  // == [Receiving]: receive, adopt, settle, tombstoneFor
+  // == [Receiving]: receive, tombstoneFor
 
   /** SLOPDOC: Takes in what storage said: judges it against the record in hand, adopts and settles what it takes. */
   receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
@@ -299,19 +181,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if (isTaken) { this.adopt(central) }
     if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
     return isTaken ? this.settle() : { badnews: [] }
-  }
-
-  // Every adopt is followed by a settle, which the snapshot is made from: an adopt left unsettled would leave it behind.
-  /** Assign the props of `central`, judged against the central held until now, then hold it, frozen; the snapshot waits for `settle`. */
-  protected adopt(central: Fetched<RecordT, SparseT>): void {
-    this.assign(central)
-    this.#central = Object.freeze(central)
-  }
-
-  /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
-  settle(): Settled {
-    this.#replaceSnapshot()
-    return { badnews: [] }
   }
 
   /** A tombstone made here, from the sparse props held, under `revision`, written now. */
@@ -359,7 +228,134 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Concrete Subclass Required Methods]: demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Settling]: settle, becomeNotifiable, replaceSnapshot, sameSnapshot
+
+  /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
+  settle(): Settled {
+    this.#replaceSnapshot()
+    return { badnews: [] }
+  }
+
+  /** Make the snapshot now, if not yet made, so that each change from here on notifies the subscribers: until then there is none to replace. */
+  becomeNotifiable(): this {
+    this.#snapshot ??= this.makeSnapshot()
+    return this
+  }
+
+  /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */
+  #replaceSnapshot(): void {
+    if (this.#snapshot === null) { return }
+    const nextSnapshot = this.makeSnapshot()
+    if (this.sameSnapshot(nextSnapshot, this.#snapshot)) { return }
+    this.#snapshot = nextSnapshot
+    this.#listeners.forEach((listener) => {
+      try {
+        listener()
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    })
+  }
+
+  /** Compare two snapshots for equality: notifications are not sent if old and new are the same */
+  protected sameSnapshot(next: SnapshotT, current: SnapshotT): boolean {
+    return stableJsonify(next) === stableJsonify(current)
+  }
+  // --
+
+  // == [Discards]: lock, sweep, vacate, disable
+
+  /** Tell the listeners the lock has moved. A no-op past a discard; never throws. */
+  lock(): this {
+    if (this.#isEnabled) { this.settle() }
+    return this
+  }
+
+  /** Drop what this instance holds of secrets, leave what this device has cached, and answer nothing from here on, unlisted. A repeat is a no-op. Never throws. */
+  sweep(): this { return this.#disable(() => { this.sweepContents() }) }
+
+  /** As `sweep`, and what this device has cached of it goes too. Storage is untouched. A repeat is a no-op. Never throws. */
+  vacate(): this { return this.#disable(() => { this.vacateContents() }) }
+
+  // Marked first, so that a repeat met on the way finds the work done.
+  #disable(dropContents: () => void): this {
+    if (! this.#isEnabled) { return this }
+    this.#isEnabled = false
+    dropContents()
+    this.listing.unlist(this)
+    this.settle()
+    return this
+  }
+  // --
+
+  // == [Guards]: isEnabled, isLocked, isTimely, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandInstanceEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
+
+  /** False past a sweep, a vacate or a delete, and from then on. */
+  get isEnabled(): boolean { return this.#isEnabled }
+
+  get isLocked(): boolean { return this.listing.lockState() === 'locked' }
+
+  /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
+  get isTimely(): boolean { return this.#isRefreshedWithin(this.#horizonMillis) }
+
+  #isRefreshedWithin(maxMillis: number): boolean {
+    return this.#refreshedAt !== null && this.world.clock.now() - this.#refreshedAt < maxMillis
+  }
+
+  /** The record in hand is not a tombstone: the thing is not gone. */
+  get isPresent(): boolean { return ! VX.isTombstone(this.#central) }
+
+  /** True where the record in hand has every field filled; false for a sparse view, as a listing's query hands back, or for a tombstone. */
+  get isFull(): boolean { return this.isFullRecord(this.#central) }
+
+  /** True where the record in hand is whole: {@link isFull}, or a tombstone; only a sparse record is not. */
+  get #isWhole(): boolean { return this.isWholeRecord(this.#central) }
+
+  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone. A sparse record is not. */
+  protected isWholeRecord(record: Fetched<RecordT, SparseT>): record is RecordT | Tombstone<SparseT> {
+    return this.isTombstoneRecord(record) || this.isFullRecord(record)
+  }
+
+  /** Whether `record` is a tombstone. */
+  protected isTombstoneRecord(record: Fetched<RecordT, SparseT>): record is Tombstone<SparseT> {
+    return VX.isTombstone(record)
+  }
+
+  /** A delete needs the thing enabled and the vault unlocked, and no more: a thing gone is deleted again. */
+  demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
+
+  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
+
+  demandEnabled():  this { this.#demandInstanceEnabled();                                                     return this }
+
+  // Not `demandEnabled`, which a Vault widens to refuse a vault gone: a fetch is how a thing gone hears its slot has moved on.
+  #demandInstanceEnabled(): void { if (! this.#isEnabled) { throw disabledError() } }
+
+  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
+
+  demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
+
+  /** The full record in hand. */
+  protected demandFullProps(): RecordT {
+    if (this.full !== null) { return this.full }
+    throw partialLoadError()
+  }
+
+  ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
+  // --
+
+  // == [Protected, for a subclass to override]: adopt, sweepContents, vacateContents, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
+
+  // Every adopt is followed by a settle, which the snapshot is made from: an adopt left unsettled would leave it behind.
+  /** Assign the props of `central`, judged against the central held until now, then hold it, frozen; the snapshot waits for `settle`. */
+  protected adopt(central: Fetched<RecordT, SparseT>): void {
+    this.assign(central)
+    this.#central = Object.freeze(central)
+  }
+
+  protected sweepContents(): void { /* a thing of no contents has none to drop */ }
+
+  protected vacateContents(): void { /* a thing of no contents has none to drop */ }
 
   abstract demandPresent(): this
 
@@ -370,4 +366,3 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   protected abstract makeSnapshot(): SnapshotT
   // --
 }
-// --
