@@ -25,6 +25,8 @@ report what you found and stop.
    *Tags*, *Variables and functions*, *Braces and layout*, *Strings*, *Validation*, *Control flow
    and refusals*, *Comments and doc blocks*, *Tests*. A line the diff did not touch is not yours,
    even when it breaks a rule beside one that is.
+   `shapes/`, `refusals/` and `helpers/phrases.ts` state their own rules in their file headers;
+   a change in one of them is checked against those too.
 3. **Fix the mechanical rules by hand**, in the worktree, where the linter does not: a block left
    unbraced or a brace on its own line, `!foo` for `(! foo)`, `'` and `"` swapped, a `toBe` or
    `toEqual` where chai's form is due, `/**` alone on its line, a local tag unsmushed

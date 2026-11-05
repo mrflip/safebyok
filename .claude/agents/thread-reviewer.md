@@ -59,6 +59,9 @@ about to make. Chain each onto the command it heralds.
    names under *Where the guarantees are kept*, read that note's *The guarantees* section and
    check the diff against each guarantee. One the diff breaks is a *significant* finding, never a
    fix you make yourself.
+
+   **The modules' own rules**: `shapes/`, `refusals/` and `helpers/phrases.ts` state their own
+   rules in their file headers; a change in one of them is checked against those too.
 2. **Judge each finding.** One `/code-review` reports as CONFIRMED was checked against the files
    in its own verify pass: take its facts as found, and read the code only where you fix it.
    Check the rest -- PLAUSIBLE, unverified, and `style-reviewer`'s -- against the files. Make a
