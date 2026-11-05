@@ -287,6 +287,29 @@ describe("Checker", () => {
   })
 })
 
+describe("refusingAs", () => {
+  it("makes a validator's schema refuse another kind, naming the same failing fields, as its doc block says", () => {
+    const asOption = boxSparse.refusingAs('bad_option')
+    const refused = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, written_at: -1 }), 'bad_record')
+    const reRefused = TH.expectSyncRefusal(() => asOption.parse({ ...sparse, written_at: -1 }), 'bad_option')
+    expect(reRefused.meta?.fieldnames).to.deep.equal(refused.meta?.fieldnames)
+    expect(asOption.parse(sparse)).to.deep.equal(sparse)
+  })
+
+  it("leaves the first validator refusing its own kind, and keeps what the schema does: a strict object refuses a stray field", () => {
+    const asOption = boxRecord.refusingAs('bad_option')
+    TH.expectSyncRefusal(() => asOption.parse({ ...sparse, whisper_ciphered: 'w', extra: 1 }), 'bad_option')
+    TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, whisper_ciphered: 'w', extra: 1 }), 'bad_record')
+  })
+
+  it("gives parseConsistent and refusingAs to what it makes, each refusing the new kind", () => {
+    const asOption = boxSparse.refusingAs('bad_option')
+    TH.expectSyncRefusal(() => asOption.parseConsistent(sparse, { user_id: 'u2' }), 'bad_option')
+    TH.expectSyncRefusal(() => asOption.refusingAs('bad_scope').parse({ ...sparse, written_at: -1 }), 'bad_scope')
+    expectTypeOf(asOption).toEqualTypeOf<typeof boxSparse>()
+  })
+})
+
 describe("objCheck", () => {
   it("makes one strict validator of an object from its fields, refusing 'bad_record' unless given a kind, as its first example shows", () => {
     const checkedScope = objCheck(bankScopeOf)

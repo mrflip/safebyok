@@ -31,21 +31,22 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 // == [Record forms]: am, revision, times, liveness, vaulted, sparseBase, tombstone, VoidRevisionSeq, isTombstone, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
 
 /** SLOPDOC: The checks of what the base knows of any record, from whatever carries it: record, storable or snapshot. */
-export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
-  am:         SX.am,
-  revision:   SX.revision,
-  times:      SX.times,
-  liveness:   obj({ am: SX.am }),
-  vaulted:    SX.vaulted,
-  sparseBase: SX.sparseBase,
-  tombstone:  SX.sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
+export const am         = SX.am.refusingAs('bad_record')
+export const revision   = SX.revision.refusingAs('bad_record')
+export const times      = SX.times.refusingAs('bad_record')
+export const vaulted    = SX.vaulted.refusingAs('bad_record')
+export const sparseBase = SX.sparseBase.refusingAs('bad_record')
+
+export const { liveness, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
+  liveness:  obj({ am }),
+  tombstone: sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
 }))
 
 /** A record's revision: its `revision_tok`, minted at each put and del, and its `revision_seq`, higher on the later one. */
-export type Revision = Readonly<Z.infer<typeof revision>>
+export type Revision = SX.Revision
 
 /** When this life of the thing began, and when the record in hand was written; on a tombstone, when it was deleted. */
-export type Times = Readonly<Z.infer<typeof times>>
+export type Times = SX.Times
 
 /** Whether a record is alive, damaged or gone: its `am`. */
 export type Liveness = Readonly<Z.infer<typeof liveness>>
@@ -236,10 +237,11 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 export const { BoxFormat } = SX
 
 /** SLOPDOC: The checks of a box's stored forms, full and sparse, from a record or a box ducking as one. */
-export const { boxRecord, boxSparse } = Checkers('bad_record', () => ({ boxRecord: SX.boxRecord, boxSparse: SX.boxSparse }))
+export const boxRecord = SX.boxRecord.refusingAs('bad_record')
+export const boxSparse = SX.boxSparse.refusingAs('bad_record')
 
-export type BoxSparse = Z.infer<typeof boxSparse>
-export type BoxRecord = Z.infer<typeof boxRecord>
+export type BoxSparse = SX.BoxSparse
+export type BoxRecord = SX.BoxRecord
 
 /** The check of what a vault's get lists of its boxes: `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check, whose boxlabel is whatever storage has it under. */
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
@@ -333,10 +335,12 @@ export type BoxListingOpts = ListingOpts & { world: BoxWorld }
 export const { VaultFormat } = SX
 
 /** SLOPDOC: The checks of a vault's stored forms, sparse and with its gate, from a record or a vault ducking as one. */
-export const { vaultRecord, vaultSparse, vaultRow } = Checkers('bad_record', () => ({ vaultRecord: SX.vaultRecord, vaultSparse: SX.vaultSparse, vaultRow: SX.vaultRow }))
+export const vaultRecord = SX.vaultRecord.refusingAs('bad_record')
+export const vaultSparse = SX.vaultSparse.refusingAs('bad_record')
+export const vaultRow    = SX.vaultRow.refusingAs('bad_record')
 
-export type VaultSparse = Z.infer<typeof vaultSparse>
-export type VaultRecord = Z.infer<typeof vaultRecord>
+export type VaultSparse = SX.VaultSparse
+export type VaultRecord = SX.VaultRecord
 
 export type VaultSnapshot = VaultScope & Readonly<{
   vault_tok:     string

@@ -72,6 +72,10 @@ export type Merged<SourcesT extends readonly object[]> =
  * A schema keyed by its input repeats those keys in a refusal: Zod's `record`, or an object's
  * `.catchall()`, puts each failing key in the path. Judge such an object whole with `custom`.
  *
+ * A validator also has `refusingAs(kind)`: the same schema again, its `parse` refusing `kind`. Where
+ * one tier checks what another does and refuses in its own kind, it takes the other's validator
+ * and makes it so (`SX.boxRecord.refusingAs('bad_record')`), rather than listing its fields twice.
+ *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
  * holds the result to `other` as {@link verifyConsistent} does, and returns the result. Where they
  * disagree it refuses `kind`, or the `refusal` given: its `kind`, its `message`, or both. A
@@ -159,6 +163,8 @@ const kitWith = <SourcesT extends readonly object[]>(sources?: SourcesT): KitWit
 export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
   /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; 'bad_option' for a story that is none, whatever `val`. */
   parse: (val: unknown, story?: Story) => Z.output<SchemaT>
+  /** This validator's schema again, its `parse` and `parseConsistent` refusing `kind`. */
+  refusingAs: (kind: RefusalKind) => Refusing<SchemaT>
 } & (Z.output<SchemaT> extends object ? {
   /** `val`, parsed, once each field it holds that `other` holds too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
   parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal> & Story) => Z.output<SchemaT>
@@ -180,7 +186,7 @@ const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT)
   )
   // A clone, not `Object.create`: Zod binds each schema's own methods to it, so a schema that only
   // inherited them would render to JSON Schema as the one it came from, losing a pipe's or a lazy's place.
-  return Object.assign(schema.clone(), { parse, parseConsistent }) as Refusing<SchemaT>
+  return Object.assign(schema.clone(), { parse, parseConsistent, refusingAs: (asKind: RefusalKind) => refusing(asKind, schema) }) as Refusing<SchemaT>
 }
 
 /** The error map every `parse` runs under: Zod's own English, whatever map the host set with `z.config`, which could quote the input.
