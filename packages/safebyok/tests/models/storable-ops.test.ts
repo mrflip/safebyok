@@ -424,7 +424,7 @@ describe("storable refusal sentences, from phrases.ts", () => {
 
   it("throws a record under another vault_tok with the sentence phrases.ts holds", async () => {
     const { box } = await timelyBoxOf()
-    const err = TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })), 'unexpected_error')
+    const err = TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })), 'record_conflict')
     expect(err.message).to.eq(Phrases.OtherVaultTok)
   })
 })

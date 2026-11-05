@@ -27,7 +27,7 @@ export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidR
 // == [Record bases]: am, revision, times, vaulted, sparseBase, Revision, Times
 
 /** What every stored row holds in common: its `am`, its revision, its times and its vault's `vault_tok`, and `sparseBase`, the four together. */
-export const { am, revision, times, vaulted, sparseBase } = Checkers('invalid_input', ({ obj, int, oneof, epochMillis, revision_tok, vault_tok }) => {
+export const { am, revision, times, vaulted, sparseBase } = Checkers('bad_option', ({ obj, int, oneof, epochMillis, revision_tok, vault_tok }) => {
   const revision = obj({
     revision_tok,
     /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. */
@@ -51,7 +51,7 @@ export type Times    = Readonly<Z.infer<typeof times>>
 
 // == [Scopes]: bankScope, vaultScope, boxscope, boxQuery, watchScope, BankScope, VaultScope, Boxscope, BoxQuery, WatchScope
 
-export const { bankScope, vaultScope, boxscope, boxQuery, watchScope } = Checkers('invalid_input', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
+export const { bankScope, vaultScope, boxscope, boxQuery, watchScope } = Checkers('bad_option', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
@@ -69,7 +69,7 @@ export type WatchScope = Readonly<Z.input<typeof watchScope>>
 
 // == [Wayins and gate]: passphraseWayin, passkeyWayin, gate, Gate
 
-export const { passphraseWayin, passkeyWayin, gate } = Checkers('invalid_input', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
+export const { passphraseWayin, passkeyWayin, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
   const passphraseWayin = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const passkeyWayin    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const gate            = obj({ gate_epoch: uint.positive(), passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin.nullable() }).strict()
@@ -81,7 +81,7 @@ export type Gate = Readonly<Z.infer<typeof gate>>
 
 // == [Vault forms]: vaultSparse, vaultRecord, vaultTombstone, vaultRow, VaultSparse, VaultRecord, VaultTombstone, VaultRow, DamagedVault
 
-export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('invalid_input', ({ lit, discrim }) => {
+export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_option', ({ lit, discrim }) => {
   const vaultSparse    = vaultScope.extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
   const vaultRecord    = vaultSparse.extend({ am: lit('a'), gate }).strict()
   const vaultTombstone = vaultSparse.extend({ am: lit('x') }).strict()
@@ -98,7 +98,7 @@ export type DamagedVault   = VaultSparse & Readonly<{ damagekind: EX.Damagekind 
 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
-export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('invalid_input', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
+export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
   const boxSparse = boxscope.extend({
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
@@ -131,7 +131,7 @@ export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
 
 // == [Gate verbs' params]: replacePassphraseParams, passkeyAddParams, revokePasskeyParams, ReplacePassphraseParams, AddPasskeyParams, RevokePasskeyParams
 
-export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('invalid_input', ({ obj, lit, unk }) => {
+export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit, unk }) => {
   // A vault record holding a gate that holds the wayin. A verb's other wayin is admitted here so that the vaultDB can refuse it 'gate_issue', against the row it read.
   const gateParams = vaultSparse.extend({ am: lit('a') })
   const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayin, passkey_wayin: unk.optional() }).strict() }).strict()
@@ -147,7 +147,7 @@ export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParam
 
 // == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutVaultOpts, DelOpts, ReqParams, VaultDBOpts, MemoryVaultDBOpts
 
-export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('invalid_input', ({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
+export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
   const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
@@ -193,7 +193,7 @@ export type Capacity = Z.infer<typeof capacity>
 
 // == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf
 
-export const { rowPeek, fmtPeek } = Checkers('invalid_input', ({ obj, num, vault_tok }) => ({
+export const { rowPeek, fmtPeek } = Checkers('bad_option', ({ obj, num, vault_tok }) => ({
   rowPeek: obj({ ...revision.shape, am, vault_tok }),
   fmtPeek: obj({ fmt: num }),
 }), [CX])
@@ -288,10 +288,10 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 
 // == [The deviceDB]: leaseQuery, leaseSparse, leaseRow, deviceRecord, cutoff, LeaseQuery, LeaseSparse, LeaseRow, DeviceRecord
 
-export const leaseQuery = Checker(({ obj, applabel, user_id, vaultlabel, vault_tok }) => obj({ applabel, user_id, vaultlabel, vault_tok }), 'bad_scope', [CX])
+export const leaseQuery = Checker(({ obj, applabel, user_id, vaultlabel, vault_tok }) => obj({ applabel, user_id, vaultlabel, vault_tok }), 'bad_option', [CX])
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
-export const { leaseSparse, leaseRow, deviceRecord } = Checkers('bad_record', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok, device_id }) => {
+export const { leaseSparse, leaseRow, deviceRecord } = Checkers('bad_option', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok, device_id }) => {
   const leaseSparse = obj({ applabel, user_id, vaultlabel, vault_tok, proved_at: epochMillis })
   return { leaseSparse, leaseRow: leaseSparse.loose(), deviceRecord: obj({ applabel, user_id, device_id }).strict() }
 }, [CX])

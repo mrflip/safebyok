@@ -74,7 +74,7 @@ export type Merged<SourcesT extends readonly object[]> =
  *
  * A validator also has `refusingAs(kind)`: the same schema again, its `parse` refusing `kind`. Where
  * one tier checks what another does and refuses in its own kind, it takes the other's validator
- * and makes it so (`SX.boxRecord.refusingAs('bad_record')`), rather than listing its fields twice.
+ * and makes it so (`SX.vaultRow.refusingAs('damaged_row')`), rather than listing its fields twice.
  *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
  * holds the result to `other` as {@link verifyConsistent} does, and returns the result. Where they
@@ -250,7 +250,7 @@ export const consistent = (bag: object, other: object): boolean => disagreeing(b
  * The kind is the caller's to choose, as the caller knows what a disagreement means: a scope of
  * another user, a record of another vault. A `refusal` that is none refuses 'bad_option'.
  *
- * @example demandConsistent(stored, scope, { kind: 'damaged_record' })   // true, when its applabel, user_id and vaultlabel are the scope's
+ * @example demandConsistent(stored, scope, { kind: 'damaged_row' })   // true, when its applabel, user_id and vaultlabel are the scope's
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */
 export const demandConsistent = (bag: object, other: object, refusal: ConsistencyRefusal): true => {

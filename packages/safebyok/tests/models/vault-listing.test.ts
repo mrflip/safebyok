@@ -274,7 +274,7 @@ describe("building over a tombstone", () => {
   })
 
   it("Vault.launchBirth refuses what is no listing, and what is no scope, nobody asked", async () => {
-    await TH.expectRefusal(Vault.launchBirth(undefined as never, Dna), 'bad_option')
+    await TH.expectRefusal(Vault.launchBirth(undefined as never, Dna), 'unexpected_error')
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
@@ -341,7 +341,7 @@ describe("building over a tombstone", () => {
 describe("the entrypoints, handed rubble", () => {
   it("a birth's listing.put refuses a record that is no record, storing nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }), 'bad_record')
+    await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }), 'bad_option')
     expect(storedNow()).to.be.null
   })
 
@@ -364,10 +364,10 @@ describe("lock() with an erase that throws synchronously", () => {
 })
 
 describe("a damaged row", () => {
-  it("refuses a fetch 'damaged_record', and the vault held stands", async () => {
+  it("refuses a fetch 'damaged_row', and the vault held stands", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     restoreRow({ garbage: true } as never)
-    await TH.expectRefusal(listing.fetch(Dna), 'damaged_record')
+    await TH.expectRefusal(listing.fetch(Dna), 'damaged_row')
     expect(listing.at(Dna)).to.eq(vault)
     expect(vault.isPresent).to.be.true
     expect(vault.isLocked).to.be.false

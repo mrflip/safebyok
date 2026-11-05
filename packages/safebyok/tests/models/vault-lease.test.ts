@@ -24,7 +24,7 @@ const expectLockWon = async ({ vault, deviceDB, demandStored }: Awaited<ReturnTy
   expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
   expect(vault.isLocked).to.be.true
   await TH.eventually(() => deviceDB.cachedNow() === null)
-  await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+  await TH.expectRefusal(vault.ensureUnlocked(), 'bad_option')
 }
 
 describe("A lease renewed through a gate change", () => {

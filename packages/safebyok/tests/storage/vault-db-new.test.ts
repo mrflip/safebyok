@@ -110,10 +110,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getVault(vaultScope, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone, world: tombstone })
     })
 
-    it("refuses damaged_record for a row failing validation, and newer_format for one of a later fmt, with no world and the request's safe metadata", async () => {
+    it("refuses damaged_row for a row failing validation, and newer_format for one of a later fmt, with no world and the request's safe metadata", async () => {
       const { vaultDB } = await storeWith()
       vaultDB._cheat_vaultRowsOf(bankScope).set('main', { garbage: true })
-      expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'damaged_record', world: null, req_params: vaultScope })
+      expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'damaged_row', world: null, req_params: vaultScope })
       vaultDB._cheat_vaultRowsOf(bankScope).set('main', { fmt: SX.VaultFormat + 1 })
       expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'newer_format', world: null })
     })
@@ -142,10 +142,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' }, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
     })
 
-    it("refuses vault_mismatch under a live row of another vault_tok, holding that row, whatever ifAbsent says", async () => {
+    it("refuses vault_remade under a live row of another vault_tok, holding that row, whatever ifAbsent says", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       const answer = await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'oldlife' }, { ifAbsent: 'nil' })
-      expect(answer).to.deep.include({ ok: false, act: 'vault_mismatch', world: vault, dbhas: vault })
+      expect(answer).to.deep.include({ ok: false, act: 'vault_remade', world: vault, dbhas: vault })
     })
 
     it("refuses vault_empty for a vault_tok no row holds, over no row or another life's tombstone", async () => {
@@ -159,10 +159,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, act: 'vault_empty', world: sentinel, dbhas: null })
     })
 
-    it("refuses vault_gone under this life's tombstone, and damaged_record for a box row failing validation", async () => {
+    it("refuses vault_gone under this life's tombstone, and damaged_row for a box row failing validation", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('openai', { garbage: true })
-      expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'damaged_record' })
+      expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'damaged_row' })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'vault_gone' })
     })
@@ -173,11 +173,11 @@ describe("MemoryVaultDB", () => {
       protected override doGetBank(): never { throw new Error('socket closed') }
     }
 
-    it("reads as storage_error, the store's error its cause, by a throw and by an answer alike", async () => {
+    it("reads as storage_unavailable, the store's error its cause, by a throw and by an answer alike", async () => {
       const vaultDB = new FailingVaultDB()
-      await expect(vaultDB.getBank(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_error'))
+      await expect(vaultDB.getBank(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
       const answer = await vaultDB.tryGetBank(bankScope)
-      expect(answer).to.deep.include({ ok: false, act: 'storage_error', world: null, req_params: bankScope, meta: { call: 'getBank' } })
+      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, req_params: bankScope, meta: { call: 'getBank' } })
       expect((answer.err?.cause as Error).message).to.eq('socket closed')
     })
 

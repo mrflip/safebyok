@@ -292,36 +292,36 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
   ] as const
   for (const [heldBlurb, heldOf] of HeldCases) {
     for (const [seq, blurb] of OtherVaultCases) {
-      it(`throws 'unexpected_error' for ${blurb} under another vault_tok over ${heldBlurb}, keeping its own copy`, async () => {
+      it(`throws 'record_conflict' for ${blurb} under another vault_tok over ${heldBlurb}, keeping its own copy`, async () => {
         const box = await boxListingOf(held.mw).build(heldOf())
         const central = box._cheat_central
-        TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })), 'unexpected_error')
+        TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })), 'record_conflict')
         expect(box._cheat_central).to.eq(central)
         expect(box.vault_tok).to.eq('vault-tok-u1')
       })
     }
   }
 
-  it("throws 'unexpected_error' for a record under another vault_tok whose life tok path, joined, is the box's own", async () => {
+  it("throws 'record_conflict' for a record under another vault_tok whose life tok path, joined, is the box's own", async () => {
     const box = await builtOf(fullBoxRecord())
     const central = box._cheat_central
-    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })), 'unexpected_error')
+    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })), 'record_conflict')
     expect(box._cheat_central).to.eq(central)
   })
 
-  it("throws 'unexpected_error' over a box just created, and for a tombstone under another vault_tok", async () => {
+  it("throws 'record_conflict' over a box just created, and for a tombstone under another vault_tok", async () => {
     const box = await boxListingOf(held.mw).create(boxDnaOf(held.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
-    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })), 'unexpected_error')
-    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')), 'unexpected_error')
+    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })), 'record_conflict')
+    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')), 'record_conflict')
     expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 0 })
   })
 
-  it("throws 'unexpected_error' from a fetch that meets a record under another vault_tok", async () => {
+  it("throws 'record_conflict' from a fetch that meets a record under another vault_tok", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
-    await TH.expectRefusal(box.fetch(), 'unexpected_error')
+    await TH.expectRefusal(box.fetch(), 'record_conflict')
     expect(box.revision_seq).to.eq(1)
   })
 

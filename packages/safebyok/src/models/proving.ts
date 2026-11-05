@@ -74,7 +74,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
-    if (checked !== NOVEL) { verifyConsistent(checked.stamp, this.stamp, { kind: 'bad_option', message: Phrases.ProvingOfOtherVault }) }
+    if (checked !== NOVEL) { verifyConsistent(checked.stamp, this.stamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherVault }) }
     const vaultKey = checked === NOVEL ? await makeVaultKey() : await checked.#unwrapVaultKey()
     return this.#wrapVaultKey(vaultKey)
   }
@@ -82,7 +82,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     const checked = provingLeaseArgs.parse({ friend, gate_epoch })
-    vaultStamp.parseConsistent(friend, this.stamp, { kind: 'bad_option', message: Phrases.LeaseOfOtherVault })
+    vaultStamp.parseConsistent(friend, this.stamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherVault })
     const vaultKey = await this.#unwrapVaultKey()
     return Lease.buildGranted(friend, vaultKey, { gate_epoch: checked.gate_epoch, wayinkind: this.wayinkind })
   }

@@ -58,7 +58,7 @@ describe("bank.autolock", () => {
     const fresh = world.bankOn({ requestCleartext: undefined })
     await fresh.hello()
     const vault = fresh.vaultAt(VaultScopeGiven)
-    await TH.expectRefusal(vault!.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(vault!.ensureUnlocked(), 'bad_option')
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
@@ -99,7 +99,7 @@ describe("bank.autolock", () => {
     world.advance(AutolockMillis + 1)
     const pageB = world.bankOn({ requestCleartext: undefined })
     await pageB.hello()
-    await TH.expectRefusal(pageB.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(pageB.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'bad_option')
     expect(world.leaseRows()).to.deep.equal([row])
     expect(vaultA.isUnlocked).to.be.true
     await pageA.autolock()
