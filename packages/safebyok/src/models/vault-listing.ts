@@ -80,8 +80,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
       this.tellIfRevoked(answer.err)
       throw answer.err
     }
-    const { vaults, damaged_records } = answer.val
-    this.world.tellBadNews(damaged_records.map((damaged) => vaultStoredDamaged(damaged)))
+    const { vaults, damaged_rows } = answer.val
+    this.world.tellBadNews(damaged_rows.map((damaged) => vaultStoredDamaged(damaged)))
     await Promise.all(vaults.map((record) => this.build(record)))
   }
 
@@ -202,10 +202,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
 // == [The vault's get]: NothingListed, vaultRowOf
 
-const NothingListed: BoxesListed = Object.freeze({ boxes: [], damaged_records: [] })
+const NothingListed: BoxesListed = Object.freeze({ boxes: [], damaged_rows: [] })
 
 /** `answer` with its `val` the vault row alone, as a listing delivers it. */
 const vaultRowOf = (answer: Awaited<ReturnType<VaultDB['tryGetVault']>>) => (
-  (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_records']) } : answer
+  (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_rows']) } : answer
 )
 // --

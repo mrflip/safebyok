@@ -216,10 +216,10 @@ export const boxSparse = SX.boxSparse.refusingAs('bad_record')
 export type BoxSparse = SX.BoxSparse
 export type BoxRecord = SX.BoxRecord
 
-/** The check of what a vault's get lists of its boxes: `boxes`, sparse, tombstones among them, and `damaged_records`, each row that failed its check, whose boxlabel is whatever storage has it under. */
+/** The check of what a vault's get lists of its boxes: `boxes`, sparse, tombstones among them, and `damaged_rows`, each row that failed its check, whose boxlabel is whatever storage has it under. */
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
   const damaged = boxSparse.extend({ boxlabel: str }).and(obj({ damagekind: oneof(EX.damagekindVals) }))
-  return { boxes: arr(boxSparse), damaged_records: arr(damaged) }
+  return { boxes: arr(boxSparse), damaged_rows: arr(damaged) }
 }, { refusalKind: 'damaged_row', extras: 'strip' })
 
 /** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */

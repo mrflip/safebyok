@@ -231,11 +231,11 @@ describe("vault.delBox", () => {
 })
 
 describe("a damaged record is set aside, and nothing acts on it", () => {
-  it("lists it in damaged_records, and refuses a get of it as 'damaged_row'", async () => {
+  it("lists it in damaged_rows, and refuses a get of it as 'damaged_row'", async () => {
     const { openNextSession } = await makeWorldWithRubble()
     const next = await openNextSession()
     await next.hello()
-    expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
+    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
     expect(next.boxListing.at({ ...next.scope, boxlabel: 'rubble' })).to.be.null
     await TH.expectRefusal(next.getBox('rubble'), 'damaged_row')
     await expect(next.getBox(boxlabel)).resolves.to.have.property('boxlabel', boxlabel)
@@ -248,7 +248,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     await next.hello()
     const box = await next.getBox(boxlabel)
     expect(await box?.extractWhisper()).to.deep.equal(Whisper)
-    expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['Not A Label'])
+    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['Not A Label'])
   })
 
   it("drops an instance held under it from the list, disabled", async () => {
@@ -275,10 +275,10 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     await next.hello()
     await TH.expectBad(next.tryDelBox('revised'), 'damaged_row')
     expect(boxrows.get('revised')).to.have.property('am', 'a')
-    expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['revised'])
+    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['revised'])
     await TH.expectGood(next.tryDelDamagedBox('revised'))
     expect(boxrows.get('revised')).to.have.property('am', 'x')
-    expect(next.boxListing.damaged_records).to.deep.equal([])
+    expect(next.boxListing.damaged_rows).to.deep.equal([])
   })
 
   it("is deleted by tryDelDamagedBox: the tombstone lands, the entry clears, a birth then goes over it", async () => {
@@ -287,7 +287,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     await next.hello()
     expect(await next.tryDelDamagedBox('rubble')).to.deep.include({ ok: true })
     expect(boxrows.get('rubble')).to.have.property('am', 'x')
-    expect(next.boxListing.damaged_records).to.deep.equal([])
+    expect(next.boxListing.damaged_rows).to.deep.equal([])
     const reborn = await next.putBox({ boxlabel: 'rubble', whisper: Whisper })
     expect(await reborn.extractWhisper()).to.deep.equal(Whisper)
   })

@@ -25,7 +25,7 @@ describe("MemoryVaultDB", () => {
       const vaultDB = new MemoryVaultDB()
       const answer = await vaultDB.getBank(bankScope)
       expect(answer).to.deep.include({ ok: true, act: 'gotvoid', world: bankScope })
-      expect(answer.val).to.deep.equal({ vaults: [], damaged_records: [] })
+      expect(answer.val).to.deep.equal({ vaults: [], damaged_rows: [] })
     })
 
     it("lists vaults full or tombstone, and sets aside a row failing validation as a tombstone in the one shape", async () => {
@@ -35,11 +35,11 @@ describe("MemoryVaultDB", () => {
       const { act, val } = await vaultDB.getBank(bankScope)
       expect(act).to.eq('got')
       expect(val.vaults).to.deep.equal([vault])
-      expect(val.damaged_records.map(({ vaultlabel, am, revision_seq, vault_tok }) => ({ vaultlabel, am, revision_seq, vault_tok }))).to.deep.equal([
+      expect(val.damaged_rows.map(({ vaultlabel, am, revision_seq, vault_tok }) => ({ vaultlabel, am, revision_seq, vault_tok }))).to.deep.equal([
         { vaultlabel: 'broken', am: 'd', revision_seq: 9, vault_tok: 'life9' },
         { vaultlabel: 'rubble', am: 'd', revision_seq: SX.VoidRevisionSeq, vault_tok: SX.VoidRevisionTok },
       ])
-      for (const damaged of val.damaged_records) { expect(SX.vaultSparse.safeParse(damaged).success).to.be.true }
+      for (const damaged of val.damaged_rows) { expect(SX.vaultSparse.safeParse(damaged).success).to.be.true }
     })
 
     it("says format_mismatch of a row of a later fmt, and damaged_row of any other it sets aside", async () => {
@@ -47,7 +47,7 @@ describe("MemoryVaultDB", () => {
       vaultDB._cheat_vaultRowsOf(bankScope).set('newer', { fmt: SX.VaultFormat + 1, revision_seq: 9 })
       vaultDB._cheat_vaultRowsOf(bankScope).set('rubble', 'not even an object')
       const { val } = await vaultDB.getBank(bankScope)
-      expect(val.damaged_records.map(({ vaultlabel, damagekind }) => ({ vaultlabel, damagekind }))).to.deep.equal([
+      expect(val.damaged_rows.map(({ vaultlabel, damagekind }) => ({ vaultlabel, damagekind }))).to.deep.equal([
         { vaultlabel: 'newer',  damagekind: 'format_mismatch' },
         { vaultlabel: 'rubble', damagekind: 'damaged_row' },
       ])
@@ -58,7 +58,7 @@ describe("MemoryVaultDB", () => {
       vaultDB._cheat_vaultRowsOf(bankScope).set('Not A Label', { garbage: true })
       const { val } = await vaultDB.getBank(bankScope)
       expect(val.vaults).to.deep.equal([vault])
-      expect(val.damaged_records.map(({ vaultlabel, am }) => ({ vaultlabel, am }))).to.deep.equal([{ vaultlabel: 'Not A Label', am: 'd' }])
+      expect(val.damaged_rows.map(({ vaultlabel, am }) => ({ vaultlabel, am }))).to.deep.equal([{ vaultlabel: 'Not A Label', am: 'd' }])
     })
   })
 
@@ -74,14 +74,14 @@ describe("MemoryVaultDB", () => {
       expect(world).to.deep.equal(vault)
       expect(val?.gate).to.deep.equal(vault.gate)
       expect(val?.boxes).to.deep.equal([SX.boxSparse.parse(box), SX.boxSparse.parse(boxTombstoneOf(other))])
-      expect(val?.damaged_records.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
+      expect(val?.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
     })
 
     it("says format_mismatch of a box row of a later fmt", async () => {
       const { vaultDB, vault } = await storeWith()
       vaultDB._cheat_boxRowsOf(vaultScope, vault.vault_tok).set('newer', { fmt: SX.BoxFormat + 1 })
       const { val } = await vaultDB.getVault(vaultScope)
-      expect(val?.damaged_records.map(({ boxlabel, damagekind }) => ({ boxlabel, damagekind }))).to.deep.equal([{ boxlabel: 'newer', damagekind: 'format_mismatch' }])
+      expect(val?.damaged_rows.map(({ boxlabel, damagekind }) => ({ boxlabel, damagekind }))).to.deep.equal([{ boxlabel: 'newer', damagekind: 'format_mismatch' }])
     })
 
     it("lists a box under a label failing its check among the damaged", async () => {
@@ -89,7 +89,7 @@ describe("MemoryVaultDB", () => {
       vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('Not A Label', { garbage: true })
       const { val } = await vaultDB.getVault(vaultScope)
       expect(val?.boxes.map(({ boxlabel }) => boxlabel)).to.deep.equal(['openai'])
-      expect(val?.damaged_records.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
+      expect(val?.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
     })
 
     it("over a void row, refuses vault_empty with no row, and answers null with ifAbsent nil", async () => {
