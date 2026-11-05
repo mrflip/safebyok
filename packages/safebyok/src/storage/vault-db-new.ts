@@ -27,7 +27,6 @@ export type DelAct = 'deleted' | 'gone' | 'void'
 
 type Said<ValT, ActT extends string, WorldT> = { act: ActT, val: ValT, world: WorldT, dbhas?: unknown }
 type PutChoices = { prior: Revision, ifAbsent: PutIfAbsent, ifPresent: IfPresent }
-type PutKind<RowT> = { rowOf: (ante: unknown) => RowT | null, worldOf: (row: RowT | null) => VaultRow, absentOf: (world: VaultRow, stored: RowT | null) => VaultError }
 
 export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_records: DamagedVault[] }
 export type VaultListed = VaultRecord & { boxes: BoxSparse[], damaged_records: DamagedBox[] }
@@ -141,7 +140,7 @@ export abstract class VaultDB {
   async tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts) { return answerOf(() => this.getBox(asked, opts)) }
   // --
 
-  // == [Puts]: putVault, tryPutVault, putBox, tryPutBox, #landVault, #putThing
+  // == [Puts]: putVault, tryPutVault, #putVault, putBox, tryPutBox, #putBox
 
   /** SLOPDOC: Stores a vault's birth or rebirth; once live, its row moves only by a gate verb. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
@@ -149,11 +148,24 @@ export abstract class VaultDB {
       const vaultRecord = SX.vaultRecord.parse(record)
       const terms = SX.putVaultOpts.parse(opts)
       demandNextSeq(vaultRecord, terms.prior)
-      return this.#landVault(vaultRecord, terms)
+      return this.#putVault(vaultRecord, terms)
     })
   }
 
   async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
+
+  async #putVault(record: VaultRecord, { prior, ifAbsent, ifPresent }: PutChoices): Promise<Said<VaultRow, PutAct, VaultRow>> {
+    const { landed, ante } = await adapted(() => this.doPutVault(record, putTermsOf({ prior, ifAbsent, ifPresent })))
+    if (landed) { return { act: landingActOf(ante), val: record, world: record } }
+    const stored = vaultRowOf(ante)
+    if (stored?.am === 'a') {
+      if (ifPresent === 'fail') { throw Refuse.camped(stored, stored) }
+      if (ifPresent === 'get')  { return { act: 'declined', val: stored, world: stored } }
+    } else if (ifAbsent === 'fail') {
+      throw (stored === null) ? Refuse.vaultEmpty(SX.sentinelVaultOf(record, record.vault_tok)) : Refuse.vaultGone(stored)
+    }
+    throw Refuse.staleWrite(stored ?? SX.sentinelVaultOf(record, record.vault_tok), stored)
+  }
 
   /** Stores `record` under a vault live at its `vault_tok`, with the answers of {@link VaultDB.putVault}. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
@@ -163,35 +175,22 @@ export abstract class VaultDB {
       demandNextSeq(boxRecord, prior)
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-      const terms = { prior, ifAbsent, ifPresent }
-      const landing = await adapted(() => this.doPutBox(boxRecord, putTermsOf(terms)))
-      const world = checkedVaultLife(vaultRowOf(landing.vault), boxRecord, boxRecord.vault_tok)
-      return this.#putThing(boxRecord, terms, landing, { rowOf: boxRowOf, worldOf: () => world, absentOf: Refuse.absentBox })
+      return this.#putBox(boxRecord, { prior, ifAbsent, ifPresent })
     })
   }
 
   async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
 
-  /** A vault row's put, as `putVault` and a gate verb make it. */
-  async #landVault(record: VaultRecord, terms: PutChoices): Promise<Said<VaultRow, PutAct, VaultRow>> {
-    const landing = await adapted(() => this.doPutVault(record, putTermsOf(terms)))
-    return this.#putThing(record, terms, landing, {
-      rowOf:    vaultRowOf,
-      worldOf:  (row) => row ?? SX.sentinelVaultOf(record, record.vault_tok),
-      absentOf: (world, stored) => ((stored === null) ? Refuse.vaultEmpty(world) : Refuse.vaultGone(stored)),
-    })
-  }
-
-  /** What `landing` comes to under `terms`, for a vault row and a box row alike: `kind` says where they differ. */
-  #putThing<RowT extends VaultRow | BoxRow>(record: RowT, { ifAbsent, ifPresent }: PutChoices, { landed, ante }: Landing, { rowOf, worldOf, absentOf }: PutKind<RowT>): Said<RowT, PutAct, VaultRow> {
-    if (landed) { return { act: landingActOf(ante), val: record, world: worldOf(record) } }
-    const stored = rowOf(ante)
-    const world = worldOf(stored)
+  async #putBox(boxRecord: BoxRecord, { prior, ifAbsent, ifPresent }: PutChoices): Promise<Said<BoxRow, PutAct, VaultRow>> {
+    const { landed, ante, vault } = await adapted(() => this.doPutBox(boxRecord, putTermsOf({ prior, ifAbsent, ifPresent })))
+    const world = checkedVaultLife(vaultRowOf(vault), boxRecord, boxRecord.vault_tok)
+    if (landed) { return { act: landingActOf(ante), val: boxRecord, world } }
+    const stored = boxRowOf(ante)
     if (stored?.am === 'a') {
       if (ifPresent === 'fail') { throw Refuse.camped(world, stored) }
       if (ifPresent === 'get')  { return { act: 'declined', val: stored, world } }
     } else if (ifAbsent === 'fail') {
-      throw absentOf(world, stored)
+      throw Refuse.absentBox(world, stored)
     }
     throw Refuse.staleWrite(world, stored)
   }
@@ -252,7 +251,7 @@ export abstract class VaultDB {
       ...SX.nextRevisionOf(stored, this.#clock.now()),
       gate: { ...stored.gate, ...wayin, gate_epoch: stored.gate.gate_epoch + 1 },
     }
-    await this.#landVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'add', ifPresent: 'repl' })
+    await this.#putVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'add', ifPresent: 'repl' })
     return { act, val: record, world: record }
   }
   // --
