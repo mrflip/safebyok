@@ -87,7 +87,7 @@ export class Bank implements VaultWorld {
     VX.bankOpts.parse(opts)
     const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
-    tattoo(this, this.scope, { writable: false })
+    tattoo(this, this.scope)
     this.#device_id = device_id
     this.clock = clock
     this.keyDeriver = keyDeriver

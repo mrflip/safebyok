@@ -58,7 +58,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   // == [Construction]: constructor, launch, askHost
 
   private constructor(gatingkind: KindT, { listing, scope, vault, run }: LaunchArgs<KindT>) {
-    tattoo(this, { gatingkind, ...scope }, { writable: false })
+    tattoo(this, { gatingkind, ...scope })
     adorn(this, 'vault', vault)
     adorn(this, 'passkeyHeader', vault?.gate.toJSON().passkey_wayin ?? null)
     this.#listing = listing

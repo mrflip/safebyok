@@ -41,7 +41,7 @@ export class Lease implements LeaseStamp {
 
   private constructor(friend: LeaseFriend, record: LeaseRecord, isFromCache: boolean) {
     this.#record = leaseRecord.parse(record)
-    tattoo(this, leaseStamp.parse(record), { writable: false, configurable: false })
+    tattoo(this, leaseStamp.parse(record), { configurable: false })
     this.#friend = friend
     this.#vaultStamp = vaultStamp.parse(friend)
     this.#isFromCache = isFromCache
