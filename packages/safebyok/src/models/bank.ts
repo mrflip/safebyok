@@ -9,7 +9,7 @@ import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { LockState } from '../shapes/shapes-enums'
-import { type Clock, wallClock, type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/shapes-core'
+import { type Clock, wallClock, type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseSparse } from '../shapes/shapes-storage'
 import type { RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
@@ -108,8 +108,8 @@ export class Bank implements VaultWorld {
     Object.freeze(this)
   }
 
-  vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = vaultBag.parseConsistent(bag, this.scope, { message: Phrases.otherScope })
+  vaultScopeOf(scope: BankedVaultScope): VaultScope {
+    const { vaultlabel } = bankedVaultScope.parseConsistent(scope, this.scope, { message: Phrases.otherScope })
     return { ...this.scope, vaultlabel }
   }
   // --
@@ -229,23 +229,23 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Vaults]: vaultOf, ensureVault, tryEnsureVault
+  // == [Vaults]: vaultAt, ensureVault, tryEnsureVault
 
-  /** The vault listed for `bag`, a tombstone among them, or null. */
-  vaultOf(bag: VaultBag): Vault | null {
+  /** The vault listed for `scope`, a tombstone among them, or null. */
+  vaultAt(scope: BankedVaultScope): Vault | null {
     this.#demandReady()
-    return this.#vaultListing.at(this.vaultScopeOf(bag))
+    return this.#vaultListing.at(this.vaultScopeOf(scope))
   }
 
-  /** SLOPDOC: The vault for `bag`, whether already listed or built now by asking the user. */
-  async ensureVault(bag: VaultBag): Promise<Vault> {
-    const scope = this.vaultScopeOf(bag)
+  /** SLOPDOC: The vault for `scope`, whether already listed or built now by asking the user. */
+  async ensureVault(scope: BankedVaultScope): Promise<Vault> {
+    const asked = this.vaultScopeOf(scope)
     this.#demandReady()
-    const listed = this.#vaultListing.at(scope)
-    return (listed?.isPresent === true) ? listed : this.#vaultListing.buildVault(scope)
+    const listed = this.#vaultListing.at(asked)
+    return (listed?.isPresent === true) ? listed : this.#vaultListing.buildVault(asked)
   }
 
-  tryEnsureVault(bag: VaultBag): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag)) }
+  tryEnsureVault(scope: BankedVaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(scope)) }
   // --
 
   // == [Bad news]: tellBadNews, hearBadNews

@@ -44,10 +44,10 @@ export const InstantNotWhole = "An instant is whole epoch milliseconds"
 export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
 // --
 
-// == [Bags]: StoreInVaultBag
+// == [Scopes]: StoreInVaultScope
 
-/** Why a store in the bag naming a vault refuses: it goes in the second bag, the options. */
-export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
+/** Why a store in the scope naming a vault refuses: it goes in the second bag, the options. */
+export const StoreInVaultScope = "A vault's stores go in the second bag, its options, not in the scope naming the vault"
 // --
 
 // == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
@@ -161,12 +161,12 @@ export const DeviceScopepathShape = `A device record's scopepath is 'device', an
 export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
 // --
 
-// == [Bank and vault]: VaultBagAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanHeld, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
+// == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanHeld, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
 
-/** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
-export const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
+/** The advice a refusal of the scope naming a vault ends with: what that scope takes, and what else names a vault. */
+export const VaultScopeAdvice = "That scope holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
 
-/** Why a bag naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
+/** Why a scope naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 
 /** Why a vault let go while the bank was opening it hands out no Vault object. */
@@ -292,7 +292,7 @@ export const PatchNamesNeitherHalf = "This update names neither a whisper nor a 
 
 /** Why an update of a box whose patch names another's scope stores nothing. */
 /** Why a seal verb refuses a stamp, or an attach a lease, of another vault. */
-export const otherVaultsBag = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than this vault's, so nothing was sealed, opened or attached: a bug in the package.`
+export const otherVaultsScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than this vault's, so nothing was sealed, opened or attached: a bug in the package.`
 
 export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`
 
