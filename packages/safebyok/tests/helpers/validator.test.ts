@@ -324,7 +324,7 @@ describe("objCheck", () => {
 
 describe("consistent", () => {
   it("is true for a record naming the same app, user and vault as a scope, whatever else it holds, as its first example shows", () => {
-    expect(consistent(TH.vaultRecordOf('u1'), TH.scopeOf('u1'))).to.be.true
+    expect(consistent({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, TH.scopeOf('u1'))).to.be.true
   })
 
   it("is false when any one field both define differs", () => {

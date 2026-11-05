@@ -1,7 +1,7 @@
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import type { Sidecar } from '../shapes/box'
+import type { Sidecar } from '../shapes/fields'
 import type { Boxscope } from '../shapes/scopes'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import * as VS from '../storage/vault-db-shapes'

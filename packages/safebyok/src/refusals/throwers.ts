@@ -2,7 +2,6 @@ import { PassphraseKeyBytes } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
 import * as Phrases   from '../helpers/phrases'
 import type * as VS   from '../storage/vault-db-shapes'
-import type { Capacity } from '../shapes/vault-db'
 
 // == [Vault Throwers]: goneError, lockedError, otherStoresError, behindError, listingExpected, unlockFirst, noProofToUnlock
 
@@ -201,7 +200,7 @@ export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): VaultE
   new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage holds in one record.`)
 )
 
-export const vaultFull = (capacity: Capacity): VaultError => (
+export const vaultFull = (capacity: VS.Capacity): VaultError => (
   new VaultError('vault_full', 'This vault holds as many boxes as its storage allows.', { meta: { capacity } })
 )
 
