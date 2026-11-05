@@ -24,15 +24,10 @@ export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidR
 
 // --
 
-// == [Checkers]: am, revision, times, vaulted, sparseBase, the scopes, the wayins, gate, the vault's and box's forms, the verbs' params and options
+// == [Record bases]: am, revision, times, vaulted, sparseBase, Revision, Times
 
-export const {
-  am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope,
-  passphraseWayin, passkeyWayin, gate, vaultSparse, vaultRecord, vaultTombstone, vaultRow,
-  boxSparse, boxRecord, boxTombstone, boxRow,
-  replacePassphraseParams, passkeyAddParams, revokePasskeyParams,
-  ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, rowPeek, fmtPeek,
-} = Checkers('invalid_input', ({ obj, lit, int, uint, num, unk, oneof, discrim, applabel, user_id, vaultlabel, boxlabel, epochMillis, revision_tok, vault_tok, box_tok, device_id, key_deriver_label, credential_id, salt_b64, prfSalt, vault_key_wayin_wrapped, box_key_wrapped, whisper_ciphered }) => {
+/** What every stored row holds in common: its `am`, its revision, its times and its vault's `vault_tok`, and `sparseBase`, the four together. */
+export const { am, revision, times, vaulted, sparseBase } = Checkers('invalid_input', ({ obj, int, oneof, epochMillis, revision_tok, vault_tok }) => {
   const revision = obj({
     revision_tok,
     /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. */
@@ -47,22 +42,63 @@ export const {
   })
   const vaulted = obj({ vault_tok })
   const sparseBase = obj({ ...revision.shape, ...times.shape, am, ...vaulted.shape })
+  return { am, revision, times, vaulted, sparseBase }
+}, [CX])
 
+export type Revision = Readonly<Z.infer<typeof revision>>
+export type Times    = Readonly<Z.infer<typeof times>>
+// --
+
+// == [Scopes]: bankScope, vaultScope, boxscope, boxQuery, watchScope, BankScope, VaultScope, Boxscope, BoxQuery, WatchScope
+
+export const { bankScope, vaultScope, boxscope, boxQuery, watchScope } = Checkers('invalid_input', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
   const boxQuery   = boxscope.extend({ vault_tok })
   const watchScope = bankScope.extend({ vaultlabel: vaultlabel.optional() })
+  return { bankScope, vaultScope, boxscope, boxQuery, watchScope }
+}, [CX])
 
+export type BankScope  = Readonly<Z.infer<typeof bankScope>>
+export type VaultScope = Readonly<Z.infer<typeof vaultScope>>
+export type Boxscope   = Readonly<Z.infer<typeof boxscope>>
+export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
+export type WatchScope = Readonly<Z.input<typeof watchScope>>
+// --
+
+// == [Wayins and gate]: passphraseWayin, passkeyWayin, gate, Gate
+
+export const { passphraseWayin, passkeyWayin, gate } = Checkers('invalid_input', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
   const passphraseWayin = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const passkeyWayin    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const gate            = obj({ gate_epoch: uint.positive(), passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin.nullable() }).strict()
+  return { passphraseWayin, passkeyWayin, gate }
+}, [CX])
 
+export type Gate = Readonly<Z.infer<typeof gate>>
+// --
+
+// == [Vault forms]: vaultSparse, vaultRecord, vaultTombstone, vaultRow, VaultSparse, VaultRecord, VaultTombstone, VaultRow, DamagedVault
+
+export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('invalid_input', ({ lit, discrim }) => {
   const vaultSparse    = vaultScope.extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
   const vaultRecord    = vaultSparse.extend({ am: lit('a'), gate }).strict()
   const vaultTombstone = vaultSparse.extend({ am: lit('x') }).strict()
   const vaultRow       = discrim('am', [vaultRecord, vaultTombstone])
+  return { vaultSparse, vaultRecord, vaultTombstone, vaultRow }
+})
 
+export type VaultSparse    = Readonly<Z.infer<typeof vaultSparse>>
+export type VaultRecord    = Readonly<Z.infer<typeof vaultRecord>>
+export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
+export type VaultRow       = VaultRecord | VaultTombstone
+export type DamagedVault   = VaultSparse & Readonly<{ damagekind: EX.Damagekind }>
+// --
+
+// == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
+
+export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('invalid_input', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
   const boxSparse = boxscope.extend({
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
@@ -83,13 +119,35 @@ export const {
   }).strict()
   const boxTombstone = boxSparse.extend({ am: lit('x') }).strict()
   const boxRow       = discrim('am', [boxRecord, boxTombstone])
+  return { boxSparse, boxRecord, boxTombstone, boxRow }
+}, [CX])
 
+export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
+export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
+export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
+export type BoxRow       = BoxRecord | BoxTombstone
+export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
+// --
+
+// == [Gate verbs' params]: replacePassphraseParams, passkeyAddParams, revokePasskeyParams, ReplacePassphraseParams, AddPasskeyParams, RevokePasskeyParams
+
+export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('invalid_input', ({ obj, lit, unk }) => {
   // A vault record holding a gate that holds the wayin. A verb's other wayin is admitted here so that the vaultDB can refuse it 'gate_issue', against the row it read.
   const gateParams = vaultSparse.extend({ am: lit('a') })
   const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayin, passkey_wayin: unk.optional() }).strict() }).strict()
   const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayin, passphrase_wayin: unk.optional() }).strict() }).strict()
   const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null), passphrase_wayin: unk.optional() }).strict() }).strict()
+  return { replacePassphraseParams, passkeyAddParams, revokePasskeyParams }
+})
 
+export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseParams>>
+export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
+export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
+// --
+
+// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutVaultOpts, DelOpts, ReqParams, VaultDBOpts, MemoryVaultDBOpts
+
+export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('invalid_input', ({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
   const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
@@ -97,42 +155,12 @@ export const {
   const delOpts = obj({ prior: revision })
 
   const reqParams = obj({ applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, ...revision.shape, prior: revision }).partial()
-  const rowPeek   = obj({ ...revision.shape, am, vault_tok })
-  const fmtPeek   = obj({ fmt: num })
-
-  return {
-    am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope,
-    passphraseWayin, passkeyWayin, gate, vaultSparse, vaultRecord, vaultTombstone, vaultRow,
-    boxSparse, boxRecord, boxTombstone, boxRow,
-    replacePassphraseParams, passkeyAddParams, revokePasskeyParams,
-    ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, rowPeek, fmtPeek,
-  }
+  return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
 }, [CX])
 
 export const vaultDBOpts = objCheck(({ num }) => ({ clock: CX.clockShape.optional(), maxRecordBytes: num.positive().optional() }), 'bad_option')
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape, maxBoxes: uint.optional() }), 'bad_option')
 
-export type Times          = Readonly<Z.infer<typeof times>>
-export type Revision       = Readonly<Z.infer<typeof revision>>
-export type BankScope      = Readonly<Z.infer<typeof bankScope>>
-export type VaultScope     = Readonly<Z.infer<typeof vaultScope>>
-export type Boxscope       = Readonly<Z.infer<typeof boxscope>>
-export type BoxQuery       = Readonly<Z.infer<typeof boxQuery>>
-export type WatchScope     = Readonly<Z.input<typeof watchScope>>
-export type Gate           = Readonly<Z.infer<typeof gate>>
-export type VaultSparse    = Readonly<Z.infer<typeof vaultSparse>>
-export type VaultRecord    = Readonly<Z.infer<typeof vaultRecord>>
-export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
-export type VaultRow       = VaultRecord | VaultTombstone
-export type BoxSparse      = Readonly<Z.infer<typeof boxSparse>>
-export type BoxRecord      = Readonly<Z.infer<typeof boxRecord>>
-export type BoxTombstone   = Readonly<Z.infer<typeof boxTombstone>>
-export type BoxRow         = BoxRecord | BoxTombstone
-export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseParams>>
-export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
-export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
-export type DamagedVault = VaultSparse & Readonly<{ damagekind: EX.Damagekind }>
-export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
@@ -163,7 +191,12 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
 export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Row helpers]: reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf
+// == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf
+
+export const { rowPeek, fmtPeek } = Checkers('invalid_input', ({ obj, num, vault_tok }) => ({
+  rowPeek: obj({ ...revision.shape, am, vault_tok }),
+  fmtPeek: obj({ fmt: num }),
+}), [CX])
 
 /** The request's safe metadata, for an answer to carry; empty when any of it fails its check, as a bad field may be anything. */
 export const reqParamsOf = (args: unknown): ReqParams => {
