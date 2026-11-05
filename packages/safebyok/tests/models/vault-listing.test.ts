@@ -47,6 +47,23 @@ const expectLandedGone = async (vault: Vault, { listing, deviceDB }: Pick<Awaite
   expect(listing.snapshot).to.deep.equal([])
 }
 
+describe("listing.stampOfBirth and listing.recordOfBirth", () => {
+  it("stamps each attempt with a new life under the scope, at the listing's clock", async () => {
+    const { listing } = await makeBornVault()
+    const stamp = listing.stampOfBirth(Dna)
+    expect(stamp).to.include({ ...Dna, registered_at: listing.clock.now() })
+    expect(stamp.vault_tok).to.not.eq(listing.stampOfBirth(Dna).vault_tok)
+  })
+
+  it("makes the record at the revision after prior, carrying the gate and its stamp", async () => {
+    const { listing, vault } = await makeBornVault()
+    const { gate } = vault
+    const record = listing.recordOfBirth(gate, { revision_tok: 'rev-gone', revision_seq: 4 })
+    expect(record).to.deep.include({ ...gate.stamp, am: 'a', revision_seq: 5, written_at: listing.clock.now(), gate: gate.pickle() })
+    expect(record.revision_tok).to.not.eq('rev-gone')
+  })
+})
+
 describe("a tombstone over a live vault", () => {
   it("reaches a local delete's end state when a fetch finds it: locked, row erased, boxes vacated, the vault in its slot", async () => {
     const world = await makeBornVault()

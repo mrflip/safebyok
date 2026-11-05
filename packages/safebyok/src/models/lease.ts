@@ -53,7 +53,7 @@ export class Lease implements LeaseStamp {
    * A store that refuses, or a row that will not read, is bad news and null, the row left standing.
    */
   static async buildFromCache(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
-    leaseFromCacheArgs.parse({ friend, gate_epoch })
+    const { gate_epoch: epoch } = leaseFromCacheArgs.parse({ friend, gate_epoch })
     const peeked = await friend.tryPeekLease()
     if (! peeked.ok) {
       friend.tellBadNews([peeked.err])
@@ -66,7 +66,7 @@ export class Lease implements LeaseStamp {
       friend.tellBadNews([damagedLease()])
       return null
     }
-    if (checked.data.gate_epoch !== gate_epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+    if (checked.data.gate_epoch !== epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
       await uncacheForgotten(friend)
       return null
     }
@@ -115,8 +115,7 @@ export class Lease implements LeaseStamp {
 
   /** Uncache the record with no lease held to {@link vacate}: one may stand from an earlier session. */
   static async uncache(friend: LeaseFriend): Promise<void> {
-    leaseFriend.parse(friend)
-    valOf(await friend.tryUncacheLease())
+    valOf(await leaseFriend.parse(friend).tryUncacheLease())
   }
 
   static tryUncache(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.uncache(friend)) }
@@ -129,13 +128,13 @@ export class Lease implements LeaseStamp {
 
   /** `whisperText` sealed under a fresh boxKey, both bound to `stamp`. */
   async sealWith(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
-    leaseSealArgs.parse({ whisperText, stamp })
+    const checked = leaseSealArgs.parse({ whisperText, stamp })
     const vaultKey = await this.#vaultKey('wrapKey')
     const boxKey = await makeBoxKey()
-    const box_key_wrapped = await wrapKeyUnder(vaultKey, boxKey, this.#ctxOf(stamp, 'box_key_wrapped'))
-    const bytes = new TextEncoder().encode(whisperText)
+    const box_key_wrapped = await wrapKeyUnder(vaultKey, boxKey, this.#ctxOf(checked.stamp, 'box_key_wrapped'))
+    const bytes = new TextEncoder().encode(checked.whisperText)
     try {
-      const whisper_ciphered = await cipherBytes(boxKey, bytes, this.#ctxOf(stamp, 'whisper_ciphered'))
+      const whisper_ciphered = await cipherBytes(boxKey, bytes, this.#ctxOf(checked.stamp, 'whisper_ciphered'))
       this.#demandRecord()
       return sealedWhisper.parse({ box_key_wrapped, whisper_ciphered })
     } finally {
@@ -145,9 +144,9 @@ export class Lease implements LeaseStamp {
 
   /** The text `sealed` holds, bound to `stamp`: what `sealWith` sealed. */
   async unsealWith(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
-    leaseUnsealArgs.parse({ sealed, stamp })
+    const checked = leaseUnsealArgs.parse({ sealed, stamp })
     const vaultKey = await this.#vaultKey('unwrapKey')
-    const bytes = await this.#opened(vaultKey, sealed, stamp)
+    const bytes = await this.#opened(vaultKey, checked.sealed, checked.stamp)
     try {
       this.#demandRecord()
       return new TextDecoder().decode(bytes)
@@ -187,11 +186,10 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Guards]: isForgotten, isInForce, demandRecord
+  // == [Guards]: isPresent, demandRecord
 
-  get isForgotten(): boolean { return this.#record === null }
-
-  get isInForce(): boolean { return this.#record !== null }
+  /** The lease still holds its record, as `Storable.isPresent` says of a thing not gone. */
+  get isPresent(): boolean { return this.#record !== null }
 
   /** The record, while the lease is in force. */
   #demandRecord(): LeaseRecord {

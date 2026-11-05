@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import * as EX from '../../src/shapes/shapes-enums'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
-import { checkSet, holdsCases } from '../test-helpers/cases'
+import { holdsCases } from '../test-helpers/cases'
 import * as TH from '../test-helpers'
 
 const mw = makeModelsWorld({ fakeTimers: false })
@@ -130,10 +129,6 @@ describe("The checks of what the base knows of a record", () => {
 })
 
 describe("The checks of what reconciling passes", () => {
-  describe("VX.recordShape", () => { checkSet(VX.recordShape, EX.recordShapeVals, ['empty', null, 'older']) })
-  describe("VX.age",         () => { checkSet(VX.age, EX.ageVals, ['skip', null, 'fill']) })
-  describe("VX.centralPolicy", () => { checkSet(VX.centralPolicy, EX.centralPolicyVals, ['edit', 'del', null]) })
-
   describe("VX.reconciled", () => {
     holdsCases(VX.reconciled, 'unexpected_error', [
       [{ central: sparse, policy: 'same' },  true,  'passes a central and the policy that chose it'],

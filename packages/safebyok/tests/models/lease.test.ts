@@ -49,8 +49,7 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
   it("shows the record's stamp as the lease's own props, and is in force", async () => {
     const { lease } = await grantedWorld()
     expect(lease).to.deep.include(Stamped)
-    expect(lease.isInForce).to.be.true
-    expect(lease.isForgotten).to.be.false
+    expect(lease.isPresent).to.be.true
   })
 
   const GrantRefusalCases = [
@@ -98,7 +97,7 @@ describe("lease.cache() and lease.tryCache()", () => {
     friend.tryCacheLease.mockResolvedValue(bad(new VaultError('unexpected_error', 'the disk is full')))
     await TH.expectRefusal(lease.cache(), 'unexpected_error')
     await TH.expectBad(lease.tryCache(), 'unexpected_error')
-    expect(lease.isInForce).to.be.true
+    expect(lease.isPresent).to.be.true
     await lease.sealWith(WhisperText, sealStampOf('b1'))
   })
 
@@ -151,7 +150,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     vi.setSystemTime(T0)
     const got = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
-    expect(got?.isInForce).to.be.true
+    expect(got?.isPresent).to.be.true
   })
 
   it("uncaches a row of another epoch even past autolock: the epoch is judged first", async () => {
@@ -174,7 +173,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     await lease.cache()
     vi.setSystemTime(T0 + (400 * 24 * 60 * 60_000))
     const got = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
-    expect(got?.isInForce).to.be.true
+    expect(got?.isPresent).to.be.true
   })
 
   it("tells a store's refusal as bad news, once, and answers null", async () => {
@@ -246,14 +245,13 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   }
 })
 
-describe("lease.vacate(), lease.evict(), isForgotten and isInForce", () => {
+describe("lease.vacate(), lease.evict() and isPresent", () => {
   it("vacate uncaches the record and leaves the lease forgotten and out of force", async () => {
     const { friend, lease } = await grantedWorld()
     await lease.vacate()
     expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.be.null
-    expect(lease.isForgotten).to.be.true
-    expect(lease.isInForce).to.be.false
+    expect(lease.isPresent).to.be.false
   })
 
   it("is idempotent: a second vacate uncaches nothing more", async () => {
@@ -267,11 +265,11 @@ describe("lease.vacate(), lease.evict(), isForgotten and isInForce", () => {
     const { friend, lease } = await grantedWorld()
     friend.tryUncacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
     await TH.expectRefusal(lease.vacate(), 'unexpected_error')
-    expect(lease.isInForce).to.be.false
+    expect(lease.isPresent).to.be.false
     const other = await grantedWorld()
     other.friend.tryUncacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
     await TH.expectBad(other.lease.tryVacate(), 'unexpected_error')
-    expect(other.lease.isInForce).to.be.false
+    expect(other.lease.isPresent).to.be.false
   })
 
   it("Lease.uncache erases a record with no lease held, on each call, and starts before it answers, so erases land in call order", async () => {
@@ -302,7 +300,7 @@ describe("lease.vacate(), lease.evict(), isForgotten and isInForce", () => {
   it("evict drops the keys and leaves the record cached", async () => {
     const { friend, lease } = await grantedWorld()
     lease.evict()
-    expect(lease.isForgotten).to.be.true
+    expect(lease.isPresent).to.be.false
     expect(friend.tryUncacheLease).not.toHaveBeenCalled()
     expect(friend.cached).to.not.be.null
   })
@@ -420,7 +418,7 @@ describe("a tampered lease record", () => {
       expect(got).to.be.instanceOf(Lease)
       await TH.expectRefusal(got!.unsealWith(sealed, stamp), 'damaged_lease')
       expect(friend.lock).toHaveBeenCalledTimes(1)
-      expect(got!.isForgotten).to.be.true
+      expect(got!.isPresent).to.be.false
       expect(friend.tryUncacheLease).not.toHaveBeenCalled()
       await TH.expectRefusal(got!.sealWith(WhisperText, stamp), 'vault_locked')
       expect(friend.lock).toHaveBeenCalledTimes(1)

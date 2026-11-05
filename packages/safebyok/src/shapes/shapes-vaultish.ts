@@ -75,13 +75,10 @@ export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched
 
 // --
 
-// == [Reconciling]: recordShape, age, centralPolicy, reconciled, settled, Reconciled, Settled
+// == [Reconciling]: reconciled, settled, Reconciled, Settled
 
-/** The checks of what reconciling passes: the kinds above, each by its list; `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
-export const { recordShape, age, centralPolicy, reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
-  recordShape:   oneof(EX.recordShapeVals),
-  age:           oneof(EX.ageVals),
-  centralPolicy: oneof(EX.centralPolicyVals),
+/** The checks of what reconciling passes: `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
+export const { reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
   reconciled:    obj({ central: sparseBase, policy: oneof(EX.centralPolicyVals) }),
   settled:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
 }), [Checks])
@@ -135,10 +132,7 @@ export type StorableOpts = Z.infer<typeof storableOpts>
 
 // --
 
-// == [The listing's world]: lockState, world, World, ListingWorld, ListingOpts, vaultDBDuck, listingOpts, putListingOpts, PutListingOpts
-
-/** The check of whether the world a listing lives in is unlocked or locked: one of {@link lockStateVals}. */
-export const lockState = Checker(({ oneof }) => oneof(EX.lockStateVals), 'unexpected_error')
+// == [The listing's world]: world, World, ListingWorld, ListingOpts, vaultDBDuck, listingOpts, putListingOpts, PutListingOpts
 
 /** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: the one `clock`. */
 export const world = objCheck(() => ({ clock: CX.clockShape }), { refuseAs: 'bad_option', extras: 'strip' })
