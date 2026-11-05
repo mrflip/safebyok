@@ -25,7 +25,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly listing: BoxListing
 
-  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until {@link veil}. */
+  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance: hidden while the vault is locked, kept until {@link veil} or a vault modification clears the box. */
   #exposed: WhisperHolder | null = null
   // --
 
@@ -91,7 +91,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, edit, keptWhisper
 
-  /** Seals `patch` over the record in hand and stores it, answering this box; a deleted box is reborn. */
+  /** Seals `patch` over the record in hand and stores it, answering this box; a deleted box is reborn.
+   *
+   * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
+   * the one stored, so a box held sparse is fetched first. */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = VX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)

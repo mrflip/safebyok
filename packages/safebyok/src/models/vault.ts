@@ -203,7 +203,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     }
   }
 
-  /** Past the enter key: a lock crossing this is answered by the next `lock()`, as the proof says this user may have the vault unlocked. */
+  /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
   async #unlockByProof(proved: Proving): Promise<this> {
     const lease = await proved.buildLease(this.#leaseFriend())
     await this.#attachLease(lease)
@@ -322,7 +322,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link fetchBox}. */
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Returns box after applying `patch`, sealing the new revision, and storing it. See {@link BoxListing.put} for important details on refusals and options */
+  /** Seals `patch` over the box listed at its `boxlabel` as the next revision and stores it, answering the box; {@link Box.put} has the options and the refusals. */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
     const box = this.boxListing.puttable({ ...patch, ...this.scope }, opts)
     return box.put(patch, opts)
@@ -331,10 +331,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link putBox}. */
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** Return the (tombstoned) box listed at `boxlabel` -- see {@link BoxListing.del} for important details on refusals and options
-   * Boxes considered "damaged" (failed validation after reading back) are
-   * treated as missing, not tombstoned -- you must use {@link tryDelDamagedBox} to remove them.
-   */
+  /** Tombstones the box listed at `boxlabel` and answers it, or null where none is stored; {@link BoxListing.del} has the refusals.
+   * A damaged box, one that failed validation when read back, reads as missing here: {@link tryDelDamagedBox} removes it. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const timely = VX.timelyOpts.parse(opts)
     const boxes = this.boxListing
