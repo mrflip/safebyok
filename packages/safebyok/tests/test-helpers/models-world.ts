@@ -280,6 +280,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   let now = opts.now ?? T0
   const clockNow = (): number => (fakeTimers ? Date.now() : now)
   let lockState: LockState = opts.lockState ?? 'unlocked'
+  const worldListeners = new Set<() => void>()
   if (fakeTimers) { vi.useFakeTimers({ now }) }
 
   const calls: ModelsCall[] = []
@@ -303,6 +304,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
+    subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
     tellBadNews:  (news) => { badnews.push(...news) },
     demandUnlocked: () => { if (lockState === 'locked') { throw Refuse.lockedError() } },
     sealStampedString: async (whisperText, stamp) => {
@@ -356,7 +358,11 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     advance:  async (ms) => {
       if (fakeTimers) { await vi.advanceTimersByTimeAsync(ms) } else { now += ms }
     },
-    setLockState: (next) => { lockState = next },
+    setLockState: (next) => {
+      if (next === lockState) { return }
+      lockState = next
+      for (const listener of worldListeners) { listener() }
+    },
     dispose,
 
     seedStore: (record) => { stored.set(record.boxlabel, record) },
@@ -463,7 +469,7 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 /** A {@link boxListingOf} whose sealed parts are fake bags named for the revision, `duringSeal` running after the real seal.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: 'sk-test', sidecar: {} }) is its rebirth
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: { apiKey: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
@@ -483,5 +489,5 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
  * @example await boxListingOf(mw).create(boxDnaOf(mw.boxscope('anthropic_api_key')))
  * @example boxDnaOf(mw.boxscope('anthropic_api_key'), { sidecar: { account: 'work' } })
  */
-export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: 'sk-test-0000', sidecar: {}, ...overrides })
+export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: { apiKey: 'sk-test-0000' }, sidecar: {}, ...overrides })
 // --

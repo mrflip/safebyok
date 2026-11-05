@@ -100,7 +100,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #hold(thing: ThingT): void {
     this.#things.set(this.scopepathOf(thing.scope), thing)
     thing.becomeNotifiable()
-    thing.subscribe(() => { this.#remakeSnapshot() })
+    thing.subscribeOwn(() => { this.#remakeSnapshot() })
   }
   // --
 

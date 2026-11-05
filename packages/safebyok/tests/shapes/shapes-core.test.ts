@@ -5,17 +5,19 @@ import * as CX from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 
 const WhisperCases = [
-  // every JSON shape a whisper may take:
-  ["sk-ant-api03-fake-fake",          true,   'a string, the common case'],
-  ["",                                true,   'even an empty string'],
-  [42,                                true,   'a number'],
-  [true,                              true,   'a boolean'],
-  [["a", "b"],                        true,   'an array'],
-  [{ apiKey: "fake", tier: 2 },      true,   'a plain object'],
+  // a whisper is an object, of any JSON inside:
+  [{ apiKey: "fake", tier: 2 },       true,   'a plain object, the common case'],
+  [{},                                true,   'an empty object'],
+  [{ list: ["a", "b"] },              true,   'an array inside it'],
   [{ orgId: null },                   true,   'null inside a structure: real JSON carries it'],
   [{ deep: { list: [1, null] } },     true,   'nesting, arbitrarily'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
+  ["sk-ant-api03-fake-fake",          false,  'a bare string'],
+  ["",                                false,  'an empty string'],
+  [42,                                false,  'a bare number'],
+  [true,                              false,  'a bare boolean'],
+  [["a", "b"],                        false,  'an array'],
   [null,                              false,  'a bare null: emptying a box is delBox\'s job'],
   [() => 'nope',                      false,  'a function is not data'],
   [new Date(),                        false,  'a Date would silently flatten to {}'],
@@ -67,9 +69,10 @@ describe("whisper and sidecar refusing by kind", () => {
     }
   })
 
-  it("says LOCKED itself is no whisper, and of a copy that a whisper has no symbol key", () => {
-    expect(TH.expectSyncRefusal(() => CX.whisper.parse(LOCKED), 'bad_option').message).to.include(Phrases.LockedIsNoWhisper)
-    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ ...LOCKED }), 'bad_option').message).to.include(Phrases.WhisperShape)
+  it("says a bag or a copy is no whisper, and of one nested that a whisper has no symbol key", () => {
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse(LOCKED), 'bad_option').message).to.include(Phrases.WhisperedIsNoWhisper)
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ ...LOCKED }), 'bad_option').message).to.include(Phrases.WhisperedIsNoWhisper)
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ deep: { ...LOCKED } }), 'bad_option').message).to.include(Phrases.WhisperBagShape)
   })
 
   for (const [candidate, expected, blurb] of WhisperCases) {
@@ -111,6 +114,11 @@ const SidecarCases = [
   [42,                                false,  'a number'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
+  ["sk-ant-api03-fake-fake",          false,  'a bare string'],
+  ["",                                false,  'an empty string'],
+  [42,                                false,  'a bare number'],
+  [true,                              false,  'a bare boolean'],
+  [["a", "b"],                        false,  'an array'],
   [{ when: new Date() },              false,  'a Date would silently flatten to {}'],
   [{ count: NaN },             false,  'NaN would silently become null'],
   [() => 'nope',                      false,  'a function is not data'],

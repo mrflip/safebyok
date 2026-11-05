@@ -234,11 +234,13 @@ export type BoxSnapshot = Boxscope & Readonly<{
   full:          boolean
   present:       boolean
   exposed:       boolean
+  veiled:        boolean
+  lockState:     EX.LockState
 }>
 
 // --
 
-// == [What a box is handed]: boxDna, boxPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxPut, BoxDna
+// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
 /** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
 export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
@@ -261,6 +263,12 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
   return { boxDna, boxPatch }
 })
 
+/** The check of what `box.putExposed` takes: a sidecar, if any, and never a whisper. */
+export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.optional() }), { refusalKind: 'bad_option' }, [CX])
+
+/** A host's patch for `box.putExposed`, which seals the whisper exposed. */
+export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
+
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchGiven = Z.output<typeof boxPatch>
 
@@ -279,7 +287,7 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 /** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers the seal verbs. Checks only. */
 export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
-  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, sealStampedString: fn(), unsealStampedString: fn() }),
+  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn() }),
 }), { refusalKind: 'bad_option', extras: 'strip' }, [CX])
 
 /** The vault's face to its boxes: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
@@ -287,6 +295,7 @@ export type BoxWorld = ListingWorld & {
   scope:     VaultScope
   vault_tok: string
   demandUnlocked(): unknown
+  subscribe(listener: () => void): () => void
   sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
   unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
 }

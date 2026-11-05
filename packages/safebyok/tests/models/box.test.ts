@@ -1,7 +1,8 @@
 /** A Box's own props, sidecar and snapshot, the records it receives, and the arguments its entries check first. */
 
+import * as Phrases from '../../src/helpers/phrases'
 import { describe, expect, it, vi } from 'vitest'
-import { LOCKED } from '../../src/helpers/consts'
+import { ENCRYPTED, LOCKED } from '../../src/helpers/consts'
 import type { BoxRecord, BoxSnapshot, BoxSparse, Fetched } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -23,7 +24,7 @@ const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord(
   return box.getSnapshot()
 }
 
-const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'full', 'present', 'exposed']
+const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'full', 'present', 'exposed', 'veiled', 'lockState']
 
 describe("Box own props", () => {
   it("are exactly the nine the base tattoos: the four of the scope, registered_at, vault_tok and the three revision props", async () => {
@@ -39,7 +40,7 @@ describe("Box own props", () => {
     held.mw.seedStore(received)
     box.receive(received)
     expect(Object.keys(box)).to.have.members(keys)
-    await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
     await box.del()
     expect(Object.keys(box)).to.have.members(keys)
@@ -61,11 +62,11 @@ describe("Box own props", () => {
 })
 
 describe("Box sidecar, locked or not", () => {
-  it("LOCKED is the bag the whisper answers while locked", async () => {
+  it("ENCRYPTED is the bag the whisper answers while unexposed, locked or not", async () => {
     const box = await boxOf()
-    expect(box.whisper).to.be.null
+    expect(box.whisper).to.eq(ENCRYPTED)
     held.mw.setLockState('locked')
-    expect(box.whisper).to.eq(LOCKED)
+    expect(box.whisper).to.eq(ENCRYPTED)
   })
 
   it("answers itself, whether the vault is unlocked or locked", async () => {
@@ -87,15 +88,21 @@ describe("Box sidecar, locked or not", () => {
     }
   })
 
-  it("is the snapshot's sidecar too, and a lock moves nothing in the snapshot, so a listener is told nothing: the vault's snapshot carries the lock", async () => {
+  it("is the snapshot's sidecar too; a lock tells a listener through the vault, and the snapshot moves once, to the new lockState", async () => {
     const box = await boxOf()
     const listener = vi.fn()
     box.subscribe(listener)
     const before = box.getSnapshot()
+    expect(before.lockState).to.eq('unlocked')
     held.mw.setLockState('locked')
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = box.getSnapshot()
+    expect(after).to.not.eq(before)
+    expect(after).to.deep.include({ lockState: 'locked', sidecar: before.sidecar })
+    expect(box.getSnapshot()).to.eq(after)
     box.settle()
-    expect(box.getSnapshot()).to.eq(before)
-    expect(listener).not.toHaveBeenCalled()
+    expect(box.getSnapshot()).to.eq(after)
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 
   it("tells an empty sidecar from an absent one in the snapshot, locked or not", async () => {
@@ -136,7 +143,7 @@ describe("Box sidecar, locked or not", () => {
 })
 
 describe("Box snapshot", () => {
-  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present and exposed, and no more", async () => {
+  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present, exposed, veiled and lockState, and no more", async () => {
     const box = await boxOf()
     expect(box.getSnapshot()).to.deep.equal({
       ...held.mw.boxscope('anthropic_api_key'),
@@ -148,6 +155,8 @@ describe("Box snapshot", () => {
       full:          true,
       present:       true,
       exposed:       false,
+      veiled:        false,
+      lockState:     'unlocked',
     })
     expect(Object.keys(box.getSnapshot())).to.have.members(SnapshotKeys)
   })
@@ -196,19 +205,21 @@ describe("Box snapshot", () => {
         full:          true,
         present:       true,
         exposed:       false,
+        veiled:        false,
+        lockState:     'unlocked',
       })
     })
 
     it("put: the record put is the record in hand, so the sidecar and the revision are the put's", async () => {
       const box = await boxOf()
       held.mw.setNow(T0 + 500)
-      await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
+      await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
       expect(box.getSnapshot()).to.deep.include({ sidecar: { note: 'edited' }, revision_seq: 2, written_at: T0 + 500, full: true, present: true })
     })
 
     it("exposed: follows the whisper the box keeps open", async () => {
       const box = await boxOf()
-      await box.put({ whisper: 'sk-ant-fake-for-test' })
+      await box.put({ whisper: { apiKey: 'sk-ant-fake-for-test' } })
       box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
@@ -216,7 +227,7 @@ describe("Box snapshot", () => {
       expect(box.getSnapshot().exposed).to.be.true
       expect(listener.mock.calls).to.have.lengthOf(1)
       expect(JSON.stringify(box.getSnapshot())).to.not.contain('sk-ant-fake-for-test')
-      box.veil()
+      box.unexpose()
       expect(box.getSnapshot().exposed).to.be.false
       expect(listener.mock.calls).to.have.lengthOf(2)
     })
@@ -339,7 +350,7 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
 // == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and put take a duckish
 
 describe("Box and Storable entries: arguments checked before any demand", () => {
-  const whisper = 'sk-test-0000'
+  const whisper = { apiKey: 'sk-test-0000' }
   const BadArgCases = [
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
     [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not take'],
@@ -371,14 +382,14 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     TH.expectSyncRefusal(() => box.subscribe('call me' as never), 'bad_option')
   })
 
-  it("refuses LOCKED handed to put, naming whisper and saying LOCKED is no whisper", async () => {
+  it("refuses a bag handed to put, naming whisper and saying it is no whisper", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
     held.mw.clearCalls()
-    expect(box.whisper).to.eq(LOCKED)
-    for (const call of [() => box.put({ whisper: box.whisper as never, sidecar: {} }), () => box.put({ whisper: LOCKED, sidecar: {} })]) {
+    expect(box.whisper).to.eq(ENCRYPTED)
+    for (const call of [() => box.put({ whisper: box.whisper, sidecar: {} }), () => box.put({ whisper: LOCKED, sidecar: {} })]) {
       const err = await TH.expectRefusal(call(), 'bad_option')
-      expect(err.message).to.include('LOCKED is not a whisper: unseal or expose one first')
+      expect(err.message).to.include(Phrases.WhisperedIsNoWhisper)
       expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
     }
     expect(held.mw.callsOf('put')).to.deep.equal([])
@@ -406,7 +417,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   /** A record handed back as a patch, every field the box controls given and none of it heeded. */
   const roundTripOf = (record: BoxRecord) => ({
     ...record, revision_tok: 'rev-ignored', revision_seq: 99, am: 'x' as never, written_at: T0 + 99, registered_at: T0 + 99,
-    whisper: 'sk-test-1111', sidecar: { note: 'round trip' },
+    whisper: { apiKey: 'sk-test-1111' }, sidecar: { note: 'round trip' },
   } as const)
 
   it("takes { ...record, whisper, sidecar } to put, putting the next revision over the one held", async () => {
