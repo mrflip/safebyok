@@ -21,7 +21,7 @@ describe("FarFuture", () => {
 })
 
 describe("ForeverMillis", () => {
-  // ForeverMillis @example
+  // ForeverMillis @example 2
   it("runs from FarPast to FarFuture", () => {
     expect(ForeverMillis).to.eq(FarFuture - FarPast)
     expect(FarPast + ForeverMillis).to.eq(FarFuture)

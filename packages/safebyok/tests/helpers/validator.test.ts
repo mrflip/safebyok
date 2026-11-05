@@ -386,13 +386,12 @@ describe("demandConsistent", () => {
 })
 
 describe("verifyConsistent", () => {
-  // verifyConsistent @example 1
+  // verifyConsistent @example
   it("returns the bag when each field both define is ===", () => {
     const bag = { ...sparse }
     expect(verifyConsistent(bag, scope, { kind: 'vault_mismatch' })).to.eq(bag)
   })
 
-  // verifyConsistent @example 2
   it("refuses the kind it is handed, naming each field that disagrees, in its message and meta.fieldnames", () => {
     const err = TH.expectSyncRefusal(() => verifyConsistent({ ...scope, user_id: 'u2', vaultlabel: 'other' }, scope, { kind: 'bad_scope' }), 'bad_scope')
     expect(err.message).to.contain('user_id and vaultlabel')
@@ -408,7 +407,6 @@ describe("verifyConsistent", () => {
     expect(err.message).to.eq('Another user_id and vaultlabel')
   })
 
-  // verifyConsistent @example 3
   it("passes by a field only one bag defines, or one defines as undefined", () => {
     expect(() => verifyConsistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' }, { kind: 'bad_scope' })).to.not.throw()
     expect(() => verifyConsistent({ boxlabel: 'openai' }, { user_id: 'u1', boxlabel: undefined }, { kind: 'bad_scope' })).to.not.throw()
