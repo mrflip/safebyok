@@ -55,7 +55,7 @@ export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases
 export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_row', Phrases.DeviceRecordRewritten)
 // --
 
-// == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock
+// == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock, stampOfOtherVault
 
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
 
@@ -64,6 +64,8 @@ export const listingExpected = (): VaultError => new VaultError('unexpected_erro
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
 export const noProofToUnlock = (): VaultError => new VaultError('bad_option', Phrases.NoProofToUnlock)
+
+export const stampOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.StampOfOtherVault)
 // --
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
@@ -154,7 +156,7 @@ export const proofMissing = (): VaultError => new VaultError('bad_option', Phras
 export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
 // --
 
-// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
+// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver, provingOfOtherVault, leaseOfOtherVault
 
 export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
 
@@ -177,6 +179,10 @@ export const otherPasskey = (): VaultError => new VaultError('wrong_passkey', Ph
 export const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPrfSalt)
 
 export const unknownKeyDeriver = (): VaultError => new VaultError('newer_format', Phrases.UnknownKeyDeriver)
+
+export const provingOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.ProvingOfOtherVault)
+
+export const leaseOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.LeaseOfOtherVault)
 // --
 
 // == [Helper Throwers]: unboundCipherCtx, strengthCheckerMisanswered, strengthCheckerLoadFailed

@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
+import * as Phrases from '../../src/helpers/phrases'
 import { VaultError } from '../../src/refusals/errors'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
@@ -53,7 +54,8 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   it("the seal verbs refuse a stamp of another vault or another life of it", async () => {
     const { vault } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
-    await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'unexpected_error')
+    const err = await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'unexpected_error')
+    expect(err.message).to.eq(Phrases.StampOfOtherVault)
     await TH.expectRefusal(vault.unsealStampedString(sealed, { ...Stamp, vault_tok: 'another-life' }), 'unexpected_error')
   })
 

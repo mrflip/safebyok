@@ -289,9 +289,6 @@ export const BoxPatchAdvice = "Nothing was stored. An update of a box names its 
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to store."
 
 /** Why an update of a box whose patch names another's scope stores nothing. */
-/** Why a seal verb refuses a stamp, or an attach a lease, of another vault. */
-export const otherVaultsScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than this vault's, so nothing was sealed, opened or attached: a bug in the package.`
-
 export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`
 
 /** Why LOCKED, which a locked box answers for its whisper, is refused where a whisper is wanted. */
@@ -319,7 +316,7 @@ export const RecordOfOtherScope = "Storage answered with a record whose scope is
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
 export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -352,10 +349,13 @@ export const WayinNotMadeYet = "A proving was asked for the vaultKey before it m
 export const WayinMadeAlready = "This proving holds a wayin already, and a proving holds one: make a new proving for another wayin. A bug in the caller."
 
 /** Why a wayin is not made under the vaultKey of a proving of another vault. */
-export const ProvingOfOtherVault = "The source proving is of another vault: a wayin is made only under the vaultKey of the vault it lets into."
+export const ProvingOfOtherVault = "The source proving is of another vault: a wayin is made only under the vaultKey of the vault it lets into, so none was made. This is a bug in safebyok."
 
 /** Why a lease is not granted to a vault other than the one a proving is of. */
-export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds."
+export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds, so none was granted. This is a bug in safebyok."
+
+/** Why a seal verb refuses a stamp of another vault, or another life of it. */
+export const StampOfOtherVault = "This stamp names another vault than this one, or another life of it, so nothing was sealed or opened. This is a bug in safebyok."
 
 /** Why a keyDeriver's throw is replaced: it heard the passphrase. */
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
