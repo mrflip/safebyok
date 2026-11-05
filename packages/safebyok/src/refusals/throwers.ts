@@ -3,6 +3,51 @@ import { VaultError, thrownNameOf } from './errors'
 import * as Phrases   from '../helpers/phrases'
 import type * as SX from '../shapes/shapes-storage'
 
+// == [Outcome Throwers]: storageUnavailable, unexpectedError
+
+/** The message of the cause given a backend that failed without an error. */
+const NoErrorGiven = 'The storage backend failed without giving an error.'
+
+/** A cause as a refusal keeps it: never null or undefined. */
+const causeOf = (cause: unknown): unknown => cause ?? new Error(NoErrorGiven)
+
+/** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
+export const StorageTroubleMessage = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
+
+/** A `storage_unavailable` refusal: the backend could not be reached, or failed.
+ * @param cause - What the backend threw, as it came, kept for debugging. It holds only what the
+ *   backend holds: ciphertext and unencrypted fields. True of a `VaultDB` adapter, never of the
+ *   device store, which is handed lease records: `DeviceDB` replaces what its store throws with a
+ *   condition that keeps only its `name`.
+ * @param message - What failed, when there is more to say than that storage failed: which read or
+ *   write it was, say. Never quotes a record or a name.
+ *
+ * @example
+ *   try { return await client.query(text, params) } catch (err) { throw storageUnavailable(err) }
+ * @example throw storageUnavailable(err, "This device's own storage failed reading its mark of this vault: try again.")
+ */
+export const storageUnavailable = (cause: unknown, message: string = StorageTroubleMessage): VaultError => (
+  new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
+)
+
+/** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it.
+ *
+ * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
+ */
+export const unexpectedError = (thrown: unknown): VaultError => (
+  new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
+)
+// --
+
+// == [Bank Throwers]: insecureContext, helloFirst, deviceRecordRewritten
+
+export const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
+
+export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
+
+export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_record', Phrases.DeviceRecordRewritten)
+// --
+
 // == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock
 
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
@@ -12,6 +57,20 @@ export const listingExpected = (): VaultError => new VaultError('bad_option', Ph
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
 export const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
+// --
+
+// == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
+
+export const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
+
+export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_record', Phrases.vaultStoredDamaged(vaultlabel))
+// --
+
+// == [Listing Throwers]: putAnsweredNothing, otherVaultTokAtBirth
+
+export const putAnsweredNothing = (): VaultError => new VaultError('unexpected_error', Phrases.PutAnsweredNothing)
+
+export const otherVaultTokAtBirth = (): VaultError => new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth)
 // --
 
 // == [Storable Throwers]: partialLoadError, alreadyHeldError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
@@ -41,6 +100,25 @@ export const otherVaultTok = (): VaultError => new VaultError('unexpected_error'
 export const shapeUnreconciled = (): VaultError => new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
 // --
 
+// == [Box Throwers]: recordForNewBox, undecodedWhisper, absentDamagedBoxError
+
+/** The refusal of a put that said only-if-new, handed a whole record. */
+export const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
+
+export const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
+
+export const absentDamagedBoxError = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.damagedBoxAbsent(boxlabel))
+// --
+
+// == [Lease Throwers]: damagedLease, unopenedWhisper, leaseNotInForce
+
+export const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
+
+export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UnopenedWhisper)
+
+export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
+// --
+
 // == [Gating Throwers]: alreadyAsking, noRequestCleartext, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight, proofMissing
 
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -62,6 +140,11 @@ export const gatingSettled = (): VaultError => new VaultError('gating_landed', P
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
 
 export const proofMissing = (): VaultError => new VaultError('unexpected_error', Phrases.ProofMissing)
+// --
+
+// == [Gate Throwers]: passkeyHeldAlready
+
+export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
 // --
 
 // == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, strengthCheckerThrew, notAVerdict, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
@@ -93,51 +176,13 @@ export const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Ph
 export const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_deriver', Phrases.UnknownKeyDeriver)
 // --
 
-// == [Gate Throwers]: passkeyHeldAlready
+// == [Helper Throwers]: unboundCipherCtx, strengthCheckerMisanswered, strengthCheckerLoadFailed
 
-export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
-// --
+export const unboundCipherCtx = (): VaultError => new VaultError('bad_option', "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
 
-// == [Lease Throwers]: damagedLease, unopenedWhisper, leaseNotInForce
+export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
 
-export const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
-
-export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UnopenedWhisper)
-
-export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
-// --
-
-// == [Box Throwers]: recordForNewBox, undecodedWhisper, absentDamagedBoxError
-
-/** The refusal of a put that said only-if-new, handed a whole record. */
-export const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
-
-export const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
-
-export const absentDamagedBoxError = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.damagedBoxAbsent(boxlabel))
-// --
-
-// == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
-
-export const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
-
-export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_record', Phrases.vaultStoredDamaged(vaultlabel))
-// --
-
-// == [Bank Throwers]: insecureContext, helloFirst, deviceRecordRewritten
-
-export const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
-
-export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
-
-export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_record', Phrases.DeviceRecordRewritten)
-// --
-
-// == [Listing Throwers]: putAnsweredNothing, otherVaultTokAtBirth
-
-export const putAnsweredNothing = (): VaultError => new VaultError('unexpected_error', Phrases.PutAnsweredNothing)
-
-export const otherVaultTokAtBirth = (): VaultError => new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth)
+export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause })
 // --
 
 // == [Deriver Throwers]: reservedLabel, suppliedSpecChanged, saltDoesNotFit
@@ -147,15 +192,6 @@ export const reservedLabel = (reservedPrefix: string): VaultError => new VaultEr
 export const suppliedSpecChanged = (label: string): VaultError => new VaultError('bad_option', Phrases.suppliedSpecChanged(label))
 
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => new VaultError('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
-// --
-
-// == [Helper Throwers]: unboundCipherCtx, strengthCheckerMisanswered, strengthCheckerLoadFailed
-
-export const unboundCipherCtx = (): VaultError => new VaultError('bad_option', "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
-
-export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
-
-export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause })
 // --
 
 // == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, damagedRecord, newerFormat, seqNotNext, storageError
@@ -215,40 +251,4 @@ export const storeFailed = (call: string, thrown: unknown): VaultError => {
   const named = (thrownName === null) ? '' : ` It threw ${thrownName}.`
   return new VaultError('storage_unavailable', `This device's own storage failed in ${call}: try again.${named}`)
 }
-// --
-
-// == [Outcome Throwers]: storageUnavailable, unexpectedError
-
-/** The message of the cause given a backend that failed without an error. */
-const NoErrorGiven = 'The storage backend failed without giving an error.'
-
-/** A cause as a refusal keeps it: never null or undefined. */
-const causeOf = (cause: unknown): unknown => cause ?? new Error(NoErrorGiven)
-
-/** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
-export const StorageTroubleMessage = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
-
-/** A `storage_unavailable` refusal: the backend could not be reached, or failed.
- * @param cause - What the backend threw, as it came, kept for debugging. It holds only what the
- *   backend holds: ciphertext and unencrypted fields. True of a `VaultDB` adapter, never of the
- *   device store, which is handed lease records: `DeviceDB` replaces what its store throws with a
- *   condition that keeps only its `name`.
- * @param message - What failed, when there is more to say than that storage failed: which read or
- *   write it was, say. Never quotes a record or a name.
- *
- * @example
- *   try { return await client.query(text, params) } catch (err) { throw storageUnavailable(err) }
- * @example throw storageUnavailable(err, "This device's own storage failed reading its mark of this vault: try again.")
- */
-export const storageUnavailable = (cause: unknown, message: string = StorageTroubleMessage): VaultError => (
-  new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
-)
-
-/** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it.
- *
- * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
- */
-export const unexpectedError = (thrown: unknown): VaultError => (
-  new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
-)
 // --
