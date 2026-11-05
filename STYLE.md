@@ -731,13 +731,10 @@ is the documentarian's.
   caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on an unlock. Before naming one, taste it
   against those two from memory: a kind of lesser salience goes unnamed. Where a caller meets a refusal in normal use, say
   what to do instead `#say-what-to-do`: `Precede with await bank.hello(), repeated to force a refresh`.
-* **Option values get a list** `#option-values-get-a-list`, one value a line, the default marked (`create`, below). A
-  term with a home (`sealed`, `stamp`) gets one `{@link}` or a pointer, never a second definition `#point-dont-redefine`.
 * **The guarantee is the line worth writing** `#say-the-guarantee`. What the call proves, or what a caller could get wrong about a secret, goes
   in: `Extracting the whisper authenticates that (sidecar included) the object has not been modified since it was sealed`.
-* **A guard names the predicates it asks** `#guard-names-its-predicates`, linked: `throw unless {@link isEnabled}, unlocked, {@link isPresent}, {@link isFull}`.
-* **A maintainer's note is a `//` comment** `#reason-goes-above`, on the line above the doc block or by the code it concerns: an invariant kept
-  (`// every lock goes through here`) or a reason (`// The lock first: no box opens under a lease while the tombstone goes out.`).
+* **The lower-yield rules** (option lists, guards' predicates, the reason above, pointing instead of redefining) are in
+  `notes/more_style.md`, with their tags; a review may still cite one.
 * `@param` and `@returns` only for a unit, a range, or what `null` or leaving an optional out means. A `{@link}` names
   something in scope in its file; anything else is backticks, a private member always.
 * **An `@example` earns its lines by showing what the first line and the signature do not** `#example-earns-its-lines`: a
