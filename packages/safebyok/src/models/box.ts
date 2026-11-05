@@ -10,10 +10,10 @@ import { absentBoxError, recordForNewBox, undecodedWhisper } from '../refusals/t
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 
-// == [Box]
-
 /** A box as this device holds it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
+  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed
+
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
   declare readonly user_id:    string
@@ -26,8 +26,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until the host sets it null. */
   #exposed: WhisperHolder | null = null
+  // --
 
-  // == [Props, as the record has them]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered
+  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper
 
   get fmt(): number { return this.central.fmt }
 
@@ -42,37 +43,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_codec():          'json_v1' | null                     { return this.full?.whisper_codec ?? null }
   get whisper_schema_version(): 1 | null                             { return this.full?.whisper_schema_version ?? null }
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
-  // --
-
-  // == [Guards]: demandPresent, ensureUnsealable, demandUnsealable, ensurePuttable, demandPuttable, demandExposable
-
-  demandPresent(): this {
-    if (! this.isPresent) { throw absentBoxError(this) }
-    return this
-  }
-
-  ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
-
-  /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
-  demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
-
-  ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
-
-  /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
-  demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
-    const given = VX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
-    if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
-    this.demandEnabled()
-    this.world.demandUnlocked()
-    this.demandWhole()
-    return given
-  }
-
-  /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
-  demandExposable(): this { return this.demandEnabled().demandUnlocked() }
-  // --
-
-  // == [The whisper]: whisper, extractWhisper, tryExtractWhisper, expose
 
   /** SLOPDOC: The whisper exposed on this instance, LOCKED while the vault is; set it to expose or forget one. */
   get whisper(): WhisperHolder | LockedBag | null {
@@ -87,6 +57,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     this.#exposed = exposed
     this.settle()
   }
+  // --
+
+  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unseal
 
   /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
@@ -116,7 +89,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Putting]: put, tryPut, edit
+  // == [Putting]: put, tryPut, edit, keptWhisper
 
   /** Seals `patch` over the record in hand and stores it, answering the box listed; a deleted box is reborn. */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
@@ -146,14 +119,39 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   #keptWhisper(): Promise<WhisperHolder> { return this.#unseal(this.demandFullProps()) }
   // --
 
-  // == [Discards]: sweepContents, vacateContents
+  // == [Guards]: demandUnsealable, demandPuttable, demandExposable, demandPresent, ensureUnsealable, ensurePuttable
+
+  /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
+  demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
+
+  /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
+  demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
+    const given = VX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
+    if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
+    this.demandEnabled()
+    this.world.demandUnlocked()
+    this.demandWhole()
+    return given
+  }
+
+  /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
+  demandExposable(): this { return this.demandEnabled().demandUnlocked() }
+
+  demandPresent(): this {
+    if (! this.isPresent) { throw absentBoxError(this) }
+    return this
+  }
+
+  ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
+
+  ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
+  // --
+
+  // == [Protected, overriding Storable's]: sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
   protected override sweepContents(): void { this.#exposed = null }
 
   protected override vacateContents(): void { this.#exposed = null }
-  // --
-
-  // == [Required by Storable]: isFullRecord, lifeTokPathOf, makeSnapshot
 
   /** A box record alive that carries its sealed whisper. */
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {
@@ -178,7 +176,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 }
-// --
 
 // == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
 
