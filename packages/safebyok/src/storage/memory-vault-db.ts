@@ -17,18 +17,74 @@ const meetsTerms = (ante: unknown, { prior, mayReplaceLive, mayAdd }: PutTerms):
 )
 
 export class MemoryVaultDB extends VaultDB {
+  // == [Props]: #vaultrowsOfBank, #boxLives, #heeders, #maxBoxes
+
   readonly #vaultrowsOfBank = new Map<string, Map<string, unknown>>()
   readonly #boxLives = new Map<string, BoxLife>()
   readonly #heeders = new Set<Heeder>()
   readonly #maxBoxes: number
+  // --
+
+  // == [Construction]: constructor
 
   constructor(opts: MemoryVaultDBOpts = {}) {
     const { maxBoxes = Infinity, ...vaultDBOpts } = SX.memoryVaultDBOpts.parse(opts)
     super(vaultDBOpts)
     this.#maxBoxes = maxBoxes
   }
+  // --
 
-  // == [Generic calls]: doGetBank, doGetVault, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #storeVaultRow, #storeBoxRow, #demandRoom, #tell
+
+  /** For tests: the bank's own map of vault rows, by vaultlabel. */
+  _cheat_vaultRowsOf({ applabel, user_id }: BankScope): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
+    const ckey = ckeyOf(applabel, user_id)
+    const vaultrows = this.#vaultrowsOfBank.get(ckey) ?? new Map<string, unknown>()
+    this.#vaultrowsOfBank.set(ckey, vaultrows)
+    return vaultrows
+  }
+
+  /** For tests: the map of box rows of one life of a vault, by boxlabel. */
+  _cheat_boxRowsOf({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
+    const ckey = ckeyOf(applabel, user_id, vaultlabel, vault_tok)
+    const life = this.#boxLives.get(ckey) ?? { scope: { applabel, user_id, vaultlabel }, vault_tok, boxrows: new Map<string, unknown>() }
+    this.#boxLives.set(ckey, life)
+    return life.boxrows
+  }
+
+  #vaultRowOf(scope: VaultScope): unknown {
+    return this._cheat_vaultRowsOf(scope).get(scope.vaultlabel) ?? null
+  }
+
+  #storeVaultRow(record: VaultRecord | VaultTombstone): void {
+    const row = structuredClone(record)
+    this._cheat_vaultRowsOf(record).set(record.vaultlabel, row)
+    this.#tell(record, { vault: row })
+  }
+
+  #storeBoxRow(boxrows: Map<string, unknown>, vault: unknown, record: BoxRecord | BoxTombstone): void {
+    const row = structuredClone(record)
+    boxrows.set(record.boxlabel, row)
+    this.#tell(record, { vault, box: row })
+  }
+
+  /** Demands room in the vault for a new live box, under its `maxBoxes`. */
+  #demandRoom(boxrows: Map<string, unknown>, ante: unknown): void {
+    if (SX.isLiveRow(ante)) { return }
+    const used = [...boxrows.values()].filter((box) => SX.isLiveRow(box)).length
+    if (used >= this.#maxBoxes) { throw Refuse.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }
+  }
+
+  /** Each heeder hears on a later tick, so that nothing it does touches the transaction that told it. */
+  #tell(scope: VaultScope, heard: Heard): void {
+    for (const { scope: heardScope, hear } of this.#heeders) {
+      const isHeard = (heardScope.applabel === scope.applabel) && (heardScope.user_id === scope.user_id) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
+      if (isHeard) { queueMicrotask(() => { hear(structuredClone(heard)) }) }
+    }
+  }
+  // --
+
+  // == [Protected, the generic calls of VaultDB]: doGetBank, doGetVault, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected doGetBank(scope: BankScope): RowOfVault[] {
     return Array.from(this._cheat_vaultRowsOf(scope), ([vaultlabel, vault]) => ({ vaultlabel, vault: structuredClone(vault) }))
@@ -105,56 +161,6 @@ export class MemoryVaultDB extends VaultDB {
     const heeder = { scope, hear }
     this.#heeders.add(heeder)
     return () => { this.#heeders.delete(heeder) }
-  }
-  // --
-
-  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #storeVaultRow, #storeBoxRow, #demandRoom, #tell
-
-  /** For tests: the bank's own map of vault rows, by vaultlabel. */
-  _cheat_vaultRowsOf({ applabel, user_id }: BankScope): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
-    const ckey = ckeyOf(applabel, user_id)
-    const vaultrows = this.#vaultrowsOfBank.get(ckey) ?? new Map<string, unknown>()
-    this.#vaultrowsOfBank.set(ckey, vaultrows)
-    return vaultrows
-  }
-
-  /** For tests: the map of box rows of one life of a vault, by boxlabel. */
-  _cheat_boxRowsOf({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
-    const ckey = ckeyOf(applabel, user_id, vaultlabel, vault_tok)
-    const life = this.#boxLives.get(ckey) ?? { scope: { applabel, user_id, vaultlabel }, vault_tok, boxrows: new Map<string, unknown>() }
-    this.#boxLives.set(ckey, life)
-    return life.boxrows
-  }
-
-  #vaultRowOf(scope: VaultScope): unknown {
-    return this._cheat_vaultRowsOf(scope).get(scope.vaultlabel) ?? null
-  }
-
-  #storeVaultRow(record: VaultRecord | VaultTombstone): void {
-    const row = structuredClone(record)
-    this._cheat_vaultRowsOf(record).set(record.vaultlabel, row)
-    this.#tell(record, { vault: row })
-  }
-
-  #storeBoxRow(boxrows: Map<string, unknown>, vault: unknown, record: BoxRecord | BoxTombstone): void {
-    const row = structuredClone(record)
-    boxrows.set(record.boxlabel, row)
-    this.#tell(record, { vault, box: row })
-  }
-
-  /** Demands room in the vault for a new live box, under its `maxBoxes`. */
-  #demandRoom(boxrows: Map<string, unknown>, ante: unknown): void {
-    if (SX.isLiveRow(ante)) { return }
-    const used = [...boxrows.values()].filter((box) => SX.isLiveRow(box)).length
-    if (used >= this.#maxBoxes) { throw Refuse.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }
-  }
-
-  /** Each heeder hears on a later tick, so that nothing it does touches the transaction that told it. */
-  #tell(scope: VaultScope, heard: Heard): void {
-    for (const { scope: heardScope, hear } of this.#heeders) {
-      const isHeard = (heardScope.applabel === scope.applabel) && (heardScope.user_id === scope.user_id) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
-      if (isHeard) { queueMicrotask(() => { hear(structuredClone(heard)) }) }
-    }
   }
   // --
 }
