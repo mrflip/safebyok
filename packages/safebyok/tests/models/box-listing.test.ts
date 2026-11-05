@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
-import * as VS from '../../src/shapes/shapes-storage'
+import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import type { BoxDna, BoxListingOpts } from '../../src/shapes/shapes-vaultish'
 import * as Phrases from '../../src/helpers/phrases'
@@ -110,7 +110,7 @@ describe("BoxListing", () => {
 
     it("refuses 'bad_record' a put of another vault's record, storing nothing", async () => {
       const listing = boxListingOf(held.mw)
-      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: VS.VoidRevision }), 'bad_record')
+      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: SX.VoidRevision }), 'bad_record')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
@@ -278,8 +278,8 @@ describe("boxListing.puttable(scoped, opts)", () => {
     const listing = boxListingOf(held.mw)
     const shell = listing.puttable(held.mw.boxscope(Label))
     expect(shell.isPresent).to.be.false
-    expect(shell.revision_seq).to.eq(VS.VoidRevisionSeq)
-    expect(shell.revision_tok).to.eq(VS.VoidRevisionTok)
+    expect(shell.revision_seq).to.eq(SX.VoidRevisionSeq)
+    expect(shell.revision_tok).to.eq(SX.VoidRevisionTok)
     expect(listing.things).to.deep.equal([shell])
     expect(listing.snapshot).to.deep.equal([])
     expect(listing.puttable(held.mw.boxscope(Label))).to.eq(shell)
@@ -623,7 +623,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(held.mw)
       const stale = held.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       held.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: VS.VoidRevision }), 'stale_write')
+      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: SX.VoidRevision }), 'stale_write')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 

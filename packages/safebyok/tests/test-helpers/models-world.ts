@@ -24,7 +24,7 @@ import { BoxListing } from '../../src/models/box-listing'
 import type { LockState } from '../../src/shapes/shapes-enums'
 import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
-import * as VS from '../../src/shapes/shapes-storage'
+import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxQuery, BoxRow, BoxTombstone, DelOpts, IfAbsentOpts, PutOpts, ReqParams, Revision, VaultRecord, WatchScope } from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type Tombstone, BoxFormat } from '../../src/shapes/shapes-vaultish'
@@ -46,7 +46,7 @@ const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user
 /** The one live vault row of every world, which a box verb demands. */
 export const worldVaultRow = (): VaultRecord => ({
   ...WorldVault.scope,
-  fmt:           VS.VaultFormat,
+  fmt:           SX.VaultFormat,
   vault_tok:     WorldVault.vault_tok,
   am:            'a',
   revision_tok:  'rev-world',
@@ -214,7 +214,7 @@ type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifAbsent: P
 type DelCall = { scope: Boxscope, priorRevisionTok: string | null }
 
 /** The `revision_tok` a call goes over: null for a birth. */
-const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === VS.VoidRevisionTok) ? null : revision_tok)
+const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === SX.VoidRevisionTok) ? null : revision_tok)
 
 /** A {@link MemoryVaultDB} whose box verbs and watch log each call, and answer what a test scripts in place of their own. */
 export class TestableVaultDB extends MemoryVaultDB {

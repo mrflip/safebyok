@@ -16,7 +16,7 @@ import type { VaultListing } from '../models/vault-listing'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type VaultScope, vaultScope } from './shapes-core'
-import * as VS from './shapes-storage'
+import * as SX from './shapes-storage'
 import type { VaultRecord, VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
@@ -123,15 +123,15 @@ export type VaultStamp = Z.infer<typeof vaultStamp>
 // == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, WayinKind
 
 export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
-  const passphraseWayinHeader = VS.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  const passkeyWayinHeader    = VS.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passphraseWayinHeader = SX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passkeyWayinHeader    = SX.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
   return {
     passphraseWayinHeader,
     passkeyWayinHeader,
     wayinHeader: discrim('wayinkind', [passphraseWayinHeader, passkeyWayinHeader]),
-    passphraseWayinRecord: VS.passphraseWayin,
-    passkeyWayinRecord:    VS.passkeyWayin,
-    wayinRecord: discrim('wayinkind', [VS.passphraseWayin, VS.passkeyWayin]),
+    passphraseWayinRecord: SX.passphraseWayin,
+    passkeyWayinRecord:    SX.passkeyWayin,
+    wayinRecord: discrim('wayinkind', [SX.passphraseWayin, SX.passkeyWayin]),
   }
 })
 

@@ -2,7 +2,7 @@
 
 import { type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, type VaultFetched, VaultDB } from './vault-db-new'
 import * as Refuse from '../refusals/throwers'
-import * as VS from '../shapes/shapes-storage'
+import * as SX from '../shapes/shapes-storage'
 import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultRecord, VaultScope, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
@@ -13,7 +13,7 @@ type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
 const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 
 const meetsTerms = (ante: unknown, { prior, mayReplaceLive, mayAdd }: PutTerms): boolean => (
-  VS.isRowAt(ante, prior) && (VS.isLiveRow(ante) ? mayReplaceLive : mayAdd)
+  SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? mayReplaceLive : mayAdd)
 )
 
 export class MemoryVaultDB extends VaultDB {
@@ -23,7 +23,7 @@ export class MemoryVaultDB extends VaultDB {
   readonly #maxBoxes: number
 
   constructor(opts: MemoryVaultDBOpts = {}) {
-    const { maxBoxes = Infinity, ...vaultDBOpts } = VS.memoryVaultDBOpts.parse(opts)
+    const { maxBoxes = Infinity, ...vaultDBOpts } = SX.memoryVaultDBOpts.parse(opts)
     super(vaultDBOpts)
     this.#maxBoxes = maxBoxes
   }
@@ -36,7 +36,7 @@ export class MemoryVaultDB extends VaultDB {
 
   protected doGetVault(scope: VaultScope): VaultFetched {
     const vault = this.#vaultRowOf(scope)
-    const vault_tok = VS.rowPeek.safeParse(vault).data?.vault_tok
+    const vault_tok = SX.rowPeek.safeParse(vault).data?.vault_tok
     const boxes = (vault_tok === undefined) ? [] : Array.from(this._cheat_boxRowsOf(scope, vault_tok), ([boxlabel, box]) => ({ boxlabel, box: structuredClone(box) }))
     return { vault: structuredClone(vault), boxes }
   }
@@ -56,7 +56,7 @@ export class MemoryVaultDB extends VaultDB {
     const vault = this.#vaultRowOf(record)
     const boxrows = this._cheat_boxRowsOf(record, record.vault_tok)
     const ante = boxrows.get(record.boxlabel) ?? null
-    const landed = VS.isCheckedLiveVault(vault, record.vault_tok) && meetsTerms(ante, terms)
+    const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && meetsTerms(ante, terms)
     if (landed) {
       this.#demandRoom(boxrows, ante)
       this.#storeBoxRow(boxrows, vault, record)
@@ -66,15 +66,15 @@ export class MemoryVaultDB extends VaultDB {
 
   protected doDelVault(tombstone: VaultTombstone, prior: Revision): Landing {
     const ante = this.#vaultRowOf(tombstone)
-    const isOurs = VS.isLiveRowUnder(ante, tombstone.vault_tok)
-    const isNamedDamage = VS.isDamagedVaultAt(ante, tombstone, prior)
-    const isStopped = isOurs ? (! VS.isRowAt(ante, prior)) : ((ante !== null) && (! VS.vaultRow.safeParse(ante).success) && (! isNamedDamage))
+    const isOurs = SX.isLiveRowUnder(ante, tombstone.vault_tok)
+    const isNamedDamage = SX.isDamagedVaultAt(ante, tombstone, prior)
+    const isStopped = isOurs ? (! SX.isRowAt(ante, prior)) : ((ante !== null) && (! SX.vaultRow.safeParse(ante).success) && (! isNamedDamage))
     if (isStopped) { return { landed: false, ante: structuredClone(ante) } }
     const landed = isOurs || isNamedDamage
     if (landed) { this.#storeVaultRow(tombstone) }
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     for (const [boxlabel, box] of boxrows) {
-      const boxTombstone = VS.boxTombstoneOf(box, tombstone.written_at)
+      const boxTombstone = SX.boxTombstoneOf(box, tombstone.written_at)
       if (boxTombstone === null) { continue }
       boxrows.set(boxlabel, boxTombstone)
       this.#tell(tombstone, { vault: this.#vaultRowOf(tombstone), box: boxTombstone })
@@ -86,8 +86,8 @@ export class MemoryVaultDB extends VaultDB {
     const vault = this.#vaultRowOf(tombstone)
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     const ante = boxrows.get(tombstone.boxlabel) ?? null
-    const isDeletable = (VS.isLiveRow(ante) && VS.isRowAt(ante, prior)) || VS.isDamagedBoxAt(ante, tombstone, prior)
-    const landed = VS.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+    const isDeletable = (SX.isLiveRow(ante) && SX.isRowAt(ante, prior)) || SX.isDamagedBoxAt(ante, tombstone, prior)
+    const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
     if (landed) { this.#storeBoxRow(boxrows, vault, tombstone) }
     return { landed, ante: structuredClone(ante), vault: structuredClone(vault) }
   }
@@ -96,7 +96,7 @@ export class MemoryVaultDB extends VaultDB {
     let totalCount = 0
     for (const [ckey, { scope: vaultScope, vault_tok, boxrows }] of this.#boxLives) {
       if ((vaultScope.applabel !== scope.applabel) || (vaultScope.user_id !== scope.user_id)) { continue }
-      if (VS.isLifeOver(this.#vaultRowOf(vaultScope), vault_tok)) { this.#boxLives.delete(ckey) } else { totalCount += boxrows.size }
+      if (SX.isLifeOver(this.#vaultRowOf(vaultScope), vault_tok)) { this.#boxLives.delete(ckey) } else { totalCount += boxrows.size }
     }
     return { totalCount }
   }
@@ -144,8 +144,8 @@ export class MemoryVaultDB extends VaultDB {
 
   /** Demands room in the vault for a new live box, under its `maxBoxes`. */
   #demandRoom(boxrows: Map<string, unknown>, ante: unknown): void {
-    if (VS.isLiveRow(ante)) { return }
-    const used = [...boxrows.values()].filter((box) => VS.isLiveRow(box)).length
+    if (SX.isLiveRow(ante)) { return }
+    const used = [...boxrows.values()].filter((box) => SX.isLiveRow(box)).length
     if (used >= this.#maxBoxes) { throw Refuse.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }
   }
 

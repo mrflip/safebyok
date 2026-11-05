@@ -6,7 +6,7 @@ import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { LockState } from '../shapes/shapes-enums'
 import type { Clock, VaultScope } from '../shapes/shapes-core'
-import * as VS from '../shapes/shapes-storage'
+import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, LeaseFriend, ProvingsForGatingkind, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
@@ -145,7 +145,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // The old lease stays in force for the moments between: the vaultKey did not change.
   /** Run the commit, then attach a lease under the epoch it landed. */
-  async #landGate(proved: Proving, commit: () => Promise<VS.VaultRecord>): Promise<this> {
+  async #landGate(proved: Proving, commit: () => Promise<SX.VaultRecord>): Promise<this> {
     const heldLease = this.#lease
     const stored = await commit()
     await this.#renewLease(proved, stored.gate.gate_epoch, heldLease)
@@ -182,7 +182,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     listing.demandEnabled()
     const held = listing.at(checked)
     if (held?.isPresent === true) { throw alreadyHeldError() }
-    const prior = VS.revisionOf(held ?? VS.VoidRevision)
+    const prior = SX.revisionOf(held ?? SX.VoidRevision)
     return Gating.launch('build_vault', { listing, scope: checked, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
   }
 
@@ -391,7 +391,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const held = boxes.at(scope)
     if (held !== null) { return held.del(timely) }
     await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
-    return boxes.del(VS.sentinelBoxOf(scope, this.vault_tok))
+    return boxes.del(SX.sentinelBoxOf(scope, this.vault_tok))
   }
 
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
@@ -474,6 +474,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
 /** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
 const recordOfBirth = (gate: Gate, prior: VX.Revision, now: number): VaultRecord => (
-  { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...VS.nextRevisionOf(prior, now), gate: gate.pickle() }
+  { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...SX.nextRevisionOf(prior, now), gate: gate.pickle() }
 )
 // --

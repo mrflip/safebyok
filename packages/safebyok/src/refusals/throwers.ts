@@ -1,7 +1,7 @@
 import { PassphraseKeyBytes } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
 import * as Phrases   from '../helpers/phrases'
-import type * as VS from '../shapes/shapes-storage'
+import type * as SX from '../shapes/shapes-storage'
 
 // == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock
 
@@ -121,7 +121,7 @@ export const absentDamagedBoxError = ({ boxlabel }: { boxlabel: string }) => new
 
 export const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
 
-export const vaultStoredDamaged = ({ vaultlabel }: VS.DamagedVault): VaultError => new VaultError('damaged_record', Phrases.vaultStoredDamaged(vaultlabel))
+export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_record', Phrases.vaultStoredDamaged(vaultlabel))
 // --
 
 // == [Bank Throwers]: insecureContext, helloFirst, deviceRecordRewritten
@@ -162,31 +162,31 @@ export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new Vau
 
 /* The refusals of a vaultDB, each read the same in an answer and an error: `meta` holds the `world` and `dbhas` the answer carries. */
 
-export const vaultEmpty = (world: VS.VaultRow): VaultError => (
+export const vaultEmpty = (world: SX.VaultRow): VaultError => (
   new VaultError('vault_empty', 'Nothing is stored for this life of the vault: read the vault again by its scope.', { meta: { world, dbhas: null } })
 )
 
-export const vaultMismatch = (world: VS.VaultRow): VaultError => (
+export const vaultMismatch = (world: SX.VaultRow): VaultError => (
   new VaultError('vault_mismatch', 'A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope.', { meta: { world, dbhas: world } })
 )
 
-export const vaultGone = (tombstone: VS.VaultRow): VaultError => (
+export const vaultGone = (tombstone: SX.VaultRow): VaultError => (
   new VaultError('vault_gone', 'This vault was deleted.', { meta: { world: tombstone, dbhas: tombstone } })
 )
 
-export const staleWrite = (world: VS.VaultRow, dbhas: VS.VaultRow | VS.BoxRow | null): VaultError => (
+export const staleWrite = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow | null): VaultError => (
   new VaultError('stale_write', 'What is stored moved since this revision was read, so nothing was written: read it again.', { meta: { world, dbhas } })
 )
 
-export const camped = (world: VS.VaultRow, dbhas: VS.VaultRow | VS.BoxRow): VaultError => (
+export const camped = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow): VaultError => (
   new VaultError('camped', 'A live record is already stored here, and this call was told not to replace it.', { meta: { world, dbhas } })
 )
 
-export const absentBox = (world: VS.VaultRow, dbhas: VS.BoxRow | null): VaultError => (
+export const absentBox = (world: SX.VaultRow, dbhas: SX.BoxRow | null): VaultError => (
   new VaultError('absent_box', 'No box is stored under that label.', { meta: { act: (dbhas === null) ? 'void' : 'gone', world, dbhas } })
 )
 
-export const gateIssue = (world: VS.VaultRow, why: string): VaultError => (
+export const gateIssue = (world: SX.VaultRow, why: string): VaultError => (
   new VaultError('gate_issue', `This change of the gate was refused: ${why}`, { meta: { world, dbhas: world } })
 )
 
@@ -194,7 +194,7 @@ export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): VaultE
   new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage holds in one record.`)
 )
 
-export const vaultFull = (capacity: VS.Capacity): VaultError => (
+export const vaultFull = (capacity: SX.Capacity): VaultError => (
   new VaultError('vault_full', 'This vault holds as many boxes as its storage allows.', { meta: { capacity } })
 )
 

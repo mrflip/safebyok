@@ -2,7 +2,7 @@ import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import type { Sidecar, Boxscope } from '../shapes/shapes-core'
-import * as VS from '../shapes/shapes-storage'
+import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from '../shapes/shapes-vaultish'
 import { stableJsonify } from '../helpers/stable-jsonify'
@@ -131,15 +131,15 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.put(patch, opts)) }
 
   /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
-  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: VS.Revision }> {
+  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: SX.Revision }> {
     const prior = this.central
     const written_at = this.world.clock.now()
-    const next = { ...prior, ...VS.nextRevisionOf(prior, written_at), am: 'a' as const }
+    const next = { ...prior, ...SX.nextRevisionOf(prior, written_at), am: 'a' as const }
     // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
     const record = this.isTombstoneRecord(prior)
       ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? { val: {} })
       : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
-    return { record, prior: VS.revisionOf(prior) }
+    return { record, prior: SX.revisionOf(prior) }
   }
 
   /** The whisper a patch left out, opened from the record in hand. */

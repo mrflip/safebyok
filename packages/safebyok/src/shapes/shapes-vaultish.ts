@@ -15,7 +15,7 @@ import type { Answer, VaultDB } from '../storage/vault-db-new'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, whisper, type Clock, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
-import * as VS from './shapes-storage'
+import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
 import type { ProvingWorld, RequestCleartext, SealedWhisper, StrengthChecker } from './shapes-gateish'
 
@@ -32,13 +32,13 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 /** SLOPDOC: The checks of what the base knows of any record, from whatever carries it: record, storable or snapshot. */
 export const { am, revision, times, liveness, vaulted, sparseBase, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
-  am:         VS.am,
-  revision:   VS.revision,
-  times:      VS.times,
-  liveness:   obj({ am: VS.am }),
-  vaulted:    VS.vaulted,
-  sparseBase: VS.sparseBase,
-  tombstone:  VS.sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
+  am:         SX.am,
+  revision:   SX.revision,
+  times:      SX.times,
+  liveness:   obj({ am: SX.am }),
+  vaulted:    SX.vaulted,
+  sparseBase: SX.sparseBase,
+  tombstone:  SX.sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
 }))
 
 /** A record's revision: its `revision_tok`, minted at each put and del, and its `revision_seq`, higher on the later one. */
@@ -66,7 +66,7 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
 /** The `revision_seq` of a void row, and of a birth's prior: every populated row holds 0 or more. */
-export const { VoidRevisionSeq } = VS
+export const { VoidRevisionSeq } = SX
 
 /** True for a record whose `am` says damaged or gone. */
 export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
@@ -94,7 +94,7 @@ export type Settled = Z.infer<typeof settled>
 // == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxesListed, BoxRecord, BoxSparse, BoxPatchGiven, BoxesListed
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
-export const { BoxFormat } = VS
+export const { BoxFormat } = SX
 
 /** SLOPDOC: The check of `{ val }`, the object a box takes and gives its whisper in, handing back a frozen copy. */
 export const whisperHolder = Checker(({ obj, custom }) => custom((val) => val !== LOCKED, Phrases.LockedIsNoWhisper)
@@ -104,7 +104,7 @@ export const whisperHolder = Checker(({ obj, custom }) => custom((val) => val !=
 export type WhisperHolder = Z.output<typeof whisperHolder>
 
 /** SLOPDOC: The checks of a box's stored forms, full and sparse, from a record or a box ducking as one. */
-export const { boxRecord, boxSparse } = Checkers('bad_record', () => ({ boxRecord: VS.boxRecord, boxSparse: VS.boxSparse }))
+export const { boxRecord, boxSparse } = Checkers('bad_record', () => ({ boxRecord: SX.boxRecord, boxSparse: SX.boxSparse }))
 
 export type BoxSparse = Z.infer<typeof boxSparse>
 export type BoxRecord = Z.infer<typeof boxRecord>
@@ -303,10 +303,10 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 // == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse, VaultSnapshot
 
 /** The vault format these forms describe, as each record carries it in `fmt`. */
-export const { VaultFormat } = VS
+export const { VaultFormat } = SX
 
 /** SLOPDOC: The checks of a vault's stored forms, sparse and with its gate, from a record or a vault ducking as one. */
-export const { vaultRecord, vaultSparse, vaultRow } = Checkers('bad_record', () => ({ vaultRecord: VS.vaultRecord, vaultSparse: VS.vaultSparse, vaultRow: VS.vaultRow }))
+export const { vaultRecord, vaultSparse, vaultRow } = Checkers('bad_record', () => ({ vaultRecord: SX.vaultRecord, vaultSparse: SX.vaultSparse, vaultRow: SX.vaultRow }))
 
 export type VaultSparse = Z.infer<typeof vaultSparse>
 export type VaultRecord = Z.infer<typeof vaultRecord>

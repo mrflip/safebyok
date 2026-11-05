@@ -4,7 +4,7 @@ import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as Phrases from '../../src/helpers/phrases'
-import * as VS from '../../src/shapes/shapes-storage'
+import * as SX from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { Passphrase, byPassphrase, delTyping, makeBornVault, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
@@ -248,7 +248,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const { vault, boxrows, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
-    expect(tryPutBox.mock.calls[0]?.[1]).to.deep.include({ prior: VS.VoidRevision })
+    expect(tryPutBox.mock.calls[0]?.[1]).to.deep.include({ prior: SX.VoidRevision })
     expect(box.isPresent).to.be.true
     expect(box.sidecar).to.deep.equal(Sidecar)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
@@ -353,7 +353,7 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     const { vault, tryGetBox } = await makeWorld()
     const box = await vault.boxListing.puttable({ ...vault.scope, boxlabel }).put({ whisper: Whisper })
     expect(box.revision_seq).to.eq(0)
-    expect(box.box_tok).not.to.eq(VS.VoidLifeTok)
+    expect(box.box_tok).not.to.eq(SX.VoidLifeTok)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
     expect(tryGetBox).not.toHaveBeenCalled()
   })
