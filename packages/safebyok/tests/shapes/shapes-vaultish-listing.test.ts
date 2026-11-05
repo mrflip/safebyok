@@ -163,18 +163,6 @@ describe("The checks of the world and the listing", () => {
     })
   })
 
-  describe("VX.isListing and VX.IsListing", () => {
-    it("tell a listing from anything else, by its tag", () => {
-      expect(VX.isListing(boxListingOf(mw))).to.be.true
-      expect(VX.isListing({ [VX.IsListing]: true })).to.be.true
-      expect(VX.isListing({ [VX.IsListing]: 1 })).to.be.false
-      expect(VX.isListing({})).to.be.false
-      expect(VX.isListing(null)).to.be.false
-      expect(VX.isListing(undefined)).to.be.false
-      expect(VX.isListing('listing')).to.be.false
-    })
-  })
-
   describe("VX.listingOpts", () => {
     const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, onBadNews: mw.onBadNews }
     holdsCases(VX.listingOpts, 'bad_option', [

@@ -1,7 +1,8 @@
 /** A vault's life end to end, through real vaults, a real lease and real boxes, over the MemoryVaultDB and the fake deviceDB of `vault-world.ts`: each `describe` a chapter, each test a sentence of the story. */
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { LOCKED, type VaultRecord } from '../../src/shapes/shapes-vaultish'
+import { LOCKED } from '../../src/helpers/consts'
+import type { VaultRecord } from '../../src/shapes/shapes-vaultish'
 import type { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'

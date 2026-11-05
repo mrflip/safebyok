@@ -40,3 +40,20 @@ export const PassphraseKeyBytes = 32
 
 /** How many random bytes a passkey wayin's `prf_salt_b64` holds: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
 export const PasskeySaltBytes = 32
+
+/** The brand {@link LOCKED} is made with: a symbol of this module's, never `Symbol.for`, so no code outside the package spells it. A copy of LOCKED carries it too, so the brand tells LOCKED from a whisper, never from its copies. */
+const LockedBrand: unique symbol = Symbol('safebyok.locked')
+
+/** SLOPDOC: The frozen singleton answered for what the locked vault hides; `Storable.isLockedFUBag` tells it. */
+export const LOCKED: LockedBag = Object.freeze({ [LockedBrand]: true as const })
+
+/** The type of {@link LOCKED}, which a copy of it has too: `Storable.isLockedFUBag` alone tells LOCKED itself. */
+export type LockedBag = Readonly<{ [LockedBrand]: true }>
+
+/** The tag a Listing answers true to, so a storable can tell one without importing it. */
+export const IsListing: unique symbol = Symbol('safebyok.listing')
+
+/** True for a Listing: an object that answers true to {@link IsListing}. */
+export const isListing = (val: unknown): val is { [IsListing]: true } => (
+  typeof val === 'object' && val !== null && (val as { [IsListing]?: unknown })[IsListing] === true
+)

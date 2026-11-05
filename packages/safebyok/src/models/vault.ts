@@ -1,5 +1,6 @@
 import { verifyConsistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
+import { isListing } from '../helpers/consts'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
@@ -76,7 +77,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
-    if (! VX.isListing(listing)) { throw listingExpected() }
+    if (! isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
     const held = listing.at(checked)

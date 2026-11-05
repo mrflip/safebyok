@@ -1,6 +1,7 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the watch on storage, and every storage call made for that kind of thing. */
 
 import { verifyConsistent } from '../helpers/validator'
+import { IsListing } from '../helpers/consts'
 import { VaultError, isVaultError } from '../refusals/errors'
 import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { IfAbsent, LockState } from '../shapes/shapes-enums'
@@ -8,7 +9,7 @@ import type { Clock } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type DelTombstone, type Fetched, type FetchOpts, type ListingAnswer, type ListingOpts, type ListingWorld, type PutListingOpts, type SlotFate, type SparseBase, type Thing, IsListing } from '../shapes/shapes-vaultish'
+import type { DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, PutListingOpts, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
 import { disabledError, otherVaultTokAtBirth, putAnsweredNothing } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import * as GX from '../../src/shapes/shapes-gateish'
+import { LOCKED } from '../../src/helpers/consts'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import { holdsCases } from '../test-helpers/cases'
@@ -161,8 +162,8 @@ describe("VX.whisperHolder", () => {
 
 describe("VX.whisperHolder and LOCKED", () => {
   it("refuses LOCKED as 'bad_option' with a sentence that names it, and a copy of it as no { val }", () => {
-    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse(VX.LOCKED), 'bad_option').message).to.include('LOCKED is not a whisper: unseal or expose one first')
-    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse({ ...VX.LOCKED }), 'bad_option').message).to.not.include('LOCKED')
+    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse(LOCKED), 'bad_option').message).to.include('LOCKED is not a whisper: unseal or expose one first')
+    expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse({ ...LOCKED }), 'bad_option').message).to.not.include('LOCKED')
   })
 })
 
@@ -274,7 +275,7 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
       [{ whisper },                                                          true,  'passes a whisper alone, the sidecar kept'],
       [{ sidecar: {} },                                                      true,  'passes a sidecar alone, the whisper kept, as its example shows'],
       [{},                                                                   false, 'refuses a patch naming neither, as its example shows'],
-      [{ whisper: VX.LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper, as its seventh example shows'],
+      [{ whisper: LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper, as its seventh example shows'],
       [{ whisper: 'sk-ant-fake', sidecar: {} },                              false, 'refuses a bare whisper'],
       [{ whisper, sidecar: 'note' },                                         false, 'refuses a sidecar that fails its check'],
       [{ ...full, revision_seq: 'one', whisper, sidecar: {} },               false, 'refuses a factory prop that fails its check'],

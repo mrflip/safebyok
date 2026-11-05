@@ -1,7 +1,8 @@
 /** A Box's whisper: extractWhisper and expose, the setter, LOCKED, and the whisper given as { val }. */
 
 import { describe, expect, it } from 'vitest'
-import { type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, LOCKED } from '../../src/shapes/shapes-vaultish'
+import { LOCKED } from '../../src/helpers/consts'
+import type { BoxRecord, BoxSparse, BoxWorld, Fetched } from '../../src/shapes/shapes-vaultish'
 import { Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'

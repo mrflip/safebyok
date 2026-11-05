@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { LOCKED } from '../../src/shapes/shapes-vaultish'
+import { LOCKED } from '../../src/helpers/consts'
 import { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultAndFriend, replaceTyping, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'

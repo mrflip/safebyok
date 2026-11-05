@@ -1,7 +1,8 @@
 /** A Box's own props, sidecar and snapshot, the records it receives, and the arguments its entries check first. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { type BoxRecord, type BoxSnapshot, type BoxSparse, type Fetched, LOCKED } from '../../src/shapes/shapes-vaultish'
+import { LOCKED } from '../../src/helpers/consts'
+import type { BoxRecord, BoxSnapshot, BoxSparse, Fetched } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
