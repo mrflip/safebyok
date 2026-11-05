@@ -52,10 +52,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
 
   set whisper(whisper: WhisperHolder | LockedBag | null) {
-    const forgets = (whisper === null) || Storable.isLockedFUBag(whisper)
-    const exposed = forgets ? null : whisperHolder.parse(whisper)
-    if (! forgets) { this.demandExposable() }
-    this.#exposed = exposed
+    if ((whisper === null) || Storable.isLockedFUBag(whisper)) {
+      this.#exposed = null
+    } else {
+      const exposed = whisperHolder.parse(whisper)
+      this.demandExposable()
+      this.#exposed = exposed
+    }
     this.settle()
   }
   // --
