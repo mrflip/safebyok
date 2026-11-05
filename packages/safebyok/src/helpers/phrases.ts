@@ -141,7 +141,7 @@ export const fieldsDisagree = (fieldnames: readonly string[]): string => `This h
 export const BagNotObject = "What a bag is checked against is an object, holding the fields to compare"
 
 /** An object in a whisper or a sidecar that is not plain JSON. */
-export const WhisperBagShape = "An object in a whisper or a sidecar is a plain object of JSON: strings, numbers, booleans, null, arrays and plain objects, never undefined, a Date, a Map or a class's instance"
+export const WhisperBagShape = "An object in a whisper or a sidecar is a plain object of JSON: strings, numbers, booleans, null, arrays and plain objects, never undefined, a Date, a Map, a class's instance or a symbol key"
 // --
 
 // == [Scopepaths]: BankScopepathShape, VaultScopepathShape, LeaseScopepathShape, DeviceScopepathShape, BoxScopepathShape

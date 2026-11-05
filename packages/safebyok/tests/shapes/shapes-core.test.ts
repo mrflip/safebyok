@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { LOCKED } from '../../src/helpers/consts'
+import * as Phrases from '../../src/helpers/phrases'
 import * as CX from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 
@@ -20,6 +22,39 @@ const WhisperCases = [
   [new Map([["a", 1]]),               false,  'a Map would silently flatten to {}'],
   [{ when: new Date() },              false,  'a class instance hiding inside an object'],
 ] as const
+
+/** What JSON would drop without a word, leaving `{}`: every one refused, or a put of it would replace the secret. */
+const SymbolKeyCases = [
+  [LOCKED,                                  'LOCKED'],
+  [{ ...LOCKED },                           'a copy of LOCKED'],
+  [{ deep: { ...LOCKED } },                 'a copy of LOCKED nested in an object'],
+  [[{ ...LOCKED }],                         'a copy of LOCKED nested in an array'],
+  [{ [Symbol('other')]: 'x' },              'an object with any other symbol key'],
+  [{ deep: [{ [Symbol('other')]: 'x' }] },  'another symbol key at depth'],
+] as const
+
+describe("whisper and sidecar refusing by kind", () => {
+  for (const [candidate, blurb] of SymbolKeyCases) {
+    it(`whisper refuses ${blurb} as 'bad_option'`, () => {
+      TH.expectSyncRefusal(() => CX.whisper.parse(candidate), 'bad_option')
+    })
+    it(`sidecar refuses ${blurb} as 'bad_option'`, () => {
+      TH.expectSyncRefusal(() => CX.sidecar.parse(candidate), 'bad_option')
+    })
+  }
+
+  it("says LOCKED itself is no whisper", () => {
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse(LOCKED), 'bad_option').message).to.include(Phrases.LockedIsNoWhisper)
+  })
+
+  for (const [candidate, expected, blurb] of WhisperCases) {
+    if (! expected) {
+      it(`whisper refuses ${blurb} as 'bad_option'`, () => {
+        TH.expectSyncRefusal(() => CX.whisper.parse(candidate), 'bad_option')
+      })
+    }
+  }
+})
 
 describe("whisper", () => {
   for (const [candidate, expected, blurb] of WhisperCases) {
