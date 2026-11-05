@@ -10,16 +10,19 @@ const Checks = Checkers('bad_option', ({ obj, custom }) => {
   return { gateMakeArgs: obj({ passphraseWayin: wayin, passkeyWayin: wayin.nullable() }) }
 })
 
-// == [Gate]: make, demandPasskeyAddable, pickle, toJSON
-
 /** The wayins of a vault's record as of one `gate_epoch`, a read-only view: a change is a vaultDB verb's, and a new `Gate` is read from the record it lands. */
 export class Gate {
+  // == [Props]: gate_epoch, passphrase_wayin, passkey_wayin, ppWayin, pkWayin, stamp
+
   declare readonly gate_epoch:       number
   declare readonly passphrase_wayin: PassphraseWayinRecord
   declare readonly passkey_wayin:    PasskeyWayinRecord | null
   declare readonly ppWayin:          Wayin
   declare readonly pkWayin:          Wayin | null
   declare readonly stamp:            VaultStamp
+  // --
+
+  // == [Construction]: constructor, make
 
   constructor(stamp: VaultStamp, props: unknown) {
     const checked = vaultStamp.parse(stamp)
@@ -36,11 +39,9 @@ export class Gate {
     Checks.gateMakeArgs.parse({ passphraseWayin, passkeyWayin })
     return new Gate(stamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passphraseWayin.pickle(), passkey_wayin: passkeyWayin?.pickle() ?? null })
   }
+  // --
 
-  /** Demands that this gate hold no passkey: the one check before anyone is asked for one. */
-  demandPasskeyAddable(): void {
-    if (this.pkWayin !== null) { throw passkeyHeldAlready() }
-  }
+  // == [Methods]: pickle, toJSON
 
   pickle(): GateProps {
     const { gate_epoch, passphrase_wayin, passkey_wayin } = this
@@ -50,5 +51,13 @@ export class Gate {
   toJSON(): { gate_epoch: number, passphrase_wayin: WayinHeader, passkey_wayin: WayinHeader | null } {
     return { gate_epoch: this.gate_epoch, passphrase_wayin: this.ppWayin.toJSON(), passkey_wayin: this.pkWayin?.toJSON() ?? null }
   }
+  // --
+
+  // == [Guards]: demandPasskeyAddable
+
+  /** Demands that this gate hold no passkey: the one check before anyone is asked for one. */
+  demandPasskeyAddable(): void {
+    if (this.pkWayin !== null) { throw passkeyHeldAlready() }
+  }
+  // --
 }
-// --
