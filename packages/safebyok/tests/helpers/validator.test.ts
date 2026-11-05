@@ -238,11 +238,11 @@ describe("Checkers", () => {
   })
 
   it("refuses a disagreement as the refusal handed to parseConsistent says, and a failed parse as parse does", () => {
-    const err = TH.expectSyncRefusal(() => boxSparse.parseConsistent(sparse, { user_id: 'u2' }, { kind: 'corrupt_record', message: 'Storage answered with another user' }), 'corrupt_record')
+    const err = TH.expectSyncRefusal(() => boxSparse.parseConsistent(sparse, { user_id: 'u2' }, { kind: 'record_conflict', message: 'Storage answered with another user' }), 'record_conflict')
     expect(err.message).to.eq('Storage answered with another user')
     expect(err.meta).to.deep.equal({ fieldnames: ['user_id'] })
     TH.expectSyncRefusal(() => boxSparse.parseConsistent(sparse, { user_id: 'u2' }, { message: 'Another user' }), 'bad_record')
-    TH.expectSyncRefusal(() => boxSparse.parseConsistent({ ...sparse, written_at: -1 }, scope, { kind: 'corrupt_record' }), 'bad_record')
+    TH.expectSyncRefusal(() => boxSparse.parseConsistent({ ...sparse, written_at: -1 }, scope, { kind: 'record_conflict' }), 'bad_record')
   })
 
   it("frames a failed parse with the where and advice handed to parseConsistent, and leaves a disagreement's message as it is", () => {
@@ -379,7 +379,7 @@ describe("consistent", () => {
 describe("demandConsistent", () => {
   // demandConsistent @example
   it("returns true, or refuses as its refusal says", () => {
-    expect(demandConsistent(sparse, scope, { kind: 'damaged_vault' })).to.be.true
+    expect(demandConsistent(sparse, scope, { kind: 'damaged_record' })).to.be.true
     const err = TH.expectSyncRefusal(() => demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` }), 'bad_scope')
     expect(err.message).to.eq('This names another user_id')
   })

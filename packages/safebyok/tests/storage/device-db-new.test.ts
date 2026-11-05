@@ -233,8 +233,8 @@ describe("a deviceDB whose store throws", () => {
   })
 
   it("passes a VaultError the store throws as it came", async () => {
-    const refusal = new VaultError('storage_blocked', 'This browser does not let the app keep anything on this device.')
-    const err = await TH.expectBad(new BrokenDeviceDB(refusal).tryPeek(asked), 'storage_blocked')
+    const refusal = new VaultError('storage_unavailable', 'This browser does not let the app keep anything on this device.')
+    const err = await TH.expectBad(new BrokenDeviceDB(refusal).tryPeek(asked), 'storage_unavailable')
     expect(err).to.eq(refusal)
   })
 })

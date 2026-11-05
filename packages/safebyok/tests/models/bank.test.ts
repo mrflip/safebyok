@@ -93,9 +93,9 @@ describe("bank.hello", () => {
   it("refuses when a plugin will not load, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
     const getBank = vi.spyOn(world.vaultDB, 'tryGetBank')
-    const refused = new VaultError('crypto_failed', 'no wasm here')
+    const refused = new VaultError('unexpected_error', 'no wasm here')
     const bank = world.bankOn({ strengthChecker: Object.assign((() => ({ strong: true })) as typeof anyStrengthChecker, { load: () => Promise.reject(refused) }) })
-    await TH.expectRefusal(bank.hello(), 'crypto_failed')
+    await TH.expectRefusal(bank.hello(), 'unexpected_error')
     expect(bank.snapshot.err).to.equal(refused)
     expect(getBank).not.toHaveBeenCalled()
   })

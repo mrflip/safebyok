@@ -250,7 +250,7 @@ export const consistent = (bag: object, other: object): boolean => disagreeing(b
  * The kind is the caller's to choose, as the caller knows what a disagreement means: a scope of
  * another user, a record of another vault. A `refusal` that is none refuses 'bad_option'.
  *
- * @example demandConsistent(stored, scope, { kind: 'damaged_vault' })   // true, when its applabel, user_id and vaultlabel are the scope's
+ * @example demandConsistent(stored, scope, { kind: 'damaged_record' })   // true, when its applabel, user_id and vaultlabel are the scope's
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */
 export const demandConsistent = (bag: object, other: object, refusal: ConsistencyRefusal): true => {
@@ -263,7 +263,7 @@ export const demandConsistent = (bag: object, other: object, refusal: Consistenc
 
 /** `bag`, once it is {@link consistent} with `other`: refuses as {@link demandConsistent} does. For a bag already parsed; a {@link Refusing}'s `parseConsistent` is this over its `parse`.
  *
- * @example const tombstone = verifyConsistent(answered, scope, { kind: 'corrupt_record' })   // the tombstone, when it is of the scope
+ * @example const tombstone = verifyConsistent(answered, scope, { kind: 'record_conflict' })   // the tombstone, when it is of the scope
  */
 export const verifyConsistent = <BagT extends object>(bag: BagT, other: object, refusal: ConsistencyRefusal): BagT => {
   demandConsistent(bag, other, refusal)

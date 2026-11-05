@@ -118,11 +118,11 @@ describe("a birth through a gating", () => {
 
   it("holds nothing where the put is refused: the gating settles the refusal, nothing stored, held or cached", async () => {
     const { listing, opts, gatingAt, storedNow, deviceDB } = birthWorld()
-    const refusal = new VaultError('storage_blocked', "the disk is full")
+    const refusal = new VaultError('storage_unavailable', "the disk is full")
     vi.spyOn(opts.vaultDB, 'tryPutVault').mockResolvedValueOnce(TH.bad(refusal) as never)
-    const launched = TH.expectRefusal(listing.buildVault(Dna), 'storage_blocked')
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'storage_unavailable')
     const gating = await gatingAt<'build_vault'>()
-    await TH.expectBad(gating.attempt({ passphraseClear }), 'storage_blocked')
+    await TH.expectBad(gating.attempt({ passphraseClear }), 'storage_unavailable')
     await launched
     expect(listing.things).to.have.lengthOf(0)
     expect(storedNow()).to.be.null

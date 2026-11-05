@@ -94,47 +94,32 @@ describe("RefusalFamilyForKind", () => {
 const FamilyCases = [
   // misuse: the host developer's code is wrong, and no user action fixes it
   ["bad_scope",           "misuse",    'a label the app chose that breaks the rules is a bug'],
-  ["bad_whisper",         "misuse",    'storing what JSON cannot carry is a bug'],
   ["bad_option",          "misuse",    'a Bank.make option out of range is a bug'],
   ["bad_record",          "misuse",    'handing a VaultDB a record this package does not build is a bug'],
-  ["invalid_box",         "misuse",    'handing a VaultDB a box this package does not build, or one for another vaultKey, is a bug'],
-  ["corrupt_record",      "misuse",    "a storage adapter's wrong answer is the developer's bug to fix, never the user's"],
   ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
-  ["passphrase_required", "misuse",    "asking to remove a vault's passphrase is a bug: it can only be replaced"],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
   ["vault_locked",        "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
-  ["gate_made_elsewhere", "condition", 'a first passphrase set on another device meanwhile asks for the passphrase chosen there'],
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
-  ["passkey_unavailable", "condition", 'a browser or authenticator without PRF falls back to the passphrase'],
-  ["crypto_failed",       "condition", "the browser's cryptography failing as a box is sealed is told to the user, who tries again"],
   ["absent_box",          "condition", 'a box deleted elsewhere is a fact of syncing'],
   ["absent_vault",        "condition", 'a novel vault, asked for what only a gated one has, is set up by its first unlock'],
   ["absent_wayin",        "condition", 'a passkey removed on another device is a fact of syncing'],
-  ["whisper_too_large",   "condition", "an oversized whisper is the user's value, not the code"],
   ["box_too_large",       "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
   ["vault_full",          "condition", 'a full vault tells the user to remove a box'],
-  ["damaged_vault",       "bad_news",  'a vault stored damaged is told to the user, who cannot open it'],
-  ["damaged_wayin",       "bad_news",  'a way in stored damaged sends the user to another way in'],
   ["damaged_box",         "bad_news",  'a box stored damaged is told to the user, who may remove it'],
   ["newer_format",        "bad_news",  'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
   ["record_conflict",     "condition", 'storage and this device disagreeing about one revision is for the app to tell the user of; fetching again does not mend it'],
   ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a fact of syncing'],
-  ["vault_behind",        "bad_news",  'storage handing back an older copy of the vault than this device has seen is a fact a user can be told'],
-  ["not_permitted",       "condition", 'a call refused to the signed-in owner is told to them'],
   ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
-  ["storage_blocked",     "condition", 'a browser withholding its storage is told to the user, without a retry'],
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
   ["vault_remade",        "condition", 'a vault deleted and made anew while a call worked on it is a fact of syncing'],
-  ["gate_moved",          "condition", 'a passphrase or passkey changed while a call worked under the old one is a fact of syncing'],
   ["gating_landed",       "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
-  ["no_whisper",          "condition", 'a store keeping a whisper where none is stored is told to the caller, who hands one in'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
   ["already_asking",      "condition", 'a second launch while a dialog is up is the host deduping late, not a fault'],
   ["locked_while_asking", "condition", 'a lock before the enter key ends the ask: the user locked, and nothing was proved'],
@@ -163,7 +148,6 @@ const ConditionCases = [
   [new VaultError('storage_unavailable', 'The vault storage could not be reached.'), true,  'a condition VaultError'],
   [new VaultError('identity_revoked', 'Sign in to reach this vault.'),               true,  'a signed-out refusal, bad news the app shows'],
   [new VaultError('damaged_box', 'That box is damaged.'),                            true,  'a damaged box, bad news too'],
-  [new VaultError('not_permitted', 'You may not change this vault.'),                true,  'a refusal of the signed-in user'],
   [new VaultError('bad_scope', 'A label is 2-40 lowercase letters.'),                false, 'a misuse VaultError'],
   [new VaultError('unexpected_error', 'Something threw that is no refusal.'),       false, 'an unexpected error, misuse too'],
   [new Error('storage_unavailable'),                                                       false, 'a plain Error, even one whose message names a condition'],
@@ -191,9 +175,9 @@ describe("isCondition", () => {
       if (! isCondition(err)) { throw err }
       shown.push(err.message)
     }
-    handle(new VaultError('whisper_too_large', 'That whisper is over the limit.'))
-    expect(shown).to.deep.equal(['That whisper is over the limit.'])
-    expect(() => { handle(new VaultError('bad_whisper', 'A whisper must be a JSON value.')) }).to.throw('A whisper must be a JSON value.')
+    handle(new VaultError('box_too_large', 'That box is over the limit.'))
+    expect(shown).to.deep.equal(['That box is over the limit.'])
+    expect(() => { handle(new VaultError('bad_option', 'A whisper must be a JSON value.')) }).to.throw('A whisper must be a JSON value.')
   })
 })
 

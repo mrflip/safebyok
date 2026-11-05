@@ -188,7 +188,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     const record = demandStored()
     const listing = new VaultListing(hearingBadNews(opts, onBadNews))
     const vault = await listing.build(record)
-    deviceDB.tryCache.mockResolvedValueOnce(TH.bad(new VaultError('storage_blocked', 'the disk is full')))
+    deviceDB.tryCache.mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the disk is full')))
     vault.lock()
     await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
