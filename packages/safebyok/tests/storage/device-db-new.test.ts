@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { makeLeaseKey } from '../../src/crypto'
-import * as Refusals from '../../src/refusals'
+import { makeLeaseKey } from '../../src/helpers/crypto'
+import * as Refusals from '../../src/refusals/refusals'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { DeviceDB } from '../../src/storage/device-db-new'
 import type { DeviceRecord, LeaseRow } from '../../src/storage/device-db-shapes'

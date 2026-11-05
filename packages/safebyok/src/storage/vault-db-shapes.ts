@@ -1,8 +1,8 @@
 /** SLOPDOC: The one place each stored thing's shape is drawn: records, verbs' params and checkers, imported as `VS`. */
 
 import type * as Z from 'zod'
-import { Checkers, objCheck } from '../checks/validator'
-import { randomId } from '../crypto'
+import { Checkers, objCheck } from '../helpers/validator'
+import { randomId } from '../helpers/crypto'
 import { sidecar } from '../shapes/box'
 import * as FX from '../shapes/fields'
 import * as HX from '../shapes/host-code'

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { reportToPlatform } from '../src/report-error'
+import { reportToPlatform } from '../../src/refusals/report-error'
 
 describe("reportToPlatform", () => {
   afterEach(() => { vi.unstubAllGlobals() })

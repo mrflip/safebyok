@@ -1,8 +1,8 @@
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { VaultError } from '../src/errors'
-import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
-import * as TH from './test-helpers'
+import { VaultError } from '../../src/refusals/errors'
+import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../../src/helpers/logger'
+import * as TH from '../test-helpers'
 
 /** What a host might hand Bank.make as its logger that is not one. */
 const NotLoggers = [

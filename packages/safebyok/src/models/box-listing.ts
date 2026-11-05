@@ -1,8 +1,8 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
-import { VaultError } from '../errors'
-import { absentBoxError, notListedBoxError } from '../helpers/throwers'
-import { type Outcome, outcomeOf } from '../outcome'
+import { VaultError } from '../refusals/errors'
+import { absentBoxError, notListedBoxError } from '../refusals/throwers'
+import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, boxscope } from '../shapes/scopes'
 import type { Notice } from '../storage/vault-db-new'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PasskeySaltBytes } from '../../src/consts'
-import { randomBytes, toB64 } from '../../src/crypto'
+import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { randomBytes, toB64 } from '../../src/helpers/crypto'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
 import { DeviceId, T0 } from '../test-helpers/proving-world'

@@ -2,7 +2,7 @@
  * and every step asserts what its components render. */
 
 import { afterEach, describe, expect, it } from 'vitest'
-import type { VaultError } from '../../src/errors'
+import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
 import type { BankSnapshot, BoxSnapshot, GatingKind, RequestCleartext, VaultSnapshot } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'

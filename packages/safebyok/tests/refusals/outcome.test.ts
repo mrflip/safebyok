@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { VaultError } from '../src/errors'
-import { type Outcome, storageTroubleOf, bad, good, outcomeOf, refusalOf, valOf } from '../src/outcome'
-import * as Refusals from '../src/refusals'
+import { VaultError } from '../../src/refusals/errors'
+import { type Outcome, storageTroubleOf, bad, good, outcomeOf, refusalOf, valOf } from '../../src/refusals/outcome'
+import * as Refusals from '../../src/refusals/refusals'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
 const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new TypeError(`no backup of ${vaultlabel}`))

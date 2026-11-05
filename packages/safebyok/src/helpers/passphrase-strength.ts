@@ -1,9 +1,9 @@
-import { VaultError } from './errors'
-import * as HostErrorSanitizer from './host-error-sanitizer'
-import type { PassphraseVerdict } from './shapes/vault'
-import * as VX from './shapes/vault'
-import type { VaultScope } from './shapes/scopes'
-import * as CX from './shapes/scopes'
+import { VaultError } from '../refusals/errors'
+import * as HostErrorSanitizer from '../refusals/host-error-sanitizer'
+import type { PassphraseVerdict } from '../shapes/vault'
+import * as VX from '../shapes/vault'
+import type { VaultScope } from '../shapes/scopes'
+import * as CX from '../shapes/scopes'
 
 /** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user

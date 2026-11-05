@@ -2,7 +2,7 @@
 
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import type { AnyGating, GatingKind, VaultWorld } from '../../src/models/models-shapes'
 import { PassphraseProving } from '../../src/models/proving'

@@ -2,8 +2,8 @@
 
 import type * as Z from 'zod'
 import { record } from 'zod'
-import * as Phrases from '../phrases'
-import { Checker, Checkers, objCheck } from '../checks/validator'
+import * as Phrases from '../helpers/phrases'
+import { Checker, Checkers, objCheck } from '../helpers/validator'
 import * as FX from './fields'
 import * as VX from './vault'
 

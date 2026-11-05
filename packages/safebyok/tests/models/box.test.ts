@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { type BoxHalves, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, LOCKED } from '../../src/models/models-shapes'
 import { Storable } from '../../src/models/storable'
-import * as Phrases from '../../src/phrases'
+import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0, type TestableBoxListing } from '../test-helpers/models-world'
 

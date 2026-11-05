@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adorn, decorate, nextMicrotask, tattoo, tattooProp } from '../src/helpers'
+import { adorn, decorate, nextMicrotask, tattoo, tattooProp } from '../../src/helpers/helpers'
 
 type Handle = { label: string, vault?: { vault_tok: string } }
 

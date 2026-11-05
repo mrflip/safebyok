@@ -1,10 +1,10 @@
 /** The checks for the fields of the stored records, each named for the field it checks: an encrypted value's halves, the tokens, the ids, the salts and the ciphered fields. */
 
 import type * as Z from 'zod'
-import * as Phrases from '../phrases'
-import { Checker, Checkers, objCheck } from '../checks/validator'
-import { PasskeySaltBytes } from '../consts'
-import { fromB64OrNull } from '../crypto'
+import * as Phrases from '../helpers/phrases'
+import { Checker, Checkers, objCheck } from '../helpers/validator'
+import { PasskeySaltBytes } from '../helpers/consts'
+import { fromB64OrNull } from '../helpers/crypto'
 
 export { epochMillis, type EpochMillis } from './primitives'
 

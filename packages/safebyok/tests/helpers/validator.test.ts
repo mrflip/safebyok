@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as PX from '../../src/shapes/primitives'
-import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, verifyConsistent } from '../../src/checks/validator'
-import { type RefusalKind, VaultError } from '../../src/errors'
+import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, verifyConsistent } from '../../src/helpers/validator'
+import { type RefusalKind, VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 
 // A module of validators, as a star import would hand one in `sources`: made in a call of its own

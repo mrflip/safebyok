@@ -1,7 +1,7 @@
 /** What the deviceDB stores and takes, and their checkers, imported as `DS`. */
 
 import type * as Z from 'zod'
-import { Checker, Checkers } from '../checks/validator'
+import { Checker, Checkers } from '../helpers/validator'
 import * as FX from '../shapes/fields'
 
 export const leaseQuery = Checker(({ obj, applabel, user_id, vaultlabel, vault_tok }) => obj({ applabel, user_id, vaultlabel, vault_tok }), 'bad_scope', [FX])

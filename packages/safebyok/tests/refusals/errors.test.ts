@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf, thrownNameOf } from '../src/errors'
+import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf, thrownNameOf } from '../../src/refusals/errors'
 
-const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
+const readmeText = readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
+const errorsSource = readFileSync(new URL('../../src/refusals/errors.ts', import.meta.url), 'utf8')
 
 /** The text of errors.ts from `from` up to the next `until`. */
 const sourceBetween = (from: string, until: string): string => {
@@ -207,7 +208,7 @@ describe("isVaultError", () => {
 
   it("is false for a VaultError of another copy of safebyok, as an ESM and a CJS build loaded side by side make: it is a foreign throw", async () => {
     vi.resetModules()
-    const Other = await import('../src/errors')
+    const Other = await import('../../src/refusals/errors')
     expect(Other.VaultError).to.not.eq(VaultError)
     expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'))).to.be.false
   })

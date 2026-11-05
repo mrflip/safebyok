@@ -1,6 +1,6 @@
-import { Checkers } from '../checks/validator'
-import { decorate, tattoo } from '../helpers'
-import { passkeyHeldAlready } from '../helpers/throwers'
+import { Checkers } from '../helpers/validator'
+import { decorate, tattoo } from '../helpers/helpers'
+import { passkeyHeldAlready } from '../refusals/throwers'
 import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultStamp, type WayinHeader, FirstGateEpoch, gateProps, vaultStamp } from './models-shapes'
 import { Wayin } from './wayin'
 

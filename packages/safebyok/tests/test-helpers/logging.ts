@@ -1,6 +1,6 @@
-import type { VaultLogger } from '../../src/logger'
-import { consoleLogger } from '../../src/console-logger'
-import { TestDeriverNotice } from '../../src/phrases'
+import type { VaultLogger } from '../../src/helpers/logger'
+import { consoleLogger } from '../../src/helpers/console-logger'
+import { TestDeriverNotice } from '../../src/helpers/phrases'
 
 
 /** One call a {@link spyLogger} heard: which of the three, and what it was handed. */

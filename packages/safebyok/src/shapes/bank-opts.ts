@@ -1,16 +1,16 @@
 /** What `Bank.make` and `bank.ensureVault` take: their options, the defaults and the limits. Each `parse` refuses 'bad_option'. The shapes of the stores, libraries and callbacks a host hands in are `./host-code`'s. */
 
 import type * as Z from 'zod'
-import { MinuteMillis, ForeverMillis, FarPast, FarFuture } from '../consts'
-import type { VaultError } from '../errors'
+import { MinuteMillis, ForeverMillis, FarPast, FarFuture } from '../helpers/consts'
+import type { VaultError } from '../refusals/errors'
 import type { DeviceDB } from '../storage/device-db-new'
 import type { RequestCleartext } from '../models/models-shapes'
 import type { KeyDeriver } from '../deriver/basederiver'
-import type { VaultLogger } from '../logger'
-import { type StrengthChecker, DefaultStrengthChecker } from '../passphrase-strength'
+import type { VaultLogger } from '../helpers/logger'
+import { type StrengthChecker, DefaultStrengthChecker } from '../helpers/passphrase-strength'
 import type { VaultDB } from '../storage/vault-db-new'
-import * as Phrases from '../phrases'
-import { Checkers } from '../checks/validator'
+import * as Phrases from '../helpers/phrases'
+import { Checkers } from '../helpers/validator'
 import * as VX from './vault'
 
 // == [Defaults]: LeaseHours, StaleMinutes, MaxLeaseHours, MaxWhisperBytes, MaxBoxes, Clock, wallClock

@@ -1,7 +1,7 @@
 /** The deviceDB: what the slim models cache on this device, a lease for each vault and one device record for the bank, and every invariant of the verbs. A subclass writes only the generic `do*` calls, each one atomic step. */
 
-import { isVaultError } from '../errors'
-import { type Outcome, outcomeOf } from '../outcome'
+import { isVaultError } from '../refusals/errors'
+import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from './device-db-refusals'
 import * as DS from './device-db-shapes'
 import type { VaultScope } from '../shapes/scopes'

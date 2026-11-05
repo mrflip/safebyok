@@ -2,11 +2,11 @@
 
 import { string as zodString } from 'zod'
 import type * as Z from 'zod'
-import { Checker, Checkers, objCheck } from '../checks/validator'
-import * as Phrases from '../phrases'
-import { PasskeySaltBytes } from '../consts'
-import { fromB64OrNull } from '../crypto'
-import type { StrengthChecker } from '../passphrase-strength'
+import { Checker, Checkers, objCheck } from '../helpers/validator'
+import * as Phrases from '../helpers/phrases'
+import { PasskeySaltBytes } from '../helpers/consts'
+import { fromB64OrNull } from '../helpers/crypto'
+import type { StrengthChecker } from '../helpers/passphrase-strength'
 import * as FX from './fields'
 
 // == [Formats]: VaultFormat, TombstoneFormat
@@ -30,7 +30,7 @@ export const wayinKindVals = ['passphrase', 'passkey'] as const
 export const wayinkind = Checker(({ oneof }) => oneof(wayinKindVals), 'bad_option')
 export type WayinKind = typeof wayinKindVals[number]
 
-export { PasskeySaltBytes } from '../consts'
+export { PasskeySaltBytes } from '../helpers/consts'
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
 export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes

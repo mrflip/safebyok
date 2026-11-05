@@ -4,8 +4,8 @@
  */
 
 import { base64urlnopad } from '@scure/base'
-import { VaultError } from './errors'
-import type { Ciphered } from './shapes/fields'
+import { VaultError } from '../refusals/errors'
+import type { Ciphered } from '../shapes/fields'
 import { stableJsonify } from './stable-jsonify'
 
 /** `count` cryptographically secure random bytes, from the platform. */

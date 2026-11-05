@@ -1,7 +1,7 @@
 /** What a VaultDB's verbs take and answer: the expectations a write is proven against, a vault's capacity, and the answers of a vault read. Each `parse` refuses 'bad_record'. */
 
 import type * as Z from 'zod'
-import { Checker, Checkers, objCheck } from '../checks/validator'
+import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { BoxSparse, BoxDamaged, DamagedBoxRecord } from './box'
 import * as BX from './box'
 import * as VX from './vault'

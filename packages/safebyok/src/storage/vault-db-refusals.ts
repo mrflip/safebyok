@@ -1,6 +1,6 @@
 /** The refusals of a vaultDB, each read the same in an answer and an error: `meta` holds the `world` and `dbhas` the answer carries. */
 
-import { VaultError } from '../errors'
+import { VaultError } from '../refusals/errors'
 import type { Capacity } from '../shapes/vault-db'
 import type { BoxRow, VaultRow } from './vault-db-shapes'
 

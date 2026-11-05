@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { VaultError } from '../src/errors'
-import * as Refusals from '../src/refusals'
-import * as TH from './test-helpers'
+import { VaultError } from '../../src/refusals/errors'
+import * as Refusals from '../../src/refusals/refusals'
+import * as TH from '../test-helpers'
 
 describe("Refusals.storageUnavailable", () => {
   it("refuses as storage_unavailable, saying to try again, the backend's error as its cause", () => {

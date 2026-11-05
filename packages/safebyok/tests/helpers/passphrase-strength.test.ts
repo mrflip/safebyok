@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, loadStrengthChecker, type StrengthChecker } from '../src/passphrase-strength'
-import type { PassphraseVerdict } from '../src/shapes/vault'
-import type { VaultScope } from '../src/shapes/scopes'
-import { VaultError } from '../src/errors'
-import * as TH from './test-helpers'
+import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, loadStrengthChecker, type StrengthChecker } from '../../src/helpers/passphrase-strength'
+import type { PassphraseVerdict } from '../../src/shapes/vault'
+import type { VaultScope } from '../../src/shapes/scopes'
+import { VaultError } from '../../src/refusals/errors'
+import * as TH from '../test-helpers'
 
 /** The scope the tests hand a strength checker. */
 const scope: VaultScope = TH.scopeOf('u1')
@@ -148,7 +148,7 @@ describe("loadStrengthChecker", () => {
 })
 
 describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason points at", () => {
-  const customization = readFileSync(new URL('../CUSTOMIZATION.md', import.meta.url), 'utf8')
+  const customization = readFileSync(new URL('../../CUSTOMIZATION.md', import.meta.url), 'utf8')
 
   it("finds every passphrase weak, with a reason for the user that quotes none, as its example shows", async () => {
     for (const passphrase of ['correct horse battery staple', 'pw', '']) {

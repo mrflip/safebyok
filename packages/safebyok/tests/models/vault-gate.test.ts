@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import { type GatingKind, Promptly } from '../../src/models/models-shapes'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'

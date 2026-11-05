@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { stableJsonify } from '../src/stable-jsonify'
+import { stableJsonify } from '../../src/helpers/stable-jsonify'
 
 describe("stableJsonify", () => {
   it("serializes equal bags identically whatever order their fields were assigned", () => {

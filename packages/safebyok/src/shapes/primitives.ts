@@ -5,8 +5,8 @@
 
 import { number as num, string as str } from 'zod'
 import type * as Z from 'zod'
-import { FarFuture, FarPast } from '../consts'
-import * as Phrases from '../phrases'
+import { FarFuture, FarPast } from '../helpers/consts'
+import * as Phrases from '../helpers/phrases'
 
 // == [Labels]: MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id
 

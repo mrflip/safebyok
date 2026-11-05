@@ -1,14 +1,14 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { omit } from 'es-toolkit'
-import { VaultError } from '../errors'
-import { type Outcome, outcomeOf, valOf } from '../outcome'
-import * as Phrases from '../phrases'
+import { VaultError } from '../refusals/errors'
+import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
+import * as Phrases from '../helpers/phrases'
 import { type VaultScope, vaultScope } from '../shapes/scopes'
 import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../helpers/throwers'
+import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import { Listing } from './listing'
 import { type AnyGating, type BoxesListed, type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from './models-shapes'

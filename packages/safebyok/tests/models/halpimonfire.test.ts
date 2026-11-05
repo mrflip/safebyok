@@ -1,7 +1,7 @@
 /** A `lock()` crossing a put, an unlock's proof or a box verb, and what can reject a gate change after its record is stored. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import { Proving } from '../../src/models/proving'

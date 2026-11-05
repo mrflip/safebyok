@@ -1,5 +1,5 @@
-import { cipherCtx } from '../crypto'
-import { tattoo } from '../helpers'
+import { cipherCtx } from '../helpers/crypto'
+import { tattoo } from '../helpers/helpers'
 import type * as FX from '../shapes/fields'
 import { type VaultStamp, type WayinHeader, type WayinKind, type WayinRecord, vaultStamp, wayinHeader, wayinRecord } from './models-shapes'
 

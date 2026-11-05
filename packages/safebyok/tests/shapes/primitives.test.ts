@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
 import { LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern } from '../../src/shapes/primitives'
 import * as PX from '../../src/shapes/primitives'
-import { FarFuture, FarPast } from '../../src/consts'
+import { FarFuture, FarPast } from '../../src/helpers/consts'
 
 const LabelCases = [
   // regular usage:

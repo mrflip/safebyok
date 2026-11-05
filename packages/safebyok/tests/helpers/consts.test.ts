@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FarFuture, FarPast, ForeverMillis } from '../src/consts'
+import { FarFuture, FarPast, ForeverMillis } from '../../src/helpers/consts'
 
 describe("FarFuture", () => {
   it("is the microsecond epochalypse: the last millisecond whose epoch microseconds are a safe integer", () => {

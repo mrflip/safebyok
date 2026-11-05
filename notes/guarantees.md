@@ -22,7 +22,7 @@ guarantees until shown otherwise.
 
 | File | What it keeps |
 |---|---|
-| `packages/safebyok/src/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
+| `packages/safebyok/src/helpers/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
 | `packages/safebyok/src/proving.ts` | the passphrase and PRF answer made into a wayinKey; every wrap and unwrap of the vaultKey under one; the lease grant |
 | `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `KeptLease`, the store's edge, which holds a lease record read back closed |
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |

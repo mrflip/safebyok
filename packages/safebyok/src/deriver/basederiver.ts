@@ -1,5 +1,5 @@
-import { VaultError } from '../errors'
-import * as Phrases from '../phrases'
+import { VaultError } from '../refusals/errors'
+import * as Phrases from '../helpers/phrases'
 import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefix, keyDeriverSpec } from './shapes'
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
