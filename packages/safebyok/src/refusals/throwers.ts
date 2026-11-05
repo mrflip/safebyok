@@ -1,3 +1,16 @@
+/** The throwers: every refusal the core raises is made here, from a phrase in helpers/phrases.ts, so they are audited in one place.
+ *
+ * A refusal kind earns its place one of three ways: the core or a host routes on it; it gives a material head start in
+ * debugging (this is a package bug for sure; the vault was not tombstoned but disappeared; a check that should be
+ * impossible to fail did); or it groups throwers that tell one story. Guessing which of two ways a strict object check
+ * failed is no head start. The stronger rule is "don't make me read": a finer kind must be worth the reading it costs.
+ *
+ * A thrower's name, its kind and its phrase's name agree; the phrase is of a piece with the kind, mirroring, containing or
+ * eliding its words; and all three read naturally at the call site. A caller passes what it has on hand and trusts the
+ * thrower to sanitize and cherry-pick. A name carries no "error" or "refusal", ends in "issue" at a loss, and is
+ * empathetic and frank to the person who trusted us with their data, and readable to the coder. Reuse is welcome, never
+ * forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged. */
+
 import { PassphraseKeyBytes } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
 import * as Phrases   from '../helpers/phrases'
