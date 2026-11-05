@@ -15,7 +15,7 @@ describe("stableJsonify", () => {
     expect(stableJsonify([3, 1, 2])).to.eq('[3,1,2]')
   })
 
-  it("handles primitives and null as JSON.stringify does", () => {
+  it("matches JSON.stringify on primitives and null", () => {
     expect(stableJsonify('hi')).to.eq('"hi"')
     expect(stableJsonify(null)).to.eq('null')
     expect(stableJsonify(42)).to.eq('42')
