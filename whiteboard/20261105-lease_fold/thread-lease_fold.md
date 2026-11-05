@@ -1,6 +1,6 @@
 # Thread: lease_fold (2026-11-05)
 
-Branch `20261105-lease_fold`, PR #494 (draft), on main at `eb7a4447`: #491 and #492 merged before the first push, so it is not stacked. Justify: see the PR's **Tests:** line.
+Branch `20261105-lease_fold`, PR #494 (draft), on main at `eb7a4447`: #491 and #492 merged before the first push, so it is not stacked. Justify: exit 0 at `3d47dda3`, every package; `safebyok` 60 files, 1773 passed, across the tree 7338 passed, 113 skipped, size budget within limits.
 
 * **Built**:
   * `LOCKED`, `LockedBag`, `IsListing`, `isListing` in `helpers/consts.ts`.
@@ -23,10 +23,10 @@ Branch `20261105-lease_fold`, PR #494 (draft), on main at `eb7a4447`: #491 and #
   * Not stacked on #492, as the handoff expected: it merged first.
   * `#runBirth`'s `Vault.launchBirth` guards stay at the entrypoint, and `prior` is read at launch as before, so `LaunchArgs` carries it.
   * `parse` of the next wayin record now runs before `landGate` rather than inside its commit closure: the same tick, nothing awaited between.
-  * Two commits touch `notes/guarantees.md` and one `notes/security.md` (by a subagent), for names that moved.
+  * `notes/guarantees.md`, `VOCABULARY.md` and `notes/security.md` (the last by a subagent, unread by this thread) follow the names that moved.
 
 * **Discoveries**:
-  * The ordering check: a scratch vitest file, not committed, logs each vaultDB, deviceDB, listing, proving and lease call and answer, with the microtask ticks since the last event and the lock state, over 19 scenarios (each gate change, lock crossings at the commit's start and landing and at the renewal's lease, a stale commit, a birth that loses to another tok, `identity_revoked`, a refused cache, a refused erase), on `eb7a4447` and on this branch. 227 events, identical but for one: `evict` is now called with the slot already null where it was called just before, in the same tick from Item 2, which the trace's own hook alone can see.
+  * The ordering check: a scratch vitest file, not committed, logs each vaultDB, deviceDB, listing, proving and lease call and answer, with the microtask ticks since the last event and the lock state, over 19 scenarios (each gate change, lock crossings at the commit's start and landing and at the renewal's lease, a stale commit, a birth that loses to another tok, `identity_revoked`, a refused cache, a refused erase), on `eb7a4447` and on this branch. 227 events, identical but for one: `evict` is now called with the slot already null where it was called just before, in the same tick, from the erase's fold, which only the trace's own hook can see.
   * The trace's gaps are marked `far` across WebCrypto, where ticks do not count; order is still compared there.
 
 * **For the Coach**:
