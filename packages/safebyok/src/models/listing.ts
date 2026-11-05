@@ -5,7 +5,7 @@ import { VaultError, isVaultError } from '../refusals/errors'
 import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { IfAbsent, LockState } from '../shapes/shapes-enums'
 import type { Clock } from '../shapes/shapes-core'
-import * as VS from '../shapes/shapes-storage'
+import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type FetchOpts, type ListingAnswer, type ListingOpts, type ListingWorld, type PutListingOpts, type SlotFate, type SparseBase, type Thing, IsListing } from '../shapes/shapes-vaultish'
@@ -159,8 +159,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** A tombstone over `sparse`'s own revision, and its answer delivered. */
   protected async delOver(sparse: SparseT): Promise<ThingT | null> {
     this.demandEnabled()
-    const prior = VS.revisionOf(sparse)
-    const tombstone = { ...sparse, ...VS.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
+    const prior = SX.revisionOf(sparse)
+    const tombstone = { ...sparse, ...SX.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
     return this.deliver(await this.tryDelRow(tombstone, { prior }))
   }
 
@@ -231,7 +231,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #makeThingOf(sparse: SparseT): ThingT {
     const vault_tok = this.vaultTokOfWorld()
     if (vault_tok !== null && sparse.vault_tok !== vault_tok) { throw otherVaultTokAtBirth() }
-    return this.makeThing({ ...sparse, ...VS.VoidRevision, am: 'x' })
+    return this.makeThing({ ...sparse, ...SX.VoidRevision, am: 'x' })
   }
 
   /** Hold `thing`, born here, under its scope, and make the listing's snapshot again on each change of the thing's. */

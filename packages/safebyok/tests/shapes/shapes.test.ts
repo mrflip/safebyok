@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import * as EX from '../../src/shapes/shapes-enums'
-import * as VS from '../../src/shapes/shapes-storage'
+import * as SX from '../../src/shapes/shapes-storage'
 import * as GX from '../../src/shapes/shapes-gateish'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
@@ -158,11 +158,11 @@ describe("EX.amVals, EX.tombstoneAmVals and the checks of what the base knows of
 
     it("passes the void row a sentinel makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
       const scope = { applabel: 'testapp', user_id: 'u1', vaultlabel: 'default', boxlabel: 'anthropic_api_key' }
-      const sentinel = VS.sentinelBoxOf(scope, 'vault-tok-1')
-      expect(VS.boxTombstone.parse(sentinel)).to.deep.include({ ...VS.VoidRevision, box_tok: VS.VoidLifeTok, registered_at: VS.VoidTime, written_at: VS.VoidTime, am: 'x' })
-      expect(new Date(VS.VoidTime).toISOString()).to.eq('2008-08-08T08:08:08.777Z')
-      expect(VS.VoidRevisionTok).to.eq('00000000-0000-0000-0000-000000000000')
-      expect(VS.VoidLifeTok).to.eq('00000000-0000-0000-0000-000000000000')
+      const sentinel = SX.sentinelBoxOf(scope, 'vault-tok-1')
+      expect(SX.boxTombstone.parse(sentinel)).to.deep.include({ ...SX.VoidRevision, box_tok: SX.VoidLifeTok, registered_at: SX.VoidTime, written_at: SX.VoidTime, am: 'x' })
+      expect(new Date(SX.VoidTime).toISOString()).to.eq('2008-08-08T08:08:08.777Z')
+      expect(SX.VoidRevisionTok).to.eq('00000000-0000-0000-0000-000000000000')
+      expect(SX.VoidLifeTok).to.eq('00000000-0000-0000-0000-000000000000')
     })
   })
 })

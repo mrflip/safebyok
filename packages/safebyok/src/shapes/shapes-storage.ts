@@ -1,4 +1,4 @@
-/** What the vaultDB and the deviceDB store and take, and their helpers. Imported as `VS`. */
+/** What the vaultDB and the deviceDB store and take, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'

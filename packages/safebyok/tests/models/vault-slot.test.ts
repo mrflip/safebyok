@@ -4,7 +4,7 @@ import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
-import * as VS from '../../src/shapes/shapes-storage'
+import * as SX from '../../src/shapes/shapes-storage'
 import type { AnyGating } from '../../src/shapes/shapes-gateish'
 import type { VaultRecord } from '../../src/shapes/shapes-vaultish'
 import { Vault } from '../../src/models/vault'
@@ -31,11 +31,11 @@ const deleted = async () => {
   const world = await makeBornVault()
   await delTyping(world.vault)
   await erased()
-  return { ...world, tombstone: VS.revisionOf(world.demandStored()) }
+  return { ...world, tombstone: SX.revisionOf(world.demandStored()) }
 }
 
 /** The record of a vault's birth over `prior`, as a birth's `listing.put` is handed it. */
-const birthOver = async (prior: VS.Revision): Promise<VaultRecord> => ({ ...await storedVaultRecord(), ...VS.nextRevisionOf(prior, Date.now()) })
+const birthOver = async (prior: SX.Revision): Promise<VaultRecord> => ({ ...await storedVaultRecord(), ...SX.nextRevisionOf(prior, Date.now()) })
 
 const expectLandedGone = async (vault: Vault, { listing, deviceDB }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing' | 'deviceDB'>) => {
   await erased()
@@ -294,8 +294,8 @@ describe("building over a tombstone", () => {
 
   it("a birth's listing.put, nothing ever stored: lands over never stored", async () => {
     const { listing } = makeVaultWorld()
-    const record = await birthOver(VS.VoidRevision)
-    const born = await listing.put(record, { prior: VS.VoidRevision, ifAbsent: 'add', ifPresent: 'get' })
+    const record = await birthOver(SX.VoidRevision)
+    const born = await listing.put(record, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' })
     expect(born.vault_tok).to.eq(record.vault_tok)
   })
 
@@ -324,7 +324,7 @@ describe("building over a tombstone", () => {
 describe("the entrypoints, handed rubble", () => {
   it("a birth's listing.put refuses a record that is no record, storing nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: VS.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }), 'bad_record')
+    await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }), 'bad_record')
     expect(storedNow()).to.be.null
   })
 
@@ -362,7 +362,7 @@ describe("a damaged row", () => {
     const stored = demandStored()
     for (const raw of [rubble, { ...stored, gate: 'chewed' }]) {
       restoreRow(raw as never)
-      await listing.del(VS.damagedVaultOf(Dna, raw))
+      await listing.del(SX.damagedVaultOf(Dna, raw))
       expect(storedNow()).to.include({ am: 'x' })
     }
   })
@@ -376,7 +376,7 @@ describe("a damaged row", () => {
     for (const raw of [{ garbage: true }, { ...boxrows.get(BoxDna.boxlabel) as object, whisper_ciphered: 'chewed' }]) {
       boxrows.set(BoxDna.boxlabel, raw)
       const session = await anotherSession().build(demandStored())
-      await session.boxListing.del(VS.damagedBoxOf(scope, vault.vault_tok, raw))
+      await session.boxListing.del(SX.damagedBoxOf(scope, vault.vault_tok, raw))
       expect(boxrows.get(BoxDna.boxlabel)).to.include({ am: 'x' })
     }
     expect(vault.isPresent).to.be.true

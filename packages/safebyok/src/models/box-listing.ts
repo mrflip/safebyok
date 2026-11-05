@@ -4,7 +4,7 @@ import { VaultError } from '../refusals/errors'
 import { absentBoxError, notListedBoxError } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, boxscope } from '../shapes/shapes-core'
-import * as VS from '../shapes/shapes-storage'
+import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import { type BoxCreateOpts, type BoxDna, type BoxesListed, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from '../shapes/shapes-vaultish'
@@ -92,7 +92,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** A void box held under `scope`. */
-  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(VS.sentinelBoxOf(scope, this.world.vault_tok)) }
+  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 
   // == [Defined by the box listing]

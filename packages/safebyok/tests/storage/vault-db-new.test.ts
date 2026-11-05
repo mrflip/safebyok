@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import * as VS from '../../src/shapes/shapes-storage'
+import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxRecord, BoxTombstone, Revision, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
 
 const bankScope  = { applabel: 'acme', user_id: 'u1' }
@@ -11,23 +11,23 @@ const Now = Date.UTC(2026, 9, 15)
 
 const ciphered = { cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q' }
 
-const passphraseWayin = VS.passphraseWayin.parse({ wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA', device_id: 'd1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
-const passkeyWayin = VS.passkeyWayin.parse({ wayinkind: 'passkey', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), device_id: 'd1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
+const passphraseWayin = SX.passphraseWayin.parse({ wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA', device_id: 'd1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
+const passkeyWayin = SX.passkeyWayin.parse({ wayinkind: 'passkey', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), device_id: 'd1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
 
-const vaultAt = (revision_seq = 0, vault_tok = 'life1'): VaultRecord => VS.vaultRecord.parse({
-  ...vaultScope, fmt: VS.VaultFormat, revision_tok: `vrev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', vault_tok,
+const vaultAt = (revision_seq = 0, vault_tok = 'life1'): VaultRecord => SX.vaultRecord.parse({
+  ...vaultScope, fmt: SX.VaultFormat, revision_tok: `vrev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', vault_tok,
   gate: { gate_epoch: 1, passphrase_wayin: passphraseWayin, passkey_wayin: null },
 })
 
-const boxAt = (revision_seq = 0, vault_tok = 'life1', extra: object = {}): BoxRecord => VS.boxRecord.parse({
-  ...boxscope, fmt: VS.BoxFormat, revision_tok: `brev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', vault_tok, box_tok: 'box1',
+const boxAt = (revision_seq = 0, vault_tok = 'life1', extra: object = {}): BoxRecord => SX.boxRecord.parse({
+  ...boxscope, fmt: SX.BoxFormat, revision_tok: `brev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', vault_tok, box_tok: 'box1',
   whisper_codec: 'json_v1', whisper_schema_version: 1, sidecar: {}, box_key_wrapped: ciphered, whisper_ciphered: ciphered,
   ...extra,
 })
 
 const tombstoneFieldsOf = ({ revision_tok, revision_seq }: Revision) => ({ revision_tok: `${revision_tok}x`, revision_seq: revision_seq + 1, am: 'x' as const })
-const vaultTombstoneOf = (record: VaultRecord): VaultTombstone => VS.vaultTombstone.parse({ ...VS.vaultSparse.parse(record), ...tombstoneFieldsOf(record) })
-const boxTombstoneOf = (record: BoxRecord): BoxTombstone => VS.boxTombstone.parse({ ...VS.boxSparse.parse(record), ...tombstoneFieldsOf(record) })
+const vaultTombstoneOf = (record: VaultRecord): VaultTombstone => SX.vaultTombstone.parse({ ...SX.vaultSparse.parse(record), ...tombstoneFieldsOf(record) })
+const boxTombstoneOf = (record: BoxRecord): BoxTombstone => SX.boxTombstone.parse({ ...SX.boxSparse.parse(record), ...tombstoneFieldsOf(record) })
 
 const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
   try { await thunk() } catch (err) { return err }
@@ -37,16 +37,16 @@ const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
 /** A gate verb's params: a vault record holding a gate that holds the wayin. */
 const paramsOf = (vault: VaultRecord, gate: object) => ({ ...vault, gate }) as never
 
-const priorOf = VS.revisionOf
+const priorOf = SX.revisionOf
 const stale: Revision = { revision_tok: 'nope', revision_seq: 7 }
 
 /** A store holding a live vault, and a live box when asked. */
 const storeWith = async (opts: { box?: boolean } = {}) => {
   const vaultDB = new MemoryVaultDB({ clock: { now: () => Now + 1 } })
   const vault = vaultAt()
-  await vaultDB.putVault(vault, { prior: VS.VoidRevision })
+  await vaultDB.putVault(vault, { prior: SX.VoidRevision })
   const box = boxAt()
-  if (opts.box) { await vaultDB.putBox(box, { prior: VS.VoidRevision }) }
+  if (opts.box) { await vaultDB.putBox(box, { prior: SX.VoidRevision }) }
   return { vaultDB, vault, box }
 }
 
@@ -76,14 +76,14 @@ describe("MemoryVaultDB", () => {
       expect(val.vaults).to.deep.equal([vault])
       expect(val.damaged_records.map(({ vaultlabel, am, revision_seq, vault_tok }) => ({ vaultlabel, am, revision_seq, vault_tok }))).to.deep.equal([
         { vaultlabel: 'broken', am: 'd', revision_seq: 9, vault_tok: 'life9' },
-        { vaultlabel: 'rubble', am: 'd', revision_seq: VS.VoidRevisionSeq, vault_tok: VS.VoidRevisionTok },
+        { vaultlabel: 'rubble', am: 'd', revision_seq: SX.VoidRevisionSeq, vault_tok: SX.VoidRevisionTok },
       ])
-      for (const damaged of val.damaged_records) { expect(VS.vaultSparse.safeParse(damaged).success).to.be.true }
+      for (const damaged of val.damaged_records) { expect(SX.vaultSparse.safeParse(damaged).success).to.be.true }
     })
 
     it("says format_mismatch of a row of a later fmt, and damaged_record of any other it sets aside", async () => {
       const { vaultDB } = await storeWith()
-      vaultDB._cheat_vaultRowsOf(bankScope).set('newer', { fmt: VS.VaultFormat + 1, revision_seq: 9 })
+      vaultDB._cheat_vaultRowsOf(bankScope).set('newer', { fmt: SX.VaultFormat + 1, revision_seq: 9 })
       vaultDB._cheat_vaultRowsOf(bankScope).set('rubble', 'not even an object')
       const { val } = await vaultDB.getBank(bankScope)
       expect(val.damaged_records.map(({ vaultlabel, damagekind }) => ({ vaultlabel, damagekind }))).to.deep.equal([
@@ -105,20 +105,20 @@ describe("MemoryVaultDB", () => {
     it("answers the record, its sparse boxes tombstones included, and the rows it set aside", async () => {
       const { vaultDB, vault, box } = await storeWith({ box: true })
       const other = boxAt(0, 'life1', { boxlabel: 'other' })
-      await vaultDB.putBox(other, { prior: VS.VoidRevision })
+      await vaultDB.putBox(other, { prior: SX.VoidRevision })
       await vaultDB.delBox(boxTombstoneOf(other), { prior: priorOf(other) })
       vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('rubble', 12)
       const { act, val, world } = await vaultDB.getVault(vaultScope)
       expect(act).to.eq('got')
       expect(world).to.deep.equal(vault)
       expect(val?.gate).to.deep.equal(vault.gate)
-      expect(val?.boxes).to.deep.equal([VS.boxSparse.parse(box), VS.boxSparse.parse(boxTombstoneOf(other))])
+      expect(val?.boxes).to.deep.equal([SX.boxSparse.parse(box), SX.boxSparse.parse(boxTombstoneOf(other))])
       expect(val?.damaged_records.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
     })
 
     it("says format_mismatch of a box row of a later fmt", async () => {
       const { vaultDB, vault } = await storeWith()
-      vaultDB._cheat_boxRowsOf(vaultScope, vault.vault_tok).set('newer', { fmt: VS.BoxFormat + 1 })
+      vaultDB._cheat_boxRowsOf(vaultScope, vault.vault_tok).set('newer', { fmt: SX.BoxFormat + 1 })
       const { val } = await vaultDB.getVault(vaultScope)
       expect(val?.damaged_records.map(({ boxlabel, damagekind }) => ({ boxlabel, damagekind }))).to.deep.equal([{ boxlabel: 'newer', damagekind: 'format_mismatch' }])
     })
@@ -135,7 +135,7 @@ describe("MemoryVaultDB", () => {
       const vaultDB = new MemoryVaultDB()
       const answer = await vaultDB.tryGetVault(vaultScope)
       expect(answer).to.deep.include({ ok: false, act: 'vault_empty', dbhas: null })
-      expect(answer.world).to.deep.equal(VS.sentinelVaultOf(vaultScope))
+      expect(answer.world).to.deep.equal(SX.sentinelVaultOf(vaultScope))
       const nil = await vaultDB.getVault(vaultScope, { ifAbsent: 'nil' })
       expect(nil).to.deep.include({ act: 'gotvoid', val: null, dbhas: null })
     })
@@ -153,7 +153,7 @@ describe("MemoryVaultDB", () => {
       const { vaultDB } = await storeWith()
       vaultDB._cheat_vaultRowsOf(bankScope).set('main', { garbage: true })
       expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'damaged_record', world: null, req_params: vaultScope })
-      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { fmt: VS.VaultFormat + 1 })
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { fmt: SX.VaultFormat + 1 })
       expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'newer_format', world: null })
     })
   })
@@ -190,10 +190,10 @@ describe("MemoryVaultDB", () => {
     it("refuses vault_empty for a vault_tok no row holds, over no row or another life's tombstone", async () => {
       const vaultDB = new MemoryVaultDB()
       const asked = { ...boxscope, vault_tok: 'oldlife' }
-      const sentinel = VS.sentinelVaultOf(vaultScope, 'oldlife')
+      const sentinel = SX.sentinelVaultOf(vaultScope, 'oldlife')
       expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, act: 'vault_empty', world: sentinel, dbhas: null })
       const vault = vaultAt()
-      await vaultDB.putVault(vault, { prior: VS.VoidRevision })
+      await vaultDB.putVault(vault, { prior: SX.VoidRevision })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, act: 'vault_empty', world: sentinel, dbhas: null })
     })
@@ -227,8 +227,8 @@ describe("MemoryVaultDB", () => {
     it("over a live row, ifPresent get answers it as declined, and fail refuses camped, neither saving", async () => {
       const { vaultDB, vault } = await storeWith()
       const rival = vaultAt(0, 'life2')
-      expect(await vaultDB.putVault(rival, { prior: VS.VoidRevision, ifPresent: 'get' })).to.deep.include({ act: 'declined', val: vault, world: vault, req_params: { ...vaultScope, vault_tok: 'life2', revision_tok: rival.revision_tok, revision_seq: 0, prior: VS.VoidRevision } })
-      expect(await vaultDB.tryPutVault(rival, { prior: VS.VoidRevision, ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: vault, world: vault })
+      expect(await vaultDB.putVault(rival, { prior: SX.VoidRevision, ifPresent: 'get' })).to.deep.include({ act: 'declined', val: vault, world: vault, req_params: { ...vaultScope, vault_tok: 'life2', revision_tok: rival.revision_tok, revision_seq: 0, prior: SX.VoidRevision } })
+      expect(await vaultDB.tryPutVault(rival, { prior: SX.VoidRevision, ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: vault, world: vault })
       expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault), ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: vault })
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
@@ -246,9 +246,9 @@ describe("MemoryVaultDB", () => {
 
     it("refuses invalid_input for a record's revision_seq not one past its prior's, and for a bad field, quoting none of it", async () => {
       const vaultDB = new MemoryVaultDB()
-      expect(await vaultDB.tryPutVault(vaultAt(3), { prior: VS.VoidRevision })).to.deep.include({ ok: false, act: 'invalid_input' })
+      expect(await vaultDB.tryPutVault(vaultAt(3), { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'invalid_input' })
       const secretish = 'hunter2'
-      const answer = await vaultDB.tryPutVault({ ...vaultAt(), vaultlabel: `${secretish}^^bad label` }, { prior: VS.VoidRevision })
+      const answer = await vaultDB.tryPutVault({ ...vaultAt(), vaultlabel: `${secretish}^^bad label` }, { prior: SX.VoidRevision })
       expect(answer).to.deep.include({ ok: false, act: 'invalid_input', req_params: {} })
       expect(JSON.stringify([answer.err?.message, answer.req_params])).to.not.include(secretish)
     })
@@ -257,7 +257,7 @@ describe("MemoryVaultDB", () => {
   describe("a birth", () => {
     it("names the whole sentinel as its prior, so a void row takes no record past revision_seq 0", async () => {
       const vaultDB = new MemoryVaultDB()
-      const answer = await vaultDB.tryPutVault(vaultAt(6), { prior: { revision_tok: VS.VoidRevisionTok, revision_seq: 5 } })
+      const answer = await vaultDB.tryPutVault(vaultAt(6), { prior: { revision_tok: SX.VoidRevisionTok, revision_seq: 5 } })
       expect(answer).to.deep.include({ ok: false, act: 'stale_write', dbhas: null })
       expect(vaultDB._cheat_vaultRowsOf(bankScope).size).to.eq(0)
     })
@@ -266,7 +266,7 @@ describe("MemoryVaultDB", () => {
   describe("putBox", () => {
     it("is born, replaced and reborn by the row it lands on, with the vault row as world", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.putBox(box, { prior: VS.VoidRevision })).to.deep.include({ act: 'born', val: box, world: vault })
+      expect(await vaultDB.putBox(box, { prior: SX.VoidRevision })).to.deep.include({ act: 'born', val: box, world: vault })
       const next = boxAt(1)
       expect(await vaultDB.putBox(next, { prior: priorOf(box) })).to.deep.include({ act: 'replaced', val: next, world: vault })
       const tombstone = boxTombstoneOf(next)
@@ -290,18 +290,18 @@ describe("MemoryVaultDB", () => {
 
     it("refuses vault_mismatch under a vault_tok that is not the live one's, and vault_gone under this life's tombstone", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: VS.VoidRevision })).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
+      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
-      expect(await vaultDB.tryPutBox(box, { prior: VS.VoidRevision })).to.deep.include({ ok: false, act: 'vault_gone' })
+      expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'vault_gone' })
     })
 
     it("refuses box_too_large over maxRecordBytes, and vault_full for a new box past maxBoxes", async () => {
       const vaultDB = new MemoryVaultDB({ maxRecordBytes: 2000, maxBoxes: 1 })
-      await vaultDB.putVault(vaultAt(), { prior: VS.VoidRevision })
+      await vaultDB.putVault(vaultAt(), { prior: SX.VoidRevision })
       const heavy = boxAt(0, 'life1', { sidecar: { memo: 'x'.repeat(2000) } })
-      expect(await vaultDB.tryPutBox(heavy, { prior: VS.VoidRevision })).to.deep.include({ ok: false, act: 'box_too_large' })
-      await vaultDB.putBox(boxAt(), { prior: VS.VoidRevision })
-      const full = await vaultDB.tryPutBox(boxAt(0, 'life1', { boxlabel: 'other' }), { prior: VS.VoidRevision })
+      expect(await vaultDB.tryPutBox(heavy, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'box_too_large' })
+      await vaultDB.putBox(boxAt(), { prior: SX.VoidRevision })
+      const full = await vaultDB.tryPutBox(boxAt(0, 'life1', { boxlabel: 'other' }), { prior: SX.VoidRevision })
       expect(full).to.deep.include({ ok: false, act: 'vault_full' })
       expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
       expect(full.req_params).to.include({ boxlabel: 'other' })
@@ -314,7 +314,7 @@ describe("MemoryVaultDB", () => {
 
     it.each(anyIfPresent)("refuses absent_box over a void box row with ifAbsent fail and ifPresent %s", async (ifPresent) => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.tryPutBox(box, { prior: VS.VoidRevision, ifAbsent: 'fail', ifPresent })).to.deep.include({ ok: false, act: 'void', dbhas: null, world: vault })
+      expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision, ifAbsent: 'fail', ifPresent })).to.deep.include({ ok: false, act: 'void', dbhas: null, world: vault })
       expect(vaultDB._cheat_boxRowsOf(boxscope, 'life1').size).to.eq(0)
     })
 
@@ -348,7 +348,7 @@ describe("MemoryVaultDB", () => {
 
     it.each(anyIfPresent)("adds over a void box row or a tombstone at its revision under ifAbsent add and ifPresent %s", async (ifPresent) => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.putBox(box, { prior: VS.VoidRevision, ifAbsent: 'add', ifPresent })).to.deep.include({ act: 'born', val: box, world: vault })
+      expect(await vaultDB.putBox(box, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent })).to.deep.include({ act: 'born', val: box, world: vault })
       const { vaultDB: other, tombstone, reborn } = await withBoxTombstone()
       expect(await other.putBox(reborn, { prior: priorOf(tombstone), ifAbsent: 'add', ifPresent })).to.deep.include({ act: 'reborn', val: reborn })
     })
@@ -363,14 +363,14 @@ describe("MemoryVaultDB", () => {
 
     it("takes ifAbsent add by default, and refuses invalid_input for fetch's nil", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.tryPutBox(box, { prior: VS.VoidRevision, ifAbsent: 'nil' } as never)).to.deep.include({ ok: false, act: 'invalid_input' })
+      expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision, ifAbsent: 'nil' } as never)).to.deep.include({ ok: false, act: 'invalid_input' })
       expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault), ifAbsent: 'nil' } as never)).to.deep.include({ ok: false, act: 'invalid_input' })
-      expect(await vaultDB.putBox(box, { prior: VS.VoidRevision })).to.deep.include({ act: 'born' })
+      expect(await vaultDB.putBox(box, { prior: SX.VoidRevision })).to.deep.include({ act: 'born' })
     })
 
     it.each(['fail', 'get'] as const)("refuses vault_empty over a void vault row and vault_gone over a tombstone, with ifAbsent fail and ifPresent %s", async (ifPresent) => {
       const empty = new MemoryVaultDB()
-      const answer = await empty.tryPutVault(vaultAt(), { prior: VS.VoidRevision, ifAbsent: 'fail', ifPresent })
+      const answer = await empty.tryPutVault(vaultAt(), { prior: SX.VoidRevision, ifAbsent: 'fail', ifPresent })
       expect(answer).to.deep.include({ ok: false, act: 'vault_empty', dbhas: null })
       expect(empty._cheat_vaultRowsOf(bankScope).size).to.eq(0)
       const { vaultDB, vault } = await storeWith()
@@ -399,7 +399,7 @@ describe("MemoryVaultDB", () => {
       const nextBox = boxAt(1)
       expect(await vaultDB.tryPutBox(nextBox, { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_record' })
       expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_record' })
-      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { ...vault, fmt: VS.VaultFormat + 1 })
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { ...vault, fmt: SX.VaultFormat + 1 })
       expect(await vaultDB.tryPutBox(nextBox, { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'newer_format' })
       expect(boxRows.get('openai')).to.deep.equal(box)
     })
@@ -412,7 +412,7 @@ describe("MemoryVaultDB", () => {
       const { act, val, world } = await vaultDB.replacePassphrase(paramsOf(vault, { passphrase_wayin: wayin }))
       expect(act).to.eq('replaced')
       expect(world).to.deep.equal(val)
-      expect(val).to.deep.include({ ...vaultScope, vault_tok: 'life1', registered_at: Now, fmt: VS.VaultFormat, revision_seq: 1, written_at: Now + 1 })
+      expect(val).to.deep.include({ ...vaultScope, vault_tok: 'life1', registered_at: Now, fmt: SX.VaultFormat, revision_seq: 1, written_at: Now + 1 })
       expect(val.revision_tok).to.not.eq(vault.revision_tok)
       expect(val.gate).to.deep.equal({ gate_epoch: 2, passphrase_wayin: wayin, passkey_wayin: null })
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: val })
@@ -478,8 +478,8 @@ describe("MemoryVaultDB", () => {
 
     it("answers void with a sentinel over a void row, and gone with the stored tombstone over a tombstone, whatever the revision", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.delBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ act: 'void', val: VS.sentinelBoxOf(boxscope, 'life1'), world: vault })
-      await vaultDB.putBox(box, { prior: VS.VoidRevision })
+      expect(await vaultDB.delBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ act: 'void', val: SX.sentinelBoxOf(boxscope, 'life1'), world: vault })
+      await vaultDB.putBox(box, { prior: SX.VoidRevision })
       const tombstone = boxTombstoneOf(box)
       await vaultDB.delBox(tombstone, { prior: priorOf(box) })
       expect(await vaultDB.delBox({ ...tombstone, revision_tok: 'again', revision_seq: 8 }, { prior: stale })).to.deep.include({ act: 'gone', val: tombstone, world: vault })
@@ -497,9 +497,9 @@ describe("MemoryVaultDB", () => {
       const tombstone = vaultTombstoneOf(vault)
       expect(await vaultDB.delVault(tombstone, { prior: priorOf(vault) })).to.deep.include({ act: 'deleted', val: tombstone, world: tombstone })
       const [row] = vaultDB._cheat_boxRowsOf(vaultScope, 'life1').values() as Iterable<BoxTombstone>
-      expect(row).to.deep.include({ ...VS.boxSparse.parse(box), am: 'x', revision_seq: 1, written_at: tombstone.written_at, revision_tok: row?.revision_tok })
+      expect(row).to.deep.include({ ...SX.boxSparse.parse(box), am: 'x', revision_seq: 1, written_at: tombstone.written_at, revision_tok: row?.revision_tok })
       expect(row?.revision_tok).to.not.eq(box.revision_tok)
-      expect(VS.boxTombstone.safeParse(row).success).to.be.true
+      expect(SX.boxTombstone.safeParse(row).success).to.be.true
     })
 
     it("refuses stale_write over a live row moved past its prior, holding the row and tombstoning no box", async () => {
@@ -520,7 +520,7 @@ describe("MemoryVaultDB", () => {
       const { vaultDB, vault } = await storeWith()
       const oldBox = boxAt(0, 'oldlife')
       vaultDB._cheat_boxRowsOf(vaultScope, 'oldlife').set('openai', oldBox)
-      const sentinel = VS.sentinelVaultOf(vaultScope, 'oldlife')
+      const sentinel = SX.sentinelVaultOf(vaultScope, 'oldlife')
       const oldLife = vaultAt(0, 'oldlife')
       expect(await vaultDB.delVault(vaultTombstoneOf(oldLife), { prior: priorOf(oldLife) })).to.deep.include({ act: 'void', val: sentinel, world: sentinel })
       expect(vaultDB._cheat_vaultRowsOf(bankScope).get('main')).to.deep.equal(vault)
@@ -535,7 +535,7 @@ describe("MemoryVaultDB", () => {
       const prior = priorOf(vaultAt())
       vaultDB._cheat_vaultRowsOf(bankScope).set('main', { garbage: true })
       expect(await vaultDB.tryDelVault(tombstone, { prior })).to.deep.include({ ok: false, act: 'damaged_record' })
-      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { fmt: VS.VaultFormat + 1 })
+      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { fmt: SX.VaultFormat + 1 })
       expect(await vaultDB.tryDelVault(tombstone, { prior })).to.deep.include({ ok: false, act: 'newer_format' })
       expect(vaultDB._cheat_boxRowsOf(vaultScope, 'life1').get('openai')).to.deep.equal(box)
     })
@@ -546,10 +546,10 @@ describe("MemoryVaultDB", () => {
       const { vaultDB, box } = await storeWith({ box: true })
       const rows = vaultDB._cheat_vaultRowsOf(bankScope)
       rows.set('main', { garbage: true })
-      const tombstone = VS.vaultTombstone.parse({ ...VS.sentinelVaultOf(vaultScope), ...VS.nextRevisionOf(VS.VoidRevision, Now) })
-      const missed = await vaultDB.tryDelVault(tombstone, { prior: { ...VS.VoidRevision, revision_tok: 'nope' } })
+      const tombstone = SX.vaultTombstone.parse({ ...SX.sentinelVaultOf(vaultScope), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
+      const missed = await vaultDB.tryDelVault(tombstone, { prior: { ...SX.VoidRevision, revision_tok: 'nope' } })
       expect(missed).to.deep.include({ ok: false, act: 'damaged_record' })
-      const named = await vaultDB.tryDelVault(tombstone, { prior: VS.VoidRevision })
+      const named = await vaultDB.tryDelVault(tombstone, { prior: SX.VoidRevision })
       expect(named).to.deep.include({ ok: true, act: 'deleted' })
       expect(rows.get('main')).to.include({ am: 'x', revision_seq: 0 })
       expect(vaultDB._cheat_boxRowsOf(vaultScope, 'life1').get('openai')).to.deep.equal(box)
@@ -573,10 +573,10 @@ describe("MemoryVaultDB", () => {
       const { vaultDB, box } = await storeWith({ box: true })
       const rows = vaultDB._cheat_boxRowsOf(vaultScope, 'life1')
       rows.set('openai', { garbage: true })
-      const tombstone = VS.boxTombstone.parse({ ...VS.sentinelBoxOf(boxscope, 'life1'), ...VS.nextRevisionOf(VS.VoidRevision, Now) })
+      const tombstone = SX.boxTombstone.parse({ ...SX.sentinelBoxOf(boxscope, 'life1'), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
       const missed = await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })
       expect(missed).to.deep.include({ ok: false, act: 'damaged_record' })
-      const named = await vaultDB.tryDelBox(tombstone, { prior: VS.VoidRevision })
+      const named = await vaultDB.tryDelBox(tombstone, { prior: SX.VoidRevision })
       expect(named).to.deep.include({ ok: true, act: 'deleted' })
       expect(rows.get('openai')).to.include({ am: 'x', revision_seq: 0 })
     })
@@ -609,7 +609,7 @@ describe("MemoryVaultDB", () => {
       const { vaultDB, vault, box } = await storeWith()
       const notices: unknown[] = []
       const unwatch = vaultDB.watch(vaultScope, (notice) => { notices.push(notice) })
-      await vaultDB.putBox(box, { prior: VS.VoidRevision })
+      await vaultDB.putBox(box, { prior: SX.VoidRevision })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(notices).to.have.lengthOf(3)
       expect(notices[0]).to.deep.equal({ act: 'got', val: box, world: vault })
@@ -665,8 +665,8 @@ describe("MemoryVaultDB", () => {
     it("read the same: a refusal's act, world and dbhas in an answer are its meta in the error", async () => {
       const { vaultDB, vault } = await storeWith()
       const rival = vaultAt(0, 'life2')
-      const answer = await vaultDB.tryPutVault(rival, { prior: VS.VoidRevision, ifPresent: 'fail' })
-      const thrown = await thrownBy(() => vaultDB.putVault(rival, { prior: VS.VoidRevision, ifPresent: 'fail' }))
+      const answer = await vaultDB.tryPutVault(rival, { prior: SX.VoidRevision, ifPresent: 'fail' })
+      const thrown = await thrownBy(() => vaultDB.putVault(rival, { prior: SX.VoidRevision, ifPresent: 'fail' }))
       expect(isVaultError(thrown, 'camped')).to.be.true
       expect(thrown).to.deep.include({ refusalkind: answer.act })
       expect((thrown as { meta: object }).meta).to.deep.include({ world: vault, dbhas: vault, req_params: answer.req_params, call: 'putVault' })

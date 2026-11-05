@@ -5,7 +5,7 @@ import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { type VaultScope, vaultScope } from '../shapes/shapes-core'
-import * as VS from '../shapes/shapes-storage'
+import * as SX from '../shapes/shapes-storage'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../shapes/shapes-storage'
 import type { AnyGating } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
@@ -52,25 +52,25 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
 
   /** Lay a new passphrase wayin on the row, deliver what it stores to the vault held, and answer that record. Nothing locks: the vaultKey does not change. */
-  async replacePassphrase(params: ReplacePassphraseParams): Promise<VS.VaultRecord> {
+  async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
   }
 
   /** Lay a passkey wayin on the row. */
-  async addPasskey(params: AddPasskeyParams): Promise<VS.VaultRecord> {
+  async addPasskey(params: AddPasskeyParams): Promise<SX.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryAddPasskey(params))
   }
 
   /** Null the row's passkey wayin. */
-  async revokePasskey(params: RevokePasskeyParams): Promise<VS.VaultRecord> {
+  async revokePasskey(params: RevokePasskeyParams): Promise<SX.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
   }
 
   /** The record a gate verb stored: the vault held may hold a newer one by the time its answer is delivered. */
-  async #deliverStored(answer: Answer<VS.VaultRecord, string>): Promise<VS.VaultRecord> {
+  async #deliverStored(answer: Answer<SX.VaultRecord, string>): Promise<SX.VaultRecord> {
     await this.deliver(answer)
     return valOf(answer)
   }
