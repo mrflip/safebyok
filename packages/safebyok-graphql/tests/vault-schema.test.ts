@@ -7,11 +7,6 @@ import { VaultOperations } from '../src/graphql-vault-db'
 
 const schema = buildSchema(VaultSchemaSdl)
 
-/** A record's validator, as the core exports it: its fields, each one a validator. */
-// A field is optional when Zod says it may be left out (`optin`), whether or not it takes an undefined;
-// nullable when its validator is Zod's nullable.
-type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safeParse: (val: unknown) => { success: boolean } }> }
-
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
   ['SafebyokVaultScope',         Safebyok.vaultScope.unwrap(), []],
@@ -42,6 +37,11 @@ describe("VaultSchemaSdl", () => {
   })
 
   for (const [typename, recordSchema, leftOut] of RecordTypes) {
+    /** A record's validator, as the core exports it: its fields, each one a validator. */
+    // A field is optional when Zod says it may be left out (`optin`), whether or not it takes an undefined;
+    // nullable when its validator is Zod's nullable.
+    type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safeParse: (val: unknown) => { success: boolean } }> }
+
     it(`gives ${typename} a field for every field of the record it carries, and no other`, () => {
       const recordFields = Object.keys((recordSchema as unknown as RecordSchema).shape).filter((field) => ! (leftOut as readonly string[]).includes(field))
       expect(Object.keys(fieldsOf(typename))).to.have.members(recordFields)

@@ -17,11 +17,11 @@ TH.bootDatabaseFirst()
 
 // ------------------------------------------------------------------------- the server half
 
-/** What each request's resolvers know of it: the user your own auth signed in, or null. */
-type VaultContext = { user_id: string | null }
-
 /** The README's route, over `pool` and `listen`, its signed-in user found by `signedInUserId`. */
 const vaultRoute = (pool: PostgresClient, listen: PostgresListen | undefined, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) => {
+  /** What each request's resolvers know of it: the user your own auth signed in, or null. */
+  type VaultContext = { user_id: string | null }
+
   const schema = createSchema<VaultContext>({
     typeDefs:  [VaultSchemaSdl],
     resolvers: [vaultResolvers({ vaultDBFor: ({ user_id }: VaultContext) => postgresVaultDB({ client: pool, user_id, listen }) })],

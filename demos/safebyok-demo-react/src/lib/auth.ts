@@ -11,13 +11,6 @@ export type Session = {
   userlabel: string
 }
 
-/** The demo's account row, in the pretend-remote database beside the vault rows. */
-type Account = {
-  user_id:       string
-  userlabel:     string
-  registered_at: number
-}
-
 export type Auth = {
   /** Current session or null; same object until it changes (useSyncExternalStore-ready). */
   getSnapshot: () => Session | null
@@ -49,6 +42,13 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
   const { applabel, dbStore, deviceStore, clock = wallClock } = opts
   const accountCkey = (userlabel: string) => `account:${applabel}:${userlabel}`
   const sessionCkey = `session:${applabel}`
+
+  /** The demo's account row, in the pretend-remote database beside the vault rows. */
+  type Account = {
+    user_id:       string
+    userlabel:     string
+    registered_at: number
+  }
 
   /** A new account for `userlabel`, stamped with the clock's reading; null when that is no time the vault would accept. */
   const newAccount = (userlabel: string): Account | null => {

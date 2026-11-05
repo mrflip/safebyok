@@ -75,9 +75,6 @@ export const randomHex = (byteCount: number): string => (
   Array.from(crypto.getRandomValues(new Uint8Array(byteCount)), (byte) => byte.toString(16).padStart(2, '0')).join('')
 )
 
-/** Anything `pg` hands out that reports a dropped connection as an 'error' event: a Pool or a Client. */
-type PgEmitter = { on: (event: 'error', listener: (err: Error) => void) => unknown }
-
 /** The connection string `url` has, naming `database` in place of its own. */
 const urlNaming = (url: string, database: string): string => {
   const named = new URL(url)
@@ -99,6 +96,9 @@ export const useFileDatabase = (): (() => FileDatabase) => {
   // A pool or client with no 'error' listener crashes the whole run when the server drops it.
   // Heard instead, the drop is held for the test that was running, which fails by name.
   const dropped: Error[] = []
+  /** Anything `pg` hands out that reports a dropped connection as an 'error' event: a Pool or a Client. */
+  type PgEmitter = { on: (event: 'error', listener: (err: Error) => void) => unknown }
+
   const watched = <Emitter extends PgEmitter>(emitter: Emitter): Emitter => {
     emitter.on('error', (err) => { dropped.push(err) })
     return emitter

@@ -10,15 +10,15 @@ export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 /** One stored field: its name, the same in the record and the table, and how it is stored. */
 export type Column<FieldT extends string = string> = readonly [field: FieldT, kind: ColumnKind]
 
-/** The fields of `RecordT` that `ColumnsT` does not store. */
-type Unstored<RecordT, ColumnsT extends readonly Column[]> = Exclude<keyof RecordT, ColumnsT[number][0]>
-
 /** `columns` as given, once the compiler holds them to `RecordT`: every column a field, every field a column.
  * A field added to the record then fails to compile until it has a column.
  */
 function everyFieldOf<RecordT>() {
+  /** The fields of `RecordT` that `ColumnsT` does not store. */
+  type Unstored<ColumnsT extends readonly Column[]> = Exclude<keyof RecordT, ColumnsT[number][0]>
+
   return <ColumnsT extends readonly Column<keyof RecordT & string>[]>(
-    columns: ColumnsT & ([Unstored<RecordT, ColumnsT>] extends [never] ? unknown : { unstored: Unstored<RecordT, ColumnsT> }),
+    columns: ColumnsT & ([Unstored<ColumnsT>] extends [never] ? unknown : { unstored: Unstored<ColumnsT> }),
   ): ColumnsT => columns
 }
 
