@@ -115,9 +115,9 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ val: box })
     })
 
-    it("refuses vault_remade under a vault_tok that is not the live one's, and vault_gone under this life's tombstone", async () => {
+    it("refuses vault_mismatch under a vault_tok that is not the live one's, and vault_gone under this life's tombstone", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'vault_remade', dbhas: vault })
+      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'vault_gone' })
     })
@@ -280,10 +280,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
 
-    it("refuses vault_gone under this life's tombstone, and vault_remade for another life", async () => {
+    it("refuses vault_gone under this life's tombstone, and vault_mismatch for another life", async () => {
       const { vaultDB, vault } = await storeWith()
       const oldLife = vaultAt(0, 'oldlife')
-      expect(await vaultDB.tryReplacePassphrase(paramsOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_remade', dbhas: vault })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
     })

@@ -119,7 +119,7 @@ describe("valOf", () => {
 describe("storageTroubleOf", () => {
   // storageTroubleOf @example
   it("hands back a VaultError as the same object, and makes storage_unavailable of anything else, the throw its cause", () => {
-    const refusal = new VaultError('vault_remade', 'Another vault is stored there.')
+    const refusal = new VaultError('vault_mismatch', 'Another vault is stored there.')
     expect(storageTroubleOf(refusal)).to.eq(refusal)
     const dropped = new Error('connection terminated unexpectedly')
     const trouble = storageTroubleOf(dropped)

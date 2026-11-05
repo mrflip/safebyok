@@ -68,7 +68,7 @@ export const noProofToUnlock = (): VaultError => new VaultError('bad_option', Ph
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
 
-export const delOfOtherLife = (): VaultError => new VaultError('vault_remade', Phrases.DelOfOtherLife)
+export const delOfOtherLife = (): VaultError => new VaultError('vault_mismatch', Phrases.DelOfOtherLife)
 
 export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel))
 // --
@@ -206,7 +206,7 @@ export const vaultEmpty = (world: SX.VaultRow): VaultError => (
 )
 
 export const vaultMismatch = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_remade', Phrases.VaultMismatch, { meta: { world, dbhas: world } })
+  new VaultError('vault_mismatch', Phrases.VaultMismatch, { meta: { world, dbhas: world } })
 )
 
 export const vaultGone = (tombstone: SX.VaultRow): VaultError => (

@@ -389,7 +389,7 @@ describe("verifyConsistent", () => {
   // verifyConsistent @example
   it("returns the bag when each field both define is ===", () => {
     const bag = { ...sparse }
-    expect(verifyConsistent(bag, scope, { kind: 'vault_remade' })).to.eq(bag)
+    expect(verifyConsistent(bag, scope, { kind: 'vault_mismatch' })).to.eq(bag)
   })
 
   it("refuses the kind it is handed, naming each field that disagrees, in its message and meta.fieldnames", () => {
