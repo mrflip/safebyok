@@ -69,38 +69,22 @@ const putTermsOf = ({ prior, ifAbsent, ifPresent }: PutChoices): PutTerms => ({ 
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
 export abstract class VaultDB {
+  // == [Props]: #clock, #maxRecordBytes
+
   readonly #clock: Clock
   readonly #maxRecordBytes: number
+  // --
+
+  // == [Construction]: constructor
 
   constructor(opts: VaultDBOpts = {}) {
     const { clock = wallClock, maxRecordBytes = Infinity } = SX.vaultDBOpts.parse(opts)
     this.#clock = clock
     this.#maxRecordBytes = maxRecordBytes
   }
-
-  // == [Generic calls]: doGetBank, doGetVault, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
-
-  /** Every vault row of the bank, full or tombstone. */
-  protected abstract doGetBank(scope: BankScope): Awaitable<RowOfVault[]>
-  /** The vault row by scope alone, with every box row under its `vault_tok`, read in one step. */
-  protected abstract doGetVault(scope: VaultScope): Awaitable<VaultFetched>
-  /** The vault row, and the box row under `vault_tok`, read in one step. */
-  protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
-  /** Writes `record` when the row meets `terms`; atomic on `revision_tok`. */
-  protected abstract doPutVault(record: VaultRecord, terms: PutTerms): Awaitable<Landing>
-  /** Writes `record` when the box row meets `terms` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
-  protected abstract doPutBox(record: BoxRecord, terms: PutTerms): Awaitable<BoxLanding>
-  /** SLOPDOC: In one transaction, tombstones a live row at `prior` and this life's boxes; a repeat sweeps them. */
-  protected abstract doDelVault(tombstone: VaultTombstone, prior: Revision): Awaitable<Landing>
-  /** Writes `tombstone` when the box row is live at `prior` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
-  protected abstract doDelBox(tombstone: BoxTombstone, prior: Revision): Awaitable<BoxLanding>
-  /** Removes the box rows whose vault row is void, a tombstone, or under another `vault_tok`, as {@link SX.isLifeOver} says, and counts those left in the bank. */
-  protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
-  /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */
-  protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }
   // --
 
-  // == [Gets]: getBank, getVault, getBox, tryGetBank, tryGetVault, tryGetBox
+  // == [Gets]: getBank, tryGetBank, getVault, tryGetVault, getBox, tryGetBox
 
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_records`. */
   async getBank(scope: BankScope): Promise<GoodAnswer<BankListed, 'got' | 'gotvoid', BankScope>> {
@@ -115,6 +99,8 @@ export abstract class VaultDB {
       return { act: (rows.length > 0) ? 'got' : 'gotvoid', val, world: bankScope }
     })
   }
+
+  async tryGetBank(scope: BankScope) { return answerOf(() => this.getBank(scope)) }
 
   /** The vault by scope alone, whatever its life, with its sparse boxes and `damaged_records`. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
   async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultListed | null, GotAct>> {
@@ -136,6 +122,8 @@ export abstract class VaultDB {
     })
   }
 
+  async tryGetVault(scope: VaultScope, opts?: IfAbsentOpts) { return answerOf(() => this.getVault(scope, opts)) }
+
   /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null. */
   async getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>> {
     return this.#call<BoxRecord | null, GotAct, VaultRow>('getBox', { ...asked, ...opts }, async () => {
@@ -150,12 +138,10 @@ export abstract class VaultDB {
     })
   }
 
-  async tryGetBank(scope: BankScope) { return answerOf(() => this.getBank(scope)) }
-  async tryGetVault(scope: VaultScope, opts?: IfAbsentOpts) { return answerOf(() => this.getVault(scope, opts)) }
   async tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts) { return answerOf(() => this.getBox(asked, opts)) }
   // --
 
-  // == [Puts]: putVault, putBox, tryPutVault, tryPutBox
+  // == [Puts]: putVault, tryPutVault, putBox, tryPutBox, #landVault
 
   /** SLOPDOC: Stores a vault's birth or rebirth; once live, its row moves only by a gate verb. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
@@ -166,6 +152,8 @@ export abstract class VaultDB {
       return this.#landVault(vaultRecord, terms)
     })
   }
+
+  async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
 
   /** Stores `record` under a vault live at its `vault_tok`, with the answers of {@link VaultDB.putVault}. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
@@ -189,7 +177,6 @@ export abstract class VaultDB {
     })
   }
 
-  async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
   async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
 
   async #landVault(record: VaultRecord, { prior, ifAbsent, ifPresent }: PutChoices): Promise<Said<VaultRow, PutAct, VaultRow>> {
@@ -206,7 +193,7 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [Gate verbs]: replacePassphrase, addPasskey, revokePasskey, tryReplacePassphrase, tryAddPasskey, tryRevokePasskey
+  // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, #moveGate
 
   /** Lays the new passphrase wayin on the row at this revision, moving `gate_epoch` and the revision up; `passkey_wayin` is left as stored. */
   async replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>> {
@@ -218,6 +205,8 @@ export abstract class VaultDB {
       })
     })
   }
+
+  async tryReplacePassphrase(params: ReplacePassphraseParams) { return answerOf(() => this.replacePassphrase(params)) }
 
   /** Lays a passkey wayin on a row holding none. */
   async addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>> {
@@ -231,6 +220,8 @@ export abstract class VaultDB {
     })
   }
 
+  async tryAddPasskey(params: AddPasskeyParams) { return answerOf(() => this.addPasskey(params)) }
+
   /** Nulls the row's passkey wayin. A row holding none answers `revoked` as stored, nothing moved. */
   async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
     return this.#call<VaultRecord, 'revoked', VaultRow>('revokePasskey', params, async () => {
@@ -242,8 +233,6 @@ export abstract class VaultDB {
     })
   }
 
-  async tryReplacePassphrase(params: ReplacePassphraseParams) { return answerOf(() => this.replacePassphrase(params)) }
-  async tryAddPasskey(params: AddPasskeyParams) { return answerOf(() => this.addPasskey(params)) }
   async tryRevokePasskey(params: RevokePasskeyParams) { return answerOf(() => this.revokePasskey(params)) }
 
   /** A gate verb's one path: a get, the integrity checks, the wayin laid on, and a put conditional on the prior revision. A null wayin has nothing to lay on, and answers the row as stored. */
@@ -264,7 +253,7 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [Dels]: delBox, delVault, tidyGone, tryDelBox, tryDelVault, tryTidyGone
+  // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
   /** SLOPDOC: Writes a box's tombstone over its live row at `prior`, or the damaged row `damaged_records` lists. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
@@ -281,6 +270,8 @@ export abstract class VaultDB {
       throw Refuse.staleWrite(world, stored)
     })
   }
+
+  async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) { return answerOf(() => this.delBox(tombstone, opts)) }
 
   /** SLOPDOC: Tombstones a vault at `prior` and its life's boxes in one transaction; a repeat sweeps the boxes. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> {
@@ -300,6 +291,8 @@ export abstract class VaultDB {
     })
   }
 
+  async tryDelVault(tombstone: VaultTombstone, opts: DelOpts) { return answerOf(() => this.delVault(tombstone, opts)) }
+
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
   async tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> {
     return this.#call<Tidied, 'tidied', BankScope>('tidyGone', scope, async () => {
@@ -308,8 +301,6 @@ export abstract class VaultDB {
     })
   }
 
-  async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) { return answerOf(() => this.delBox(tombstone, opts)) }
-  async tryDelVault(tombstone: VaultTombstone, opts: DelOpts) { return answerOf(() => this.delVault(tombstone, opts)) }
   async tryTidyGone(scope: BankScope) { return answerOf(() => this.tidyGone(scope)) }
   // --
 
@@ -342,6 +333,28 @@ export abstract class VaultDB {
       throw isVaultError(err) ? Object.assign(err, { meta: { ...err.meta, call, req_params } }) : err
     }
   }
+  // --
+
+  // == [Protected, for a subclass to write]: doGetBank, doGetVault, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+
+  /** Every vault row of the bank, full or tombstone. */
+  protected abstract doGetBank(scope: BankScope): Awaitable<RowOfVault[]>
+  /** The vault row by scope alone, with every box row under its `vault_tok`, read in one step. */
+  protected abstract doGetVault(scope: VaultScope): Awaitable<VaultFetched>
+  /** The vault row, and the box row under `vault_tok`, read in one step. */
+  protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
+  /** Writes `record` when the row meets `terms`; atomic on `revision_tok`. */
+  protected abstract doPutVault(record: VaultRecord, terms: PutTerms): Awaitable<Landing>
+  /** Writes `record` when the box row meets `terms` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
+  protected abstract doPutBox(record: BoxRecord, terms: PutTerms): Awaitable<BoxLanding>
+  /** SLOPDOC: In one transaction, tombstones a live row at `prior` and this life's boxes; a repeat sweeps them. */
+  protected abstract doDelVault(tombstone: VaultTombstone, prior: Revision): Awaitable<Landing>
+  /** Writes `tombstone` when the box row is live at `prior` and the vault row, passing its checks, is live under its `vault_tok`; atomic on `revision_tok`. */
+  protected abstract doDelBox(tombstone: BoxTombstone, prior: Revision): Awaitable<BoxLanding>
+  /** Removes the box rows whose vault row is void, a tombstone, or under another `vault_tok`, as {@link SX.isLifeOver} says, and counts those left in the bank. */
+  protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
+  /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */
+  protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }
   // --
 }
 
