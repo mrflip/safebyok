@@ -103,13 +103,6 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
   })
 })
 
-describe("vault.takeWorld(world)", () => {
-  it("refuses 'bad_record' a world that is no vault row", async () => {
-    const { vault } = await makeBornVault()
-    TH.expectSyncRefusal(() => { vault.takeWorld({ am: 'nope' }) }, 'bad_record')
-  })
-})
-
 describe("the friend a vault hands its leases", () => {
   it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
@@ -118,6 +111,13 @@ describe("the friend a vault hands its leases", () => {
     const asked = { ...vault.scope, vault_tok: vault.vault_tok }
     expect(deviceDB.peek).toHaveBeenCalledWith(asked)
     expect(deviceDB.tryVacate).toHaveBeenCalledWith(asked)
+  })
+})
+
+describe("vault.takeWorld(world)", () => {
+  it("refuses 'bad_record' a world that is no vault row", async () => {
+    const { vault } = await makeBornVault()
+    TH.expectSyncRefusal(() => { vault.takeWorld({ am: 'nope' }) }, 'bad_record')
   })
 })
 
