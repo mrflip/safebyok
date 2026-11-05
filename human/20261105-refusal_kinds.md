@@ -79,3 +79,38 @@ wrong wayin); ~246 (registered_at not the stored one) is an integrity check agai
 * `bad_record` cannot be culled: validators serve both ways, and validator.ts defaults to it.
 * A host's ensureUnlocked on a bank made without `requestCleartext` now refuses `bad_option`, not `vault_locked`
   (`noProofToUnlock`): the vault tests' world has no dialog, so a dozen assertions moved.
+
+## Rework after the Coach's rulings (2026-11-05), paused by the Coach's change of orders
+
+Done, a commit each: step 0 (rebased onto origin/main, pushed); 1 (a vaultDB verb's record, which safebyok
+prepares, refuses `unexpected_error` by `recordPreparedWrong`, apart from its options at `bad_option`); 2
+(`vault_mismatch` kept, `delOfOtherLife` on it too, `vault_remade` culled); 3 (`provingOfOtherVault`,
+`leaseOfOtherVault`, `stampOfOtherVault`; `listingExpected` and `unboundCipherCtx` already had their own); 4
+(`Bank.make` requires `requestCleartext`; `noProofToUnlock` and `noRequestCleartext` deleted, lint having flagged
+both guards as no-overlap conditions; tests that ran with no dialog now close one unanswered and see `declined`).
+The changeset carries 1-4. Kinds now: 34 (main has 53).
+
+Not done, held by the Coach: 5 (stored `damagekind` `damaged_record` to `damaged_row`), 6 (guarantees.md kind
+names), 7 (no code change: before-and-after to be discussed first), 8 (the count of parses on package-built values).
+
+* The superseded bullet above, "ensureUnlocked on a bank made without `requestCleartext` now refuses `bad_option`",
+  no longer holds: no bank can be made without one.
+* VOCABULARY.md:118 still cites the culled `gate_moved`; not changed.
+* Step 4's refinement (validation at boundaries only): `Bank.make` parses `bankOpts` and `VaultListing`'s
+  constructor parses `vaultListingOpts` (vault-listing.ts:37), both already there. Bank.make is the host's
+  boundary; whether VaultListing's is one (the bank builds it) is for the Coach. Untouched.
+
+Step 7, the current code only (packages/safebyok/src/refusals/throwers.ts):
+
+    22   const causeOf = (cause: unknown): unknown => cause ?? new Error(Phrases.NoErrorGiven)
+    36   export const storageUnavailable = (cause: unknown, message: string = Phrases.StorageUnavailable): VaultError => (
+    37     new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
+    44   export const unexpectedError = (thrown: unknown): VaultError => (
+    45     new VaultError('unexpected_error', Phrases.UnexpectedError, { cause: thrown ?? new Error(Phrases.NothingThrown) })
+    165  export const weakPassphrase = (reason: string): VaultError => new VaultError('weak_passphrase', reason)
+    226  export const absentBox = (world: SX.VaultRow, dbhas: SX.BoxRow | null): VaultError => (
+    227    new VaultError('absent_box', Phrases.AbsentBox, { meta: { act: (dbhas === null) ? 'void' : 'gone', world, dbhas } })
+    256  export const storeFailed = (call: string, thrown: unknown): VaultError => {
+    257    const thrownName = thrownNameOf(thrown)
+    258    const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
+    259    return new VaultError('storage_unavailable', Phrases.storeFailed(call, named))
