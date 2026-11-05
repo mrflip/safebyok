@@ -1,7 +1,7 @@
 import { Checkers } from '../helpers/validator'
 import { decorate, tattoo } from '../helpers/helpers'
 import { passkeyHeldAlready } from '../refusals/throwers'
-import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultStamp, type WayinHeader, FirstGateEpoch, gateProps, vaultStamp } from '../shapes/gateish-shapes'
+import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultStamp, type WayinHeader, FirstGateEpoch, gateProps, vaultStamp } from '../shapes/shapes-gateish'
 import { Wayin } from './wayin'
 
 /** Stays here: it names the class. */

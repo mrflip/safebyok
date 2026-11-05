@@ -1,9 +1,9 @@
 /** The deviceDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code, and starts its work before its caller can await. */
 
 import { DeviceDB } from './device-db-new'
-import * as DS from './device-db-shapes'
-import type { VaultScope } from '../shapes/scopes'
-import type { DeviceRecord, LeaseQuery, LeaseRow } from './device-db-shapes'
+import type { VaultScope } from '../shapes/shapes-core'
+import * as VS from '../shapes/shapes-storage'
+import type { DeviceRecord, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
 const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 const leaseCkeyOf = ({ applabel, user_id, vaultlabel }: VaultScope): string => ckeyOf(applabel, user_id, vaultlabel)
@@ -23,12 +23,12 @@ export class MemoryDeviceDB extends DeviceDB {
   }
 
   protected doVacate(asked: LeaseQuery): void {
-    const stored = DS.leaseRow.safeParse(this.#leaserows.get(leaseCkeyOf(asked)))
+    const stored = VS.leaseRow.safeParse(this.#leaserows.get(leaseCkeyOf(asked)))
     if (stored.success && (stored.data.vault_tok === asked.vault_tok)) { this.#leaserows.delete(leaseCkeyOf(asked)) }
   }
 
   protected doLeasesProvedBefore(cutoff: number): unknown[] {
-    const rows = [...this.#leaserows.values()].flatMap((row) => { const parsed = DS.leaseRow.safeParse(row); return (parsed.success && parsed.data.proved_at < cutoff) ? [parsed.data] : [] })
+    const rows = [...this.#leaserows.values()].flatMap((row) => { const parsed = VS.leaseRow.safeParse(row); return (parsed.success && parsed.data.proved_at < cutoff) ? [parsed.data] : [] })
     return rows.toSorted((one, other) => one.proved_at - other.proved_at)
   }
 

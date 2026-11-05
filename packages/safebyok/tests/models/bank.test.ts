@@ -4,13 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import * as Phrases from '../../src/helpers/phrases'
 import { makeLifeTok } from '../../src/helpers/crypto'
-import type { LeaseRow } from '../../src/storage/device-db-shapes'
+import type { LeaseRow } from '../../src/shapes/shapes-storage'
+import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
+import type { BankSnapshot } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, BankBag, VaultBag, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
-import type { RequestCleartext } from '../../src/shapes/gateish-shapes'
-import type { BankSnapshot } from '../../src/shapes/vaultish-shapes'
 
 useBankWorlds()
 

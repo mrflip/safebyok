@@ -21,18 +21,18 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
-import * as VX from '../../src/shapes/vaultish-shapes'
-import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type LockState, type Tombstone, BoxFormat } from '../../src/shapes/vaultish-shapes'
+import type { LockState } from '../../src/shapes/shapes-enums'
+import * as CX from '../../src/shapes/shapes-core'
+import type { Boxscope } from '../../src/shapes/shapes-core'
+import * as VS from '../../src/shapes/shapes-storage'
+import type { BoxQuery, BoxRow, BoxTombstone, DelOpts, IfAbsentOpts, PutOpts, ReqParams, Revision, VaultRecord, WatchScope } from '../../src/shapes/shapes-storage'
+import * as VX from '../../src/shapes/shapes-vaultish'
+import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type Tombstone, BoxFormat } from '../../src/shapes/shapes-vaultish'
 import * as Phrases from '../../src/helpers/phrases'
-import type * as FX from '../../src/shapes/fields'
-import * as CX from '../../src/shapes/scopes'
-import type { Boxscope } from '../../src/shapes/scopes'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Notice } from '../../src/storage/vault-db-new'
 import * as Refuse from '../../src/refusals/throwers'
-import * as VS from '../../src/storage/vault-db-shapes'
-import type { BoxQuery, BoxRow, BoxTombstone, DelOpts, IfAbsentOpts, PutOpts, ReqParams, Revision, VaultRecord, WatchScope } from '../../src/storage/vault-db-shapes'
 import { fakeCiphered } from './builders'
 
 // == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord
@@ -55,7 +55,7 @@ export const worldVaultRow = (): VaultRecord => ({
   written_at:    T0,
   gate:          {
     gate_epoch:       1,
-    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA' as FX.PassphraseSalt, device_id: 'd1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
+    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA' as CX.PassphraseSalt, device_id: 'd1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
     passkey_wayin:    null,
   },
 })

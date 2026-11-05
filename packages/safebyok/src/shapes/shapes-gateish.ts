@@ -13,22 +13,19 @@ import type { Gating } from '../models/gating'
 import type { NOVEL, PasskeyProving, PassphraseProving, Proving } from '../models/proving'
 import type { Vault } from '../models/vault'
 import type { VaultListing } from '../models/vault-listing'
-import * as VS from '../storage/vault-db-shapes'
-import * as FX from './fields'
-import * as HX from './host-code'
-import { type VaultScope, vaultScope } from './scopes'
-import type { VaultRecord, VaultWorld } from './vaultish-shapes'
+import * as EX from './shapes-enums'
+import * as CX from './shapes-core'
+import { type VaultScope, vaultScope } from './shapes-core'
+import * as VS from './shapes-storage'
+import type { VaultRecord, VaultWorld } from './shapes-vaultish'
 
-// == [Wayin kinds]: wayinKindVals, wayinkind, WayinKind, PasskeySaltBytes, isPrfSalt
-
-/** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
-export const wayinKindVals = ['passphrase', 'passkey'] as const
+// == [Wayin kinds]: wayinkind, isPrfSalt
 
 /** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinKindVals}. Its `parse` refuses 'bad_option'.
  *
  * @example wayinkind.safeParse('passkey').success   // true
  */
-export const wayinkind = Checker(({ oneof }) => oneof(wayinKindVals), 'bad_option')
+export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinKindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
 export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
@@ -63,7 +60,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   prf_salt_b64:  str.min(1),
   /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
   prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
-}), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
+}), { refuseAs: 'bad_option', extras: 'strip' }, [CX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
  * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take
@@ -118,7 +115,7 @@ export const vaultStamp = objCheck(({ applabel, user_id, vaultlabel, vault_tok, 
   vaultlabel,
   vault_tok,
   registered_at: epochMillis,
-}), { refuseAs: 'bad_option', extras: 'strip' }, [FX])
+}), { refuseAs: 'bad_option', extras: 'strip' }, [CX])
 
 export type VaultStamp = Z.infer<typeof vaultStamp>
 // --
@@ -144,7 +141,6 @@ export type WayinHeader           = Z.infer<typeof wayinHeader>
 export type PassphraseWayinRecord = Z.infer<typeof passphraseWayinRecord>
 export type PasskeyWayinRecord    = Z.infer<typeof passkeyWayinRecord>
 export type WayinRecord           = Z.infer<typeof wayinRecord>
-export type WayinKind             = WayinRecord['wayinkind']
 // --
 
 // == [The gate's forms]: FirstGateEpoch, gateEpoch, gateProps, GateProps
@@ -168,7 +164,7 @@ export type GateProps = Z.infer<typeof gateProps>
 
 export const { provingWorld } = Checkers('bad_option', ({ obj, clockShape, keyDeriverShape, device_id }) => ({
   provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
-}), [FX, HX])
+}), [CX])
 
 export type ProvingWorld = Z.infer<typeof provingWorld>
 
@@ -219,13 +215,13 @@ export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, c
     vault_key_lease_wrapped: vault_key_lease_wrapped.readonly(),
   }).strict().readonly()
   return { leaseStamp, leaseRecord }
-}, [FX])
+}, [CX])
 
 export type LeaseStamp  = Z.infer<typeof leaseStamp>
 export type LeaseSparse = LeaseStamp
 export type LeaseRecord = Z.infer<typeof leaseRecord>
 
-export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refuseAs: 'bad_record', extras: 'strip' }, [FX])
+export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refuseAs: 'bad_record', extras: 'strip' }, [CX])
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
@@ -235,8 +231,8 @@ export const leaseMillis = Checker(({ int, lit, union }) => union([int.positive(
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
-  clock:           HX.clockShape,
-  logger:          HX.loggerShape,
+  clock:           CX.clockShape,
+  logger:          CX.loggerShape,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
@@ -276,19 +272,15 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
     leaseSealArgs:      obj({ whisperText: str, stamp: ctxStamp }),
     leaseUnsealArgs:    obj({ sealed: sealedWhisper, stamp: ctxStamp }),
   }
-}, [FX])
+}, [CX])
+
 // --
 
-// == [The gating's forms]: gatingKindVals, correctableKindVals, gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, GatingKind, ClearsForGatingkind, StrengthChecker
-
-export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey', 'del_vault'] as const
-
-/** The refusals an attempt leaves its gating open under, for the user to try again. */
-export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
+// == [The gating's forms]: gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, ClearsForGatingkind, StrengthChecker
 
 /** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
 export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj }) => ({
-  gatingkind:              oneof(gatingKindVals),
+  gatingkind:              oneof(EX.gatingKindVals),
   vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
     .refine(({ passphraseClear, passkeyClear = null }) => passphraseClear !== undefined || passkeyClear !== null, Phrases.ProofMissing),
@@ -300,8 +292,6 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
 
 /** The check of what launches a gating. */
 export const gatingLaunchArgs = objCheck(({ fn }) => ({ gatingkind, scope: vaultScope, run: fn() }), { refuseAs: 'bad_option', extras: 'strip' })
-
-export type GatingKind = typeof gatingKindVals[number]
 
 export type ClearsForGatingkind = {
   build_vault:        Z.input<typeof vaultBuildClears>
@@ -320,9 +310,9 @@ export type { StrengthChecker } from '../helpers/passphrase-strength'
 /** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
 export type RequestCleartext = (gating: AnyGating) => unknown
 
-export type AnyGating = { [KindT in GatingKind]: Gating<KindT> }[GatingKind]
+export type AnyGating = { [KindT in EX.GatingKind]: Gating<KindT> }[EX.GatingKind]
 
-export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: GatingKind }>
+export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: EX.GatingKind }>
 
 /** What an attempt makes of the clears it is handed, for its `run`. */
 export type ProvingsForGatingkind = {
@@ -335,13 +325,13 @@ export type ProvingsForGatingkind = {
 }
 
 /** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
-export type Run<KindT extends GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
+export type Run<KindT extends EX.GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
 
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
-export type LaunchArgs<KindT extends GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
+export type LaunchArgs<KindT extends EX.GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
 
-export type Asked<KindT extends GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
+export type Asked<KindT extends EX.GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
 
-export type Prove<KindT extends GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
+export type Prove<KindT extends EX.GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
 // --

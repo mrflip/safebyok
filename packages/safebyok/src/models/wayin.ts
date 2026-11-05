@@ -1,7 +1,8 @@
 import { cipherCtx } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
-import type * as FX from '../shapes/fields'
-import { type VaultStamp, type WayinHeader, type WayinKind, type WayinRecord, vaultStamp, wayinHeader, wayinRecord } from '../shapes/gateish-shapes'
+import type { WayinKind } from '../shapes/shapes-enums'
+import type * as CX from '../shapes/shapes-core'
+import { type VaultStamp, type WayinHeader, type WayinRecord, vaultStamp, wayinHeader, wayinRecord } from '../shapes/shapes-gateish'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
@@ -22,11 +23,11 @@ export class Wayin {
   declare readonly wayinkind:               WayinKind
   declare readonly device_id:               string
   declare readonly registered_at:           number
-  declare readonly vault_key_wayin_wrapped: FX.VaultKeyWayinWrapped
+  declare readonly vault_key_wayin_wrapped: CX.VaultKeyWayinWrapped
   declare readonly key_deriver_label?:      string
-  declare readonly salt_b64?:               FX.PassphraseSalt
+  declare readonly salt_b64?:               CX.PassphraseSalt
   declare readonly credential_id?:          string
-  declare readonly prf_salt_b64?:           FX.PrfSalt
+  declare readonly prf_salt_b64?:           CX.PrfSalt
 
   readonly #pickle: WayinRecord
 

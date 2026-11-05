@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeLeaseKey, makeBoxKey, makeLifeTok, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder, type CipherCtxRecord } from '../../src/helpers/crypto'
 import * as TH from '../test-helpers'
-import { vault_tok } from '../../src/shapes/fields'
+import { vault_tok } from '../../src/shapes/shapes-core'
 
 const utf8 = (text: string) => new TextEncoder().encode(text)
 

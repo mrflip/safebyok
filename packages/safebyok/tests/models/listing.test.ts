@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
-import * as VS from '../../src/storage/vault-db-shapes'
+import * as VS from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 

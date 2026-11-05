@@ -2,10 +2,10 @@
 
 import { type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, type VaultFetched, VaultDB } from './vault-db-new'
 import * as Refuse from '../refusals/throwers'
-import * as VS from './vault-db-shapes'
-import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultRecord, VaultScope, VaultTombstone, WatchScope } from './vault-db-shapes'
+import * as VS from '../shapes/shapes-storage'
+import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultRecord, VaultScope, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
-export type { MemoryVaultDBOpts } from './vault-db-shapes'
 
 type BoxLife = { scope: VaultScope, vault_tok: string, boxrows: Map<string, unknown> }
 type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }

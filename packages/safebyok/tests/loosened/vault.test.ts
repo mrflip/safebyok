@@ -1,8 +1,8 @@
 /** What a vault does today that safebyok-old's README forbids, pinned as it is until the Coach rules. Each `it` names its source and line. */
 
 import { describe, expect, it } from 'vitest'
-import type { VaultRecord } from '../../src/shapes/vaultish-shapes'
-import type { PrfSalt } from '../../src/shapes/fields'
+import type { PrfSalt } from '../../src/shapes/shapes-core'
+import type { VaultRecord } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
 import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, storedVaultRecord, vaultRoundTrip, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 

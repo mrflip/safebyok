@@ -1,10 +1,9 @@
-import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered }                                                                                                                              from '../../src/shapes/fields'
-import type { PasskeyAnswer, PassphraseWayinRecord } from '../../src/shapes/gateish-shapes'
-import      * as FX                                 from '../../src/shapes/fields'
+import * as CX from '../../src/shapes/shapes-core'
+import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered, VaultScope } from '../../src/shapes/shapes-core'
+import type { PasskeyAnswer, PassphraseWayinRecord } from '../../src/shapes/shapes-gateish'
 import      { toB64 }                               from '../../src/helpers/crypto'
 import type { KeyDeriver }                          from '../../src/deriver/basederiver'
 import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/passphrase-strength'
-import type { VaultScope }                          from '../../src/shapes/scopes'
 
 /**
  * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
@@ -68,7 +67,7 @@ export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> =
   wayinkind:               'passphrase',
   key_deriver_label:       'test_digest_v0',
   // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
-  salt_b64:                FX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
+  salt_b64:                CX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),

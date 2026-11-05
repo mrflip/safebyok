@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { BoxRecord, BoxTombstone, Revision, VaultRecord, VaultTombstone } from '../../src/storage/vault-db-shapes'
-import * as VS from '../../src/storage/vault-db-shapes'
+import * as VS from '../../src/shapes/shapes-storage'
+import type { BoxRecord, BoxTombstone, Revision, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
 
 const bankScope  = { applabel: 'acme', user_id: 'u1' }
 const vaultScope = { ...bankScope, vaultlabel: 'main' }

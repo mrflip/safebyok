@@ -1,4 +1,4 @@
-import * as HX from '../shapes/host-code'
+import * as CX from '../shapes/shapes-core'
 import { consoleLogger } from './console-logger'
 
 /** Where a vault says what it has nobody to throw to, such as a background refresh that failed.
@@ -59,7 +59,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
 export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLogger => {
   if (candidate === undefined || candidate === null) { return DefaultLogger }
   if (guardedOnes.has(candidate)) { return candidate }
-  HX.loggerShape.parse(candidate)
+  CX.loggerShape.parse(candidate)
   const known = guardedFor.get(candidate)
   if (known !== undefined) { return known }
   const made = guarded(candidate)

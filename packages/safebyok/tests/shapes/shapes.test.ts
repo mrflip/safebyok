@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
-import * as GX from '../../src/shapes/gateish-shapes'
-import * as VX from '../../src/shapes/vaultish-shapes'
-import * as VS from '../../src/storage/vault-db-shapes'
+import * as EX from '../../src/shapes/shapes-enums'
+import * as VS from '../../src/shapes/shapes-storage'
+import * as GX from '../../src/shapes/shapes-gateish'
+import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import * as TH from '../test-helpers'
 
@@ -39,10 +40,10 @@ const holdsCases = (check: { parse: (val: unknown) => unknown }, kind: VaultErro
   }
 }
 
-describe("VX.amVals, VX.tombstoneAmVals and the checks of what the base knows of a record", () => {
+describe("EX.amVals, EX.tombstoneAmVals and the checks of what the base knows of a record", () => {
   it("name alive, damaged and gone, a tombstone's am being never alive", () => {
-    expect(VX.amVals).to.deep.equal(['a', 'd', 'x'])
-    expect(VX.tombstoneAmVals).to.deep.equal(['d', 'x'])
+    expect(EX.amVals).to.deep.equal(['a', 'd', 'x'])
+    expect(EX.tombstoneAmVals).to.deep.equal(['d', 'x'])
   })
 
   describe("VX.am", () => {
@@ -172,14 +173,14 @@ describe("The checks of what reconciling passes", () => {
     for (const val of bads) { it(`refuses ${JSON.stringify(val)} as 'unexpected_error'`, () => { TH.expectSyncRefusal(() => check.parse(val), 'unexpected_error') }) }
   }
 
-  describe("VX.recordShape", () => { checkSet(VX.recordShape, VX.recordShapeVals, ['empty', null, 'older']) })
-  describe("VX.age",         () => { checkSet(VX.age, VX.ageVals, ['skip', null, 'fill']) })
-  describe("VX.centralPolicy", () => { checkSet(VX.centralPolicy, VX.centralPolicyVals, ['edit', 'del', null]) })
+  describe("VX.recordShape", () => { checkSet(VX.recordShape, EX.recordShapeVals, ['empty', null, 'older']) })
+  describe("VX.age",         () => { checkSet(VX.age, EX.ageVals, ['skip', null, 'fill']) })
+  describe("VX.centralPolicy", () => { checkSet(VX.centralPolicy, EX.centralPolicyVals, ['edit', 'del', null]) })
 
   it("list the kinds of the table", () => {
-    expect(VX.centralPolicyVals).to.deep.equal(['older', 'same', 'fill', 'adopt', 'gone'])
-    expect(VX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone'])
-    expect(VX.ageVals).to.deep.equal(['older', 'same', 'newer'])
+    expect(EX.centralPolicyVals).to.deep.equal(['older', 'same', 'fill', 'adopt', 'gone'])
+    expect(EX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone'])
+    expect(EX.ageVals).to.deep.equal(['older', 'same', 'newer'])
   })
 
   describe("VX.reconciled", () => {
@@ -510,7 +511,7 @@ describe("VX.boxDna", () => {
   })
 })
 
-describe("VX.ifAbsentVals, VX.ifAbsent and VX.fetchOpts", () => {
+describe("EX.ifAbsentVals, VX.ifAbsent and VX.fetchOpts", () => {
   holdsCases(VX.ifAbsent, 'bad_option', [
     ["fail",     true,  'passes fail'],
     ["nil",      true,  'passes nil'],
@@ -546,9 +547,9 @@ describe("VX.boxCreateOpts", () => {
   })
 })
 
-describe("VX.ifPresentVals, VX.ifPresent and VX.boxPutOpts", () => {
+describe("EX.ifPresentVals, VX.ifPresent and VX.boxPutOpts", () => {
   it("name the three policies", () => {
-    expect(VX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
+    expect(EX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
   })
 
   holdsCases(VX.ifPresent, 'bad_option', [

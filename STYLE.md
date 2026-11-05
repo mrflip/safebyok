@@ -41,7 +41,7 @@ is a bug.
   const { applabel, user_id } = CX.bankScope.parse(opts)
   export const { boxCiphered } = Checkers('bad_record', ({ obj, box_key_wrapped, whisper_ciphered }) => ({
     boxCiphered: obj({ box_key_wrapped, whisper_ciphered }),
-  }), [FX])
+  }), [CX])
   ```
 
   The names, one to a module and the same in every file:
@@ -49,12 +49,11 @@ is a bug.
   | Name  | Module                                          |
   | ----- | ----------------------------------------------- |
   | `PX`  | `src/shapes/primitives.ts`                      |
-  | `FX`  | `src/shapes/fields.ts`                          |
-  | `CX`  | `src/shapes/scopes.ts`                          |
-  | `GX`  | `src/shapes/gateish-shapes.ts`                  |
-  | `VX`  | `src/shapes/vaultish-shapes.ts`                 |
-  | `HX`  | `src/shapes/host-code.ts`                       |
-  | `VS`  | `src/storage/vault-db-shapes.ts`                |
+  | `EX`  | `src/shapes/shapes-enums.ts`                    |
+  | `CX`  | `src/shapes/shapes-core.ts`                     |
+  | `VS`  | `src/shapes/shapes-storage.ts`                  |
+  | `GX`  | `src/shapes/shapes-gateish.ts`                  |
+  | `VX`  | `src/shapes/shapes-vaultish.ts`                 |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
 
   Not the Startcase name above, which would collide with `Box`, `Vault` and `KeyDeriverSpec`.
@@ -75,7 +74,7 @@ is a bug.
   `Checkers` call (the kit's own primitives) imports the builders under the same short names.
 * Tree-shaking is no reason to choose either. Where a star import is reached only through its
   members (`CX.bankScope`), it shakes as named imports do (esbuild 0.27, rolldown 1.2). One passed
-  as a value, as `[FX]` is to a `Checkers` call, keeps the module's namespace object, and with it
+  as a value, as `[CX]` is to a `Checkers` call, keeps the module's namespace object, and with it
   every export the namespace names: about 0.2 kB in idbDeviceDB (`fields_exports` in
   `dist/shapes/fields.js`). That cost is accepted for what the source buys the builder.
 * **Picking named fields needs no library**: destructure them from the parsed output. No
@@ -450,14 +449,14 @@ export const boxDamaged = objCheck(({ oneof, boxlabel, revision_tok }) => ({
   boxlabel,
   revision_tok: revision_tok.nullable(),
   damage:       oneof(boxDamageVals),
-}), 'bad_record', [FX])
-export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { extras: 'strip' }, [FX])
-export const boxStamp = Checker(({ vault_tok }) => boxSparse.extend({ vault_tok }).strict(), 'bad_record', [FX])
+}), 'bad_record', [CX])
+export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { extras: 'strip' }, [CX])
+export const boxStamp = Checker(({ vault_tok }) => boxSparse.extend({ vault_tok }).strict(), 'bad_record', [CX])
 ```
 
 * **Writing one is strictly easier than Zod alone**: the body is plain Zod with shorter names, one
   schema a line, and nothing added per line, neither a wrapper call nor an annotation.
-* Modules of validators in `sources` (star imports, `[FX]`) are spread into the kit
+* Modules of validators in `sources` (star imports, `[CX]`) are spread into the kit
   beneath it, so a kit name wins. A file makes its own in-file validators the same way, without
   bringing names into scope.
 * The primitives the kit hands out (`shapes/primitives.ts`) are plain Zod, and so is a variation

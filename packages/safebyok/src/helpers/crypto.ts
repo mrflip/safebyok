@@ -5,7 +5,7 @@
 
 import { base64urlnopad } from '@scure/base'
 import { unboundCipherCtx } from '../refusals/throwers'
-import type { Ciphered } from '../shapes/fields'
+import type { Ciphered } from '../shapes/shapes-core'
 import { stableJsonify } from './stable-jsonify'
 
 /** `count` cryptographically secure random bytes, from the platform. */
