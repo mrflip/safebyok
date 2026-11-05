@@ -1,6 +1,7 @@
 /** The vaultDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code. */
 
 import { type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, type VaultFetched, VaultDB } from './vault-db-new'
+import { ckeyOf } from '../helpers/helpers'
 import * as Refuse from '../refusals/throwers'
 import * as SX from '../shapes/shapes-storage'
 import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultRecord, VaultScope, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
@@ -9,8 +10,6 @@ export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
 type BoxLife = { scope: VaultScope, vault_tok: string, boxrows: Map<string, unknown> }
 type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
-
-const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 
 const meetsTerms = (ante: unknown, { prior, mayReplaceLive, mayAdd }: PutTerms): boolean => (
   SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? mayReplaceLive : mayAdd)

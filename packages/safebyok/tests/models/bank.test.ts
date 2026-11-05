@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
+import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
 import { BankBag, OtherBag, VaultBag, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
@@ -241,6 +242,32 @@ describe("'identity_revoked' and bad news", () => {
     bank.tellBadNews([news])
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     expect(vault.isEnabled).to.be.true
+  })
+
+  it("with no strengthChecker, finds every new passphrase weak, its reason sending the app's makers to CUSTOMIZATION.md", async () => {
+    const attempts: Outcome<unknown>[] = []
+    const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase) as never)) } })
+    await bank.hello()
+    await TH.expectRefusal(bank.ensureVault(VaultBag), 'declined')
+    const [attempted] = attempts
+    expect(attempted?.err).to.include({ refusalkind: 'weak_passphrase' })
+    expect(attempted?.err?.message).to.include('CUSTOMIZATION.md')
+  })
+
+  it("keeps to its call when the host's logger throws, in Bank.make and past a cached lease row it cannot erase", async () => {
+    const world = makeBankWorld()
+    const warn = vi.fn(() => { throw new Error('the logger broke') })
+    const logger = { log: warn, warn, error: warn }
+    await makeBankWithVault(world, { logger })
+    expect(warn.mock.calls).to.have.length(1)
+    const [cached] = world.leaseRows() as [{ gate_epoch: number }]
+    vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce(TH.good({ ...cached, gate_epoch: cached.gate_epoch + 1 } as never))
+    vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the store is down')))
+    const page = world.bankOn({ logger })
+    await page.hello()
+    const unlocked = await page.vaultOf(VaultBag)?.ensureUnlocked()
+    expect(unlocked?.isUnlocked).to.be.true
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not be erased'), expect.objectContaining({ call: 'Lease.buildFromCache' }), undefined)
   })
 
   it("hears a vault's bad news, a box's way, the same as its own, and 'identity_revoked' told so vacates it", async () => {

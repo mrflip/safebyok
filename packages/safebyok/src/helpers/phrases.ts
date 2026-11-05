@@ -409,7 +409,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const DelOfOtherLife = "This Vault was deleted and made anew since it was read, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -431,11 +431,7 @@ export const ClearsThrew = "Reading what was handed to this attempt threw, so no
 
 export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: give Bank.make a requestCleartext."
 
-export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."
-
-export const NotAVerdict = "The strengthChecker answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
-
-export const NoStrengthChecker = "This app cannot accept a passphrase until a strength checker is configured. For the app's makers: see notes/configuration.md, under Strength checker, for instructions."
+export const StrengthCheckerThrew = "The strengthChecker handed to Bank.make threw, or answered a verdict that throws when read. What it threw is left out, as it heard the passphrase: have it catch its own failures."
 
 export const SamePassphrase = "The new passphrase is the one the vault has already, so nothing was changed: choose another."
 

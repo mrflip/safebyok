@@ -1,9 +1,9 @@
+import { isEqual } from 'es-toolkit'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type LockedBag, LOCKED } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { reportToPlatform } from '../refusals/report-error'
-import { stableJsonify } from '../helpers/stable-jsonify'
 import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
@@ -106,8 +106,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
   constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, opts: StorableOpts) {
-    VX.storableArgs.parse({ world, listing, central, opts })
-    this.#horizonMillis = opts.maxMillisSinceRefresh
+    const { opts: { maxMillisSinceRefresh } } = VX.storableArgs.parse({ world, listing, central, opts })
+    this.#horizonMillis = maxMillisSinceRefresh
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
     this.#scope = Object.freeze(listing.scopeOf(central))
@@ -229,7 +229,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Settling]: settle, becomeNotifiable, replaceSnapshot, sameSnapshot
+  // == [Settling]: settle, becomeNotifiable, replaceSnapshot
 
   /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
   settle(): Settled {
@@ -247,7 +247,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #replaceSnapshot(): void {
     if (this.#snapshot === null) { return }
     const nextSnapshot = this.makeSnapshot()
-    if (this.sameSnapshot(nextSnapshot, this.#snapshot)) { return }
+    if (isEqual(nextSnapshot, this.#snapshot)) { return }
     this.#snapshot = nextSnapshot
     this.#listeners.forEach((listener) => {
       try {
@@ -256,11 +256,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
         reportToPlatform(err)
       }
     })
-  }
-
-  /** Compare two snapshots for equality: notifications are not sent if old and new are the same */
-  protected sameSnapshot(next: SnapshotT, current: SnapshotT): boolean {
-    return stableJsonify(next) === stableJsonify(current)
   }
   // --
 
