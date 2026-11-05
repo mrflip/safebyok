@@ -28,7 +28,6 @@ import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxQuery, BoxRow, BoxTombstone, DelOpts, IfAbsentOpts, PutOpts, ReqParams, Revision, VaultRecord, WatchScope } from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type Tombstone, BoxFormat } from '../../src/shapes/shapes-vaultish'
-import * as Phrases from '../../src/helpers/phrases'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Notice } from '../../src/storage/vault-db-new'
@@ -296,7 +295,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   // The fake seal: the text sealed, by the stamp it was sealed under.
   const sealedTexts = new Map<string, string>()
   const demandFakeUnlocked = (): void => {
-    if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.UnlockFirst) }
+    if (lockState === 'locked') { throw Refuse.unlockFirst() }
   }
 
   const world: BoxWorld = {
@@ -305,7 +304,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
     tellBadNews:  (news) => { badnews.push(...news) },
-    demandUnlocked: () => { if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.VaultLocked) } },
+    demandUnlocked: () => { if (lockState === 'locked') { throw Refuse.lockedError() } },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()
@@ -316,7 +315,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       await Promise.resolve()
       demandFakeUnlocked()
       const whisperText = sealedTexts.get(String(stableJsonify(stamp)))
-      if (whisperText === undefined) { throw new VaultError('damaged_box', Phrases.UnopenedWhisper) }
+      if (whisperText === undefined) { throw Refuse.unopenedWhisper() }
       return whisperText
     },
     takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
