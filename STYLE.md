@@ -443,6 +443,8 @@ it; a shape taken out of whatever carries it says `'strip'`. A check of the obje
 (`.refine()`, `.readonly()`, a sentence of its own) goes inside a `Checker`: chained onto the
 validator a call returns, it would refuse as Zod does. `Checkers` stays for validators made
 together, sharing locals or built one from another.
+A shape that is another module's, refusing in this one's kind, is that validator's `refusingAs(kind)`
+(`SX.boxRecord.refusingAs('bad_record')`), not its fields listed again.
 
 ```ts
 export const boxDamaged = objCheck(({ oneof, boxlabel, revision_tok }) => ({

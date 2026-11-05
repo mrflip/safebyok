@@ -33,16 +33,17 @@ export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_sa
 
 // == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
 
-export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
+export const passphraseWayinRecord = SX.passphraseWayin.refusingAs('bad_record')
+export const passkeyWayinRecord    = SX.passkeyWayin.refusingAs('bad_record')
+
+export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
   const passphraseWayinHeader = SX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
   const passkeyWayinHeader    = SX.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
   return {
     passphraseWayinHeader,
     passkeyWayinHeader,
     wayinHeader: discrim('wayinkind', [passphraseWayinHeader, passkeyWayinHeader]),
-    passphraseWayinRecord: SX.passphraseWayin,
-    passkeyWayinRecord:    SX.passkeyWayin,
-    wayinRecord: discrim('wayinkind', [SX.passphraseWayin, SX.passkeyWayin]),
+    wayinRecord: discrim('wayinkind', [passphraseWayinRecord, passkeyWayinRecord]),
   }
 })
 
