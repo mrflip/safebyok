@@ -14,28 +14,15 @@ export type DeviceCached = { act: 'born' | 'held' | 'rewrote', record: DeviceRec
 
 /** SLOPDOC: A deviceDB's base: calls reach the store in order, only `peek` answers a `lease_key`, no verb logs one. */
 export abstract class DeviceDB {
-  // == [Generic calls]: doCache, doPeek, doVacate, doLeasesProvedBefore, doCacheDeviceRecord
-
-  // A store starts each call's work in the order called, or a `vacate` made after a `cache` may not erase it.
-  /** Stores `row` as the lease of its vault scope, over any row there. */
-  protected abstract doCache(row: LeaseRow): Awaitable<void>
-  /** The row stored at this vault scope, whatever its `vault_tok`, or null. */
-  protected abstract doPeek(scope: VaultScope): Awaitable<unknown>
-  /** Removes the row at this vault scope when it holds this `vault_tok`, in one step. */
-  protected abstract doVacate(asked: LeaseQuery): Awaitable<void>
-  /** Every row whose `proved_at` is under `cutoff`, oldest first: an index range scan. */
-  protected abstract doLeasesProvedBefore(cutoff: number): Awaitable<unknown[]>
-  /** In one step, stores `record` at its bank scope unless `isHeld` accepts the row stored there, and resolves that row, or null for none. */
-  protected abstract doCacheDeviceRecord(record: DeviceRecord, isHeld: (stored: unknown) => boolean): Awaitable<unknown>
-  // --
-
-  // == [Lease verbs]: cache, peek, vacate, leasesProvedBefore, tryCache, tryPeek, tryVacate, tryLeasesProvedBefore
+  // == [Lease verbs]: cache, tryCache, peek, tryPeek, vacate, tryVacate, leasesProvedBefore, tryLeasesProvedBefore
 
   /** Caches the lease row for its vault, in place of any before. */
   async cache(row: LeaseRow): Promise<void> {
     const leaseRow = SX.leaseRow.parse(row)
     await adapted('cache', () => this.doCache(leaseRow))
   }
+
+  tryCache(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.cache(row)) }
 
   /** The row cached for this vault under this `vault_tok`, or null: a row of another `vault_tok`, or one failing its check, is no row. */
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
@@ -45,11 +32,15 @@ export abstract class DeviceDB {
     return (parsed.success && parsed.data.vault_tok === leaseQuery.vault_tok) ? parsed.data : null
   }
 
+  tryPeek(asked: LeaseQuery): Promise<Outcome<LeaseRow | null>> { return outcomeOf(() => this.peek(asked)) }
+
   /** Erases the row cached for this vault under this `vault_tok`; none is a no-op, and a row of another `vault_tok` stays. */
   async vacate(asked: LeaseQuery): Promise<void> {
     const leaseQuery = SX.leaseQuery.parse(asked)
     await adapted('vacate', () => this.doVacate(leaseQuery))
   }
+
+  tryVacate(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.vacate(asked)) }
 
   /** The cached leases, of any vault, proved before `cutoff`, oldest first, as scope, `vault_tok` and `proved_at` only. */
   async leasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
@@ -58,9 +49,6 @@ export abstract class DeviceDB {
     return rows.flatMap((row) => { const parsed = SX.leaseSparse.safeParse(row); return parsed.success ? [parsed.data] : [] })
   }
 
-  tryCache(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.cache(row)) }
-  tryPeek(asked: LeaseQuery): Promise<Outcome<LeaseRow | null>> { return outcomeOf(() => this.peek(asked)) }
-  tryVacate(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.vacate(asked)) }
   tryLeasesProvedBefore(cutoff: number): Promise<Outcome<LeaseSparse[]>> { return outcomeOf(() => this.leasesProvedBefore(cutoff)) }
   // --
 
@@ -76,6 +64,21 @@ export abstract class DeviceDB {
   }
 
   tryCacheDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceCached>> { return outcomeOf(() => this.cacheDeviceRecord(record)) }
+  // --
+
+  // == [Protected, for a subclass to write]: doCache, doPeek, doVacate, doLeasesProvedBefore, doCacheDeviceRecord
+
+  // A store starts each call's work in the order called, or a `vacate` made after a `cache` may not erase it.
+  /** Stores `row` as the lease of its vault scope, over any row there. */
+  protected abstract doCache(row: LeaseRow): Awaitable<void>
+  /** The row stored at this vault scope, whatever its `vault_tok`, or null. */
+  protected abstract doPeek(scope: VaultScope): Awaitable<unknown>
+  /** Removes the row at this vault scope when it holds this `vault_tok`, in one step. */
+  protected abstract doVacate(asked: LeaseQuery): Awaitable<void>
+  /** Every row whose `proved_at` is under `cutoff`, oldest first: an index range scan. */
+  protected abstract doLeasesProvedBefore(cutoff: number): Awaitable<unknown[]>
+  /** In one step, stores `record` at its bank scope unless `isHeld` accepts the row stored there, and resolves that row, or null for none. */
+  protected abstract doCacheDeviceRecord(record: DeviceRecord, isHeld: (stored: unknown) => boolean): Awaitable<unknown>
   // --
 }
 
