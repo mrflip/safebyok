@@ -245,7 +245,7 @@ erased from the store at `lock()`. In `src/models/` no lease is dropped at a tim
 guarantee**: a lease held in a page stays held until something locks it. Two things answer to the autolock duration, against a row cached on
 this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` erases it. `Lease.buildFromCache`, at the
 door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.buildFromCache` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the host's clock: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
-algorithm, or for another use reads as `corrupt_record` (`isLeaseKey`, `types.ts`). *Caveat:*
+algorithm, or for another use reads as `damaged_lease` (`isLeaseKey`, `types.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
 vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease
 record, is inside the trust boundary, as the host already is (SECURITY.md, *What is outside
@@ -277,7 +277,7 @@ the eighth value that this note names here: it lives in locals and arguments for
 message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a
 kind, a limit, a field name, or the `name` of an error it replaces (`thrownNameOf`, `errors.ts`: a
 DOMException's or an Error's class name such as `QuotaExceededError`, or whatever name a host's own
-device store gave its error, kept by the device-store conditions and `crypto_failed` until a redact
+device store gave its error, kept by the device-store conditions until a redact
 lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests/validators.test.ts`,
 *no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
@@ -286,9 +286,7 @@ logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, l
 the host's that throws as an attempt's clears are read: `clearsThrew`, `unexpected_error`, with no cause, and a `requestCleartext`
 that throws is `requestCleartextThrew`, `unexpected_error`; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`). A WebCrypto
 failure is caught and replaced, its error never kept: `wrongProof`, `damaged_lease` and
-`damaged_box` where a wrong key or an altered record explains it, and `crypto_failed`
-(`Lease.cipheredWith`) for a key made, wrapped or a cipher under fresh keys that failed all the
-same, which keeps the error's `name` alone. Each such catch holds only WebCrypto calls, their ctx
+`damaged_box` where a wrong key or an altered record explains it. Each such catch holds only WebCrypto calls, their ctx
 built before it (`Proving.#unwrap`, `Lease.#vaultKeyOrNull`, `Lease.#openedOrNull`, the cipher step
 of `Lease.cipheredWith`), so a bug in building the ctx never reads as a wrong proof or a damaged
 box. A device-store failure's cause never crosses to the host: `deviceTrouble` (`device-db.ts`)
@@ -346,7 +344,7 @@ the crypto imports.
 * *A memory-hard, labelled, salted derivation.* Argon2id (`@noble/hashes`, or hash-wasm in
   safebyok-fastkey) under a stored `key_deriver_label` whose spec is fixed (`Argon2idWebV1`: 64 MiB,
   3 passes, 1 lane, 16-byte salt, 32-byte key); a fresh random salt per wayin; a wayin under
-  another label refuses `unknown_key_deriver`, so there is no silent downgrade; a deriver wearing a
+  another label refuses `newer_format`, so there is no silent downgrade; a deriver wearing a
   supplied label must carry exactly its parameters (`Bank.make`).
 * *Randomness* from `crypto.getRandomValues` and `subtle.generateKey` alone (`randomBytes`,
   `randomId`, the key makers).
