@@ -68,7 +68,7 @@ describe("MaxLabelChars and LabelPattern", () => {
     }
   })
 
-  // MaxLabelChars and LabelPattern @example
+  // LabelPattern @example
   it("gives a form's input its pattern and length", () => {
     const input = { pattern: LabelPattern.source, maxLength: MaxLabelChars }
     expect(new RegExp(input.pattern).test('anthropic_api_key')).to.be.true

@@ -90,7 +90,6 @@ describe("The checks of what the base knows of a record", () => {
       ["rev-a1",                               false, 'refuses text'],
     ])
 
-    // VX.sparseBase @example
     it("takes the six props from a record and strips the rest", () => {
       expect(VX.sparseBase.parse(full)).to.deep.equal(baseProps)
     })
