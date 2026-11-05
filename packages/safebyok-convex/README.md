@@ -133,7 +133,7 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
 * **Other devices' writes arrive live.** The vault watches `watchVault` and refreshes whenever
   it changes, so its snapshot (and a React render) follows writes from anywhere.
 * **Refusals** are `VaultError`s, each the `err` of the `Outcome` a call resolves, of the kinds in
-  the *Errors* tables of the [`safebyok` README](../safebyok/README.md), which say what each means
+  the *Errors* tables of the [`safebyok-old` README](../safebyok-old/README.md), which say what each means
   and what a host does. The Convex functions throw two, `identity_revoked` and `not_permitted` (your
   `getUserId`'s), each arriving with the `ConvexError` it came as for its `cause`; a write that
   came too late is a `stale_write`, and one with no room a `vault_full`, carrying how full the

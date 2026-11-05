@@ -30,8 +30,6 @@ import type { WayinSummary, VaultRecord } from './shapes/vault'
  *
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
  * altered, since decryption fails alike; the message says so.
- *
- * The package README's *Errors* section says what each kind means and what to do about it.
  */
 export const refusalKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
