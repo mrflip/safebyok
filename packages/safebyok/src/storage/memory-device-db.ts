@@ -9,10 +9,22 @@ const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 const leaseCkeyOf = ({ applabel, user_id, vaultlabel }: VaultScope): string => ckeyOf(applabel, user_id, vaultlabel)
 
 export class MemoryDeviceDB extends DeviceDB {
+  // == [Props]: #leaserows, #devicerows
+
   readonly #leaserows = new Map<string, unknown>()
   readonly #devicerows = new Map<string, unknown>()
+  // --
 
-  // == [Generic calls]: doCache, doPeek, doVacate, doLeasesProvedBefore, doCacheDeviceRecord
+  // == [Rows]: _cheat_leaseRows, _cheat_deviceRows
+
+  /** For tests: the map of lease rows, by scope. */
+  _cheat_leaseRows(): Map<string, unknown> { return this.#leaserows } // eslint-disable-line unicorn/prefer-private-class-fields
+
+  /** For tests: the map of device records, by bank scope. */
+  _cheat_deviceRows(): Map<string, unknown> { return this.#devicerows } // eslint-disable-line unicorn/prefer-private-class-fields
+  // --
+
+  // == [Protected, the generic calls of DeviceDB]: doCache, doPeek, doVacate, doLeasesProvedBefore, doCacheDeviceRecord
 
   protected doCache(row: LeaseRow): void {
     this.#leaserows.set(leaseCkeyOf(row), structuredClone(row))
@@ -38,14 +50,5 @@ export class MemoryDeviceDB extends DeviceDB {
     if (! isHeld(stored)) { this.#devicerows.set(ckey, structuredClone(record)) }
     return structuredClone(stored)
   }
-  // --
-
-  // == [Rows]: _cheat_leaseRows, _cheat_deviceRows
-
-  /** For tests: the map of lease rows, by scope. */
-  _cheat_leaseRows(): Map<string, unknown> { return this.#leaserows } // eslint-disable-line unicorn/prefer-private-class-fields
-
-  /** For tests: the map of device records, by bank scope. */
-  _cheat_deviceRows(): Map<string, unknown> { return this.#devicerows } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 }
