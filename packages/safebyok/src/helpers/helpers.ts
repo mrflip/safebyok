@@ -57,13 +57,3 @@ export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: Tat
  * @example await nextMicrotask()   // every promise settled earlier in this task has run its handlers
  */
 export function nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }
-
-/** The field `fieldname` of `row`, a stored row as fetched, unchecked: undefined when the row is no object or has none.
- * For the few reads made before, or instead of, a row's check: its `format`, or the tokens a
- * key-value adapter compares inside its one atomic step.
- *
- * @example fieldOf(raw, 'format')   // 'safebyok-vault-v6', or whatever a damaged row holds there
- */
-export const fieldOf = (row: unknown, fieldname: string): unknown => (
-  typeof row === 'object' && row !== null ? (row as Record<string, unknown>)[fieldname] : undefined
-)
