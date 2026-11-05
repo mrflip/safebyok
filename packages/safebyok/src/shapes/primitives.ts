@@ -51,7 +51,7 @@ export const UserIdPattern = /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/
 export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true }).max(MaxUserIdChars, Phrases.userIdTooLong(MaxUserIdChars)).regex(UserIdPattern, Phrases.UserIdChars)
 // --
 
-// == [Instants]: epochMillis
+// == [Instants]: epochMillis, EpochMillis
 
 /** The check for an instant: whole UTC epoch milliseconds from {@link FarPast} to {@link FarFuture}, both included.
  * Every time the package keeps is one, and a stored record holding anything else fails its check.
