@@ -27,9 +27,9 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 const RefusingStrengthChecker: StrengthChecker = () => ({ strong: false, reason: Phrases.NoStrengthChecker })
 // --
 
-// == [Bank]
-
 export class Bank implements VaultWorld {
+  // == [Props]: applabel, user_id, scope, clock, keyDeriver, deviceDB, logger, requestCleartext, strengthChecker, leaseMillis, onPanic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #device_id, #lastHello, #snapshot, #getSnapshot, #subscribe
+
   declare readonly applabel: string
   declare readonly user_id:  string
   readonly scope:            BankScope
@@ -51,6 +51,34 @@ export class Bank implements VaultWorld {
   /** The outcome of the last `hello`, null with none since the bank was made, swept or vacated. */
   #lastHello:            Outcome<void> | null = null
   #snapshot:             BankSnapshot
+
+  readonly #getSnapshot = (): BankSnapshot => this.#snapshot
+
+  readonly #subscribe = (listener: () => void): (() => void) => {
+    this.#listeners.add(VX.listener.parse(listener))
+    return () => { this.#listeners.delete(listener) }
+  }
+  // --
+
+  // == [Getters]: device_id, vaultListing, autolockMinutes, snapshot, getSnapshot, subscribe, toJSON
+
+  /** The first `device_id` cached for this bank on this device, once a `hello` has cached it. */
+  get device_id(): string { return this.#device_id }
+
+  get vaultListing(): VaultListing { return this.#vaultListing }
+
+  get autolockMinutes(): number { return this.leaseMillis / MinuteMillis }
+
+  get snapshot(): BankSnapshot { return this.#snapshot }
+
+  get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
+
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+
+  toJSON(): BankSnapshot { return this.#snapshot }
+  // --
+
+  // == [Construction]: make, constructor, vaultScopeOf
 
   static make(opts: BankOpts): Bank { return new Bank(opts) }
 
@@ -83,23 +111,22 @@ export class Bank implements VaultWorld {
     Object.freeze(this)
   }
 
-  /** The first `device_id` cached for this bank on this device, once a `hello` has cached it. */
-  get device_id(): string { return this.#device_id }
+  vaultScopeOf(bag: VaultBag): VaultScope {
+    const { vaultlabel } = verifyConsistent(vaultBag.parse(bag), this.scope, { kind: 'bad_scope', message: Phrases.otherScope })
+    return { ...this.scope, vaultlabel }
+  }
+  // --
 
-  get vaultListing(): VaultListing { return this.#vaultListing }
-
-  // == [The world of its vaults]: lockState, ensureTimely, takeWorld, autolockMinutes
+  // == [The world of its vaults]: lockState, ensureTimely, takeWorld
 
   lockState(): LockState { return 'unlocked' }
 
   ensureTimely(): Promise<void> { return Promise.resolve() }
 
   takeWorld(): void { noop() }
-
-  get autolockMinutes(): number { return this.leaseMillis / MinuteMillis }
   // --
 
-  // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord, demandReady
+  // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord
 
   /** SLOPDOC: Brings the bank up from the vaultDB, and again whenever the host calls it to force a reset. */
   async hello(): Promise<void> {
@@ -126,11 +153,6 @@ export class Bank implements VaultWorld {
     const { act, record } = await this.deviceDB.cacheDeviceRecord({ ...this.scope, device_id: this.#device_id })
     this.#device_id = record.device_id
     if (act === 'rewrote') { this.#vaultListing.tellBadNews([deviceRecordRewritten()]) }
-  }
-
-  #demandReady(): void {
-    if (this.#lastHello === null) { throw helloFirst() }
-    valOf(this.#lastHello)
   }
   // --
 
@@ -183,8 +205,6 @@ export class Bank implements VaultWorld {
     return scan.val.filter((row) => this.#isOwnLease(row))
   }
 
-  #isOwnLease({ applabel, user_id }: LeaseSparse): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
-
   /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
    * none.
    */
@@ -212,12 +232,7 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Vaults]: vaultScopeOf, vaultOf, ensureVault, tryEnsureVault
-
-  vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = verifyConsistent(vaultBag.parse(bag), this.scope, { kind: 'bad_scope', message: Phrases.otherScope })
-    return { ...this.scope, vaultlabel }
-  }
+  // == [Vaults]: vaultOf, ensureVault, tryEnsureVault
 
   /** The vault listed for `bag`, a tombstone among them, or null. */
   vaultOf(bag: VaultBag): Vault | null {
@@ -247,25 +262,7 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Snapshot and subscription]: snapshot, getSnapshot, subscribe, toJSON, makeSnapshot, remakeSnapshot
-
-  get snapshot(): BankSnapshot { return this.#snapshot }
-
-  get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
-  readonly #getSnapshot = (): BankSnapshot => this.#snapshot
-
-  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
-  readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(VX.listener.parse(listener))
-    return () => { this.#listeners.delete(listener) }
-  }
-
-  toJSON(): BankSnapshot { return this.#snapshot }
-
-  #makeSnapshot(): BankSnapshot {
-    const hello = this.#lastHello
-    return Object.freeze({ ...this.scope, stage: stageOf(hello), err: hello?.err ?? null, device_id: this.#device_id, vaults: this.#vaultListing.snapshot })
-  }
+  // == [Snapshot]: remakeSnapshot, makeSnapshot
 
   /** Make the snapshot again, and tell every listener where it differs. Bound, as each listing calls it. */
   readonly #remakeSnapshot = (): void => {
@@ -281,9 +278,23 @@ export class Bank implements VaultWorld {
       }
     }
   }
+
+  #makeSnapshot(): BankSnapshot {
+    const hello = this.#lastHello
+    return Object.freeze({ ...this.scope, stage: stageOf(hello), err: hello?.err ?? null, device_id: this.#device_id, vaults: this.#vaultListing.snapshot })
+  }
+  // --
+
+  // == [Guards]: isOwnLease, demandReady
+
+  #isOwnLease({ applabel, user_id }: LeaseSparse): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
+
+  #demandReady(): void {
+    if (this.#lastHello === null) { throw helloFirst() }
+    valOf(this.#lastHello)
+  }
   // --
 }
-// --
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext
 
