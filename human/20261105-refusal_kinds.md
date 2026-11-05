@@ -7,7 +7,16 @@ Branch `20261105-refusal_kinds`, off main at fa7ff8e5. Plan: `whiteboard/2026110
 
 * **Step 1 (8414cbcf)**: the fifteen kinds culled from `refusals/errors.ts`; `corrupt_record` folded into `record_conflict`.
 * **Step 2 (47b6b818)**: merges, renames and re-kinds per the plan's table; `damaged_record` is `damaged_row`.
-  Kinds: 53 before, 34 after.
+  Kinds: 53 before, 38 after the cull, 34 after the merges.
+* **Step 3**: no `src` site outside `refusals/` threw inline (the earlier passes had already made throwers of them),
+  so 0 src sites converted; the test helpers' three (models-world.ts `demandFakeUnlocked`, `demandUnlocked`,
+  `unsealStampedString`) now call `unlockFirst`, `lockedError`, `unopenedWhisper`. The literals inside throwers.ts
+  (21 strings and templates, `NoErrorGiven` and `StorageTroubleMessage` among them) are named phrases in two new
+  sections at the foot of phrases.ts, words unchanged; `StorageTroubleMessage` is `Phrases.StorageUnavailable`.
+  Throwers: 73 before, 73 after; none added, merged or renamed.
+* **Step 4**: the plan's rules text, verbatim, heads throwers.ts; errors.ts and phrases.ts point there.
+* **Step 5**: the reviewers' note in `.claude/agents/thread-reviewer.md` and `style-reviewer.md`.
+* **Step 6**: changeset `.changeset/20261105-refusal_kinds.md`, safebyok minor.
 
 ## Decisions: bad_record, invalid_input and bad_scope, site by site
 
@@ -59,6 +68,14 @@ wrong wayin); ~246 (registered_at not the stored one) is an integrity check agai
   `corrupt_record`, `crypto_failed`. Not edited here.
 * The plan said `bad_whisper` had no site: shapes-core's `whisper`/`whisperBag` declared it, nested inside
   `bad_option` validators, so never thrown; they now say `bad_option`.
+* `validator.ts`'s `demandConsistent` and `verifyConsistent` throw `new VaultError(kind, ...)` with the caller's kind:
+  a thrower would have to take the kind as an argument, so they stay.
+* `passphrase-strength.ts:85`'s `HostErrorSanitizer.refusalFor(err, 'unexpected_error', ...)`: the dead copy of
+  proving.ts's guard (no src caller of `guardStrengthChecker`); reported, not changed (coordinator 4d).
+* `tests/test-helpers/bank-world.ts:45` throws `new VaultError(this.#refusalkind, ...)`, the kind the test's choice:
+  no thrower takes one, so it stays.
+* `listing.ts:303` (`demandEnabled`) calls the existing `disabledError`; the Coach's note asks for
+  `boxBecameDisabled` there. Untouched (no thrower renamed in this pass): for the gallant pass on labels.
 * `bad_record` cannot be culled: validators serve both ways, and validator.ts defaults to it.
 * A host's ensureUnlocked on a bank made without `requestCleartext` now refuses `bad_option`, not `vault_locked`
   (`noProofToUnlock`): the vault tests' world has no dialog, so a dozen assertions moved.
