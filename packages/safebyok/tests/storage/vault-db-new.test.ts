@@ -183,9 +183,9 @@ describe("MemoryVaultDB", () => {
 
     it("a VaultError a store throws passes up unchanged, with the request's safe metadata", async () => {
       class RefusingVaultDB extends MemoryVaultDB {
-        protected override doGetBank(): never { throw new VaultError('not_permitted', 'Not yours.') }
+        protected override doGetBank(): never { throw new VaultError('storage_unavailable', 'Storage is down.') }
       }
-      expect(await new RefusingVaultDB().tryGetBank(bankScope)).to.deep.include({ ok: false, act: 'not_permitted', req_params: bankScope })
+      expect(await new RefusingVaultDB().tryGetBank(bankScope)).to.deep.include({ ok: false, act: 'storage_unavailable', req_params: bankScope })
     })
   })
 

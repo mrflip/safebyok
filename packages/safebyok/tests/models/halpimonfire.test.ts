@@ -185,7 +185,7 @@ describe("A gate change after its record is stored", () => {
     const { opts, deviceDB, demandStored } = await makeBornVault()
     const vault = await new VaultListing(hearingBadNews(opts, onBadNews)).build(demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
-    const refusal = new VaultError('storage_blocked', "the disk is full")
+    const refusal = new VaultError('storage_unavailable', "the disk is full")
     deviceDB.tryCache.mockResolvedValueOnce(TH.bad(refusal))
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
     expect(vault.isUnlocked).to.be.true

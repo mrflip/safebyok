@@ -86,7 +86,7 @@ describe("a tombstone over a live vault", () => {
     await buildTyping(born, Dna, byPassphrase(Passphrase))
     const listing = new VaultListing(hearingBadNews(opts, onBadNews))
     const vault = await listing.build(demandStored())
-    const refusal = new VaultError('storage_blocked', 'the disk is full')
+    const refusal = new VaultError('storage_unavailable', 'the disk is full')
     deviceDB.tryVacate.mockResolvedValueOnce(TH.bad(refusal))
     restoreRow(tombstoneOver(demandStored()))
     await listing.fetch(Dna, { ifAbsent: 'nil' })

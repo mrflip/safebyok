@@ -99,10 +99,10 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("has tryPut resolve the outcome of a refusal, rejecting never", async () => {
       const { listing, box, next } = await putable()
-      held.mw.willPut(held.mw.refusalOf(box.scope, new VaultError('not_permitted', "No.")))
+      held.mw.willPut(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "Storage is down.")))
       const outcome = await listing.tryPut(next, { prior: box })
       expect(outcome.ok).to.be.false
-      expect(outcome.err?.refusalkind).to.eq('not_permitted')
+      expect(outcome.err?.refusalkind).to.eq('storage_unavailable')
     })
   })
 
