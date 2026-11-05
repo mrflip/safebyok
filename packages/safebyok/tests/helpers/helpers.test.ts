@@ -103,23 +103,32 @@ describe("tattoo", () => {
     expect(JSON.stringify(handle)).to.eq('{"label":"anthropic","vault_tok":"v1","revision_seq":3}')
   })
 
-  it("leaves what it attached writable and configurable unless told otherwise", () => {
+  it("leaves what it attached readonly and configurable unless told otherwise", () => {
     const handle = {}
     tattoo(handle, { vault_tok: 'v1' })
-    expect(Object.getOwnPropertyDescriptor(handle, 'vault_tok')).to.include({ enumerable: true, writable: true, configurable: true })
+    expect(Object.getOwnPropertyDescriptor(handle, 'vault_tok')).to.include({ enumerable: true, writable: false, configurable: true })
   })
 
-  it("fixes for good what it attaches with writable and configurable false, as its example shows", () => {
+  it("throws on assigning to a readonly prop, which a configurable one still lets adorn redefine", () => {
+    const handle: { vault_tok?: string } = {}
+    tattoo(handle, { vault_tok: 'v1' })
+    expect(() => { handle.vault_tok = 'v2' }).to.throw(TypeError)
+    adorn(handle, 'vault_tok', 'v2')
+    expect(handle.vault_tok).to.eq('v2')
+  })
+
+  it("fixes for good what it attaches with configurable false, as its example shows", () => {
     const handle = {}
-    tattoo(handle, { vault_tok: 'v1' }, { writable: false, configurable: false })
+    tattoo(handle, { vault_tok: 'v1' }, { configurable: false })
     expect(Reflect.set(handle, 'vault_tok', 'v2')).to.be.false
     expect(Reflect.deleteProperty(handle, 'vault_tok')).to.be.false
+    expect(() => adorn(handle, 'vault_tok', 'v2')).to.throw(TypeError)
     expect(handle).to.deep.equal({ vault_tok: 'v1' })
   })
 
-  it("leaves a prop not configurable but writable assignable, never removable", () => {
+  it("leaves a prop writable but not configurable assignable, never removable", () => {
     const handle = {}
-    tattoo(handle, { revision_seq: 1 }, { configurable: false })
+    tattoo(handle, { revision_seq: 1 }, { writable: true, configurable: false })
     expect(Reflect.set(handle, 'revision_seq', 2)).to.be.true
     expect(Reflect.deleteProperty(handle, 'revision_seq')).to.be.false
     expect(handle).to.deep.equal({ revision_seq: 2 })
@@ -129,9 +138,16 @@ describe("tattoo", () => {
 describe("tattooProp", () => {
   it("attaches one value as an enumerable own prop and hands it back, as its example shows", () => {
     const handle = { label: 'anthropic' }
-    expect(tattooProp(handle, 'vault_tok', 'v1', { writable: false })).to.eq('v1')
+    expect(tattooProp(handle, 'vault_tok', 'v1')).to.eq('v1')
     expect(Object.keys(handle)).to.deep.equal(['label', 'vault_tok'])
     expect(Reflect.set(handle, 'vault_tok', 'v2')).to.be.false
-    expect(Object.getOwnPropertyDescriptor(handle, 'vault_tok')).to.include({ value: 'v1', enumerable: true, configurable: true })
+    expect(Object.getOwnPropertyDescriptor(handle, 'vault_tok')).to.include({ value: 'v1', enumerable: true, writable: false, configurable: true })
+  })
+
+  it("leaves a prop assignable only when told writable", () => {
+    const handle = {}
+    tattooProp(handle, 'revision_seq', 1, { writable: true })
+    expect(Reflect.set(handle, 'revision_seq', 2)).to.be.true
+    expect(handle).to.deep.equal({ revision_seq: 2 })
   })
 })

@@ -38,7 +38,7 @@ export class Wayin {
     const parsed = wayinRecord.parse(record)
     Object.freeze(parsed.vault_key_wayin_wrapped)
     this.#pickle = Object.freeze(parsed)
-    tattoo(this, this.#pickle, { writable: false })
+    tattoo(this, this.#pickle)
     Object.freeze(this)
   }
   // --

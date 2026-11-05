@@ -118,7 +118,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** SLOPDOC: Inscribes the own props before the seal; a subclass adds its own the same way, never as #fields. */
   protected assignInitialProps(central: Fetched<RecordT, SparseT>): void {
-    tattoo(this, { ...this.scope, vault_tok: central.vault_tok }, { writable: false, configurable: false })
+    tattoo(this, { ...this.scope, vault_tok: central.vault_tok }, { configurable: false })
     this.registered_at = central.registered_at
     this.assign(central)
   }

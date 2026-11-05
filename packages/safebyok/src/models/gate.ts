@@ -29,7 +29,7 @@ export class Gate {
     const { gate_epoch, passphrase_wayin, passkey_wayin } = gateProps.parse(props)
     const ppWayin = new Wayin(passphrase_wayin)
     const pkWayin = passkey_wayin === null ? null : new Wayin(passkey_wayin)
-    tattoo(this, { gate_epoch, passphrase_wayin: ppWayin.pickle(), passkey_wayin: pkWayin?.pickle() ?? null }, { writable: false })
+    tattoo(this, { gate_epoch, passphrase_wayin: ppWayin.pickle(), passkey_wayin: pkWayin?.pickle() ?? null })
     decorate<Gate>(this, { ppWayin, pkWayin, stamp: checked })
     Object.freeze(this)
   }
