@@ -41,6 +41,15 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-05 (lease_fold, [#494](https://github.com/mrflip/safebyok/pull/494), branch `20261105-lease_fold`): **A gating's run reaches the
+  vault's private `#unlockByProof` and `#landGate` by a gating friend, a second friend beside the lease's.** In
+  `packages/safebyok/src/models/`, a gating's runs are `RunForGatingkind` in `gating.ts`, beside `ProveForGatingkind`; a run hears
+  provings, never a clear. `Vault.#gatingFriend` (private, static) is two closures taking a vault and a proving, handed to
+  `Gating.launch` as `friend` and held in the gating's private `#launchArgs`. No public `Vault` method takes a proving, and no field of a
+  gating shows the friend (`tests/models/vault-lease.test.ts` checks it). It holds no key; it can land a gate change or attach a lease by
+  a proving already made. `Gating.launch` no longer accepts a `run`: a caller who supplies a friend of their own hears provings, the
+  same reach a supplied `run` had. The vault entrypoints are `replacePassphrasePrompt`, `addPasskeyPrompt`, `revokePasskeyPrompt` and
+  `delVaultPrompt`. (Models are not yet exported from the package.)
 * 2026-11-03 (cleanup, branch `20261103-cleanup`): **The key that gets a thing out of storage is entered into the data with an enter-key
   step, and no verb of the models layer returns a vaultKey, wayinKey or leaseKey.** In `packages/safebyok/src/models/`, a vaultKey is
   unwrapped under the wayinKey (`Proving.#unwrapVaultKey`, extractable only to be wrapped again, dropped when the method ends) or under
@@ -63,27 +72,27 @@ added or folded into through the subagent, and no other entry changes.
   A row past autolock stays on the deviceDB, with its leaseKey handle and the wrapped vaultKey, though `Lease.peek` reads it as no row and the vault asks for a proof; it stays until the next proof's lease is written over it or a host's `bank.autolock` locks it and so erases it, and a host that never calls `bank.autolock` keeps it until then. Both go by the host's clock: a clock jumping forward destroys nothing, and setting the clock back reopens the row until the clock catches up. `notes/guarantees.md` G4 says the same. Autolock is a best-effort reminder process, not a guarantee, and `bank.autolock` is called by the host, not by `hello`. (Models are not yet exported from
   `src/index.ts`.)
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change does not rotate the vaultKey, so it ends no session.**
-  `Vault.replacePassphrase`, `addPasskey` and `revokePasskey` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
+  `Vault.replacePassphrasePrompt`, `addPasskeyPrompt` and `revokePasskeyPrompt` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
   and a device that holds the vaultKey keeps it to its lock. Revoking a passkey or replacing a passphrase stops new unlocks through the
   old way in; it does not evict a device already unlocked, nor undo what an attacker who once held the vaultKey learned. A lease held on
   the acting device is renewed under the new gate epoch (`#renewLease`), unless a `lock()` crossed the change. (Models are not yet
   exported from the package.)
-* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`replacePassphrase` keeps the passkey.** A vault must always have a
+* 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`replacePassphrasePrompt` keeps the passkey.** A vault must always have a
   passphrase; the passkey is optional. Replacing the passphrase after a suspected compromise does not remove a passkey; a host wanting
-  both gone calls `revokePasskey` as well.
+  both gone calls `revokePasskeyPrompt` as well.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change is its params, with no client-side next gate.** The params
   spread the record read after a timely refresh (`vault.ensureTimely(MSX.Promptly)`, `timelyAnte` in `models/gating.ts`) inside the
   attempt, and land conditional on its revision at the vaultDB, so a change crossing another refuses `stale_write` and stores nothing.
   The prior `Gate.with*` and closure-taking `attemptProof` (host code handed proof closures) are gone: what the user types arrives as
   clears through the one gating, and is spent by `spendClears`, which also zeroes a bare `ArrayBuffer` `prfBytes`.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`del_vault`'s proof is a client-side confirmation; the vaultDB checks no
-  proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). `Vault.#runDelVault` locks first,
+  proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). the `del_vault` run (`RunForGatingkind` in `models/gating.ts`; amended 2026-11-05 (lease_fold): it was `Vault.#runDelVault`) locks first,
   so no box opens under a lease while the tombstone goes out; a refused delete leaves the vault locked. A `lock()` does not settle a
   `del_vault` asking, as a lock does not stop a delete (`declineAtLock` skips that kind), but a goodbye or vacate does
-  (`declineAtDiscard`). `Vault.del()` is `delVault()`, and `revokePasskey` runs through its own gating, so each is guarded by a Gating (the user proves the
+  (`declineAtDiscard`). `Vault.del()` is `delVaultPrompt()` (amended 2026-11-05 (lease_fold): the entrypoints were renamed), and `revokePasskeyPrompt` runs through its own gating, so each is guarded by a Gating (the user proves the
   passphrase) (amended 2026-11-03 (cleanup): this said there was no unguarded delete through the Vault; the listing's is not guarded). `listing.del(vault)`
   (`VaultListing.del`, `models/vault-listing.ts`) has no gating of its own: it is the call a gated `vault.del()` ends in
-  (`#runDelVault`), and a host holding the listing can call it directly, with no proof asked. `vaultListing.del(ante)`
+  (the `del_vault` run), and a host holding the listing can call it directly, with no proof asked. `vaultListing.del(ante)`
   refuses `stale_write`, asking nothing of the vaultDB, for an instance of another life than the slot's vault, as a delivered answer
   would tombstone the live vault locally.
 * 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
@@ -122,7 +131,7 @@ added or folded into through the subagent, and no other entry changes.
   2026-11-03 (small_rulings): `lease.isMadeFor` and the refusal built on it are gone; a lease reaches only the vault whose friend it was built
   on, as `lease.attach` calls its own friend's `attachLease`). A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
   from `VaultListing`; its run now lives in the Vault class as the public static `Vault.launchBirth(listing, scope)` with a private
-  static `#runBirth`, which reaches the private `vault.#unlockByProof`. `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
+  static `#runBirth`, which reaches the private `vault.#unlockByProof` (amended 2026-11-05 (lease_fold): `#runBirth` is gone; the run is `RunForGatingkind.build_vault` in `models/gating.ts`, which reaches `#unlockByProof` by the gating friend, see the entry of that date). `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
   itself and refuses 'bad_option' over a vault present, with no gating opened and no KDF run. It takes no proving: the proving comes from the
   gating it launches. A public `vault.unlockByProof(proving)` was set aside, as whatever is passed as a proving is handed the friend
   (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) (amended 2026-11-03 (small_rulings): `vault._cheat_leaseFriend()`, a public
@@ -512,7 +521,7 @@ added or folded into through the subagent, and no other entry changes.
   object goes. A forgotten passphrase can therefore no longer delete a sound vault from the client; `delDamagedVault`
   remains for props that fail their checks, and `safebyok-react`'s start over is off pending a ruling.
   Amended 2026-11-03 (gate_changes): in `models/vault.ts` the passphrase's proof is a client-side confirmation only; the vaultDB is
-  conditional on the revision and checks no proof. `#runDelVault` locks first and the delete follows, where this entry has the lock
+  conditional on the revision and checks no proof. the `del_vault` run locks first and the delete follows, where this entry has the lock
   after it; a refused delete leaves the vault locked. See the 2026-11-03 (gate_changes) entry on `del_vault`.
 * 2026-10-23 (primitives sprint, thread 9, gating): **a grant the device store refuses after a change to the ways in landed is warned of, not
   thrown (today's contract).** For change passphrase and put or delete passkey, a `storage_unavailable` or `storage_blocked`
@@ -877,7 +886,7 @@ added or folded into through the subagent, and no other entry changes.
   checker is a contract to answer.** (1) `putWayin` proves with the current passphrase only (a passkey's
   answer as the proof is refused `bad_option`), as `changePassphrase` and `addPasskey` did. A new
   passphrase as text replaces the passphrase (amended 2026-10-21 (wayin_rules): and removes the
-  passkey, writing vault props with `passkey: null`; amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; in `src/models/` `replacePassphrase` leaves the passkey wayin alone, and the vaultDB refuses one carrying a `passkey_wayin` (`storage/vault-db-new.ts`), so a passkey added under the old passphrase no
+  passkey, writing vault props with `passkey: null`; amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; in `src/models/` `replacePassphrasePrompt` leaves the passkey wayin alone, and the vaultDB refuses one carrying a `passkey_wayin` (`storage/vault-db-new.ts`), so a passkey added under the old passphrase no
   longer opens the current vault props; the user adds a passkey again by proving the new passphrase;
   removal, not revocation: a copy of older vault props still opens with it, as before); a passkey's
   answer (`PasskeyAnswer`) puts the passkey, replacing any. The passkey is now made by the host before the call and its answer handed in, so a
@@ -950,7 +959,7 @@ added or folded into through the subagent, and no other entry changes.
   read or derived. Before, any wayin proved any change, so a passkey holder could reset the passphrase;
   now a passkey opens the vault but cannot change who may. `addPassphrase` is gone. Consequence: a
   forgotten passphrase can no longer be reset with the passkey, and a passphrase stored damaged cannot
-  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the current one (amended 2026-10-21 (wayin_rules): so does `putWayin` of a new passphrase, which removes it (amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; `models/` `replacePassphrase` keeps the passkey); the old
+  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the current one (amended 2026-10-21 (wayin_rules): so does `putWayin` of a new passphrase, which removes it (amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; `models/` `replacePassphrasePrompt` keeps the passkey); the old
   credential no longer opens; the same credential again mends a damaged one, with a fresh wrap), and
   `delWayin(passphrase)` removes the passkey, refusing `absent_wayin` when there is none; the passphrase
   can never be removed. Removal is still not revocation. Every change still moves `unlock_epoch`,
