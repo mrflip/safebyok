@@ -51,11 +51,9 @@ export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases
 export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_row', Phrases.DeviceRecordRewritten)
 // --
 
-// == [Vault Throwers]: lockedError, listingExpected, unlockFirst, stampOfOtherVault
+// == [Vault Throwers]: lockedError, unlockFirst, stampOfOtherVault
 
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
-
-export const listingExpected = (): VaultError => new VaultError('unexpected_error', Phrases.ListingExpected)
 
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
