@@ -18,7 +18,7 @@ const scope     = mw.boxscope('anthropic_api_key')
 
 describe("VX.boxRecord and VX.boxSparse", () => {
   describe("VX.boxRecord", () => {
-    holdsCases(VX.boxRecord, 'bad_record', [
+    holdsCases(VX.boxRecord, 'bad_option', [
       [full,                                            true,  'passes a full record'],
       [{ ...full, sidecar: {} },                        true,  'passes an empty sidecar'],
       [sparse,                                          false, 'refuses a sparse record: it is the full one'],
@@ -49,16 +49,16 @@ describe("VX.boxRecord and VX.boxSparse", () => {
 
     it("refuses a plain object carrying a field the Box ducks without", async () => {
       const box = await boxListingOf(mw).build(full)
-      TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...VX.boxRecord.parse(box), extra: 1 }), 'bad_record')
+      TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...VX.boxRecord.parse(box), extra: 1 }), 'bad_option')
     })
 
     it("refuses a Box that is not full, as it ducks as the sparse form", async () => {
       const box = await boxListingOf(mw).build(sparse)
-      TH.expectSyncRefusal(() => VX.boxRecord.parse(box), 'bad_record')
+      TH.expectSyncRefusal(() => VX.boxRecord.parse(box), 'bad_option')
     })
 
     it("refuses without quoting its input", () => {
-      const err = TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }), 'bad_record')
+      const err = TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }), 'bad_option')
       expect(err.message).to.not.include('SECRET')
     })
   })
@@ -306,7 +306,7 @@ describe("VX.vaultRecord and VX.vaultSparse: the gate rides in the vault record,
 
   const gate = { gate_epoch: GX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
-  holdsCases(VX.vaultRecord, 'bad_record', [
+  holdsCases(VX.vaultRecord, 'bad_option', [
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
     [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
     [sparseVault,                    false, 'refuses a record without its gate'],

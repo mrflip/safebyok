@@ -107,10 +107,10 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("hears 'damaged_record' for a sidecar alone over a damaged row not listed, fetching nothing: a damaged row is the host's", async () => {
+  it("hears 'damaged_row' for a sidecar alone over a damaged row not listed, fetching nothing: a damaged row is the host's", async () => {
     const { boxrows, openNextSession } = await makeWorldWithRubble()
     const next = await openNextSession()
-    await TH.expectRefusal(next.putBox({ boxlabel: 'rubble', sidecar: Sidecar }), 'damaged_record')
+    await TH.expectRefusal(next.putBox({ boxlabel: 'rubble', sidecar: Sidecar }), 'damaged_row')
     expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
   })
 })

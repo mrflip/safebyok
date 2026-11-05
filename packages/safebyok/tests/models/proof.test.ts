@@ -330,7 +330,7 @@ describe("the proof", () => {
     world.advance(AutolockMillis + 1)
     const latePage = world.bankOn({ requestCleartext: undefined, onBadNews })
     await latePage.hello()
-    await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'bad_option')
     expect(world.leaseRows()).to.have.lengthOf(1)
     bankUi.expectRenders([])
     await bank.autolock()
@@ -365,14 +365,14 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
 
     world.advance(StaleMillis)
-    world.vaultDB._cheat_refuseGets('storage_error')
+    world.vaultDB._cheat_refuseGets('storage_unavailable')
     // A vault too stale to know whether it deserves its lease refuses the ask, and keeps the lease it has.
-    await TH.expectRefusal(vault.ensureUnlocked(), 'storage_error')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'storage_unavailable')
     expect(vault.isUnlocked).to.be.true
-    await TH.expectRefusal(bank.hello(), 'storage_error')
+    await TH.expectRefusal(bank.hello(), 'storage_unavailable')
     bankUi.expectRenders(['refused: main unlocked'])
-    expect(bank.snapshot.err?.refusalkind).to.eq('storage_error')
-    TH.expectSyncRefusal(() => bank.vaultAt(VaultScopeGiven), 'storage_error')
+    expect(bank.snapshot.err?.refusalkind).to.eq('storage_unavailable')
+    TH.expectSyncRefusal(() => bank.vaultAt(VaultScopeGiven), 'storage_unavailable')
 
     world.vaultDB._cheat_refuseGets(null)
     await bank.hello()

@@ -86,9 +86,9 @@ describe("BoxListing", () => {
       expect(held.mw.callsOf('get')).to.deep.equal([])
     })
 
-    it("refuses 'bad_record' a put of another vault's record, storing nothing", async () => {
+    it("refuses 'bad_option' a put of another vault's record, storing nothing", async () => {
       const listing = boxListingOf(held.mw)
-      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: SX.VoidRevision }), 'bad_record')
+      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: SX.VoidRevision }), 'bad_option')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 

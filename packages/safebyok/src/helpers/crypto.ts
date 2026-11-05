@@ -63,7 +63,7 @@ export type CipherCtxRecord = Readonly<Record<string, string | number>>
  * beside its own: each keeps its own field names. The ctx is the UTF-8 JSON of the parts in order,
  * each stamp, the purpose, then the header where there is one, each record's keys sorted. It is
  * rebuilt rather than stored, so ciphertext refuses to open under any other. It refuses
- * 'bad_option' for no stamp, or for a part or a record's field that is undefined or null: each
+ * 'unexpected_error' for no stamp, or for a part or a record's field that is undefined or null: each
  * would bind the same as some other ctx.
  *
  * @example cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_id, registered_at })

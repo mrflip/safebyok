@@ -45,32 +45,32 @@ export const insecureContext = (): VaultError => new VaultError('insecure_contex
 
 export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
 
-export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_record', Phrases.DeviceRecordRewritten)
+export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_row', Phrases.DeviceRecordRewritten)
 // --
 
 // == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock
 
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
 
-export const listingExpected = (): VaultError => new VaultError('bad_option', Phrases.ListingExpected)
+export const listingExpected = (): VaultError => new VaultError('unexpected_error', Phrases.ListingExpected)
 
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
-export const noProofToUnlock = (): VaultError => new VaultError('vault_locked', Phrases.NoProofToUnlock)
+export const noProofToUnlock = (): VaultError => new VaultError('bad_option', Phrases.NoProofToUnlock)
 // --
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
 
-export const delOfOtherLife = (): VaultError => new VaultError('stale_write', Phrases.DelOfOtherLife)
+export const delOfOtherLife = (): VaultError => new VaultError('vault_remade', Phrases.DelOfOtherLife)
 
-export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_record', Phrases.vaultStoredDamaged(vaultlabel))
+export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel))
 // --
 
 // == [Listing Throwers]: putAnsweredNothing, otherVaultTokAtBirth
 
-export const putAnsweredNothing = (): VaultError => new VaultError('unexpected_error', Phrases.PutAnsweredNothing)
+export const putAnsweredNothing = (): VaultError => new VaultError('record_conflict', Phrases.PutAnsweredNothing)
 
-export const otherVaultTokAtBirth = (): VaultError => new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth)
+export const otherVaultTokAtBirth = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTokAtBirth)
 // --
 
 // == [Storable Throwers]: partialLoadError, alreadyHeldError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
@@ -95,7 +95,7 @@ export const oneRevisionTwoLives = (): VaultError => new VaultError('record_conf
 
 export const oneRevisionTwoFates = (): VaultError => new VaultError('record_conflict', Phrases.OneRevisionTwoFates)
 
-export const otherVaultTok = (): VaultError => new VaultError('unexpected_error', Phrases.OtherVaultTok)
+export const otherVaultTok = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTok)
 
 export const shapeUnreconciled = (): VaultError => new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
 // --
@@ -139,7 +139,7 @@ export const gatingSettled = (): VaultError => new VaultError('gating_landed', P
 
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
 
-export const proofMissing = (): VaultError => new VaultError('unexpected_error', Phrases.ProofMissing)
+export const proofMissing = (): VaultError => new VaultError('bad_option', Phrases.ProofMissing)
 // --
 
 // == [Gate Throwers]: passkeyHeldAlready
@@ -169,12 +169,12 @@ export const otherPasskey = (): VaultError => new VaultError('wrong_passkey', Ph
 
 export const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Phrases.OtherPrfSalt)
 
-export const unknownKeyDeriver = (): VaultError => new VaultError('unknown_key_deriver', Phrases.UnknownKeyDeriver)
+export const unknownKeyDeriver = (): VaultError => new VaultError('newer_format', Phrases.UnknownKeyDeriver)
 // --
 
 // == [Helper Throwers]: unboundCipherCtx, strengthCheckerMisanswered, strengthCheckerLoadFailed
 
-export const unboundCipherCtx = (): VaultError => new VaultError('bad_option', "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
+export const unboundCipherCtx = (): VaultError => new VaultError('unexpected_error', "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
 
 export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
 
@@ -199,7 +199,7 @@ export const vaultEmpty = (world: SX.VaultRow): VaultError => (
 )
 
 export const vaultMismatch = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_mismatch', 'A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope.', { meta: { world, dbhas: world } })
+  new VaultError('vault_remade', 'A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope.', { meta: { world, dbhas: world } })
 )
 
 export const vaultGone = (tombstone: SX.VaultRow): VaultError => (
@@ -230,13 +230,13 @@ export const vaultFull = (capacity: SX.Capacity): VaultError => (
   new VaultError('vault_full', 'This vault holds as many boxes as its storage allows.', { meta: { capacity } })
 )
 
-export const damagedRecord = (): VaultError => new VaultError('damaged_record', 'The stored record failed its checks, so it is set aside.')
+export const damagedRecord = (): VaultError => new VaultError('damaged_row', 'The stored record failed its checks, so it is set aside.')
 
 export const newerFormat = (): VaultError => new VaultError('newer_format', 'The stored record is in a format newer than this version of the package reads.')
 
-export const seqNotNext = (): VaultError => new VaultError('invalid_input', "A record's revision_seq must be one past its prior's.")
+export const seqNotNext = (): VaultError => new VaultError('bad_option', "A record's revision_seq must be one past its prior's.")
 
-export const storageError = (cause: unknown): VaultError => new VaultError('storage_error', "The vault's storage failed: its own error is this error's cause.", { cause })
+export const storageError = (cause: unknown): VaultError => new VaultError('storage_unavailable', "The vault's storage failed: its own error is this error's cause.", { cause })
 // --
 
 // == [DeviceDB Throwers]: storeFailed

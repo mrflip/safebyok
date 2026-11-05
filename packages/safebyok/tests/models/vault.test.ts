@@ -94,11 +94,11 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     lease.evict()
   })
 
-  it("refuses 'bad_option' a vault of another stamp, before any key is touched", async () => {
+  it("refuses 'unexpected_error' a vault of another stamp, before any key is touched", async () => {
     const { deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryCache.mockClear()
-    await TH.expectRefusal(proving.buildLease(friend), 'bad_option')
+    await TH.expectRefusal(proving.buildLease(friend), 'unexpected_error')
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
   })
 })
@@ -115,9 +115,9 @@ describe("the friend a vault hands its leases", () => {
 })
 
 describe("vault.takeWorld(world)", () => {
-  it("refuses 'bad_record' a world that is no vault row", async () => {
+  it("refuses 'damaged_row' a world that is no vault row", async () => {
     const { vault } = await makeBornVault()
-    TH.expectSyncRefusal(() => { vault.takeWorld({ am: 'nope' }) }, 'bad_record')
+    TH.expectSyncRefusal(() => { vault.takeWorld({ am: 'nope' }) }, 'damaged_row')
   })
 })
 

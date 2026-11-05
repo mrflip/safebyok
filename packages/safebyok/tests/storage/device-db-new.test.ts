@@ -77,11 +77,11 @@ describe("deviceDB.cache(row), peek(asked)", () => {
     expect(await deviceDB.peek(asked)).to.be.null
   })
 
-  it("refuses a row without proved_at as 'bad_record', and a malformed query as 'bad_scope'", async () => {
+  it("refuses a row without proved_at as 'bad_option', and a malformed query too", async () => {
     const deviceDB = new MemoryDeviceDB()
-    await TH.expectRefusal(deviceDB.cache({ ...asked, lease_key: await makeLeaseKey() } as unknown as LeaseRow), 'bad_record')
-    await TH.expectRefusal(deviceDB.peek({ ...asked, vaultlabel: 'No Good!' }), 'bad_scope')
-    await TH.expectRefusal(deviceDB.peek({ ...scope } as never), 'bad_scope')
+    await TH.expectRefusal(deviceDB.cache({ ...asked, lease_key: await makeLeaseKey() } as unknown as LeaseRow), 'bad_option')
+    await TH.expectRefusal(deviceDB.peek({ ...asked, vaultlabel: 'No Good!' }), 'bad_option')
+    await TH.expectRefusal(deviceDB.peek({ ...scope } as never), 'bad_option')
   })
 
   it("answers each as an Outcome through its try form, refusing the same", async () => {
@@ -90,7 +90,7 @@ describe("deviceDB.cache(row), peek(asked)", () => {
     const cached = await deviceDB.tryCache(row)
     expect(cached.ok).to.be.true
     expect(await TH.expectGood(deviceDB.tryPeek(asked))).to.not.be.null
-    await TH.expectBad(deviceDB.tryPeek({ ...asked, applabel: '' }), 'bad_scope')
+    await TH.expectBad(deviceDB.tryPeek({ ...asked, applabel: '' }), 'bad_option')
   })
 })
 
@@ -206,10 +206,10 @@ describe("deviceDB.cacheDeviceRecord(record)", () => {
     expect(second.record.device_id).to.eq('dev_one')
   })
 
-  it("refuses a record without a device_id or with a stray field as 'bad_record'", async () => {
+  it("refuses a record without a device_id or with a stray field as 'bad_option'", async () => {
     const deviceDB = new MemoryDeviceDB()
-    await TH.expectBad(deviceDB.tryCacheDeviceRecord({ applabel: 'acme', user_id: 'u1' } as DeviceRecord), 'bad_record')
-    await TH.expectBad(deviceDB.tryCacheDeviceRecord({ ...deviceRecordOf(), extra: 1 } as DeviceRecord), 'bad_record')
+    await TH.expectBad(deviceDB.tryCacheDeviceRecord({ applabel: 'acme', user_id: 'u1' } as DeviceRecord), 'bad_option')
+    await TH.expectBad(deviceDB.tryCacheDeviceRecord({ ...deviceRecordOf(), extra: 1 } as DeviceRecord), 'bad_option')
   })
 })
 
