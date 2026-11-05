@@ -44,7 +44,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-11-05 (whisper_object, branch `20261105-whisper_object`): **A box that will not show its exposed whisper answers `box.whisper`
   with a frozen marked bag, and the exposed whisper stays in memory through a lock and `veil()`.** In
   `packages/safebyok/src/models/box.ts` (the mark is in `src/helpers/consts.ts`), a whisper is always a plain JSON object: a bare string,
-  number, boolean, array, null or undefined refuses `bad_whisper` (`bad_option` at a put), and a symbol key refuses at any depth, since
+  number, boolean, array, null or undefined refuses `bad_option` (amended 2026-11-05 (refusal_followups): it was `bad_whisper`), and a symbol key refuses at any depth, since
   JSON would drop it and leave `{}`. A box that will not show answers one of three frozen bags, `{ [sym]: 'encrypted' }`,
   `{ [sym]: 'locked' }` or `{ [sym]: 'veiled' }`, where `sym` is the public `Symbol.for('@safebyok/whispered')` (not a private `Symbol()`,
   so two copies of the module, such as the ESM and CJS builds, agree on the mark). The check is of the mark, not of identity: `put`,
