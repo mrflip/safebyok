@@ -27,6 +27,9 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
  * `vault.tryCheckStrength(typed)`.
  *
+ * - A blank passphrase is sent back as a weak passphrase, unconditionally, without consulting the checker.
+ * - The default strength checker refuses everything: see CUSTOMIZATION.md for why we do this, and instructions to supply one.
+ *
  * @example
  *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
  * @example
