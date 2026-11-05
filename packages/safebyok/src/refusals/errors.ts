@@ -7,26 +7,25 @@ import type { Capacity } from '../shapes/shapes-storage'
  * are told apart by who handles them:
  *
  * * **Misuse**: a programming error, the host developer's to fix. Let it reach an error boundary
- *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`, `bad_whisper`,
- *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`, `unknown_key_deriver`,
- *   `insecure_context`, `unexpected_error`, `passphrase_required`, `invalid_input`, `gate_issue`, `disabled`.
+ *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`,
+ *   `bad_option`, `bad_record`, `unknown_key_deriver`,
+ *   `insecure_context`, `unexpected_error`, `invalid_input`, `gate_issue`, `disabled`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
- *   `gate_made_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `crypto_failed`,
- *   `absent_box`, `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
- *   `stale_write`, `record_conflict`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`,
- *   `vault_gone`, `vault_remade`, `gate_moved`, `gating_landed`, `no_whisper`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
+ *   `weak_passphrase`, `wrong_passkey`,
+ *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
+ *   `stale_write`, `record_conflict`, `vault_mismatch`, `storage_unavailable`,
+ *   `vault_gone`, `vault_remade`, `gating_landed`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
  *   `same_passphrase`, `camped`, `vault_empty`, `storage_error`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
- *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `damaged_lease`, `newer_format`,
- *   `vault_behind`, `identity_revoked`, `damaged_record`.
+ *   the user. `damaged_box`, `damaged_lease`, `newer_format`,
+ *   `identity_revoked`, `damaged_record`.
  *
  * A record that fails its checks is named for who is at fault, by a VaultDB and a vault alike. One
- * read from storage that fails them, or a box that will not open under the lease in hand, is
- * damaged: `damaged_vault` or `damaged_box`, Zod's own error its `cause` where a check failed. One
- * the host hands in is `bad_record` (a box handed to a VaultDB's `putBox`, `invalid_box`). A
- * storage adapter's answer in a shape its protocol does not allow is `corrupt_record`: a bug in the
- * adapter, and nothing else.
+ * read from storage that fails them is `damaged_record`, and a box that will not open under the
+ * lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. One the host
+ * hands in is `bad_record`. A storage adapter's answer that cannot be, one revision under two toks
+ * say, is `record_conflict`.
  *
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
  * altered, since decryption fails alike; the message says so.
@@ -34,49 +33,34 @@ import type { Capacity } from '../shapes/shapes-storage'
 export const refusalKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
-  'gate_made_elsewhere', // a first unlock found the vault's first passphrase just set on another device
   'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
-  'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
   'absent_box',          // no box under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
-  'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
-  'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
   'bad_option',          // an option or argument out of its range: Bank.make's, mask's, argon2idDeriver's, a putBox()'s sidecar
   'bad_record',          // a record or expectation the host handed in that is not one this package builds
-  'invalid_box',         // a box handed to a VaultDB's putBox that is not one this package builds, or not for its expectation
-  'corrupt_record',      // a storage adapter answered in a shape its protocol does not allow: a bug in the adapter
-  'damaged_vault',       // the vault's record, read from storage, failed its checks, so no way in can be tried
-  'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
   'damaged_box',         // a box read from storage failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
-  'crypto_failed',       // the browser's WebCrypto failed a key, wrap or cipher that should have worked: a fault of the platform, not of the user or the record
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
   'record_conflict',     // storage and this device disagree about one revision of a record; a fetch again is worth one try, and if it persists the system is fundamentally not working
   'vault_mismatch',      // a box read's or write's vault record is not the one stored -- another vault_tok, or none -- so it was refused
-  'vault_behind',        // storage handed back the vault at a lower vault_epoch than this device has seen, which it refuses to use
-  'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
-  'storage_blocked',     // this device's own store refuses until something outside the app changes: storage blocked, or no room
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
-  'gate_moved',          // the vault's ways in changed since the thing a call holds was made: a passphrase or passkey changed
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
-  'no_whisper',          // a putBox() left out the whisper, to keep the one stored, and no box is stored under that label
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
   'already_asking',      // a gating is open on this bank, so a second one was not launched: one dialog at a time, and no join
   'locked_while_asking', // a lock landed before the user's attempt, so the gating settled and nothing was proved
   'declined',            // the dialog was declined, or closed with no attempt under way, so nothing was done
-  'passphrase_required', // delWayin('passphrase'): a vault keeps its passphrase, which can be replaced, never removed
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a vaultDB put told not to replace a live row found one there
   'vault_empty',         // a vaultDB call named a vault_tok no row holds, and no live row stands there: nothing of this life
@@ -102,49 +86,34 @@ export type RefusalFamily = typeof refusalFamilyVals[number]
 export const RefusalFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
-  gate_made_elsewhere: 'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',
-  passkey_unavailable: 'condition',
   absent_box:          'condition',
   absent_vault:        'condition',
   absent_wayin:        'condition',
   bad_scope:           'misuse',
-  bad_whisper:         'misuse',
-  whisper_too_large:   'condition',
   box_too_large:       'condition',
   vault_full:          'condition',
   bad_option:          'misuse',
   bad_record:          'misuse',
-  invalid_box:         'misuse',
-  corrupt_record:      'misuse',
-  damaged_vault:       'bad_news',
-  damaged_wayin:       'bad_news',
   damaged_box:         'bad_news',
   newer_format:        'bad_news',
   unknown_key_deriver: 'misuse',
   insecure_context:    'misuse',
-  crypto_failed:       'condition',
   unexpected_error:    'misuse',
   stale_write:         'condition',
   record_conflict:     'condition',
   vault_mismatch:      'condition',
-  vault_behind:        'bad_news',
-  not_permitted:       'condition',
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
-  storage_blocked:     'condition',
   vault_gone:          'condition',
   vault_remade:        'condition',
-  gate_moved:          'condition',
   gating_landed:       'condition',
   damaged_lease:       'bad_news',
-  no_whisper:          'condition',
   attempt_in_flight:   'condition',
   already_asking:      'condition',
   locked_while_asking: 'condition',
   declined:            'condition',
-  passphrase_required: 'misuse',
   same_passphrase:     'condition',
   camped:              'condition',
   vault_empty:         'condition',

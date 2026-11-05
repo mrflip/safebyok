@@ -54,7 +54,7 @@ describe("outcomeOf", () => {
   })
 
   it("keeps a VaultError the body throws or rejects with, as it came", async () => {
-    const refusal = new VaultError('not_permitted', 'Not yours to make.')
+    const refusal = new VaultError('storage_unavailable', 'Storage is down.')
     const thrown = await outcomeOf(() => { throw refusal })
     expect(thrown.err).to.eq(refusal)
     const rejected = await outcomeOf(() => Promise.reject(refusal))
