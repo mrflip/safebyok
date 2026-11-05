@@ -12,14 +12,20 @@ import type { Notice } from '../storage/vault-db-new'
 import { Box } from './box'
 import { Listing } from './listing'
 
-// == [BoxListing]
-
 /** One vault's boxes, by boxlabel. */
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box> {
+  // == [Props]: world, #damagedRecords, damaged_records
+
   declare readonly world: BoxWorld
 
   /** The rows the vault's get set aside as damaged. */
   #damagedRecords: readonly DamagedBox[] = Object.freeze([])
+
+  /** The rows of this vault found damaged, set aside until `del` names one. */
+  get damaged_records(): readonly DamagedBox[] { return this.#damagedRecords }
+  // --
+
+  // == [Construction]: constructor, scopeOf, sparseOf, recordOf
 
   /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check. */
   constructor(opts: BoxListingOpts) {
@@ -28,7 +34,15 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  // == [Starting]: hello, damaged_records, damagedAt, del
+  /** The scope of `duck`, held to this vault: no listing answers for another's. */
+  scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.world.scope) }
+
+  sparseOf(duck: unknown): BoxSparse { return boxSparse.parse(duck) }
+
+  recordOf(duck: unknown): BoxRecord { return boxRecord.parseConsistent(duck, this.world.scope) }
+  // --
+
+  // == [Methods]: hello, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
 
   /** Start the watch and take what the vault's get listed, if given: its boxes held sparse, its damaged rows set aside. */
   override async hello(listed?: BoxesListed): Promise<void> {
@@ -39,9 +53,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     for (const { boxlabel } of damaged_records) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
   }
-
-  /** The rows of this vault found damaged, set aside until `del` names one. */
-  get damaged_records(): readonly DamagedBox[] { return this.#damagedRecords }
 
   /** The entry of {@link damaged_records} under `scope`, or null. */
   damagedAt(scope: Boxscope): DamagedBox | null {
@@ -56,9 +67,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     this.#damagedRecords = Object.freeze(this.#damagedRecords.filter((damaged) => damaged.boxlabel !== boxlabel))
     return thing
   }
-  // --
-
-  // == [Finding]: get, tryGet
 
   /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
@@ -69,9 +77,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
-  // --
-
-  // == [Putting]: puttable, create, tryCreate, shellFor
 
   /** The box a put of `scoped` goes through: the one held, or a void one made for an empty slot. */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
@@ -95,20 +100,13 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 
-  // == [Defined by the box listing]
+  // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): string { return this.world.vault_tok }
 
   protected scopepathOf(scope: Boxscope): string {
     return ['box', scope.applabel, scope.user_id, scope.vaultlabel, scope.boxlabel].join('^')
   }
-
-  /** The scope of `duck`, held to this vault: no listing answers for another's. */
-  scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.world.scope) }
-
-  sparseOf(duck: unknown): BoxSparse { return boxSparse.parse(duck) }
-
-  recordOf(duck: unknown): BoxRecord { return boxRecord.parseConsistent(duck, this.world.scope) }
 
   protected makeThing(central: Fetched<BoxRecord, BoxSparse>): Box {
     return new Box(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
@@ -128,4 +126,3 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected isOwnRow(row: VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (row.vault_tok === this.world.vault_tok) }
   // --
 }
-// --
