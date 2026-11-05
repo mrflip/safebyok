@@ -6,10 +6,10 @@ import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/thro
 import type { WayinKind } from '../shapes/shapes-enums'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
 
-// == [Lease]
-
 /** A vault's vaultKey in force on this device, good for one `gate_epoch`. It holds the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
+  // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #friend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
+
   declare readonly fmt:           typeof LeaseFormat
   declare readonly applabel:      string
   declare readonly user_id:       string
@@ -19,6 +19,7 @@ export class Lease implements LeaseStamp {
   declare readonly gate_epoch:    number
   declare readonly proved_at:     number
   declare readonly wayinkind:     WayinKind
+
   /** All this lease hears of its vault. */
   readonly #friend: LeaseFriend
 
@@ -31,6 +32,13 @@ export class Lease implements LeaseStamp {
   /** True where this lease came from the cache, so caching it has nothing to do. */
   readonly #isFromCache: boolean
 
+  get #leaseStamp(): LeaseStamp { return leaseStamp.parse(this) }
+
+  toJSON(): LeaseSparse { return this.#leaseStamp }
+  // --
+
+  // == [Construction]: constructor, buildFromCache, buildGranted
+
   private constructor(friend: LeaseFriend, record: LeaseRecord, isFromCache: boolean) {
     this.#record = leaseRecord.parse(record)
     tattoo(this, leaseStamp.parse(record), { writable: false, configurable: false })
@@ -39,8 +47,6 @@ export class Lease implements LeaseStamp {
     this.#isFromCache = isFromCache
     Object.freeze(this)
   }
-
-  // == [Making one]: buildFromCache, buildGranted
 
   /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is uncached;
    * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
@@ -79,7 +85,7 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Taking hold]: cache, tryCache, cacheAsCacheCan
+  // == [Caching]: cache, tryCache, cacheAsCacheCan
 
   /** Put this lease in the deviceDB's cache; one built from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
   async cache(): Promise<void> {
@@ -96,7 +102,7 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Ending one]: vacate, tryVacate, evict, isForgotten, isInForce
+  // == [Ending one]: vacate, tryVacate, evict
 
   /** Drop the keys and uncache the record, so this device is locked. */
   async vacate(): Promise<void> {
@@ -109,18 +115,9 @@ export class Lease implements LeaseStamp {
 
   /** Drop the keys, leaving the cached record for the next session. */
   evict(): void { this.#record = null }
-
-  get isForgotten(): boolean { return this.#record === null }
-
-  get isInForce(): boolean { return this.#record !== null }
   // --
 
-  // == [Its stamp]: toJSON
-
-  toJSON(): LeaseSparse { return this.#leaseStamp }
-  // --
-
-  // == [Whispers under the vaultKey]: sealWith, unsealWith, ctxOf
+  // == [Whispers under the vaultKey]: sealWith, unsealWith, opened, ctxOf, vaultKey
 
   /** `whisperText` sealed under a fresh boxKey, both bound to `stamp`. */
   async sealWith(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
@@ -167,15 +164,6 @@ export class Lease implements LeaseStamp {
   #ctxOf(stamp: CipherCtxRecord, purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array {
     return cipherCtx([this.#vaultStamp, stamp], purpose)
   }
-  // --
-
-  // == [The vaultKey]: demandRecord, vaultKey, leaseStamp
-
-  /** The record, while the lease is in force. */
-  #demandRecord(): LeaseRecord {
-    if (this.#record === null) { throw leaseNotInForce() }
-    return this.#record
-  }
 
   /** The vaultKey for this one call, non-extractable, with the one usage. Nothing keeps the key between calls. */
   async #vaultKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
@@ -189,11 +177,21 @@ export class Lease implements LeaseStamp {
     }
     return valOf(opened)
   }
+  // --
 
-  get #leaseStamp(): LeaseStamp { return leaseStamp.parse(this) }
+  // == [Guards]: isForgotten, isInForce, demandRecord
+
+  get isForgotten(): boolean { return this.#record === null }
+
+  get isInForce(): boolean { return this.#record !== null }
+
+  /** The record, while the lease is in force. */
+  #demandRecord(): LeaseRecord {
+    if (this.#record === null) { throw leaseNotInForce() }
+    return this.#record
+  }
   // --
 }
-// --
 
 // == [Judging the cached record]: isPastAutolock, uncacheForgotten
 
