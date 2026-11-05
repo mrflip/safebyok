@@ -51,14 +51,14 @@ describe("bank.autolock", () => {
     expect((world.leaseRows()[0] as LeaseRow).proved_at).to.eq(T0 + AutolockMillis + 1)
   })
 
-  it("past autolock, ensureUnlocked with no dialog refuses as it does with no row at all, not for the lease's age", async () => {
+  it("past autolock, ensureUnlocked asks the dialog as it does with no row at all, not refusing for the lease's age", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
-    const fresh = world.bankOn({ requestCleartext: undefined })
+    const fresh = world.bankOn({ requestCleartext: () => undefined })
     await fresh.hello()
     const vault = fresh.vaultAt(VaultScopeGiven)
-    await TH.expectRefusal(vault!.ensureUnlocked(), 'bad_option')
+    await TH.expectRefusal(vault!.ensureUnlocked(), 'declined')
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
@@ -97,9 +97,9 @@ describe("bank.autolock", () => {
     const { bank: pageA, vault: vaultA } = await makeBankWithVault(world)
     const row = world.leaseRows()[0]
     world.advance(AutolockMillis + 1)
-    const pageB = world.bankOn({ requestCleartext: undefined })
+    const pageB = world.bankOn({ requestCleartext: () => undefined })
     await pageB.hello()
-    await TH.expectRefusal(pageB.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'bad_option')
+    await TH.expectRefusal(pageB.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'declined')
     expect(world.leaseRows()).to.deep.equal([row])
     expect(vaultA.isUnlocked).to.be.true
     await pageA.autolock()

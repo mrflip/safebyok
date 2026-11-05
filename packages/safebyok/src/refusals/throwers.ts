@@ -55,15 +55,13 @@ export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases
 export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_row', Phrases.DeviceRecordRewritten)
 // --
 
-// == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock, stampOfOtherVault
+// == [Vault Throwers]: lockedError, listingExpected, unlockFirst, stampOfOtherVault
 
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
 
 export const listingExpected = (): VaultError => new VaultError('unexpected_error', Phrases.ListingExpected)
 
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
-
-export const noProofToUnlock = (): VaultError => new VaultError('bad_option', Phrases.NoProofToUnlock)
 
 export const stampOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.StampOfOtherVault)
 // --
@@ -128,11 +126,9 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, noRequestCleartext, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight, proofMissing
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight, proofMissing
 
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
-
-export const noRequestCleartext = (): VaultError => new VaultError('bad_option', Phrases.NoRequestCleartext)
 
 export const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
 

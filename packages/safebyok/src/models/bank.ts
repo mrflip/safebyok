@@ -34,7 +34,7 @@ export class Bank implements VaultWorld {
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
-  readonly requestCleartext: RequestCleartext | undefined
+  readonly requestCleartext: RequestCleartext
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
   readonly onPanic:          ((refusal: VaultError) => unknown) | undefined

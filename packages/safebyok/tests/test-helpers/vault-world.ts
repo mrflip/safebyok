@@ -124,6 +124,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     device_id:    'device-1',
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
+    requestCleartext: nothing,
     ...worldOverrides,
   }
   const vaultDB = new MemoryVaultDB({ clock: world.clock })

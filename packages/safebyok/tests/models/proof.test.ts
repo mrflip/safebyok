@@ -323,14 +323,14 @@ describe("the proof", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("a row past autolock outlives a late page with no dialog, and the first page's bank.autolock finds it and locks", async () => {
+  it("a row past autolock outlives a late page whose dialog closes unanswered, and the first page's bank.autolock finds it and locks", async () => {
     const { world, bank, vault } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
     world.advance(AutolockMillis + 1)
-    const latePage = world.bankOn({ requestCleartext: undefined, onBadNews })
+    const latePage = world.bankOn({ requestCleartext: () => undefined, onBadNews })
     await latePage.hello()
-    await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'bad_option')
+    await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'declined')
     expect(world.leaseRows()).to.have.lengthOf(1)
     bankUi.expectRenders([])
     await bank.autolock()

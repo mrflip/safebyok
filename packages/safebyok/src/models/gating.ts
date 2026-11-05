@@ -8,7 +8,7 @@ import * as GX from '../shapes/shapes-gateish'
 import type { AnteProvings, AnyGating, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultWorld } from '../shapes/shapes-vaultish'
-import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
@@ -74,7 +74,6 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   static async launch<KindT extends GatingKind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
     const { scope } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend })
     const { requestCleartext } = args.listing.world
-    if (requestCleartext === undefined) { throw noRequestCleartext() }
     const gating = new Gating(gatingkind, { ...args, scope })
     args.listing.holdGating(gating as unknown as AnyGating)
     void gating.#askHost(requestCleartext)
