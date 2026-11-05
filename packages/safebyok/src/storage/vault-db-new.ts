@@ -1,5 +1,6 @@
 /** The vaultDB: the verbs the storables and listings call, and every invariant of them. A subclass writes only the generic `do*` calls, each one atomic step. */
 
+import type * as Z from 'zod'
 import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf } from '../refusals/outcome'
@@ -145,7 +146,7 @@ export abstract class VaultDB {
   /** SLOPDOC: Stores a vault's birth or rebirth; once live, its row moves only by a gate verb. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     return this.#call<VaultRow, PutAct, VaultRow>('putVault', { ...record, ...opts }, async () => {
-      const vaultRecord = SX.vaultRecord.parse(record)
+      const vaultRecord = preparedOf(SX.vaultRecord, record)
       const terms = SX.putVaultOpts.parse(opts)
       demandNextSeq(vaultRecord, terms.prior)
       return this.#putVault(vaultRecord, terms)
@@ -170,7 +171,7 @@ export abstract class VaultDB {
   /** Stores `record` under a vault live at its `vault_tok`, with the answers of {@link VaultDB.putVault}. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
     return this.#call<BoxRow, PutAct, VaultRow>('putBox', { ...record, ...opts }, async () => {
-      const boxRecord = SX.boxRecord.parse(record)
+      const boxRecord = preparedOf(SX.boxRecord, record)
       const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
       demandNextSeq(boxRecord, prior)
       const recordBytes = jsonBytes(boxRecord)
@@ -261,7 +262,7 @@ export abstract class VaultDB {
   /** SLOPDOC: Writes a box's tombstone over its live row at `prior`, or the damaged row `damaged_records` lists. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
     return this.#call<BoxTombstone, DelAct, VaultRow>('delBox', { ...tombstone, ...opts }, async () => {
-      const boxTombstone = SX.boxTombstone.parse(tombstone)
+      const boxTombstone = preparedOf(SX.boxTombstone, tombstone)
       const { prior } = SX.delOpts.parse(opts)
       demandNextSeq(boxTombstone, prior)
       const { landed, ante, vault } = await adapted(() => this.doDelBox(boxTombstone, prior))
@@ -279,7 +280,7 @@ export abstract class VaultDB {
   /** SLOPDOC: Tombstones a vault at `prior` and its life's boxes in one transaction; a repeat sweeps the boxes. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> {
     return this.#call<VaultTombstone, DelAct, VaultRow>('delVault', { ...tombstone, ...opts }, async () => {
-      const vaultTombstone = SX.vaultTombstone.parse(tombstone)
+      const vaultTombstone = preparedOf(SX.vaultTombstone, tombstone)
       const { prior } = SX.delOpts.parse(opts)
       demandNextSeq(vaultTombstone, prior)
       const { landed, ante } = await adapted(() => this.doDelVault(vaultTombstone, prior))
@@ -361,7 +362,14 @@ export abstract class VaultDB {
   // --
 }
 
-// == [Row checks]: adapted, unreadableRowOf, vaultRowOf, boxRowOf, listedBoxesOf, checkedVaultLife, demandNextSeq, landingActOf, jsonBytes
+// == [Row checks]: preparedOf, adapted, unreadableRowOf, vaultRowOf, boxRowOf, listedBoxesOf, checkedVaultLife, demandNextSeq, landingActOf, jsonBytes
+
+/** A record the package prepared, as `checker` parses it: one failing it is a package bug, refused 'unexpected_error', unlike the options beside it. */
+const preparedOf = <ValT>(checker: { safeParse: (val: unknown) => Z.ZodSafeParseResult<ValT> }, record: unknown): ValT => {
+  const parsed = checker.safeParse(record)
+  if (parsed.success) { return parsed.data }
+  throw Refuse.recordPreparedWrong(parsed.error)
+}
 
 /** A store call: what it throws that is no refusal of its own is `storage_unavailable`. */
 const adapted = async <ValT>(thunk: () => Awaitable<ValT>): Promise<ValT> => {
