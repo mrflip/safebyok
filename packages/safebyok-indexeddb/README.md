@@ -152,7 +152,7 @@ And keep, as they are:
 * **Prove it with the shared suite**: `describeVaultDB` from `safebyok/testing` runs every verb,
   expectation and refusal against a fresh adapter, in one line
   (`tests/idb-vault-db.test.ts`), each group of tests named for the line of the
-  [VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
+  [VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok-old/VAULTDB.md)
   it checks. It makes two writes at once, which is what one transaction per verb is for, and,
   told your adapter pushes (`{ pushes: true }`), checks that `subscribe` hears each write. Your
   own tests are for what is yours alone: the rows as stored, a damaged row, a failure partway,
