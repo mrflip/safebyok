@@ -126,7 +126,7 @@ describe("Checkers", () => {
     expect(nested.meta?.fieldnames).to.deep.equal(['inner'])
   })
 
-  it("gives no record maker in its kit, as a record's keys in a refusal's path would be the input's", () => {
+  it("gives no record maker in its kit", () => {
     expect(Object.keys(Kit)).to.not.include('rec')
   })
 

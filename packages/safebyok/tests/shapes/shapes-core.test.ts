@@ -96,7 +96,7 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
     expect(Object.isFrozen(handed)).to.be.false
   })
 
-  it("read a scope's names through a getter, as a Vault object holds them", () => {
+  it("read a scope's names through a getter", () => {
     class Holder {
       readonly #applabel = 'acme'
       readonly user_id = 'u1'

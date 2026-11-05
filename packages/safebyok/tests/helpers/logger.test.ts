@@ -66,7 +66,7 @@ describe("parseLogger", () => {
     expect(parseLogger(parseLogger(fallback))).to.eq(fallback)
   })
 
-  it("carries nothing beside its three calls, so that spreading or listing a guarded logger shows nothing more", () => {
+  it("carries nothing beside its three calls", () => {
     const guarded = parseLogger(TH.spyLogger().logger)
     expect(Reflect.ownKeys(guarded)).to.deep.equal(['log', 'warn', 'error'])
   })
