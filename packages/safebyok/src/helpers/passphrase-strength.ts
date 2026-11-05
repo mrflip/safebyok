@@ -1,4 +1,4 @@
-import { VaultError } from '../refusals/errors'
+import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
 import * as HostErrorSanitizer from '../refusals/host-error-sanitizer'
 import type { PassphraseVerdict } from '../shapes/vault'
 import * as VX from '../shapes/vault'
@@ -83,7 +83,7 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultS
       throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
     }
     if (! checked.success) {
-      throw new VaultError('bad_option', "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
+      throw strengthCheckerMisanswered()
     }
     return checked.data.strong ? StrongVerdict : checked.data
   }
@@ -98,6 +98,6 @@ export const loadStrengthChecker = async (hostChecker: StrengthChecker): Promise
   try {
     await hostChecker.load?.()
   } catch (err) {
-    throw new VaultError('unexpected_error', "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello().", { cause: err })
+    throw strengthCheckerLoadFailed(err)
   }
 }

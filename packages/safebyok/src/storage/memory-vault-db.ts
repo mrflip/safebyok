@@ -1,7 +1,7 @@
 /** The vaultDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code. */
 
 import { type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, type VaultFetched, VaultDB } from './vault-db-new'
-import * as Refuse from './vault-db-refusals'
+import * as Refuse from '../refusals/throwers'
 import * as VS from './vault-db-shapes'
 import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultRecord, VaultScope, VaultTombstone, WatchScope } from './vault-db-shapes'
 

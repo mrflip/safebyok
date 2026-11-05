@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { VaultError } from '../../src/refusals/errors'
 import { makeLeaseKey } from '../../src/helpers/crypto'
-import * as Refusals from '../../src/refusals/refusals'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { DeviceDB } from '../../src/storage/device-db-new'
 import type { DeviceRecord, LeaseRow } from '../../src/storage/device-db-shapes'
@@ -233,7 +233,7 @@ describe("a deviceDB whose store throws", () => {
   })
 
   it("passes a VaultError the store throws as it came", async () => {
-    const refusal = Refusals.storageBlocked()
+    const refusal = new VaultError('storage_blocked', 'This browser does not let the app keep anything on this device.')
     const err = await TH.expectBad(new BrokenDeviceDB(refusal).tryPeek(asked), 'storage_blocked')
     expect(err).to.eq(refusal)
   })

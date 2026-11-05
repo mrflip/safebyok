@@ -2,7 +2,7 @@
 
 import { isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import * as Refuse from './device-db-refusals'
+import * as Refuse from '../refusals/throwers'
 import * as DS from './device-db-shapes'
 import type { VaultScope } from '../shapes/scopes'
 import type { DeviceRecord, LeaseQuery, LeaseRow, LeaseSparse } from './device-db-shapes'
