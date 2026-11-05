@@ -1,5 +1,7 @@
 import type { Capacity } from '../shapes/shapes-storage'
 
+// == [Kinds and families]: refusalKindVals, RefusalKind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
+
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind's meaning sits beside it, and its family in {@link RefusalFamilyForKind}. The families
  * are told apart by who handles them:
@@ -152,6 +154,9 @@ export const RefusalFamilyForKind = {
   gate_issue:          'misuse',
   disabled:            'misuse',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
+// --
+
+// == [The error]: RefusalMeta, VaultErrorOpts, VaultError
 
 /** The facts a refusal learned, each under its own name, filled only by the refusals that name it.
  * Records are as storage holds them, ciphertext and visible fields, never secret material.
@@ -216,20 +221,9 @@ export class VaultError extends Error {
     if (meta !== undefined) { this.meta = meta }
   }
 }
+// --
 
-/** True when `err` is a VaultError, of `refusalkind` when one is given: the one test for a refusal.
- * It is an `instanceof` test. An error that only calls itself `VaultError` (one rebuilt from a
- * server's JSON, say) is not one. Nor is a VaultError from a second copy of safebyok loaded beside
- * this one, as an ESM and a CJS build side by side.
- *
- * @example
- *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
- *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
- *   }
- */
-export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is VaultError => (
-  err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
-)
+// == [What a refusal keeps of a thrown]: listedKindOf, thrownNameOf
 
 /** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link refusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
  * A kind off the list is the thrower's own text, and may quote what it heard.
@@ -251,6 +245,23 @@ export const listedKindOf = (thrown: unknown): RefusalKind | null => (
 export const thrownNameOf = (thrown: unknown): string | null => (
   typeof thrown === 'object' && thrown !== null && 'name' in thrown && typeof thrown.name === 'string' ? thrown.name : null
 )
+// --
+
+// == [Guards]: isVaultError, isCondition
+
+/** True when `err` is a VaultError, of `refusalkind` when one is given: the one test for a refusal.
+ * It is an `instanceof` test. An error that only calls itself `VaultError` (one rebuilt from a
+ * server's JSON, say) is not one. Nor is a VaultError from a second copy of safebyok loaded beside
+ * this one, as an ESM and a CJS build side by side.
+ *
+ * @example
+ *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
+ *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
+ *   }
+ */
+export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is VaultError => (
+  err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
+)
 
 /** True when `err` is a VaultError the app may show the user, or retry: a `condition` or `bad_news`.
  * Misuse, and anything that is not a VaultError, is false, and belongs with an error boundary.
@@ -264,3 +275,4 @@ export const thrownNameOf = (thrown: unknown): string | null => (
 export const isCondition = (err: unknown): err is VaultError => (
   isVaultError(err) && err.family !== 'misuse'
 )
+// --
