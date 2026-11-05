@@ -124,7 +124,7 @@ describe("box.veil()", () => {
 
 // == [LOCKED, a frozen bag]: LOCKED, Storable.isLockedFUBag
 
-describe("LOCKED and Storable.isLockedFUBag: a frozen bag of the package's own (the Coach, 2026-10-31)", () => {
+describe("LOCKED and Storable.isLockedFUBag: a frozen bag of the package's own", () => {
   it("is frozen, and shows nothing as JSON", () => {
     expect(Object.isFrozen(LOCKED)).to.be.true
     expect(JSON.stringify(LOCKED)).to.eq('{}')
@@ -194,7 +194,7 @@ describe("box.whisper and box.put: the whisper given as { val }", () => {
     })
   }
 
-  it("refuses 'bad_option' before its guards: a bare whisper refuses so while the vault is locked", async () => {
+  it("refuses before its guards: a bare whisper refuses while the vault is locked", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
     await TH.expectRefusal(box.put({ whisper: 'sk-test-0000' as never, sidecar: {} }), 'bad_option')

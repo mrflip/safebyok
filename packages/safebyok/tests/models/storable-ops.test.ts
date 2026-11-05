@@ -100,7 +100,7 @@ describe("storable.hydrate(opts): the world first", () => {
     expect(verbs).to.include('get')
   })
 
-  it("waits on the world's ensureTimely before it fetches", async () => {
+  it("never fetches under a stale world", async () => {
     const { box } = await timelyBoxOf(1000)
     held.mw.setNow(T0 + 1000)
     const hold = holdOf()

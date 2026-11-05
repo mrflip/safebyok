@@ -179,7 +179,7 @@ describe("a birth through a gating", () => {
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
   })
 
-  it("refuses 'bad_option' a vault present in the slot, showing no dialog", async () => {
+  it("refuses a vault present in the slot, showing no dialog", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = listing.buildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
@@ -235,14 +235,14 @@ describe("the dialog ending", () => {
     await TH.expectRefusal(listing.buildVault(Dna), 'declined')
   })
 
-  it("settles a sanitized 'unexpected_error' where requestCleartext throws: what it threw is not kept, as it heard the passphrase (G8)", async () => {
+  it("settles a sanitized 'unexpected_error' where requestCleartext throws: what it threw is not kept", async () => {
     const { listing } = makeVaultWorld(null, { requestCleartext: () => { throw new Error(Passphrase) } })
     const err = await TH.expectRefusal(listing.buildVault(Dna), 'unexpected_error')
     expect(err.message).to.not.include(Passphrase)
     expect(err.cause).to.be.undefined
   })
 
-  it("refuses 'bad_option' a world with no dialog", async () => {
+  it("refuses a world with no dialog", async () => {
     const { listing } = makeVaultWorld()
     await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
   })
@@ -273,7 +273,7 @@ describe("gating.attempt", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("settles a malformed attempt 'bad_option', spends what came with it, and the refusal holds no passphrase (G8)", async () => {
+  it("settles a malformed attempt, spends what came with it, and the refusal holds no passphrase", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
     const gating = await gatingAt<'build_vault'>()
@@ -287,7 +287,7 @@ describe("gating.attempt", () => {
     expect(storedNow()).to.be.null
   })
 
-  it("spends an answer from another realm, whose bytes are no instance of this realm's Uint8Array (G2)", async () => {
+  it("spends an answer from another realm, whose bytes are no instance of this realm's Uint8Array", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = listing.buildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
@@ -298,7 +298,7 @@ describe("gating.attempt", () => {
     expect(prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("replaces what a getter on the clears throws, so the passphrase it quotes appears nowhere in the refusal (G8)", async () => {
+  it("replaces what a getter on the clears throws, so the passphrase it quotes appears nowhere in the refusal", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'unexpected_error')
     const gating = await gatingAt<'build_vault'>()
@@ -362,7 +362,7 @@ describe("an unlock through a gating", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("replaces what a getter on a passkey's answer throws, so the passphrase it quotes appears nowhere in the refusal (G8)", async () => {
+  it("replaces what a getter on a passkey's answer throws, so the passphrase it quotes appears nowhere in the refusal", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'unexpected_error')
     const gating = await gatingAt<'unlock_vault'>()

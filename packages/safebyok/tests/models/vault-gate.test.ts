@@ -169,14 +169,14 @@ describe("vault.addPasskeyPrompt()", () => {
     await expect(PasskeyProving.buildStored(vault.gate, await TH.passkeyOf('laptop'))).resolves.to.be.instanceOf(PasskeyProving)
   })
 
-  it("refuses 'bad_option' a passkey held, nobody asked", async () => {
+  it("refuses where a passkey is held, nobody asked", async () => {
     const born = await makeBornVaultWithPasskey()
     const { shown } = dialogOf(born)
     await TH.expectRefusal(born.vault.addPasskeyPrompt(), 'bad_option')
     expect(shown).to.have.lengthOf(0)
   })
 
-  it("leaves a wrong passphrase's answer unspent for the next attempt, and spends it as the gating settles (G2)", async () => {
+  it("leaves a wrong passphrase's answer unspent for the next attempt, and spends it as the gating settles", async () => {
     const born = await makeBornVault()
     const { vault } = born
     const { gatingAt } = dialogOf(born)
@@ -190,7 +190,7 @@ describe("vault.addPasskeyPrompt()", () => {
     expect(isZeroed(passkeyClear.prfBytes)).to.be.true
   })
 
-  it("spends a bare ArrayBuffer of PRF bytes, as WebAuthn hands them, in refusing it 'bad_option' (G2)", async () => {
+  it("spends a bare ArrayBuffer of PRF bytes in refusing it", async () => {
     const born = await makeBornVault()
     const { gatingAt } = dialogOf(born)
     const adding = TH.expectRefusal(born.vault.addPasskeyPrompt(), 'bad_option')
@@ -223,7 +223,7 @@ describe("vault.revokePasskeyPrompt()", () => {
     expect(vault.isUnlocked).to.be.true
   })
 
-  it("answers at once with no passkey held: nobody asked, nothing moved", async () => {
+  it("is a no-op with no passkey held", async () => {
     const born = await makeBornVault()
     const { storedNow, vault } = born
     const ante = storedNow()

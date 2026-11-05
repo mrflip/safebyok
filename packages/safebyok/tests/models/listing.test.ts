@@ -28,7 +28,7 @@ const seededListing = async () => {
 // --
 
 describe("listing.ensureTimelyWorld(maxMillis)", () => {
-  it("refuses 'bad_option' a span out of range, asking the world nothing", async () => {
+  it("refuses a span out of range, asking the world nothing", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.ensureTimelyWorld(-1), 'bad_option')
     expect(held.mw.callsOf('ensureTimely')).to.deep.equal([])
@@ -188,7 +188,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(listing.snapshot).to.deep.equal([])
     })
 
-    it("lets a listener go, and tells none after", async () => {
+    it("stops telling a listener once it unsubscribes", async () => {
       const listing = boxListingOf(held.mw)
       let told = 0
       const unsubscribe = listing.subscribe(() => { told += 1 })

@@ -50,7 +50,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(dialog).toHaveBeenCalledOnce()
   })
 
-  it("the seal verbs refuse 'bad_option' a stamp of another vault or another life of it", async () => {
+  it("the seal verbs refuse a stamp of another vault or another life of it", async () => {
     const { vault } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'bad_option')
@@ -67,7 +67,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
   })
 
-  it("refuses 'bad_option' a stamp of no fields, at the seal and at the unseal: a seal bound to nothing of the box's binds nothing", async () => {
+  it("refuses a stamp of no fields, at the seal and at the unseal: a seal bound to nothing of the box's binds nothing", async () => {
     const { vault } = await makeBornVault()
     await TH.expectRefusal(vault.sealStampedString('sk-test', {}), 'bad_option')
     await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}), 'bad_option')
@@ -115,7 +115,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.isFull).to.be.true
   })
 
-  it("vault.unlock on a vault held sparse fetches its full record, where the gating it launches would refuse 'bad_option'", async () => {
+  it("vault.unlock on a vault held sparse fetches its full record, where the gating it launches would refuse", async () => {
     const { demandStored } = await makeBornVault()
     const record = demandStored()
     const { listing } = makeVaultWorld(record)

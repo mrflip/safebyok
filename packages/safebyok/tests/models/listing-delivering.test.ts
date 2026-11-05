@@ -45,13 +45,13 @@ describe("Listing's pipeline: what every answer takes", () => {
       await boxListingOf(held.mw).fetch(scopeOf())
       expect(held.mw.callsOf('takeWorld')).to.deep.equal([{ verb: 'takeWorld', world: 'the world now' }])
     })
-    it("refuses a fetch of a scope that is no scope as 'bad_scope', before the world or storage is called", async () => {
+    it("refuses a fetch of a scope that is no scope, before the world or storage is called", async () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.fetch({ ...scopeOf(), boxlabel: 'Not A Label!' }), 'bad_scope')
       expect(held.mw.calls).to.deep.equal([])
     })
 
-    it("refuses fetch options out of range as 'bad_option', before the world or storage is called", async () => {
+    it("refuses fetch options out of range, before the world or storage is called", async () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.fetch(scopeOf(), { ifAbsent: 'create' } as never), 'bad_option')
       expect(held.mw.calls).to.deep.equal([])
@@ -216,7 +216,7 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
     expect(listing.things).to.deep.equal([])
   })
 
-  it("refuses it for a tombstone and a sparse record alike", async () => {
+  it("refuses a tombstone and a sparse record of another vault_tok alike", async () => {
     const listing = boxListingOf(held.mw)
     for (const record of [tombstoneBoxRecord({ vault_tok: OtherVault, revision_seq: 2 }), sparseBoxRecord({ vault_tok: OtherVault })]) {
       held.mw.willGet(held.mw.answerOf(scopeOf(), record))
@@ -225,7 +225,7 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
     expect(listing.things).to.deep.equal([])
   })
 
-  it("refuses it for build(record), and passes over a notice, as a row of another life is no row of this listing's", async () => {
+  it("refuses build(record) of a record of another vault_tok, and passes over a notice of one", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })), 'unexpected_error')
     held.mw.seedStore(fullBoxRecord())
@@ -260,7 +260,7 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
 })
 
 describe("listing: an answer names the scope of the record it carries", () => {
-  it("refuses 'bad_record' for a fetch answered with a record of another scope, making nothing", async () => {
+  it("refuses a fetch answered with a record of another scope, making nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willGet(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
     await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'bad_record')
@@ -278,7 +278,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
     expect(other._cheat_central).to.deep.equal(otherBefore)
   })
 
-  it("refuses it for a put and a del answered so, and for the record a stale_write carries, told to onBadNews with the stale_write thrown", async () => {
+  it("refuses a put and a del answered with a record of another scope, and the record a stale_write carries, told to onBadNews with the stale_write thrown", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willPut(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
     await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { prior: SX.VoidRevision }), 'bad_record')

@@ -45,7 +45,7 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
 
-  it("starts the box listing's watch, so another session's put reaches the box held", async () => {
+  it("a put from another session reaches the box held", async () => {
     const { vault, openNextSession } = await makeWorldWithBox()
     const next = await openNextSession()
     await next.hello()
@@ -72,7 +72,7 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
   })
 
-  it("refuses a boxListing.hello given a list that fails its check as 'bad_record'", async () => {
+  it("refuses a boxListing.hello given a list that fails its check", async () => {
     const { vault } = await makeWorld()
     await TH.expectRefusal(vault.boxListing.hello({ boxes: 'none' } as never), 'bad_record')
   })
@@ -190,7 +190,7 @@ describe("vault.getBox", () => {
     expect(tryGetBox).toHaveBeenCalledOnce()
   })
 
-  it("refuses a boxlabel that fails its check as 'bad_scope', and opts that fail theirs as 'bad_option'", async () => {
+  it("refuses a boxlabel that fails its check, and opts that fail theirs", async () => {
     const { vault } = await makeWorld()
     await TH.expectRefusal(vault.getBox('Not A Label'), 'bad_scope')
     await TH.expectRefusal(vault.getBox(42 as never), 'bad_scope')
@@ -223,7 +223,7 @@ describe("vault.delBox", () => {
     expect(boxrows.has(boxlabel)).to.be.false
   })
 
-  it("refuses a boxlabel that fails its check as 'bad_scope'", async () => {
+  it("refuses a boxlabel that fails its check", async () => {
     const { vault } = await makeWorld()
     await TH.expectRefusal(vault.delBox('Not A Label'), 'bad_scope')
     expect(await vault.tryDelBox('Not A Label')).to.deep.include({ ok: false })
