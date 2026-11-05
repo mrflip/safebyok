@@ -138,7 +138,7 @@ Operates on it without holding it: nothing; a passphrase has no handle form.
 
 **Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
 `bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt`,
-`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswer`, `isAllZero`),
+`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswer`, `isSafelyAllZero`),
 `checkFreshSalt`, `checkNewPasskey` → `#initializeGate`, `#unlockByPasskey`, `#putPasskey` →
 `PasskeyProving.seal` → `deriveWrappingKey` (`subtle.importKey` as HKDF input, then
 `subtle.deriveKey`), and `prfBytes.fill(0)`; or, for an attempt that never sealed it,
@@ -150,7 +150,7 @@ not, and `fill(0)`s it. In
 or zero it untried (`useWhenShown`'s `isShown`), and `attemptOnce` zeroes it after its attempt.
 
 **passphraseKey bytes.** Naked: `keyDeriver.deriveKeyBytes` → `passphraseKeyOf`
-(`isSharedMemory`, `isAllZero`, the length check) → `importWrappingKeyBytes`
+(`isSharedMemory`, `isSafelyAllZero`, the length check) → `importWrappingKeyBytes`
 (`subtle.importKey`), then `keyBytes.fill(0)`.
 
 **wayinKey.** Never naked: non-extractable from `importWrappingKeyBytes` or
