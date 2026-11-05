@@ -101,7 +101,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   prf_salt_b64:  str.min(1),
   /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
   prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
-}), { refuseAs: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalKind: 'bad_option', extras: 'strip' }, [CX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
  * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take
@@ -158,7 +158,7 @@ export const vaultStamp = objCheck(({ applabel, user_id, vaultlabel, vault_tok, 
   vaultlabel,
   vault_tok,
   registered_at: epochMillis,
-}), { refuseAs: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalKind: 'bad_option', extras: 'strip' }, [CX])
 
 export type VaultStamp = Z.infer<typeof vaultStamp>
 // --
@@ -227,7 +227,7 @@ export type LeaseRecord = Z.infer<typeof leaseRecord>
 
 // == [What a lease is handed]: sealedWhisper, leaseMillis, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
-export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refuseAs: 'bad_record', extras: 'strip' }, [CX])
+export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refusalKind: 'bad_record', extras: 'strip' }, [CX])
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
@@ -249,7 +249,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
-}), { refuseAs: 'bad_option', extras: 'strip' })
+}), { refusalKind: 'bad_option', extras: 'strip' })
 
 export type LeaseFriend = Z.infer<typeof leaseFriend>
 
@@ -300,12 +300,12 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
 export const gatingFriend = objCheck(({ fn }) => ({
   unlockByProof: fn<(vault: Vault, proved: Proving) => Promise<Vault>>(),
   landGate:      fn<(vault: Vault, proved: Proving, commit: () => Promise<VaultRecord>) => Promise<Vault>>(),
-}), { refuseAs: 'bad_option', extras: 'strip' })
+}), { refusalKind: 'bad_option', extras: 'strip' })
 
 export type GatingFriend = Z.infer<typeof gatingFriend>
 
 /** The check of what launches a gating. */
-export const gatingLaunchArgs = objCheck(() => ({ gatingkind, scope: vaultScope, friend: gatingFriend }), { refuseAs: 'bad_option', extras: 'strip' })
+export const gatingLaunchArgs = objCheck(() => ({ gatingkind, scope: vaultScope, friend: gatingFriend }), { refusalKind: 'bad_option', extras: 'strip' })
 
 export type ClearsForGatingkind = {
   build_vault:        Z.input<typeof vaultBuildClears>
