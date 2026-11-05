@@ -118,7 +118,7 @@ export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, 
 export type Settled = Z.infer<typeof settled>
 // --
 
-// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxesListed, BoxRecord, BoxSparse, BoxDnaFilled, BoxPatchGiven, BoxesListed
+// == [The box's forms]: BoxFormat, whisperHolder, WhisperHolder, boxRecord, boxSparse, boxDna, boxPatch, boxesListed, BoxRecord, BoxSparse, BoxPatchGiven, BoxesListed
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const { BoxFormat } = VS
@@ -153,9 +153,6 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
   return { boxDna, boxPatch }
 })
-
-/** A box's dna as {@link boxDna} hands it back: the scope, the whisper and the sidecar, and the record's own props with their defaults filled. */
-export type BoxDnaFilled = Z.output<typeof boxDna>
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchGiven = Z.output<typeof boxPatch>

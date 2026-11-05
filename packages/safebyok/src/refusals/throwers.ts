@@ -3,15 +3,9 @@ import { VaultError, thrownNameOf } from './errors'
 import * as Phrases   from '../helpers/phrases'
 import type * as VS   from '../storage/vault-db-shapes'
 
-// == [Vault Throwers]: goneError, lockedError, otherStoresError, behindError, listingExpected, unlockFirst, noProofToUnlock
-
-export const goneError        = () => new VaultError('vault_gone', Phrases.VaultGoneWhileOpening)
+// == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock
 
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
-
-export const otherStoresError = () => new VaultError('bad_option', Phrases.OtherStoresThanHeld)
-
-export const behindError      = () => new VaultError('vault_behind', Phrases.VaultBehindWhileOpening)
 
 export const listingExpected = (): VaultError => new VaultError('bad_option', Phrases.ListingExpected)
 
