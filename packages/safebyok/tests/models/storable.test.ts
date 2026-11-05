@@ -130,7 +130,7 @@ describe("Storable own props", () => {
     it("follow the record a put lands, which is one revision on, written now", async () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
-      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+      await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })
       expect(box.revision_seq).to.eq(2)
       expect(box.revision_tok).to.not.eq('rev-a1')
       expect(box.written_at).to.eq(T0 + 500)
@@ -186,7 +186,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot).to.eq(box.getSnapshot)
       const { getSnapshot } = box
       const first = getSnapshot()
-      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'changed' } })
+      await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'changed' } })
       expect(getSnapshot()).to.not.eq(first)
       expect(getSnapshot()).to.eq(box.snapshot)
     })
@@ -275,7 +275,7 @@ describe("Storable snapshot and subscription", () => {
       box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+      await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })
       const afterEdit = listener.mock.calls.length
       expect(afterEdit).to.be.greaterThan(0)
       await box.del()
@@ -320,7 +320,7 @@ describe("Storable snapshot and subscription", () => {
 })
 
 describe("Storable put guards: ensurePuttable, demandPuttable", () => {
-  const Patch = { whisper: { val: 'sk-test-0000' } }
+  const Patch = { whisper: 'sk-test-0000' }
 
   it("demandPuttable answers the patch as parsed while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
     const box = await builtBoxOf()
@@ -366,7 +366,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     const box = await builtBoxOf()
     held.mw.setLockState('locked')
     await expect(box.ensurePuttable()).resolves.to.eq(box)
-    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: {} }), 'vault_locked')
   })
 
   it("put ensures once, before its seal, and a bad patch heard after that ensure puts nothing", async () => {
@@ -376,7 +376,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     expect(putGuard).toHaveBeenCalledOnce()
     expect(held.mw.callsOf('put')).to.deep.equal([])
     putGuard.mockClear()
-    await expect(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })).resolves.to.eq(box)
+    await expect(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })).resolves.to.eq(box)
     expect(putGuard).toHaveBeenCalledOnce()
   })
 })
