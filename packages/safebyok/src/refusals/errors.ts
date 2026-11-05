@@ -42,7 +42,7 @@ export const refusalKindVals = [
   'absent_vault',        // the vault has never been created, and this call will not create it
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
-  'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
+  'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or one that is not an object
   'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for

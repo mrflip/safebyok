@@ -22,7 +22,7 @@ describe("registered_at over a rebirth", () => {
     const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
     await box.del()
     held.mw.setNow(T0 + 5000)
-    await box.put({ whisper: 'sk-test-0000', sidecar: {} })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
 
@@ -30,7 +30,7 @@ describe("registered_at over a rebirth", () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
     held.mw.setNow(T0 + 5000)
     held.mw.willPut(({ record }) => held.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
-    await box.put({ whisper: 'sk-test-0000', sidecar: {} })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ registered_at: T0 })
     expect(box.registered_at).to.eq(T0)
     expect(held.mw.badnews).to.deep.equal([])

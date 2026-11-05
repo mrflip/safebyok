@@ -254,7 +254,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(aliveRow)
     const box = await listing.build(aliveRow)
-    await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
     expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a1'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_seq: 2, revision_tok: box.revision_tok })
   })
@@ -262,7 +262,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
   it("meets 'stale_write' carrying nothing from a put, and 'record_conflict' from a del, where the box held is stored no more", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(aliveRow)
-    const putErr = await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } }), 'stale_write')
+    const putErr = await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
     expect(putErr.meta?.dbhas).to.be.null
     await TH.expectRefusal(box.del(), 'record_conflict')
     expect(box._cheat_central.revision_tok).to.eq('rev-a1')
@@ -273,8 +273,8 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
     const box = await listing.build(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'once' } }), 'stale_write')
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'twice' } }), 'stale_write')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'once' } }), 'stale_write')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'twice' } }), 'stale_write')
     expect(box._cheat_central.revision_seq).to.eq(5)
     expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a5', 'rev-a5'])
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_tok: 'rev-a3' })

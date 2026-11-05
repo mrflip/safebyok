@@ -1,3 +1,5 @@
+import type { Whisper } from '../shapes/shapes-core'
+
 /** The character a scopepath joins its parts on: `^`, which no label or user_id may hold. */
 export const ScopepathDelimiter = '^'
 
@@ -41,14 +43,24 @@ export const PassphraseKeyBytes = 32
 /** How many random bytes a passkey wayin's `prf_salt_b64` holds: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
 export const PasskeySaltBytes = 32
 
-/** The brand {@link LOCKED} is made with: a symbol of this module's, never `Symbol.for`, so no code outside the package spells it. A copy of LOCKED carries it too, so the brand tells LOCKED from a whisper, never from its copies. */
-const LockedBrand: unique symbol = Symbol('@LOCKED')
+/** The mark on what a box answers for a whisper it will not show: `box.whisper[Whispered]` says why.
+ * It is `Symbol.for`, as two copies of this module, such as our ESM and CJS builds, would otherwise make two symbols. */
+export const Whispered: unique symbol = Symbol.for('@safebyok/whispered')
 
-/** SLOPDOC: The frozen singleton answered for what the locked vault hides; `Storable.isLockedFUBag` tells it. */
-export const LOCKED: LockedBag = Object.freeze({ [LockedBrand]: 'locked' as const })
+/** What `box.whisper` answers for a whisper it will not show: a whisper to the type checker, carrying {@link Whispered}. */
+export type WhisperedBag = Whisper & { readonly [Whispered]: 'encrypted' | 'locked' | 'veiled' }
 
-/** The type of {@link LOCKED}, which a copy of it has too: `Storable.isLockedFUBag` alone tells LOCKED itself. */
-export type LockedBag = Readonly<{ [LockedBrand]: 'locked' }>
+/** What `box.whisper` answers for a whisper not exposed. */
+export const ENCRYPTED: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
+
+/** What `box.whisper` answers for a whisper exposed while the vault is locked. */
+export const LOCKED: WhisperedBag = Object.freeze({ [Whispered]: 'locked' })
+
+/** What `box.whisper` answers for a whisper exposed and veiled. */
+export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
+
+/** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
+export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (val !== null) && Object.hasOwn(val, Whispered)
 
 /** The tag a Listing answers true to, so a storable can tell one without importing it. */
 export const IsListing: unique symbol = Symbol('safebyok.listing')
