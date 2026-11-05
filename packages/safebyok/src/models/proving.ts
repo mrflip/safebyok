@@ -30,10 +30,10 @@ const Checks = Checkers('bad_option', ({ custom }) => ({
 }))
 // --
 
-// == [Proving]: checkStrength, buildWayin, buildLease, checkOpens, wrapVaultKey, unwrapVaultKey, toJSON
-
 /** The proof of a wayin: a strong key from birth, made by a subclass's static, and the one thing that can unwrap the vaultKey. Only the statics hear a clear, and they leave a passkeyClear unspent: spending it is their caller's. */
 export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
+  // == [Props]: wayinkind, header, stamp, gate_epoch, #wayinKey, #wayin, toJSON
+
   readonly wayinkind: HeaderT['wayinkind']
   readonly header:    HeaderT
   /** The stamp of the vault this proving is of, as parsed: what every wayin ctx under it binds. */
@@ -43,6 +43,11 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   readonly #wayinKey: CryptoKey
   #wayin: Wayin | null = null
+
+  toJSON(): { wayinkind: WayinKind } { return { wayinkind: this.wayinkind } }
+  // --
+
+  // == [Construction]: constructor
 
   /** A proving of a stored wayin is born holding it; a proving minted for a new wayin holds none until `buildWayin`. */
   protected constructor(stamp: VaultStamp, gate_epoch: number, header: HeaderT, wayinKey: CryptoKey, stored: Wayin | null = null) {
@@ -54,6 +59,9 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     adorn(this, 'gate_epoch', gate_epoch)
     Object.freeze(this)
   }
+  // --
+
+  // == [Methods]: checkStrength, buildWayin, buildLease, wrapVaultKey, unwrapVaultKey, wayinCtx
 
   /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
   static async checkStrength(passphraseClear: GX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<GX.PassphraseVerdict> {
@@ -80,13 +88,6 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return Lease.buildGranted(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
   }
 
-  /** Unwrap the stored wayin's vaultKey and drop it, to learn that the key opens the wrap (guarantees.md, G3). */
-  protected async checkOpens(wrongProof: () => VaultError): Promise<void> {
-    const { vault_key_wayin_wrapped } = this.#demandWayin()
-    const ctx = this.#wayinCtx()
-    valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, vault_key_wayin_wrapped, ctx, CheckUsage), wrongProof))
-  }
-
   async #wrapVaultKey(vaultKey: CryptoKey): Promise<Wayin> {
     const vault_key_wayin_wrapped = await wrapKeyUnder(this.#wayinKey, vaultKey, this.#wayinCtx())
     this.#wayin = new Wayin({ ...this.header, vault_key_wayin_wrapped })
@@ -97,20 +98,31 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return unwrapKeyUnder(this.#wayinKey, this.#demandWayin().vault_key_wayin_wrapped, this.#wayinCtx(), RewrapUsage)
   }
 
+  #wayinCtx(): Uint8Array { return wayinCtxOf(this.stamp, this.header) }
+  // --
+
+  // == [Guards]: demandWayin
+
   #demandWayin(): Wayin {
     if (this.#wayin === null) { throw wayinNotMadeYet() }
     return this.#wayin
   }
+  // --
 
-  #wayinCtx(): Uint8Array { return wayinCtxOf(this.stamp, this.header) }
+  // == [Protected, for a subclass to call]: checkOpens
 
-  toJSON(): { wayinkind: WayinKind } { return { wayinkind: this.wayinkind } }
+  /** Unwrap the stored wayin's vaultKey and drop it, to learn that the key opens the wrap (guarantees.md, G3). */
+  protected async checkOpens(wrongProof: () => VaultError): Promise<void> {
+    const { vault_key_wayin_wrapped } = this.#demandWayin()
+    const ctx = this.#wayinCtx()
+    valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, vault_key_wayin_wrapped, ctx, CheckUsage), wrongProof))
+  }
+  // --
 }
-// --
-
-// == [PassphraseProving]: buildNovel, buildStored
 
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
+  // == [Construction]: buildNovel, buildStored
+
   /** A proving for a new wayin, of the first gate's epoch. */
   static async buildNovel(stamp: VaultStamp, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { stamp: checked, passphraseClear: typed } = passphraseNovelArgs.parse({ stamp, passphraseClear, world })
@@ -131,12 +143,12 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     await proving.checkOpens(wrongPassphrase)
     return proving
   }
+  // --
 }
-// --
-
-// == [PasskeyProving]: buildNovel, buildStored
 
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
+  // == [Construction]: buildNovel, buildStored
+
   /** A proving for a new wayin, of the first gate's epoch. */
   static async buildNovel(stamp: VaultStamp, passkeyClear: GX.PasskeyAnswer, world: ProvingWorld): Promise<PasskeyProving> {
     const { stamp: checked, passkeyClear: answer } = passkeyNovelArgs.parse({ stamp, passkeyClear, world })
@@ -157,8 +169,8 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
     await proving.checkOpens(wrongPasskey)
     return proving
   }
+  // --
 }
-// --
 
 // == [Headers]: mintPassphraseHeader, mintPasskeyHeader
 
