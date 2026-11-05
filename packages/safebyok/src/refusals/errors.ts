@@ -25,8 +25,10 @@ import type { Capacity } from '../shapes/shapes-storage'
  * A record that fails its checks is named for its direction, by a VaultDB and a vault alike. One
  * read from storage that fails them is `damaged_row`, on the way out, and a box that will not open
  * under the lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. One
- * handed in is `bad_option`, on the way in; `bad_record` where one check serves both ways. A
- * storage adapter's answer that cannot be, one revision under two toks say, is `record_conflict`.
+ * handed in is `bad_option`, on the way in; `bad_record` where one check serves both ways. The
+ * record a vaultDB verb is handed is safebyok's own to prepare, so one failing there is
+ * `unexpected_error`, though the options beside it are `bad_option`. A storage adapter's answer
+ * that cannot be, one revision under two toks say, is `record_conflict`.
  *
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
  * altered, since decryption fails alike; the message says so.
