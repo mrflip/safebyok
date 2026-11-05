@@ -95,17 +95,18 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, edit, keptWhisper
 
-  /** Seals `patch` over the record in hand and stores it, answering the box listed; a deleted box is reborn. */
-  async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
+  /** Seals `patch` over the record in hand and stores it, answering this box; a deleted box is reborn. */
+  async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = VX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
     const given = this.demandPuttable(patch, { ifPresent })
     const { record, prior } = await this.#edit(given)
     this.demandPuttable(patch, { ifPresent })
-    return this.listing.put(record, { prior, ifAbsent, ifPresent })
+    await this.listing.put(record, { prior, ifAbsent, ifPresent })
+    return this
   }
 
-  tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.put(patch, opts)) }
+  tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.put(patch, opts)) }
 
   /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: SX.Revision }> {
