@@ -1,3 +1,5 @@
+/** The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts. */
+
 import type { Capacity } from '../shapes/shapes-storage'
 
 // == [Kinds and families]: refusalKindVals, RefusalKind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
