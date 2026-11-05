@@ -3,7 +3,7 @@ import { randomId } from '../helpers/crypto'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
-import { DefaultLogger, type VaultLogger } from '../helpers/logger'
+import { type VaultLogger, parseLogger } from '../helpers/logger'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
@@ -83,7 +83,7 @@ export class Bank implements VaultWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     VX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
+    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.#device_id = device_id
@@ -91,7 +91,7 @@ export class Bank implements VaultWorld {
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
     this.onPanic = onPanic
-    this.logger = logger
+    this.logger = parseLogger(opts.logger)
     this.requestCleartext = requestCleartext
     this.strengthChecker = strengthChecker
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
@@ -105,7 +105,7 @@ export class Bank implements VaultWorld {
     }
     this.#vaultListing = this.#makeListing()
     this.#snapshot = this.#makeSnapshot()
-    if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
+    if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
     Object.freeze(this)
   }
 

@@ -243,6 +243,22 @@ describe("'identity_revoked' and bad news", () => {
     expect(vault.isEnabled).to.be.true
   })
 
+  it("keeps to its call when the host's logger throws, in Bank.make and past a cached lease row it cannot erase", async () => {
+    const world = makeBankWorld()
+    const warn = vi.fn(() => { throw new Error('the logger broke') })
+    const logger = { log: warn, warn, error: warn }
+    await makeBankWithVault(world, { logger })
+    expect(warn.mock.calls).to.have.length(1)
+    const [cached] = world.leaseRows() as [{ gate_epoch: number }]
+    vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce(TH.good({ ...cached, gate_epoch: cached.gate_epoch + 1 } as never))
+    vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the store is down')))
+    const page = world.bankOn({ logger })
+    await page.hello()
+    const unlocked = await page.vaultOf(VaultBag)?.ensureUnlocked()
+    expect(unlocked?.isUnlocked).to.be.true
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not be erased'), expect.objectContaining({ call: 'Lease.buildFromCache' }), undefined)
+  })
+
   it("hears a vault's bad news, a box's way, the same as its own, and 'identity_revoked' told so vacates it", async () => {
     const onBadNews = vi.fn()
     const { vault } = await makeBankWithVault(makeBankWorld(), { onBadNews })
