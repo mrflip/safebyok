@@ -114,3 +114,62 @@ Step 7, the current code only (packages/safebyok/src/refusals/throwers.ts):
     257    const thrownName = thrownNameOf(thrown)
     258    const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
     259    return new VaultError('storage_unavailable', Phrases.storeFailed(call, named))
+
+## Resumed (2026-11-05): steps 5, 6 and 8
+
+The pause was lifted except for two groups, which stay held and untouched: the five package-bug guards and their
+throwers (step 3 stands as committed), and the throwers that carry logic (`absentBox`, `storeFailed`,
+`weakPassphrase`, `unexpectedError`). `causeOf` was folded into `storageUnavailable` by the coordinator (9cef6543).
+Rebased onto origin/main again (5766597c) with no conflict.
+
+* Step 5: the `damagekind` value `damaged_record` is `damaged_row` (shapes-enums.ts, shapes-storage.ts
+  `damagekindOf`). No vault is written with it: VaultDB computes it as it lists a row it sets aside, so a host sees
+  it only in a listing's `damaged_records`. The changeset says so. **`damaged_records` should follow, as
+  `damaged_rows`** (its own thread: the exported `BankListed`/`VaultListed` types, `boxListing.damaged_records`,
+  VOCABULARY's `am` row); not renamed here.
+* Step 6, observed, not guessed:
+  * guarantees.md G4: a lease record whose key fails `isLeaseKey` now reads as `damaged_lease`. `Lease.buildFromCache`'s
+    `leaseRecord` check tells it as bad news, and no lease is used. Before, it read as `corrupt_record`.
+  * G8: `crypto_failed` is dropped twice, as it has no successor. **Reported, not amended**: G8 still says "a WebCrypto
+    failure is caught and replaced". Lease.sealWith's `makeBoxKey` and `wrapKeyUnder`, and `buildGranted`'s
+    `makeLeaseKey` and `wrapKeyUnder`, are not caught today, so their error passes as thrown. G8 also still names
+    old-design sites (`Lease.cipheredWith`, `Proving.#unwrap`, `deviceTrouble`, `device-db.ts`, `types.ts`).
+  * G10: `unknown_key_deriver` is now `newer_format`.
+  * VOCABULARY.md:
+    * gone: the `damaged_wayin` clause, both `vault_behind` sentences, and the `gate_moved` clause (no site);
+    * renamed: `damaged_vault` is now `damaged_row`.
+* `vault-listing.ts:37`'s `VX.vaultListingOpts.parse(opts)` stays as it is.
+**Step 8: 20 validator parses in src run on a value safebyok itself just built or already checked**, so only a bug in safebyok can fail them. Each is either a *build* (a literal assembled from package-made parts, parsed) or a *pick* (a parse of `this` or of a value already parsed, to take some of its fields). By kind: 9 `bad_option`, 9 `bad_record`, 1 `bad_scope`, 1 `damaged_row`.
+
+- `storage/vault-db-new.ts:399`: `SX.boxSparse.parse(parsed.data)`, a pick from a boxRow just parsed. `bad_option`.
+- `shapes/shapes-storage.ts:285` (`boxTombstoneOf`): `boxSparse.parse(parsed.data)`, a pick from a boxRow just parsed. `bad_option`.
+- `models/box.ts`:
+  - `:84`: `VX.boxSparse.parse(record)`, a pick from a checked BoxRecord. `bad_record`.
+  - `:188`: `VX.boxSparse.parse(base)`, a pick. `bad_record`.
+  - `:191`: `VX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })`, a build. `bad_option`.
+- `models/box-listing.ts:51`: `VX.boxesListed.parse(listed)`, which re-parses what `vault-listing.ts:95` parsed one call earlier (`vault.hello`). `damaged_row`.
+- `models/gating.ts`:
+  - `:182`: `passphraseWayinRecord.parse(nextWayin.pickle())`, a build. `bad_record`.
+  - `:188`: `passkeyWayinRecord.parse(passkeyWayin.pickle())`, a build. `bad_record`.
+- `models/proving.ts`:
+  - `:84`: `vaultStamp.parse(friend)`, a pick from a friend parsed on the line above. `bad_option`.
+  - `:127`: `vaultScope.parse(checked)`, a pick. `bad_scope`.
+- `models/vault.ts:254`: `GX.vaultStamp.parse(this)`, a pick from itself. `bad_option`.
+- `models/lease.ts`:
+  - `:35`: `leaseStamp.parse(this)`, a pick from itself. `bad_record`.
+  - `:43`: `leaseRecord.parse(record)`, in the private constructor; both callers pass a record already parsed. `bad_record`.
+  - `:44`: `leaseStamp.parse(record)`, a pick. `bad_record`.
+  - `:46`: `vaultStamp.parse(friend)`, a pick from a friend its callers parsed. `bad_option`.
+  - `:69`: `vaultStamp.parse(checked.data)` and `vaultStamp.parse(friend)`, two picks. `bad_option`.
+  - `:80`: `vaultStamp.parse(friend)`, a pick (the friend was parsed on line 79). `bad_option`.
+  - `:84`: `leaseRecord.parse({ ...granted, lease_key, vault_key_lease_wrapped })`, a build. `bad_record`.
+  - `:139`: `sealedWhisper.parse({ box_key_wrapped, whisper_ciphered })`, a build from WebCrypto's output. `bad_record`.
+
+Not counted, though close:
+- **Builds that hold the host's clock** (`world.clock.now()`), which a bad clock can fail:
+  - `vault-listing.ts:64` (`vaultStamp`, `bad_option`);
+  - `lease.ts:81` (`leaseStamp`, `bad_record`);
+  - `proving.ts:175` and `:183` (the wayin headers, `bad_record`; these also hold the host's key deriver label or passkey answer).
+- **Constructors fed both by a build and by a stored record**: `gate.ts:29` and `wayin.ts:38`.
+- **The four `preparedOf` parses in VaultDB**: they run on records the core prepared, but VaultDB's verbs are exported.
+- **Argument checks at internal model entries** (`leaseGrantedArgs`, `provingLeaseArgs`, `leaseSealArgs`, `gateMakeArgs` and their kin): these check a caller, not a value just built.
