@@ -1,4 +1,4 @@
-/** What a vault does today that the README forbids, pinned as it is until the Coach rules. Each `it` names its source and line. */
+/** What a vault does today that safebyok-old's README forbids, pinned as it is until the Coach rules. Each `it` names its source and line. */
 
 import { describe, expect, it } from 'vitest'
 import type { VaultRecord } from '../../src/models/models-shapes'
@@ -9,7 +9,7 @@ import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWi
 useVaultWorlds()
 
 describe("the ways in changing under a vault unlocked", () => {
-  it("README.md:844, 'Every change locks the other devices ... each other device falls back to `locked`': a vault that receives a newer record whose wayins are not the ones in hand takes its gate and stays unlocked, its held lease still sealing", async () => {
+  it("safebyok-old/README.md:844, 'Every change locks the other devices ... each other device falls back to `locked`': a vault that receives a newer record whose wayins are not the ones in hand takes its gate and stays unlocked, its held lease still sealing", async () => {
     const record = await storedVaultRecord()
     const { listing, storeBehindOurBack } = makeVaultWorld(record)
     const vault = await listing.build(record)
@@ -29,7 +29,7 @@ describe("the ways in changing under a vault unlocked", () => {
 })
 
 describe("an older copy of the vault record", () => {
-  it("README.md:1204, 'Storage handing back an older copy could otherwise bring back a way in that was removed': the next session on this device holds a vault record restored from before a passphrase change, and the passphrase replaced opens it again", async () => {
+  it("safebyok-old/README.md:1204, 'Storage handing back an older copy could otherwise bring back a way in that was removed': the next session on this device holds a vault record restored from before a passphrase change, and the passphrase replaced opens it again", async () => {
     const { vault, restoreRow, demandStored, anotherSession, deviceDB } = await makeBornVault()
     const ante = demandStored()
     await replaceTyping(vault, Passphrase, NewPassphrase)
@@ -48,7 +48,7 @@ describe("an older copy of the vault record", () => {
 })
 
 describe("a vault record stored damaged", () => {
-  it("README.md:810, 'A way in stored in a form this package never writes cannot be tried, but the other still opens the vault': a passkey wayin stored with a salt too short to be one passes the record's check, then refuses the passphrase's unlock 'bad_record'", async () => {
+  it("safebyok-old/README.md:810, 'A way in stored in a form this package never writes cannot be tried, but the other still opens the vault': a passkey wayin stored with a salt too short to be one passes the record's check, then refuses the passphrase's unlock 'bad_record'", async () => {
     const { demandStored } = await makeBornVaultWithPasskey()
     const record = demandStored()
     const { passkey_wayin } = record.gate
@@ -61,7 +61,7 @@ describe("a vault record stored damaged", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate refuses 'damaged_record' at ensureUnlocked's hydrate, and stores nothing", async () => {
+  it("safebyok-old/README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate refuses 'damaged_record' at ensureUnlocked's hydrate, and stores nothing", async () => {
     const { gate: _gate, ...gateless } = await storedVaultRecord()
     const { listing, storedNow } = makeVaultWorld(gateless as VaultRecord)
     const vault = await listing.build(listing.sparseOf(gateless))

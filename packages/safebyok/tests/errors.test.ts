@@ -2,43 +2,31 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf, thrownNameOf } from '../src/errors'
 
-const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
 
-/** The text from `from` up to the next `until`, or to the end. */
-const between = (text: string, from: string, until: string): string => {
-  const start = text.indexOf(from)
-  const end = text.indexOf(until, start)
-  return text.slice(start, end === -1 ? text.length : end)
+/** The text of errors.ts from `from` up to the next `until`. */
+const sourceBetween = (from: string, until: string): string => {
+  const start = errorsSource.indexOf(from)
+  return errorsSource.slice(start, errorsSource.indexOf(until, start))
 }
-
-/** The kinds in the backticked first cell of each table row of `text`. */
-const tableKinds = (text: string): string[] => (
-  Array.from(text.matchAll(/^\| `([a-z_]+)`/gm), (hit) => hit[1]!)
-)
 
 /** The kinds a doc block names, in backticks. */
 const namedKinds = (text: string): string[] => (
   refusalKindVals.filter((kind) => text.includes(`\`${kind}\``))
 )
 
-const MisuseKinds    = tableKinds(between(readmeText, '### Misuse', '### Conditions'))
-const ConditionKinds = tableKinds(between(readmeText, '### Conditions', '### Bad news'))
-const BadNewsKinds   = tableKinds(between(readmeText, '### Bad news', '\n## '))
+/** The kinds RefusalFamilyForKind puts in `family`. */
+const familyKinds = (family: string): string[] => refusalKindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
 
 describe("refusalKindVals", () => {
   it("lists each kind once", () => {
     expect(new Set(refusalKindVals).size).to.eq(refusalKindVals.length)
   })
 
-  it("is documented in the README, each kind in exactly one family's table", () => {
-    expect([...MisuseKinds, ...ConditionKinds, ...BadNewsKinds]).to.have.members([...refusalKindVals])
-  })
-
   it("puts the same kinds in each family as the doc block in errors.ts does", () => {
-    expect(namedKinds(between(errorsSource, '* **Misuse**', '* **Condition**'))).to.have.members(MisuseKinds)
-    expect(namedKinds(between(errorsSource, '* **Condition**', '* **Bad news**'))).to.have.members(ConditionKinds)
-    expect(namedKinds(between(errorsSource, '* **Bad news**', '\n *\n'))).to.have.members(BadNewsKinds)
+    expect(namedKinds(sourceBetween('* **Misuse**', '* **Condition**'))).to.have.members(familyKinds('misuse'))
+    expect(namedKinds(sourceBetween('* **Condition**', '* **Bad news**'))).to.have.members(familyKinds('condition'))
+    expect(namedKinds(sourceBetween('* **Bad news**', '\n *\n'))).to.have.members(familyKinds('bad_news'))
   })
 })
 
@@ -85,9 +73,6 @@ describe("VaultError", () => {
   })
 })
 
-/** The kinds RefusalFamilyForKind puts in `family`. */
-const familyKinds = (family: string): string[] => refusalKindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
-
 describe("RefusalFamilyForKind", () => {
   it("names a family for every kind, and only for kinds", () => {
     expect(Object.keys(RefusalFamilyForKind)).to.have.members([...refusalKindVals])
@@ -95,12 +80,6 @@ describe("RefusalFamilyForKind", () => {
 
   it("uses only the families in refusalFamilyVals, and uses each of them", () => {
     expect([...new Set(Object.values(RefusalFamilyForKind))]).to.have.members([...refusalFamilyVals])
-  })
-
-  it("puts each kind in the family the README's tables do", () => {
-    expect(familyKinds('misuse')).to.have.members(MisuseKinds)
-    expect(familyKinds('condition')).to.have.members(ConditionKinds)
-    expect(familyKinds('bad_news')).to.have.members(BadNewsKinds)
   })
 
   it("matches the @examples", () => {

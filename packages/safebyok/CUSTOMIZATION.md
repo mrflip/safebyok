@@ -1,7 +1,9 @@
 # Customizing safebyok
 
 The parts of safebyok an app chooses for itself, beyond the options every app answers the same
-way. The package README has the options; this file says how to choose.
+way. `Bank.make`'s type, `BankOpts`, has the options; this file says how to choose. It still names
+the old design's entry points and calls (`safebyok/browser`, `safebyok/idb`, `putWayin`), which this
+package does not have yet.
 
 ## Pluggable Passphrase Strength Checker
 

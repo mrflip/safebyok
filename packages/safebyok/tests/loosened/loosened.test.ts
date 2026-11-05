@@ -55,7 +55,7 @@ const bornWithPasskey = async () => {
 }
 
 describe("the gate changes the vault sends", () => {
-  it("README.md:841, 'A new passphrase removes the passkey with the old one': the passkey wayin is kept as stored, and the passkey still opens", async () => {
+  it("safebyok-old/README.md:841, 'A new passphrase removes the passkey with the old one': the passkey wayin is kept as stored, and the passkey still opens", async () => {
     const { vault, demandStored } = await bornWithPasskey()
     const { passkey_wayin } = demandStored().gate
     await replaceTyping(vault, Passphrase, NewPassphrase)
@@ -64,7 +64,7 @@ describe("the gate changes the vault sends", () => {
     expect(proving.wayinkind).to.eq('passkey')
   })
 
-  it("README.md:844, 'Every change locks the other devices': another device, unlocked before the change, fetches the new gate and stays unlocked, its lease in force", async () => {
+  it("safebyok-old/README.md:844, 'Every change locks the other devices': another device, unlocked before the change, fetches the new gate and stays unlocked, its lease in force", async () => {
     const { vault, demandStored } = await bornWithPasskey()
     const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
     const theirs = await other.listing.build(demandStored())
@@ -77,7 +77,7 @@ describe("the gate changes the vault sends", () => {
     expect(await vaultRoundTrip(theirs, theirs)).to.eq('sk-test')
   })
 
-  it("README.md:853, 'each change_passphrase sets -- is put to the vault's strengthChecker first': a one-letter new passphrase is set, as the world carries no checker", async () => {
+  it("safebyok-old/README.md:853, 'each change_passphrase sets -- is put to the vault's strengthChecker first': a one-letter new passphrase is set, as the world carries no checker", async () => {
     const { vault, opts: { world } } = await bornWithPasskey()
     await replaceTyping(vault, Passphrase, 'x')
     const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse('x'), world)
