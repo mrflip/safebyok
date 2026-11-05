@@ -7,13 +7,15 @@ import * as Refusals from '../../src/refusals/throwers'
 const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new TypeError(`no backup of ${vaultlabel}`))
 
 describe("good and bad", () => {
-  it("makes a good outcome of a val, as good's example shows (Contract: Shapes)", () => {
+  // good @example
+  it("makes a good outcome of a val", () => {
     const vaultRecord = { vault_tok: 'vault-tok-u1' }
     expect(good(vaultRecord)).to.deep.equal({ ok: true, val: vaultRecord })
     expect(good(null)).to.deep.equal({ ok: true, val: null })
   })
 
-  it("makes a bad outcome of a refusal, as bad's example shows (Contract: Shapes)", () => {
+  // bad @example
+  it("makes a bad outcome of a refusal", () => {
     const err = Refusals.lockedError()
     const outcome = bad(err)
     expect(outcome).to.deep.equal({ ok: false, err })
@@ -22,7 +24,8 @@ describe("good and bad", () => {
 })
 
 describe("Outcome", () => {
-  it("narrows on ok, so a destructured val is the answer once a refusal has returned, as its example shows (Contract: Shapes)", () => {
+  // Outcome @example
+  it("narrows on ok, so a destructured val is the answer once a refusal has returned", () => {
     const answer = (outcome: Outcome<number | null>): number | null | VaultError => {
       const { ok, val, err } = outcome
       if (! ok) {
@@ -37,7 +40,7 @@ describe("Outcome", () => {
     expect(answer(locked)).to.be.instanceOf(VaultError)
   })
 
-  it("has an err that is always a VaultError, so throw err always works (Contract: Shapes)", () => {
+  it("has an err that is always a VaultError", () => {
     const outcomes: Outcome<string>[] = [bad(new VaultError('absent_box', 'No box under that label.'))]
     expect(() => { for (const { ok, err } of outcomes) { if (! ok) { throw err } } }).to.throw(VaultError)
   })
@@ -50,7 +53,7 @@ describe("outcomeOf", () => {
     expect(await outcomeOf(() => undefined)).to.deep.equal({ ok: true, val: undefined })
   })
 
-  it("keeps a VaultError the body throws or rejects with, as it came (Contract: Shapes)", async () => {
+  it("keeps a VaultError the body throws or rejects with, as it came", async () => {
     const refusal = new VaultError('not_permitted', 'Not yours to make.')
     const thrown = await outcomeOf(() => { throw refusal })
     expect(thrown.err).to.eq(refusal)
@@ -58,7 +61,8 @@ describe("outcomeOf", () => {
     expect(rejected.err).to.eq(refusal)
   })
 
-  it("turns anything else thrown into unexpected_error, the thrown value its cause, as its second example shows (Contract: Shapes)", async () => {
+  // outcomeOf @example 2
+  it("turns anything else thrown into unexpected_error, the thrown value its cause", async () => {
     const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
     const { ok, err } = await outcomeOf(() => parseImport('backup.json'))
     expect(ok).to.be.false
@@ -76,7 +80,8 @@ describe("outcomeOf", () => {
     expect(fromNothing.err?.cause).to.be.instanceOf(Error)
   })
 
-  it("never rejects: what an app wraps is one Outcome whatever happens, as its first example shows", async () => {
+  // outcomeOf @example 1
+  it("never rejects: what an app wraps is one Outcome whatever happens", async () => {
     const { ok, val, err } = await outcomeOf(() => fetchBackup('main'), Refusals.storageUnavailable)
     expect(ok).to.be.false
     expect(val).to.be.undefined
@@ -86,7 +91,8 @@ describe("outcomeOf", () => {
 })
 
 describe("outcomeOf, told otherwise", () => {
-  it("turns a throw that is no VaultError into what otherwise makes of it, as its third example shows", async () => {
+  // outcomeOf @example 3
+  it("turns a throw that is no VaultError into what otherwise makes of it", async () => {
     const socketClosed = new Error('socket closed')
     const { err } = await outcomeOf(() => { throw socketClosed }, Refusals.storageUnavailable)
     expect(err?.refusalkind).to.eq('storage_unavailable')
@@ -102,7 +108,8 @@ describe("outcomeOf, told otherwise", () => {
 })
 
 describe("valOf", () => {
-  it("hands back a good outcome's val, and throws a bad one's err, as its example shows", () => {
+  // valOf @example
+  it("hands back a good outcome's val, and throws a bad one's err", () => {
     expect(valOf(good('vault record'))).to.eq('vault record')
     const refusal = new VaultError('stale_write', 'Read it again.')
     expect(() => valOf(bad(refusal))).to.throw(refusal)
@@ -110,7 +117,8 @@ describe("valOf", () => {
 })
 
 describe("storageTroubleOf", () => {
-  it("hands back a VaultError as the same object, and makes storage_unavailable of anything else, the throw its cause, as its example shows", () => {
+  // storageTroubleOf @example
+  it("hands back a VaultError as the same object, and makes storage_unavailable of anything else, the throw its cause", () => {
     const refusal = new VaultError('vault_mismatch', 'Another vault is stored there.')
     expect(storageTroubleOf(refusal)).to.eq(refusal)
     const dropped = new Error('connection terminated unexpectedly')
@@ -120,7 +128,7 @@ describe("storageTroubleOf", () => {
     expect(trouble.message).to.not.include('terminated')
   })
 
-  it("makes storage_unavailable of a thrown string, or of nothing, with a cause that is never null, as Refusals.storageUnavailable does", () => {
+  it("makes storage_unavailable of a thrown string, or of nothing, with a cause that is never null and the message Refusals.storageUnavailable gives", () => {
     for (const thrown of ['socket closed', undefined, null]) {
       const trouble = storageTroubleOf(thrown)
       expect(trouble.refusalkind).to.eq('storage_unavailable')
@@ -132,12 +140,14 @@ describe("storageTroubleOf", () => {
 })
 
 describe("refusalOf", () => {
-  it("hands a VaultError back as it came, as its second example shows", () => {
+  // refusalOf @example 2
+  it("hands a VaultError back as it came", () => {
     const refusal = new VaultError('vault_locked', 'The vault is locked.')
     expect(refusalOf(refusal)).to.eq(refusal)
   })
 
-  it("makes an unexpected_error of anything else, the throw its cause, as its third example shows", () => {
+  // refusalOf @example 3
+  it("makes an unexpected_error of anything else, the throw its cause", () => {
     const bug = new TypeError('ctx is not a function')
     const err = refusalOf(bug)
     expect(err).to.be.instanceOf(VaultError).and.to.have.property('refusalkind', 'unexpected_error')
@@ -146,7 +156,8 @@ describe("refusalOf", () => {
     expect(refusalOf(undefined).cause).to.be.instanceOf(Error)
   })
 
-  it("ends a throwing form, so a bug in its body reaches the caller as a VaultError and a refusal passes untouched, as its first example shows", async () => {
+  // refusalOf @example 1
+  it("ends a throwing form: a bug in its body reaches the caller as a VaultError and a refusal passes untouched", async () => {
     const refusal = new VaultError('vault_locked', 'The vault is locked.')
     await expect(throwingForm(new TypeError('broken'))).rejects.toThrow(expect.objectContaining({ name: 'VaultError', refusalkind: 'unexpected_error' }))
     await expect(throwingForm(refusal)).rejects.toThrow(refusal)

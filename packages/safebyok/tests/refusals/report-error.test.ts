@@ -12,7 +12,7 @@ describe("reportToPlatform", () => {
     expect(reported).to.deep.equal([thrown])
   })
 
-  it("does nothing where the platform has no reportError, as Node has none", () => {
+  it("does nothing on a platform without reportError", () => {
     vi.stubGlobal('reportError', undefined)
     expect(() => { reportToPlatform(new Error('heard by no one')) }).to.not.throw()
   })
