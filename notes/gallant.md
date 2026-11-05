@@ -22,7 +22,7 @@ Contents:
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`
 * **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`
-* **Words:** `#purpose-not-process`
+* **Words:** `#purpose-not-path`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`, `#a-helper-gets-a-phrase`
 * **Reading the Coach:** `#a-fact-is-not-a-ruling`, `#dont-overstretch-a-request`
 
 ---
@@ -807,23 +807,146 @@ override demandEnabled(): this {
 
 # Words
 
-## A doc block says purpose, not process `#purpose-not-process`
+## A doc block has no past `#purpose-not-path`
 
-One or two 120-character lines: what it is or does, for its caller. Never how it works, why it's built that way, what it replaced,
-or what a later line relies on. "As", "so", "once", "since", "no longer", "still" and "rather than" usually mark a failure.
-A method that won't describe in a line is a smell: report it. STYLE.md, *Comments and doc blocks*, has the rule.
+How the code came to be is not the caller's business: the decision behind a shape, the request that produced it, what it
+replaced, which thread ruled. "As", "so", "since", "rather than", "no longer" and "still" usually mark it. A reason worth
+keeping goes in a `//` comment above the doc block: `// The lock first: no box opens under a lease while the tombstone goes out.`
+
+| Goofus | Gallant |
+|---|---|
+| The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. | Lock this vault and store its tombstone; the answer delivered vacates its boxes. |
+| Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. No box verb needs it; the host runs it for the list and the pushes. | List this vault's boxes and start its watch. |
+
+From the old tree (`packages/safebyok-old/src`), the Gallant column proposed, not the Coach's: a decision given as its reason, the
+project rule the code answers echoed as its doc, and a look ahead.
+
+| Goofus | Gallant, proposed |
+|---|---|
+| A verdict that admits, frozen so that a checker may share it. | A verdict that admits. *(above it: `// Frozen: a checker may share it.`)* |
+| `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which hold one bag to another, as a validator's `parseConsistent` does. | The validator builders, `Checkers`, `Checker` and `objCheck`, and the `consistent` family that holds one bag to another. |
+| Which generation of the whisper's own shape this box holds: 1, the only one so far. | Which generation of the whisper's own shape this box holds. |
+
+## A doc block does not read the body aloud `#purpose-not-machinery`
+
+What it is or does, for its caller, never how it works: the steps, their order, what a later line relies on, what a refusal
+leaves behind. "Once", "which" and a participle pile usually mark it. A method that won't describe in a line is a smell:
+report it.
 
 | Goofus | Gallant |
 |---|---|
 | A void box held under `scope`, timely as it received its own void revision, so a put on it fetches nothing. | A timely tombstoned box listed at `scope`. |
 | The instance held under `scope`, once it hears that storage holds nothing there; null where none is held, as nothing is made of an absence. | Handle an impossible situation: VaultDB reports an empty row whereas we have an instance at `scope`.\nPass the null to held.receive, share the bad news and settle |
 | The next record `patch` makes of the record in hand on entry, sealed and not yet stored, with that revision it was sealed over. | A sealed uncommitted record for the `patch`, with the `prior` revision bag proving it is next in sequence. |
-| Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. No box verb needs it; the host runs it for the list and the pushes. | List this vault's boxes and start its watch. |
-| The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. | Lock this vault and store its tombstone; the answer delivered vacates its boxes. |
 
-A reason worth keeping goes in a `//` comment above the doc block: `// The lock first: no box opens under a lease while the tombstone goes out.`
+*Status, both: Fixed on the blocks #470 changed and the ones its review named. The rest of `models/` hasn't had a pass.*
 
-*Status: Fixed on the blocks #470 changed and the ones its review named. The rest of `models/` hasn't had a pass.*
+## Refusals are not a catalog `#no-refusal-catalog`
+
+A block that lists each refusal kind with its condition is the method's throw sites read aloud: long, stale by the next guard,
+and no use to a caller, who gets the kind from the error. Say the job on the first line. An option's values get a list, one
+line each, the default marked. A term defined elsewhere ("sealed", "encrypted") gets a pointer, not a second definition.
+
+**Goofus:**
+
+```ts
+/** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'vault_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
+async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box>
+```
+
+**Gallant:**
+
+```ts
+/** Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata
+ * @see `sealedRecordOf` in models/box.ts for what "encrypted" and "sealed" imply
+ * - `ifPresent:fail` (default): replace a void/tombstoned box, else fail
+ * - `ifPresent:repl` replaces (if in correct sequence);
+ * - `ifPresent:get`  returns an existing box
+ */
+async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
+```
+
+**Goofus again:** a guard as a catalog, with a pointer to the ensure that cures one entry.
+
+```ts
+/** Throws unless unlocked with a full, healthy record: refuses 'vault_locked', 'absent_box' for a box gone, or 'bad_option' for a sparse record not yet filled, which `ensureReadyToUnsealWhisper` fetches first. */
+demandReadyToUnsealWhisper(): this
+```
+
+**Gallant again:** a guard names the predicates it asks, each linked. The kinds follow from them.
+
+```ts
+/** throw unless {@link isEnabled}, unlocked, {@link isPresent}, {@link isFull} */
+demandUnsealable(): this
+```
+
+*Status: Planned, the documentarian run on `models/`. #498 carries a stripped one-liner on each.*
+
+## Say what to do, not what gets refused `#say-what-to-do`
+
+"Refuses before ready" hands the caller a state they can't act on. "Precede with `await bank.hello()`" hands them the call.
+A block written for its caller names the call to make before and the one to make after, and bolds the one word that would
+surprise them.
+
+**Goofus:**
+
+```ts
+/** The vault listed for `bag`, a tombstone among them, or null. Refuses before ready. */
+vaultOf(bag: VaultBag): Vault | null
+```
+
+**Gallant:**
+
+```ts
+/** Vault **or tombstone** listed at `scope`, null if absent.
+ * Precede with await bank.hello(), repeated to force a refresh; then .hydrate() on the vault answered makes it timely
+ */
+vaultAt(scope: BankedVaultScope): Vault | null
+```
+
+*Status: Planned, the documentarian run. The rename is on #498; the block there still reads as the Goofus's first sentence.*
+
+## The line worth writing is the guarantee `#say-the-guarantee`
+
+The signature can't tell a caller what the call proves, and a security reviewer opens the block for exactly that. A line spent
+on the holder's shape, with the refusals pointed at another method, leaves it unsaid.
+
+**Goofus:**
+
+```ts
+/** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. Refuses as `demandReadyToUnsealWhisper` does. */
+async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder>
+```
+
+**Gallant:**
+
+```ts
+/** The timely stored whisper object. Extracting the whisper authenticates that (sidecar included) the object has not been modified since it was sealed */
+async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper>
+```
+
+*Status: Planned, the documentarian run. #498 still carries the Goofus's first sentence; the `Whisper` return is #499's.*
+
+## A private helper gets a phrase `#a-helper-gets-a-phrase`
+
+A private helper trusts its exported caller, and its block does too: what it answers, in a phrase. The reach it makes and the
+refusals it can meet belong to the exported method that owns them, and are said there, once.
+
+**Goofus:**
+
+```ts
+/** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_box'. */
+async #unseal(record: BoxRecord): Promise<WhisperHolder>
+```
+
+**Gallant:**
+
+```ts
+/** The whisper of `record` */
+async #unseal(record: BoxRecord): Promise<Whisper>
+```
+
+*Status: Planned, the documentarian run. #498 carries the Goofus minus its last clause.*
 
 ---
 
