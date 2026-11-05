@@ -39,7 +39,7 @@ describe("Box own props", () => {
     held.mw.seedStore(received)
     box.receive(received)
     expect(Object.keys(box)).to.have.members(keys)
-    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
+    await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
     await box.del()
     expect(Object.keys(box)).to.have.members(keys)
@@ -202,13 +202,13 @@ describe("Box snapshot", () => {
     it("put: the record put is the record in hand, so the sidecar and the revision are the put's", async () => {
       const box = await boxOf()
       held.mw.setNow(T0 + 500)
-      await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'edited' } })
+      await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'edited' } })
       expect(box.getSnapshot()).to.deep.include({ sidecar: { note: 'edited' }, revision_seq: 2, written_at: T0 + 500, full: true, present: true })
     })
 
     it("exposed: follows the whisper the box keeps open", async () => {
       const box = await boxOf()
-      await box.put({ whisper: { val: 'sk-ant-fake-for-test' } })
+      await box.put({ whisper: 'sk-ant-fake-for-test' })
       box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
@@ -339,7 +339,7 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
 // == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and put take a duckish
 
 describe("Box and Storable entries: arguments checked before any demand", () => {
-  const whisper = { val: 'sk-test-0000' }
+  const whisper = 'sk-test-0000'
   const BadArgCases = [
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
     [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not take'],
@@ -376,7 +376,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     held.mw.setLockState('locked')
     held.mw.clearCalls()
     expect(box.whisper).to.eq(LOCKED)
-    for (const call of [() => box.put({ whisper: box.whisper as never, sidecar: {} }), () => box.put({ whisper: LOCKED as never, sidecar: {} })]) {
+    for (const call of [() => box.put({ whisper: box.whisper as never, sidecar: {} }), () => box.put({ whisper: LOCKED, sidecar: {} })]) {
       const err = await TH.expectRefusal(call(), 'bad_option')
       expect(err.message).to.include('LOCKED is not a whisper: unseal or expose one first')
       expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
@@ -406,7 +406,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   /** A record handed back as a patch, every field the box controls given and none of it heeded. */
   const roundTripOf = (record: BoxRecord) => ({
     ...record, revision_tok: 'rev-ignored', revision_seq: 99, am: 'x' as never, written_at: T0 + 99, registered_at: T0 + 99,
-    whisper: { val: 'sk-test-1111' }, sidecar: { note: 'round trip' },
+    whisper: 'sk-test-1111', sidecar: { note: 'round trip' },
   } as const)
 
   it("takes { ...record, whisper, sidecar } to put, putting the next revision over the one held", async () => {

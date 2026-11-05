@@ -1,9 +1,9 @@
 /** The checks and types of what's stored and listed: records, options, listings, boxes, vaults and banks, imported as `VX`. */
 
-import { deepFreeze, omit } from 'es-toolkit'
+import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { LOCKED, isListing } from '../helpers/consts'
+import { isListing } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
@@ -15,7 +15,7 @@ import type { DeviceDB } from '../storage/device-db-new'
 import type { Answer, VaultDB } from '../storage/vault-db-new'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
-import { type Sidecar, sidecar, whisper, type Clock, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
+import { type Sidecar, sidecar, type Whisper, whisper, type Clock, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
 import type { ProvingWorld, RequestCleartext, SealedWhisper, StrengthChecker } from './shapes-gateish'
@@ -238,17 +238,10 @@ export type BoxSnapshot = Boxscope & Readonly<{
 
 // --
 
-// == [What a box is handed]: whisperHolder, boxDna, boxPatch, WhisperHolder, BoxHalves, BoxPatchGiven, BoxPatch, BoxPut, BoxDna
+// == [What a box is handed]: boxDna, boxPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxPut, BoxDna
 
-/** SLOPDOC: The check of `{ val }`, the object a box takes and gives its whisper in, handing back a frozen copy. */
-export const whisperHolder = Checker(({ obj, custom }) => custom((val) => val !== LOCKED, Phrases.LockedIsNoWhisper)
-  .pipe(obj({ val: whisper }).strict().overwrite((holder) => deepFreeze(holder)).readonly()), 'bad_option')
-
-/** The object a box takes and gives its whisper in: `{ val }`, frozen, the whisper its `val`. */
-export type WhisperHolder = Z.output<typeof whisperHolder>
-
-/** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
-export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
+/** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
+export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
 
 /** True where a patch names a half of its box. */
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
@@ -258,12 +251,12 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
-    whisper: whisperHolder.default({ val: {} }),
+    whisper: whisper.default({}),
     sidecar: sidecar.default({}),
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisperHolder.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
   return { boxDna, boxPatch }
 })

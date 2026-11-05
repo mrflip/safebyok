@@ -209,7 +209,7 @@ describe("storable.put(patch): seal, then put", () => {
     })
     let resolved = false
     const putting = (async () => {
-      const sent = await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+      const sent = await box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sent' } })
       resolved = true
       return sent
     })()
@@ -274,7 +274,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
 
 describe("storable verbs while the vault is locked", () => {
   const EntryCases = [
-    [(box: TestableBox) => box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'locked' } }), 'put'],
+    [(box: TestableBox) => box.put({ whisper: 'sk-test-0000', sidecar: { note: 'locked' } }), 'put'],
     [(box: TestableBox) => box.del(),                                                          'del'],
   ] as const
   for (const [verb, verbname] of EntryCases) {
@@ -306,7 +306,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
     [(box: TestableBox) => box.tryFetch(),                                                   'tryFetch of a stored record'],
     [(box: TestableBox) => box.tryHydrate(),                                                 'tryHydrate of a timely record'],
-    [(box: TestableBox) => box.tryPut({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage takes'],
+    [(box: TestableBox) => box.tryPut({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), 'tryPut that storage takes'],
     [(box: TestableBox) => box.tryDel(),                                                     'tryDel that storage takes'],
   ] as const
   for (const [tryVerb, blurb] of GoodCases) {
@@ -320,7 +320,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
     [(box: TestableBox) => box.tryFetch(),                                                   (box: TestableBox) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
     [(box: TestableBox) => box.tryFetch(),                                                   () => { held.mw.willGet(() => { throw new Error("socket closed") }) },         "unexpected_error",    'tryFetch whose store throws a plain Error'],
     [(box: TestableBox) => box.tryHydrate(),                                                 () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
-    [(box: TestableBox) => box.tryPut({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
+    [(box: TestableBox) => box.tryPut({ whisper: 'sk-test-0000', sidecar: { note: 'x' } }), (box: TestableBox) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
     [(box: TestableBox) => box.tryDel(),                                                     () => { held.mw.setLockState('locked') },                                      "vault_locked",        'tryDel while locked'],
   ] as const
   for (const [tryVerb, arrange, refusalkind, blurb] of BadCases) {
@@ -392,7 +392,7 @@ describe("storable.receive(rcvd): after a put over a box held gone", () => {
     const gone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' })
     held.mw.seedStore(gone)
     const box = await fakeSealBoxListingOf(held.mw).build(gone)
-    await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} })
+    await box.put({ whisper: 'sk-test-0000', sidecar: {} })
     box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     expect(box.isPresent).to.be.true
   })
@@ -414,7 +414,7 @@ describe("storable refusal sentences, from phrases.ts", () => {
   it("refuses a locked put and a record not full with the sentences phrases.ts holds", async () => {
     const { box } = await timelyBoxOf()
     held.mw.setLockState('locked')
-    const locked = await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
+    const locked = await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: {} }), 'vault_locked')
     expect(locked.message).to.eq(Phrases.VaultLocked)
     held.mw.setLockState('unlocked')
     const sparse = await boxListingOf(held.mw).build(sparseBoxRecord({ boxlabel: 'sparse_one' }))

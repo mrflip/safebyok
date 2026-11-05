@@ -43,8 +43,33 @@ describe("whisper and sidecar refusing by kind", () => {
     })
   }
 
-  it("says LOCKED itself is no whisper", () => {
+  it("hands back a copy, never the object it was given, nor anything inside it", () => {
+    const given = { apiKey: 'sk-ant-fake', deep: { orgId: null } }
+    const parsed = CX.whisper.parse(given) as typeof given
+    expect(parsed).to.deep.equal(given)
+    expect(parsed).to.not.eq(given)
+    expect(parsed.deep).to.not.eq(given.deep)
+    given.apiKey = 'sk-ant-changed'
+    expect(parsed.apiKey).to.eq('sk-ant-fake')
+  })
+
+  it("quotes nothing of what it was handed, a secret or a field's name, in its message, meta, cause or stack", () => {
+    const Marked = [
+      { apiKey: 'SECRET-VAL', when: new Date(0) },
+      ['SECRET-VAL', undefined],
+      { SECRET_KEY: undefined },
+      { SECRET_KEY: new Map() },
+    ]
+    for (const marked of Marked) {
+      const err = TH.expectSyncRefusal(() => CX.whisper.parse(marked), 'bad_option')
+      expect(TH.thrownText(err)).to.not.include('SECRET')
+      expect(JSON.stringify(err.meta)).to.not.include('SECRET')
+    }
+  })
+
+  it("says LOCKED itself is no whisper, and of a copy that a whisper has no symbol key", () => {
     expect(TH.expectSyncRefusal(() => CX.whisper.parse(LOCKED), 'bad_option').message).to.include(Phrases.LockedIsNoWhisper)
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ ...LOCKED }), 'bad_option').message).to.include(Phrases.WhisperShape)
   })
 
   for (const [candidate, expected, blurb] of WhisperCases) {

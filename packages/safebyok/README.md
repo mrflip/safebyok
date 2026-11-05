@@ -34,7 +34,7 @@ run on until they move here; its long README describes that design, not this one
 [VOCABULARY.md](../../VOCABULARY.md) has the only names for these. Its nouns hold, but some calls
 it names are the old design's (`putWayin`, `getWhisper`): for calls, trust the types here.
 
-* **whisper**: the secret, any JSON value. A **box** holds one, encrypted, as `{ val }`, with its
+* **whisper**: the secret, any JSON value but a bare null. A **box** holds one, encrypted, with its
   `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `applabel`, `user_id` and `vaultlabel`. Deleted and made
   anew, it is a new life: a new `vault_tok` and a new `Vault` instance.
@@ -64,8 +64,8 @@ const bank = Bank.make({
 await bank.hello()
 
 const vault = await bank.ensureVault({ vaultlabel: 'main' }) // none yet: asks, build_vault
-const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-...' }, sidecar: { nickname: 'work' } })
-const { val } = await box.extractWhisper() // hands it over, and keeps nothing
+const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: 'sk-...', sidecar: { nickname: 'work' } })
+const whisper = await box.extractWhisper() // hands it over, and keeps nothing
 
 vault.lock()                 // every subscriber is told before this returns
 await vault.ensureUnlocked() // no lease now: asks, unlock_vault

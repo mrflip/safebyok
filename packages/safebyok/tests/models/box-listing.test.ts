@@ -200,7 +200,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     const listing = boxListingOf(held.mw)
     held.mw.setLockState('locked')
     const shell = listing.puttable(held.mw.boxscope(Label))
-    await TH.expectRefusal(shell.put({ whisper: { val: 'sk-test-0000' } }), 'vault_locked')
+    await TH.expectRefusal(shell.put({ whisper: 'sk-test-0000' }), 'vault_locked')
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
@@ -240,7 +240,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
   })
 
   it("says LOCKED is no whisper, naming whisper, for a dna that hands it as the whisper", async () => {
-    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: LOCKED } as never), 'bad_option')
+    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: LOCKED }), 'bad_option')
     expect(err.message).to.include('LOCKED is not a whisper')
     expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
   })

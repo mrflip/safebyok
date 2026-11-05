@@ -127,7 +127,7 @@ describe("A refused erase of the row: the panic", () => {
 })
 
 describe("The discards: sweep and vacate, down the chain", () => {
-  const BoxDna = { boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test' }, sidecar: {} }
+  const BoxDna = { boxlabel: 'anthropic_api_key', whisper: 'sk-test', sidecar: {} }
   const makeVaultWithBox = async () => {
     const born = await makeBornVault()
     const box = await born.vault.boxListing.create({ ...born.vault.scope, ...BoxDna })
@@ -136,7 +136,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
 
   it("seals a box through the vault and opens it, end to end", async () => {
     const { box } = await makeVaultWithBox()
-    expect(await box.extractWhisper()).to.deep.eq({ val: 'sk-test' })
+    expect(await box.extractWhisper()).to.deep.equal('sk-test')
   })
 
   it("sweep leaves the row, drops the lease, disables and unlists all the way down", async () => {
@@ -171,7 +171,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     vault.sweep()
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
     TH.expectSyncRefusal(() => vault.demandUnlocked(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { val: 'sk-test' } }), 'disabled')
+    TH.expectSyncRefusal(() => box.demandPuttable({ whisper: 'sk-test' }), 'disabled')
     TH.expectSyncRefusal(() => box.demandUnsealable(), 'disabled')
     TH.expectSyncRefusal(() => box.demandExposable(), 'disabled')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')
@@ -211,7 +211,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const { box } = await makeVaultWithBox()
     vi.spyOn(Vault.prototype, 'unsealStampedString').mockImplementationOnce(() => {
       box.sweep()
-      return Promise.resolve('{"val":"sk-test"}')
+      return Promise.resolve('"sk-test"')
     })
     await TH.expectRefusal(box.expose(), 'disabled')
     expect(box.whisper).to.be.null

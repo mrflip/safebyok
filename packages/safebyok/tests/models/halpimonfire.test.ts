@@ -22,7 +22,7 @@ describe("a lock() landing during a put", () => {
     held.mw.seedStore(record)
     const box = await listing.build(record)
     lock.during = true
-    await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sealed while locking' } }), 'vault_locked')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -34,7 +34,7 @@ describe("a lock() landing during a put", () => {
       held.mw.setLockState('locked')
       return held.mw.answerOf(box.scope, sent)
     })
-    await expect(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
+    await expect(box.put({ whisper: 'sk-test-0000', sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
     expect(box.sidecar).to.deep.equal({ note: 'sent while locking' })
   })
@@ -63,12 +63,12 @@ describe("A lock that lands during a box verb", () => {
     const tryGetVault = vaultDB.tryGetVault.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetVault').mockImplementationOnce((...args) => { vault.lock(); return tryGetVault(...args) })
     await expect(vault.hello()).resolves.to.eq(vault)
-    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' } }), 'vault_locked')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: 'sk-test-0000' }), 'vault_locked')
   })
 
   it("during getBox's get answers the box, with its whisper refusing 'vault_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
-    await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' } })
+    await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: 'sk-test-0000' })
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
     const box = (await vault.fetchBox('anthropic_api_key'))!

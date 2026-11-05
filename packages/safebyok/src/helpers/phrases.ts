@@ -133,7 +133,7 @@ export const unknownFields = (count: number, fieldnames: readonly string[]): str
 export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
 
 /** A whisper that is no JSON value, or a bare null. */
-export const WhisperShape = "A whisper is a JSON value: a string, number, boolean, array or plain object. A bare null or undefined cannot be stored: to empty a box, delete it (null inside an array or object is fine)"
+export const WhisperShape = "A whisper is a JSON value: a string, number, boolean, array or plain object, with no symbol key anywhere. A bare null or undefined cannot be stored: to empty a box, delete it (null inside an array or object is fine)"
 /** A bag holding `fieldnames` at other values than the bag it is checked against holds them. */
 export const fieldsDisagree = (fieldnames: readonly string[]): string => `This holds another ${fieldnames.join(' and ')} than what it is checked against: a field both hold must agree`
 
@@ -285,7 +285,7 @@ export const AlreadyHeld = "This listing already holds an instance under the dna
 export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
 
 /** Why an update of a box naming neither its whisper nor its sidecar stores nothing. */
-export const BoxPatchAdvice = "Nothing was stored. An update of a box names its whisper, as { val }, its sidecar, or both: the half left out is kept."
+export const BoxPatchAdvice = "Nothing was stored. An update of a box names its whisper, its sidecar, or both: the half left out is kept."
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to store."
 
 /** Why an update of a box whose patch names another's scope stores nothing. */
