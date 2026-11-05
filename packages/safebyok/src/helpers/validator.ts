@@ -115,7 +115,7 @@ export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT
  * @example
  *   export const boxDamaged = Checker(({ obj, oneof, boxlabel, revision_tok }) => (
  *     obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(boxDamageVals) }).strict()
- *   ), 'bad_record', [FX])
+ *   ), 'bad_record', [CX])
  * @example export const callback = Checker(({ fn }) => fn(), 'bad_option')
  */
 export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(
@@ -135,13 +135,13 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
  *     boxlabel,
  *     revision_tok: revision_tok.nullable(),
  *     damage:       oneof(boxDamageVals),
- *   }), 'bad_record', [FX])
+ *   }), 'bad_record', [CX])
  *   boxDamaged.parse({ ...damaged, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
  * @example
  *   export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({
  *     box_key_wrapped,
  *     whisper_ciphered,
- *   }), { refuseAs: 'bad_record', extras: 'strip' }, [FX])
+ *   }), { refuseAs: 'bad_record', extras: 'strip' }, [CX])
  *   boxCiphered.parse(boxRecord)  // its two ciphered fields, the rest dropped
  */
 export const objCheck = <ShapeT extends Z.ZodRawShape, const SourcesT extends readonly object[] = readonly []>(

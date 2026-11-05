@@ -1,14 +1,13 @@
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import type { Sidecar } from '../shapes/fields'
-import type { Boxscope } from '../shapes/scopes'
+import type { Sidecar, Boxscope } from '../shapes/shapes-core'
+import * as VS from '../shapes/shapes-storage'
+import * as VX from '../shapes/shapes-vaultish'
+import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from '../shapes/shapes-vaultish'
 import { stableJsonify } from '../helpers/stable-jsonify'
-import * as VS from '../storage/vault-db-shapes'
 import { absentBoxError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
-import * as VX from '../shapes/vaultish-shapes'
-import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type LockedBag, type TimelyOpts, type WhisperHolder, LOCKED, whisperHolder } from '../shapes/vaultish-shapes'
 import { Storable } from './storable'
 
 // == [Box]

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import * as BX from '../../src/shapes/fields'
-import * as CX from '../../src/shapes/scopes'
+import * as CX from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 
 const WhisperCases = [
@@ -24,17 +23,17 @@ const WhisperCases = [
 
 describe("whisper", () => {
   for (const [candidate, expected, blurb] of WhisperCases) {
-    it(blurb, () => { expect(BX.whisper.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(CX.whisper.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("hands back the value unchanged when it passes", () => {
     const bag = { apiKey: 'fake', scopes: ['read', 'write'] }
-    expect(BX.whisper.parse(bag)).to.deep.equal(bag)
+    expect(CX.whisper.parse(bag)).to.deep.equal(bag)
   })
 
   it("hands back a copy of an object or array, sharing none of the caller's own", () => {
     const bag = { apiKey: 'fake', scopes: ['read', { tier: 2 }] }
-    const checked = BX.whisper.parse(bag) as typeof bag
+    const checked = CX.whisper.parse(bag) as typeof bag
     expect(checked).to.not.eq(bag)
     expect(checked.scopes[1]).to.not.eq(bag.scopes[1])
   })
@@ -81,18 +80,18 @@ const SidecarCases = [
 
 describe("sidecar", () => {
   for (const [candidate, expected, blurb] of SidecarCases) {
-    it(blurb, () => { expect(BX.sidecar.safeParse(candidate).success).to.eq(expected) })
+    it(blurb, () => { expect(CX.sidecar.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("passes the examples its doc block shows", () => {
-    expect(BX.sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
-    expect(BX.sidecar.safeParse({ when: new Date() }).success).to.be.false
-    expect(BX.sidecar.safeParse('work account').success).to.be.false
+    expect(CX.sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
+    expect(CX.sidecar.safeParse({ when: new Date() }).success).to.be.false
+    expect(CX.sidecar.safeParse('work account').success).to.be.false
   })
 
   it("hands back a copy, sharing none of the caller's own objects", () => {
     const sidecar = { note: 'work account', tags: [{ team: 'atlas' }] }
-    const checked = BX.sidecar.parse(sidecar)
+    const checked = CX.sidecar.parse(sidecar)
     expect(checked).to.deep.equal(sidecar)
     expect(checked).to.not.eq(sidecar)
     expect(checked['tags']).to.not.eq(sidecar.tags)

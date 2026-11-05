@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf, thrownNameOf } from '../../src/refusals/errors'
 
-const readmeText = readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../../src/refusals/errors.ts', import.meta.url), 'utf8')
 
 /** The text of errors.ts from `from` up to the next `until`. */

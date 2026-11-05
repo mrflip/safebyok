@@ -3,9 +3,9 @@
 import { isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
-import * as DS from './device-db-shapes'
-import type { VaultScope } from '../shapes/scopes'
-import type { DeviceRecord, LeaseQuery, LeaseRow, LeaseSparse } from './device-db-shapes'
+import type { VaultScope } from '../shapes/shapes-core'
+import * as VS from '../shapes/shapes-storage'
+import type { DeviceRecord, LeaseQuery, LeaseRow, LeaseSparse } from '../shapes/shapes-storage'
 
 export type Awaitable<ValT> = ValT | Promise<ValT>
 
@@ -33,29 +33,29 @@ export abstract class DeviceDB {
 
   /** Caches the lease row for its vault, in place of any before. */
   async cache(row: LeaseRow): Promise<void> {
-    const leaseRow = DS.leaseRow.parse(row)
+    const leaseRow = VS.leaseRow.parse(row)
     await adapted('cache', () => this.doCache(leaseRow))
   }
 
   /** The row cached for this vault under this `vault_tok`, or null: a row of another `vault_tok`, or one failing its check, is no row. */
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
-    const leaseQuery = DS.leaseQuery.parse(asked)
+    const leaseQuery = VS.leaseQuery.parse(asked)
     const stored = await adapted('peek', () => this.doPeek(leaseQuery))
-    const parsed = DS.leaseRow.safeParse(stored)
+    const parsed = VS.leaseRow.safeParse(stored)
     return (parsed.success && parsed.data.vault_tok === leaseQuery.vault_tok) ? parsed.data : null
   }
 
   /** Erases the row cached for this vault under this `vault_tok`; none is a no-op, and a row of another `vault_tok` stays. */
   async vacate(asked: LeaseQuery): Promise<void> {
-    const leaseQuery = DS.leaseQuery.parse(asked)
+    const leaseQuery = VS.leaseQuery.parse(asked)
     await adapted('vacate', () => this.doVacate(leaseQuery))
   }
 
   /** The cached leases, of any vault, proved before `cutoff`, oldest first, as scope, `vault_tok` and `proved_at` only. */
   async leasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
-    const before = DS.cutoff.parse(cutoff)
+    const before = VS.cutoff.parse(cutoff)
     const rows = await adapted('leasesProvedBefore', () => this.doLeasesProvedBefore(before))
-    return rows.flatMap((row) => { const parsed = DS.leaseSparse.safeParse(row); return parsed.success ? [parsed.data] : [] })
+    return rows.flatMap((row) => { const parsed = VS.leaseSparse.safeParse(row); return parsed.success ? [parsed.data] : [] })
   }
 
   tryCache(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.cache(row)) }
@@ -68,10 +68,10 @@ export abstract class DeviceDB {
 
   /** Caches the bank scope's device record unless a good one is there: the first `device_id` cached is the bank's. A damaged record is written over, `rewrote`. */
   async cacheDeviceRecord(record: DeviceRecord): Promise<DeviceCached> {
-    const wanted = DS.deviceRecord.parse(record)
-    const ante = await adapted('cacheDeviceRecord', () => this.doCacheDeviceRecord(wanted, (stored) => DS.deviceRecord.safeParse(stored).success))
+    const wanted = VS.deviceRecord.parse(record)
+    const ante = await adapted('cacheDeviceRecord', () => this.doCacheDeviceRecord(wanted, (stored) => VS.deviceRecord.safeParse(stored).success))
     if (ante === null) { return { act: 'born', record: wanted } }
-    const held = DS.deviceRecord.safeParse(ante)
+    const held = VS.deviceRecord.safeParse(ante)
     return held.success ? { act: 'held', record: held.data } : { act: 'rewrote', record: wanted }
   }
 

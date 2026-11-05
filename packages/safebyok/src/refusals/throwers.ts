@@ -1,7 +1,7 @@
 import { PassphraseKeyBytes } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
 import * as Phrases   from '../helpers/phrases'
-import type * as VS   from '../storage/vault-db-shapes'
+import type * as VS from '../shapes/shapes-storage'
 
 // == [Vault Throwers]: lockedError, listingExpected, unlockFirst, noProofToUnlock
 

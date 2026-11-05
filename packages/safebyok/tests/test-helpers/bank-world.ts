@@ -5,12 +5,12 @@ import { VaultError, type RefusalKind } from '../../src/refusals/errors'
 import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { BankScope, VaultScope } from '../../src/storage/vault-db-shapes'
+import type { BankScope, VaultScope } from '../../src/shapes/shapes-storage'
+import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
+import type { BankOpts } from '../../src/shapes/shapes-vaultish'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { quietLogger } from './logging'
 import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
-import type { RequestCleartext } from '../../src/shapes/gateish-shapes'
-import type { BankOpts } from '../../src/shapes/vaultish-shapes'
 
 export const AutolockMinutes = 60
 

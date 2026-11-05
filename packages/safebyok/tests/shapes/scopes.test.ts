@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import * as CX from '../../src/shapes/scopes'
+import * as CX from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 
 const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }

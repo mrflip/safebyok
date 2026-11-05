@@ -84,9 +84,9 @@ Easy to get wrong:
 ## Not done yet
 
 **A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
-`Box`, `Gating`, `Vault` and their snapshot types, and `safebyok/testing` adds a cheap `testDeriver`
+`Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, and `safebyok/testing` adds a cheap `testDeriver`
 and an `anyStrengthChecker`. Nothing exports a `VaultDB`, a `DeviceDB`, a real key deriver or
-strength checker, or `VaultError`; the only stores are in-memory ones the tests reach in for.
+strength checker; the only stores are in-memory ones the tests reach in for.
 
 ## Next
 

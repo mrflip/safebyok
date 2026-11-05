@@ -3,7 +3,7 @@ import { VaultError } from '../../src/refusals/errors'
 import { makeLeaseKey } from '../../src/helpers/crypto'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { DeviceDB } from '../../src/storage/device-db-new'
-import type { DeviceRecord, LeaseRow } from '../../src/storage/device-db-shapes'
+import type { DeviceRecord, LeaseRow } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 
 const T0 = Date.UTC(2026, 10, 3)

@@ -27,7 +27,7 @@ guarantees until shown otherwise.
 | `packages/safebyok/src/lease.ts` | the leaseKey and the vaultKey wrapped under it; every cipher and decipher of a box; `KeptLease`, the store's edge, which holds a lease record read back closed |
 | `packages/safebyok/src/gating.ts` | the chains that carry a passphrase or an answer from the host's dialog to a proving |
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
-| `packages/safebyok/src/shapes/gateish-shapes.ts`, `fields.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
+| `packages/safebyok/src/shapes/shapes-gateish.ts`, `shapes-core.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 | `packages/safebyok/src/models/proving.ts` | the wayinKey, and the vaultKey unwrapped per call and moved from proving to proving inside `buildWayin(source)`, handed only to `Lease.buildGranted`; the PRF bytes, read to derive the passkeyKey and left for the gating to zero |
 | `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedClears`; `spendClears`, the one place the PRF bytes are zeroed |
 | `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `vacate` |

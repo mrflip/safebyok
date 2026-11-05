@@ -1,11 +1,13 @@
-/** The checks for the fields of the stored records, each named for the field it checks: an encrypted value's halves, the tokens, the ids, the salts and the ciphered fields. */
+/** What every other shape stands on: the stored records' fields, the whisper and sidecar, the scopes, and the shapes of the code a host hands in. Imported as `CX`. */
 
 import type * as Z from 'zod'
-import { record } from 'zod'
+import { never, record } from 'zod'
+import { MaxSaltBytes, PasskeySaltBytes } from '../helpers/consts'
+import { fromB64OrNull } from '../helpers/crypto'
+import type { VaultLogger } from '../helpers/logger'
 import * as Phrases from '../helpers/phrases'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { PasskeySaltBytes } from '../helpers/consts'
-import { fromB64OrNull } from '../helpers/crypto'
+import type { KeyDeriver } from '../deriver/basederiver'
 
 export { epochMillis, type EpochMillis } from './primitives'
 
@@ -125,4 +127,95 @@ export const { whisper, whisperBag } = Checkers('bad_whisper', ({ lazy, union, s
  */
 export const sidecar = Checker(() => whisperBag, 'bad_option')
 export type Sidecar = Z.infer<typeof sidecar>
+// --
+
+// == [Scopes]: bankScope, vaultScope, boxscope, BankScope, VaultScope, Boxscope, vaultBag, bankBag, VaultBag, BankBag
+
+/** A scope as a frozen copy.
+ * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
+ * passes as its scope. Being a copy, no one it is handed to can change it for everyone else.
+ *
+ * @example CX.vaultScope.parse(vault)                                   // { applabel, user_id, vaultlabel }, frozen
+ * @example CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' })          // throws 'bad_scope', "boxlabel: A label is ..."
+ */
+export const { bankScope, vaultScope, boxscope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
+  const bankScope  = obj({ applabel, user_id })
+  const vaultScope = bankScope.extend({ vaultlabel })
+  const boxscope   = vaultScope.extend({ boxlabel })
+
+  return { bankScope: bankScope.readonly(), vaultScope: vaultScope.readonly(), boxscope: boxscope.readonly() }
+})
+
+/** What names a bank: the app's label and the signed-in user's id. */
+export type BankScope = Z.infer<typeof bankScope>
+/** What names one vault: its bank's scope and the vault's own label. */
+export type VaultScope = Z.infer<typeof vaultScope>
+/** What names one box: its vault's scope and its boxlabel. */
+export type Boxscope = Z.infer<typeof boxscope>
+
+/** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
+ * Each takes whatever carries the names, a plain bag, a Vault object, its snapshot or a
+ * BankVault, and leaves the rest. A store in the bag naming the vault refuses: it belongs in the
+ * second bag, the options, and would be dropped unseen here.
+ *
+ * @example vaultBag.parse({ vaultlabel: 'main' })                          // { vaultlabel: 'main' }
+ * @example vaultBag.parse(vault)                                           // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+ * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
+ * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
+ */
+export const { vaultBag, bankBag } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
+  const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
+  const store   = never(Phrases.StoreInVaultBag).optional()
+  return { bankBag, vaultBag: bankBag.extend({ vaultlabel, vaultDB: store, deviceDB: store }) }
+})
+
+/** The bag naming one of a bank's vaults, as {@link vaultBag} checks it: its `vaultlabel`, and the bank's own `applabel` and `user_id` if you like.
+ *
+ * @example bank.ensureVault({ vaultlabel: 'main' })
+ */
+export type VaultBag = Z.input<typeof vaultBag>
+
+/** What of a bank's scope a thing carries, as {@link bankBag} checks it: an `applabel` and a `user_id`, each optional. */
+export type BankBag = Z.input<typeof bankBag>
+// --
+
+// == [Clock]: Clock, wallClock
+
+/** A source of the time, `Bank.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
+ * `Bank.make` reads it once, and refuses 'bad_option' for a reading outside `FarPast` to
+ * `FarFuture`, or a throw. The vault takes every later reading as it comes.
+ */
+export type Clock = { now(): number }
+
+/** The wall clock: the default `Clock`. */
+export const wallClock: Clock = { now: () => Date.now() }
+// --
+
+// == [Libraries]: clockShape, keyDeriverShape
+
+/** The checks of the stores and libraries Bank.make takes, each by the verbs the vault calls on it and, for a keyDeriver, the fields it reads, each refusing 'bad_option'.
+ * Bank.make keeps what it was handed, prototype and all.
+ */
+export const { clockShape, keyDeriverShape } = Checkers('bad_option', ({ obj, fn, str, int }) => {
+  return {
+    clockShape:      obj({ now: fn<Clock['now']>() }),
+    keyDeriverShape: obj({
+      algorithm:         str.optional(),
+      key_deriver_label,
+      salt_bytes:        int.gte(1).lte(MaxSaltBytes),
+      deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
+      load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
+    }, Phrases.KeyDeriverShape),
+  }
+})
+// --
+
+// == [Host code and adapters' options]: loggerShape, localVaultDBOpts, callback
+
+/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: Bank.make keeps and calls the host's own logger, `this` and all. */
+export const loggerShape = Checker(({ obj, fn }) => {
+  const loggerCall = fn<VaultLogger['log']>()
+  return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
+}, 'bad_option')
+
 // --

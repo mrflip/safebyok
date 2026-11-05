@@ -9,7 +9,7 @@ import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
-import type { BoxWorld } from '../../src/shapes/vaultish-shapes'
+import type { BoxWorld } from '../../src/shapes/shapes-vaultish'
 
 const held = useModelsWorld()
 useVaultWorlds()

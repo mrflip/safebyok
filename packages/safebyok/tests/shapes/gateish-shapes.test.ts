@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import * as GX from '../../src/shapes/gateish-shapes'
-import type { PasskeyAnswer } from '../../src/shapes/gateish-shapes'
+import * as GX from '../../src/shapes/shapes-gateish'
+import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
 describe("wayinkind", () => {

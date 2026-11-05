@@ -1,4 +1,4 @@
-import type { Capacity } from '../storage/vault-db-shapes'
+import type { Capacity } from '../shapes/shapes-storage'
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind's meaning sits beside it, and its family in {@link RefusalFamilyForKind}. The families

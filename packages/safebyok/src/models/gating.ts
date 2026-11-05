@@ -2,11 +2,13 @@ import { makeLifeTok } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
-import type { VaultScope } from '../shapes/scopes'
-import * as GX from '../shapes/gateish-shapes'
-import * as VX from '../shapes/vaultish-shapes'
-import type { AnyGating, ClearsForGatingkind, GatingKind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/gateish-shapes'
-import type { VaultRecord, VaultWorld } from '../shapes/vaultish-shapes'
+import * as EX from '../shapes/shapes-enums'
+import type { GatingKind } from '../shapes/shapes-enums'
+import type { VaultScope } from '../shapes/shapes-core'
+import * as GX from '../shapes/shapes-gateish'
+import type { AnyGating, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
+import * as VX from '../shapes/shapes-vaultish'
+import type { VaultRecord, VaultWorld } from '../shapes/shapes-vaultish'
 import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import type { Gate } from './gate'
 import { PasskeyProving, PassphraseProving, Proving } from './proving'
@@ -201,7 +203,7 @@ const checkedClears = <ClearsT>(checker: { parse: (clears: unknown) => ClearsT }
   }
 }
 
-const isCorrectable = (err: VaultError): boolean => (GX.correctableKindVals as readonly string[]).includes(err.refusalkind)
+const isCorrectable = (err: VaultError): boolean => (EX.correctableKindVals as readonly string[]).includes(err.refusalkind)
 
 /** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not and of any realm, a bare ArrayBuffer too, as WebAuthn hands one: an answer is single-use (G2). */
 const spendClears = (clears: unknown): void => {

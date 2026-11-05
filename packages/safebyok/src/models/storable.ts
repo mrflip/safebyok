@@ -4,8 +4,9 @@ import { oneAtATime } from '../helpers/one-at-a-time'
 import { reportToPlatform } from '../refusals/report-error'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
-import * as VX from '../shapes/vaultish-shapes'
-import type { Age, Am, Fetched, FetchOpts, ListingOf, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from '../shapes/vaultish-shapes'
+import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
+import * as VX from '../shapes/shapes-vaultish'
+import type { Fetched, FetchOpts, ListingOf, Reconciled, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from '../shapes/shapes-vaultish'
 
 // == [Revisions]: cmpRevisions
 

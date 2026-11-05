@@ -1,11 +1,11 @@
-/** SLOPDOC: The one place each stored thing's shape is drawn: records, verbs' params and checkers, imported as `VS`. */
+/** What the vaultDB and the deviceDB store and take, and their helpers. Imported as `VS`. */
 
 import type * as Z from 'zod'
-import { Checkers, objCheck } from '../helpers/validator'
+import { Checker, Checkers, objCheck } from '../helpers/validator'
 import { randomId } from '../helpers/crypto'
-import * as FX from '../shapes/fields'
-import { sidecar } from '../shapes/fields'
-import * as HX from '../shapes/host-code'
+import * as EX from './shapes-enums'
+import * as CX from './shapes-core'
+import { sidecar } from './shapes-core'
 
 // == [Sentinels and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
 
@@ -21,15 +21,10 @@ export const BoxFormat = 5001
 export const VaultFormat = 6001
 /** The revision of a void row, and of a birth's prior. */
 export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
+
 // --
 
-// == [Checkers]: amVals, ifAbsentVals, putIfAbsentVals, ifPresentVals, damagekindVals, Damagekind, DamagedVault, DamagedBox, am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope, vaultRecord, boxRecord and their tombstones, sparse forms and rows, the gate verbs' params, the verbs' opts, reqParams, the peeks
-
-export const amVals = ['a', 'd', 'x'] as const
-export const ifAbsentVals = ['fail', 'nil'] as const
-export const putIfAbsentVals = ['add', 'fail'] as const
-export const ifPresentVals = ['repl', 'fail', 'get'] as const
-export const damagekindVals = ['format_mismatch', 'damaged_record'] as const
+// == [Checkers]: am, revision, times, vaulted, sparseBase, the scopes, the wayins, gate, the vault's and box's forms, the verbs' params and options
 
 export const {
   am, revision, times, vaulted, sparseBase, bankScope, vaultScope, boxscope, boxQuery, watchScope,
@@ -43,7 +38,7 @@ export const {
     /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. */
     revision_seq: int,
   })
-  const am = oneof(amVals)
+  const am = oneof(EX.amVals)
   const times = obj({
     /** When this life of the thing began: the `written_at` of its birth, kept by every later revision of that life. */
     registered_at: epochMillis,
@@ -95,9 +90,9 @@ export const {
   const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayin, passphrase_wayin: unk.optional() }).strict() }).strict()
   const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null), passphrase_wayin: unk.optional() }).strict() }).strict()
 
-  const ifAbsentOpts = obj({ ifAbsent: oneof(ifAbsentVals).default('fail') })
-  const putIfAbsent = oneof(putIfAbsentVals).default('add')
-  const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(ifPresentVals).default('repl') })
+  const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
+  const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
+  const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
   const putVaultOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(['fail', 'get']).default('fail') })
   const delOpts = obj({ prior: revision })
 
@@ -112,9 +107,9 @@ export const {
     replacePassphraseParams, passkeyAddParams, revokePasskeyParams,
     ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, rowPeek, fmtPeek,
   }
-}, [FX])
+}, [CX])
 
-export const vaultDBOpts = objCheck(({ num }) => ({ clock: HX.clockShape.optional(), maxRecordBytes: num.positive().optional() }), 'bad_option')
+export const vaultDBOpts = objCheck(({ num }) => ({ clock: CX.clockShape.optional(), maxRecordBytes: num.positive().optional() }), 'bad_option')
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape, maxBoxes: uint.optional() }), 'bad_option')
 
 export type Times          = Readonly<Z.infer<typeof times>>
@@ -136,12 +131,8 @@ export type BoxRow         = BoxRecord | BoxTombstone
 export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseParams>>
 export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
-export type IfPresent = typeof ifPresentVals[number]
-export type PutIfAbsent = typeof putIfAbsentVals[number]
-/** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_record`, anything else. */
-export type Damagekind = typeof damagekindVals[number]
-export type DamagedVault = VaultSparse & Readonly<{ damagekind: Damagekind }>
-export type DamagedBox   = BoxSparse & Readonly<{ damagekind: Damagekind }>
+export type DamagedVault = VaultSparse & Readonly<{ damagekind: EX.Damagekind }>
+export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
@@ -234,7 +225,7 @@ export const isNewerFormat = (raw: unknown, ownFormat: number): boolean => {
   return peek.success && (peek.data.fmt > ownFormat)
 }
 
-const damagekindOf = (raw: unknown, ownFormat: number): Damagekind => (isNewerFormat(raw, ownFormat) ? 'format_mismatch' : 'damaged_record')
+const damagekindOf = (raw: unknown, ownFormat: number): EX.Damagekind => (isNewerFormat(raw, ownFormat) ? 'format_mismatch' : 'damaged_record')
 
 /** A vault row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
 export const damagedVaultOf = (scope: VaultScope, raw: unknown): DamagedVault => ({ ...sentinelVaultOf(scope), ...peekOf(raw), am: 'd', damagekind: damagekindOf(raw, VaultFormat) })
@@ -260,4 +251,22 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
   if ((! parsed.success) || (parsed.data.am === 'x')) { return null }
   return { ...boxSparse.parse(parsed.data), ...nextRevisionOf(parsed.data, written_at), am: 'x' }
 }
+// --
+
+// == [The deviceDB]: leaseQuery, leaseSparse, leaseRow, deviceRecord, cutoff, LeaseQuery, LeaseSparse, LeaseRow, DeviceRecord
+
+export const leaseQuery = Checker(({ obj, applabel, user_id, vaultlabel, vault_tok }) => obj({ applabel, user_id, vaultlabel, vault_tok }), 'bad_scope', [CX])
+
+/** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
+export const { leaseSparse, leaseRow, deviceRecord } = Checkers('bad_record', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok, device_id }) => {
+  const leaseSparse = obj({ applabel, user_id, vaultlabel, vault_tok, proved_at: epochMillis })
+  return { leaseSparse, leaseRow: leaseSparse.loose(), deviceRecord: obj({ applabel, user_id, device_id }).strict() }
+}, [CX])
+
+export const cutoff = Checker(({ epochMillis }) => epochMillis, 'bad_option')
+
+export type LeaseQuery   = Z.infer<typeof leaseQuery>
+export type LeaseSparse  = Z.infer<typeof leaseSparse>
+export type LeaseRow     = Z.infer<typeof leaseRow>
+export type DeviceRecord = Z.infer<typeof deviceRecord>
 // --
