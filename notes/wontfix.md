@@ -107,3 +107,7 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-05 (the Coach's brief for `box.putExposed`: "a race gets a row"): **a `box.unexpose()` crossing a `box.putExposed()`.** `putExposed` takes
   the value exposed when it is called, before its hydrate, so an `unexpose` that lands inside the put's awaits changes nothing about what is sealed:
   the value taken at the call is stored, and the instance holds none.
+* 2026-11-05 (the Coach's brief for `box.field`: "a race gets a row"): **a `box.expose()` crossing the last unbind.** An `expose` in flight when the
+  last field unbinds lands after the `unexpose`, so the whisper stays exposed with no field to tie it to, until the host unexposes or the box is swept,
+  vacated or deleted. Also: **a `box.saveFields()` crossing an edit:** it reads the fields when called, so what is typed during the put's awaits is not
+  in that put, and stays in the element for the next.

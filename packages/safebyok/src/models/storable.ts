@@ -232,7 +232,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Settling]: settle, becomeNotifiable, remakeSnapshot, replaceSnapshot
+  // == [Settling]: settle, becomeNotifiable, remakeSnapshot, replaceSnapshot, tellListeners
 
   /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
   settle(): Settled {
@@ -255,6 +255,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const nextSnapshot = this.makeSnapshot()
     if (isEqual(nextSnapshot, this.#snapshot)) { return }
     this.#snapshot = nextSnapshot
+    this.tellListeners()
+  }
+
+  /** Tell every listener, for a subclass whose change a snapshot's fields cannot show. */
+  protected tellListeners(): void {
     this.#listeners.forEach((listener) => {
       try {
         listener()

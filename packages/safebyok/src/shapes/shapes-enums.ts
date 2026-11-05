@@ -29,9 +29,13 @@ export const centralPolicyVals = ['older', 'same', 'fill', 'adopt', 'gone'] as c
 export type CentralPolicy = typeof centralPolicyVals[number]
 // --
 
-// == [Policies]: ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
+// == [Policies]: whenLockedVals, WhenLocked, ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
 
 /** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` takes it up. */
+/** What a `box.field` writes while its whisper will not show. */
+export const whenLockedVals = ['blank', 'mask'] as const
+export type WhenLocked = typeof whenLockedVals[number]
+
 export const ifPresentVals = ['repl', 'fail', 'get'] as const
 export type IfPresent = typeof ifPresentVals[number]
 
