@@ -1,6 +1,6 @@
 /** A vault's putBox on real seals: a box's birth, a put over a void instance or a live box, a sidecar-only put, and extractWhisper. */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
@@ -321,6 +321,18 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
+  it("stores what a kept reference holds at a put after a lock and an unlock: nothing blanked it", async () => {
+    const { vault, box } = await makeWorldWithBox()
+    await box.put({ whisper: { apiKey: 'sk-test-0000' } })
+    await box.expose()
+    const kept = box.whisper as { apiKey: string }
+    vault.lock()
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    kept.apiKey = 'sk-test-edited'
+    await box.put({ whisper: kept })
+    expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-edited' })
+  })
+
   it("is what putBox of a sidecar alone does to a box held", async () => {
     const { vault } = await makeWorldWithBox()
     const box = await vault.putBox({ boxlabel, sidecar: { note: 'home' } })
@@ -345,12 +357,14 @@ describe("a sidecar-only put", () => {
 })
 
 describe("extractWhisper", () => {
-  it("hands back the frozen holder, keeping nothing on the instance", async () => {
+  it("hands back a plain object of the caller's, keeping nothing on the instance", async () => {
     const { box } = await makeWorldWithBox()
-    const whisper = await box.extractWhisper()
-    expect(Object.isFrozen(whisper)).to.be.true
+    await box.put({ whisper: { apiKey: 'sk-test-0000', deep: { orgId: null } } })
+    const whisper = await box.extractWhisper() as { deep: unknown }
+    expect(Object.isFrozen(whisper)).to.be.false
+    expect(Object.isFrozen(whisper.deep)).to.be.false
     expect(box.whisper).to.be.null
-    expect(await box.tryExtractWhisper()).to.deep.include({ ok: true, val: Whisper })
+    expect(await box.tryExtractWhisper()).to.deep.include({ ok: true, val: { apiKey: 'sk-test-0000', deep: { orgId: null } } })
   })
 
   it("refuses 'vault_locked' once locked", async () => {
@@ -359,3 +373,60 @@ describe("extractWhisper", () => {
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
 })
+
+// == [The README's recipe]: expose, subscribe, lock, unlock, put
+
+/** The README's component, without React: what it paints from the two snapshots and box.whisper. */
+const paintOf = ({ vault, box }: Pick<Awaited<ReturnType<typeof makeWorldWithBox>>, 'vault' | 'box'>) => () => {
+  if (vault.getSnapshot().lockState === 'locked') { return 'unlock button' }
+  if (! box.getSnapshot().exposed) { return 'show button' }
+  return box.whisper
+}
+
+describe("the README's recipe for showing a whisper", () => {
+  it("paints the button, then the form; a lock tells the vault's subscribers alone, and an unlock paints the same object again", async () => {
+    const { vault, box } = await makeWorldWithBox()
+    const paint = paintOf({ vault, box })
+    const toldBox = vi.fn()
+    const toldVault = vi.fn()
+    box.subscribe(toldBox)
+    vault.subscribe(toldVault)
+    await box.put({ whisper: { apiKey: 'sk-test-0000' } })
+    expect(paint()).to.eq('show button')
+    toldBox.mockClear()
+
+    await box.expose()
+    expect(toldBox).toHaveBeenCalledTimes(1)
+    const form = paint()
+    expect(form).to.deep.equal({ apiKey: 'sk-test-0000' })
+
+    toldBox.mockClear()
+    vault.lock()
+    expect(toldVault).toHaveBeenCalled()
+    expect(toldBox).not.toHaveBeenCalled()
+    expect(paint()).to.eq('unlock button')
+    expect(box.whisper).to.eq(LOCKED)
+    expect(box.getSnapshot().exposed).to.be.true
+
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    expect(paint()).to.eq(form)
+
+    await box.put({ whisper: { apiKey: 'sk-test-saved' } })
+    expect(paint()).to.eq(form)
+    expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-saved' })
+  })
+
+  it("edits in place and stores a copy, as a script does", async () => {
+    const { box } = await makeWorldWithBox()
+    await box.put({ whisper: { apiKey: 'sk-test-0000' } })
+    await box.expose()
+    const exposed = box.whisper as { apiKey: string, org?: string }
+    exposed.org = 'acme'
+    await box.put({ whisper: exposed })
+    expect(box.whisper).to.eq(exposed)
+    expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0000', org: 'acme' })
+    exposed.org = 'not put'
+    expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0000', org: 'acme' })
+  })
+})
+// --
