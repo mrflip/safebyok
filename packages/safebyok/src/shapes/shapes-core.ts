@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import { never, record } from 'zod'
-import { MaxSaltBytes, PasskeySaltBytes } from '../helpers/consts'
+import { LOCKED, MaxSaltBytes, PasskeySaltBytes } from '../helpers/consts'
 import { fromB64OrNull } from '../helpers/crypto'
 import type { VaultLogger } from '../helpers/logger'
 import * as Phrases from '../helpers/phrases'
@@ -84,9 +84,10 @@ export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [
  */
 export type Whisper = Exclude<WhisperJson, null>
 
-/** True for a plain object, built by a literal or `Object.create(null)`: never a Date or Map, which JSON would flatten. */
+/** True for a plain object, built by a literal or `Object.create(null)`: never a Date or Map, which JSON would flatten, nor one with a symbol key, such as LOCKED, which it would drop. */
 export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
   if (typeof val !== 'object' || val === null) { return false }
+  if (Object.getOwnPropertySymbols(val).length > 0) { return false }
   const proto: unknown = Object.getPrototypeOf(val)
   return proto === Object.prototype || proto === null
 }
@@ -110,7 +111,8 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
   // A judged object is the caller's own, so each check hands back a copy, as a parse of an object does:
   // a box freezes its record through, and must never freeze, or share, the caller's sidecar.
   const whisperBag = plainBag.overwrite((bag) => structuredClone(bag))
-  const whisper: Z.ZodType<Whisper> = union([str, num, bool, whisperArr, plainBag], Phrases.WhisperShape).overwrite((whisper) => structuredClone(whisper))
+  const whisper: Z.ZodType<Whisper> = custom((val) => val !== LOCKED, Phrases.LockedIsNoWhisper)
+    .pipe(union([str, num, bool, whisperArr, plainBag], Phrases.WhisperShape).overwrite((whisper) => structuredClone(whisper)))
   return { whisper, whisperBag }
 })
 
