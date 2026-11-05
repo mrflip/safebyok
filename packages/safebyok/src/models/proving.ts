@@ -212,7 +212,10 @@ const isSharedMemory = (view: ArrayBufferView): boolean => Object.prototype.toSt
 const isSafelyAllZero = (bytes: Uint8Array): boolean => {
   let   seen = 0
   const len  = bytes.length
-  for (let ii = 0; ii < len; ii++) { seen |= bytes[ii] ?? 0 }
+  for (let ii = 0; ii < len; ii++) {
+    // @ts-expect-error -- ii stays below len; noUncheckedIndexedAccess cannot see that, and a default would read as a branch
+    seen |= bytes[ii]
+  }
   return seen === 0
 }
 
