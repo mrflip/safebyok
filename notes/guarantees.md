@@ -282,7 +282,7 @@ lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests
 *no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
-logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In `src/models/` the gating's `checkedClears` does the same for a getter or proxy of
+logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In `src/models/` `invokeStrengthChecker` (`helpers/passphrase-strength.ts`) does the same for a `strengthChecker`, and the gating's `checkedClears` does the same for a getter or proxy of
 the host's that throws as an attempt's clears are read: `clearsThrew`, `unexpected_error`, with no cause, and a `requestCleartext`
 that throws is `requestCleartextThrew`, `unexpected_error`; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`). A WebCrypto
 failure is caught and replaced, its error never kept: `wrongProof`, `damaged_lease` and

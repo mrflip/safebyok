@@ -205,7 +205,7 @@ export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
   load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
 }, Phrases.KeyDeriverShape), 'bad_option')
 
-/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: Bank.make keeps and calls the host's own logger, `this` and all. */
+/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: `parseLogger` guards the host's own logger, and calls it `this` and all. */
 export const loggerShape = Checker(({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)

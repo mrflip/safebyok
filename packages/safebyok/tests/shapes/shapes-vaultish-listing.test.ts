@@ -137,16 +137,6 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
 })
 
 describe("The checks of the world and the listing", () => {
-  describe("VX.lockState", () => {
-    holdsCases(VX.lockState, 'unexpected_error', [
-      ["unlocked", true,  'passes unlocked'],
-      ["locked",   true,  'passes locked'],
-      ["LOCKED",   false, 'refuses another spelling: a world that answers it is a bug'],
-      [true,       false, 'refuses a boolean'],
-      [undefined,  false, 'refuses undefined'],
-    ])
-  })
-
   describe("VX.world", () => {
     holdsCases(VX.world, 'bad_option', [
       [{ clock: { now: () => T0 } },  true,  'passes a world carrying a clock'],

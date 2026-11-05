@@ -1,13 +1,12 @@
 /** The deviceDB: what the slim models cache on this device, a lease for each vault and one device record for the bank, and every invariant of the verbs. A subclass writes only the generic `do*` calls, each one atomic step. */
 
+import type { Awaitable } from '../helpers/helpers'
 import { isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { DeviceRecord, LeaseQuery, LeaseRow, LeaseSparse } from '../shapes/shapes-storage'
-
-export type Awaitable<ValT> = ValT | Promise<ValT>
 
 /** `born` for the first record of a bank scope, `held` for one already cached, which stands, and `rewrote` for a damaged one written over: bad news for the bank. `record` is what the device now holds. */
 export type DeviceCached = { act: 'born' | 'held' | 'rewrote', record: DeviceRecord }
