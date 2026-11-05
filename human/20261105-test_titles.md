@@ -8,15 +8,15 @@ a wrapped test). `pnpm justify` is green. No PR yet, per the brief.
 
 Titles changed (234; a title can carry two faults, counted under its main one):
 
-* `#no-as-trailer` 101: 80 of them became a `// member @example [N]` comment above the test (above
-  the case row's end, for a blurb in a bulk list); the rest dropped a reason ("as a model freezes
+* `#no-as-trailer` 101: 82 `@example` pointers (some on tests whose title was fixed for another fault) became a `// member @example [N]` comment above the test (at
+  the row's end, for a blurb in a bulk list); the rest dropped a reason ("as a model freezes
   itself") or became the predicate.
 * `#kind-is-the-assertion` 93: nearly all `'bad_option'`, `'bad_scope'` or `'bad_record'` on a misuse.
 * `#no-citations` 18: `(Contract: Shapes)`, `(G2)`, `(G4)`, `(G8)`, `(the Coach, 2026-10-31)`.
 * `#so-clause-is-the-behaviour` 7, `#name-the-referent` 6, `#invariant-not-trace` 3,
   `#outcome-not-action` 3, `#conditions-move-up` 2.
 
-By folder: helpers 54, refusals 28, shapes 38, storage 4, models 110, loosened 0.
+By folder: helpers 55, refusals 28, shapes 37, storage 4, models 110, loosened 0.
 
 Gallant's own rewrites applied verbatim: ensureTimely/box.put/listing.create/puttable/settle/
 revokePasskey/unsubscribe/hydrate/vault.hello/friend/isCondition/errors.ts family lists/reportError.
