@@ -25,7 +25,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly listing: BoxListing
 
-  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until the host sets it null. */
+  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until {@link veil}. */
   #exposed: WhisperHolder | null = null
   // --
 
@@ -45,25 +45,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_schema_version(): 1 | null                             { return this.full?.whisper_schema_version ?? null }
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
 
-  /** SLOPDOC: The whisper exposed on this instance, LOCKED while the vault is; set it to expose or forget one. */
+  /** SLOPDOC: The whisper exposed on this instance, LOCKED while the vault is. */
   get whisper(): WhisperHolder | LockedBag | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
   }
-
-  set whisper(whisper: WhisperHolder | LockedBag | null) {
-    if ((whisper === null) || Storable.isLockedFUBag(whisper)) {
-      this.#exposed = null
-    } else {
-      const exposed = whisperHolder.parse(whisper)
-      this.demandExposable()
-      this.#exposed = exposed
-    }
-    this.settle()
-  }
   // --
 
-  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unseal
+  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, veil, unseal
 
   /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
@@ -78,6 +67,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const exposed = await this.extractWhisper(opts)
     this.demandExposable()
     this.#exposed = exposed
+    this.settle()
+    return this
+  }
+
+  /** Overwrite the whisper held on this instance, locked or not. */
+  veil(): this {
+    this.#exposed = null
     this.settle()
     return this
   }
