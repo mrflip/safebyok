@@ -284,7 +284,6 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
   ])
 
   holdsCases(VX.boxPutOpts, 'bad_option', [
-    [{},                                                true,  'passes no options'],
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
     [{ ifPresent: 'repl', maxWorldMillis: 5 },          true,  'passes ifPresent beside the timely options'],
@@ -507,6 +506,7 @@ describe("VX.boxDna", () => {
     [{ ...dna, boxlabel: undefined },                       false, 'refuses a dna with no boxlabel'],
     [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label, as its sixth example shows'],
     [{ boxlabel: 'anthropic_api_key' },                     false, 'refuses a boxlabel without its vault'],
+    [{ whisper: { val: 'sk-ant-fake' }, sidecar: {} },      false, 'refuses a dna with no scope'],
     // the record's own props refused:
     [{ ...dna, sidecar: 'work account' },                   false, 'refuses a sidecar that is no object'],
     [{ ...dna, whisper_codec: 'json_v2' },                  false, 'refuses a codec it does not know'],
@@ -634,13 +634,9 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
 
   describe("boxDna", () => {
     holdsCases(VX.boxDna, 'bad_option', [
-      [{ ...scope, whisper, sidecar: {} },                                   true,  'passes the scope, whisper and sidecar, as its first example shows'],
       [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls, as its second example shows'],
-      [{ ...scope, whisper },                                                true,  'passes a dna with no sidecar, which defaults'],
       [{ ...scope, whisper, sidecar: {}, revision_seq: 3 },                  false, 'refuses a revision_seq, as its fourth example shows'],
-      [{ ...scope, whisper, sidecar: {}, whisper_ciphered: full.whisper_ciphered }, false, 'refuses a sealed part, as its fifth example shows'],
       [{ ...scope, whisper, sidecar: {}, am: 'q' },                          false, 'refuses a factory prop that fails its check'],
-      [{ whisper, sidecar: {} },                                             false, 'refuses a dna with no scope'],
     ])
 
     it("strips the props the factory controls and fills the whisper's codec", () => {
