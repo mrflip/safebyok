@@ -42,14 +42,14 @@ describe("MemoryVaultDB", () => {
       for (const damaged of val.damaged_records) { expect(SX.vaultSparse.safeParse(damaged).success).to.be.true }
     })
 
-    it("says format_mismatch of a row of a later fmt, and damaged_record of any other it sets aside", async () => {
+    it("says format_mismatch of a row of a later fmt, and damaged_row of any other it sets aside", async () => {
       const { vaultDB } = await storeWith()
       vaultDB._cheat_vaultRowsOf(bankScope).set('newer', { fmt: SX.VaultFormat + 1, revision_seq: 9 })
       vaultDB._cheat_vaultRowsOf(bankScope).set('rubble', 'not even an object')
       const { val } = await vaultDB.getBank(bankScope)
       expect(val.damaged_records.map(({ vaultlabel, damagekind }) => ({ vaultlabel, damagekind }))).to.deep.equal([
         { vaultlabel: 'newer',  damagekind: 'format_mismatch' },
-        { vaultlabel: 'rubble', damagekind: 'damaged_record' },
+        { vaultlabel: 'rubble', damagekind: 'damaged_row' },
       ])
     })
 

@@ -9,8 +9,8 @@ export type Am = typeof amVals[number]
 /** The `am` a tombstone carries: damaged or gone, never alive. */
 export const tombstoneAmVals = ['d', 'x'] as const
 
-/** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_record`, anything else that failed its check. */
-export const damagekindVals = ['format_mismatch', 'damaged_record'] as const
+/** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_row`, anything else that failed its check. */
+export const damagekindVals = ['format_mismatch', 'damaged_row'] as const
 export type Damagekind = typeof damagekindVals[number]
 // --
 
