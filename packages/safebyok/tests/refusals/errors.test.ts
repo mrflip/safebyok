@@ -23,7 +23,7 @@ describe("refusalKindVals", () => {
     expect(new Set(refusalKindVals).size).to.eq(refusalKindVals.length)
   })
 
-  it("puts the same kinds in each family as the doc block in errors.ts does", () => {
+  it("matches the family lists in the errors.ts doc block", () => {
     expect(namedKinds(sourceBetween('* **Misuse**', '* **Condition**'))).to.have.members(familyKinds('misuse'))
     expect(namedKinds(sourceBetween('* **Condition**', '* **Bad news**'))).to.have.members(familyKinds('condition'))
     expect(namedKinds(sourceBetween('* **Bad news**', '\n *\n'))).to.have.members(familyKinds('bad_news'))
@@ -40,7 +40,7 @@ describe("VaultError", () => {
     expect(isVaultError(new Error('vault_full'))).to.be.false
   })
 
-  it("carries refusalkind, family, message and cause, and its family read from the one table (Contract: Shapes)", () => {
+  it("carries refusalkind, family, message and cause, and its family read from the one table", () => {
     const cause = new Error('socket closed')
     const err = new VaultError('storage_unavailable', 'Try again shortly.', { cause })
     expect(err).to.include({ refusalkind: 'storage_unavailable', family: 'condition', message: 'Try again shortly.', cause })
@@ -49,7 +49,7 @@ describe("VaultError", () => {
     }
   })
 
-  it("keeps each fact a refusal learned under its own name in meta, and has no meta when it learned none (Contract: Shapes)", () => {
+  it("keeps each fact a refusal learned under its own name in meta, and has no meta when it learned none", () => {
     const capacity = { boxes: { used: 3, max: 3 }, bytes: { used: 900, max: 1000 } }
     const full = new VaultError('vault_full', 'This vault is full.', { meta: { capacity } })
     expect(full.meta).to.deep.equal({ capacity })
@@ -67,7 +67,8 @@ describe("VaultError", () => {
     expect(Object.keys(err)).to.have.members(['name', 'refusalkind', 'family', 'meta'])
   })
 
-  it("lets a caller branch on family, as its second example shows", () => {
+  // VaultError @example 2
+  it("lets a caller branch on family", () => {
     const err = new VaultError('bad_record', 'Not one this package builds.')
     expect(err.family).to.eq('misuse')
   })
@@ -177,7 +178,7 @@ describe("isCondition", () => {
     it(`is ${String(expected)} for ${blurb}`, () => { expect(isCondition(thrown)).to.eq(expected) })
   }
 
-  it("narrows to a VaultError, so the caller can read its kind and message", () => {
+  it("narrows to a VaultError", () => {
     const err: unknown = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
     if (! isCondition(err)) { throw new Error('expected a condition') }
     expect(err.refusalkind).to.eq('storage_unavailable')
@@ -197,7 +198,8 @@ describe("isCondition", () => {
 })
 
 describe("isVaultError", () => {
-  it("tells a refusal of the kind asked, as its example shows", () => {
+  // isVaultError @example
+  it("tells a refusal of the kind asked", () => {
     const prompted: string[] = []
     const handle = (err: unknown) => { if (isVaultError(err, 'vault_locked')) { prompted.push('passphrase') } }
     handle(new VaultError('vault_locked', 'Unlock the vault first.'))
@@ -205,7 +207,7 @@ describe("isVaultError", () => {
     expect(prompted).to.deep.equal(['passphrase'])
   })
 
-  it("is false for a VaultError of another copy of safebyok, as an ESM and a CJS build loaded side by side make: it is a foreign throw", async () => {
+  it("is false for a VaultError of another copy of safebyok", async () => {
     vi.resetModules()
     const Other = await import('../../src/refusals/errors')
     expect(Other.VaultError).to.not.eq(VaultError)
@@ -235,7 +237,8 @@ describe("isVaultError", () => {
 })
 
 describe("listedKindOf", () => {
-  it("is the kind of a VaultError on the list, and null for any other throw, as its examples show", () => {
+  // listedKindOf @example
+  it("is the kind of a VaultError on the list, and null for any other throw", () => {
     expect(listedKindOf(new VaultError('storage_unavailable', 'The word list would not load.'))).to.eq('storage_unavailable')
     expect(listedKindOf(new Error('no luck with hunter2'))).to.be.null
   })
@@ -247,13 +250,15 @@ describe("listedKindOf", () => {
 })
 
 describe("thrownNameOf", () => {
-  it("is the name an Error, a DOMException or a bare object carries, as its first example shows", () => {
+  // thrownNameOf @example 1
+  it("is the name an Error, a DOMException or a bare object carries", () => {
     expect(thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))).to.eq('QuotaExceededError')
     expect(thrownNameOf(new TypeError('hunter2 is not a function'))).to.eq('TypeError')
     expect(thrownNameOf({ name: 'SecurityError', message: 'from another frame' })).to.eq('SecurityError')
   })
 
-  it("is null for anything without a string name, as its second example shows", () => {
+  // thrownNameOf @example 2
+  it("is null for anything without a string name", () => {
     expect(thrownNameOf('a bare string')).to.be.null
     expect(thrownNameOf(null)).to.be.null
     expect(thrownNameOf(undefined)).to.be.null

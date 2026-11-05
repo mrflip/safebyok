@@ -41,7 +41,8 @@ describe("HostErrorSanitizer.refusalFor", () => {
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
-  it("stands in for a key deriver's throw quoting the passphrase, as its first example shows", async () => {
+  // HostErrorSanitizer.refusalFor @example 1
+  it("stands in for a key deriver's throw quoting the passphrase", async () => {
     const keyDeriver = { deriveKeyBytes: (passphrase: string) => Promise.reject(new TypeError(`cannot derive ${passphrase}`)) }
     const deriveOrRefuse = async (passphrase: string) => {
       let handed: unknown
@@ -55,7 +56,8 @@ describe("HostErrorSanitizer.refusalFor", () => {
     expect(TH.thrownText(refusal)).to.not.include('pw-the-passphrase')
   })
 
-  it("stands in for a storage client's failure, as its second example shows", async () => {
+  // HostErrorSanitizer.refusalFor @example 2
+  it("stands in for a storage client's failure", async () => {
     const client = { mutation: () => Promise.reject(quotingError()) }
     const putBox = async () => {
       try {
