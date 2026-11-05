@@ -34,7 +34,7 @@ describe("BoxListing", () => {
       ['a vaultDB without its verbs', () => ({ vaultDB: { watch: () => null } })],
       ['no horizon',                  () => ({ maxMillisSinceRefresh: undefined })],
       ['a negative horizon',          () => ({ maxMillisSinceRefresh: -1 })],
-      ['an onBadNews not a function', () => ({ onBadNews: 'tell me' })],
+      ['a world that cannot tell bad news', () => ({ world: { ...held.mw.world, tellBadNews: 'tell me' } })],
     ]
     for (const [blurb, patch] of bads) {
       it(`refuses ${blurb} as 'bad_option'`, () => {

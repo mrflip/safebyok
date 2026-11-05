@@ -8,7 +8,7 @@ import { Proving } from '../../src/models/proving'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
-import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds, hearingBadNews } from '../test-helpers/vault-world'
 import type { BoxWorld } from '../../src/shapes/shapes-vaultish'
 
 const held = useModelsWorld()
@@ -183,7 +183,7 @@ describe("A gate change after its record is stored", () => {
   it("a refused tryCache during replacePassphrasePrompt resolves, unlocked, and tells onBadNews", async () => {
     const onBadNews = vi.fn()
     const { opts, deviceDB, demandStored } = await makeBornVault()
-    const vault = await new VaultListing({ ...opts, onBadNews }).build(demandStored())
+    const vault = await new VaultListing(hearingBadNews(opts, onBadNews)).build(demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
     const refusal = new VaultError('storage_blocked', "the disk is full")
     deviceDB.tryCache.mockResolvedValueOnce(TH.bad(refusal))

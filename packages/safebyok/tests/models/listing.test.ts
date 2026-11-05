@@ -7,7 +7,7 @@ import { boxDnaOf, boxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWor
 
 const held = useModelsWorld()
 
-// == [Helpers of the pipeline tests]: scopeOf, dnaOf, seededListing, bust, rejectingHandler
+// == [Helpers of the pipeline tests]: scopeOf, dnaOf, seededListing
 
 const scopeOf = (boxlabel = 'anthropic_api_key') => held.mw.boxscope(boxlabel)
 const dnaOf = (boxlabel = 'anthropic_api_key') => boxDnaOf(scopeOf(boxlabel))
@@ -25,10 +25,6 @@ const seededListing = async () => {
   held.mw.clearCalls()
   return listing
 }
-
-/** Handlers that fail: `bust` throws, and `rejectingHandler` answers a promise that rejects. */
-const bust = (): never => { throw new Error("The handler is broken.") }
-const rejectingHandler = (): Promise<never> => Promise.reject(new Error("Rejected."))
 // --
 
 describe("listing.ensureTimelyWorld(maxMillis)", () => {
@@ -120,20 +116,12 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.badnews).to.deep.equal([])
     })
 
-    it("tells a refusal met on the way to onBadNews, rather than throwing it", async () => {
+    it("tells a refusal met on the way to its world, rather than throwing it", async () => {
       const listing = boxListingOf(held.mw)
       await listing.hello()
       await listing.build(fullBoxRecord())
       await held.mw.notify(fullBoxRecord({ revision_tok: 'rev-other' }))
       expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['record_conflict'])
-    })
-
-    it("tells a refusal met on the way, with no onBadNews given, to nobody and still resolves", async () => {
-      const listing = boxListingOf(held.mw, { onBadNews: undefined })
-      await listing.hello()
-      await listing.build(fullBoxRecord())
-      await held.mw.notify(fullBoxRecord({ revision_tok: 'rev-other' }))
-      expect(held.mw.badnews).to.deep.equal([])
     })
   })
 
@@ -211,37 +199,3 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
   })
 })
-
-// == [Bad news told]: a handler that throws, a refusal told once
-
-describe("listing: a host's onBadNews that fails", () => {
-  it("reports a handler that throws to the platform and goes on, the rest of the news told", () => {
-    const reported: unknown[] = []
-    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
-    try {
-      const told: string[] = []
-      const listing = boxListingOf(held.mw, { onBadNews: (news) => { told.push(news.refusalkind); bust() } })
-      listing.tellBadNews([new VaultError('storage_unavailable', "Down."), new VaultError('absent_box', "Gone.")])
-      expect(told).to.deep.equal(['storage_unavailable', 'absent_box'])
-      expect(reported).to.have.lengthOf(2)
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
-
-  it("reports a handler whose promise rejects to the platform, with no unhandled rejection", async () => {
-    const reported: unknown[] = []
-    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
-    try {
-      const listing = boxListingOf(held.mw, { onBadNews: rejectingHandler })
-      listing.tellBadNews([new VaultError('storage_unavailable', "Down.")])
-      await vi.advanceTimersByTimeAsync(0)
-      expect(reported).to.have.lengthOf(1)
-      expect(reported[0]).to.have.property('message', "Rejected.")
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
-})
-
-// --

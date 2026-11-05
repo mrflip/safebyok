@@ -11,7 +11,7 @@ import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping, hearingBadNews } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -67,7 +67,7 @@ describe("a tombstone over a live vault", () => {
     const onBadNews = vi.fn()
     const { opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onPanic })
     await buildTyping(born, Dna, byPassphrase(Passphrase))
-    const listing = new VaultListing({ ...opts, onBadNews })
+    const listing = new VaultListing(hearingBadNews(opts, onBadNews))
     const vault = await listing.build(demandStored())
     const refusal = new VaultError('storage_blocked', 'the disk is full')
     deviceDB.tryVacate.mockResolvedValueOnce(TH.bad(refusal))
@@ -87,7 +87,7 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
     const { opts, demandStored, listing: born } = makeVaultWorld()
     const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
     await bornVault.boxListing.create(BoxDna)
-    const listing = new VaultListing({ ...opts, onBadNews })
+    const listing = new VaultListing(hearingBadNews(opts, onBadNews))
     const vault = await listing.build(demandStored())
     const boxes = vault.boxListing
     await boxes.hello()

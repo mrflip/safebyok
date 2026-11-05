@@ -146,20 +146,20 @@ export const world = objCheck(() => ({ clock: CX.clockShape }), { refuseAs: 'bad
 /** The world a listing lives in: the vault for boxes, the bank for vaults. The one clock lives here. */
 export type World = Z.infer<typeof world>
 
-/** The world as a listing needs it beyond the clock: its lock, its own timeliness, and the taking of the world an answer carries. */
+/** The world as a listing needs it beyond the clock: its lock, its own timeliness, the taking of the world an answer carries, and where bad news goes. */
 export type ListingWorld = World & {
   lockState(): EX.LockState
   ensureTimely(maxMillis?: number): Promise<unknown>
   takeWorld(world: unknown): void
+  /** Told bad news nobody asked about. A bank hears it, by way of a vault for its boxes. */
+  tellBadNews(badnews: readonly VaultError[]): void
 }
 
-/** The options a listing is made with: its world and vaultDB, the refresh horizon of each thing it makes, and where to tell bad news. */
+/** The options a listing is made with: its world and vaultDB, and the refresh horizon of each thing it makes. */
 export type ListingOpts = {
   world:                 ListingWorld
   vaultDB:               VaultDB
   maxMillisSinceRefresh: number
-  /** Told bad news nobody asked about; its answer, a promise too, is heard out and never awaited. */
-  onBadNews?:            ((news: VaultError) => unknown) | undefined
 }
 
 /** The check of a vaultDB as a model is handed one: the verbs the listings call. Checks only. */
@@ -167,10 +167,9 @@ export const vaultDBDuck = Checker(({ obj, fn }) => obj({ tryGetVault: fn(), try
 
 /** The check of a listing's constructor arguments, as far as the base can tell. Checks only. */
 export const listingOpts = objCheck(({ obj, fn }) => ({
-  world:                 obj({ clock: CX.clockShape, lockState: fn(), ensureTimely: fn(), takeWorld: fn() }),
+  world:                 obj({ clock: CX.clockShape, lockState: fn(), ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }),
   vaultDB:               vaultDBDuck,
   maxMillisSinceRefresh: horizonMillis,
-  onBadNews:             fn().optional(),
 }), 'bad_option')
 
 /** The check of what `listing.put` is told: the revision `prior` it goes over, and how it meets a row absent or live. */

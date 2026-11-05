@@ -18,7 +18,7 @@ import type { Storable } from './storable'
 
 /** SLOPDOC: The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone. */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>> {
-  // == [Props]: world, maxMillisSinceRefresh, vaultDB, IsListing, #things, #listeners, #onBadNews, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
+  // == [Props]: world, maxMillisSinceRefresh, vaultDB, IsListing, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
@@ -30,7 +30,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()
-  readonly #onBadNews: ((news: VaultError) => unknown) | null
   #snapshot: readonly SnapshotT[] = Object.freeze([])
   #unwatch:  (() => void) | null = null
   /** Set by a sweep or a vacate, and never cleared. */
@@ -65,7 +64,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.world = opts.world
     this.vaultDB = opts.vaultDB
     this.maxMillisSinceRefresh = opts.maxMillisSinceRefresh
-    this.#onBadNews = opts.onBadNews ?? null
   }
 
   /** The instance of `record`, built or brought up to it, and held. Stores nothing. */
@@ -206,7 +204,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
         this.#demandRecordOfScope(stored, this.scopeOf(answer.req_params))
         return this.buildOrReceive(stored)
       })
-      if (! delivered.ok) { this.tellBadNews([delivered.err]) }
+      if (! delivered.ok) { this.world.tellBadNews([delivered.err]) }
     }
     this.tellIfRevoked(answer.err)
     throw answer.err
@@ -225,7 +223,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.demandEnabled()
     const held = this.at(scope)
     if (held === null) { return null }
-    this.tellBadNews(held.receive(null).badnews)
+    this.world.tellBadNews(held.receive(null).badnews)
     this.#remakeSnapshot()
     return held
   }
@@ -239,7 +237,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const fate = (held === null) ? 'replace' : this.fateOver(held, record)
     if ((held !== null) && (fate === 'lose')) { return held }
     const thing = ((fate === 'replace') ? null : held) ?? this.#makeThingOf(sparse)
-    this.tellBadNews(thing.receive(record).badnews)
+    this.world.tellBadNews(thing.receive(record).badnews)
     if (thing !== held) {
       this.#hold(thing)
       held?.vacate()
@@ -267,7 +265,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
         this.world.takeWorld(world)
         return this.#isEnabled ? this.buildOrReceive(val) : null
       })
-      if (! ok) { this.tellBadNews([err]) }
+      if (! ok) { this.world.tellBadNews([err]) }
     })()
   }
   // --
@@ -290,27 +288,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Bad news]: tellBadNews, tellIfRevoked
-
-  /** SLOPDOC: Tells bad news no caller waits on to the host's `onBadNews`, whose failures reach only the platform. */
-  tellBadNews(badnews: readonly VaultError[]): void {
-    const onBadNews = this.#onBadNews
-    if (onBadNews === null) { return }
-    for (const news of badnews) {
-      // Any answer is heard out, a thenable among them: none is awaited.
-      void (async () => {
-        try {
-          await onBadNews(news)
-        } catch (err) {
-          reportToPlatform(err)
-        }
-      })()
-    }
-  }
+  // == [Bad news]: tellIfRevoked
 
   /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is news to the bank as well, heard before the caller hears it. */
   protected tellIfRevoked(refusal: VaultError): void {
-    if (isVaultError(refusal, 'identity_revoked')) { this.tellBadNews([refusal]) }
+    if (isVaultError(refusal, 'identity_revoked')) { this.world.tellBadNews([refusal]) }
   }
   // --
 

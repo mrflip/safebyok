@@ -2,7 +2,6 @@
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultListing } from '../../src/models/vault-listing'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { Sidecar, Whisper, boxlabel, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, delTyping, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
@@ -121,9 +120,9 @@ describe("the box verbs refuse a vault locked, or gone", () => {
 
 describe("a box verb the vaultDB refuses over its vault's row", () => {
   it("'vault_gone' delivers no box, as its dbhas is the vault's: the tombstone reaches the vault as its world, and no bad news is told", async () => {
-    const { vault, restoreRow, demandStored, tryGetBox } = await makeWorldWithBox()
+    const { vault, restoreRow, demandStored, tryGetBox, opts: { world } } = await makeWorldWithBox()
     restoreRow({ ...omit(demandStored(), ['gate']), am: 'x', revision_seq: 5, revision_tok: 'rev-gone-5' })
-    const tellBadNews = vi.spyOn(VaultListing.prototype, 'tellBadNews')
+    const tellBadNews = vi.spyOn(world, 'tellBadNews')
     tryGetBox.mockClear()
     await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_gone')
     expect(tryGetBox).toHaveBeenCalledOnce()
@@ -132,9 +131,9 @@ describe("a box verb the vaultDB refuses over its vault's row", () => {
   })
 
   it("'vault_mismatch' delivers no box, as its dbhas is the vault's, and no bad news is told", async () => {
-    const { vault, restoreRow, tryGetBox } = await makeWorldWithBox()
+    const { vault, restoreRow, tryGetBox, opts: { world } } = await makeWorldWithBox()
     restoreRow({ ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' })
-    const tellBadNews = vi.spyOn(VaultListing.prototype, 'tellBadNews')
+    const tellBadNews = vi.spyOn(world, 'tellBadNews')
     tryGetBox.mockClear()
     await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_mismatch')
     expect(tryGetBox).toHaveBeenCalledOnce()

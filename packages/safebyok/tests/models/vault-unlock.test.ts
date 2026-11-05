@@ -8,7 +8,7 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { DefaultLeaseMillis } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping } from '../test-helpers/vault-world'
+import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping, hearingBadNews } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -186,7 +186,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     const onBadNews = vi.fn()
     const { opts, deviceDB, demandStored } = await makeBornVault()
     const record = demandStored()
-    const listing = new VaultListing({ ...opts, onBadNews })
+    const listing = new VaultListing(hearingBadNews(opts, onBadNews))
     const vault = await listing.build(record)
     deviceDB.tryCache.mockResolvedValueOnce(TH.bad(new VaultError('storage_blocked', 'the disk is full')))
     vault.lock()
@@ -289,7 +289,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const { opts, demandStored, deviceDB } = await makeBornVault()
     const cached = deviceDB.cachedNow() as Record<string, unknown>
     deviceDB.layCached({ ...cached, lease_key: 'no key at all' })
-    const listing = new VaultListing({ ...opts, onBadNews })
+    const listing = new VaultListing(hearingBadNews(opts, onBadNews))
     const again = await listing.build(demandStored())
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
     expect(onBadNews.mock.calls[0]?.[0]).to.deep.include({ refusalkind: 'damaged_lease' })

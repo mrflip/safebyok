@@ -264,7 +264,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       tryPeekLease:    () => deviceDB.tryPeek(asked),
       tryCacheLease:   (record) => deviceDB.tryCache(record),
       tryUncacheLease: () => deviceDB.tryVacate(asked),
-      tellBadNews:     (badnews) => { this.listing.tellBadNews(badnews) },
+      tellBadNews:     (badnews) => { this.world.tellBadNews(badnews) },
     }
   }
 
@@ -272,7 +272,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
   // --
 
-  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld
+  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld, tellBadNews
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
@@ -291,6 +291,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const row = VX.vaultRow.parse(world)
     if (row.vault_tok === this.vault_tok) { this.receive(row) }
   }
+
+  /** Tell bad news of this vault's boxes where its own goes. */
+  tellBadNews(badnews: readonly VaultError[]): void { this.world.tellBadNews(badnews) }
   // --
 
   // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form
@@ -407,7 +410,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)
     if (this.isPresent) { return }
-    void this.#vacateLease((refusal) => { this.listing.tellBadNews([refusal]) })
+    void this.#vacateLease((refusal) => { this.world.tellBadNews([refusal]) })
     this.#boxListing?.vacate()
   }
 

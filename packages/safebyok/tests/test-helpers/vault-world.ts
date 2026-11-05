@@ -116,6 +116,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     lockState:    () => 'unlocked',
     ensureTimely: () => Promise.resolve(),
     takeWorld:    nothing,
+    tellBadNews:  nothing,
     scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
     logger:       quietLogger,
     keyDeriver:   testDeriver,
@@ -158,6 +159,12 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   }
 }
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
+
+/** `opts` of a listing whose bad news `onBadNews` hears, each news by itself, as a bank's host does. */
+export const hearingBadNews = (opts: VaultListingOpts, onBadNews: (news: unknown) => unknown): VaultListingOpts => ({
+  ...opts,
+  world: { ...opts.world, tellBadNews: (badnews) => { for (const news of badnews) { onBadNews(news) } } },
+})
 
 /** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB holds it. */
 export const storedVaultRecord = async (passphrase: string = Passphrase): Promise<VaultRecord> => {
@@ -211,6 +218,7 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   lockState:    () => vault.lockState(),
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
+  tellBadNews:  (badnews) => { vault.tellBadNews(badnews) },
   demandUnlocked:   () => vault.demandUnlocked(),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
   unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
