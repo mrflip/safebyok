@@ -6,7 +6,7 @@ import * as EX from '../shapes/shapes-enums'
 import type { GatingKind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
-import type { AnyGating, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
+import type { AnteProvings, AnyGating, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultWorld } from '../shapes/shapes-vaultish'
@@ -254,7 +254,7 @@ const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate
   return { ante: vault.fullRecord, gate: vault.gate }
 }
 
-const provePassphrase = async (vault: Vault, { passphraseClear }: { passphraseClear: GX.PassphraseCleartext }, world: VaultWorld): Promise<{ ante: VaultRecord, proved: PassphraseProving }> => {
+const provePassphrase = async (vault: Vault, { passphraseClear }: { passphraseClear: GX.PassphraseCleartext }, world: VaultWorld): Promise<AnteProvings> => {
   const { ante, gate } = await timelyAnte(vault)
   return { ante, proved: await PassphraseProving.buildStored(gate, passphraseClear, world) }
 }

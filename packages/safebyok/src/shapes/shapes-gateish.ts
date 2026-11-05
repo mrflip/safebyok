@@ -317,7 +317,7 @@ export type ClearsForGatingkind = {
 }
 // --
 
-// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
+// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, VaultBuildProvings, VaultUnlockProvings, AnteProvings, PassphraseReplaceProvings, PasskeyAddProvings, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
 
 /** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
 export type RequestCleartext = (gating: AnyGating) => unknown
@@ -326,14 +326,29 @@ export type AnyGating = { [KindT in EX.GatingKind]: Gating<KindT> }[EX.GatingKin
 
 export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: EX.GatingKind }>
 
-/** What an attempt makes of the clears it is handed, for its run. */
+/** What a build_vault attempt proves: the provings of a new vault's wayins, with no record to prove them against. */
+export type VaultBuildProvings = { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
+
+/** What an unlock_vault attempt proves: either wayin will do. */
+export type VaultUnlockProvings = { proved: Proving }
+
+/** The record an attempt read and the passphrase proved against it: all a revoke_passkey or a del_vault needs, and a commit's `ante`. */
+export type AnteProvings = { ante: VaultRecord, proved: PassphraseProving }
+
+/** What a replace_passphrase attempt proves: the ante passphrase against the record it read, and the next, unproved. */
+export type PassphraseReplaceProvings = { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
+
+/** What an add_passkey attempt proves: the passphrase, and the passkey to wrap the vaultKey for. */
+export type PasskeyAddProvings = AnteProvings & { passkeyProving: PasskeyProving }
+
+/** The provings by kind of gating, for what must look one up by its kind: `Run` and `Prove`. */
 export type ProvingsForGatingkind = {
-  build_vault:        { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
-  unlock_vault:       { proved: Proving }
-  replace_passphrase: { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
-  add_passkey:        { ante: VaultRecord, proved: PassphraseProving, passkeyProving: PasskeyProving }
-  revoke_passkey:     { ante: VaultRecord, proved: PassphraseProving }
-  del_vault:          { ante: VaultRecord, proved: PassphraseProving }
+  build_vault:        VaultBuildProvings
+  unlock_vault:       VaultUnlockProvings
+  replace_passphrase: PassphraseReplaceProvings
+  add_passkey:        PasskeyAddProvings
+  revoke_passkey:     AnteProvings
+  del_vault:          AnteProvings
 }
 
 /** The change a gating is launched for, past the enter key. It hears provings, never a clear. */
