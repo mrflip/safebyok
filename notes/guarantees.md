@@ -110,7 +110,7 @@ Eight values are secret. Everything else safebyok stores or shows is either publ
 | vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
 | boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
 | leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record` and `KeptLease.#record`, through the `DeviceDB`, and at rest in the device store | the lease | `Lease`, `KeptLease`, `Proving.grantLease`; the `DeviceDB` stores it opaque |
-| whisper | the host's JSON value, then its UTF-8 bytes (in `models/`: its JSON text, which crosses from box to lease, and only the lease makes bytes) | the host's value in and out; bytes as locals, zeroed; the text a string, which cannot be (G6); in `models/`, the value on the instance after `expose` (*Open items*, 2) | one seal or open, but for that exposed value | `Box.seal`, `box.extractWhisper`, `Lease`; in `models/`, `Box` and `Lease` |
+| whisper | the host's JSON object, then its UTF-8 bytes (in `models/`: its JSON text, which crosses from box to lease, and only the lease makes bytes) | the host's value in and out; bytes as locals, zeroed; the text a string, which cannot be (G6); in `models/`, the value on the instance from `expose` until `unexpose`, a sweep, a vacate or a delete, a lock and a veil keeping it (*Open items*, 2) | one seal or open, but for that exposed value | `Box.seal`, `box.extractWhisper`, `Lease`; in `models/`, `Box` and `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
 `device_id`, `key_deriver_label`, every label and `user_id` (a scope name; a host that counts its
@@ -367,8 +367,10 @@ Each is a Coach's call; none breaks a guarantee above.
    as a test of the Vault object's surface asserts no `Lease` is reachable from it without a method call.
 2. **The exposed whisper** (`src/models/box.ts`, `Box.expose` and `box.whisper`) is a whisper
    kept on the instance, a new form of a secret, which G7 says this note names first: the models' `Box` holds
-   it, a plain object the host may edit, after `expose` until the host calls `box.veil()`, and keeps it while the vault locks,
-   answering `LOCKED` in its place until it unlocks. It is the host's decision, which a host would
+   it, a plain object the host may edit, after `expose` until the host calls `box.unexpose()` or the box is swept, deleted or vacated.
+   A lock and `box.veil()` keep it, answering a frozen bag marked `Whispered` in its place (`'locked'`, `'veiled'`), so neither takes it out of
+   memory: to make it go away is `unexpose`, and a bag or a copy of one refuses at a put, so it can never replace the secret. Forging the mark
+   only refuses a put. It is the host's decision, which a host would
    otherwise make for itself without the guard. "whisper is unsafe by design and its
    implementation may change as we tune its unsafeness" (the Coach, 2026-10-31). The core's `Box`
    of G6 holds no whisper; the models are not yet exported.
