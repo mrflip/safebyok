@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import * as Refusals from '../../src/refusals/throwers'
+import * as Phrases from '../../src/helpers/phrases'
 
 describe("Refusals.storageUnavailable", () => {
   it("refuses as storage_unavailable, saying to try again, the backend's error as its cause", () => {
@@ -8,7 +9,7 @@ describe("Refusals.storageUnavailable", () => {
     const refusal = Refusals.storageUnavailable(outage)
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.refusalkind).to.eq('storage_unavailable')
-    expect(refusal.message).to.eq(Refusals.StorageTroubleMessage)
+    expect(refusal.message).to.eq(Phrases.StorageUnavailable)
     expect(refusal.cause).to.eq(outage)
   })
 
