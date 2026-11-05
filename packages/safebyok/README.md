@@ -77,24 +77,86 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* To show a whisper, `box.expose()` holds it on `box.whisper`, a plain object of the box's to edit,
-  until `box.unexpose()`. `box.veil()` and `box.unveil()` hide it and show it again. While it will
-  not show, `box.whisper` answers a frozen bag, whose `Whispered` symbol says why: `'encrypted'`
-  (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a put of one refuses. A lock
-  keeps the whisper, so the unlock brings the same object back. The lock is the vault's, shown on
-  its snapshot and not the box's; `box.subscribe` hears of a lock too, as `box.whisper` changes:
-
-  ```tsx
-  const { lockState } = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
-  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
-  if (lockState === 'locked') { return <button onClick={() => vault.ensureUnlocked()}>Unlock</button> }
-  if (! exposed) { return <button onClick={() => box.expose()}>Show</button> }
-  return <WhisperForm initial={box.whisper} onSave={(next) => box.put({ whisper: next })} />
-  ```
-
-  A script edits it in place, and `box.putExposed()` stores it:
-  `await box.expose(); box.whisper.org = 'acme'; await box.putExposed()`.
 * `bank.vacate()` is sign-out: it erases this device's leases and leaves the vaultDB alone.
+
+## Showing a whisper
+
+`box.expose()` holds a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
+`box.whisper` shows it. While it will not show, `box.whisper` answers a frozen bag, whose `Whispered`
+symbol says why: `'encrypted'` (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a
+put of one refuses. `box.veil()` and `box.unveil()` hide it and show it again; a lock hides it, and
+an unlock shows it again. `box.subscribe` hears of all of this.
+
+**A script.** Fetch the passphrase in `requestCleartext`, with a token the container already holds:
+
+```ts
+const bank = Bank.make({
+  /* ... */
+  requestCleartext: async (gating) => {
+    await gating.attempt({ passphraseClear: await doppler.get('VAULT_PASSPHRASE') })
+  },
+})
+await bank.hello()
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
+await vault.hello()
+const box = await vault.getBox('stripe')
+
+await box.expose()
+await stripe.charge({ ...box.whisper, amount: 100 })
+box.whisper.org = 'acme'
+await box.putExposed()
+
+vault.lock()                 // box.whisper.apiKey is undefined
+await vault.ensureUnlocked() // and it is back, edit included
+```
+
+Read it through `box.whisper` each time: a reference you kept outlives a lock.
+
+**A raw field.** The whisper reaches no prop or state of yours, so it is only in the DOM (and on the
+screen), where React's dev tools do not list it:
+
+```tsx
+function ApiKeyField({ box }) {
+  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
+  return (
+    <>
+      <input ref={box.field('apiKey')} type="password" autoComplete="off" spellCheck={false} />
+      {exposed
+        ? <button onClick={() => box.saveFields()}>Save</button>
+        : <button onClick={() => box.expose()}>Show</button>}
+    </>
+  )
+}
+```
+
+The field goes blank at a lock or a veil, or shows a mask of fixed length under
+`box.field('apiKey', { whenLocked: 'mask' })`, and an edit comes back with the value. Nothing is
+stored until `box.saveFields()`. When the last field unmounts the box unexposes, so the whisper lasts
+no longer than its field: expose after it mounts. Without React, `box.field('apiKey')(el)` binds any
+element with a `value`, and answers how to unbind it.
+
+**React that looks like React.** The hook needs no library code:
+
+```tsx
+function ApiKeyForm({ box }) {
+  const whisper = useSyncExternalStore(box.subscribe, () => box.whisperMasked)
+  return (
+    <>
+      <input
+        type="password" value={whisper.apiKey ?? ''} readOnly={Box.isFUBag(whisper)}
+        onChange={(evt) => box.patchWhisper({ apiKey: evt.target.value })}
+      />
+      <button onClick={() => box.putExposed()}>Save</button>
+    </>
+  )
+}
+```
+
+`box.whisperMasked` is the value when it shows. While locked or veiled it has the same shape, each
+leaf `WhisperMask`, and a put refuses it. To show nothing there instead, read `() => box.whisper`.
+Never replace the prop or edit it in place here: `box.patchWhisper` makes the new object, and tells
+the hook. It merges deeply, and an array replaces. Make the input read-only while it shows a mask,
+as above: `patchWhisper` works behind a veil, and would take the mask for an edit.
 
 ## Not done yet
 
