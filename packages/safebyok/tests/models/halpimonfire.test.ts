@@ -180,7 +180,7 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("a refused tryCache during replacePassphrase resolves, unlocked, and tells onBadNews", async () => {
+  it("a refused tryCache during replacePassphrasePrompt resolves, unlocked, and tells onBadNews", async () => {
     const onBadNews = vi.fn()
     const { opts, deviceDB, demandStored } = await makeBornVault()
     const vault = await new VaultListing({ ...opts, onBadNews }).build(demandStored())

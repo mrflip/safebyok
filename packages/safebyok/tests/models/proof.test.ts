@@ -180,7 +180,7 @@ describe("the proof", () => {
 
     // Delete: the user proves it, the list empties, and the vault says it is gone.
     dialog.typing = byPassphrase(Passphrase)
-    await vault.delVault()
+    await vault.delVaultPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['del_vault'])
     bankUi.expectRenders(['ready: main locked', 'ready: no vaults'])
     vaultUi.expectRenders(['main locked', 'main deleted'])
@@ -230,7 +230,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
 
     dialog.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
-    await vault.replacePassphrase()
+    await vault.replacePassphrasePrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['replace_passphrase'])
     bankUi.expectRenders(['ready: main unlocked'])
     expect(vault.isUnlocked).to.be.true
@@ -249,7 +249,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
 
     dialog.typing = { ...byPassphrase(Passphrase), ...await byPasskey('laptop') }
-    await vault.addPasskey()
+    await vault.addPasskeyPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['add_passkey'])
     bankUi.expectRenders(['ready: main unlocked'])
     expect(vault.gate.toJSON().passkey_wayin).not.to.be.null
@@ -262,7 +262,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
 
     dialog.typing = byPassphrase(Passphrase)
-    await vault.revokePasskey()
+    await vault.revokePasskeyPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['revoke_passkey'])
     expect(vault.gate.toJSON().passkey_wayin).to.be.null
     bankUi.expectRenders(['ready: main unlocked'])
@@ -414,7 +414,7 @@ describe("the proof", () => {
 
     // It replaces the passphrase: this device stays unlocked and holds the new gate; a later unlock takes the new passphrase.
     phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
-    await phoneVault.replacePassphrase()
+    await phoneVault.replacePassphrasePrompt()
     await ticks(1)
     bankUi.expectRenders(['ready: main unlocked'])
     expect(vault.isUnlocked).to.be.true
@@ -429,7 +429,7 @@ describe("the proof", () => {
 
     // It deletes the vault: this device locks, erases its lease, and the vault leaves the list.
     phone.typing = byPassphrase(NewPassphrase)
-    await phoneVault.delVault()
+    await phoneVault.delVaultPrompt()
     await ticks(1)
     bankUi.expectRenders(['ready: no vaults'])
     expect(vault.isUnlocked).to.be.false

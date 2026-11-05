@@ -67,7 +67,7 @@ describe("A lease renewed through a gate change", () => {
       vault.lock()
       await attempting
     }
-    await vault.replacePassphrase()
+    await vault.replacePassphrasePrompt()
     world.requestCleartext = asBefore
     await expectLockWon(born, epoch0)
   })

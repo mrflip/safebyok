@@ -97,16 +97,16 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, delVault, del, each with its try form, landGate
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, del, each with its try form, landGate
 
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
-  async replacePassphrase(): Promise<this> {
+  async replacePassphrasePrompt(): Promise<this> {
     await this.ensureTimely(); this.demandEnabled()
     await Gating.launch('replace_passphrase', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runReplacePassphrase(provings) })
     return this
   }
 
-  tryReplacePassphrase(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase()) }
+  tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
 
   async #runReplacePassphrase({ ante, anteProving, nextProving }: ProvingsForGatingkind['replace_passphrase']): Promise<this> {
     const nextWayin = await nextProving.buildWayin(anteProving)
@@ -114,14 +114,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** Add a passkey through an add_passkey gating. */
-  async addPasskey(): Promise<this> {
+  async addPasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandEnabled()
     this.gate.demandPasskeyAddable()
     await Gating.launch('add_passkey', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runAddPasskey(provings) })
     return this
   }
 
-  tryAddPasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey()) }
+  tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
   async #runAddPasskey({ ante, proved, passkeyProving }: ProvingsForGatingkind['add_passkey']): Promise<this> {
     const passkeyWayin = await passkeyProving.buildWayin(proved)
@@ -129,23 +129,23 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
-  async revokePasskey(): Promise<this> {
+  async revokePasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandEnabled()
     if (this.gate.pkWayin === null) { return this }
     await Gating.launch('revoke_passkey', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante, proved }) => this.#landGate(proved, () => this.listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })) })
     return this
   }
 
-  tryRevokePasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey()) }
+  tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
 
   /** SLOPDOC: Deletes this vault through a gating, leaving a tombstone in its slot and nothing of it on this device. */
-  async delVault(): Promise<this> {
+  async delVaultPrompt(): Promise<this> {
     await this.ensureTimely(); this.demandEnabled()
     await Gating.launch('del_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante }) => this.#runDelVault(ante) })
     return this
   }
 
-  tryDelVault(): Promise<Outcome<this>> { return outcomeOf(() => this.delVault()) }
+  tryDelVaultPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delVaultPrompt()) }
 
   // The lock first: no box opens under a lease while the tombstone goes out.
   /** Lock this vault and store its tombstone; the answer delivered vacates its boxes. */
@@ -155,8 +155,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  /** Delete this vault by {@link delVault}, which takes the passphrase's proof. */
-  override del(): Promise<this> { return this.delVault() }
+  /** Delete this vault by {@link delVaultPrompt}, which takes the passphrase's proof. */
+  override del(): Promise<this> { return this.delVaultPrompt() }
 
   // The old lease stays in force for the moments between: the vaultKey did not change.
   /** Run the commit, then attach a lease under the epoch it landed. */

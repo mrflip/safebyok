@@ -65,17 +65,17 @@ export const unlockTyping = (vault: Vault, typing: Typing): Promise<Vault> => as
 /** `vault.unlock()` itself, the user doing `typing` at the dialog. */
 export const unlockVerbTyping = (vault: Vault, typing: Typing): Promise<Vault> => askTyping(vault.world, typing, () => vault.unlock())
 
-/** `vault.replacePassphrase()`, the user typing the passphrase and the next at the dialog. */
-export const replaceTyping = (vault: Vault, ante: string, next: string): Promise<Vault> => askTyping(vault.world, { antePassphraseClear: ante, nextPassphraseClear: next }, () => vault.replacePassphrase())
+/** `vault.replacePassphrasePrompt()`, the user typing the passphrase and the next at the dialog. */
+export const replaceTyping = (vault: Vault, ante: string, next: string): Promise<Vault> => askTyping(vault.world, { antePassphraseClear: ante, nextPassphraseClear: next }, () => vault.replacePassphrasePrompt())
 
-/** `vault.addPasskey()`, the user typing the passphrase and touching the passkey `tag` names at the dialog. */
-export const addPasskeyTyping = async (vault: Vault, passphrase: string, tag: string): Promise<Vault> => askTyping(vault.world, { passphraseClear: passphrase, passkeyClear: await passkeyOf(tag) }, () => vault.addPasskey())
+/** `vault.addPasskeyPrompt()`, the user typing the passphrase and touching the passkey `tag` names at the dialog. */
+export const addPasskeyTyping = async (vault: Vault, passphrase: string, tag: string): Promise<Vault> => askTyping(vault.world, { passphraseClear: passphrase, passkeyClear: await passkeyOf(tag) }, () => vault.addPasskeyPrompt())
 
-/** `vault.revokePasskey()`, the user typing `passphrase` at the dialog, should it be shown. */
-export const revokeTyping = (vault: Vault, passphrase: string): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.revokePasskey())
+/** `vault.revokePasskeyPrompt()`, the user typing `passphrase` at the dialog, should it be shown. */
+export const revokeTyping = (vault: Vault, passphrase: string): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.revokePasskeyPrompt())
 
-/** `vault.delVault()`, the user typing `passphrase` at the dialog. */
-export const delTyping = (vault: Vault, passphrase: string = Passphrase): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.delVault())
+/** `vault.delVaultPrompt()`, the user typing `passphrase` at the dialog. */
+export const delTyping = (vault: Vault, passphrase: string = Passphrase): Promise<Vault> => askTyping(vault.world, byPassphrase(passphrase), () => vault.delVaultPrompt())
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
