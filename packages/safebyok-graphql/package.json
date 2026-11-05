@@ -63,7 +63,7 @@
     "eslint-plugin-sonarjs": "^4.2.2",
     "eslint-plugin-unicorn": "^78.0.0",
     "graphql": "^17.0.2",
-    "graphql-yoga": "^5.24.6",
+    "graphql-yoga": "^6.0.1",
     "publint": "^0.3.25",
     "safebyok": "workspace:*",
     "safebyok-postgres": "workspace:*",
