@@ -73,7 +73,8 @@ describe("oneAtATime", () => {
     expect(held.tally.most).to.eq(1)
   })
 
-  it("runs the task once for three calls at once, as its example says", async () => {
+  // oneAtATime @example
+  it("runs the task once for three calls at once", async () => {
     let runs = 0
     const run = oneAtATime(async () => {
       runs += 1

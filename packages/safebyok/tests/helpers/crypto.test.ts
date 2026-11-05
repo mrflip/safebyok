@@ -15,7 +15,8 @@ describe("base64url text", () => {
     expect(() => fromB64('not/base64url+!')).to.throw(/Unknown letter/)
   })
 
-  it("reads base64url text as bytes, or null for text that is not base64url, as fromB64OrNull's examples show", () => {
+  // fromB64OrNull @example
+  it("reads base64url text as bytes, or null for text that is not base64url", () => {
     expect(fromB64OrNull('Y3JlZC1sYXB0b3A')).to.have.lengthOf(11)
     expect(fromB64OrNull('not/base64url+!')).to.be.null
   })
@@ -47,7 +48,8 @@ const boxStamp = { boxlabel: 'anthropic', revision_tok: 'r1', written_at: 2 }
 const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', salt_b64: 'c2FsdA', device_id: 'd1', registered_at: 3 }
 
 describe("cipherCtx", () => {
-  it("binds a vault's stamp, a purpose and a header, as its first example shows: the same parts make the same bytes, and other parts others", () => {
+  // cipherCtx @example 1
+  it("binds a vault's stamp, a purpose and a header: the same parts make the same bytes, and other parts others", () => {
     const one = cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', header)
     expect(toB64(cipherCtx({ ...vaultStamp }, 'vault_key_passphrase_wrapped', { ...header }))).to.eq(toB64(one))
     expect(toB64(cipherCtx({ ...vaultStamp, user_id: 'u2' }, 'vault_key_passphrase_wrapped', header))).to.not.eq(toB64(one))
@@ -56,7 +58,8 @@ describe("cipherCtx", () => {
     expect(toB64(cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped'))).to.not.eq(toB64(one))
   })
 
-  it("binds a list of stamps, each keeping its own field names, as its second example shows", () => {
+  // cipherCtx @example 2
+  it("binds a list of stamps, each keeping its own field names", () => {
     const { format: _format, ...vaultButFormat } = vaultStamp
     const both = cipherCtx([vaultButFormat, { ...boxStamp, registered_at: 5 }], 'box_key_wrapped')
     expect(new TextDecoder().decode(both)).to.eq('[{"applabel":"acme","registered_at":1,"user_id":"u1","vault_tok":"vid","vaultlabel":"main"},{"boxlabel":"anthropic","registered_at":5,"revision_tok":"r1","written_at":2},"box_key_wrapped"]')
@@ -76,33 +79,35 @@ describe("cipherCtx", () => {
     expect(toB64(cipherCtx({ boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar: '{}' }, 'whisper_ciphered'))).to.not.eq(toB64(sorted))
   })
 
-  it("refuses a record holding a field set to undefined as bad_option, rather than treating it as if it were not there", () => {
-    const holding = { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar: undefined } as unknown as CipherCtxRecord
-    TH.expectSyncRefusal(() => cipherCtx(holding, 'whisper_ciphered'), 'bad_option')
-    TH.expectSyncRefusal(() => cipherCtx([vaultStamp, holding], 'whisper_ciphered'), 'bad_option')
-    TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'whisper_ciphered', holding), 'bad_option')
-  })
+  describe("refuses 'bad_option' for", () => {
+    it("a record holding a field set to undefined, rather than treating it as if it were not there", () => {
+      const holding = { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar: undefined } as unknown as CipherCtxRecord
+      TH.expectSyncRefusal(() => cipherCtx(holding, 'whisper_ciphered'), 'bad_option')
+      TH.expectSyncRefusal(() => cipherCtx([vaultStamp, holding], 'whisper_ciphered'), 'bad_option')
+      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'whisper_ciphered', holding), 'bad_option')
+    })
 
-  it("refuses a record holding a field set to null as bad_option, as it does one set to undefined", () => {
-    const holding = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
-    TH.expectSyncRefusal(() => cipherCtx(holding, 'vault_key_passphrase_wrapped'), 'bad_option')
-    TH.expectSyncRefusal(() => cipherCtx([holding, boxStamp], 'box_key_wrapped'), 'bad_option')
-    TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_id: null } as unknown as CipherCtxRecord), 'bad_option')
-  })
+    it("a record holding a field set to null", () => {
+      const holding = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
+      TH.expectSyncRefusal(() => cipherCtx(holding, 'vault_key_passphrase_wrapped'), 'bad_option')
+      TH.expectSyncRefusal(() => cipherCtx([holding, boxStamp], 'box_key_wrapped'), 'bad_option')
+      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_id: null } as unknown as CipherCtxRecord), 'bad_option')
+    })
 
-  it("refuses a stamp, a purpose or a header that is undefined or null as bad_option, rather than treating it as null", () => {
-    for (const missing of [undefined, null]) {
-      const part = missing as unknown as CipherCtxRecord
-      const err = TH.expectSyncRefusal(() => cipherCtx(part, 'vault_key_lease_wrapped'), 'bad_option')
-      expect(err.message).to.include('undefined or null')
-      TH.expectSyncRefusal(() => cipherCtx([vaultStamp, part], 'vault_key_lease_wrapped'), 'bad_option')
-      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, missing as unknown as string), 'bad_option')
-      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', part), 'bad_option')
-    }
-  })
+    it("a stamp, a purpose or a header that is undefined or null, rather than treating it as null", () => {
+      for (const missing of [undefined, null]) {
+        const part = missing as unknown as CipherCtxRecord
+        const err = TH.expectSyncRefusal(() => cipherCtx(part, 'vault_key_lease_wrapped'), 'bad_option')
+        expect(err.message).to.include('undefined or null')
+        TH.expectSyncRefusal(() => cipherCtx([vaultStamp, part], 'vault_key_lease_wrapped'), 'bad_option')
+        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, missing as unknown as string), 'bad_option')
+        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', part), 'bad_option')
+      }
+    })
 
-  it("refuses an empty list of stamps as bad_option: a ctx binds at least one", () => {
-    TH.expectSyncRefusal(() => cipherCtx([], 'vault_key_lease_wrapped'), 'bad_option')
+    it("an empty list of stamps: a ctx binds at least one", () => {
+      TH.expectSyncRefusal(() => cipherCtx([], 'vault_key_lease_wrapped'), 'bad_option')
+    })
   })
 })
 
