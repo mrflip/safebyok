@@ -89,7 +89,7 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     const proving = await makeProving(vault)
     deviceDB.tryCache.mockClear()
     const lease = await proving.buildLease(friend)
-    expect(lease.isInForce).to.be.true
+    expect(lease.isPresent).to.be.true
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
     lease.evict()
   })

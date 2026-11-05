@@ -36,8 +36,8 @@ export class Gate {
 
   /** The first gate of the vault `stamp` names, of `gate_epoch` 1. */
   static make(stamp: VaultStamp, passphraseWayin: Wayin, passkeyWayin: Wayin | null): Gate {
-    Checks.gateMakeArgs.parse({ passphraseWayin, passkeyWayin })
-    return new Gate(stamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passphraseWayin.pickle(), passkey_wayin: passkeyWayin?.pickle() ?? null })
+    const checked = Checks.gateMakeArgs.parse({ passphraseWayin, passkeyWayin })
+    return new Gate(stamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: checked.passphraseWayin.pickle(), passkey_wayin: checked.passkeyWayin?.pickle() ?? null })
   }
   // --
 
