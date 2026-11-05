@@ -48,7 +48,7 @@ export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, c
   vault_key_lease_wrapped: ciphered.brand<'VaultKeyLeaseWrapped'>(),
 }))
 
-/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record stores it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use (`damaged_wayin`), not at read. Its `parse` refuses 'bad_record'. */
+/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record stores it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use, not at read. Its `parse` refuses 'bad_record'. */
 export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)), 'bad_record')
 
 /** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */
@@ -92,7 +92,7 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
 }
 
 /** The check for a {@link Whisper}, exactly what JSON can carry, never what it would mangle, and never a bare null; and `whisperBag`, the plain JSON object a whisper or a {@link Sidecar} may be.
- * Its `parse` refuses 'bad_whisper', quoting none of it, and naming none of an object's keys: an
+ * Its `parse` refuses 'bad_option', quoting none of it, and naming none of an object's keys: an
  * object that is not plain JSON fails whole.
  *
  * @example whisper.parse('sk-ant-...')                  // a string passes through
@@ -101,7 +101,7 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
  * @example whisper.safeParse(null).success              // false: emptying a box is delBox's job
  * @example whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
  */
-export const { whisper, whisperBag } = Checkers('bad_whisper', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
+export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
   const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, plainBag]))
   // An object is judged whole, so a refusal's path never holds one of its keys, which are the caller's own.
   const whisperMembers = record(str, whisperJson)

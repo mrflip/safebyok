@@ -88,7 +88,7 @@ describe("A lease renewed through a gate change", () => {
 })
 
 describe("A refused erase of the row: the panic", () => {
-  const Refusal = new VaultError('storage_blocked', 'the disk is full')
+  const Refusal = new VaultError('storage_unavailable', 'the disk is full')
 
   it("hears the host's onPanic, leaving the vault locked and enabled; a rejection of it goes to the platform and no further", async () => {
     const reported = stubReportError()

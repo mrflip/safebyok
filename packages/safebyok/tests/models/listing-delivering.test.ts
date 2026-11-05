@@ -23,7 +23,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
       held.mw.clearCalls()
-      const err = new VaultError('not_permitted', "Not yours.")
+      const err = new VaultError('storage_unavailable', "Storage is down.")
       held.mw.willGet(held.mw.refusalOf(box.scope, err, 'a world'))
       const outcome = await listing.tryFetch(box.scope)
       expect(outcome.err).to.eq(err)
@@ -69,7 +69,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       held.mw.willGet(() => {
         listing.vacate()
-        return held.mw.refusalOf(scopeOf(), new VaultError('not_permitted', "No."), 'a world')
+        return held.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Storage is down."), 'a world')
       })
       await TH.expectRefusal(listing.fetch(scopeOf()), 'disabled')
       expect(held.mw.callsOf('takeWorld')).to.deep.equal([])
