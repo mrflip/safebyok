@@ -56,7 +56,8 @@ added or folded into through the subagent, and no other entry changes.
   back, and a host that wants it gone calls `unexpose()`. `expose` requires an unlocked vault and sets veiled false; `putExposed` seals
   the kept value directly, so it never reads a bag, and is allowed while veiled and refused `vault_locked` while locked. The value is
   never on a snapshot, in `toJSON` or in a refusal; `box.getSnapshot()` carries only the booleans `exposed` and `veiled` and the
-  `lockState`.
+  `lockState`. (amended 2026-11-05 (whisper_object): the full argument for keeping the exposed whisper is in
+  `notes/expose_improves_security.md`.)
 * 2026-11-05 (lease_fold, [#494](https://github.com/mrflip/safebyok/pull/494), branch `20261105-lease_fold`): **A gating's run reaches the
   vault's private `#unlockByProof` and `#landGate` by a gating friend, a second friend beside the lease's.** In
   `packages/safebyok/src/models/`, a gating's runs are `RunForGatingkind` in `gating.ts`, beside `ProveForGatingkind`; a run hears
