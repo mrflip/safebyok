@@ -130,12 +130,12 @@ describe("a box verb the vaultDB refuses over its vault's row", () => {
     expect(tellBadNews).not.toHaveBeenCalled()
   })
 
-  it("'vault_remade' delivers no box, and no bad news is told", async () => {
+  it("'vault_mismatch' delivers no box, and no bad news is told", async () => {
     const { vault, restoreRow, tryGetBox, opts: { world } } = await makeWorldWithBox()
     restoreRow({ ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' })
     const tellBadNews = vi.spyOn(world, 'tellBadNews')
     tryGetBox.mockClear()
-    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_remade')
+    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_mismatch')
     expect(tryGetBox).toHaveBeenCalledOnce()
     expect(tellBadNews).not.toHaveBeenCalled()
   })
