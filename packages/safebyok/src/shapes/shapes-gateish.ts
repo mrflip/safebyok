@@ -31,6 +31,46 @@ export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinKindVals), 'bad_op
 export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
 // --
 
+// == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
+
+export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
+  const passphraseWayinHeader = SX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passkeyWayinHeader    = SX.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
+  return {
+    passphraseWayinHeader,
+    passkeyWayinHeader,
+    wayinHeader: discrim('wayinkind', [passphraseWayinHeader, passkeyWayinHeader]),
+    passphraseWayinRecord: SX.passphraseWayin,
+    passkeyWayinRecord:    SX.passkeyWayin,
+    wayinRecord: discrim('wayinkind', [SX.passphraseWayin, SX.passkeyWayin]),
+  }
+})
+
+export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
+export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
+export type WayinHeader           = Z.infer<typeof wayinHeader>
+export type PassphraseWayinRecord = Z.infer<typeof passphraseWayinRecord>
+export type PasskeyWayinRecord    = Z.infer<typeof passkeyWayinRecord>
+export type WayinRecord           = Z.infer<typeof wayinRecord>
+// --
+
+// == [The gate's forms]: FirstGateEpoch, gateEpoch, gateProps, GateProps
+
+/** The `gate_epoch` of a vault's first gate. */
+export const FirstGateEpoch = 1
+
+/** Which gate of its vault a gate is: bound into every lease, which a gate of another epoch does not honour. */
+export const gateEpoch = Checker(({ int }) => int.positive(), 'bad_record')
+
+export const gateProps = objCheck(() => ({
+  gate_epoch:       gateEpoch,
+  passphrase_wayin: passphraseWayinRecord,
+  passkey_wayin:    passkeyWayinRecord.nullable(),
+}), 'bad_record')
+
+export type GateProps = Z.infer<typeof gateProps>
+// --
+
 // == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
 
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` refuses 'bad_option', quoting none of it.
@@ -83,7 +123,7 @@ export const freshPasskeyAnswer = Checker(() => (
 ), 'bad_option')
 // --
 
-// == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict
+// == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict, StrengthChecker
 
 /** True for a {@link StrengthChecker}: a function, whose `load`, if it carries one, is a function too. */
 const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
@@ -104,6 +144,8 @@ export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ 
  * vault's 'weak_passphrase' refusal carries it as its message.
  */
 export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
+
+export type { StrengthChecker } from '../helpers/passphrase-strength'
 // --
 
 // == [The vault's stamp]: vaultStamp, VaultStamp
@@ -120,47 +162,7 @@ export const vaultStamp = objCheck(({ applabel, user_id, vaultlabel, vault_tok, 
 export type VaultStamp = Z.infer<typeof vaultStamp>
 // --
 
-// == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord, WayinKind
-
-export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
-  const passphraseWayinHeader = SX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  const passkeyWayinHeader    = SX.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  return {
-    passphraseWayinHeader,
-    passkeyWayinHeader,
-    wayinHeader: discrim('wayinkind', [passphraseWayinHeader, passkeyWayinHeader]),
-    passphraseWayinRecord: SX.passphraseWayin,
-    passkeyWayinRecord:    SX.passkeyWayin,
-    wayinRecord: discrim('wayinkind', [SX.passphraseWayin, SX.passkeyWayin]),
-  }
-})
-
-export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
-export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
-export type WayinHeader           = Z.infer<typeof wayinHeader>
-export type PassphraseWayinRecord = Z.infer<typeof passphraseWayinRecord>
-export type PasskeyWayinRecord    = Z.infer<typeof passkeyWayinRecord>
-export type WayinRecord           = Z.infer<typeof wayinRecord>
-// --
-
-// == [The gate's forms]: FirstGateEpoch, gateEpoch, gateProps, GateProps
-
-/** The `gate_epoch` of a vault's first gate. */
-export const FirstGateEpoch = 1
-
-/** Which gate of its vault a gate is: bound into every lease, which a gate of another epoch does not honour. */
-export const gateEpoch = Checker(({ int }) => int.positive(), 'bad_record')
-
-export const gateProps = objCheck(() => ({
-  gate_epoch:       gateEpoch,
-  passphrase_wayin: passphraseWayinRecord,
-  passkey_wayin:    passkeyWayinRecord.nullable(),
-}), 'bad_record')
-
-export type GateProps = Z.infer<typeof gateProps>
-// --
-
-// == [What a proving is handed]: provingWorld, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
+// == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
 export const { provingWorld } = Checkers('bad_option', ({ obj, clockShape, keyDeriverShape, device_id }) => ({
   provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
@@ -187,7 +189,7 @@ export type StampedGate = Z.infer<typeof stampedGate>
 export type Novel = typeof NOVEL
 // --
 
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, sealedWhisper, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, LeaseStamp, LeaseSparse, LeaseRecord, SealedWhisper, LeaseFriend, LeaseGrantOpts
+// == [The lease's forms]: LeaseFormat, isLeaseKey, leaseStamp, leaseRecord, LeaseStamp, LeaseSparse, LeaseRecord
 
 /** The `fmt` a lease carries, as `Lease` checks it. */
 export const LeaseFormat = 7001
@@ -220,6 +222,9 @@ export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, c
 export type LeaseStamp  = Z.infer<typeof leaseStamp>
 export type LeaseSparse = LeaseStamp
 export type LeaseRecord = Z.infer<typeof leaseRecord>
+// --
+
+// == [What a lease is handed]: sealedWhisper, leaseMillis, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
 export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refuseAs: 'bad_record', extras: 'strip' }, [CX])
 
@@ -276,7 +281,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // --
 
-// == [The gating's forms]: gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, ClearsForGatingkind, StrengthChecker
+// == [The gating's forms]: gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, ClearsForGatingkind
 
 /** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
 export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj }) => ({
@@ -301,8 +306,6 @@ export type ClearsForGatingkind = {
   revoke_passkey:     Z.input<typeof passkeyRevokeClears>
   del_vault:          Z.input<typeof vaultDelClears>
 }
-
-export type { StrengthChecker } from '../helpers/passphrase-strength'
 // --
 
 // == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
