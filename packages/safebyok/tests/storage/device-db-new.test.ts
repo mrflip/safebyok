@@ -77,7 +77,7 @@ describe("deviceDB.cache(row), peek(asked)", () => {
     expect(await deviceDB.peek(asked)).to.be.null
   })
 
-  it("refuses a row without proved_at as 'bad_record', and a malformed query as 'bad_scope'", async () => {
+  it("refuses a row without proved_at, and a malformed query", async () => {
     const deviceDB = new MemoryDeviceDB()
     await TH.expectRefusal(deviceDB.cache({ ...asked, lease_key: await makeLeaseKey() } as unknown as LeaseRow), 'bad_record')
     await TH.expectRefusal(deviceDB.peek({ ...asked, vaultlabel: 'No Good!' }), 'bad_scope')
@@ -163,7 +163,7 @@ describe("deviceDB.leasesProvedBefore(cutoff)", () => {
     expect(await deviceDB.leasesProvedBefore(T0)).to.deep.equal([])
   })
 
-  it("answers an empty list for an empty store, and refuses a cutoff that is no instant as 'bad_option'", async () => {
+  it("answers an empty list for an empty store, and refuses a cutoff that is no instant", async () => {
     const deviceDB = new MemoryDeviceDB()
     expect(await TH.expectGood(deviceDB.tryLeasesProvedBefore(T0))).to.deep.equal([])
     await TH.expectBad(deviceDB.tryLeasesProvedBefore(NaN), 'bad_option')
@@ -206,7 +206,7 @@ describe("deviceDB.cacheDeviceRecord(record)", () => {
     expect(second.record.device_id).to.eq('dev_one')
   })
 
-  it("refuses a record without a device_id or with a stray field as 'bad_record'", async () => {
+  it("refuses a record without a device_id or with a stray field", async () => {
     const deviceDB = new MemoryDeviceDB()
     await TH.expectBad(deviceDB.tryCacheDeviceRecord({ applabel: 'acme', user_id: 'u1' } as DeviceRecord), 'bad_record')
     await TH.expectBad(deviceDB.tryCacheDeviceRecord({ ...deviceRecordOf(), extra: 1 } as DeviceRecord), 'bad_record')

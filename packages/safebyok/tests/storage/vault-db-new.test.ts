@@ -13,7 +13,7 @@ const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
 
 describe("MemoryVaultDB", () => {
   describe("the constructor", () => {
-    it("refuses bad_option for a maxBoxes or maxRecordBytes it cannot use", () => {
+    it("refuses a maxBoxes or maxRecordBytes it cannot use", () => {
       for (const opts of [{ maxBoxes: NaN }, { maxBoxes: -1 }, { maxRecordBytes: -1 }]) {
         expect(() => new MemoryVaultDB(opts)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
       }
