@@ -222,7 +222,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async #renewLease(proved: Proving, gate_epoch: number, heldLease: Lease | null): Promise<void> {
     if (heldLease === null) { return }
     const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
-    if (heldLease.isForgotten) {
+    if (! heldLease.isPresent) {
       lease.evict()
       return
     }

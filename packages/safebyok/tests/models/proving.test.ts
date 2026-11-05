@@ -440,7 +440,7 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(friend)
     expect(lease.toJSON()).to.deep.include({ ...WorldStamp, gate_epoch: gate.gate_epoch, proved_at: T0, wayinkind: 'passkey' })
-    expect(lease.isInForce).to.be.true
+    expect(lease.isPresent).to.be.true
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 

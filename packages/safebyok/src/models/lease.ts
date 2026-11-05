@@ -186,11 +186,10 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Guards]: isForgotten, isInForce, demandRecord
+  // == [Guards]: isPresent, demandRecord
 
-  get isForgotten(): boolean { return this.#record === null }
-
-  get isInForce(): boolean { return this.#record !== null }
+  /** The lease still holds its record, as `Storable.isPresent` says of a thing not gone. */
+  get isPresent(): boolean { return this.#record !== null }
 
   /** The record, while the lease is in force. */
   #demandRecord(): LeaseRecord {
