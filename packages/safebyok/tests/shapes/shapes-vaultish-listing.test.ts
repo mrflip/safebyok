@@ -37,7 +37,7 @@ describe("The checks of options", () => {
     holdsCases(VX.boxPutOpts, 'bad_option', [
       [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
-      [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon, as timelyOpts does'],
+      [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon'],
     ])
 
     it("take their fields from the bag given and strip the rest", () => {
@@ -78,7 +78,7 @@ describe("VX.ifAbsent and VX.fetchOpts", () => {
     [{ ifAbsent: undefined },                           true,  'passes ifAbsent undefined, as a caller spreading options may leave it'],
     [{ ifAbsent: 'fail', maxMillisSinceRefresh: 5 },    true,  'passes ifAbsent beside the timely options'],
     [{ ifAbsent: 'replace' },                           false, 'refuses an ifAbsent that is not one of the two'],
-    [{ maxMillisSinceRefresh: -1 },                     false, 'refuses a negative horizon, as timelyOpts does'],
+    [{ maxMillisSinceRefresh: -1 },                     false, 'refuses a negative horizon'],
   ])
 
   it("keeps ifAbsent and the timely options and strips the rest", () => {
@@ -115,7 +115,7 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
     [{ ifPresent: 'repl', maxWorldMillis: 5 },          true,  'passes ifPresent beside the timely options'],
     [{ ifPresent: 'replace' },                          false, 'refuses an ifPresent it does not offer'],
-    [{ maxMillisSinceRefresh: -1, ifPresent: 'repl' },  false, 'refuses a negative horizon, as timelyOpts does'],
+    [{ maxMillisSinceRefresh: -1, ifPresent: 'repl' },  false, 'refuses a negative horizon'],
   ])
 
   it("keeps ifPresent, ifAbsent and the timely options and strips the rest", () => {

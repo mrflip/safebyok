@@ -106,21 +106,21 @@ describe("VX.boxRecord and VX.boxSparse", () => {
 describe("VX.whisperHolder", () => {
   holdsCases(VX.whisperHolder, 'bad_option', [
     // a whisper as its val, any JSON a whisper can carry:
-    [{ val: 'sk-ant-fake' },                                true,  'passes a string, as its first example shows'],
-    [{ val: { apiKey: 'sk-ant-fake', orgId: null } },       true,  'passes a plain object, null inside it, as its second example shows'],
+    [{ val: 'sk-ant-fake' },                                true,  'passes a string'], // VX.whisperHolder @example 1
+    [{ val: { apiKey: 'sk-ant-fake', orgId: null } },       true,  'passes a plain object, null inside it'], // VX.whisperHolder @example 2
     [{ val: ['sk-ant-fake', 7, true, null] },               true,  'passes an array, null inside it'],
     [{ val: 7 },                                            true,  'passes a number'],
     [{ val: false },                                        true,  'passes a boolean'],
     // not given as { val }:
-    ['sk-ant-fake',                                         false, 'refuses a bare whisper, as its third example shows'],
+    ['sk-ant-fake',                                         false, 'refuses a bare whisper'], // VX.whisperHolder @example 3
     [null,                                                  false, 'refuses null'],
     [undefined,                                             false, 'refuses undefined'],
     [{},                                                    false, 'refuses an object with no val'],
     [{ value: 'sk-ant-fake' },                              false, 'refuses a whisper under another name'],
-    [{ val: 'sk-ant-fake', note: 'work' },                  false, 'refuses a field beside the val, as its fifth example shows'],
+    [{ val: 'sk-ant-fake', note: 'work' },                  false, 'refuses a field beside the val'], // VX.whisperHolder @example 5
     [new Map([['val', 'sk-ant-fake']]),                     false, 'refuses a Map'],
     // a val no whisper may be:
-    [{ val: null },                                         false, 'refuses a val that is null, as its fourth example shows'],
+    [{ val: null },                                         false, 'refuses a val that is null'], // VX.whisperHolder @example 4
     [{ val: undefined },                                    false, 'refuses a val given as undefined'],
     [{ val: new Date(T0) },                                 false, 'refuses a val JSON would mangle'],
     [{ val: { apiKey: undefined } },                        false, 'refuses a val holding undefined'],
@@ -161,7 +161,7 @@ describe("VX.whisperHolder", () => {
 })
 
 describe("VX.whisperHolder and LOCKED", () => {
-  it("refuses LOCKED as 'bad_option' with a sentence that names it, and a copy of it as no { val }", () => {
+  it("refuses LOCKED with a sentence that names it, and a copy of it as no { val }", () => {
     expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse(LOCKED), 'bad_option').message).to.include('LOCKED is not a whisper: unseal or expose one first')
     expect(TH.expectSyncRefusal(() => VX.whisperHolder.parse({ ...LOCKED }), 'bad_option').message).to.not.include('LOCKED')
   })
@@ -189,7 +189,7 @@ describe("VX.boxDna", () => {
     [{ ...dna, sidecar: undefined },                        true,  'passes a sidecar given as undefined'],
     // the scope refused:
     [{ ...dna, boxlabel: undefined },                       false, 'refuses a dna with no boxlabel'],
-    [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label, as its sixth example shows'],
+    [{ ...dna, boxlabel: 'B' },                             false, 'refuses a boxlabel that is no label'], // VX.boxDna @example 6
     [{ boxlabel: 'anthropic_api_key' },                     false, 'refuses a boxlabel without its vault'],
     [{ whisper: { val: 'sk-ant-fake' }, sidecar: {} },      false, 'refuses a dna with no scope'],
     // the record's own props refused:
@@ -197,29 +197,31 @@ describe("VX.boxDna", () => {
     [{ ...dna, whisper_codec: 'json_v2' },                  false, 'refuses a codec it does not know'],
     [{ ...dna, whisper_schema_version: 2 },                 false, 'refuses a schema version it does not know'],
     [{ ...dna, box_key_wrapped },                           false, 'refuses a box_key_wrapped, which only the seal makes'],
-    [{ ...dna, whisper_ciphered },                          false, 'refuses a whisper_ciphered, which only the seal makes, as its eighth example shows'],
+    [{ ...dna, whisper_ciphered },                          false, 'refuses a whisper_ciphered, which only the seal makes'], // VX.boxDna @example 8
     [{ ...dna, whisper: null },                             false, 'refuses a whisper that is null'],
     [{ ...dna, whisper: { val: null } },                    false, 'refuses a whisper whose val is null'],
     [{ ...dna, whisper: { val: new Date(T0) } },            false, 'refuses a whisper JSON would mangle'],
-    [{ ...dna, whisper: 'sk-ant-fake' },                    false, 'refuses a bare whisper, not given as { val }, as its fifth example shows'],
+    [{ ...dna, whisper: 'sk-ant-fake' },                    false, 'refuses a bare whisper, not given as { val }'], // VX.boxDna @example 5
     [{ ...dna, whisper: {} },                               false, 'refuses a whisper with no val'],
     [{ ...dna, whisper: { val: 'sk-ant-fake', note: 'x' } }, false, 'refuses a whisper with a field beside its val'],
     // the factory's props, given, must pass their checks:
     [{ ...dna, fmt: 8 },                                    false, 'refuses another format'],
     [{ ...dna, am: 'z' },                                   false, 'refuses an am it does not know'],
     [{ ...dna, vault_tok: 7 },                              false, 'refuses a vault_tok that is no string'],
-    [{ ...dna, revision_seq: 1 },                           false, 'refuses a revision_seq, which a dna never carries, as its seventh example shows'],
+    [{ ...dna, revision_seq: 1 },                           false, 'refuses a revision_seq, which a dna never carries'], // VX.boxDna @example 7
     [{ ...dna, registered_at: 5 },                          false, 'refuses a registered_at that is no epoch'],
     // a bag a person typed:
     [{ ...dna, sidcar: {} },                                false, 'refuses a field it does not take, being strict'],
     [null,                                                  false, 'refuses null'],
   ])
 
-  it("hands back the whisper and the sidecar given, with the codec and the schema version filled, as its first example shows", () => {
+  // VX.boxDna @example 1
+  it("hands back the whisper and the sidecar given, with the codec and the schema version filled", () => {
     expect(VX.boxDna.parse(dna)).to.deep.equal(filled)
   })
 
-  it("strips the props the factory controls, as its second example shows", () => {
+  // VX.boxDna @example 2
+  it("strips the props the factory controls", () => {
     const parsed = VX.boxDna.parse({ ...dna, ...factoryProps, fmt: VX.BoxFormat })
     expect(parsed).to.deep.equal(filled)
     expect(parsed).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'registered_at', 'written_at')
@@ -255,8 +257,8 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
 
   describe("boxDna", () => {
     holdsCases(VX.boxDna, 'bad_option', [
-      [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls, as its second example shows'],
-      [{ ...scope, whisper, sidecar: {}, revision_seq: 3 },                  false, 'refuses a revision_seq, as its fourth example shows'],
+      [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls'], // VX.boxDna @example 2
+      [{ ...scope, whisper, sidecar: {}, revision_seq: 3 },                  false, 'refuses a revision_seq'], // VX.boxDna @example 4
       [{ ...scope, whisper, sidecar: {}, am: 'q' },                          false, 'refuses a factory prop that fails its check'],
     ])
 
@@ -269,13 +271,13 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
   describe("boxPatch", () => {
     holdsCases(VX.boxPatch, 'bad_option', [
       [{ whisper, sidecar: {} },                                             true,  'passes the whisper and the sidecar alone'],
-      [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with its whisper and a sidecar, as its sixth example shows'],
+      [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with its whisper and a sidecar'], // VX.boxPatch @example 6
       [{ ...sparse, whisper, sidecar: {} },                                  true,  'passes a sparse record given back so'],
       [{ ...sealedless, revision_seq: 99, am: 'x', whisper, sidecar: {} },   true,  'passes the factory props, revision_seq among them, whatever they say'],
       [{ whisper },                                                          true,  'passes a whisper alone, the sidecar kept'],
-      [{ sidecar: {} },                                                      true,  'passes a sidecar alone, the whisper kept, as its example shows'],
-      [{},                                                                   false, 'refuses a patch naming neither, as its example shows'],
-      [{ whisper: LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper, as its seventh example shows'],
+      [{ sidecar: {} },                                                      true,  'passes a sidecar alone, the whisper kept'], // VX.boxPatch @example
+      [{},                                                                   false, 'refuses a patch naming neither'], // VX.boxPatch @example
+      [{ whisper: LOCKED, sidecar: {} },                                 false, 'refuses LOCKED as the whisper'], // VX.boxPatch @example 7
       [{ whisper: 'sk-ant-fake', sidecar: {} },                              false, 'refuses a bare whisper'],
       [{ whisper, sidecar: 'note' },                                         false, 'refuses a sidecar that fails its check'],
       [{ ...full, revision_seq: 'one', whisper, sidecar: {} },               false, 'refuses a factory prop that fails its check'],

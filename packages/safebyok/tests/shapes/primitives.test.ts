@@ -38,7 +38,8 @@ describe("label", () => {
     }
   })
 
-  it("passes and refuses as its examples show", () => {
+  // label @example
+  it("passes a lowercase word and refuses uppercase", () => {
     expect(PX.label.safeParse('anthropic_api_key').success).to.be.true
     expect(PX.label.safeParse('ANTHROPIC_API_KEY').success).to.be.false
   })
@@ -67,7 +68,8 @@ describe("MaxLabelChars and LabelPattern", () => {
     }
   })
 
-  it("gives a form's input its pattern and length, as its example shows", () => {
+  // MaxLabelChars and LabelPattern @example
+  it("gives a form's input its pattern and length", () => {
     const input = { pattern: LabelPattern.source, maxLength: MaxLabelChars }
     expect(new RegExp(input.pattern).test('anthropic_api_key')).to.be.true
     expect(new RegExp(input.pattern).test('Anthropic')).to.be.false
@@ -115,7 +117,8 @@ describe("user_id", () => {
     }
   })
 
-  it("passes and refuses as its examples show", () => {
+  // user_id @example
+  it("passes a provider's ids and refuses dots alone and a slash", () => {
     expect(PX.user_id.safeParse('user_2abc.def+work').success).to.be.true
     expect(PX.user_id.safeParse('auth0|5f7c8ec7').success).to.be.true
     expect(PX.user_id.safeParse('..').success).to.be.false
@@ -138,7 +141,8 @@ describe("user_id", () => {
 })
 
 describe("UserIdPattern", () => {
-  it("is the pattern user_id checks, as its example shows", () => {
+  // UserIdPattern @example
+  it("is the pattern user_id checks", () => {
     expect(UserIdPattern.test('auth0|5f7c8ec7c33c6c004bbafe82')).to.be.true
     const withinLength = UserIdCases.filter(([candidate]) => candidate.length > 0 && candidate.length <= MaxUserIdChars)
     for (const [candidate, expected] of withinLength) {
@@ -200,7 +204,8 @@ describe("epochMillis", () => {
     expect(PX.epochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
   })
 
-  it("passes a time through unchanged, as its examples show", () => {
+  // epochMillis @example
+  it("passes a time through unchanged", () => {
     expect(PX.epochMillis.parse(Date.UTC(2026, 9, 15))).to.eq(1_792_022_400_000)
     expect(PX.epochMillis.safeParse(1_792_022_400).success).to.be.false
     expect(PX.epochMillis.safeParse(1_792_022_400_000_000).success).to.be.false

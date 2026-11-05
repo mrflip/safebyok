@@ -79,7 +79,8 @@ describe("sidecar", () => {
 const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
 
 describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
-  it("hand back a frozen copy of the scope a record carries, its other fields left out, as the first example shows", () => {
+  // CX.vaultScope @example 1
+  it("hand back a frozen copy of the scope a record carries, its other fields left out", () => {
     const vault = { ...scope, vault_tok: 'tok', format: 'safebyok-vault-v1', lock: () => null }
     const parsed = CX.vaultScope.parse(vault)
     expect(parsed).to.deep.equal(scope)
@@ -105,13 +106,14 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
     expect(CX.vaultScope.parse(new Holder())).to.deep.equal(scope)
   })
 
-  it("refuse a bad boxlabel as 'bad_scope', naming the field, as the second example shows", () => {
+  // CX.boxscope @example 2
+  it("refuse a bad boxlabel, naming the field", () => {
     const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' }), 'bad_scope')
     expect(err.message).to.match(/^boxlabel: A label is lowercase words/)
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
   })
 
-  it("refuse a name missing, or not text, as 'bad_scope', naming each", () => {
+  it("refuse a name missing, or not text, naming each", () => {
     const err = TH.expectSyncRefusal(() => CX.vaultScope.parse({ applabel: 'acme', user_id: 42 }), 'bad_scope')
     expect(err.meta?.fieldnames).to.deep.equal(['user_id', 'vaultlabel'])
     TH.expectSyncRefusal(() => CX.vaultScope.parse(null), 'bad_scope')
