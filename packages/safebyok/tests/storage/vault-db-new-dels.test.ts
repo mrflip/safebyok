@@ -79,7 +79,7 @@ describe("MemoryVaultDB", () => {
     })
   })
 
-  describe("a damaged row named as damaged_records lists it", () => {
+  describe("a damaged row named as damaged_rows lists it", () => {
     it("delVault deletes rubble at the sentinels and cascades over nothing else; any other prior refuses 'damaged_row'", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       const rows = vaultDB._cheat_vaultRowsOf(bankScope)

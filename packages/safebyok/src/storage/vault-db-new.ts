@@ -29,8 +29,8 @@ export type DelAct = 'deleted' | 'gone' | 'void'
 type Said<ValT, ActT extends string, WorldT> = { act: ActT, val: ValT, world: WorldT, dbhas?: unknown }
 type PutChoices = { prior: Revision, ifAbsent: PutIfAbsent, ifPresent: IfPresent }
 
-export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_records: DamagedVault[] }
-export type VaultListed = VaultRecord & { boxes: BoxSparse[], damaged_records: DamagedBox[] }
+export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_rows: DamagedVault[] }
+export type VaultListed = VaultRecord & { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 export type Tidied      = { totalCount: number }
 
 /** A row that changed, as a watch hears it. Nothing may count on hearing one. */
@@ -86,15 +86,15 @@ export abstract class VaultDB {
 
   // == [Gets]: getBank, tryGetBank, getVault, tryGetVault, getBox, tryGetBox
 
-  /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_records`. */
+  /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
   async getBank(scope: BankScope): Promise<GoodAnswer<BankListed, 'got' | 'gotvoid', BankScope>> {
     return this.#call<BankListed, 'got' | 'gotvoid', BankScope>('getBank', scope, async () => {
       const bankScope = SX.bankScope.parse(scope)
       const rows = await adapted(() => this.doGetBank(bankScope))
-      const val: BankListed = { vaults: [], damaged_records: [] }
+      const val: BankListed = { vaults: [], damaged_rows: [] }
       for (const { vaultlabel, vault } of rows) {
         const parsed = SX.vaultRow.safeParse(vault)
-        if (parsed.success) { val.vaults.push(parsed.data) } else { val.damaged_records.push(SX.damagedVaultOf({ ...bankScope, vaultlabel }, vault)) }
+        if (parsed.success) { val.vaults.push(parsed.data) } else { val.damaged_rows.push(SX.damagedVaultOf({ ...bankScope, vaultlabel }, vault)) }
       }
       return { act: (rows.length > 0) ? 'got' : 'gotvoid', val, world: bankScope }
     })
@@ -102,7 +102,7 @@ export abstract class VaultDB {
 
   async tryGetBank(scope: BankScope) { return answerOf(() => this.getBank(scope)) }
 
-  /** The vault by scope alone, whatever its life, with its sparse boxes and `damaged_records`. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
+  /** The vault by scope alone, whatever its life, with its sparse boxes and `damaged_rows`. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
   async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultListed | null, GotAct>> {
     return this.#call<VaultListed | null, GotAct, VaultRow>('getVault', { ...scope, ...opts }, async () => {
       const vaultScope = SX.vaultScope.parse(scope)
@@ -259,7 +259,7 @@ export abstract class VaultDB {
 
   // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
-  /** SLOPDOC: Writes a box's tombstone over its live row at `prior`, or the damaged row `damaged_records` lists. */
+  /** SLOPDOC: Writes a box's tombstone over its live row at `prior`, or the damaged row `damaged_rows` lists. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
     return this.#call<BoxTombstone, DelAct, VaultRow>('delBox', { ...tombstone, ...opts }, async () => {
       const boxTombstone = preparedOf(SX.boxTombstone, tombstone)
@@ -392,11 +392,11 @@ const boxRowOf = (raw: unknown): BoxRow | null => {
   throw unreadableRowOf(raw, SX.BoxFormat)
 }
 
-const listedBoxesOf = (scope: VaultScope, vault_tok: string, rows: { boxlabel: string, box: unknown }[]): Pick<VaultListed, 'boxes' | 'damaged_records'> => {
-  const listed: Pick<VaultListed, 'boxes' | 'damaged_records'> = { boxes: [], damaged_records: [] }
+const listedBoxesOf = (scope: VaultScope, vault_tok: string, rows: { boxlabel: string, box: unknown }[]): Pick<VaultListed, 'boxes' | 'damaged_rows'> => {
+  const listed: Pick<VaultListed, 'boxes' | 'damaged_rows'> = { boxes: [], damaged_rows: [] }
   for (const { boxlabel, box } of rows) {
     const parsed = SX.boxRow.safeParse(box)
-    if (parsed.success) { listed.boxes.push(SX.boxSparse.parse(parsed.data)) } else { listed.damaged_records.push(SX.damagedBoxOf({ ...scope, boxlabel }, vault_tok, box)) }
+    if (parsed.success) { listed.boxes.push(SX.boxSparse.parse(parsed.data)) } else { listed.damaged_rows.push(SX.damagedBoxOf({ ...scope, boxlabel }, vault_tok, box)) }
   }
   return listed
 }
