@@ -2,7 +2,7 @@ import { verifyConsistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { isListing } from '../helpers/consts'
 import { VaultError } from '../refusals/errors'
-import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
+import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { LockState } from '../shapes/shapes-enums'
@@ -192,7 +192,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lockState, lock, vacateLease, panic, dropLease, unlockByProof, attachLease, renewLease
+  // == [The lease]: lockState, lock, vacateLease, panic, unlockByProof, attachLease, renewLease
 
   lockState(): LockState { return this.#lease === null ? 'locked' : 'unlocked' }
 
@@ -208,8 +208,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: Drops any lease held and erases the row cached on this device. */
   async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#panic(refusal)): Promise<void> {
     // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
-    this.#dropLease()
-    const vacating = outcomeOf(async () => { valOf(await this.#leaseFriend().tryUncacheLease()) })
+    const held = this.#lease
+    this.#lease = null
+    const vacating = held?.tryVacate() ?? Lease.tryUncache(this.#leaseFriend())
     this.settle()
     const vacated = await vacating
     if (! vacated.ok) { await onRefused(vacated.err) }
@@ -228,11 +229,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     } catch (err) {
       reportToPlatform(err)
     }
-  }
-
-  #dropLease(): void {
-    this.#lease?.evict()
-    this.#lease = null
   }
 
   /** Past the enter key: a lock crossing this is answered by the next `lock()`, as the proof says this user may have the vault unlocked. */
@@ -432,7 +428,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The lease dropped, the row cached left for the next session, and the boxes swept. */
   protected override sweepContents(): void {
-    this.#dropLease()
+    this.#lease?.evict()
+    this.#lease = null
     this.#boxListing?.sweep()
     this.listing.declineGatingAtDiscard(this)
   }

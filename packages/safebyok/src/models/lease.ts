@@ -4,7 +4,7 @@ import { tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
 import type { WayinKind } from '../shapes/shapes-enums'
-import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
 
 /** A vault's vaultKey in force on this device, good for one `gate_epoch`. It holds the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
@@ -102,7 +102,7 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Ending one]: vacate, tryVacate, evict
+  // == [Ending one]: vacate, tryVacate, uncache, tryUncache, evict
 
   /** Drop the keys and uncache the record, so this device is locked. */
   async vacate(): Promise<void> {
@@ -112,6 +112,14 @@ export class Lease implements LeaseStamp {
   }
 
   tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
+
+  /** Uncache the record with no lease held to {@link vacate}: one may stand from an earlier session. */
+  static async uncache(friend: LeaseFriend): Promise<void> {
+    leaseFriend.parse(friend)
+    valOf(await friend.tryUncacheLease())
+  }
+
+  static tryUncache(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.uncache(friend)) }
 
   /** Drop the keys, leaving the cached record for the next session. */
   evict(): void { this.#record = null }

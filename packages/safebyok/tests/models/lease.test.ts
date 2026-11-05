@@ -274,6 +274,31 @@ describe("lease.vacate(), lease.evict(), isForgotten and isInForce", () => {
     expect(other.lease.isInForce).to.be.false
   })
 
+  it("Lease.uncache erases a record with no lease held, on each call, and starts before it answers, so erases land in call order", async () => {
+    const friend = fakeLeaseFriendOf()
+    friend.cached = 'a row of an earlier session'
+    const uncaching = Lease.tryUncache(friend)
+    expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
+    expect(friend.cached).to.be.null
+    await TH.expectGood(uncaching)
+    await Lease.uncache(friend)
+    expect(friend.tryUncacheLease).toHaveBeenCalledTimes(2)
+  })
+
+  it("Lease.uncache throws what tryUncacheLease refuses; tryUncache answers it as a bad Outcome", async () => {
+    const friend = fakeLeaseFriendOf()
+    friend.tryUncacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    await TH.expectRefusal(Lease.uncache(friend), 'unexpected_error')
+    friend.tryUncacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    await TH.expectBad(Lease.tryUncache(friend), 'unexpected_error')
+  })
+
+  it("Lease.uncache refuses 'bad_option' a friend its check refuses, uncaching nothing", async () => {
+    const friend = { ...fakeLeaseFriendOf(), lock: undefined } as unknown as FakeLeaseFriend
+    await TH.expectRefusal(Lease.uncache(friend), 'bad_option')
+    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
+  })
+
   it("evict drops the keys and leaves the record cached", async () => {
     const { friend, lease } = await grantedWorld()
     lease.evict()
