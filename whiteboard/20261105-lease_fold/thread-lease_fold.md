@@ -1,6 +1,6 @@
 # Thread: lease_fold (2026-11-05)
 
-Branch `20261105-lease_fold`, PR #494 (draft), on main at `eb7a4447`: #491 and #492 merged before the first push, so it is not stacked. Justify: exit 0 at `3d47dda3`, every package; `safebyok` 60 files, 1773 passed, across the tree 7338 passed, 113 skipped, size budget within limits.
+Branch `20261105-lease_fold`, PR #494 (draft), on main at `eb7a4447`: #491 and #492 merged before the first push, so it is not stacked. Justify: exit 0 at this tip, every package; `safebyok` 60 files, 1773 passed, across the tree 7640 passed, 113 skipped, size budget within limits.
 
 * **Built**:
   * `LOCKED`, `LockedBag`, `IsListing`, `isListing` in `helpers/consts.ts`.
