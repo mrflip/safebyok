@@ -463,7 +463,7 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 /** A {@link boxListingOf} whose sealed parts are fake bags named for the revision, `duringSeal` running after the real seal.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: { val: 'sk-test' }, sidecar: {} }) is its rebirth
+ * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: 'sk-test', sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
@@ -483,5 +483,5 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
  * @example await boxListingOf(mw).create(boxDnaOf(mw.boxscope('anthropic_api_key')))
  * @example boxDnaOf(mw.boxscope('anthropic_api_key'), { sidecar: { account: 'work' } })
  */
-export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: { val: 'sk-test-0000' }, sidecar: {}, ...overrides })
+export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: 'sk-test-0000', sidecar: {}, ...overrides })
 // --

@@ -63,7 +63,7 @@ const boxRow = ({ boxlabel, present, sidecar }: BoxSnapshot): string => `${boxla
 const whisperReveal = (box: Box) => (): string => {
   const { whisper } = box
   if (whisper === null) { return 'hidden' }
-  return Storable.isLockedFUBag(whisper) ? 'locked' : JSON.stringify(whisper.val)
+  return Storable.isLockedFUBag(whisper) ? 'locked' : JSON.stringify(whisper)
 }
 
 /** The host's dialog: it records what it was shown for, and attempts what the user types; typing nothing closes it. */
@@ -100,7 +100,7 @@ const AutolockMillis = AutolockMinutes * 60_000
 /** Longer than a vault waits before it asks the vaultDB again. */
 const StaleMillis = 10 * 60_000
 
-const ApiKey = Object.freeze({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-not-a-real-key' }, sidecar: { nickname: 'work' } })
+const ApiKey = Object.freeze({ boxlabel: 'anthropic_api_key', whisper: 'sk-not-a-real-key', sidecar: { nickname: 'work' } })
 
 describe("the proof", () => {
   it("a bank's whole life, as its components see it", async () => {
@@ -136,7 +136,7 @@ describe("the proof", () => {
     revealOfLockUi.expectRenders(['hidden'])
     const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
     expect(boxRows).to.have.lengthOf(1)
-    expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper.val)
+    expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper)
 
     // Unseal it: extractWhisper hands over the whisper and keeps nothing; expose keeps it for the component.
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
@@ -144,9 +144,9 @@ describe("the proof", () => {
     await box.expose()
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
-    revealUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
+    revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     const snapshots = [bank.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
-    expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.val)
+    expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper)
 
     // Lock: every component watching the vault is told before lock() returns, the whisper leaves the screen, and the box refuses.
     vault.lock()
@@ -175,7 +175,7 @@ describe("the proof", () => {
     boxUi.expectRenders([])
     boxesUi.expectRenders([])
     revealUi.expectRenders([])
-    revealOfLockUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
+    revealOfLockUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
     // Delete: the user proves it, the list empties, and the vault says it is gone.

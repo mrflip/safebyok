@@ -113,8 +113,8 @@ describe("the box verbs refuse a vault locked, or gone", () => {
     const { vault } = await makeWorld()
     vault.lock()
     const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'vault_locked')
-    expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper.val)
-    expect(err.message).not.to.include(Whisper.val)
+    expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper)
+    expect(err.message).not.to.include(Whisper)
   })
 })
 

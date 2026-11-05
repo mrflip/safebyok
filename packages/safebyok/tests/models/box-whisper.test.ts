@@ -1,4 +1,4 @@
-/** A Box's whisper: extractWhisper, expose and veil, LOCKED, and the whisper given as { val }. */
+/** A Box's whisper: extractWhisper, expose and veil, LOCKED, and what may be a whisper. */
 
 import { describe, expect, it } from 'vitest'
 import { LOCKED } from '../../src/helpers/consts'
@@ -17,10 +17,10 @@ const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> =>
   return boxListingOf(held.mw).build(record)
 }
 
-/** A box storing `val`, that whisper exposed. */
-const exposedOf = async (val: Whisper = 'sk-test-0000'): Promise<TestableBox> => {
+/** A box storing `whisper`, that whisper exposed. */
+const exposedOf = async (whisper: Whisper = 'sk-test-0000'): Promise<TestableBox> => {
   const box = await builtOf(fullBoxRecord())
-  await box.put({ whisper: { val } })
+  await box.put({ whisper })
   return box.expose()
 }
 
@@ -51,7 +51,7 @@ describe("box.extractWhisper(): refused from its guard", () => {
 describe("box.extractWhisper(): what the lease opens that is no whisper", () => {
   const OpenedCases = [
     ['text that is no JSON',            'sk-test-SECRET {'],
-    ['JSON that is no { val } holder',  '{"value":"sk-test-SECRET"}'],
+    ['JSON that is no whisper',         'null'],
   ] as const
   for (const [blurb, text] of OpenedCases) {
     it(`refuses 'damaged_box' for ${blurb}, quoting none of it`, async () => {
@@ -81,7 +81,7 @@ describe("box.whisper while the vault is locked", () => {
     expect(box.whisper).to.eq(LOCKED)
     expect(box.getSnapshot().exposed).to.be.true
     held.mw.setLockState('unlocked')
-    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
+    expect(box.whisper).to.deep.equal('sk-test-0000')
   })
 })
 // --
@@ -117,7 +117,7 @@ describe("box.veil()", () => {
     held.mw.setLockState('locked')
     await TH.expectRefusal(box.expose(), 'vault_locked')
     held.mw.setLockState('unlocked')
-    expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
+    expect(box.whisper).to.deep.equal('sk-test-0000')
   })
 })
 // --
@@ -135,7 +135,7 @@ describe("LOCKED and Storable.isLockedFUBag: a frozen bag of the package's own",
     [{},                            'an empty bag'],
     [{ ...LOCKED },                 'a copy made by spreading it'],
     [Object.assign({}, LOCKED),     'a copy made by assigning it'],
-    [{ val: 'sk-test-0000' },       'a whisper given as { val }'],
+    [{ apiKey: 'sk-test-0000' },    'a whisper'],
     [null,                          'null'],
     [undefined,                     'undefined'],
     ['LOCKED',                      'its name'],
@@ -156,7 +156,7 @@ describe("LOCKED and Storable.isLockedFUBag: a frozen bag of the package's own",
     held.mw.setLockState('locked')
     expect(Storable.isLockedFUBag(box.whisper)).to.be.true
     held.mw.setLockState('unlocked')
-    await box.put({ whisper: { val: 'sk-test-0000' } })
+    await box.put({ whisper: 'sk-test-0000' })
     await box.expose()
     held.mw.setLockState('locked')
     expect(box.whisper).to.eq(LOCKED)
@@ -164,23 +164,22 @@ describe("LOCKED and Storable.isLockedFUBag: a frozen bag of the package's own",
 
   it("never takes a whisper for it: a whisper of that name is exposed, and LOCKED or a copy is refused at a put as no whisper", async () => {
     const box = await exposedOf('LOCKED')
-    expect(box.whisper).to.deep.equal({ val: 'LOCKED' })
-    await TH.expectRefusal(box.put({ whisper: LOCKED as never }), 'bad_option')
-    await TH.expectRefusal(box.put({ whisper: { ...LOCKED } as never }), 'bad_option')
-    expect(box.whisper).to.deep.equal({ val: 'LOCKED' })
+    expect(box.whisper).to.deep.equal('LOCKED')
+    await TH.expectRefusal(box.put({ whisper: LOCKED }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: { ...LOCKED } }), 'bad_option')
+    expect(box.whisper).to.deep.equal('LOCKED')
   })
 })
 // --
 
-// == [The whisper as { val }]: put, expose
+// == [What a whisper may be]: put, expose
 
-describe("box.whisper and box.put: the whisper given as { val }", () => {
+describe("box.whisper and box.put: what a whisper may be", () => {
   const BadWhisperCases = [
-    ['sk-test-SECRET',                                          'a bare whisper'],
-    [{ val: null },                                             'a val that is null'],
-    [{ val: { apiKey: 'sk-test-SECRET', when: new Date(T0) } }, 'a val JSON would mangle'],
-    [{ val: 'sk-test-SECRET', SECRET_NOTE: 'x' },               'a field beside the val'],
-    [{ value: 'sk-test-SECRET' },                               'a whisper under another name'],
+    [null,                                               'null'],
+    [{ apiKey: 'sk-test-SECRET', when: new Date(T0) },   'an object JSON would mangle'],
+    [['sk-test-SECRET', undefined],                      'an array holding undefined'],
+    [{ SECRET_KEY: new Map() },                          'an object holding a Map'],
   ] as const
 
   for (const [whisper, blurb] of BadWhisperCases) {
@@ -194,23 +193,44 @@ describe("box.whisper and box.put: the whisper given as { val }", () => {
     })
   }
 
-  it("refuses before its guards: a bare whisper refuses while the vault is locked", async () => {
+  it("refuses before its guards: a whisper JSON would mangle refuses while the vault is locked", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
-    await TH.expectRefusal(box.put({ whisper: 'sk-test-0000' as never, sidecar: {} }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: new Date(T0) as never, sidecar: {} }), 'bad_option')
   })
 
-  it("exposes a frozen copy of the whisper put: the host's later change to its own reaches no box, and the box's cannot be changed in place, val and all", async () => {
+  it("exposes a frozen copy of the whisper put: the host's later change to its own reaches no box, and the box's cannot be changed in place", async () => {
     const box = await builtOf(fullBoxRecord())
-    const given = { val: { apiKey: 'sk-test-0000' } }
+    const given = { apiKey: 'sk-test-0000', deep: { orgId: 'org-0000' } }
     await box.put({ whisper: given })
-    given.val.apiKey = 'sk-test-changed'
+    given.apiKey = 'sk-test-changed'
     await box.expose()
-    expect(box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000' } })
-    expect(Object.isFrozen(box.whisper)).to.be.true
-    expect(() => { (box.whisper as { val: unknown }).val = 'sk-test-1111' }).to.throw(TypeError)
-    expect(() => { ((box.whisper as { val: { apiKey: string } }).val).apiKey = 'sk-test-1111' }).to.throw(TypeError)
-    expect(box.whisper).to.deep.equal({ val: { apiKey: 'sk-test-0000' } })
+    const AsPut = { apiKey: 'sk-test-0000', deep: { orgId: 'org-0000' } }
+    expect(box.whisper).to.deep.equal(AsPut)
+    const exposed = box.whisper as typeof AsPut
+    expect(Object.isFrozen(exposed)).to.be.true
+    expect(() => { exposed.apiKey = 'sk-test-1111' }).to.throw(TypeError)
+    expect(() => { exposed.deep.orgId = 'org-1111' }).to.throw(TypeError)
+    expect(box.whisper).to.deep.equal(AsPut)
+  })
+
+  for (const [whisper, blurb] of [['', 'an empty string'], [0, 'zero'], [false, 'false'], [{}, 'an empty object'], [[], 'an empty array'], [{ val: null }, 'an object with a val, no holder now']] as const) {
+    it(`stores and opens ${blurb} as the whisper it is`, async () => {
+      const box = await builtOf(fullBoxRecord())
+      await box.put({ whisper: whisper as Whisper })
+      expect(await box.extractWhisper()).to.deep.equal(whisper)
+      await box.expose()
+      expect(box.whisper).to.deep.equal(whisper)
+      expect(box.getSnapshot().exposed).to.be.true
+      await box.put({ sidecar: { note: 'kept' } })
+      expect(await box.extractWhisper()).to.deep.equal(whisper)
+    })
+  }
+
+  it("opens a box sealed as { val } in the old form as the whisper { val }, not a failure", async () => {
+    const box = await builtOf(fullBoxRecord())
+    await box.put({ whisper: { val: 'sk-test-0000' } })
+    expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0000' })
   })
 
   it("shows the whisper exposed in no snapshot or JSON of the box", async () => {

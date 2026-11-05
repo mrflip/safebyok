@@ -1,11 +1,13 @@
+import { deepFreeze } from 'es-toolkit'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { type LockedBag, LOCKED } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import type { Sidecar, Boxscope } from '../shapes/shapes-core'
+import * as CX from '../shapes/shapes-core'
+import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts, type WhisperHolder, whisperHolder } from '../shapes/shapes-vaultish'
+import { type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { absentBoxError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
@@ -25,8 +27,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly listing: BoxListing
 
-  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance: hidden while the vault is locked, kept until {@link veil} or a vault modification clears the box. */
-  #exposed: WhisperHolder | null = null
+  /** The frozen whisper the host asked to keep open on the instance: hidden while the vault is locked, kept until {@link veil} or a vault modification clears the box. */
+  #exposed: Whisper | null = null
   // --
 
   // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper
@@ -46,7 +48,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
 
   /** SLOPDOC: The whisper exposed on this instance, LOCKED while the vault is. */
-  get whisper(): WhisperHolder | LockedBag | null {
+  get whisper(): Whisper | LockedBag | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
   }
@@ -54,13 +56,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [The whisper]: extractWhisper, tryExtractWhisper, expose, veil, unseal
 
-  /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
-  async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
+  /** The timely stored whisper, frozen, keeping nothing on the instance. */
+  async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper> {
     await this.ensureUnsealable(opts); this.demandUnsealable()
     return this.#unseal(this.demandFullProps())
   }
 
-  tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<WhisperHolder>> { return outcomeOf(() => this.extractWhisper(opts)) }
+  tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
   /** SLOPDOC: Opens the stored whisper and holds it on the instance, where `box.whisper` offers it until forgotten. */
   async expose(opts: TimelyOpts = {}): Promise<this> {
@@ -78,14 +80,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}. */
-  async #unseal(record: BoxRecord): Promise<WhisperHolder> {
+  /** The whisper of `record`, opened through the vault's seal verbs and held to `CX.whisper`. */
+  async #unseal(record: BoxRecord): Promise<Whisper> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(VX.boxSparse.parse(record), sidecar)
     const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
-    const held = whisperHolder.safeParse(parseJsonOrNull(whisperText))
+    const held = CX.whisper.safeParse(parseJsonOrNull(whisperText))
     if (! held.success) { throw undecodedWhisper() }
-    return held.data
+    return deepFreeze(held.data)
   }
   // --
 
@@ -114,13 +116,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const next = { ...prior, ...SX.nextRevisionOf(prior, written_at), am: 'a' as const }
     // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
     const record = this.isTombstoneRecord(prior)
-      ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? { val: {} })
+      ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? {})
       : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
     return { record, prior: SX.revisionOf(prior) }
   }
 
   /** The whisper a patch left out, opened from the record in hand. */
-  #keptWhisper(): Promise<WhisperHolder> { return this.#unseal(this.demandFullProps()) }
+  #keptWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
   // --
 
   // == [Guards]: demandUnsealable, demandPuttable, demandExposable, demandPresent, ensureUnsealable, ensurePuttable
@@ -183,8 +185,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
 // == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
 
-/** The full record of `base` with `sidecar`, `whisper` sealed through `world`: its {@link WhisperHolder} `{ val }` as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
-const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: WhisperHolder): Promise<BoxRecord> => {
+/** The full record of `base` with `sidecar`, `whisper` sealed through `world`: as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
+const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> => {
   const sparse = VX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
   const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper) ?? '', stamp)
