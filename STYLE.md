@@ -698,134 +698,89 @@ rows with it.
 
 ## Comments and doc blocks
 
-**For now, a doc block is one or two 120-character lines giving the purpose: no refusal lists and no narrated
-parameters. Where the rest of this section disagrees, this note wins.** (The Coach, 2026-11-03: the guidance on
-comments is inconsistent, and a reform is coming.)
+`/** */` for doc blocks, `//` for a running clarification or commented-out code. Bulleted lists use `*` at the top level and
+`-` below, indented two spaces per level.
 
-* `/** */` for doc blocks, `//` for a running clarification or commented-out code.
-* Bulleted lists use `*` at the top level and `-` below, indented two spaces per level.
-* **Every exported function, class, constant and type gets a doc block**, written for its caller:
-  a developer, or their agent, *using* it, who is no expert in security, distributed systems or
-  backends. For a private member, the reader is the code that calls it. Never how it came to be,
-  what's next, or how it works inside: a caveat for maintainers is a running comment by the code
-  it concerns, and an invariant they keep ("every lock goes through here") one on the line above
-  the member's doc block.
-* **The purpose goes on the `/**` line**, a sentence that stands alone when the block is folded
-  in an editor: `/** Brief statement */` alone, or `/** Brief statement.` with the rest on the
-  lines below. Never `/**` alone on its line.
-* **Lead with what the thing *is*, or with what it *does***. A type, a constant or a pure
-  function leads with what it is or returns: `/** The fields written to storage: the visible
-  ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
-  that will be written to the database */`. A function that reads storage, decrypts, asks the
-  user or writes leads with that verb: `/** Get and open the box stored under boxlabel, ...`.
-  "Get" here is a storage read: a lookup in memory leads with what it returns. Never open on "What
-  a ..." or "What ... does": name the thing, or say the act.
-* **Read the member's name against that first line** (*Naming*).
-* **Name the shape and say *stamp*.** A block says which shape it takes or hands back
-  (`VaultSparse`, `BoxStamp`) by its name, and calls the fields a ciphertext is bound to the
-  stamp (*Naming*). An interface a host implements says what is checked, and by whom.
-* **Each sentence tells the caller something they would otherwise get wrong**, given the
-  signature, the names, what a capable developer already knows, and what is said once elsewhere.
-  Leave out a parameter's type, what it is when its name says so, the return type, and a default
-  that is an option of the same name elsewhere.
-* **Say a thing once.** What holds for every member of a class, module or interface goes in its
-  doc, one sentence each; a member that is an exception says so. Another function's doc is
-  linked on first mention, never restated. A condition every member meets alike (a lock landing
-  mid-call, the object gone) is said once, in the class doc or on the call that causes it
-  (`lock()`); a member names it only where what it leaves behind differs. A `try` twin is one
-  line: `/** The whisper in
-  `boxlabel`, as an {@link Outcome}: the non-throwing form of {@link getBox}. */`. A storage
-  adapter's members say only where they differ from `VaultDB`'s contract.
-* **A block is as long as its contract, not its code.** A patently obvious member needs its
-  first line and nothing more. A guard, or an entrypoint other calls go through, states its
-  contract even when it is simple: what holds once it succeeds. Beyond that, only what the
-  signature cannot give: the state the call leaves behind, side effects, when it may be called,
-  and any security fact a caller could get wrong ("replacing is not revoking"). Most public
-  methods take 5 to 15 lines of prose; one whose contract has many conditions may run longer, in
-  short paragraphs of one theme each (limits, races, locks).
-* **Name every reach across a seam**: storage, a decryption, the user, a timer, an injected
-  interface, a public call it goes through. One sentence with `{@link}`s: `Reads {@link
-  DeviceDB.getDeviceRecord}, then {@link DeviceDB.getLease}.` Private members too, down to the
-  private call that holds the reach, named in backticks (`Gets the box through #getBox`).
-  Never the order of steps.
-* **Say what a member does and when to call it, never who calls it.** A list of callers, or of
-  what each does with the result, belongs to those callers and goes stale. A rule its callers
-  must keep stays, as an instruction: "Ask it first in every call." A caller list that is the
-  only word on what a parameter means becomes that `@param`: what to pass, and why.
-* **Never tour the fields.** A type's doc says what the whole is and what holds of every field.
-  Each field's own facts go on that field, inline object types included. Where a field, a
-  parameter or a return value has a documented type, link it rather than list its fields.
-* **Name the refusals that are common and not obvious.** `RefusalKind` in `errors.ts` sorts them:
-  - *Misuse* (`bad_option`, `bad_scope`, `insecure_context`, ...) is said once, in the class
-    or module doc.
-  - *Conditions* a caller meets in normal use are named: a wrong proof, a weak passphrase, a race
-    with another device or tab (`stale_write`, `created_elsewhere`), a lock landing mid-call, a
-    limit reached.
-  - *Bad news* is named on the call where a host first meets it, as `hello` names
-    `damaged_vault`.
-  - Not what passes through from storage or another public call, and not what only a bug or a
-    record breaking the package's own invariants brings about. A refusal from beneath that the
-    member turns into another kind is its own, and named, with what it leaves behind.
-  - The kind goes unexplained. A clause only for a meaning or an aftermath this member gives it;
-    a remedy only when it is another call (`delDamagedVault` clears them). The user's next step
-    is the message's job.
-* **Plain sentences**: subject, verb, object, in that order; one fact to a sentence; under 25
-  words.
-* **Facts come from the code**, not from the old prose, which is sometimes wrong. Where they
-  disagree, write what the code does and raise the disagreement; the doc never changes behaviour.
-  Timing words ("at once", "before", "never") are facts too: check each against the awaits.
-* Don't be stingy with `@example`s. A short example on one line; a long one on following lines,
-  indented two spaces. Each has a test whose title points back to it (*Tests*). What is best said
-  beside an example goes in its `//` comment.
-* `@param` and `@returns` only for what the name and type can't say: a unit or range, what `null`
-  or leaving an optional parameter out means, a return the first line doesn't cover. A `@param`
-  is the parameter's role, an entry in the playbill: `@param boxlabel - Box to open, as its owner
-  named it.`
-* Each `{@link}` names something in scope in its file; anything else is plain code, in
-  backticks, never a type-only import made for the link, which `no-unused-vars` refuses. A
-  private member is always plain code, in backticks: never a `{@link}`.
+**A doc block is as short as its purpose, and says what the member does for the one reading its signature.** Its first
+line is one whole sentence resting on the `/**`, however long, so it reads with the code folded; a member whose purpose will
+not go in a sentence is a smell to report. For length, measure it against the doc of a method of like complexity and
+flexibility in a library you trust from memory (the DOM, Node's `fs`, Zod): usually one line, rarely more than five. No
+count holds the length: a reviewer does. The first line runs long only while it is one fact a caller must know before
+calling `#one-sentence-headline`: `create` refusing a live box is that news and stays on the line; a put's stale-write
+criteria are a description under a short headline (the pairs: `notes/gallant-docblocks.md`). A coding agent writes the first line and nothing more; everything past it
+is the documentarian's.
+
+* **Every export gets a doc block; a private member gets a phrase** `#a-helper-gets-a-phrase` (``/** The whisper of `record` */``). Both answer the caller's three questions and no others `#three-questions`: when
+  do I call it, what do I get, what would I otherwise get wrong. Never who calls it, nor what a sibling does.
+* **A doc block has no past and no future** `#purpose-not-path`: nothing on how the code came to be, what it replaced,
+  which thread or ruling shaped it, why it is built this way, or what is next. A reason worth keeping is a `//` comment
+  above the block (below); a caveat, a progress note or an open question goes to `human/` or the whiteboard, never here.
+* **A doc block does not read the body aloud** `#purpose-not-machinery`: not the steps or their order, the helpers it calls,
+  the fields it touches, or the state a refusal leaves behind. The body is a line below, and a caller who needs it will open
+  it. The test: cover the body and ask of each sentence whether the caller still needs it.
+* **The first sentence names the act or the thing** `#name-the-act`. A function that stores, decrypts, asks the user or sends opens with that
+  verb: `Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata`. A lookup, a type
+  or a constant opens with what it is or hands back: ``Vault **or tombstone** listed at `scope`, null if absent.`` Read the
+  member's name against that sentence (*Naming*). It carries one qualifier at most; anything more is a sentence of its own.
+* **Every sentence has a subject and a finite verb, and says one thing** `#one-verb-one-fact`. The usual signs that one
+  doesn't: a semicolon joining two facts, a list with its verb gapped out (`a row or record, 'bad_record'; a cutoff,
+  'bad_option'`), a clause hung on "as", "so", "once", "since" or "which", and "one" standing in for a noun you cut. Each
+  is a cue to write the second sentence, not a ban. A fact that will not go in a plain sentence is not a doc-block fact.
+* **A member's block names no refusal catalog** `#no-refusal-catalog`. The thrower's doc and the `Outcome` type carry the
+  kinds, and a class or module doc may say in one sentence what misuse refuses. The one kind worth naming is a condition the
+  caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on an unlock. Before naming one, taste it
+  against those two from memory: a kind of lesser salience goes unnamed. Where a caller meets a refusal in normal use, say
+  what to do instead `#say-what-to-do`: `Precede with await bank.hello(), repeated to force a refresh`.
+* **Option values get a list** `#option-values-get-a-list`, one value a line, the default marked (`create`, below). A
+  term with a home (`sealed`, `stamp`) gets one `{@link}` or a pointer, never a second definition `#point-dont-redefine`.
+* **The guarantee is the line worth writing** `#say-the-guarantee`. What the call proves, or what a caller could get wrong about a secret, goes
+  in: `Extracting the whisper authenticates that (sidecar included) the object has not been modified since it was sealed`.
+* **A guard names the predicates it asks** `#guard-names-its-predicates`, linked: `throw unless {@link isEnabled}, unlocked, {@link isPresent}, {@link isFull}`.
+* **A maintainer's note is a `//` comment** `#reason-goes-above`, on the line above the doc block or by the code it concerns: an invariant kept
+  (`// every lock goes through here`) or a reason (`// The lock first: no box opens under a lease while the tombstone goes out.`).
+* `@param` and `@returns` only for a unit, a range, or what `null` or leaving an optional out means. A `{@link}` names
+  something in scope in its file; anything else is backticks, a private member always.
+* **`@example`s are welcome**, one line each where they can be, and each has a test (*Tests*).
+* **Facts come from the code** `#facts-from-the-code`, never from the old prose or the test titles. Where they disagree, write what the code does
+  and raise it; the doc never changes behaviour.
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
   section (its name, then the names a reader would `rg` for), `// --` closes it, both at the
   section's indentation; sections are flat, never nested. `rg -n '// == ' <file>` is the file's
   table of contents. A banner groups declarations; it does not excuse a file that should be
   split, and it moves with the code it names.
 
-A doc block before and after, its examples left out. Before, 41 lines opening:
+Goofus and Gallant, from `notes/gallant.md` *Words*, which has the rest. Each Goofus is named for its device, so you can
+recognise your own.
+
+The noun phrase carrying the contract, and a refusal where a recipe belongs:
 
 ```ts
-/**
- * Read storage and settle the vault: one read of the vault props, their ways in and the box
- * listing, then this device's lease, taken up when it still fits and still opens, and the vault
- * settled from those into `absent`, `locked` or `unlocked`, its snapshot published -- never
- * prompting: asking for a passphrase is the host's job, and only when a whisper is actually
+/** The vault listed for `bag`, a tombstone among them, or null. Refuses before ready. */
+vaultOf(bag: VaultBag): Vault | null
 ```
 
-After:
-
 ```ts
-/** Read storage and settle the vault as `novel`, `locked` or `unlocked`, resolving the vault.
- * Never prompts. Within `staleMinutes` of the last read it re-settles without reading.
- * Reads {@link DeviceDB.getDeviceRecord}, then `VaultDB.getVault` beside {@link DeviceDB.getLease}.
- *
- * A refused hello leaves the vault as it last settled. Stored vault props it cannot use refuse
- * with 'damaged_vault' (`delDamagedVault` clears them), 'newer_format' or 'vault_behind'.
+/** Vault **or tombstone** listed at `scope`, null if absent.
+ * Precede with await bank.hello(), repeated to force a refresh; then .hydrate() on the vault answered makes it timely
  */
+vaultAt(scope: BankedVaultScope): Vault | null
 ```
 
-A private helper whose block toured its return value and hid its reach. Before:
+The gapped refusal list, the participial absolutes, and the option explained in a clause:
 
 ```ts
-/** What a `putBox()` leaving out the sidecar or the whisper seals: the box read from storage and opened, its sidecar and whisper kept where not given, its revision the base.
+/** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'vault_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
+async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box>
 ```
 
-After, and renamed from `#storedBase`, as the line showed the name was wrong:
-
 ```ts
-/** Get and open the box stored under `boxlabel`, filling in the sidecar or whisper a partial `putBox()` left out.
- * Gets through `#getBox`, and decrypts the whisper under the lease in hand. The put then
- * lands only over the revision read.
+/** Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata
+ * @see `sealedRecordOf` in models/box.ts for what "encrypted" and "sealed" imply
+ * - `ifPresent:fail` (default): replace a void/tombstoned box, else fail
+ * - `ifPresent:repl` replaces (if in correct sequence);
+ * - `ifPresent:get`  returns an existing box
  */
-async #fillFromStored(boxlabel: string, ...)
+async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 ```
 
 Well-named, short functions rarely need running comments. A comment that narrates the code, makes
@@ -863,9 +818,11 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
   passes. Name it for what it does: if the helper should not assert, give it a different name
   (`check...`, `read...`); if it should, make it assert and keep the name. Never add an assertion
   to a helper merely to make the rule happy.
-* **Every use case of an exported function has a test, and every `@example` has one whose
-  title points back to it**: `"refuses a misspelt field as 'bad_option', as its second example
-  shows"`, so a reviewer, or whoever changes the example, finds its test by the title.
+* **Every use case of an exported function has a test. A title is one plain clause naming the behaviour.** It quotes no
+  refusal kind and chains no second outcome: the assertions carry those. `it("refuses a misspelt field")`, never
+  `"refuses a misspelt field as 'bad_option', as its second example shows"`. A test that covers an `@example` says so on
+  its first line, `// putBox @example 2`, which `rg` finds. The blurb slot of a bulk case list follows the same rule. The
+  linter (`vitest/valid-title`) refuses a quoted kind; the length is for review.
 * **Each example ties to a plausible failure mode.** Ask what null, undefined and a missing value
   mean; what an absurd type does (`seal(42)`); what a not-quite-absurd one does (a salt one byte
   short, a passphrase of only whitespace, a vault written by a newer version).
