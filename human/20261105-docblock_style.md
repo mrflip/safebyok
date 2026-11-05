@@ -1,6 +1,6 @@
 # Thread docblock_style: the doc-block reform's rules land (2026-11-05)
 
-Branch `20261105-docblock_style`, cut from `origin/main` at fa7ff8e5. Step 1 of the reform's order of operations
+Branch `20261105-docblock_style`, [#508](https://github.com/mrflip/safebyok/pull/508), cut from `origin/main` at fa7ff8e5. Step 1 of the reform's order of operations
 (`whiteboard/20261102-newdesign/docblock-reform.md` 3f, in the base checkout): the rules land at `warn`; the
 documentarian sweep that turns them to `error` is a later thread. Justify green; lint 534 warnings, 0 errors.
 
@@ -25,8 +25,8 @@ documentarian sweep that turns them to `error` is a later thread. Justify green;
 * **Deviations**: the brief's lint step says "flags a refusal catalog" where 3e says "refuses a quoted kind": the rule
   wants two kinds, and at `warn` it refuses nothing. "Then each member" became "Each member" once *Gather first* was cut.
 * **Discoveries**: `allowArguments` skips any identifier title, so a bulk list's blurb quoting a kind goes unseen by
-  the lint, though STYLE.md now says the linter refuses one. Eight STYLE.md tags have no bestiary entry yet
-  (#facts-from-the-code, #guard-names-its-predicates, #name-the-act, #one-verb-one-fact, #option-values-get-a-list,
+  the lint, though STYLE.md now says the linter refuses one. Nine STYLE.md tags have no bestiary entry yet
+  (#example-earns-its-lines, #facts-from-the-code, #guard-names-its-predicates, #name-the-act, #one-verb-one-fact, #option-values-get-a-list,
   #point-dont-redefine, #reason-goes-above, #three-questions). The `create` Gallant uses `-` bullets at top level,
   where the section's own first paragraph says `*`. "One file per spawn" in the brief sits beside its unchanged
   frontmatter (target: files or folders) and *Done* (commits grouped by folder, four at most).
