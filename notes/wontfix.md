@@ -104,3 +104,6 @@ not as a settled ruling, and check it against the current design before relying 
   A box listing never replaces a held box, so `put` answers the instance it was called on. Only a `box.vacate()` or `box.sweep()`, or a
   `boxListing.hello` naming the box damaged, landing inside the put's `tryPutRow` empties the slot, and the delivery then lists a new instance.
   The caller holds the discarded one, which refuses `disabled` from then on; the listing answers the new one.
+* 2026-11-05 (the Coach's brief for `box.putExposed`: "a race gets a row"): **a `box.unexpose()` crossing a `box.putExposed()`.** `putExposed` takes
+  the value exposed when it is called, before its hydrate, so an `unexpose` that lands inside the put's awaits changes nothing about what is sealed:
+  the value taken at the call is stored, and the instance holds none.
