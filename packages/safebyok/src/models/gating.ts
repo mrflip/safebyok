@@ -15,10 +15,10 @@ import { PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
 import type { VaultListing } from './vault-listing'
 
-// == [Gating]: launch, isOpen, whenSettled, checkStrength, attempt, decline, declineAtLock, declineAtDiscard, toJSON
-
 /** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and settles once: launch answers with that outcome. */
 export class Gating<KindT extends GatingKind = GatingKind> {
+  // == [Props]: gatingkind, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #run, #prove, #settled, #settle, #outcome, #isAttempting, #isLastAttempt
+
   declare readonly gatingkind:    KindT
   declare readonly applabel:      string
   declare readonly user_id:       string
@@ -35,6 +35,27 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   #outcome:       Outcome<Vault> | null = null
   #isAttempting  = false
   #isLastAttempt = false
+  // --
+
+  // == [Getters]: isOpen, whenSettled, scope, toJSON
+
+  get isOpen(): boolean { return this.#outcome === null }
+
+  /** The outcome once settled, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
+  get whenSettled(): Promise<Outcome<Vault>> { return this.#settled }
+
+  get #scope(): VaultScope {
+    const { applabel, user_id, vaultlabel } = this
+    return { applabel, user_id, vaultlabel }
+  }
+
+  toJSON(): GatingSnapshot {
+    const { gatingkind } = this
+    return { gatingkind, ...this.#scope }
+  }
+  // --
+
+  // == [Construction]: constructor, launch, askHost
 
   private constructor(gatingkind: KindT, { listing, scope, vault, run }: LaunchArgs<KindT>) {
     tattoo(this, { gatingkind, ...scope }, { writable: false })
@@ -66,20 +87,13 @@ export class Gating<KindT extends GatingKind = GatingKind> {
       this.#endAsking(requestCleartextThrew())
     }
   }
+  // --
 
-  get isOpen(): boolean { return this.#outcome === null }
-
-  /** The outcome once settled, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
-  get whenSettled(): Promise<Outcome<Vault>> { return this.#settled }
+  // == [The attempt]: checkStrength, attempt, refusalOfAttempt, attemptOnce
 
   /** The verdict on a passphrase, as the user types it. Nothing changes. */
   async checkStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
     return Proving.checkStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
-  }
-
-  get #scope(): VaultScope {
-    const { applabel, user_id, vaultlabel } = this
-    return { applabel, user_id, vaultlabel }
   }
 
   /** SLOPDOC: The one door for a clear: tries what the user typed once, and answers how it went as an Outcome. */
@@ -110,6 +124,9 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     }
     return outcome
   }
+  // --
+
+  // == [Settling]: decline, declineAtLock, declineAtDiscard, endAsking, settleOnce
 
   /** The user said no. With no attempt under way the gating settles 'declined'; one under way runs on, and its outcome settles it. */
   decline(): void { this.#endAsking(gatingDeclined()) }
@@ -137,13 +154,8 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     this.#listing.releaseGating()
     this.#settle(outcome)
   }
-
-  toJSON(): GatingSnapshot {
-    const { gatingkind } = this
-    return { gatingkind, ...this.#scope }
-  }
+  // --
 }
-// --
 
 // == [An attempt's provings]: Prove, ProveForGatingkind, timelyAnte, provePassphrase, checkedClears, isCorrectable, spendClears
 
