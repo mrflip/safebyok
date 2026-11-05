@@ -8,6 +8,14 @@ import { unboundCipherCtx } from '../refusals/throwers'
 import type { Ciphered } from '../shapes/shapes-core'
 import { stableJsonify } from './stable-jsonify'
 
+// == [Constants]: AesGcm, IvBytes
+
+const AesGcm = { name: 'AES-GCM', length: 256 } as const
+const IvBytes = 12
+// --
+
+// == [Randomness and base64]: randomBytes, randomId, makeLifeTok, toB64, fromB64, fromB64OrNull
+
 /** `count` cryptographically secure random bytes, from the platform. */
 export const randomBytes = (count: number): Uint8Array => (
   crypto.getRandomValues(new Uint8Array(count))
@@ -43,9 +51,9 @@ export const fromB64OrNull = (b64: string): Uint8Array | null => {
     return null
   }
 }
+// --
 
-const AesGcm = { name: 'AES-GCM', length: 256 } as const
-const IvBytes = 12
+// == [The ctx]: CipherCtxRecord, cipherCtx, isUnbound
 
 /** One record of a {@link cipherCtx}, a stamp or a header: a flat record of strings and numbers, encoded with its keys sorted, every field bound. */
 export type CipherCtxRecord = Readonly<Record<string, string | number>>
@@ -75,6 +83,9 @@ const isUnbound = (part: CipherCtxRecord | string | null | undefined): boolean =
   part === undefined || part === null
   || (typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).some((val) => val === undefined || val === null))
 )
+// --
+
+// == [Making keys]: makeVaultKey, makeBoxKey, makeLeaseKey, importWrappingKeyBytes, deriveWrappingKey
 
 /** A fresh random 256-bit AES-GCM key for wrapping other keys: a brand-new vaultKey.
  * It is extractable, as a key must be to be wrapped, so keep it only inside the operation that
@@ -121,6 +132,9 @@ export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array):
     ['wrapKey', 'unwrapKey'],
   )
 }
+// --
+
+// == [Ciphering]: cipherBytes, decipherBytes
 
 /** `plainBytes` encrypted under `cipherKey`, bound to `ctx`, under a fresh cipherIv every call. */
 export const cipherBytes = async (cipherKey: CryptoKey, plainBytes: Uint8Array, ctx: Uint8Array): Promise<Ciphered> => {
@@ -145,6 +159,9 @@ export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, ct
   )
   return new Uint8Array(plain)
 }
+// --
+
+// == [Wrapping]: wrapKeyUnder, unwrapKeyUnder
 
 /** `wrappedKey`, which must be extractable, encrypted under `wrappingKey` and bound to `ctx`, under a fresh cipherIv every call. */
 export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey, ctx: Uint8Array): Promise<Ciphered> => {
@@ -182,3 +199,4 @@ export const unwrapKeyUnder = async (
     [...usages.usage],
   )
 )
+// --
