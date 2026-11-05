@@ -258,7 +258,7 @@ export const isNewerFormat = (raw: unknown, ownFormat: number): boolean => {
   return peek.success && (peek.data.fmt > ownFormat)
 }
 
-const damagekindOf = (raw: unknown, ownFormat: number): EX.Damagekind => (isNewerFormat(raw, ownFormat) ? 'format_mismatch' : 'damaged_record')
+const damagekindOf = (raw: unknown, ownFormat: number): EX.Damagekind => (isNewerFormat(raw, ownFormat) ? 'format_mismatch' : 'damaged_row')
 
 /** A vault row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
 export const damagedVaultOf = (scope: VaultScope, raw: unknown): DamagedVault => ({ ...sentinelVaultOf(scope), ...peekOf(raw), am: 'd', damagekind: damagekindOf(raw, VaultFormat) })
