@@ -1,5 +1,6 @@
 import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
+import * as Phrases from '../../src/helpers/phrases'
 import { fromB64, randomBytes, toB64 } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
@@ -411,7 +412,8 @@ describe("proving.buildWayin(source)", () => {
     const theirs = await PassphraseProving.buildNovel({ ...WorldStamp, vault_tok: 'vault-tok-other' }, TestPassphrase, provingWorldOf())
     await theirs.buildWayin(NOVEL)
     const mine = await novelPassphrase()
-    await TH.expectRefusal(mine.buildWayin(theirs), 'unexpected_error')
+    const err = await TH.expectRefusal(mine.buildWayin(theirs), 'unexpected_error')
+    expect(err.message).to.eq(Phrases.ProvingOfOtherVault)
   })
 
   it("refuses a second buildWayin on one proving as 'unexpected_error', so its leases stay under the one vaultKey its first wayin wraps", async () => {
