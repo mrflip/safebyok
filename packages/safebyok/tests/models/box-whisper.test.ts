@@ -83,6 +83,18 @@ describe("box.whisper while the vault is locked", () => {
     held.mw.setLockState('unlocked')
     expect(box.whisper).to.deep.equal('sk-test-0000')
   })
+
+  it("gives back the very object once unlocked, an edit made before the lock or during it kept", async () => {
+    const box = await exposedOf({ apiKey: 'sk-test-0000' })
+    const exposed = box.whisper as { apiKey: string, org?: string }
+    exposed.apiKey = 'sk-test-edited'
+    held.mw.setLockState('locked')
+    exposed.org = 'acme'
+    expect(box.whisper).to.eq(LOCKED)
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.eq(exposed)
+    expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-edited', org: 'acme' })
+  })
 })
 // --
 
@@ -118,6 +130,18 @@ describe("box.veil()", () => {
     await TH.expectRefusal(box.expose(), 'vault_locked')
     held.mw.setLockState('unlocked')
     expect(box.whisper).to.deep.equal('sk-test-0000')
+  })
+
+  it("gives back the very object once unlocked, an edit made before the lock or during it kept", async () => {
+    const box = await exposedOf({ apiKey: 'sk-test-0000' })
+    const exposed = box.whisper as { apiKey: string, org?: string }
+    exposed.apiKey = 'sk-test-edited'
+    held.mw.setLockState('locked')
+    exposed.org = 'acme'
+    expect(box.whisper).to.eq(LOCKED)
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.eq(exposed)
+    expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-edited', org: 'acme' })
   })
 })
 // --
@@ -199,7 +223,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     await TH.expectRefusal(box.put({ whisper: new Date(T0) as never, sidecar: {} }), 'bad_option')
   })
 
-  it("exposes a frozen copy of the whisper put: the host's later change to its own reaches no box, and the box's cannot be changed in place", async () => {
+  it("exposes a plain copy of the whisper put: the host's later change to its own reaches no box, and the box's takes an edit, stable until the next expose", async () => {
     const box = await builtOf(fullBoxRecord())
     const given = { apiKey: 'sk-test-0000', deep: { orgId: 'org-0000' } }
     await box.put({ whisper: given })
@@ -208,9 +232,14 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     const AsPut = { apiKey: 'sk-test-0000', deep: { orgId: 'org-0000' } }
     expect(box.whisper).to.deep.equal(AsPut)
     const exposed = box.whisper as typeof AsPut
-    expect(Object.isFrozen(exposed)).to.be.true
-    expect(() => { exposed.apiKey = 'sk-test-1111' }).to.throw(TypeError)
-    expect(() => { exposed.deep.orgId = 'org-1111' }).to.throw(TypeError)
+    expect(Object.isFrozen(exposed)).to.be.false
+    expect(Object.isFrozen(exposed.deep)).to.be.false
+    exposed.deep.orgId = 'org-1111'
+    expect(box.whisper).to.eq(exposed)
+    expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-0000', deep: { orgId: 'org-1111' } })
+    expect(await box.extractWhisper()).to.deep.equal(AsPut)
+    await box.expose()
+    expect(box.whisper).to.not.eq(exposed)
     expect(box.whisper).to.deep.equal(AsPut)
   })
 
