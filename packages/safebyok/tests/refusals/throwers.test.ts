@@ -3,6 +3,56 @@ import { VaultError } from '../../src/refusals/errors'
 import * as Refusals from '../../src/refusals/throwers'
 import * as Phrases from '../../src/helpers/phrases'
 
+describe("Refusals.sanitizeForeignError", () => {
+  it("hands an Error back as it came", () => {
+    const thrown = new TypeError('not a function')
+    expect(Refusals.sanitizeForeignError(thrown)).to.eq(thrown)
+  })
+
+  // Refusals.sanitizeForeignError @example 1
+  it("makes an Error of a thrown string, the string its message", () => {
+    const err = Refusals.sanitizeForeignError('ECONNRESET')
+    expect(err).to.be.instanceOf(Error)
+    expect(err.message).to.eq('ECONNRESET')
+    expect(err.cause).to.be.undefined
+  })
+
+  const NothingCases = [
+    [null,       'makes an Error saying nothing was thrown of a thrown null'],
+    [undefined,  'makes an Error saying nothing was thrown of a thrown undefined'],
+  ] as const
+
+  for (const [thrown, blurb] of NothingCases) {
+    it(blurb, () => {
+      const err = Refusals.sanitizeForeignError(thrown)
+      expect(err).to.be.instanceOf(Error)
+      expect(err.message).to.eq(Phrases.NoErrorGiven)
+    })
+  }
+
+  const StrayCases = [
+    [42,                    "number",  'names the type of a thrown number'],
+    [{ code: 'ENOSPC' },    "object",  'names the type of a thrown plain object'],
+    [Symbol('oops'),        "symbol",  'names the type of a thrown symbol'],
+  ] as const
+
+  for (const [thrown, typeName, blurb] of StrayCases) {
+    it(blurb, () => {
+      const err = Refusals.sanitizeForeignError(thrown)
+      expect(err).to.be.instanceOf(Error)
+      expect(err.message).to.eq(Phrases.nonErrorThrown(typeName))
+      expect(err.cause).to.eq(thrown)
+    })
+  }
+
+  // Refusals.sanitizeForeignError @example 2
+  it("keeps a stray value as the cause of the Error it makes", () => {
+    const err = Refusals.sanitizeForeignError(42)
+    expect(err.message).to.include('number')
+    expect(err.cause).to.eq(42)
+  })
+})
+
 describe("Refusals.storageUnavailable", () => {
   it("refuses as storage_unavailable, saying to try again, the backend's error as its cause", () => {
     const outage = new Error('connection reset')
@@ -27,12 +77,14 @@ describe("Refusals.storageUnavailable", () => {
     it(`never carries a null cause: ${blurb} becomes an Error saying so`, () => {
       const refusal = Refusals.storageUnavailable(cause)
       expect(refusal.cause).to.be.instanceOf(Error)
-      expect((refusal.cause as Error).message).to.eq('The storage backend failed without giving an error.')
+      expect((refusal.cause as Error).message).to.eq(Phrases.NoErrorGiven)
     })
   }
 
-  it("keeps a cause that is no Error as it came: a backend may throw anything", () => {
-    expect(Refusals.storageUnavailable('ECONNRESET').cause).to.eq('ECONNRESET')
+  it("makes an Error of a cause that is no Error: a backend may throw anything", () => {
+    const refusal = Refusals.storageUnavailable('ECONNRESET')
+    expect(refusal.cause).to.be.instanceOf(Error)
+    expect((refusal.cause as Error).message).to.eq('ECONNRESET')
   })
 })
 
@@ -46,5 +98,11 @@ describe("Refusals.unexpectedError", () => {
 
   it("keeps a cause that is never null, for a throw of nothing", () => {
     expect(Refusals.unexpectedError(undefined).cause).to.be.instanceOf(Error)
+  })
+
+  it("makes an Error of a thrown value that is no Error, the value its cause", () => {
+    const cause = Refusals.unexpectedError({ code: 7 }).cause as Error
+    expect(cause).to.be.instanceOf(Error)
+    expect(cause.cause).to.deep.equal({ code: 7 })
   })
 })

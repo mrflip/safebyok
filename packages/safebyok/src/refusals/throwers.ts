@@ -16,29 +16,43 @@
 
 import { PassphraseKeyBytes } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
+import type { Thrown } from './errors'
 import * as Phrases   from '../helpers/phrases'
 import type * as SX from '../shapes/shapes-storage'
 
-// == [Outcome Throwers]: storageUnavailable, unexpectedError
+// == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, unexpectedError
+
+/** The Error that stands as a refusal's cause for whatever was thrown: an Error as it is, anything else wrapped in one.
+ * The header's rule on `meta` is advisory for the bag a thrower keeps: this function trims nothing it is handed.
+ *
+ * @example sanitizeForeignError('ECONNRESET')  // new Error('ECONNRESET')
+ * @example sanitizeForeignError(42)            // an Error naming type number, 42 its cause
+ */
+export const sanitizeForeignError = (thrown: Thrown): Error => {
+  if (thrown instanceof Error) { return thrown }
+  if (typeof thrown === 'string') { return new Error(thrown) }
+  if (thrown === null || thrown === undefined) { return new Error(Phrases.NoErrorGiven) }
+  return new Error(Phrases.nonErrorThrown(typeof thrown), { cause: thrown })
+}
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
- * @param cause - What the backend threw, as it came, kept for debugging. It holds only what the
- *   backend holds: ciphertext and unencrypted fields. True of a `VaultDB` adapter, never of the
- *   device store, which is handed lease records: `DeviceDB` replaces what its store throws with a
- *   condition that keeps only its `name`.
+ * @param cause - What the backend threw, kept for debugging as {@link sanitizeForeignError} makes it.
+ *   It holds only what the backend holds: ciphertext and unencrypted fields. True of a `VaultDB`
+ *   adapter, never of the device store, which is handed lease records: `DeviceDB` replaces what its
+ *   store throws with a condition that keeps only its `name`.
  * @param message - What failed, when there is more to say than that storage failed: which read or
  *   write it was, say. Never quotes a record or a name.
  *
  * @example
  *   try { return await client.query(text, params) } catch (err) { throw storageUnavailable(err) }
  */
-export const storageUnavailable = (cause: unknown, message: string = Phrases.StorageUnavailable): VaultError => (
-  new VaultError('storage_unavailable', message, { cause: cause ?? new Error(Phrases.NoErrorGiven) })
+export const storageUnavailable = (cause: Thrown, message: string = Phrases.StorageUnavailable): VaultError => (
+  new VaultError('storage_unavailable', message, { cause: sanitizeForeignError(cause) })
 )
 
 /** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it. */
-export const unexpectedError = (thrown: unknown): VaultError => (
-  new VaultError('unexpected_error', Phrases.UnexpectedError, { cause: thrown ?? new Error(Phrases.NothingThrown) })
+export const unexpectedError = (thrown: Thrown): VaultError => (
+  new VaultError('unexpected_error', Phrases.UnexpectedError, { cause: sanitizeForeignError(thrown) })
 )
 // --
 
