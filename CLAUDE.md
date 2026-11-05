@@ -77,7 +77,8 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 ## Layout
 
 * `packages/` -- `safebyok` (the core, the new design), `safebyok-old` (the old design, private,
-  which the adapters and demo run on until they move) and `safebyok-*` (clients, adapters, plugins).
+  which the adapters and demo run on until they move) and `safebyok-*` (clients, adapters, plugins). **Never change `packages/safebyok-old/`**: not to fix it,
+  tidy it or update a pointer in it, whatever a search finds there.
 * Private, never published: the root (`scripts/`, tested in `tests/scripts/`), `demos/`, and
   `e2e/` (adapter-by-framework checks).
 * `whiteboard/` and `winboard/` -- thread and session folders, `YYYYMMDD-<label>/`, open and
