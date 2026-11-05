@@ -208,15 +208,17 @@ describe("Box snapshot", () => {
 
     it("exposed: follows the whisper the box keeps open", async () => {
       const box = await boxOf()
+      await box.put({ whisper: { val: 'sk-ant-fake-for-test' } })
       box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      box.whisper = { val: 'sk-ant-fake-for-test' }
+      await box.expose()
       expect(box.getSnapshot().exposed).to.be.true
       expect(listener.mock.calls).to.have.lengthOf(1)
       expect(JSON.stringify(box.getSnapshot())).to.not.contain('sk-ant-fake-for-test')
-      box.whisper = null
+      box.veil()
       expect(box.getSnapshot().exposed).to.be.false
+      expect(listener.mock.calls).to.have.lengthOf(2)
     })
   })
 })

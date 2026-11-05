@@ -25,7 +25,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   declare readonly listing: BoxListing
 
-  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until the host sets it null. */
+  /** The frozen {@link WhisperHolder} the host asked to keep open on the instance, until {@link veil}. */
   #exposed: WhisperHolder | null = null
   // --
 
@@ -45,22 +45,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_schema_version(): 1 | null                             { return this.full?.whisper_schema_version ?? null }
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
 
-  /** SLOPDOC: The whisper exposed on this instance, LOCKED while the vault is; set it to expose or forget one. */
+  /** SLOPDOC: The whisper exposed on this instance, LOCKED while the vault is. */
   get whisper(): WhisperHolder | LockedBag | null {
     if (this.isLocked) { return LOCKED }
     return this.#exposed
   }
-
-  set whisper(whisper: WhisperHolder | LockedBag | null) {
-    const forgets = (whisper === null) || Storable.isLockedFUBag(whisper)
-    const exposed = forgets ? null : whisperHolder.parse(whisper)
-    if (! forgets) { this.demandExposable() }
-    this.#exposed = exposed
-    this.settle()
-  }
   // --
 
-  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unseal
+  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, veil, unseal
 
   /** The timely stored whisper, as its frozen {@link WhisperHolder} `{ val }`, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder> {
@@ -79,6 +71,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
+  /** Overwrite the whisper held on this instance, locked or not. */
+  veil(): this {
+    this.#exposed = null
+    this.settle()
+    return this
+  }
+
   /** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}. */
   async #unseal(record: BoxRecord): Promise<WhisperHolder> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
@@ -92,17 +91,18 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, edit, keptWhisper
 
-  /** Seals `patch` over the record in hand and stores it, answering the box listed; a deleted box is reborn. */
-  async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box> {
+  /** Seals `patch` over the record in hand and stores it, answering this box; a deleted box is reborn. */
+  async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = VX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
     const given = this.demandPuttable(patch, { ifPresent })
     const { record, prior } = await this.#edit(given)
     this.demandPuttable(patch, { ifPresent })
-    return this.listing.put(record, { prior, ifAbsent, ifPresent })
+    await this.listing.put(record, { prior, ifAbsent, ifPresent })
+    return this
   }
 
-  tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.put(patch, opts)) }
+  tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.put(patch, opts)) }
 
   /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: SX.Revision }> {

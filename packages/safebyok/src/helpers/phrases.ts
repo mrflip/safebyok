@@ -44,10 +44,10 @@ export const InstantNotWhole = "An instant is whole epoch milliseconds"
 export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
 // --
 
-// == [Bags]: StoreInVaultBag
+// == [Scopes]: StoreInVaultScope
 
-/** Why a store in the bag naming a vault refuses: it goes in the second bag, the options. */
-export const StoreInVaultBag = "A vault's stores go in the second bag, its options, not in the bag naming the vault"
+/** Why a store in the scope naming a vault refuses: it goes in the second bag, the options. */
+export const StoreInVaultScope = "A vault's stores go in the second bag, its options, not in the scope naming the vault"
 // --
 
 // == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
@@ -161,12 +161,12 @@ export const DeviceScopepathShape = `A device record's scopepath is 'device', an
 export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
 // --
 
-// == [Bank and vault]: VaultBagAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanHeld, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
+// == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanHeld, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
 
-/** The advice a refusal of the bag naming a vault ends with: what that bag takes, and what else names a vault. */
-export const VaultBagAdvice = "That bag holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
+/** The advice a refusal of the scope naming a vault ends with: what that scope takes, and what else names a vault. */
+export const VaultScopeAdvice = "That scope holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
 
-/** Why a bag naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
+/** Why a scope naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 
 /** Why a vault let go while the bank was opening it hands out no Vault object. */
@@ -292,7 +292,7 @@ export const PatchNamesNeitherHalf = "This update names neither a whisper nor a 
 
 /** Why an update of a box whose patch names another's scope stores nothing. */
 /** Why a seal verb refuses a stamp, or an attach a lease, of another vault. */
-export const otherVaultsBag = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than this vault's, so nothing was sealed, opened or attached: a bug in the package.`
+export const otherVaultsScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than this vault's, so nothing was sealed, opened or attached: a bug in the package.`
 
 export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`
 
@@ -409,7 +409,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const DelOfOtherLife = "This Vault was deleted and made anew since it was read, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, NotAVerdict, NoStrengthChecker, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -431,11 +431,7 @@ export const ClearsThrew = "Reading what was handed to this attempt threw, so no
 
 export const NoRequestCleartext = "This bank was made without a requestCleartext, so it cannot ask the user for a passphrase: give Bank.make a requestCleartext."
 
-export const StrengthCheckerThrew = "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out, as it heard the passphrase."
-
-export const NotAVerdict = "The strengthChecker answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
-
-export const NoStrengthChecker = "This app cannot accept a passphrase until a strength checker is configured. For the app's makers: see notes/configuration.md, under Strength checker, for instructions."
+export const StrengthCheckerThrew = "The strengthChecker handed to Bank.make threw, or answered a verdict that throws when read. What it threw is left out, as it heard the passphrase: have it catch its own failures."
 
 export const SamePassphrase = "The new passphrase is the one the vault has already, so nothing was changed: choose another."
 

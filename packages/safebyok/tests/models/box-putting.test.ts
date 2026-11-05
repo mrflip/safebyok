@@ -169,7 +169,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
   })
 })
 
-// == [A whisper and a sidecar on every update]: put, the whisper setter
+// == [A whisper and a sidecar on every update]: put, expose, veil
 
 describe("box.put(patch): a patch naming a half", () => {
   const PatchCases = [
@@ -199,12 +199,16 @@ describe("box.put(patch): a patch naming a half", () => {
     await TH.expectRefusal(box.put({}), 'bad_option')
   })
 
-  it("seals nothing when the whisper is set: the setter only exposes it", async () => {
+  it("seals nothing at an expose or a veil: they move only what the instance holds", async () => {
     const box = await builtOf(fullBoxRecord())
+    await box.put({ whisper: { val: 'sk-test-0000' } })
+    const { revision_seq } = box
     held.mw.clearCalls()
-    box.whisper = { val: 'sk-test-0000' }
+    await box.expose()
     expect(box.whisper).to.deep.equal({ val: 'sk-test-0000' })
-    expect(box.revision_seq).to.eq(1)
+    box.veil()
+    expect(box.whisper).to.be.null
+    expect(box.revision_seq).to.eq(revision_seq)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 

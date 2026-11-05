@@ -7,7 +7,7 @@ import { makeLifeTok } from '../../src/helpers/crypto'
 import type { LeaseRow } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
-import { AutolockMinutes, BankBag, OtherBag, VaultBag, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
+import { AutolockMinutes, BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
 
 useBankWorlds()
@@ -41,7 +41,7 @@ describe("bank.autolock", () => {
     await fresh.hello()
     expect(scan).not.toHaveBeenCalled()
     expect(world.leaseRows()).to.have.lengthOf(1)
-    const vault = fresh.vaultOf(VaultBag)
+    const vault = fresh.vaultAt(VaultScopeGiven)
     await vault?.ensureUnlocked()
     expect(tryVacate).not.toHaveBeenCalled()
     expect(requestCleartext).toHaveBeenCalledOnce()
@@ -57,7 +57,7 @@ describe("bank.autolock", () => {
     world.advance(AutolockMillis + 1)
     const fresh = world.bankOn({ requestCleartext: undefined })
     await fresh.hello()
-    const vault = fresh.vaultOf(VaultBag)
+    const vault = fresh.vaultAt(VaultScopeGiven)
     await TH.expectRefusal(vault!.ensureUnlocked(), 'vault_locked')
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
@@ -69,7 +69,7 @@ describe("bank.autolock", () => {
     const requestCleartext = vi.fn<RequestCleartext>()
     const fresh = world.bankOn({ requestCleartext })
     await fresh.hello()
-    const vault = fresh.vaultOf(VaultBag)
+    const vault = fresh.vaultAt(VaultScopeGiven)
     await vault?.ensureUnlocked()
     expect(vault?.isUnlocked).to.be.true
     expect(requestCleartext).not.toHaveBeenCalled()
@@ -99,7 +99,7 @@ describe("bank.autolock", () => {
     world.advance(AutolockMillis + 1)
     const pageB = world.bankOn({ requestCleartext: undefined })
     await pageB.hello()
-    await TH.expectRefusal(pageB.vaultOf(VaultBag)!.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(pageB.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'vault_locked')
     expect(world.leaseRows()).to.deep.equal([row])
     expect(vaultA.isUnlocked).to.be.true
     await pageA.autolock()
@@ -116,7 +116,7 @@ describe("bank.autolock", () => {
     await fresh.hello()
     await fresh.autolock()
     await TH.eventually(() => world.leaseRows().length === 0)
-    const vault = fresh.vaultOf(VaultBag)
+    const vault = fresh.vaultAt(VaultScopeGiven)
     expect(vault?.isLocked).to.be.true
     await vault?.ensureUnlocked()
     expect(requestCleartext).toHaveBeenCalledOnce()
@@ -127,7 +127,7 @@ describe("bank.autolock", () => {
     await makeBankWithVault(world)
     const fresh = world.bankOn()
     await fresh.hello()
-    const vault = fresh.vaultOf(VaultBag)
+    const vault = fresh.vaultAt(VaultScopeGiven)
     expect(vault?.isLocked).to.be.true
     expect(world.leaseRows()).to.have.lengthOf(1)
     vault?.lock()
@@ -150,15 +150,15 @@ describe("bank.autolock", () => {
     const others = [world.bankOn({ user_id: 'u2' }), world.bankOn({ applabel: 'other_app' })]
     for (const other of others) {
       await other.hello()
-      await other.ensureVault(VaultBag)
+      await other.ensureVault(VaultScopeGiven)
     }
     expect(world.leaseRows()).to.have.lengthOf(3)
     world.advance(AutolockMillis + 1)
     await ours.autolock()
     await TH.eventually(() => world.leaseRows().length === 2)
     expect(world.leaseRows().map((row) => (row as { user_id: string, applabel: string }).user_id + (row as { applabel: string }).applabel)).to.have.members(['u2acme', 'u1other_app'])
-    for (const other of others) { expect(other.vaultOf(VaultBag)?.isUnlocked).to.be.true }
-    expect(ours.vaultOf(VaultBag)?.isLocked).to.be.true
+    for (const other of others) { expect(other.vaultAt(VaultScopeGiven)?.isUnlocked).to.be.true }
+    expect(ours.vaultAt(VaultScopeGiven)?.isLocked).to.be.true
   })
 
   it("leaves an old row whose vault is not listed, and one of another life, neither locking the vault listed", async () => {
@@ -206,12 +206,12 @@ describe("bank.autolock", () => {
 describe("bank.lock, bank.vacate, bank.sweep", () => {
   it("locks every listed vault and erases its lease, the bank unchanged", async () => {
     const { world, bank, vault } = await makeBankWithVault()
-    const other = await bank.ensureVault(OtherBag)
+    const other = await bank.ensureVault(OtherScopeGiven)
     bank.lock()
     expect([vault.isLocked, other.isLocked]).to.deep.equal([true, true])
     await TH.eventually(() => world.leaseRows().length === 0)
     expect(bank.snapshot.stage).to.eq('ready')
-    expect(await bank.ensureVault(VaultBag)).to.equal(vault)
+    expect(await bank.ensureVault(VaultScopeGiven)).to.equal(vault)
   })
 
   it("vacates every listed vault and every lease of the bank on this device, leaving the vaultDB, the bank not ready, and a hello lists them afresh", async () => {
@@ -219,7 +219,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const { bank, vault } = await makeBankWithVault(world)
     const elsewhere = world.bankOn({ user_id: 'u2' })
     await elsewhere.hello()
-    await elsewhere.ensureVault(VaultBag)
+    await elsewhere.ensureVault(VaultScopeGiven)
     await world.deviceDB.cache(oldLeaseRow(world, 'unlisted'))
     const seen = vi.fn()
     bank.subscribe(seen)
@@ -231,7 +231,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(seen).toHaveBeenCalled()
     await TH.eventually(() => world.leaseRows().length === 1)
     await bank.hello()
-    const relisted = bank.vaultOf(VaultBag)
+    const relisted = bank.vaultAt(VaultScopeGiven)
     expect(relisted?.isPresent).to.be.true
     expect(relisted).not.to.equal(vault)
     expect(relisted?.isLocked).to.be.true
@@ -242,7 +242,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     await makeBankWithVault(world)
     const elsewhere = world.bankOn({ user_id: 'u2' })
     await elsewhere.hello()
-    await elsewhere.ensureVault(VaultBag)
+    await elsewhere.ensureVault(VaultScopeGiven)
     world.bankOn().vacate()
     await TH.eventually(() => world.leaseRows().length === 1)
     expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
@@ -253,7 +253,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onPanic = vi.fn()
     const bank = world.bankOn({ onPanic })
-    const row = { ...BankBag, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
+    const row = { ...BankScopeGiven, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
     vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore').mockResolvedValue({ ok: true, val: [row] })
     vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValue({ ok: false, err: refusal })
     bank.vacate()
@@ -289,7 +289,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
       await gating.attempt(byPassphrase(Passphrase) as never)
     } })
     await bank.hello()
-    const asking = bank.ensureVault(VaultBag)
+    const asking = bank.ensureVault(VaultScopeGiven)
     bank.vacate()
     await TH.expectRefusal(asking, 'locked_while_asking')
     expect(bank.vaultListing.openGating).to.be.null
@@ -315,13 +315,13 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(vault.isEnabled).to.be.false
     expect(vault.isUnlocked).to.be.false
     expect(world.leaseRows()).to.have.lengthOf(1)
-    await TH.expectRefusal(bank.ensureVault(VaultBag), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'bad_option')
     const seen = vi.fn()
     bank.subscribe(seen)
     await bank.hello()
     expect(seen).toHaveBeenCalled()
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
-    const again = await bank.ensureVault(VaultBag)
+    const again = await bank.ensureVault(VaultScopeGiven)
     expect(again).not.to.equal(vault)
     await again.ensureUnlocked()
     expect(again.isUnlocked).to.be.true
@@ -377,17 +377,17 @@ describe("a bank past a vacate", () => {
       await TH.expectRefusal(vault.fetch(), 'identity_revoked')
       world.vaultDB._cheat_refuseGets(null)
     }],
-  ] as const)("refuses ensureVault and vaultOf with BankHelloFirst and opens no gating, after %s, and a hello answers the stored vault with nobody asked", async (_label, vacating) => {
+  ] as const)("refuses ensureVault and vaultAt with BankHelloFirst and opens no gating, after %s, and a hello answers the stored vault with nobody asked", async (_label, vacating) => {
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { requestCleartext })
     requestCleartext.mockClear()
     await vacating({ world, bank, vault })
-    await expect(bank.ensureVault(VaultBag)).rejects.toThrow(Phrases.BankHelloFirst)
-    expect(() => bank.vaultOf(VaultBag)).to.throw(Phrases.BankHelloFirst)
+    await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(Phrases.BankHelloFirst)
+    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.BankHelloFirst)
     expect(bank.vaultListing.openGating).to.be.null
     expect(requestCleartext).not.toHaveBeenCalled()
     await bank.hello()
-    const relisted = await bank.ensureVault(VaultBag)
+    const relisted = await bank.ensureVault(VaultScopeGiven)
     expect(relisted.vault_tok).to.equal(vault.vault_tok)
     expect(requestCleartext).not.toHaveBeenCalled()
   })

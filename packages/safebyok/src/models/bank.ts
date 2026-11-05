@@ -1,16 +1,15 @@
-import { noop } from 'es-toolkit'
-import { verifyConsistent } from '../helpers/validator'
 import { FarFuture, FarPast, MinuteMillis } from '../helpers/consts'
 import { randomId } from '../helpers/crypto'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
-import { DefaultLogger, type VaultLogger } from '../helpers/logger'
+import { type VaultLogger, parseLogger } from '../helpers/logger'
+import { DefaultStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { LockState } from '../shapes/shapes-enums'
-import { type Clock, wallClock, type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } from '../shapes/shapes-core'
+import { type Clock, wallClock, type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseSparse } from '../shapes/shapes-storage'
 import type { RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
@@ -20,11 +19,9 @@ import { deviceRecordRewritten, helloFirst, insecureContext } from '../refusals/
 import { DefaultLeaseMillis, type Vault } from './vault'
 import { VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultRefreshMillis, RefusingStrengthChecker
+// == [Given to a bank]: DefaultRefreshMillis
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
-
-const RefusingStrengthChecker: StrengthChecker = () => ({ strong: false, reason: Phrases.NoStrengthChecker })
 // --
 
 export class Bank implements VaultWorld {
@@ -85,7 +82,7 @@ export class Bank implements VaultWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     VX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
+    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.#device_id = device_id
@@ -93,7 +90,7 @@ export class Bank implements VaultWorld {
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
     this.onPanic = onPanic
-    this.logger = logger
+    this.logger = parseLogger(opts.logger)
     this.requestCleartext = requestCleartext
     this.strengthChecker = strengthChecker
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
@@ -107,12 +104,12 @@ export class Bank implements VaultWorld {
     }
     this.#vaultListing = this.#makeListing()
     this.#snapshot = this.#makeSnapshot()
-    if (isTestDeriver(keyDeriver)) { logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
+    if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
     Object.freeze(this)
   }
 
-  vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = verifyConsistent(vaultBag.parse(bag), this.scope, { kind: 'bad_scope', message: Phrases.otherScope })
+  vaultScopeOf(scope: BankedVaultScope): VaultScope {
+    const { vaultlabel } = bankedVaultScope.parseConsistent(scope, this.scope, { message: Phrases.otherScope })
     return { ...this.scope, vaultlabel }
   }
   // --
@@ -123,7 +120,7 @@ export class Bank implements VaultWorld {
 
   ensureTimely(): Promise<void> { return Promise.resolve() }
 
-  takeWorld(): void { noop() }
+  takeWorld(): void { /* no world sits above a bank */ }
   // --
 
   // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord
@@ -232,23 +229,23 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Vaults]: vaultOf, ensureVault, tryEnsureVault
+  // == [Vaults]: vaultAt, ensureVault, tryEnsureVault
 
-  /** The vault listed for `bag`, a tombstone among them, or null. */
-  vaultOf(bag: VaultBag): Vault | null {
+  /** The vault listed for `scope`, a tombstone among them, or null. */
+  vaultAt(scope: BankedVaultScope): Vault | null {
     this.#demandReady()
-    return this.#vaultListing.at(this.vaultScopeOf(bag))
+    return this.#vaultListing.at(this.vaultScopeOf(scope))
   }
 
-  /** SLOPDOC: The vault for `bag`, whether already listed or built now by asking the user. */
-  async ensureVault(bag: VaultBag): Promise<Vault> {
-    const scope = this.vaultScopeOf(bag)
+  /** SLOPDOC: The vault for `scope`, whether already listed or built now by asking the user. */
+  async ensureVault(scope: BankedVaultScope): Promise<Vault> {
+    const asked = this.vaultScopeOf(scope)
     this.#demandReady()
-    const listed = this.#vaultListing.at(scope)
-    return (listed?.isPresent === true) ? listed : this.#vaultListing.buildVault(scope)
+    const listed = this.#vaultListing.at(asked)
+    return (listed?.isPresent === true) ? listed : this.#vaultListing.buildVault(asked)
   }
 
-  tryEnsureVault(bag: VaultBag): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag)) }
+  tryEnsureVault(scope: BankedVaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(scope)) }
   // --
 
   // == [Bad news]: tellBadNews, hearBadNews

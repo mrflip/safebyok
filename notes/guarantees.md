@@ -282,7 +282,7 @@ lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests
 *no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
 message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
-logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In `src/models/` the gating's `checkedClears` does the same for a getter or proxy of
+logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In `src/models/` `invokeStrengthChecker` (`helpers/passphrase-strength.ts`) does the same for a `strengthChecker`, and the gating's `checkedClears` does the same for a getter or proxy of
 the host's that throws as an attempt's clears are read: `clearsThrew`, `unexpected_error`, with no cause, and a `requestCleartext`
 that throws is `requestCleartextThrew`, `unexpected_error`; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`). A WebCrypto
 failure is caught and replaced, its error never kept: `wrongProof`, `damaged_lease` and
@@ -369,7 +369,7 @@ Each is a Coach's call; none breaks a guarantee above.
    as a test of the Vault object's surface asserts no `Lease` is reachable from it without a method call.
 2. **The exposed whisper** (`src/models/box.ts`, `Box.expose` and `box.whisper`) is a whisper
    kept on the instance, a new form of a secret, which G7 says this note names first: the models' `Box` holds
-   it after `expose` until the host sets `box.whisper` null, and keeps it while the vault locks,
+   it after `expose` until the host calls `box.veil()`, and keeps it while the vault locks,
    answering `LOCKED` in its place until it unlocks. It is the host's decision, which a host would
    otherwise make for itself without the guard. "whisper is unsafe by design and its
    implementation may change as we tune its unsafeness" (the Coach, 2026-10-31). The core's `Box`
