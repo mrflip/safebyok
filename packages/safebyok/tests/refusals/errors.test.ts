@@ -96,7 +96,6 @@ const FamilyCases = [
   ["bad_scope",           "misuse",    'a label the app chose that breaks the rules is a bug'],
   ["bad_option",          "misuse",    'a Bank.make option out of range is a bug'],
   ["bad_record",          "misuse",    'handing a VaultDB a record this package does not build is a bug'],
-  ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
@@ -113,7 +112,6 @@ const FamilyCases = [
   ["newer_format",        "bad_news",  'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
   ["record_conflict",     "condition", 'storage and this device disagreeing about one revision is for the app to tell the user of; fetching again does not mend it'],
-  ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a fact of syncing'],
   ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
@@ -127,9 +125,7 @@ const FamilyCases = [
   ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
   ["camped",              "condition", 'a put told not to replace a live record takes up the one stored'],
   ["vault_empty",         "condition", 'a vault_tok of a life no row holds is a fact of syncing: read the vault by its scope'],
-  ["storage_error",       "condition", "a vaultDB's store failing is tried again shortly"],
-  ["damaged_record",      "bad_news",  'a stored row failing its checks is set aside and told of'],
-  ["invalid_input",       "misuse",    'an argument failing its check is a bug in the caller'],
+  ["damaged_row",         "bad_news",  'a row read from storage failing its checks is set aside and told of'],
   ["gate_issue",          "misuse",    'gate params at odds with the stored row are a bug in the caller'],
   ["disabled",            "misuse",    'calling an object let go by a sweep, a vacate or a delete is a bug: ask the bank for it again'],
 ] as const

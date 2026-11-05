@@ -79,34 +79,34 @@ describe("cipherCtx", () => {
     expect(toB64(cipherCtx({ boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar: '{}' }, 'whisper_ciphered'))).to.not.eq(toB64(sorted))
   })
 
-  describe("refuses 'bad_option' for", () => {
+  describe("refuses 'unexpected_error' for", () => {
     it("a record holding a field set to undefined, rather than treating it as if it were not there", () => {
       const holding = { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar: undefined } as unknown as CipherCtxRecord
-      TH.expectSyncRefusal(() => cipherCtx(holding, 'whisper_ciphered'), 'bad_option')
-      TH.expectSyncRefusal(() => cipherCtx([vaultStamp, holding], 'whisper_ciphered'), 'bad_option')
-      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'whisper_ciphered', holding), 'bad_option')
+      TH.expectSyncRefusal(() => cipherCtx(holding, 'whisper_ciphered'), 'unexpected_error')
+      TH.expectSyncRefusal(() => cipherCtx([vaultStamp, holding], 'whisper_ciphered'), 'unexpected_error')
+      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'whisper_ciphered', holding), 'unexpected_error')
     })
 
     it("a record holding a field set to null", () => {
       const holding = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
-      TH.expectSyncRefusal(() => cipherCtx(holding, 'vault_key_passphrase_wrapped'), 'bad_option')
-      TH.expectSyncRefusal(() => cipherCtx([holding, boxStamp], 'box_key_wrapped'), 'bad_option')
-      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_id: null } as unknown as CipherCtxRecord), 'bad_option')
+      TH.expectSyncRefusal(() => cipherCtx(holding, 'vault_key_passphrase_wrapped'), 'unexpected_error')
+      TH.expectSyncRefusal(() => cipherCtx([holding, boxStamp], 'box_key_wrapped'), 'unexpected_error')
+      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_id: null } as unknown as CipherCtxRecord), 'unexpected_error')
     })
 
     it("a stamp, a purpose or a header that is undefined or null, rather than treating it as null", () => {
       for (const missing of [undefined, null]) {
         const part = missing as unknown as CipherCtxRecord
-        const err = TH.expectSyncRefusal(() => cipherCtx(part, 'vault_key_lease_wrapped'), 'bad_option')
+        const err = TH.expectSyncRefusal(() => cipherCtx(part, 'vault_key_lease_wrapped'), 'unexpected_error')
         expect(err.message).to.include('undefined or null')
-        TH.expectSyncRefusal(() => cipherCtx([vaultStamp, part], 'vault_key_lease_wrapped'), 'bad_option')
-        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, missing as unknown as string), 'bad_option')
-        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', part), 'bad_option')
+        TH.expectSyncRefusal(() => cipherCtx([vaultStamp, part], 'vault_key_lease_wrapped'), 'unexpected_error')
+        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, missing as unknown as string), 'unexpected_error')
+        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', part), 'unexpected_error')
       }
     })
 
     it("an empty list of stamps: a ctx binds at least one", () => {
-      TH.expectSyncRefusal(() => cipherCtx([], 'vault_key_lease_wrapped'), 'bad_option')
+      TH.expectSyncRefusal(() => cipherCtx([], 'vault_key_lease_wrapped'), 'unexpected_error')
     })
   })
 })

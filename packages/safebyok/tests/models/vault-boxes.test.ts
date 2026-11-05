@@ -74,7 +74,7 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
 
   it("refuses a boxListing.hello given a list that fails its check", async () => {
     const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.boxListing.hello({ boxes: 'none' } as never), 'bad_record')
+    await TH.expectRefusal(vault.boxListing.hello({ boxes: 'none' } as never), 'damaged_row')
   })
 })
 
@@ -130,12 +130,12 @@ describe("a box verb the vaultDB refuses over its vault's row", () => {
     expect(tellBadNews).not.toHaveBeenCalled()
   })
 
-  it("'vault_mismatch' delivers no box, and no bad news is told", async () => {
+  it("'vault_remade' delivers no box, and no bad news is told", async () => {
     const { vault, restoreRow, tryGetBox, opts: { world } } = await makeWorldWithBox()
     restoreRow({ ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' })
     const tellBadNews = vi.spyOn(world, 'tellBadNews')
     tryGetBox.mockClear()
-    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_mismatch')
+    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_remade')
     expect(tryGetBox).toHaveBeenCalledOnce()
     expect(tellBadNews).not.toHaveBeenCalled()
   })
@@ -231,13 +231,13 @@ describe("vault.delBox", () => {
 })
 
 describe("a damaged record is set aside, and nothing acts on it", () => {
-  it("lists it in damaged_records, and refuses a get of it as 'damaged_record'", async () => {
+  it("lists it in damaged_records, and refuses a get of it as 'damaged_row'", async () => {
     const { openNextSession } = await makeWorldWithRubble()
     const next = await openNextSession()
     await next.hello()
     expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
     expect(next.boxListing.at({ ...next.scope, boxlabel: 'rubble' })).to.be.null
-    await TH.expectRefusal(next.getBox('rubble'), 'damaged_record')
+    await TH.expectRefusal(next.getBox('rubble'), 'damaged_row')
     await expect(next.getBox(boxlabel)).resolves.to.have.property('boxlabel', boxlabel)
   })
 
@@ -261,19 +261,19 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
   })
 
-  it("refuses a birth over it as 'damaged_record', the row standing", async () => {
+  it("refuses a birth over it as 'damaged_row', the row standing", async () => {
     const { openNextSession, boxrows } = await makeWorldWithRubble()
     const next = await openNextSession()
-    await TH.expectRefusal(next.putBox({ boxlabel: 'rubble', whisper: Whisper }), 'damaged_record')
+    await TH.expectRefusal(next.putBox({ boxlabel: 'rubble', whisper: Whisper }), 'damaged_row')
     expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
   })
 
-  it("is not deleted by tryDelBox when it names a revision: 'damaged_record', the row and its listing standing, tryDelDamagedBox then deleting it", async () => {
+  it("is not deleted by tryDelBox when it names a revision: 'damaged_row', the row and its listing standing, tryDelDamagedBox then deleting it", async () => {
     const { openNextSession, boxrows } = await makeWorldWithBox()
     boxrows.set('revised', { ...boxrows.get(boxlabel) as object, boxlabel: 'revised', whisper_ciphered: 'garbled' })
     const next = await openNextSession()
     await next.hello()
-    await TH.expectBad(next.tryDelBox('revised'), 'damaged_record')
+    await TH.expectBad(next.tryDelBox('revised'), 'damaged_row')
     expect(boxrows.get('revised')).to.have.property('am', 'a')
     expect(next.boxListing.damaged_records.map((row) => row.boxlabel)).to.deep.equal(['revised'])
     await TH.expectGood(next.tryDelDamagedBox('revised'))

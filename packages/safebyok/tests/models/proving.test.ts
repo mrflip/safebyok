@@ -249,11 +249,11 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
     expect(TH.thrownText(err)).to.not.include(misremembered)
   })
 
-  it("refuses a wayin made under another key deriver as 'unknown_key_deriver', before the world's is asked", async () => {
+  it("refuses a wayin made under another key deriver as 'newer_format', before the world's is asked", async () => {
     const { gate } = await gateWithBoth()
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
     const keyDeriver: KeyDeriver = { key_deriver_label: 'test_other_v0', salt_bytes: 16, deriveKeyBytes }
-    await TH.expectRefusal(PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf({ keyDeriver })), 'unknown_key_deriver')
+    await TH.expectRefusal(PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf({ keyDeriver })), 'newer_format')
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 
@@ -411,7 +411,7 @@ describe("proving.buildWayin(source)", () => {
     const theirs = await PassphraseProving.buildNovel({ ...WorldStamp, vault_tok: 'vault-tok-other' }, TestPassphrase, provingWorldOf())
     await theirs.buildWayin(NOVEL)
     const mine = await novelPassphrase()
-    await TH.expectRefusal(mine.buildWayin(theirs), 'bad_option')
+    await TH.expectRefusal(mine.buildWayin(theirs), 'unexpected_error')
   })
 
   it("refuses a second buildWayin on one proving as 'unexpected_error', so its leases stay under the one vaultKey its first wayin wraps", async () => {
@@ -466,10 +466,10 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
   ] as const
 
   for (const [stamp, blurb] of OtherFriendCases) {
-    it(`refuses a friend of ${blurb} as 'bad_option'`, async () => {
+    it(`refuses a friend of ${blurb} as 'unexpected_error'`, async () => {
       const proving = await novelPassphrase()
       await proving.buildWayin(NOVEL)
-      await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(stamp)), 'bad_option')
+      await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(stamp)), 'unexpected_error')
     })
   }
 

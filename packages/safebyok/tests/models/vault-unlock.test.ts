@@ -20,7 +20,7 @@ describe("proving.buildWayin: one wayin per proving, of its own vault", () => {
     const mine = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
     await TH.expectRefusal(mine.buildWayin(NOVEL), 'unexpected_error')
     const novel = await PassphraseProving.buildNovel(vault.gate.stamp, passphraseCleartext.parse('a new passphrase'), world)
-    await TH.expectRefusal(novel.buildWayin(await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })), 'bad_option')
+    await TH.expectRefusal(novel.buildWayin(await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })), 'unexpected_error')
     const wayin = await novel.buildWayin(mine)
     expect(wayin.wayinkind).to.eq('passphrase')
   })
@@ -53,8 +53,8 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   it("the seal verbs refuse a stamp of another vault or another life of it", async () => {
     const { vault } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
-    await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'bad_option')
-    await TH.expectRefusal(vault.unsealStampedString(sealed, { ...Stamp, vault_tok: 'another-life' }), 'bad_option')
+    await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'unexpected_error')
+    await TH.expectRefusal(vault.unsealStampedString(sealed, { ...Stamp, vault_tok: 'another-life' }), 'unexpected_error')
   })
 
   it("is born unlocked, under the lease its passphrase proving grants and the deviceDB caches; ensureUnlocked answers the vault and asks nothing", async () => {
@@ -73,7 +73,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}), 'bad_option')
   })
 
-  it("locks at `lock()`, reading locked before it returns and erasing the row; seal and unseal refuse; then 'vault_locked' with no proof, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
+  it("locks at `lock()`, reading locked before it returns and erasing the row; seal and unseal refuse; then 'bad_option' with no proof and no requestCleartext, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
     const { vault, deviceDB } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     expect(vault.lock()).to.equal(vault)
@@ -82,7 +82,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'vault_locked')
     await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'vault_locked')
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'bad_option')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase('not the passphrase')), 'wrong_passphrase')
     expect(vault.isLocked).to.be.true
     await unlockTyping(vault, byPassphrase(Passphrase))
@@ -226,7 +226,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     await replaceTyping(vault, Passphrase, NewPassphrase)
     deviceDB.layCached(stale)
     const again = await anotherSession().build(demandStored())
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'bad_option')
     expect(deviceDB.cachedNow()).to.be.null
     await unlockTyping(again, byPassphrase(NewPassphrase))
     expect(again.isUnlocked).to.be.true
@@ -241,7 +241,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     other.storeBehindOurBack(demandStored())
     const again = await other.anotherSession().build(other.demandStored())
     expect(other.deviceDB.cachedNow()).not.to.be.null
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'bad_option')
     expect(again.gate.pkWayin).to.be.null
     expect(other.deviceDB.cachedNow()).to.be.null
   })
@@ -254,7 +254,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(within.isUnlocked).to.be.true
     advance(1)
     const past = await anotherSession().build(demandStored())
-    await TH.expectRefusal(past.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(past.ensureUnlocked(), 'bad_option')
     expect(past.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.not.be.null
   })
@@ -267,7 +267,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(within.isUnlocked).to.be.true
     advance(1)
     const past = await anotherSession().build(demandStored())
-    await TH.expectRefusal(past.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(past.ensureUnlocked(), 'bad_option')
     expect(past.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.not.be.null
   })
@@ -291,7 +291,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     deviceDB.layCached({ ...cached, lease_key: 'no key at all' })
     const listing = new VaultListing(hearingBadNews(opts, onBadNews))
     const again = await listing.build(demandStored())
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'bad_option')
     expect(onBadNews.mock.calls[0]?.[0]).to.deep.include({ refusalkind: 'damaged_lease' })
     await unlockTyping(again, byPassphrase(Passphrase))
     expect(again.isUnlocked).to.be.true
@@ -304,7 +304,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const again = await anotherSession().build(record)
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'bad_option')
     await unlockTyping(vault, byPassphrase(Passphrase))
     await again.ensureUnlocked()
     expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
@@ -318,6 +318,6 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     idle.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const again = await anotherSession().build(record)
-    await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(again.ensureUnlocked(), 'bad_option')
   })
 })

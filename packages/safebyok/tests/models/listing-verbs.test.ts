@@ -93,7 +93,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       const sparse = await listing.build(sparseBoxRecord())
       held.mw.clearCalls()
-      await TH.expectRefusal(listing.put(sparse as never, { prior: sparse }), 'bad_record')
+      await TH.expectRefusal(listing.put(sparse as never, { prior: sparse }), 'bad_option')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
@@ -167,7 +167,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
   it("refuses a fetch answered with a record of another scope, making nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willGet(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'bad_record')
+    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'record_conflict')
     expect(listing.things).to.deep.equal([])
   })
 })
@@ -225,9 +225,9 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
 const aliveRow = fullBoxRecord()
 
 describe("listing.put and listing.del: the prior tok they put", () => {
-  it("refuses 'invalid_input' a record at a revision other than 0 for a box not held, changing nothing", async () => {
+  it("refuses 'bad_option' a record at a revision other than 0 for a box not held, changing nothing", async () => {
     const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { prior: SX.VoidRevision }), 'invalid_input')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { prior: SX.VoidRevision }), 'bad_option')
     expect(listing.things).to.deep.equal([])
   })
 
@@ -240,11 +240,11 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     expect(box.revision_tok).to.eq('rev-a1')
   })
 
-  it("sends a record past central's seq + 1, which the vaultDB refuses 'invalid_input', changing nothing", async () => {
+  it("sends a record past central's seq + 1, which the vaultDB refuses 'bad_option', changing nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(aliveRow)
     const box = await listing.build(aliveRow)
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }), { prior: aliveRow }), 'invalid_input')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }), { prior: aliveRow }), 'bad_option')
     expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a1'])
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.equal(aliveRow)
     expect(box.revision_seq).to.eq(1)

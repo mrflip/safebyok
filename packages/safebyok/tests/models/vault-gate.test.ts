@@ -127,11 +127,11 @@ describe("vault.replacePassphrasePrompt()", () => {
     expect(vault.revision_seq).to.eq(demandStored().revision_seq)
   })
 
-  it("refuses 'vault_mismatch' a vault of another life stored since the last fetch, that life replacing the vault in its slot", async () => {
+  it("refuses 'vault_remade' a vault of another life stored since the last fetch, that life replacing the vault in its slot", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     const other = { ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' }
     restoreRow(other)
-    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'vault_mismatch')
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'vault_remade')
     expect(listing.at(vault.scope)?.vault_tok).to.eq(other.vault_tok)
   })
 
@@ -367,11 +367,11 @@ describe("listing.del(ante): the delete names one life at one revision", () => {
     expect(storedNow()).to.include({ am: 'a' })
   })
 
-  it("refuses 'stale_write' a stale instance of another life than the slot's, asking the vaultDB nothing, and the slot's vault stands", async () => {
+  it("refuses 'vault_remade' a stale instance of another life than the slot's, asking the vaultDB nothing, and the slot's vault stands", async () => {
     const { vault, listing, opts: { vaultDB }, demandStored, storedNow } = await makeBornVault()
     const stale = { ...vault.fullRecord, vault_tok: 'vault-tok-of-a-life-gone' }
     const tryDelVault = vi.spyOn(vaultDB, 'tryDelVault')
-    await TH.expectRefusal(listing.del(stale), 'stale_write')
+    await TH.expectRefusal(listing.del(stale), 'vault_remade')
     expect(tryDelVault).not.toHaveBeenCalled()
     expect(storedNow()).to.deep.equal(demandStored())
     expect(vault.isPresent).to.be.true

@@ -61,11 +61,11 @@ describe("a vault record stored damaged", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("safebyok-old/README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate refuses 'damaged_record' at ensureUnlocked's hydrate, and stores nothing", async () => {
+  it("safebyok-old/README.md:1085, 'damaged_vault: the vault's record, read from storage, failed its checks ... a retry will not mend it': a vault record stored without its gate refuses 'damaged_row' at ensureUnlocked's hydrate, and stores nothing", async () => {
     const { gate: _gate, ...gateless } = await storedVaultRecord()
     const { listing, storedNow } = makeVaultWorld(gateless as VaultRecord)
     const vault = await listing.build(listing.sparseOf(gateless))
-    await TH.expectRefusal(vault.hydrate(), 'damaged_record')
+    await TH.expectRefusal(vault.hydrate(), 'damaged_row')
     expect(vault.isFull).to.be.false
     expect(storedNow()).to.equal(gateless)
   })

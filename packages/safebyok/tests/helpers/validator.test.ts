@@ -379,7 +379,7 @@ describe("consistent", () => {
 describe("demandConsistent", () => {
   // demandConsistent @example
   it("returns true, or refuses as its refusal says", () => {
-    expect(demandConsistent(sparse, scope, { kind: 'damaged_record' })).to.be.true
+    expect(demandConsistent(sparse, scope, { kind: 'damaged_row' })).to.be.true
     const err = TH.expectSyncRefusal(() => demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` }), 'bad_scope')
     expect(err.message).to.eq('This names another user_id')
   })
@@ -389,7 +389,7 @@ describe("verifyConsistent", () => {
   // verifyConsistent @example
   it("returns the bag when each field both define is ===", () => {
     const bag = { ...sparse }
-    expect(verifyConsistent(bag, scope, { kind: 'vault_mismatch' })).to.eq(bag)
+    expect(verifyConsistent(bag, scope, { kind: 'vault_remade' })).to.eq(bag)
   })
 
   it("refuses the kind it is handed, naming each field that disagrees, in its message and meta.fieldnames", () => {

@@ -80,8 +80,8 @@ describe("bank.hello", () => {
   it("refuses with no network, the bank not ready: its own refusal is what the snapshot shows and each bank call throws, until a hello lands", async () => {
     const world = makeBankWorld()
     const bank = world.bankOn()
-    world.vaultDB._cheat_refuseGets('storage_error')
-    const refusal = await TH.expectRefusal(bank.hello(), 'storage_error')
+    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    const refusal = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
     expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
     await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(refusal)
     expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(refusal)
@@ -107,7 +107,7 @@ describe("bank.hello", () => {
     const bank = world.bankOn({ onBadNews })
     await bank.hello()
     expect(bank.snapshot.stage).to.eq('ready')
-    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_record'])
+    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
     expect((onBadNews.mock.calls[0]?.[0] as VaultError).message).to.include('broken')
   })
 
@@ -118,7 +118,7 @@ describe("bank.hello", () => {
     rows.set(Dna.vaultlabel, { ...(rows.get(Dna.vaultlabel) as object), revision_tok: 'rev-other' })
     rows.set('broken', { am: 'a', nonsense: true })
     await TH.expectRefusal(bank.hello(), 'record_conflict')
-    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_record'])
+    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
   })
 
   it("adopts the first device_id cached for the bank, whatever it was handed, and is told of a damaged record written over", async () => {
@@ -136,7 +136,7 @@ describe("bank.hello", () => {
     const third = world.bankOn({ device_id: 'device-third', onBadNews })
     await third.hello()
     expect(third.device_id).to.eq('device-third')
-    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_record'])
+    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
   })
 
   it("hears a vault made elsewhere over the watch it starts", async () => {
@@ -238,7 +238,7 @@ describe("'identity_revoked' and bad news", () => {
     const world = makeBankWorld()
     const spy = TH.spyLogger()
     const { bank, vault } = await makeBankWithVault(world, { logger: spy.logger })
-    const news = new VaultError('damaged_record', 'something stored is damaged')
+    const news = new VaultError('damaged_row', 'something stored is damaged')
     bank.tellBadNews([news])
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     expect(vault.isEnabled).to.be.true
@@ -273,7 +273,7 @@ describe("'identity_revoked' and bad news", () => {
   it("hears a vault's bad news, a box's way, the same as its own, and 'identity_revoked' told so vacates it", async () => {
     const onBadNews = vi.fn()
     const { vault } = await makeBankWithVault(makeBankWorld(), { onBadNews })
-    const news = new VaultError('damaged_record', 'something stored is damaged')
+    const news = new VaultError('damaged_row', 'something stored is damaged')
     vault.tellBadNews([news])
     expect(onBadNews.mock.calls).to.deep.equal([[news]])
     expect(vault.isEnabled).to.be.true

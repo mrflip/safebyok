@@ -111,10 +111,10 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 1000 })
     })
 
-    it("keep the vault_tok of birth, not writable: a record under another vault_tok received over a tombstone throws 'unexpected_error', and neither it nor the scope moves", async () => {
+    it("keep the vault_tok of birth, not writable: a record under another vault_tok received over a tombstone throws 'record_conflict', and neither it nor the scope moves", async () => {
       const box = await builtBoxOf(tombstoneBoxRecord())
       const { scope } = box
-      TH.expectSyncRefusal(() => box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })), 'unexpected_error')
+      TH.expectSyncRefusal(() => box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })), 'record_conflict')
       expect(box.vault_tok).to.eq('vault-tok-u1')
       expect(Object.getOwnPropertyDescriptor(box, 'vault_tok')).to.include({ writable: false, configurable: false })
       expect(box.scope).to.eq(scope)

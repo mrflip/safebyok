@@ -363,7 +363,7 @@ export abstract class VaultDB {
 
 // == [Row checks]: adapted, unreadableRowOf, vaultRowOf, boxRowOf, listedBoxesOf, checkedVaultLife, demandNextSeq, landingActOf, jsonBytes
 
-/** A store call: what it throws that is no refusal of its own is a `storage_error`. */
+/** A store call: what it throws that is no refusal of its own is `storage_unavailable`. */
 const adapted = async <ValT>(thunk: () => Awaitable<ValT>): Promise<ValT> => {
   try { return await thunk() } catch (err) { throw (isVaultError(err) ? err : Refuse.storageError(err)) }
 }

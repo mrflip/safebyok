@@ -376,7 +376,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled()
-    verifyConsistent(stamp, this.#stampOfLife(), { kind: 'bad_option', message: Phrases.otherVaultsScope })
+    verifyConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.otherVaultsScope })
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }

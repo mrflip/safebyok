@@ -210,7 +210,7 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 export const { BoxFormat } = SX
 
 /** SLOPDOC: The checks of a box's stored forms, full and sparse, from a record or a box ducking as one. */
-export const boxRecord = SX.boxRecord.refusingAs('bad_record')
+export const { boxRecord } = SX
 export const boxSparse = SX.boxSparse.refusingAs('bad_record')
 
 export type BoxSparse = SX.BoxSparse
@@ -220,7 +220,7 @@ export type BoxRecord = SX.BoxRecord
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
   const damaged = boxSparse.extend({ boxlabel: str }).and(obj({ damagekind: oneof(EX.damagekindVals) }))
   return { boxes: arr(boxSparse), damaged_records: arr(damaged) }
-}, { refuseAs: 'bad_record', extras: 'strip' })
+}, { refuseAs: 'damaged_row', extras: 'strip' })
 
 /** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */
 export type BoxesListed = Z.output<typeof boxesListed>
@@ -308,9 +308,9 @@ export type BoxListingOpts = ListingOpts & { world: BoxWorld }
 export const { VaultFormat } = SX
 
 /** SLOPDOC: The checks of a vault's stored forms, sparse and with its gate, from a record or a vault ducking as one. */
-export const vaultRecord = SX.vaultRecord.refusingAs('bad_record')
+export const { vaultRecord } = SX
 export const vaultSparse = SX.vaultSparse.refusingAs('bad_record')
-export const vaultRow    = SX.vaultRow.refusingAs('bad_record')
+export const vaultRow    = SX.vaultRow.refusingAs('damaged_row')
 
 export type VaultSparse = SX.VaultSparse
 export type VaultRecord = SX.VaultRecord
