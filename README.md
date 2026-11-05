@@ -7,7 +7,10 @@ ciphertext: unrecoverable even with a copy of the database, the application, and
 
 This repository is a pnpm workspace. Its packages:
 
-* [`safebyok`](packages/safebyok) -- the vault itself, with the IndexedDB device store in `safebyok/idb` and display helpers (`mask`) in `safebyok/utils`.
+* [`safebyok`](packages/safebyok) -- the vault itself, in its new design, which nothing below has moved to yet.
+* [`safebyok-old`](packages/safebyok-old) -- the old design, private: what the packages below run on
+  until they move, with the IndexedDB device store in `safebyok-old/idb` and display helpers (`mask`)
+  in `safebyok-old/utils`.
 * [`safebyok-react`](packages/safebyok-react) -- the React binding: a provider, snapshot hooks,
   and a guard that asks for the passphrase on demand.
 * [`safebyok-convex`](packages/safebyok-convex) -- Convex storage: a Convex component, and the
@@ -28,6 +31,8 @@ This repository is a pnpm workspace. Its packages:
 [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
 
 ## Basic e2ee architecture:
+
+The old design's sketch. The new design's calls are in [its README](packages/safebyok/README.md).
 
 ### Backend (VaultDB)
 
