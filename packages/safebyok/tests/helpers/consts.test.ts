@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { FarFuture, FarPast, ForeverMillis } from '../../src/helpers/consts'
+import { afterEach, describe, expect, it } from 'vitest'
+import { FarFuture, FarPast, ForeverMillis, IsListing, isListing } from '../../src/helpers/consts'
+import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
 
 describe("FarFuture", () => {
   it("is the microsecond epochalypse: the last millisecond whose epoch microseconds are a safe integer", () => {
@@ -30,5 +31,20 @@ describe("FarPast", () => {
   it("is the first instant of 1981", () => {
     expect(FarPast).to.eq(Date.UTC(1981, 0, 1))
     expect(new Date(FarPast).toISOString()).to.eq('1981-01-01T00:00:00.000Z')
+  })
+})
+
+describe("isListing and IsListing", () => {
+  const mw = makeModelsWorld({ fakeTimers: false })
+  afterEach(() => { mw.dispose() })
+
+  it("tell a listing from anything else, by its tag", () => {
+    expect(isListing(boxListingOf(mw))).to.be.true
+    expect(isListing({ [IsListing]: true })).to.be.true
+    expect(isListing({ [IsListing]: 1 })).to.be.false
+    expect(isListing({})).to.be.false
+    expect(isListing(null)).to.be.false
+    expect(isListing(undefined)).to.be.false
+    expect(isListing('listing')).to.be.false
   })
 })

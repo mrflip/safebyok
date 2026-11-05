@@ -32,7 +32,7 @@ describe("bank.hello", () => {
     const world = makeBankWorld()
     const { bank: elsewhere, vault } = await makeBankWithVault(world)
     await elsewhere.ensureVault(OtherBag)
-    await vault.delVault()
+    await vault.delVaultPrompt()
     const requestCleartext = vi.fn()
     const bank = world.bankOnAnotherDevice({ requestCleartext })
     await bank.hello()
@@ -50,7 +50,7 @@ describe("bank.hello", () => {
     const held = bank.vaultOf(VaultBag)
     await bank.hello()
     expect(bank.vaultOf(VaultBag)).to.equal(held)
-    await vault.delVault()
+    await vault.delVaultPrompt()
     await elsewhere.ensureVault(VaultBag)
     await bank.hello()
     const reborn = bank.vaultOf(VaultBag)
@@ -65,7 +65,7 @@ describe("bank.hello", () => {
     const bank = world.bankOnAnotherDevice()
     await bank.hello()
     const held = bank.vaultOf(VaultBag)
-    await vault.delVault()
+    await vault.delVaultPrompt()
     await bank.hello()
     expect(bank.vaultOf(VaultBag)).to.equal(held)
     expect(held?.isPresent).to.be.false
@@ -238,9 +238,43 @@ describe("'identity_revoked' and bad news", () => {
     const spy = TH.spyLogger()
     const { bank, vault } = await makeBankWithVault(world, { logger: spy.logger })
     const news = new VaultError('damaged_record', 'something stored is damaged')
-    bank.vaultListing.tellBadNews([news])
+    bank.tellBadNews([news])
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     expect(vault.isEnabled).to.be.true
+  })
+
+  it("hears a vault's bad news, a box's way, the same as its own, and 'identity_revoked' told so vacates it", async () => {
+    const onBadNews = vi.fn()
+    const { vault } = await makeBankWithVault(makeBankWorld(), { onBadNews })
+    const news = new VaultError('damaged_record', 'something stored is damaged')
+    vault.tellBadNews([news])
+    expect(onBadNews.mock.calls).to.deep.equal([[news]])
+    expect(vault.isEnabled).to.be.true
+    const revoked = new VaultError('identity_revoked', 'the host says no')
+    vault.tellBadNews([revoked])
+    expect(onBadNews).toHaveBeenCalledWith(revoked)
+    expect(vault.isEnabled).to.be.false
+  })
+
+  it("reports a handler that throws to the platform and goes on, the rest of the news told", () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const told: string[] = []
+    const bank = makeBankWorld().bankOn({ onBadNews: (news) => { told.push(news.refusalkind); throw new Error("The handler is broken.") } })
+    bank.tellBadNews([new VaultError('storage_unavailable', "Down."), new VaultError('absent_box', "Gone.")])
+    expect(told).to.deep.equal(['storage_unavailable', 'absent_box'])
+    expect(reported).toHaveBeenCalledTimes(2)
+    vi.unstubAllGlobals()
+  })
+
+  it("reports a handler whose promise rejects to the platform, with no unhandled rejection", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const bank = makeBankWorld().bankOn({ onBadNews: () => Promise.reject(new Error("Rejected.")) })
+    bank.tellBadNews([new VaultError('storage_unavailable', "Down.")])
+    await TH.eventually(() => reported.mock.calls.length === 1)
+    expect(reported.mock.calls[0]?.[0]).to.have.property('message', "Rejected.")
+    vi.unstubAllGlobals()
   })
 })
 

@@ -41,10 +41,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
 
-  /** The listing of `vault`'s boxes, its watch not started. Bad news of a box goes where this listing's goes. */
+  /** The listing of `vault`'s boxes, its watch not started. */
   boxListingOf(vault: Vault): BoxListing {
     const { boxRefreshMillis = this.maxMillisSinceRefresh } = this.world
-    return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis, onBadNews: (news) => { this.tellBadNews([news]) } })
+    return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis })
   }
 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */
@@ -66,7 +66,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
       throw answer.err
     }
     const { vaults, damaged_records } = answer.val
-    this.tellBadNews(damaged_records.map((damaged) => vaultStoredDamaged(damaged)))
+    this.world.tellBadNews(damaged_records.map((damaged) => vaultStoredDamaged(damaged)))
     await Promise.all(vaults.map((record) => this.build(record)))
   }
 

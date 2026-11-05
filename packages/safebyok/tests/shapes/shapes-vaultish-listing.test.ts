@@ -163,23 +163,10 @@ describe("The checks of the world and the listing", () => {
     })
   })
 
-  describe("VX.isListing and VX.IsListing", () => {
-    it("tell a listing from anything else, by its tag", () => {
-      expect(VX.isListing(boxListingOf(mw))).to.be.true
-      expect(VX.isListing({ [VX.IsListing]: true })).to.be.true
-      expect(VX.isListing({ [VX.IsListing]: 1 })).to.be.false
-      expect(VX.isListing({})).to.be.false
-      expect(VX.isListing(null)).to.be.false
-      expect(VX.isListing(undefined)).to.be.false
-      expect(VX.isListing('listing')).to.be.false
-    })
-  })
-
   describe("VX.listingOpts", () => {
-    const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, onBadNews: mw.onBadNews }
+    const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000 }
     holdsCases(VX.listingOpts, 'bad_option', [
       [opts,                                                     true,  'passes the test world and vaultDB'],
-      [{ ...opts, onBadNews: undefined },                        true,  'passes no onBadNews'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
       [{ ...opts, world: undefined },                            false, 'refuses a missing world'],
       [{ ...opts, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
@@ -189,7 +176,8 @@ describe("The checks of the world and the listing", () => {
       [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
-      [{ ...opts, onBadNews: 'tell me' },                        false, 'refuses an onBadNews that is no function'],
+      [{ ...opts, world: { ...mw.world, tellBadNews: undefined } }, false, 'refuses a world that cannot tellBadNews'],
+      [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],
       [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not take, being strict'],
     ])
 

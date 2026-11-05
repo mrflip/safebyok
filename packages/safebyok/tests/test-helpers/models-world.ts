@@ -144,10 +144,8 @@ export type ModelsWorld = {
   vaultDB: TestableVaultDB
   /** Every call made to the world and the vaultDB, in order, oldest first. A live array. */
   calls:  readonly ModelsCall[]
-  /** The refusals the listing told its `onBadNews`, oldest first. A live array. */
+  /** The refusals the listing told its world, oldest first. A live array. */
   badnews: readonly VaultError[]
-  /** The `onBadNews` {@link boxListingOf} gives the listing: it logs into `badnews`. */
-  onBadNews: (news: VaultError) => void
   /** The vaultDB's own box rows, by boxlabel: the one vault's boxes. */
   stored: Map<string, unknown>
 
@@ -306,6 +304,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,
+    tellBadNews:  (news) => { badnews.push(...news) },
     demandUnlocked: () => { if (lockState === 'locked') { throw new VaultError('vault_locked', Phrases.VaultLocked) } },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
@@ -350,7 +349,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
   return {
     world, vaultDB, calls, badnews, stored, watches,
-    onBadNews:  (news) => { badnews.push(news) },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0 },
 
@@ -457,7 +455,6 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
     world:                 mw.world,
     vaultDB:               mw.vaultDB,
     maxMillisSinceRefresh: 10 * 60_000,
-    onBadNews:             mw.onBadNews,
     ...overrides,
   })
 )

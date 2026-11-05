@@ -1,4 +1,5 @@
 import { adorn, tattoo } from '../helpers/helpers'
+import { type LockedBag, LOCKED } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { reportToPlatform } from '../refusals/report-error'
@@ -65,8 +66,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** True for {@link VX.LOCKED}, the bag a storable answers in place of what the locked vault hides, and for nothing else: not a copy of it, nor any bag a host builds, nor `Symbol.for('LOCKED')`. */
-  static isLockedFUBag(val: unknown): val is VX.LockedBag { return val === VX.LOCKED }
+  /** True for {@link LOCKED}, the bag a storable answers in place of what the locked vault hides, and for nothing else: not a copy of it, nor any bag a host builds, nor `Symbol.for('LOCKED')`. */
+  static isLockedFUBag(val: unknown): val is LockedBag { return val === LOCKED }
   // --
 
   // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe

@@ -29,9 +29,9 @@ guarantees until shown otherwise.
 | `packages/safebyok/src/box.ts` | the whisper serialized, sealed, opened and zeroed |
 | `packages/safebyok/src/shapes/shapes-gateish.ts`, `shapes-core.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 | `packages/safebyok/src/models/proving.ts` | the wayinKey, and the vaultKey unwrapped per call and moved from proving to proving inside `buildWayin(source)`, handed only to `Lease.buildGranted`; the PRF bytes, read to derive the passkeyKey and left for the gating to zero |
-| `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedClears`; `spendClears`, the one place the PRF bytes are zeroed |
+| `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedClears`; `spendClears`, the one place the PRF bytes are zeroed; `RunForGatingkind`, which hears provings, never a clear |
 | `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `vacate` |
-| `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; the passphrase proving a birth's gating made is dropped after `Vault.launchBirth`'s lease |
+| `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; the passphrase proving a birth's gating made is dropped after the `build_vault` run's lease |
 | `packages/safebyok/src/models/box.ts` | holds no key: hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
 
 Beside them, three host functions hear the passphrase and are guarded where they are called:
@@ -324,8 +324,8 @@ route reaches is no key and yields none. Neither class has a getter, field, spre
 that yields a key, and no module exports a route to one: `leaseRecordOf`, which did, is gone
 ([#305](https://github.com/mrflip/safebyok/pull/305)). In `src/models/`, the `LeaseFriend` whose
 `tryPeekLease` answers the cached row, as an Outcome, with its leaseKey handle is held in `Lease.#friend` and made in
-`Vault.#leaseFriend`; no public `Vault` method takes a proving, as a birth runs inside the class
-(`Vault.launchBirth`); nothing public on a `Vault` or a `Lease` hands the friend out, and a test catches
+`Vault.#leaseFriend`; no public `Vault` method takes a proving, as a gating's run (`RunForGatingkind`) comes to
+`#unlockByProof` and `#landGate` by `Vault.#gatingFriend`, private in the vault and the gating; nothing public on a `Vault` or a `Lease` hands the friend out, and a test catches
 it with a spy on `Proving.prototype.buildLease`. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export `Lease` and
 `Proving` as types and classes alone, and none of the registries. Checked by:
 `tests/lease.test.ts` (*hands out no record*), `tests/models/vault-lease.test.ts` (*a vault and a

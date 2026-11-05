@@ -42,7 +42,7 @@ const movedBeforeCommit = ({ opts: { vaultDB }, demandStored, storeBehindOurBack
   vi.spyOn(vaultDB, verb).mockImplementationOnce(crossing as never)
 }
 
-describe("vault.replacePassphrase()", () => {
+describe("vault.replacePassphrasePrompt()", () => {
   it("lays the next wayin and keeps the passkey: the next passphrase opens, the ante refuses 'wrong_passphrase', the passkey still opens", async () => {
     const born = await makeBornVaultWithPasskey()
     const { vault, demandStored } = born
@@ -64,7 +64,7 @@ describe("vault.replacePassphrase()", () => {
     world.strengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: "too short" } : { strong: true as const })
     const ante = storedNow()
     const { gatingAt } = dialogOf(born)
-    const replacing = vault.replacePassphrase()
+    const replacing = vault.replacePassphrasePrompt()
     const gating = await gatingAt<'replace_passphrase'>()
     await TH.expectBad(gating.attempt({ antePassphraseClear: 'not it', nextPassphraseClear: NewPassphrase }), 'wrong_passphrase')
     await TH.expectBad(gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: 'weak' }), 'weak_passphrase')
@@ -82,7 +82,7 @@ describe("vault.replacePassphrase()", () => {
     const { vault, storedNow } = born
     const ante = storedNow()
     const { gatingAt } = dialogOf(born)
-    const replacing = TH.expectRefusal(vault.replacePassphrase(), 'locked_while_asking')
+    const replacing = TH.expectRefusal(vault.replacePassphrasePrompt(), 'locked_while_asking')
     const gating = await gatingAt<'replace_passphrase'>()
     vault.lock()
     await replacing
@@ -151,11 +151,11 @@ describe("vault.replacePassphrase()", () => {
   it("the try form answers the refusal", async () => {
     const born = await makeBornVault()
     born.opts.world.requestCleartext = (gating) => { gating.decline() }
-    await TH.expectBad(born.vault.tryReplacePassphrase(), 'declined')
+    await TH.expectBad(born.vault.tryReplacePassphrasePrompt(), 'declined')
   })
 })
 
-describe("vault.addPasskey()", () => {
+describe("vault.addPasskeyPrompt()", () => {
   it("lays the passkey's wayin and keeps the passphrase's: both open, and the passphrase's lease stays held", async () => {
     const born = await makeBornVault()
     const { vault, demandStored } = born
@@ -172,7 +172,7 @@ describe("vault.addPasskey()", () => {
   it("refuses 'bad_option' a passkey held, nobody asked", async () => {
     const born = await makeBornVaultWithPasskey()
     const { shown } = dialogOf(born)
-    await TH.expectRefusal(born.vault.addPasskey(), 'bad_option')
+    await TH.expectRefusal(born.vault.addPasskeyPrompt(), 'bad_option')
     expect(shown).to.have.lengthOf(0)
   })
 
@@ -180,7 +180,7 @@ describe("vault.addPasskey()", () => {
     const born = await makeBornVault()
     const { vault } = born
     const { gatingAt } = dialogOf(born)
-    const adding = vault.addPasskey()
+    const adding = vault.addPasskeyPrompt()
     const gating = await gatingAt<'add_passkey'>()
     const passkeyClear = await TH.passkeyOf('laptop')
     await TH.expectBad(gating.attempt({ passphraseClear: 'not it', passkeyClear }), 'wrong_passphrase')
@@ -193,7 +193,7 @@ describe("vault.addPasskey()", () => {
   it("spends a bare ArrayBuffer of PRF bytes, as WebAuthn hands them, in refusing it 'bad_option' (G2)", async () => {
     const born = await makeBornVault()
     const { gatingAt } = dialogOf(born)
-    const adding = TH.expectRefusal(born.vault.addPasskey(), 'bad_option')
+    const adding = TH.expectRefusal(born.vault.addPasskeyPrompt(), 'bad_option')
     const gating = await gatingAt<'add_passkey'>()
     const { prfBytes, ...answer } = await TH.passkeyOf('laptop')
     const { buffer } = new Uint8Array(prfBytes)
@@ -211,7 +211,7 @@ describe("vault.addPasskey()", () => {
   })
 })
 
-describe("vault.revokePasskey()", () => {
+describe("vault.revokePasskeyPrompt()", () => {
   it("nulls the passkey's wayin and keeps the passphrase's, the vault unlocked: no key turns over", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
     const { gate: anteGate } = demandStored()
@@ -228,7 +228,7 @@ describe("vault.revokePasskey()", () => {
     const { storedNow, vault } = born
     const ante = storedNow()
     const { shown } = dialogOf(born)
-    expect(await vault.revokePasskey()).to.equal(vault)
+    expect(await vault.revokePasskeyPrompt()).to.equal(vault)
     expect(shown).to.have.lengthOf(0)
     expect(storedNow()).to.equal(ante)
   })
@@ -268,7 +268,7 @@ describe("a gate change on other sessions", () => {
   })
 })
 
-describe("vault.delVault()", () => {
+describe("vault.delVaultPrompt()", () => {
   it("locks the vault, stores a tombstone with its boxes cascaded, erases the row cached, and stays in its slot tombstoned", async () => {
     const { vault, listing, storedNow, deviceDB } = await makeBornVault()
     const boxes = vault.boxListing
@@ -286,7 +286,7 @@ describe("vault.delVault()", () => {
     const { vault, storedNow } = born
     const ante = storedNow()
     const { gatingAt } = dialogOf(born)
-    const deleting = vault.delVault()
+    const deleting = vault.delVaultPrompt()
     const gating = await gatingAt<'del_vault'>()
     await TH.expectBad(gating.attempt({ passphraseClear: 'not it' }), 'wrong_passphrase')
     expect(gating.isOpen).to.be.true
@@ -301,7 +301,7 @@ describe("vault.delVault()", () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const { gatingAt } = dialogOf(born)
-    const deleting = vault.delVault()
+    const deleting = vault.delVaultPrompt()
     const gating = await gatingAt<'del_vault'>()
     vault.lock()
     expect(gating.isOpen).to.be.true
@@ -315,7 +315,7 @@ describe("vault.delVault()", () => {
     const { vault, listing, storedNow } = born
     const ante = storedNow()
     const { gatingAt } = dialogOf(born)
-    const deleting = TH.expectRefusal(vault.delVault(), 'locked_while_asking')
+    const deleting = TH.expectRefusal(vault.delVaultPrompt(), 'locked_while_asking')
     await gatingAt<'del_vault'>()
     listing.sweep()
     await deleting
@@ -352,7 +352,7 @@ describe("vault.delVault()", () => {
     await delTyping(await anotherSession().build(demandStored()))
     const { shown } = dialogOf(born)
     await TH.expectRefusal(vault.fetch(), 'vault_gone')
-    await TH.expectRefusal(vault.delVault(), 'vault_gone')
+    await TH.expectRefusal(vault.delVaultPrompt(), 'vault_gone')
     expect(shown).to.have.lengthOf(0)
   })
 })

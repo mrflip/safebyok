@@ -1,7 +1,8 @@
 /** A Box's whisper: extractWhisper and expose, the setter, LOCKED, and the whisper given as { val }. */
 
 import { describe, expect, it } from 'vitest'
-import { type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, LOCKED } from '../../src/shapes/shapes-vaultish'
+import { LOCKED } from '../../src/helpers/consts'
+import type { BoxRecord, BoxSparse, BoxWorld, Fetched } from '../../src/shapes/shapes-vaultish'
 import { Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
@@ -47,7 +48,7 @@ describe("box.extractWhisper(): what the lease opens that is no whisper", () => 
   for (const [blurb, text] of OpenedCases) {
     it(`refuses 'damaged_box' for ${blurb}, quoting none of it`, async () => {
       const { world } = held.mw
-      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), demandUnlocked: () => world.demandUnlocked(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (maxMillis) => world.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text) }
+      const leasedWorld: BoxWorld = { clock: world.clock, scope: world.scope, vault_tok: world.vault_tok, lockState: () => world.lockState(), tellBadNews: (badnews) => { world.tellBadNews(badnews) }, demandUnlocked: () => world.demandUnlocked(), takeWorld: (taken) => { world.takeWorld(taken) }, ensureTimely: (maxMillis) => world.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text) }
       const box = await boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
       const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_box')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)

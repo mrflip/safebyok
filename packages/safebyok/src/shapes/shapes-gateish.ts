@@ -17,7 +17,7 @@ import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type VaultScope, vaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
-import type { VaultRecord, VaultWorld } from './shapes-vaultish'
+import type { Revision, VaultRecord, VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
@@ -282,7 +282,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // --
 
-// == [The gating's forms]: gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingLaunchArgs, ClearsForGatingkind
+// == [The gating's forms]: gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, gatingFriend, gatingLaunchArgs, GatingFriend, ClearsForGatingkind
 
 /** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
 export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj }) => ({
@@ -296,8 +296,16 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
   vaultDelClears:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
+/** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault takes a proving. */
+export const gatingFriend = objCheck(({ fn }) => ({
+  unlockByProof: fn<(vault: Vault, proved: Proving) => Promise<Vault>>(),
+  landGate:      fn<(vault: Vault, proved: Proving, commit: () => Promise<VaultRecord>) => Promise<Vault>>(),
+}), { refuseAs: 'bad_option', extras: 'strip' })
+
+export type GatingFriend = Z.infer<typeof gatingFriend>
+
 /** The check of what launches a gating. */
-export const gatingLaunchArgs = objCheck(({ fn }) => ({ gatingkind, scope: vaultScope, run: fn() }), { refuseAs: 'bad_option', extras: 'strip' })
+export const gatingLaunchArgs = objCheck(() => ({ gatingkind, scope: vaultScope, friend: gatingFriend }), { refuseAs: 'bad_option', extras: 'strip' })
 
 export type ClearsForGatingkind = {
   build_vault:        Z.input<typeof vaultBuildClears>
@@ -309,7 +317,7 @@ export type ClearsForGatingkind = {
 }
 // --
 
-// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
+// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, VaultBuildProvings, VaultUnlockProvings, AnteProvings, PassphraseReplaceProvings, PasskeyAddProvings, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
 
 /** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
 export type RequestCleartext = (gating: AnyGating) => unknown
@@ -318,22 +326,38 @@ export type AnyGating = { [KindT in EX.GatingKind]: Gating<KindT> }[EX.GatingKin
 
 export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: EX.GatingKind }>
 
-/** What an attempt makes of the clears it is handed, for its `run`. */
+/** What a build_vault attempt proves: the provings of a new vault's wayins, with no record to prove them against. */
+export type VaultBuildProvings = { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
+
+/** What an unlock_vault attempt proves: either wayin will do. */
+export type VaultUnlockProvings = { proved: Proving }
+
+/** The record an attempt read and the passphrase proved against it: all a revoke_passkey or a del_vault needs, and a commit's `ante`. */
+export type AnteProvings = { ante: VaultRecord, proved: PassphraseProving }
+
+/** What a replace_passphrase attempt proves: the ante passphrase against the record it read, and the next, unproved. */
+export type PassphraseReplaceProvings = { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
+
+/** What an add_passkey attempt proves: the passphrase, and the passkey to wrap the vaultKey for. */
+export type PasskeyAddProvings = AnteProvings & { passkeyProving: PasskeyProving }
+
+/** The provings by kind of gating, for what must look one up by its kind: `Run` and `Prove`. */
 export type ProvingsForGatingkind = {
-  build_vault:        { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
-  unlock_vault:       { proved: Proving }
-  replace_passphrase: { ante: VaultRecord, anteProving: PassphraseProving, nextProving: PassphraseProving }
-  add_passkey:        { ante: VaultRecord, proved: PassphraseProving, passkeyProving: PasskeyProving }
-  revoke_passkey:     { ante: VaultRecord, proved: PassphraseProving }
-  del_vault:          { ante: VaultRecord, proved: PassphraseProving }
+  build_vault:        VaultBuildProvings
+  unlock_vault:       VaultUnlockProvings
+  replace_passphrase: PassphraseReplaceProvings
+  add_passkey:        PasskeyAddProvings
+  revoke_passkey:     AnteProvings
+  del_vault:          AnteProvings
 }
 
-/** The verb a gating is launched for, past the enter key. It hears provings, never a clear. */
-export type Run<KindT extends EX.GatingKind> = (provings: ProvingsForGatingkind[KindT]) => Promise<Vault>
+/** The change a gating is launched for, past the enter key. It hears provings, never a clear. */
+export type Run<KindT extends EX.GatingKind> = (provings: ProvingsForGatingkind[KindT], launchArgs: LaunchArgs<KindT>) => Promise<Vault>
 
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
-export type LaunchArgs<KindT extends EX.GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], run: Run<KindT> }
+/** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch. */
+export type LaunchArgs<KindT extends EX.GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend }
 
 export type Asked<KindT extends EX.GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
 

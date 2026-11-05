@@ -101,7 +101,7 @@ export class Bank implements VaultWorld {
     this.#onBadNews = onBadNews
     const maxMillisSinceRefresh = millisOf(vaultRefreshMinutes, DefaultRefreshMillis)
     this.#makeListing = () => {
-      const listing = new VaultListing({ world: this, vaultDB, maxMillisSinceRefresh, onBadNews: this.#hearBadNews })
+      const listing = new VaultListing({ world: this, vaultDB, maxMillisSinceRefresh })
       listing.subscribe(this.#remakeSnapshot)
       return listing
     }
@@ -152,7 +152,7 @@ export class Bank implements VaultWorld {
   async #cacheDeviceRecord(): Promise<void> {
     const { act, record } = await this.deviceDB.cacheDeviceRecord({ ...this.scope, device_id: this.#device_id })
     this.#device_id = record.device_id
-    if (act === 'rewrote') { this.#vaultListing.tellBadNews([deviceRecordRewritten()]) }
+    if (act === 'rewrote') { this.tellBadNews([deviceRecordRewritten()]) }
   }
   // --
 
@@ -199,7 +199,7 @@ export class Bank implements VaultWorld {
   async #scanOwnLeasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
     const scan = await this.deviceDB.tryLeasesProvedBefore(cutoff)
     if (! scan.ok) {
-      this.#vaultListing.tellBadNews([scan.err])
+      this.tellBadNews([scan.err])
       return []
     }
     return scan.val.filter((row) => this.#isOwnLease(row))
@@ -251,10 +251,24 @@ export class Bank implements VaultWorld {
   tryEnsureVault(bag: VaultBag): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(bag)) }
   // --
 
-  // == [Bad news]: hearBadNews
+  // == [Bad news]: tellBadNews, hearBadNews
+
+  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here. A handler's failure reaches only the platform. */
+  tellBadNews(badnews: readonly VaultError[]): void {
+    for (const news of badnews) {
+      // Any answer is heard out, a thenable among them: none is awaited.
+      void (async () => {
+        try {
+          await this.#hearBadNews(news)
+        } catch (err) {
+          reportToPlatform(err)
+        }
+      })()
+    }
+  }
 
   /** Every news goes to the host's `onBadNews`, else the logger; 'identity_revoked' vacates the bank first. */
-  readonly #hearBadNews = (news: VaultError): unknown => {
+  #hearBadNews(news: VaultError): unknown {
     if (isVaultError(news, 'identity_revoked')) { this.vacate() }
     if (this.#onBadNews !== undefined) { return this.#onBadNews(news) }
     this.logger.warn(news.message, { call: 'Bank.onBadNews', refusalkind: news.refusalkind })

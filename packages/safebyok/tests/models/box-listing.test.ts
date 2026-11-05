@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { BoxListing } from '../../src/models/box-listing'
 import * as SX from '../../src/shapes/shapes-storage'
-import * as VX from '../../src/shapes/shapes-vaultish'
+import { LOCKED } from '../../src/helpers/consts'
 import type { BoxListingOpts } from '../../src/shapes/shapes-vaultish'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
@@ -34,7 +34,7 @@ describe("BoxListing", () => {
       ['a vaultDB without its verbs', () => ({ vaultDB: { watch: () => null } })],
       ['no horizon',                  () => ({ maxMillisSinceRefresh: undefined })],
       ['a negative horizon',          () => ({ maxMillisSinceRefresh: -1 })],
-      ['an onBadNews not a function', () => ({ onBadNews: 'tell me' })],
+      ['a world that cannot tell bad news', () => ({ world: { ...held.mw.world, tellBadNews: 'tell me' } })],
     ]
     for (const [blurb, patch] of bads) {
       it(`refuses ${blurb} as 'bad_option'`, () => {
@@ -219,7 +219,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand (t
     [() => null,                                'null'],
     [() => 'anthropic_api_key',                 'a bare boxlabel'],
     [() => ({ ...dna(), sidecar: 'note' }),     'a dna whose sidecar fails its check'],
-    [() => ({ ...dna(), whisper: VX.LOCKED }), 'a dna whose whisper is LOCKED'],
+    [() => ({ ...dna(), whisper: LOCKED }), 'a dna whose whisper is LOCKED'],
   ] as const
 
   for (const [inputOf, blurb] of BadDnaCases) {
@@ -240,7 +240,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand (t
   })
 
   it("says LOCKED is no whisper, naming whisper, for a dna that hands it as the whisper", async () => {
-    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: VX.LOCKED } as never), 'bad_option')
+    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: LOCKED } as never), 'bad_option')
     expect(err.message).to.include('LOCKED is not a whisper')
     expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
   })

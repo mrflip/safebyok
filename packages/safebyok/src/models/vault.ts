@@ -1,14 +1,15 @@
 import { verifyConsistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
+import { isListing } from '../helpers/consts'
 import { VaultError } from '../refusals/errors'
-import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
+import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
-import type { LockState } from '../shapes/shapes-enums'
+import type { GatingKind, LockState } from '../shapes/shapes-enums'
 import type { Clock, VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
-import type { GateProps, LeaseFriend, ProvingsForGatingkind, SealedWhisper } from '../shapes/shapes-gateish'
+import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
 import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, listingExpected, noProofToUnlock, unlockFirst } from '../refusals/throwers'
@@ -17,7 +18,7 @@ import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
 import { Gating } from './gating'
 import { Lease } from './lease'
-import { type Proving, NOVEL } from './proving'
+import type { Proving } from './proving'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
 
@@ -72,90 +73,62 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Construction]: launchBirth, runBirth
+  // == [Construction]: launchBirth
 
   /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
-    if (! VX.isListing(listing)) { throw listingExpected() }
+    if (! isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
     const held = listing.at(checked)
     if (held?.isPresent === true) { throw alreadyHeldError() }
     const prior = SX.revisionOf(held ?? SX.VoidRevision)
-    return Gating.launch('build_vault', { listing, scope: checked, vault: null, run: (provings) => Vault.#runBirth(listing, provings, prior) })
-  }
-
-  /** SLOPDOC: Stores the birth record, and unlocks under its passphrase's lease if the vault stored is its own. */
-  static async #runBirth(listing: VaultListing, { passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: VX.Revision): Promise<Vault> {
-    const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
-    const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null
-    const record = recordOfBirth(Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin), prior, listing.clock.now())
-    const vault = await listing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
-    if (vault.vault_tok === record.vault_tok) { await vault.#unlockByProof(passphraseProving) }
-    return vault
+    return Gating.launch('build_vault', { listing, scope: checked, vault: null, prior, friend: Vault.#gatingFriend })
   }
   // --
 
-  // == [Changing the gate]: replacePassphrase, addPasskey, revokePasskey, delVault, del, each with its try form, landGate
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, del, each with its try form, landGate
 
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
-  async replacePassphrase(): Promise<this> {
+  async replacePassphrasePrompt(): Promise<this> {
     await this.ensureTimely(); this.demandEnabled()
-    await Gating.launch('replace_passphrase', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runReplacePassphrase(provings) })
+    await Gating.launch('replace_passphrase', this.#launchArgs)
     return this
   }
 
-  tryReplacePassphrase(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrase()) }
-
-  async #runReplacePassphrase({ ante, anteProving, nextProving }: ProvingsForGatingkind['replace_passphrase']): Promise<this> {
-    const nextWayin = await nextProving.buildWayin(anteProving)
-    return this.#landGate(anteProving, () => this.listing.replacePassphrase({ ...ante, gate: { passphrase_wayin: GX.passphraseWayinRecord.parse(nextWayin.pickle()) } }))
-  }
+  tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
 
   /** Add a passkey through an add_passkey gating. */
-  async addPasskey(): Promise<this> {
+  async addPasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandEnabled()
     this.gate.demandPasskeyAddable()
-    await Gating.launch('add_passkey', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runAddPasskey(provings) })
+    await Gating.launch('add_passkey', this.#launchArgs)
     return this
   }
 
-  tryAddPasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskey()) }
-
-  async #runAddPasskey({ ante, proved, passkeyProving }: ProvingsForGatingkind['add_passkey']): Promise<this> {
-    const passkeyWayin = await passkeyProving.buildWayin(proved)
-    return this.#landGate(proved, () => this.listing.addPasskey({ ...ante, gate: { passkey_wayin: GX.passkeyWayinRecord.parse(passkeyWayin.pickle()) } }))
-  }
+  tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
   /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
-  async revokePasskey(): Promise<this> {
+  async revokePasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandEnabled()
     if (this.gate.pkWayin === null) { return this }
-    await Gating.launch('revoke_passkey', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante, proved }) => this.#landGate(proved, () => this.listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })) })
+    await Gating.launch('revoke_passkey', this.#launchArgs)
     return this
   }
 
-  tryRevokePasskey(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskey()) }
+  tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
 
   /** SLOPDOC: Deletes this vault through a gating, leaving a tombstone in its slot and nothing of it on this device. */
-  async delVault(): Promise<this> {
+  async delVaultPrompt(): Promise<this> {
     await this.ensureTimely(); this.demandEnabled()
-    await Gating.launch('del_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante }) => this.#runDelVault(ante) })
+    await Gating.launch('del_vault', this.#launchArgs)
     return this
   }
 
-  tryDelVault(): Promise<Outcome<this>> { return outcomeOf(() => this.delVault()) }
+  tryDelVaultPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delVaultPrompt()) }
 
-  // The lock first: no box opens under a lease while the tombstone goes out.
-  /** Lock this vault and store its tombstone; the answer delivered vacates its boxes. */
-  async #runDelVault(ante: VaultRecord): Promise<this> {
-    this.lock()
-    await this.listing.del(ante)
-    return this
-  }
-
-  /** Delete this vault by {@link delVault}, which takes the passphrase's proof. */
-  override del(): Promise<this> { return this.delVault() }
+  /** Delete this vault by {@link delVaultPrompt}, which takes the passphrase's proof. */
+  override del(): Promise<this> { return this.delVaultPrompt() }
 
   // The old lease stays in force for the moments between: the vaultKey did not change.
   /** Run the commit, then attach a lease under the epoch it landed. */
@@ -184,14 +157,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async unlock(): Promise<this> {
     await this.ensureAttachable(); this.demandAttachable()
     if (this.world.requestCleartext === undefined) { throw noProofToUnlock() }
-    await Gating.launch('unlock_vault', { listing: this.listing, scope: this.scope, vault: this, run: ({ proved }) => this.#unlockByProof(proved) })
+    await Gating.launch('unlock_vault', this.#launchArgs)
     return this
   }
 
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lockState, lock, vacateLease, panic, dropLease, unlockByProof, attachLease, renewLease
+  // == [The lease]: lockState, lock, vacateLease, panic, unlockByProof, attachLease, renewLease
 
   lockState(): LockState { return this.#lease === null ? 'locked' : 'unlocked' }
 
@@ -207,8 +180,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: Drops any lease held and erases the row cached on this device. */
   async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#panic(refusal)): Promise<void> {
     // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
-    this.#dropLease()
-    const vacating = outcomeOf(async () => { valOf(await this.#leaseFriend().tryUncacheLease()) })
+    const held = this.#lease
+    this.#lease = null
+    const vacating = held?.tryVacate() ?? Lease.tryUncache(this.#leaseFriend())
     this.settle()
     const vacated = await vacating
     if (! vacated.ok) { await onRefused(vacated.err) }
@@ -227,11 +201,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     } catch (err) {
       reportToPlatform(err)
     }
-  }
-
-  #dropLease(): void {
-    this.#lease?.evict()
-    this.#lease = null
   }
 
   /** Past the enter key: a lock crossing this is answered by the next `lock()`, as the proof says this user may have the vault unlocked. */
@@ -261,6 +230,19 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
+  // == [The gating's friend]: gatingFriend, launchArgs
+
+  /** The private verbs a gating's run calls past the enter key, as no public method of a vault takes a proving (G9). */
+  static readonly #gatingFriend: GatingFriend = {
+    unlockByProof: (vault, proved) => vault.#unlockByProof(proved),
+    landGate:      (vault, proved, commit) => vault.#landGate(proved, commit),
+  }
+
+  get #launchArgs(): LaunchArgs<Exclude<GatingKind, 'build_vault'>> {
+    return { listing: this.listing, scope: this.scope, vault: this, prior: null, friend: Vault.#gatingFriend }
+  }
+  // --
+
   // == [The lease's friend]: leaseFriend, makeFriend, stampOfLife
 
   /** All a lease or a proving hears of this vault, made once. */
@@ -282,7 +264,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       tryPeekLease:    () => deviceDB.tryPeek(asked),
       tryCacheLease:   (record) => deviceDB.tryCache(record),
       tryUncacheLease: () => deviceDB.tryVacate(asked),
-      tellBadNews:     (badnews) => { this.listing.tellBadNews(badnews) },
+      tellBadNews:     (badnews) => { this.world.tellBadNews(badnews) },
     }
   }
 
@@ -290,7 +272,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
   // --
 
-  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld
+  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld, tellBadNews
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
@@ -309,6 +291,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const row = VX.vaultRow.parse(world)
     if (row.vault_tok === this.vault_tok) { this.receive(row) }
   }
+
+  /** Tell bad news of this vault's boxes where its own goes. */
+  tellBadNews(badnews: readonly VaultError[]): void { this.world.tellBadNews(badnews) }
   // --
 
   // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form
@@ -425,13 +410,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)
     if (this.isPresent) { return }
-    void this.#vacateLease((refusal) => { this.listing.tellBadNews([refusal]) })
+    void this.#vacateLease((refusal) => { this.world.tellBadNews([refusal]) })
     this.#boxListing?.vacate()
   }
 
   /** The lease dropped, the row cached left for the next session, and the boxes swept. */
   protected override sweepContents(): void {
-    this.#dropLease()
+    this.#lease?.evict()
+    this.#lease = null
     this.#boxListing?.sweep()
     this.listing.declineGatingAtDiscard(this)
   }
@@ -465,11 +451,3 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 }
-
-// == [Birth's record]: recordOfBirth
-
-/** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
-const recordOfBirth = (gate: Gate, prior: VX.Revision, now: number): VaultRecord => (
-  { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...SX.nextRevisionOf(prior, now), gate: gate.pickle() }
-)
-// --
