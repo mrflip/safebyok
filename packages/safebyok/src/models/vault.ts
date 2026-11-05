@@ -276,14 +276,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
-    GX.leaseSealArgs.parse({ whisperText, stamp })
-    return this.#demandLease(stamp).sealWith(whisperText, stamp)
+    const checked = GX.leaseSealArgs.parse({ whisperText, stamp })
+    return this.#demandLease(checked.stamp).sealWith(checked.whisperText, checked.stamp)
   }
 
   /** The text `sealed` holds, bound to `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
-    GX.leaseUnsealArgs.parse({ sealed, stamp })
-    return this.#demandLease(stamp).unsealWith(sealed, stamp)
+    const checked = GX.leaseUnsealArgs.parse({ sealed, stamp })
+    return this.#demandLease(checked.stamp).unsealWith(checked.sealed, checked.stamp)
   }
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */

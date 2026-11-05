@@ -274,7 +274,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
     ctxStamp,
     leaseFromCacheArgs: obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
     leaseGrantedArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
-    provingLeaseArgs:   obj({ friend: leaseFriend, gate_epoch: gateEpoch.optional() }),
+    provingLeaseArgs:   obj({ friend: leaseFriend, gate_epoch: gateEpoch }),
     leaseSealArgs:      obj({ whisperText: str, stamp: ctxStamp }),
     leaseUnsealArgs:    obj({ sealed: sealedWhisper, stamp: ctxStamp }),
   }

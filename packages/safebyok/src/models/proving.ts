@@ -66,8 +66,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
   static async checkStrength(passphraseClear: GX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<GX.PassphraseVerdict> {
-    strengthArgs.parse({ passphraseClear, scope, world })
-    return invokeStrengthChecker(world.strengthChecker, scope)(passphraseClear)
+    const checked = strengthArgs.parse({ passphraseClear, scope, world })
+    return invokeStrengthChecker(checked.world.strengthChecker, checked.scope)(checked.passphraseClear)
   }
 
   /** The wayin this proving holds, made under a vaultKey new (`NOVEL`) or held by the `source` proving of the same vault. A proving holds one wayin. */
@@ -81,10 +81,10 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
-    provingLeaseArgs.parse({ friend, gate_epoch })
+    const checked = provingLeaseArgs.parse({ friend, gate_epoch })
     vaultStamp.parseConsistent(friend, this.stamp, { kind: 'bad_option', message: Phrases.LeaseOfOtherVault })
     const vaultKey = await this.#unwrapVaultKey()
-    return Lease.buildGranted(friend, vaultKey, { gate_epoch, wayinkind: this.wayinkind })
+    return Lease.buildGranted(friend, vaultKey, { gate_epoch: checked.gate_epoch, wayinkind: this.wayinkind })
   }
 
   async #wrapVaultKey(vaultKey: CryptoKey): Promise<Wayin> {

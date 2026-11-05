@@ -106,8 +106,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
   constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, opts: StorableOpts) {
-    VX.storableArgs.parse({ world, listing, central, opts })
-    this.#horizonMillis = opts.maxMillisSinceRefresh
+    const { opts: { maxMillisSinceRefresh } } = VX.storableArgs.parse({ world, listing, central, opts })
+    this.#horizonMillis = maxMillisSinceRefresh
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
     this.#scope = Object.freeze(listing.scopeOf(central))
