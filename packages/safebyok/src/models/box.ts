@@ -60,7 +60,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get whisper_schema_version(): 1 | null                             { return this.full?.whisper_schema_version ?? null }
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
 
-  /** The whisper exposed on this instance, or the bag saying why it will not show: encrypted, locked or veiled. */
+  /** The whisper exposed on this instance, or the bag saying why it will not show: encrypted, locked or veiled.
+   * See notes/expose_improves_security.md
+   */
   get whisper(): Whisper {
     if (this.#exposed === null) { return ENCRYPTED }
     if (this.isLocked)          { return LOCKED }
@@ -94,7 +96,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
-  /** Open the stored whisper and hold it on the instance, showing, where `box.whisper` offers it until {@link unexpose}. */
+  /** Open the stored whisper and hold it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
+   * See notes/expose_improves_security.md
+   */
   async expose(opts: TimelyOpts = {}): Promise<this> {
     const exposed = await this.extractWhisper(opts)
     this.demandExposable()
@@ -118,7 +122,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Stop hiding the whisper exposed; a locked vault still hides it. */
+  /** Stop hiding the whisper exposed; a locked vault still hides it.
+   * See notes/expose_improves_security.md
+   */
   unveil(): this {
     if (this.#exposed === null) { throw notExposedError() }
     this.#isVeiled = false
