@@ -328,7 +328,7 @@ that yields a key, and no module exports a route to one: `leaseRecordOf`, which 
 (`Vault.launchBirth`); nothing public on a `Vault` or a `Lease` hands the friend out, and a test catches
 it with a spy on `Proving.prototype.buildLease`. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export `Lease` and
 `Proving` as types and classes alone, and none of the registries. Checked by:
-`tests/lease.test.ts` (*hands out no record*), `tests/models/vault-unlock.test.ts` (*a vault and a
+`tests/lease.test.ts` (*hands out no record*), `tests/models/vault-lease.test.ts` (*a vault and a
 lease show neither the lease friend nor the lease key handle, one level deep, by identity*), `rg` for
 the crypto imports.
 
