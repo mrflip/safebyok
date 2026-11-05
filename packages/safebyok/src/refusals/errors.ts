@@ -1,6 +1,4 @@
-import type { BoxDamaged, BoxRecord } from '../shapes/box'
-import type { Capacity } from '../shapes/vault-db'
-import type { WayinSummary, VaultRecord } from '../shapes/vault'
+import type { Capacity } from '../storage/vault-db-shapes'
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind's meaning sits beside it, and its family in {@link RefusalFamilyForKind}. The families
@@ -159,17 +157,6 @@ export const RefusalFamilyForKind = {
  * Records are as storage holds them, ciphertext and visible fields, never secret material.
  */
 export type RefusalMeta = {
-  /** `stale_write` from a box write: what is stored under the boxlabel, read in the step that refused.
-   * It is the winning box's whole record, so the caller can open it or write over it with no second
-   * read. It is a {@link BoxDamaged} when what is stored does not read back as a box, and null when
-   * nothing is stored there.
-   */
-  box_stored?:   BoxRecord | BoxDamaged | null
-  /** `stale_write` from an update of the vault record: the stored vault record, read in the step that refused, or null when none is stored.
-   * It is the winner's whole record, checked as a read checks one, so the caller can take it up
-   * with no second read.
-   */
-  vault_stored?: VaultRecord | null
   /** `stale_write` from an edit whose stored record moved while the edit was being made: the revision storage now holds, as this device received it. */
   stored_revision?: Readonly<{ revision_tok: string, revision_seq: number }>
   /** `stale_write` from an edit whose stored record moved while the edit was being made: the revision the edit had staged its record under, which nothing holds. */
@@ -179,10 +166,6 @@ export type RefusalMeta = {
    * `vault.snapshot.capacity` before storage is asked.
    */
   capacity?:     Capacity
-  /** `damaged_box` told of a listing: the box as the listing shows it among `damagedBoxes`, its boxlabel, the revision it names, and its `damage`. */
-  box_listed?:   BoxDamaged
-  /** `damaged_wayin` told of a read of the vault record: the way in as the snapshot shows it. */
-  wayin_listed?: WayinSummary
   /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */
   fieldnames?:   readonly string[]
   /** A vaultDB's refusal: the verb that refused. */

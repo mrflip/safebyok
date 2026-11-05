@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import * as Zod from 'zod'
-import * as BX from '../../src/shapes/box'
-import * as DX from '../../src/shapes/device'
+import * as BX from '../../src/shapes/fields'
 import * as CX from '../../src/shapes/scopes'
-import * as VX from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 
 const WhisperCases = [
@@ -99,76 +96,5 @@ describe("sidecar", () => {
     expect(checked).to.deep.equal(sidecar)
     expect(checked).to.not.eq(sidecar)
     expect(checked['tags']).to.not.eq(sidecar.tags)
-  })
-})
-
-describe("leaseRecord", () => {
-  it("takes a user_id up to a hundred characters, and refuses a longer one or one that is not text", async () => {
-    const lease = await TH.leaseOf('u'.repeat(100))
-    expect(DX.leaseRecord.safeParse(lease).success).to.be.true
-    expect(DX.leaseRecord.safeParse({ ...lease, user_id: 'u'.repeat(101) }).success).to.be.false
-    expect(DX.leaseRecord.safeParse({ ...lease, user_id: 42 }).success).to.be.false
-  })
-})
-
-const DeviceRecordCases = [
-  // regular usage:
-  [TH.deviceRecordOf('u1'),                                                 true,   'a whole device record'],
-  [TH.deviceRecordOf('u1', { highest_vault_epoch: 40 }),                    true,   'a record of a vault seen at a later epoch'],
-  [TH.deviceRecordOf('u1', { highest_vault_epoch: 0 }),                     true,   'a record of a vault seen only at epoch zero'],
-  // refused, as a damaged or foreign record:
-  [TH.deviceRecordOf('u1', { format: 'safebyok-device-v2' as never }),      false,  'a format this version does not know'],
-  [{ format: 'safebyok-mark-v5', ...TH.scopeOf('u1'), seen: { device_id: 'device-one', vault_tok: 'vault-tok-u1', gate_epoch: 1 } }, false, 'a device mark from before the device record, which reads as none'],
-  [TH.omitting(TH.deviceRecordOf('u1'), 'device_id'),                       false,  'a record missing its device_id'],
-  [TH.deviceRecordOf('u1', { device_id: '' }),                              false,  'an empty device_id'],
-  [TH.omitting(TH.deviceRecordOf('u1'), 'highest_vault_epoch'),             false,  'a record missing the epoch it has seen'],
-  [TH.deviceRecordOf('u1', { highest_vault_epoch: -1 }),                    false,  'an epoch below zero'],
-  [TH.deviceRecordOf('u1', { highest_vault_epoch: 1.5 }),                   false,  'an epoch that is no whole number'],
-  [TH.omitting(TH.deviceRecordOf('u1'), 'user_id'),                         false,  'a record that names no user'],
-] as const
-
-describe("deviceRecord", () => {
-  for (const [candidate, expected, blurb] of DeviceRecordCases) {
-    it(blurb, () => { expect(DX.deviceRecord.safeParse(candidate).success).to.eq(expected) })
-  }
-})
-
-// Every record the package writes to storage, by the schema that checks it: each rendered as JSON
-// Schema and kept as a snapshot under its own format literal, so no change to a stored shape goes
-// unnoticed. Before 1.0 a shape may change under the format it has (CLAUDE.md, *What the package
-// promises*), and a record written before the change reads as damaged. So a change here is made on
-// purpose: update the snapshot (`vitest -u`) in the commit that changes the shape, and say in its
-// changeset what a host holding older records sees. A refinement (a `.refine`, such
-// as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
-// the ranges a check states, not every rule. Each is rendered twice. As output, it shows every
-// field's shape, a sidecar's JSON among them. As input, a strict record shows
-// `additionalProperties: false` and a stripping one does not, which output renders alike: so
-// strictness is guarded too.
-const StoredRecords = [
-  [VX.vaultRecord.shape.format, VX.vaultRecord],
-  [BX.boxRecord.shape.format, BX.boxRecord],
-  [DX.leaseRecord.shape.format, DX.leaseRecord],
-  [DX.deviceRecord.unwrap().shape.format, DX.deviceRecord],
-  [VX.vaultTombstone.shape.format, VX.vaultTombstone],
-] as const
-
-describe("Stored record formats", () => {
-  for (const [formatSchema, schema] of StoredRecords) {
-    const format = formatSchema.def.values.join(' | ')
-    it(format, () => {
-      const rendered = {
-        output: Zod.toJSONSchema(schema, { unrepresentable: 'any' }),
-        input:  Zod.toJSONSchema(schema, { unrepresentable: 'any', io: 'input' }),
-      }
-      expect(rendered, `The ${format} record's schema is not the one on record: if its shape changed on purpose, say in the changeset what an older record does, then update the snapshot (vitest -u)`).toMatchSnapshot()
-    })
-  }
-
-  it("renders a stripping schema apart from a strict one as input, where output renders them alike, so strictness shows in the guard", () => {
-    const strict = Zod.object({ field: Zod.string() }).strict()
-    const stripping = Zod.object({ field: Zod.string() })
-    expect(Zod.toJSONSchema(strict, { io: 'input' })).to.include({ additionalProperties: false })
-    expect(Zod.toJSONSchema(stripping, { io: 'input' })).to.not.have.property('additionalProperties')
-    expect(Zod.toJSONSchema(stripping)).to.include({ additionalProperties: false })
   })
 })

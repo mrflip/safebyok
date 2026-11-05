@@ -1,24 +1,31 @@
-/** The shapes of the code a host hands in: the stores and libraries Bank.make takes, a logger, what `localVaultDB` is handed, and a callback. Each `parse` refuses 'bad_option', and only checks: what was handed in goes on as it came, prototype, `this` and all. */
+/** The shapes of the code a host hands in: the clock, the key deriver and the logger. Each `parse` refuses 'bad_option', and only checks: what was handed in goes on as it came, prototype, `this` and all. */
 
 import { MaxSaltBytes } from '../helpers/consts'
 import type { KeyDeriver } from '../deriver/basederiver'
 import type { VaultLogger } from '../helpers/logger'
-import type { Clock } from './bank-opts'
 import * as Phrases from '../helpers/phrases'
 import { Checker, Checkers } from '../helpers/validator'
 import * as FX from './fields'
 
-// == [Stores and libraries]: vaultDBShape, deviceDBShape, clockShape, keyDeriverShape
+// == [Clock]: Clock, wallClock
+
+/** A source of the time, `Bank.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
+ * `Bank.make` reads it once, and refuses 'bad_option' for a reading outside `FarPast` to
+ * `FarFuture`, or a throw. The vault takes every later reading as it comes.
+ */
+export type Clock = { now(): number }
+
+/** The wall clock: the default `Clock`. */
+export const wallClock: Clock = { now: () => Date.now() }
+// --
+
+// == [Libraries]: clockShape, keyDeriverShape
 
 /** The checks of the stores and libraries Bank.make takes, each by the verbs the vault calls on it and, for a keyDeriver, the fields it reads, each refusing 'bad_option'.
  * Bank.make keeps what it was handed, prototype and all.
  */
-export const { vaultDBShape, deviceDBShape, clockShape, keyDeriverShape } = Checkers('bad_option', ({ obj, fn, str, int, key_deriver_label }) => {
-  const verb = fn()
+export const { clockShape, keyDeriverShape } = Checkers('bad_option', ({ obj, fn, str, int, key_deriver_label }) => {
   return {
-    // The public verbs the bank and its vaults call on a VaultDB, beside its being an instance of the `VaultDB` base class.
-    vaultDBShape:    obj({ tryGetVault: verb, tryEnsureVault: verb, tryPutVaultRecord: verb, tryGetBox: verb, tryPutBox: verb, tryDelBox: verb, tryDelVault: verb, tryDelDamagedVault: verb, subscribe: verb }, Phrases.VaultDBShape),
-    deviceDBShape:   obj({ tryGetLease: verb, tryPutLease: verb, tryDelLease: verb, tryGetDeviceRecord: verb, tryRaiseDeviceRecord: verb, tryDelDeviceRecord: verb, tryDelAll: verb }, Phrases.DeviceDBShape),
     clockShape:      obj({ now: fn<Clock['now']>() }),
     keyDeriverShape: obj({
       algorithm:         str.optional(),
@@ -39,9 +46,4 @@ export const loggerShape = Checker(({ obj, fn }) => {
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
 }, 'bad_option')
 
-/** The check of a listener or a callback a host hands in, a function: its `parse` refuses 'bad_option', quoting none of it, and hands it back as it came.
- *
- * @example this.#listeners.add(callback.parse(listener))
- */
-export const callback = Checker(({ fn }) => fn(), 'bad_option')
 // --

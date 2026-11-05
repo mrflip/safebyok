@@ -1,7 +1,6 @@
 /** The checks for scopes, the bags naming a vault, and scopepaths, made in {@link Checkers}, with the names a scope is made of: a failed `parse` refuses 'bad_scope', quoting nothing. */
 
 import type * as Z from 'zod'
-import { ScopepathDelimiter } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 import type * as PX from './primitives'
 import { never } from 'zod'
@@ -22,51 +21,20 @@ export type Boxlabel = Z.infer<typeof PX.label>
 
 /** The signed-in user's stable, opaque id from the host's own auth, as {@link user_id} checks it: the one name in a scope that is not a label. */
 export type UserId = Z.infer<typeof PX.user_id>
-// --
 
-// == [Fieldnames]: each scope's fieldnames, in the order its scopepath joins them
-
-/** The fieldnames of a bank's scope, in the order its scopepath joins them. */
-export const bankScopepathFieldnameVals = ['applabel', 'user_id'] as const
-/** The fieldnames of a vault's scope, in the order its scopepath joins them: its bank's, then its vaultlabel. */
-export const vaultScopepathFieldnameVals = [...bankScopepathFieldnameVals, 'vaultlabel'] as const
-/** The fieldnames of a box's scope, in the order its scopepath joins them: its vault's, then its boxlabel. */
-export const boxScopepathFieldnameVals = [...vaultScopepathFieldnameVals, 'boxlabel'] as const
-
-/** A fieldname of a bank's scope. */
-export type BankScopepathFieldname = typeof bankScopepathFieldnameVals[number]
-/** A fieldname of a vault's scope. */
-export type VaultScopepathFieldname = typeof vaultScopepathFieldnameVals[number]
-/** A fieldname of a box's scope. */
-export type BoxScopepathFieldname = typeof boxScopepathFieldnameVals[number]
-// --
-
-// == [Scopes and scopepaths]: bankScope, vaultScope, boxscope, BankScope, VaultScope, Boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath
-
-/** A scopepath's parts, as its validator checks them: split on {@link ScopepathDelimiter}. */
-const partsOf = (scopepath: string): string[] => scopepath.split(ScopepathDelimiter)
-
-/** A scope as a frozen copy, or a scopepath split into its kind and names.
+/** A scope as a frozen copy.
  * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
  * passes as its scope. Being a copy, no one it is handed to can change it for everyone else.
  *
  * @example CX.vaultScope.parse(vault)                                   // { applabel, user_id, vaultlabel }, frozen
  * @example CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' })          // throws 'bad_scope', "boxlabel: A label is ..."
- * @example CX.vaultScopepath.parse('vault^acme^auth0|x^main')           // ['vault', 'acme', 'auth0|x', 'main']
- * @example CX.vaultScopepath.parse('lease^acme^u1^main')                // throws 'bad_scope': a lease's
  */
-export const { bankScope, vaultScope, boxscope, bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath } = Checkers('bad_scope', ({ obj, str, tuple, lit, applabel, user_id, vaultlabel, boxlabel }) => {
+export const { bankScope, vaultScope, boxscope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
 
-  const bankScopepath   = str.transform(partsOf).pipe(tuple([lit('bank'),   applabel, user_id], Phrases.BankScopepathShape))
-  const vaultScopepath  = str.transform(partsOf).pipe(tuple([lit('vault'),  applabel, user_id, vaultlabel], Phrases.VaultScopepathShape))
-  const leaseScopepath  = str.transform(partsOf).pipe(tuple([lit('lease'),  applabel, user_id, vaultlabel], Phrases.LeaseScopepathShape))
-  const deviceScopepath = str.transform(partsOf).pipe(tuple([lit('device'), applabel, user_id, vaultlabel], Phrases.DeviceScopepathShape))
-  const boxScopepath    = str.transform(partsOf).pipe(tuple([lit('box'),    applabel, user_id, vaultlabel, boxlabel], Phrases.BoxScopepathShape))
-
-  return { bankScope: bankScope.readonly(), vaultScope: vaultScope.readonly(), boxscope: boxscope.readonly(), bankScopepath, vaultScopepath, leaseScopepath, deviceScopepath, boxScopepath }
+  return { bankScope: bankScope.readonly(), vaultScope: vaultScope.readonly(), boxscope: boxscope.readonly() }
 })
 
 /** What names a bank: the app's label and the signed-in user's id. */

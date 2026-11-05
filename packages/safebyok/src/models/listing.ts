@@ -9,7 +9,7 @@ import { disabledError, otherVaultTokAtBirth, putAnsweredNothing } from '../refu
 import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
-import type { Clock } from '../shapes/bank-opts'
+import type { Clock } from '../shapes/host-code'
 import { type DelTombstone, type Fetched, type FetchOpts, type IfAbsent, type ListingAnswer, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type SlotFate, type SparseBase, type Thing, IsListing } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Storable } from './storable'

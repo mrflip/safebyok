@@ -3,8 +3,8 @@
 import type * as Z from 'zod'
 import { Checkers, objCheck } from '../helpers/validator'
 import { randomId } from '../helpers/crypto'
-import { sidecar } from '../shapes/box'
 import * as FX from '../shapes/fields'
+import { sidecar } from '../shapes/fields'
 import * as HX from '../shapes/host-code'
 
 // == [Sentinels and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
@@ -150,6 +150,26 @@ export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
 export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
 export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
+// --
+
+// == [Capacity]: capacity, Capacity
+
+/** How much room a vault has: boxes against the most it holds, and bytes against the most its storage holds of one vault.
+ * A vault reckons it from its last read; a VaultDB from storage, in `getCapacity` and a
+ * `vault_full`'s `meta.capacity`. Either is an estimate: storage checks again on every write, and
+ * its answer wins. A limit storage reports as `Infinity` reads as `Number.MAX_SAFE_INTEGER`. Its
+ * `parse` refuses 'bad_record'.
+ *
+ * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
+ */
+export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
+  // A storage adapter's `Infinity`, its way of saying it sets no limit, is kept as the largest
+  // safe integer, as Bank.make keeps a declared limit: past this check, no limit is infinite.
+  const roomLimit = union([int.positive(), lit(Infinity)]).transform((most) => Math.min(most, Number.MAX_SAFE_INTEGER))
+  const room      = obj({ used: uint, max: roomLimit })
+  return { boxes: room, bytes: room }
+}, { extras: 'strip' })
+export type Capacity = Z.infer<typeof capacity>
 // --
 
 // == [Row helpers]: reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf

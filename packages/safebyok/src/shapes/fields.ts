@@ -1,6 +1,7 @@
 /** The checks for the fields of the stored records, each named for the field it checks: an encrypted value's halves, the tokens, the ids, the salts and the ciphered fields. */
 
 import type * as Z from 'zod'
+import { record } from 'zod'
 import * as Phrases from '../helpers/phrases'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import { PasskeySaltBytes } from '../helpers/consts'
@@ -74,4 +75,63 @@ export type VaultKeyWayinWrapped = Z.infer<typeof vault_key_wayin_wrapped>
 
 /** A lease's vaultKeyLeaseWrapped: the vaultKey, wrapped under this device's leaseKey. */
 export type VaultKeyLeaseWrapped = Z.infer<typeof vault_key_lease_wrapped>
+// --
+
+// == [Whisper and sidecar]: WhisperJson, whisper, isPlainBag, whisperBag, sidecar
+
+/** The JSON a whisper is made of, `null` included inside an array or object: a whole {@link Whisper} cannot be null. */
+export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [ckey: string]: WhisperJson }
+
+/** The secret kept in a box: a JSON value, a string, number, boolean, array or plain object.
+ * `undefined` anywhere in it is refused, as JSON cannot carry it. A bare `null` is refused too:
+ * emptying a box is `delBox`'s job.
+ *
+ * @example 'sk-ant-api03-...'
+ * @example { apiKey: 'sk-ant-...', orgId: null }
+ */
+export type Whisper = Exclude<WhisperJson, null>
+
+/** True for a plain object, built by a literal or `Object.create(null)`: never a Date or Map, which JSON would flatten. */
+export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
+  if (typeof val !== 'object' || val === null) { return false }
+  const proto: unknown = Object.getPrototypeOf(val)
+  return proto === Object.prototype || proto === null
+}
+
+/** The check for a {@link Whisper}, exactly what JSON can carry, never what it would mangle, and never a bare null; and `whisperBag`, the plain JSON object a whisper or a {@link Sidecar} may be.
+ * Its `parse` refuses 'bad_whisper', quoting none of it, and naming none of an object's keys: an
+ * object that is not plain JSON fails whole.
+ *
+ * @example whisper.parse('sk-ant-...')                  // a string passes through
+ * @example whisper.safeParse(new Date()).success        // false: JSON would flatten it to {}
+ * @example whisper.safeParse(undefined).success         // false: undefined cannot be stored
+ * @example whisper.safeParse(null).success              // false: emptying a box is delBox's job
+ * @example whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
+ */
+export const { whisper, whisperBag } = Checkers('bad_whisper', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
+  const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, plainBag]))
+  // An object is judged whole, so a refusal's path never holds one of its keys, which are the caller's own.
+  const whisperMembers = record(str, whisperJson)
+  const plainBag = custom<Record<string, WhisperJson>>((val) => isPlainBag(val) && whisperMembers.safeParse(val).success, Phrases.WhisperBagShape)
+  const whisperArr = arr(whisperJson)
+  // A judged object is the caller's own, so each check hands back a copy, as a parse of an object does:
+  // a box freezes its record through, and must never freeze, or share, the caller's sidecar.
+  const whisperBag = plainBag.overwrite((bag) => structuredClone(bag))
+  const whisper: Z.ZodType<Whisper> = union([str, num, bool, whisperArr, plainBag], Phrases.WhisperShape).overwrite((whisper) => structuredClone(whisper))
+  return { whisper, whisperBag }
+})
+
+/** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, shown while the vault is locked. Never put secret material in it.
+ * It is stored in the clear, as the JSON object it is (a `jsonb` column, say, which a server can
+ * query), so anyone who can read the database can read it. It is in the box's stamp as its JSON
+ * with keys sorted: a sidecar altered in storage makes the box refuse to open, while one whose
+ * keys storage reorders still opens. safebyok never looks inside it: check its shape before
+ * `putBox()`. Its `parse` refuses 'bad_option', as `putBox()` does.
+ *
+ * @example sidecar.parse({ note: 'work account', project: 'atlas' })
+ * @example sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
+ * @example sidecar.safeParse('work account').success           // false: a sidecar is an object -- { note: 'work account' }
+ */
+export const sidecar = Checker(() => whisperBag, 'bad_option')
+export type Sidecar = Z.infer<typeof sidecar>
 // --

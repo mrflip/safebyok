@@ -2,7 +2,7 @@
 
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf } from '../refusals/outcome'
-import { type Clock, wallClock } from '../shapes/bank-opts'
+import { type Clock, wallClock } from '../shapes/host-code'
 import * as Refuse from '../refusals/throwers'
 import * as VS from './vault-db-shapes'
 import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, IfPresent, PutIfAbsent, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from './vault-db-shapes'

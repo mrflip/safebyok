@@ -7,9 +7,7 @@
  * only warnings and errors, and checks that a call refuses and that what it threw quotes nothing it
  * shouldn't. For tests only, and under vitest: the deriver is worthless against a brute-forcer.
  */
-export { testDeriver, anyStrengthChecker, fakeCiphered, scopeOf,
-  wayinOf, passkeyWayinOf, passkeyOf, gateOf, vaultRecordOf, gatelessOf, boxOf, OddLabels,
-  noBoxYet, inThisVault, thisVault, deleting, deviceRecordOf, leaseOf, tweakB64 } from './test-helpers/builders'
+export { testDeriver, anyStrengthChecker, fakeCiphered, scopeOf, wayinOf, passkeyOf, tweakB64 } from './test-helpers/builders'
 export type { FakeCiphered } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, makeLatch, beforeNextCall,
   holdNextCall, holdNextAnswer, readAfresh } from './test-helpers/timing'

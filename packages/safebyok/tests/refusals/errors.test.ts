@@ -54,8 +54,8 @@ describe("VaultError", () => {
     const capacity = { boxes: { used: 3, max: 3 }, bytes: { used: 900, max: 1000 } }
     const full = new VaultError('vault_full', 'This vault is full.', { meta: { capacity } })
     expect(full.meta).to.deep.equal({ capacity })
-    const stale = new VaultError('stale_write', 'Read it again.', { meta: { box_stored: null } })
-    expect(stale.meta).to.deep.equal({ box_stored: null })
+    const stale = new VaultError('stale_write', 'Read it again.', { meta: { act: 'void' } })
+    expect(stale.meta).to.deep.equal({ act: 'void' })
     const plain = new VaultError('vault_locked', 'Unlock it first.')
     expect(plain.meta).to.be.undefined
     expect(Object.keys(plain)).to.not.include('meta')

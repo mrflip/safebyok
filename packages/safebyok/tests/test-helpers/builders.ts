@@ -1,12 +1,11 @@
 import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered }                                                                                                                              from '../../src/shapes/fields'
-import      { type PasskeyAnswer, type GatedVaultRecord, type GateRecord, type PassphraseWayinRecord, type PasskeyWayinRecord, type VaultRecord, VaultFormat, type VaultDraft } from '../../src/shapes/vault'
+import type { PasskeyAnswer } from '../../src/shapes/vault'
+import type { PassphraseWayinRecord } from '../../src/models/models-shapes'
 import      * as FX                                 from '../../src/shapes/fields'
 import      { toB64 }                               from '../../src/helpers/crypto'
 import type { KeyDeriver }                          from '../../src/deriver/basederiver'
 import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/passphrase-strength'
-import type { BoxRecord }    from '../../src/shapes/box'
 import type { VaultScope }                          from '../../src/shapes/scopes'
-import type { DeviceRecord, LeaseRecord }           from '../../src/shapes/device'
 
 /**
  * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
@@ -77,25 +76,6 @@ export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> =
   ...overrides,
 })
 
-/**
- * A shape-valid passkey wayin, its wrap fake (`wayin-<tag>`) and its credential_id `cred-<tag>`:
- * for storage-layer tests, which never decrypt. It wraps the vault's first vaultKey, and was added
- * by `device-one`.
- *
- * @example passkeyWayinOf('laptop')
- * @example gateOf('u1', { passkey: passkeyWayinOf('laptop') })
- */
-export const passkeyWayinOf = (tag: string, overrides: Partial<PasskeyWayinRecord> = {}): PasskeyWayinRecord => ({
-  wayinkind:               'passkey',
-  credential_id:           `cred-${tag}`,
-  // base64 of the literal text 'prfsaltprfsaltprfsaltprfsaltprfs': a fake 32-byte salt, public material anyway
-  prf_salt_b64:            FX.prf_salt_b64.parse('cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM'),
-  device_id:               'device-one',
-  registered_at:           Date.UTC(2026, 9, 14),
-  vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
-  ...overrides,
-})
-
 /** SHA-256 of `text`'s UTF-8 bytes. */
 const digestOf = async (text: string): Promise<Uint8Array> => (
   new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
@@ -117,143 +97,6 @@ export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<Pas
   const saltB64 = prfSaltGiven ?? toB64(await digestOf(`salt-${tag}`))
   return { credential_id, prf_salt_b64: saltB64, prfBytes: await digestOf(`${credential_id}:${saltB64}`) }
 }
-
-/** A shape-valid gate for `user_id`'s `main` vault: its passphrase a {@link wayinOf} whose wrap is `vault-<user_id>`, and no passkey.
- * For storage-layer tests, which never decrypt. Any field as `overrides` says otherwise.
- *
- * @example gateOf('u1', { passkey: passkeyWayinOf('laptop') })
- */
-export const gateOf = (user_id: string, overrides: Partial<GateRecord> = {}): GateRecord => ({
-  passphrase:          wayinOf(`vault-${user_id}`, { vault_key_wayin_wrapped: fakeCiphered(`vault-${user_id}`) }),
-  passkey:             null,
-  ...overrides,
-})
-
-/** A shape-valid gated vault record for `user_id`'s `main` vault, its gate a {@link gateOf}'s.
- * For storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<user_id>`, its
- * vault_epoch and gate_epoch 1.
- *
- * @example vaultRecordOf('u1', { gate_epoch: 2 })
- * @example vaultRecordOf('u1', { gate: gateOf('u1', { passkey: passkeyWayinOf('laptop') }) })
- */
-export const vaultRecordOf = (user_id: string, overrides: Partial<GatedVaultRecord> = {}): GatedVaultRecord => ({
-  format:              VaultFormat,
-  ...scopeOf(user_id),
-  vault_tok:           `vault-tok-${user_id}`,
-  registered_at:       Date.UTC(2026, 9, 14),
-  vault_epoch:         1,
-  gate_epoch:          1,
-  gate:                gateOf(user_id),
-  ...overrides,
-})
-
-/** The novel vault record a vault is first stored as, for `user_id`'s `main` vault: `gate_epoch` 0 and no gate.
- * Otherwise as {@link vaultRecordOf} makes it, its vault_tok `vault-tok-<user_id>`. With a
- * `vault_epoch`, it is no draft but the new life a store makes of one over a tombstone, the counter
- * carried on.
- *
- * @example vaultDB.tryEnsureVault(gatelessOf('u1'))
- * @example gatelessOf('u1', { vault_tok: 'vault-tok-two' })
- * @example gatelessOf('u1', { vault_epoch: 2 })   // a new life, as a read over a tombstone shows it
- */
-export function gatelessOf(user_id: string, overrides?: Partial<VaultDraft>): VaultDraft
-export function gatelessOf(user_id: string, overrides: Partial<Omit<VaultDraft, 'vault_epoch'>> & Pick<VaultRecord, 'vault_epoch'>): VaultRecord
-export function gatelessOf(user_id: string, overrides: Partial<VaultRecord> = {}): VaultRecord {
-  return {
-    format:              VaultFormat,
-    ...scopeOf(user_id),
-    vault_tok:           `vault-tok-${user_id}`,
-    registered_at:       Date.UTC(2026, 9, 14),
-    vault_epoch:         0,
-    gate_epoch:          0,
-    gate:                null,
-    ...overrides,
-  }
-}
-
-/**
- * A shape-valid BoxRecord for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
- * with the sidecar `{ note: 'a test box' }` unless
- * `overrides` says otherwise.
- *
- * @example boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'work account' } })
- */
-export const boxOf = (boxlabel: string, tag: string, overrides: Partial<BoxRecord> = {}): BoxRecord => ({
-  format:                 'safebyok-box-v8',
-  boxlabel,
-  revision_tok:           `rev-${tag}`,
-  box_key_wrapped:        fakeCiphered(`boxkey-${tag}`),
-  whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
-  whisper_codec:          'json_v1',
-  whisper_schema_version: 1,
-  sidecar:                { note: 'a test box' },
-  registered_at:          Date.UTC(2026, 9, 14),
-  written_at:             Date.UTC(2026, 9, 14),
-  ...overrides,
-})
-
-/** Labels that differ only by an underscore, a digit or where an underscore falls: the nearest neighbours a store's keys might run together. */
-export const OddLabels = Object.freeze([
-  'main', 'main_x', 'mainx', 'main_1', 'main1', 'ma_in', 'mai_n', 'm_ain',
-] as const)
-
-/**
- * What a write into {@link vaultRecordOf}('u1')'s vault expects when its box is not there yet:
- * that vault, under its first vaultKey, and no revision. Frozen, since every test shares it.
- *
- * @example vaultDB.tryPutBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
- */
-export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok: null } as const)
-
-/** What a box read in {@link vaultRecordOf}('u1')'s vault expects: that vault.
- * Frozen, since every test shares it.
- *
- * @example vaultDB.tryGetBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
- */
-export const inThisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
-
-/**
- * What a deletion of {@link vaultRecordOf}('u1')'s vault expects: that vault, at its first gate.
- * Frozen, since every test shares it.
- *
- * @example vaultDB.tryDelVault(TH.scopeOf('u1'), TH.thisVault)
- */
-export const thisVault = Object.freeze({ vault_tok: 'vault-tok-u1', gate_epoch: 1 } as const)
-
-/**
- * What a deletion of a box in {@link vaultRecordOf}('u1')'s vault expects: that vault, and
- * the revision the deleting device read -- `rev-` and its tag, for a box {@link boxOf} made --
- * or null, for one listed with none.
- *
- * @example vaultDB.tryDelBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))
- */
-export const deleting = (revisionTok: string | null) => ({ vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
-
-/** A shape-valid DeviceRecord for device-storage tests: `user_id`'s `main` vault, its device `device-one`, having seen `vault_epoch` 1.
- * Any field as `overrides` says otherwise.
- *
- * @example await deviceDB.tryRaiseDeviceRecord(TH.deviceRecordOf('u1'))
- * @example TH.deviceRecordOf('u1', { highest_vault_epoch: 3 })    // a device that has seen the vault at epoch 3
- */
-export const deviceRecordOf = (user_id: string, overrides: Partial<DeviceRecord> = {}): DeviceRecord => ({
-  format:              'safebyok-device-v1',
-  ...scopeOf(user_id),
-  device_id:           'device-one',
-  highest_vault_epoch: 1,
-  ...overrides,
-})
-
-/** A real lease record for device-storage tests: a live non-extractable leaseKey around fake wrapped material. */
-export const leaseOf = async (user_id: string, overrides: Partial<LeaseRecord> = {}): Promise<LeaseRecord> => ({
-  format:                  'safebyok-lease-v1',
-  ...scopeOf(user_id),
-  vault_tok:               `vault-tok-${user_id}`,
-  gate_epoch:              1,
-  lease_key:               await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']),
-  vault_key_lease_wrapped: fakeCiphered(`lease-${user_id}`),
-  ask_passphrase_at:       1_900_000_000_000,
-  ...overrides,
-})
 
 /**
  * Base64url text, bent a little: its first character swapped for another valid one, so it is

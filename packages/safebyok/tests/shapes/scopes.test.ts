@@ -45,47 +45,10 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
   })
 
   it("refuse a name holding the scopepath delimiter, in every place a name goes", () => {
-    for (const fieldname of CX.boxScopepathFieldnameVals) {
+    for (const fieldname of ['applabel', 'user_id', 'vaultlabel', 'boxlabel']) {
       const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'openai', [fieldname]: 'a^b' }), 'bad_scope')
       expect(err.meta?.fieldnames).to.deep.equal([fieldname])
       expect(err.message).to.not.include('a^b')
     }
-  })
-})
-
-describe("CX.bankScopepath, CX.vaultScopepath and CX.boxScopepath", () => {
-  it("split a scopepath into its kind and names, as the third example shows", () => {
-    expect(CX.vaultScopepath.parse('vault^acme^auth0|x^main')).to.deep.equal(['vault', 'acme', 'auth0|x', 'main'])
-    expect(CX.bankScopepath.parse('bank^acme^u1')).to.deep.equal(['bank', 'acme', 'u1'])
-    expect(CX.boxScopepath.parse('box^acme^u1^main^openai')).to.deep.equal(['box', 'acme', 'u1', 'main', 'openai'])
-  })
-
-  it("refuse another kind's scopepath as 'bad_scope', as the fourth example shows", () => {
-    const err = TH.expectSyncRefusal(() => CX.vaultScopepath.parse('lease^acme^u1^main'), 'bad_scope')
-    expect(err.meta?.fieldnames).to.deep.equal(['0'])
-    TH.expectSyncRefusal(() => CX.boxScopepath.parse('vault^acme^u1^main^openai'), 'bad_scope')
-  })
-
-  it("refuse a scopepath with a name too few or too many, saying what a scopepath is", () => {
-    expect(TH.expectSyncRefusal(() => CX.vaultScopepath.parse('vault^acme^u1'), 'bad_scope').message).to.include("A vault's scopepath is 'vault', an applabel, a user_id and a vaultlabel")
-    expect(TH.expectSyncRefusal(() => CX.vaultScopepath.parse('vault^acme^u1^main^extra'), 'bad_scope').message).to.include("A vault's scopepath is")
-    expect(TH.expectSyncRefusal(() => CX.bankScopepath.parse('bank^acme'), 'bad_scope').message).to.include("A bank's scopepath is")
-    expect(TH.expectSyncRefusal(() => CX.boxScopepath.parse('box^acme^u1^main'), 'bad_scope').message).to.include("A box's scopepath is")
-  })
-
-  it("refuse a name in a scopepath that fails its check, quoting none of it", () => {
-    const err = TH.expectSyncRefusal(() => CX.vaultScopepath.parse('vault^acme^u1^Secret_Main'), 'bad_scope')
-    expect(err.message).to.match(/^3: A label is/)
-    expect(err.message).to.not.include('Secret')
-    TH.expectSyncRefusal(() => CX.vaultScopepath.parse(42), 'bad_scope')
-  })
-})
-
-describe("the scopepath fieldnames", () => {
-  it("list each scope's names in the order its scopepath joins them, each a field its scope validator checks", () => {
-    expect(CX.bankScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id'])
-    expect(CX.vaultScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id', 'vaultlabel'])
-    expect(CX.boxScopepathFieldnameVals).to.deep.equal(['applabel', 'user_id', 'vaultlabel', 'boxlabel'])
-    expect(Object.keys(CX.boxscope.unwrap().shape)).to.deep.equal([...CX.boxScopepathFieldnameVals])
   })
 })
