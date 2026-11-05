@@ -1,9 +1,8 @@
-import { verifyConsistent } from '../helpers/validator'
+import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { isListing } from '../helpers/consts'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { GatingKind, LockState } from '../shapes/shapes-enums'
 import type { Clock, VaultScope } from '../shapes/shapes-core'
@@ -12,7 +11,7 @@ import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
-import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, listingExpected, noProofToUnlock, unlockFirst } from '../refusals/throwers'
+import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, listingExpected, noProofToUnlock, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -376,7 +375,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled()
-    verifyConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.otherVaultsScope })
+    if (! consistent(stamp, this.#stampOfLife())) { throw stampOfOtherVault() }
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }

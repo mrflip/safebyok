@@ -1,5 +1,6 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
+import * as Phrases from '../../src/helpers/phrases'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { Dna, Passphrase, T0, makeBornVault, makeBornVaultAndFriend, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, buildTyping, byPassphrase } from '../test-helpers/vault-world'
@@ -98,7 +99,8 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     const { deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryCache.mockClear()
-    await TH.expectRefusal(proving.buildLease(friend), 'unexpected_error')
+    const err = await TH.expectRefusal(proving.buildLease(friend), 'unexpected_error')
+    expect(err.message).to.eq(Phrases.LeaseOfOtherVault)
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
   })
 })
