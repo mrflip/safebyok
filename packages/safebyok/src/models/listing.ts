@@ -5,7 +5,7 @@ import { VaultError, isVaultError } from '../refusals/errors'
 import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../storage/vault-db-shapes'
 import * as VS from '../storage/vault-db-shapes'
-import { disabledError } from '../refusals/throwers'
+import { disabledError, otherVaultTokAtBirth, putAnsweredNothing } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
@@ -142,7 +142,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const { prior, ifAbsent = 'add', ifPresent = 'repl' } = MSX.putListingOpts.parse(opts)
     this.demandEnabled()
     const thing = await this.deliver(await this.tryPutRow(checked, { prior, ifAbsent, ifPresent }))
-    if (thing === null) { throw new VaultError('unexpected_error', Phrases.PutAnsweredNothing) }
+    if (thing === null) { throw putAnsweredNothing() }
     return thing
   }
 
@@ -229,7 +229,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** SLOPDOC: A new instance born of `sparse`, void, for `receive` to adopt its record like any newer one. */
   #makeThingOf(sparse: SparseT): ThingT {
     const vault_tok = this.vaultTokOfWorld()
-    if (vault_tok !== null && sparse.vault_tok !== vault_tok) { throw new VaultError('unexpected_error', Phrases.OtherVaultTokAtBirth) }
+    if (vault_tok !== null && sparse.vault_tok !== vault_tok) { throw otherVaultTokAtBirth() }
     return this.makeThing({ ...sparse, ...VS.VoidRevision, am: 'x' })
   }
 

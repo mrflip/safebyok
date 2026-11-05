@@ -4,7 +4,7 @@
  */
 
 import { base64urlnopad } from '@scure/base'
-import { VaultError } from '../refusals/errors'
+import { unboundCipherCtx } from '../refusals/throwers'
 import type { Ciphered } from '../shapes/fields'
 import { stableJsonify } from './stable-jsonify'
 
@@ -65,7 +65,7 @@ export const cipherCtx = (stamp: CipherCtxRecord | readonly CipherCtxRecord[], p
   const stamps: readonly CipherCtxRecord[] = Array.isArray(stamp) ? stamp : [stamp as CipherCtxRecord]
   const parts = [...stamps, purpose, ...header]
   if (stamps.length === 0 || parts.some((part) => isUnbound(part))) {
-    throw new VaultError('bad_option', "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
+    throw unboundCipherCtx()
   }
   return new TextEncoder().encode(stableJsonify(parts))
 }

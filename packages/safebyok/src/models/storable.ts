@@ -1,11 +1,9 @@
-import { VaultError } from '../refusals/errors'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { reportToPlatform } from '../refusals/report-error'
 import { stableJsonify } from '../helpers/stable-jsonify'
-import { disabledError, lockedError, partialLoadError } from '../refusals/throwers'
-import * as Phrases from '../helpers/phrases'
+import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, Fetched, FetchOpts, ListingOf, Reconciled, RecordShape, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from './models-shapes'
 import * as MSX from './models-shapes'
 
@@ -16,7 +14,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
   if (post.revision_tok !== ante.revision_tok) {
-    throw new VaultError('record_conflict', Phrases.OneRevisionTwoToks)
+    throw oneRevisionTwoToks()
   }
   return 'same'
 }
@@ -327,15 +325,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** SLOPDOC: Judges `rcvd` against the central held, answering the central that results and the policy applied. */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
     // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
-    if ((rcvd.vault_tok !== this.vault_tok))                     { throw new VaultError('unexpected_error', Phrases.OtherVaultTok) }
+    if ((rcvd.vault_tok !== this.vault_tok))                     { throw otherVaultTok() }
     const central = this.#central
     const age = cmpRevisions(central, rcvd)
-    if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
+    if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw oneRevisionTwoLives() }
     const centralShape = this.classifyRecordShape(central)
     if ((age === 'older'))                                       { return { central, policy: 'older' } }
     if ((age === 'same')) {
-      if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
-      if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
+      if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw oneRevisionTwoFates() }
+      if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw oneRevisionTwoFates() }
       if ((rcvdShape === 'gone') && (centralShape === 'gone'))   { return { central, policy: 'same' } }
       if ((rcvdShape === 'sparse'))                              { return { central, policy: 'same' } }
       if ((rcvdShape === 'full') && (centralShape === 'full'))   { return { central, policy: 'same' } }
@@ -344,7 +342,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
       if (rcvdShape === 'gone') { return { central: rcvd, policy: 'gone' } }
       return { central: rcvd, policy: 'adopt' }
     }
-    throw new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
+    throw shapeUnreconciled()
   }
 
   /** Whether `record` is of the life of the central held: the same {@link lifeTokPathOf}. */

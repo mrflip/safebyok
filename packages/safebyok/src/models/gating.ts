@@ -2,10 +2,9 @@ import { makeLifeTok } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
-import * as Phrases from '../helpers/phrases'
 import type { VaultScope } from '../shapes/scopes'
 import * as VX from '../shapes/vault'
-import { attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import type { AnyGating, ClearsForGatingkind, GatingKind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, VaultRecord, VaultWorld, WayinHeader } from './models-shapes'
 import * as MSX from './models-shapes'
 import type { Gate } from './gate'
@@ -159,7 +158,7 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
     await vault.ensureTimely(MSX.Promptly); vault.demandEnabled()
     const { gate } = vault
     if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
-    if (! passkeyClear) { throw new VaultError('unexpected_error', Phrases.ProofMissing) }
+    if (! passkeyClear) { throw proofMissing() }
     return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
   },
   replace_passphrase: async ({ vault, world }, clears) => {

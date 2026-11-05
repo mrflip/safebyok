@@ -1,5 +1,4 @@
-import { VaultError } from '../refusals/errors'
-import * as Phrases from '../helpers/phrases'
+import { reservedLabel, saltDoesNotFit, suppliedSpecChanged } from '../refusals/throwers'
 import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefix, keyDeriverSpec } from './shapes'
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
@@ -26,7 +25,7 @@ export const parseKeyDeriverSpec = (candidate: unknown): KeyDeriverSpec => {
 export const checkSuppliedSpecKept = (candidate: KeyDeriverSpec): void => {
   const supplied = SuppliedSpecs.find((spec) => spec.key_deriver_label === candidate.key_deriver_label)
   if (supplied === undefined) {
-    if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) { throw reservedLabel() }
+    if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) { throw reservedLabel(ReservedLabelPrefix) }
     return
   }
   const carried: Readonly<Record<string, unknown>> = candidate
@@ -39,13 +38,4 @@ export const checkSaltFits = (spec: Pick<KeyDeriverSpec, 'salt_bytes'>, saltByte
 }
 
 export const isTestDeriver = (keyDeriver: Pick<KeyDeriver, 'key_deriver_label'>): boolean => keyDeriver.key_deriver_label.startsWith(TestLabelPrefix)
-// --
-
-// == [Refusals]: reservedLabel, suppliedSpecChanged, saltDoesNotFit
-
-const reservedLabel = (): VaultError => new VaultError('bad_option', Phrases.reservedDeriverLabel(ReservedLabelPrefix))
-
-const suppliedSpecChanged = (label: string): VaultError => new VaultError('bad_option', Phrases.suppliedSpecChanged(label))
-
-const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => new VaultError('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
 // --

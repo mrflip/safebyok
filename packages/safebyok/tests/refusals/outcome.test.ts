@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { type Outcome, storageTroubleOf, bad, good, outcomeOf, refusalOf, valOf } from '../../src/refusals/outcome'
-import * as Refusals from '../../src/refusals/refusals'
+import * as Refusals from '../../src/refusals/throwers'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
 const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new TypeError(`no backup of ${vaultlabel}`))
@@ -14,7 +14,7 @@ describe("good and bad", () => {
   })
 
   it("makes a bad outcome of a refusal, as bad's example shows (Contract: Shapes)", () => {
-    const err = Refusals.staleDel()
+    const err = Refusals.lockedError()
     const outcome = bad(err)
     expect(outcome).to.deep.equal({ ok: false, err })
     expect(outcome).to.not.have.property('val')
