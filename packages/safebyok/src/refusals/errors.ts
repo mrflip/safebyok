@@ -8,24 +8,23 @@ import type { Capacity } from '../shapes/shapes-storage'
  *
  * * **Misuse**: a programming error, the host developer's to fix. Let it reach an error boundary
  *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`,
- *   `bad_option`, `bad_record`, `unknown_key_deriver`,
- *   `insecure_context`, `unexpected_error`, `invalid_input`, `gate_issue`, `disabled`.
+ *   `bad_option`, `bad_record`, `insecure_context`, `unexpected_error`, `gate_issue`, `disabled`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
- *   `stale_write`, `record_conflict`, `vault_mismatch`, `storage_unavailable`,
+ *   `stale_write`, `record_conflict`, `storage_unavailable`,
  *   `vault_gone`, `vault_remade`, `gating_landed`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
- *   `same_passphrase`, `camped`, `vault_empty`, `storage_error`.
+ *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_box`, `damaged_lease`, `newer_format`,
- *   `identity_revoked`, `damaged_record`.
+ *   `identity_revoked`, `damaged_row`.
  *
- * A record that fails its checks is named for who is at fault, by a VaultDB and a vault alike. One
- * read from storage that fails them is `damaged_record`, and a box that will not open under the
- * lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. One the host
- * hands in is `bad_record`. A storage adapter's answer that cannot be, one revision under two toks
- * say, is `record_conflict`.
+ * A record that fails its checks is named for its direction, by a VaultDB and a vault alike. One
+ * read from storage that fails them is `damaged_row`, on the way out, and a box that will not open
+ * under the lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. One
+ * handed in is `bad_option`, on the way in; `bad_record` where one check serves both ways. A
+ * storage adapter's answer that cannot be, one revision under two toks say, is `record_conflict`.
  *
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
  * altered, since decryption fails alike; the message says so.
@@ -41,20 +40,18 @@ export const refusalKindVals = [
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
-  'bad_option',          // an option or argument out of its range: Bank.make's, mask's, argon2idDeriver's, a putBox()'s sidecar
-  'bad_record',          // a record or expectation the host handed in that is not one this package builds
+  'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, argon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
+  'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
   'damaged_box',         // a box read from storage failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
-  'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
-  'unknown_key_deriver', // the vault names a key deriver this handle was not built with
+  'newer_format',        // a stored vault in a form this version does not know, or naming a key deriver this handle was not built with: update safebyok
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'record_conflict',     // storage and this device disagree about one revision of a record; a fetch again is worth one try, and if it persists the system is fundamentally not working
-  'vault_mismatch',      // a box read's or write's vault record is not the one stored -- another vault_tok, or none -- so it was refused
+  'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another scope or another vault_tok, a put that answered nothing; a fetch again is worth one try, and if it persists the system is fundamentally not working
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
-  'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
+  'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
-  'vault_remade',        // the vault a call was working on was deleted and made anew elsewhere, under another vault_tok
+  'vault_remade',        // the vault a call was working on was deleted and made anew, under another vault_tok: a live vault stands where it stood
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
@@ -64,9 +61,7 @@ export const refusalKindVals = [
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a vaultDB put told not to replace a live row found one there
   'vault_empty',         // a vaultDB call named a vault_tok no row holds, and no live row stands there: nothing of this life
-  'storage_error',       // a vaultDB's store failed: its own error is the cause
-  'damaged_record',      // a vaultDB row read alone failed its checks, and is set aside
-  'invalid_input',       // an argument to a vaultDB verb failed its check
+  'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
   'gate_issue',          // a vaultDB gate verb whose params fail the integrity checks against the stored row
   'disabled',            // a call on an object let go by a sweep, a vacate or a delete: it answers nothing more, and the bank has a fresh one
 ] as const
@@ -98,12 +93,10 @@ export const RefusalFamilyForKind = {
   bad_record:          'misuse',
   damaged_box:         'bad_news',
   newer_format:        'bad_news',
-  unknown_key_deriver: 'misuse',
   insecure_context:    'misuse',
   unexpected_error:    'misuse',
   stale_write:         'condition',
   record_conflict:     'condition',
-  vault_mismatch:      'condition',
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
   vault_gone:          'condition',
@@ -117,9 +110,7 @@ export const RefusalFamilyForKind = {
   same_passphrase:     'condition',
   camped:              'condition',
   vault_empty:         'condition',
-  storage_error:       'condition',
-  damaged_record:      'bad_news',
-  invalid_input:       'misuse',
+  damaged_row:         'bad_news',
   gate_issue:          'misuse',
   disabled:            'misuse',
 } as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>

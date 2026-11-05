@@ -306,7 +306,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Demands a `record` whose scope is `scope`, the one the answer that carries it names. */
   #demandRecordOfScope(record: Fetched<RecordT, SparseT>, scope: ScopeT): void {
-    verifyConsistent(this.scopeOf(record), scope, { kind: 'bad_record', message: Phrases.RecordOfOtherScope })
+    verifyConsistent(this.scopeOf(record), scope, { kind: 'record_conflict', message: Phrases.RecordOfOtherScope })
   }
   // --
 
