@@ -9,7 +9,8 @@ import type { BankScope, VaultScope } from '../../src/storage/vault-db-shapes'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { quietLogger } from './logging'
 import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
-import type { BankOpts, RequestCleartext } from '../../src/models/models-shapes'
+import type { RequestCleartext } from '../../src/shapes/gateish-shapes'
+import type { BankOpts } from '../../src/shapes/vaultish-shapes'
 
 export const AutolockMinutes = 60
 

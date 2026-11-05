@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
 import { VaultError } from '../../src/refusals/errors'
-import { LOCKED } from '../../src/models/models-shapes'
+import { passphraseCleartext } from '../../src/shapes/gateish-shapes'
+import { LOCKED } from '../../src/shapes/vaultish-shapes'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { DefaultLeaseMillis, Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
-import { passphraseCleartext } from '../../src/shapes/vault'
 import * as TH from '../test-helpers'
 import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultAndFriend, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping } from '../test-helpers/vault-world'
 

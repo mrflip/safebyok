@@ -51,14 +51,10 @@ is a bug.
   | `PX`  | `src/shapes/primitives.ts`                      |
   | `FX`  | `src/shapes/fields.ts`                          |
   | `CX`  | `src/shapes/scopes.ts`                          |
-  | `BX`  | `src/shapes/box.ts`                             |
-  | `DX`  | `src/shapes/device.ts`                          |
-  | `VX`  | `src/shapes/vault.ts`                           |
-  | `VDX` | `src/shapes/vault-db.ts`                        |
-  | `OX`  | `src/shapes/bank-opts.ts`                       |
+  | `GX`  | `src/shapes/gateish-shapes.ts`                  |
+  | `VX`  | `src/shapes/vaultish-shapes.ts`                 |
   | `HX`  | `src/shapes/host-code.ts`                       |
-  | `KX`  | `src/shapes/key-deriver-spec.ts`                |
-  | `MX`  | `src/shapes/mask.ts`                            |
+  | `VS`  | `src/storage/vault-db-shapes.ts`                |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
 
   Not the Startcase name above, which would collide with `Box`, `Vault` and `KeyDeriverSpec`.

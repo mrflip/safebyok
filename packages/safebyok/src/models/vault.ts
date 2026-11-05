@@ -13,8 +13,10 @@ import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
 import { Gating } from './gating'
 import { Lease } from './lease'
-import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, GateProps, LeaseFriend, LockState, ProvingsForGatingkind, SealedWhisper, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from './models-shapes'
-import * as MSX from './models-shapes'
+import * as GX from '../shapes/gateish-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import type { GateProps, LeaseFriend, ProvingsForGatingkind, SealedWhisper } from '../shapes/gateish-shapes'
+import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, LockState, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/vaultish-shapes'
 import { type Proving, NOVEL } from './proving'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
@@ -81,7 +83,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   takeWorld(world: unknown): void {
-    const row = MSX.vaultRow.parse(world)
+    const row = VX.vaultRow.parse(world)
     if (row.vault_tok === this.vault_tok) { this.receive(row) }
   }
   // --
@@ -113,12 +115,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   async #runReplacePassphrase({ ante, anteProving, nextProving }: ProvingsForGatingkind['replace_passphrase']): Promise<this> {
     const nextWayin = await nextProving.buildWayin(anteProving)
-    return this.#landGate(anteProving, () => this.listing.replacePassphrase({ ...ante, gate: { passphrase_wayin: MSX.passphraseWayinRecord.parse(nextWayin.pickle()) } }))
+    return this.#landGate(anteProving, () => this.listing.replacePassphrase({ ...ante, gate: { passphrase_wayin: GX.passphraseWayinRecord.parse(nextWayin.pickle()) } }))
   }
 
   /** Add a passkey through an add_passkey gating. */
   async addPasskey(): Promise<this> {
-    await this.ensureTimely(MSX.Promptly); this.demandEnabled()
+    await this.ensureTimely(VX.Promptly); this.demandEnabled()
     this.gate.demandPasskeyAddable()
     await Gating.launch('add_passkey', { listing: this.listing, scope: this.scope, vault: this, run: (provings) => this.#runAddPasskey(provings) })
     return this
@@ -128,12 +130,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   async #runAddPasskey({ ante, proved, passkeyProving }: ProvingsForGatingkind['add_passkey']): Promise<this> {
     const passkeyWayin = await passkeyProving.buildWayin(proved)
-    return this.#landGate(proved, () => this.listing.addPasskey({ ...ante, gate: { passkey_wayin: MSX.passkeyWayinRecord.parse(passkeyWayin.pickle()) } }))
+    return this.#landGate(proved, () => this.listing.addPasskey({ ...ante, gate: { passkey_wayin: GX.passkeyWayinRecord.parse(passkeyWayin.pickle()) } }))
   }
 
   /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
   async revokePasskey(): Promise<this> {
-    await this.ensureTimely(MSX.Promptly); this.demandEnabled()
+    await this.ensureTimely(VX.Promptly); this.demandEnabled()
     if (this.gate.pkWayin === null) { return this }
     await Gating.launch('revoke_passkey', { listing: this.listing, scope: this.scope, vault: this, run: ({ ante, proved }) => this.#landGate(proved, () => this.listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })) })
     return this
@@ -175,7 +177,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
-    if (! MSX.isListing(listing)) { throw listingExpected() }
+    if (! VX.isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
     const held = listing.at(checked)
@@ -185,7 +187,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** SLOPDOC: Stores the birth record, and unlocks under its passphrase's lease if the vault stored is its own. */
-  static async #runBirth(listing: VaultListing, { passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: MSX.Revision): Promise<Vault> {
+  static async #runBirth(listing: VaultListing, { passphraseProving, passkeyProving }: ProvingsForGatingkind['build_vault'], prior: VX.Revision): Promise<Vault> {
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin = await passkeyProving?.buildWayin(passphraseProving) ?? null
     const record = recordOfBirth(Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin), prior, listing.clock.now())
@@ -238,7 +240,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   #makeFriend(): LeaseFriend {
     const { world: { clock, logger, deviceDB, leaseMillis = DefaultLeaseMillis } } = this
-    const stamp = MSX.vaultStamp.parse(this)
+    const stamp = GX.vaultStamp.parse(this)
     const asked = this.#stampOfLife()
     return {
       ...stamp,
@@ -324,13 +326,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
-    MSX.leaseSealArgs.parse({ whisperText, stamp })
+    GX.leaseSealArgs.parse({ whisperText, stamp })
     return this.#demandLease(stamp).sealWith(whisperText, stamp)
   }
 
   /** The text `sealed` holds, bound to `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
-    MSX.leaseUnsealArgs.parse({ sealed, stamp })
+    GX.leaseUnsealArgs.parse({ sealed, stamp })
     return this.#demandLease(stamp).unsealWith(sealed, stamp)
   }
 
@@ -382,7 +384,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
    * treated as missing, not tombstoned -- you must use {@link tryDelDamagedBox} to remove them.
    */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
-    const timely = MSX.timelyOpts.parse(opts)
+    const timely = VX.timelyOpts.parse(opts)
     const boxes = this.boxListing
     const scope = boxes.scopeOf({ ...this.scope, boxlabel })
     this.demandUnlocked()
@@ -397,7 +399,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Delete the damaged box listed at `boxlabel`, the only verb that does. Refuses 'absent_box' for a healthy box or none listed. */
   tryDelDamagedBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> {
     return outcomeOf(async () => { // this method does not offer a throwing (delDamagedBox) form
-      const timely = MSX.timelyOpts.parse(opts)
+      const timely = VX.timelyOpts.parse(opts)
       const boxes = this.boxListing
       const scope = boxes.scopeOf({ ...this.scope, boxlabel })
       this.demandUnlocked()
@@ -471,7 +473,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 // == [Birth's record]: recordOfBirth
 
 /** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
-const recordOfBirth = (gate: Gate, prior: MSX.Revision, now: number): VaultRecord => (
-  { ...gate.stamp, fmt: MSX.VaultFormat, am: 'a', ...VS.nextRevisionOf(prior, now), gate: gate.pickle() }
+const recordOfBirth = (gate: Gate, prior: VX.Revision, now: number): VaultRecord => (
+  { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...VS.nextRevisionOf(prior, now), gate: gate.pickle() }
 )
 // --

@@ -10,8 +10,8 @@ import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import type { Clock } from '../shapes/host-code'
-import { type DelTombstone, type Fetched, type FetchOpts, type IfAbsent, type ListingAnswer, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type SlotFate, type SparseBase, type Thing, IsListing } from './models-shapes'
-import * as MSX from './models-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import { type DelTombstone, type Fetched, type FetchOpts, type IfAbsent, type ListingAnswer, type ListingOpts, type ListingWorld, type LockState, type PutListingOpts, type SlotFate, type SparseBase, type Thing, IsListing } from '../shapes/vaultish-shapes'
 import type { Storable } from './storable'
 
 // == [Listing]
@@ -32,7 +32,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #isEnabled = true
 
   constructor(opts: ListingOpts) {
-    MSX.listingOpts.parse(opts)
+    VX.listingOpts.parse(opts)
     this.world = opts.world
     this.vaultDB = opts.vaultDB
     this.maxMillisSinceRefresh = opts.maxMillisSinceRefresh
@@ -47,7 +47,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   lockState(): LockState { return this.world.lockState() }
 
   /** The world refreshed within `maxMillis`, by default its own horizon. */
-  async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(MSX.maxMillis.parse(maxMillis)) }
+  async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(VX.maxMillis.parse(maxMillis)) }
 
   // == [Starting and ending]: hello, goodbye, lock, sweep, vacate, unlist, demandEnabled
 
@@ -118,7 +118,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** SLOPDOC: The instance under `scope` as storage now holds it, built where none was held. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
-    const { ifAbsent = 'fail', maxWorldMillis } = MSX.fetchOpts.parse(opts)
+    const { ifAbsent = 'fail', maxWorldMillis } = VX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
     await this.ensureTimelyWorld(maxWorldMillis)
     this.demandEnabled()
@@ -139,7 +139,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Stores `record` over the revision `prior`, answering the instance held. */
   async put(record: RecordT, opts: PutListingOpts): Promise<ThingT> {
     const checked = this.recordOf(record)
-    const { prior, ifAbsent = 'add', ifPresent = 'repl' } = MSX.putListingOpts.parse(opts)
+    const { prior, ifAbsent = 'add', ifPresent = 'repl' } = VX.putListingOpts.parse(opts)
     this.demandEnabled()
     const thing = await this.deliver(await this.tryPutRow(checked, { prior, ifAbsent, ifPresent }))
     if (thing === null) { throw putAnsweredNothing() }
@@ -267,7 +267,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(MSX.listener.parse(listener))
+    this.#listeners.add(VX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
   }
 

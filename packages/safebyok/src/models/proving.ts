@@ -6,10 +6,10 @@ import { adorn } from '../helpers/helpers'
 import { outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { type VaultScope, vaultScope } from '../shapes/scopes'
-import * as VX from '../shapes/vault'
+import * as GX from '../shapes/gateish-shapes'
+import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, type WayinKind, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from '../shapes/gateish-shapes'
 import { keyDeriverThrew, noPasskeyWayin, notAVerdict, notKeyBytes, otherPasskey, otherPrfSalt, strengthCheckerThrew, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
 import { Lease } from './lease'
-import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, type WayinKind, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from './models-shapes'
 import { Wayin, wayinCtxOf } from './wayin'
 
 // == [NOVEL and the checks]: NOVEL, RewrapUsage, CheckUsage, Checks
@@ -55,7 +55,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
 
   /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
-  static async checkStrength(passphraseClear: VX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<VX.PassphraseVerdict> {
+  static async checkStrength(passphraseClear: GX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<GX.PassphraseVerdict> {
     strengthArgs.parse({ passphraseClear, scope, world })
     const verdict = await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope)
     if (! verdict.success) { throw notAVerdict() }
@@ -111,7 +111,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   /** A proving for a new wayin, of the first gate's epoch. */
-  static async buildNovel(stamp: VaultStamp, passphraseClear: VX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
+  static async buildNovel(stamp: VaultStamp, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { stamp: checked, passphraseClear: typed } = passphraseNovelArgs.parse({ stamp, passphraseClear, world })
     const verdict = await super.checkStrength(typed, vaultScope.parse(checked), world)
     if (! verdict.strong) { throw weakPassphrase(verdict.reason) }
@@ -121,7 +121,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   }
 
   /** The proving of `gate`'s passphrase wayin, proved against the gate in hand. */
-  static async buildStored(gate: StampedGate, passphraseClear: VX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
+  static async buildStored(gate: StampedGate, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { gate: { stamp, gate_epoch, passphrase_wayin }, passphraseClear: typed } = passphraseStoredArgs.parse({ gate, passphraseClear, world })
     const { vault_key_wayin_wrapped: _wrapped, ...header } = passphrase_wayin
     if (header.key_deriver_label !== world.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
@@ -137,7 +137,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   /** A proving for a new wayin, of the first gate's epoch. */
-  static async buildNovel(stamp: VaultStamp, passkeyClear: VX.PasskeyAnswer, world: ProvingWorld): Promise<PasskeyProving> {
+  static async buildNovel(stamp: VaultStamp, passkeyClear: GX.PasskeyAnswer, world: ProvingWorld): Promise<PasskeyProving> {
     const { stamp: checked, passkeyClear: answer } = passkeyNovelArgs.parse({ stamp, passkeyClear, world })
     const header = mintPasskeyHeader(world, answer)
     const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checked, header))
@@ -145,7 +145,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   }
 
   /** The proving of `gate`'s passkey wayin, proved against the gate in hand. */
-  static async buildStored(gate: StampedGate, passkeyClear: VX.PasskeyAnswer): Promise<PasskeyProving> {
+  static async buildStored(gate: StampedGate, passkeyClear: GX.PasskeyAnswer): Promise<PasskeyProving> {
     const { gate: { stamp, gate_epoch, passkey_wayin }, passkeyClear: { credential_id, prf_salt_b64, prfBytes } } = passkeyStoredArgs.parse({ gate, passkeyClear })
     if (passkey_wayin === null) { throw noPasskeyWayin() }
     const { vault_key_wayin_wrapped: _wrapped, ...header } = passkey_wayin
@@ -169,7 +169,7 @@ const mintPassphraseHeader = ({ clock, keyDeriver, device_id }: ProvingWorld): P
   registered_at:     clock.now(),
 })
 
-const mintPasskeyHeader = ({ clock, device_id }: ProvingWorld, { credential_id, prf_salt_b64 }: VX.PasskeyAnswer): PasskeyWayinHeader => passkeyWayinHeader.parse({
+const mintPasskeyHeader = ({ clock, device_id }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader => passkeyWayinHeader.parse({
   wayinkind:     'passkey',
   credential_id,
   prf_salt_b64,
@@ -181,15 +181,15 @@ const mintPasskeyHeader = ({ clock, device_id }: ProvingWorld, { credential_id, 
 // == [Host calls]: invokeStrengthChecker, deriveKeyBytes
 
 // The two host functions that hear the passphrase here (guarantees.md, G1 and G8): what they throw may quote it, so it is replaced, not kept as a cause. The verdict is parsed inside the catch, as a getter on what the strengthChecker answered may throw the same.
-const invokeStrengthChecker = async (strengthChecker: ProvingWorld['strengthChecker'], passphraseClear: VX.PassphraseCleartext, scope: VaultScope) => {
+const invokeStrengthChecker = async (strengthChecker: ProvingWorld['strengthChecker'], passphraseClear: GX.PassphraseCleartext, scope: VaultScope) => {
   try {
-    return VX.passphraseVerdict.safeParse(await strengthChecker(passphraseClear, scope))
+    return GX.passphraseVerdict.safeParse(await strengthChecker(passphraseClear, scope))
   } catch {
     throw strengthCheckerThrew()
   }
 }
 
-const deriveKeyBytes = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase: VX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> => {
+const deriveKeyBytes = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> => {
   try {
     return await keyDeriver.deriveKeyBytes(passphrase, saltBytes)
   } catch {
@@ -204,7 +204,7 @@ const isSharedMemory = (view: ArrayBufferView): boolean => Object.prototype.toSt
 
 const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
 
-const passphraseKeyOf = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase: VX.PassphraseCleartext, saltBytes: Uint8Array): Promise<CryptoKey> => {
+const passphraseKeyOf = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<CryptoKey> => {
   const handed = await deriveKeyBytes(keyDeriver, passphrase, saltBytes)
   if (! ArrayBuffer.isView(handed) || isSharedMemory(handed)) { throw notKeyBytes() }
   const keyBytes = new Uint8Array(handed.buffer, handed.byteOffset, handed.byteLength)

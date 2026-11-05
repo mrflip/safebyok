@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, loadStrengthChecker, type StrengthChecker } from '../../src/helpers/passphrase-strength'
-import type { PassphraseVerdict } from '../../src/shapes/vault'
+import type { PassphraseVerdict } from '../../src/shapes/gateish-shapes'
 import type { VaultScope } from '../../src/shapes/scopes'
 import { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'

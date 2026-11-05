@@ -3,10 +3,11 @@ import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
 import type { VaultScope } from '../shapes/scopes'
-import * as VX from '../shapes/vault'
+import * as GX from '../shapes/gateish-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import type { AnyGating, ClearsForGatingkind, GatingKind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/gateish-shapes'
+import type { VaultRecord, VaultWorld } from '../shapes/vaultish-shapes'
 import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
-import type { AnyGating, ClearsForGatingkind, GatingKind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, VaultRecord, VaultWorld, WayinHeader } from './models-shapes'
-import * as MSX from './models-shapes'
 import type { Gate } from './gate'
 import { PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
@@ -46,7 +47,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 
   /** SLOPDOC: Opens a new gating's dialog on this bank and resolves with the vault its `run` answers. */
   static async launch<KindT extends GatingKind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
-    const { scope } = MSX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, run: args.run })
+    const { scope } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, run: args.run })
     const { requestCleartext } = args.listing.world
     if (requestCleartext === undefined) { throw noRequestCleartext() }
     const gating = new Gating(gatingkind, { ...args, scope })
@@ -70,8 +71,8 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   get whenSettled(): Promise<Outcome<Vault>> { return this.#settled }
 
   /** The verdict on a passphrase, as the user types it. Nothing changes. */
-  async checkStrength(passphraseClear: string): Promise<VX.PassphraseVerdict> {
-    return Proving.checkStrength(VX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
+  async checkStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
+    return Proving.checkStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
   }
 
   get #scope(): VaultScope {
@@ -147,22 +148,22 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 /** Past the enter key, the last to hear the clears. A birth's stamp is minted here, one per attempt. */
 const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
   build_vault: async ({ scope, world }, clears) => {
-    const { passphraseClear, passkeyClear } = checkedClears(MSX.vaultBuildClears, clears)
-    const stamp = MSX.vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: world.clock.now() })
+    const { passphraseClear, passkeyClear } = checkedClears(GX.vaultBuildClears, clears)
+    const stamp = GX.vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: world.clock.now() })
     const passphraseProving = await PassphraseProving.buildNovel(stamp, passphraseClear, world)
     const passkeyProving = passkeyClear ? await PasskeyProving.buildNovel(stamp, passkeyClear, world) : null
     return { passphraseProving, passkeyProving }
   },
   unlock_vault: async ({ vault, world }, clears) => {
-    const { passphraseClear, passkeyClear } = checkedClears(MSX.vaultUnlockClears, clears)
-    await vault.ensureTimely(MSX.Promptly); vault.demandEnabled()
+    const { passphraseClear, passkeyClear } = checkedClears(GX.vaultUnlockClears, clears)
+    await vault.ensureTimely(VX.Promptly); vault.demandEnabled()
     const { gate } = vault
     if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
     if (! passkeyClear) { throw proofMissing() }
     return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
   },
   replace_passphrase: async ({ vault, world }, clears) => {
-    const { antePassphraseClear, nextPassphraseClear } = checkedClears(MSX.passphraseReplaceClears, clears)
+    const { antePassphraseClear, nextPassphraseClear } = checkedClears(GX.passphraseReplaceClears, clears)
     if (antePassphraseClear === nextPassphraseClear) { throw samePassphrase() }
     const { ante, gate } = await timelyAnte(vault)
     const anteProving = await PassphraseProving.buildStored(gate, antePassphraseClear, world)
@@ -170,23 +171,23 @@ const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
     return { ante, anteProving, nextProving }
   },
   add_passkey: async ({ vault, world }, clears) => {
-    const { passphraseClear, passkeyClear } = checkedClears(MSX.passkeyAddClears, clears)
+    const { passphraseClear, passkeyClear } = checkedClears(GX.passkeyAddClears, clears)
     const { ante, gate } = await timelyAnte(vault)
     const proved = await PassphraseProving.buildStored(gate, passphraseClear, world)
     const passkeyProving = await PasskeyProving.buildNovel(gate.stamp, passkeyClear, world)
     return { ante, proved, passkeyProving }
   },
-  revoke_passkey: ({ vault, world }, clears) => provePassphrase(vault, checkedClears(MSX.passkeyRevokeClears, clears), world),
-  del_vault:      ({ vault, world }, clears) => provePassphrase(vault, checkedClears(MSX.vaultDelClears, clears), world),
+  revoke_passkey: ({ vault, world }, clears) => provePassphrase(vault, checkedClears(GX.passkeyRevokeClears, clears), world),
+  del_vault:      ({ vault, world }, clears) => provePassphrase(vault, checkedClears(GX.vaultDelClears, clears), world),
 }
 
 /** The attempt's one record and the gate it holds, read once, after its timeliness request. */
 const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
-  await vault.ensureTimely(MSX.Promptly); vault.demandEnabled()
+  await vault.ensureTimely(VX.Promptly); vault.demandEnabled()
   return { ante: vault.fullRecord, gate: vault.gate }
 }
 
-const provePassphrase = async (vault: Vault, { passphraseClear }: { passphraseClear: VX.PassphraseCleartext }, world: VaultWorld): Promise<{ ante: VaultRecord, proved: PassphraseProving }> => {
+const provePassphrase = async (vault: Vault, { passphraseClear }: { passphraseClear: GX.PassphraseCleartext }, world: VaultWorld): Promise<{ ante: VaultRecord, proved: PassphraseProving }> => {
   const { ante, gate } = await timelyAnte(vault)
   return { ante, proved: await PassphraseProving.buildStored(gate, passphraseClear, world) }
 }
@@ -200,7 +201,7 @@ const checkedClears = <ClearsT>(checker: { parse: (clears: unknown) => ClearsT }
   }
 }
 
-const isCorrectable = (err: VaultError): boolean => (MSX.correctableKindVals as readonly string[]).includes(err.refusalkind)
+const isCorrectable = (err: VaultError): boolean => (GX.correctableKindVals as readonly string[]).includes(err.refusalkind)
 
 /** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not and of any realm, a bare ArrayBuffer too, as WebAuthn hands one: an answer is single-use (G2). */
 const spendClears = (clears: unknown): void => {

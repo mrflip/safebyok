@@ -21,8 +21,8 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
-import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type LockState, type Tombstone, BoxFormat } from '../../src/models/models-shapes'
-import * as MSX from '../../src/models/models-shapes'
+import * as VX from '../../src/shapes/vaultish-shapes'
+import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type LockState, type Tombstone, BoxFormat } from '../../src/shapes/vaultish-shapes'
 import * as Phrases from '../../src/helpers/phrases'
 import type * as FX from '../../src/shapes/fields'
 import * as CX from '../../src/shapes/scopes'
@@ -87,7 +87,7 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
  *
  * @example sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
  */
-export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => MSX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
+export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => VX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
 
 /** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x' for a deletion or 'd' for damage, and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`.
  *
@@ -377,7 +377,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     },
 
     notify: async (record, worldNow = worldVaultRow()) => {
-      const notice = { act: MSX.isTombstone(record) ? 'gone' : 'got', val: record, world: worldNow } as Notice
+      const notice = { act: VX.isTombstone(record) ? 'gone' : 'got', val: record, world: worldNow } as Notice
       liveWatch().onNotice(notice)
       await settled()
     },

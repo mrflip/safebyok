@@ -14,8 +14,9 @@ import { type BankScope, type VaultBag, type VaultScope, bankScope, vaultBag } f
 import type { DeviceDB } from '../storage/device-db-new'
 import type { LeaseSparse } from '../storage/device-db-shapes'
 import { deviceRecordRewritten, helloFirst, insecureContext } from '../refusals/throwers'
-import type { BankOpts, BankSnapshot, BankStage, LockState, RequestCleartext, StrengthChecker, VaultWorld } from './models-shapes'
-import * as MSX from './models-shapes'
+import * as VX from '../shapes/vaultish-shapes'
+import type { RequestCleartext, StrengthChecker } from '../shapes/gateish-shapes'
+import type { BankOpts, BankSnapshot, BankStage, LockState, VaultWorld } from '../shapes/vaultish-shapes'
 import { DefaultLeaseMillis, type Vault } from './vault'
 import { VaultListing } from './vault-listing'
 
@@ -55,7 +56,7 @@ export class Bank implements VaultWorld {
 
   constructor(opts: BankOpts) {
     checkSecureContext()
-    MSX.bankOpts.parse(opts)
+    VX.bankOpts.parse(opts)
     const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, logger = DefaultLogger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope, { writable: false })
@@ -255,7 +256,7 @@ export class Bank implements VaultWorld {
 
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#listeners.add(MSX.listener.parse(listener))
+    this.#listeners.add(VX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
   }
 

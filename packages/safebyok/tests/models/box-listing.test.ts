@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
-import * as MSX from '../../src/models/models-shapes'
+import * as VX from '../../src/shapes/vaultish-shapes'
+import type { BoxDna, BoxListingOpts } from '../../src/shapes/vaultish-shapes'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 import * as VS from '../../src/storage/vault-db-shapes'
-import type { BoxDna, BoxListingOpts } from '../../src/models/models-shapes'
 
 const held = useModelsWorld()
 
@@ -686,7 +686,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     const [put] = held.mw.callsOf('put')
     expect(put?.priorRevisionTok).to.be.null
     expect(put?.record).to.include({ revision_seq: 0, am: 'a' })
-    expect(MSX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
+    expect(VX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
   })
 
   it("seals the dna's sidecar in beside the whisper", async () => {
@@ -800,7 +800,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand (t
     [() => null,                                'null'],
     [() => 'anthropic_api_key',                 'a bare boxlabel'],
     [() => ({ ...dna(), sidecar: 'note' }),     'a dna whose sidecar fails its check'],
-    [() => ({ ...dna(), whisper: MSX.LOCKED }), 'a dna whose whisper is LOCKED'],
+    [() => ({ ...dna(), whisper: VX.LOCKED }), 'a dna whose whisper is LOCKED'],
   ] as const
 
   for (const [inputOf, blurb] of BadDnaCases) {
@@ -821,7 +821,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand (t
   })
 
   it("says LOCKED is no whisper, naming whisper, for a dna that hands it as the whisper", async () => {
-    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: MSX.LOCKED } as never), 'bad_option')
+    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: VX.LOCKED } as never), 'bad_option')
     expect(err.message).to.include('LOCKED is not a whisper')
     expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
   })

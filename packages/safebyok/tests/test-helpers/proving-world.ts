@@ -12,11 +12,11 @@ import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyByte
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
-import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
+import * as GX from '../../src/shapes/gateish-shapes'
+import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/shapes/gateish-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/refusals/outcome'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
-import * as VX from '../../src/shapes/vault'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { type LoggedCall, spyLogger } from './logging'
 import { T0 } from './models-world'
@@ -105,7 +105,7 @@ export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string,
 // == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, builtGateOf
 
 /** An obvious fake passphrase, never a real one. */
-export const TestPassphrase = VX.passphraseCleartext.parse('correct horse battery staple')
+export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
 /** The `device_id` a {@link provingWorldOf} world carries. */
 export const DeviceId = 'device-laptop'
@@ -120,7 +120,7 @@ export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWo
 })
 
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
-export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.PasskeyAnswer => ({
+export const passkeyAnswerOf = (overrides: Partial<GX.PasskeyAnswer> = {}): GX.PasskeyAnswer => ({
   credential_id: 'cred-test-1',
   prf_salt_b64:  toB64(randomBytes(PasskeySaltBytes)),
   prfBytes:      randomBytes(32),
@@ -128,9 +128,9 @@ export const passkeyAnswerOf = (overrides: Partial<VX.PasskeyAnswer> = {}): VX.P
 })
 
 /** A first gate of {@link WorldStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving. */
-export const builtGateOf = async (answer?: VX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> => {
+export const builtGateOf = async (answer?: GX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> => {
   const world = provingWorldOf()
-  const proving = await PassphraseProving.buildNovel(WorldStamp, VX.passphraseCleartext.parse(TestPassphrase), world)
+  const proving = await PassphraseProving.buildNovel(WorldStamp, GX.passphraseCleartext.parse(TestPassphrase), world)
   const passkeyProving = answer && await PasskeyProving.buildNovel(WorldStamp, answer, world)
   const passphraseWayin = await proving.buildWayin(NOVEL)
   const passkeyWayin = await passkeyProving?.buildWayin(proving) ?? null
@@ -159,7 +159,7 @@ export const _cheat_vaultKeyBytesOf = async (vault: VaultStamp, wayin: Wayin, se
       return deriveWrappingKey(secret.prfBytes, ctx)
     }
     if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase opens a passphrase wayin alone.') }
-    return importWrappingKeyBytes(await keyDeriver.deriveKeyBytes(VX.passphraseCleartext.parse(secret.passphrase), fromB64(header.salt_b64)))
+    return importWrappingKeyBytes(await keyDeriver.deriveKeyBytes(GX.passphraseCleartext.parse(secret.passphrase), fromB64(header.salt_b64)))
   }
   const wayinKey = await wayinKeyOf()
   const vaultKey = await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: true, usage: ['wrapKey'] })

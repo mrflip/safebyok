@@ -1,14 +1,14 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import type { PasskeyAnswer } from '../../src/shapes/vault'
-import * as VX from '../../src/shapes/vault'
+import * as GX from '../../src/shapes/gateish-shapes'
+import type { PasskeyAnswer } from '../../src/shapes/gateish-shapes'
 import * as TH from '../test-helpers'
 
 describe("wayinkind", () => {
   it("takes each kind of wayin, as its example shows, and refuses any other slot 'bad_option'", () => {
-    expect(VX.wayinkind.safeParse('passkey').success).to.be.true
-    expect(VX.wayinkind.parse('passphrase')).to.eq('passphrase')
-    TH.expectSyncRefusal(() => VX.wayinkind.parse('hunter2'), 'bad_option')
+    expect(GX.wayinkind.safeParse('passkey').success).to.be.true
+    expect(GX.wayinkind.parse('passphrase')).to.eq('passphrase')
+    TH.expectSyncRefusal(() => GX.wayinkind.parse('hunter2'), 'bad_option')
   })
 })
 
@@ -25,7 +25,7 @@ const misshapenAnswers = (answer: PasskeyAnswer) => [
 describe("passkeyAnswer", () => {
   it("takes a passkey's answer, its bytes the very ones handed in, as its first example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const checked = VX.passkeyAnswer.parse(answer)
+    const checked = GX.passkeyAnswer.parse(answer)
     expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
     expect(checked.prfBytes).to.eq(answer.prfBytes)
   })
@@ -34,25 +34,25 @@ describe("passkeyAnswer", () => {
     const answer = await TH.passkeyOf('laptop')
     const foreign = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
     expect(foreign instanceof Uint8Array).to.be.false
-    expect(VX.passkeyAnswer.parse({ ...answer, prfBytes: foreign }).prfBytes).to.eq(foreign)
+    expect(GX.passkeyAnswer.parse({ ...answer, prfBytes: foreign }).prfBytes).to.eq(foreign)
   })
 
   it("refuses an answer already used, its bytes zeroed, as bad_option, as its second example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const err = TH.expectSyncRefusal(() => VX.passkeyAnswer.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => GX.passkeyAnswer.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
     expect(err.message).to.match(/^prfBytes: .*used already/)
   })
 
   it("refuses what is no answer at all as bad_option", () => {
     for (const given of ["pw", 42, null, { credential_id: 'abc' }]) {
-      TH.expectSyncRefusal(() => VX.passkeyAnswer.parse(given), 'bad_option')
+      TH.expectSyncRefusal(() => GX.passkeyAnswer.parse(given), 'bad_option')
     }
   })
 
   it("refuses a misshapen answer as bad_option, naming the field and quoting none of it", async () => {
     const answer = await TH.passkeyOf('laptop')
     for (const [given, fieldname, blurb] of misshapenAnswers(answer)) {
-      const err = TH.expectSyncRefusal(() => VX.passkeyAnswer.parse(given), 'bad_option')
+      const err = TH.expectSyncRefusal(() => GX.passkeyAnswer.parse(given), 'bad_option')
       expect(err.message, blurb).to.match(new RegExp(`^${fieldname}: `))
       expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credential_id)
     }
