@@ -6,12 +6,12 @@ import * as TH from './test-helpers'
 import { VaultRowColumns, BoxColumns, TombstoneColumns } from '../src/columns'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
 
-/** A column as information_schema describes it: its name and its type. */
-type DescribedColumn = { column_name: string, data_type: string }
-
 const TypeForKind = { text: 'text', bigint: 'bigint', jsonb: 'jsonb' } as const
 
 const describedColumns = async (db: PGlite, table: string) => {
+  /** A column as information_schema describes it: its name and its type. */
+  type DescribedColumn = { column_name: string, data_type: string }
+
   const { rows } = await db.query<DescribedColumn>(
     'SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position',
     [table],
@@ -19,12 +19,12 @@ const describedColumns = async (db: PGlite, table: string) => {
   return rows.map((row) => [row.column_name, row.data_type])
 }
 
-/** A key as pg_constraint describes it: its name and its definition. */
-type DescribedKey = { conname: string, definition: string }
-
 // Primary, unique, foreign and check constraints: every key a table has, and none of the NOT NULLs
 // a newer Postgres also lists there.
 const describedKeys = async (db: PGlite, table: string) => {
+  /** A key as pg_constraint describes it: its name and its definition. */
+  type DescribedKey = { conname: string, definition: string }
+
   const { rows } = await db.query<DescribedKey>(
     "SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f', 'c') ORDER BY conname",
     [table],

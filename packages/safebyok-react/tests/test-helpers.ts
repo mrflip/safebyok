@@ -288,9 +288,6 @@ export const Hider = ({ hiding }: { hiding: Promise<unknown> | null }) => {
 /** How the fake authenticator behaves: whether it offers PRF at all, and whether it answers as it makes a passkey. */
 export type FakeAuthenticatorOpts = { prf?: boolean, prfAtCreate?: boolean }
 
-/** A credential as the fake hands it back: just what the helper reads of a PublicKeyCredential. */
-type FakeCredential = { type: 'public-key', id: string, rawId: ArrayBuffer, getClientExtensionResults: () => AuthenticationExtensionsClientOutputs }
-
 /** HMAC-SHA256 of `saltBytes` under `secretBytes`: the fake's PRF, as hmac-secret's is in spirit. */
 const prfOf = async (secretBytes: Uint8Array<ArrayBuffer>, saltBytes: BufferSource): Promise<ArrayBuffer> => {
   const hmacKey = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
@@ -316,6 +313,9 @@ const b64Of = (source: BufferSource): string => (
  * @example const authenticator = TH.installFakeAuthenticator({ prf: false })         // no PRF extension
  */
 export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
+  /** A credential as the fake hands it back: just what the helper reads of a PublicKeyCredential. */
+  type FakeCredential = { type: 'public-key', id: string, rawId: ArrayBuffer, getClientExtensionResults: () => AuthenticationExtensionsClientOutputs }
+
   const offersPrf = opts.prf ?? true
   const prfAtCreate = opts.prfAtCreate ?? true
   const secrets = new Map<string, Uint8Array<ArrayBuffer>>()

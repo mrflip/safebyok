@@ -8,15 +8,15 @@ export type FieldKind = 'plain' | 'ciphered' | 'gate'
 /** One field of a record: its name, the same in the record and the schema, and how it crosses. */
 export type Field<FieldT extends string = string> = readonly [field: FieldT, kind: FieldKind]
 
-/** The fields of `RecordT` that `FieldsT` does not carry. */
-type Uncarried<RecordT, FieldsT extends readonly Field[]> = Exclude<keyof RecordT, FieldsT[number][0]>
-
 /** `fields` as given, once the compiler holds them to `RecordT`: every one a field of it, and every field of it among them.
  * A field added to the record then fails to compile until it is carried.
  */
 function everyFieldOf<RecordT>() {
+  /** The fields of `RecordT` that `FieldsT` does not carry. */
+  type Uncarried<FieldsT extends readonly Field[]> = Exclude<keyof RecordT, FieldsT[number][0]>
+
   return <FieldsT extends readonly Field<keyof RecordT & string>[]>(
-    fields: FieldsT & ([Uncarried<RecordT, FieldsT>] extends [never] ? unknown : { uncarried: Uncarried<RecordT, FieldsT> }),
+    fields: FieldsT & ([Uncarried<FieldsT>] extends [never] ? unknown : { uncarried: Uncarried<FieldsT> }),
   ): FieldsT => fields
 }
 

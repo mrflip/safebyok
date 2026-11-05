@@ -120,10 +120,7 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 }
 // --
 
-// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, Showing, hasUserGesture
-
-/** One showing of the dialog: which one, the gating it answers, and how it closes. */
-type Showing = { round: number, gating: Gating, close: () => void }
+// == [BankProvider]: BankProviderProps, BankProvider, settleLogger, hasUserGesture
 
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say (`navigator.userActivation` is newer than some), as there is no telling. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
@@ -233,6 +230,9 @@ export const BankProvider = ({ user_id, allowStartOver, passphraseUsername, pass
   // which each hook names -- handed on to it, so it is refused, to the error boundary, rather than
   // dropped here unseen.
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
+  /** One showing of the dialog: which one, the gating it answers, and how it closes. */
+  type Showing = { round: number, gating: Gating, close: () => void }
+
   // The dialog showing now, if any. The ref is what the callbacks read, so that a dialog's answer
   // reaches its own ask and no newer one's; the state renders it.
   const [showing, setShowing] = useState<Showing | null>(null)
