@@ -1,3 +1,5 @@
+import { decorate } from './helpers'
+import * as Phrases from './phrases'
 import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
 import * as HostErrorSanitizer from '../refusals/host-error-sanitizer'
 import * as CX from '../shapes/shapes-core'
@@ -36,7 +38,7 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** A strength checker as a vault keeps it: the host's, told the vault's scope and held to its contract by {@link guardStrengthChecker}. */
+/** A strength checker as a vault keeps it: the host's, told the vault's scope and held to its contract by {@link invokeStrengthChecker}. */
 export type GuardedStrengthChecker = {
   (passphrase: string): Promise<PassphraseVerdict>
   load: () => Promise<void>
@@ -62,32 +64,33 @@ export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
 /** `hostChecker` held to its contract and told `scope`. Ask the host's checker only through it, so the vault and a dialog checking as the user types decide alike.
- * A blank passphrase is weak before the host's checker hears it. It refuses 'bad_option' for an
+ * A blank passphrase is weak before the host's checker hears it. It refuses 'bad_option' for a passphrase that is no string, or an
  * answer that is no verdict, and 'unexpected_error' for a throw, carrying nothing of it, as the
  * checker heard the passphrase. `load` refuses a failure 'unexpected_error', its cause the throw,
  * as it heard nothing.
  *
- * @example guardStrengthChecker(zxcvbnStrengthChecker, scope)('')   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
- * @example guardStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: kind bad_option
+ * @example invokeStrengthChecker(zxcvbnStrengthChecker, scope)('')   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
+ * @example invokeStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: kind bad_option
  */
-export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
+export const invokeStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
   // Frozen, so the host's checker can change nothing of what it is told.
   const told = CX.vaultScope.parse(scope)
   const check = async (passphrase: string): Promise<PassphraseVerdict> => {
-    if (! passphrase.trim()) { return BlankVerdict }
+    const typed = GX.passphraseCleartext.parse(passphrase)
+    if (! typed.trim()) { return BlankVerdict }
     let checked: ReturnType<typeof GX.passphraseVerdict.safeParse>
     try {
-      // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
-      checked = GX.passphraseVerdict.safeParse(await hostChecker(passphrase, told))
+      // Parsed inside the guard, to be certain no cleartext passphrase leakage
+      checked = GX.passphraseVerdict.safeParse(await hostChecker(typed, told))
     } catch (err) {
-      throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', "The strengthChecker handed to Bank.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
+      throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', Phrases.StrengthCheckerThrew)
     }
     if (! checked.success) {
       throw strengthCheckerMisanswered()
     }
     return checked.data.strong ? StrongVerdict : checked.data
   }
-  return Object.assign(check, { load: () => loadStrengthChecker(hostChecker) })
+  return decorate(check as GuardedStrengthChecker, { load: () => loadStrengthChecker(hostChecker) })
 }
 
 /** Run `hostChecker`'s `load`, if it has one, refusing a failure 'unexpected_error' with what it threw as the cause.

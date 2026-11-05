@@ -3,13 +3,14 @@ import { PassphraseKeyBytes } from '../helpers/consts'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
+import { invokeStrengthChecker } from '../helpers/passphrase-strength'
 import { outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import type { WayinKind } from '../shapes/shapes-enums'
 import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from '../shapes/shapes-gateish'
-import { keyDeriverThrew, noPasskeyWayin, notAVerdict, notKeyBytes, otherPasskey, otherPrfSalt, strengthCheckerThrew, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
+import { keyDeriverThrew, noPasskeyWayin, notKeyBytes, otherPasskey, otherPrfSalt, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
 import { Lease } from './lease'
 import { Wayin, wayinCtxOf } from './wayin'
 
@@ -66,9 +67,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
   static async checkStrength(passphraseClear: GX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<GX.PassphraseVerdict> {
     strengthArgs.parse({ passphraseClear, scope, world })
-    const verdict = await invokeStrengthChecker(world.strengthChecker, passphraseClear, scope)
-    if (! verdict.success) { throw notAVerdict() }
-    return verdict.data
+    return invokeStrengthChecker(world.strengthChecker, scope)(passphraseClear)
   }
 
   /** The wayin this proving holds, made under a vaultKey new (`NOVEL`) or held by the `source` proving of the same vault. A proving holds one wayin. */
@@ -191,17 +190,9 @@ const mintPasskeyHeader = ({ clock, device_id }: ProvingWorld, { credential_id, 
 })
 // --
 
-// == [Host calls]: invokeStrengthChecker, deriveKeyBytes
+// == [Host calls]: deriveKeyBytes
 
-// The two host functions that hear the passphrase here (guarantees.md, G1 and G8): what they throw may quote it, so it is replaced, not kept as a cause. The verdict is parsed inside the catch, as a getter on what the strengthChecker answered may throw the same.
-const invokeStrengthChecker = async (strengthChecker: ProvingWorld['strengthChecker'], passphraseClear: GX.PassphraseCleartext, scope: VaultScope) => {
-  try {
-    return GX.passphraseVerdict.safeParse(await strengthChecker(passphraseClear, scope))
-  } catch {
-    throw strengthCheckerThrew()
-  }
-}
-
+// The key deriver hears the passphrase here (guarantees.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
 const deriveKeyBytes = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> => {
   try {
     return await keyDeriver.deriveKeyBytes(passphrase, saltBytes)

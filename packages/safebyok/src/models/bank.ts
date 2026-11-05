@@ -4,6 +4,7 @@ import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
 import { type VaultLogger, parseLogger } from '../helpers/logger'
+import { DefaultStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
@@ -18,11 +19,9 @@ import { deviceRecordRewritten, helloFirst, insecureContext } from '../refusals/
 import { DefaultLeaseMillis, type Vault } from './vault'
 import { VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultRefreshMillis, RefusingStrengthChecker
+// == [Given to a bank]: DefaultRefreshMillis
 
 export const DefaultRefreshMillis = 5 * MinuteMillis
-
-const RefusingStrengthChecker: StrengthChecker = () => ({ strong: false, reason: Phrases.NoStrengthChecker })
 // --
 
 export class Bank implements VaultWorld {
@@ -83,7 +82,7 @@ export class Bank implements VaultWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     VX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = RefusingStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
+    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.#device_id = device_id

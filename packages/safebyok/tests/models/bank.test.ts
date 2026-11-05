@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
+import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
 import { BankBag, OtherBag, VaultBag, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
@@ -241,6 +242,16 @@ describe("'identity_revoked' and bad news", () => {
     bank.tellBadNews([news])
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     expect(vault.isEnabled).to.be.true
+  })
+
+  it("with no strengthChecker, finds every new passphrase weak, its reason sending the app's makers to CUSTOMIZATION.md", async () => {
+    const attempts: Outcome<unknown>[] = []
+    const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase) as never)) } })
+    await bank.hello()
+    await TH.expectRefusal(bank.ensureVault(VaultBag), 'declined')
+    const [attempted] = attempts
+    expect(attempted?.err).to.include({ refusalkind: 'weak_passphrase' })
+    expect(attempted?.err?.message).to.include('CUSTOMIZATION.md')
   })
 
   it("keeps to its call when the host's logger throws, in Bank.make and past a cached lease row it cannot erase", async () => {

@@ -94,6 +94,13 @@ describe("Proving.checkStrength(passphraseClear, scope, world)", () => {
     await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker })), 'bad_option')
   })
 
+  it("finds a blank passphrase weak before the checker hears it", async () => {
+    const strengthChecker = vi.fn(() => ({ strong: true as const }))
+    const verdict = await Proving.checkStrength(passphraseCleartext.parse(' '.repeat(3)), WorldScope, provingWorldOf({ strengthChecker }))
+    expect(verdict).to.have.property('strong', false)
+    expect(strengthChecker).not.toHaveBeenCalled()
+  })
+
   it("refuses a passphrase that is no string as 'bad_option', before the checker hears it", async () => {
     const strengthChecker = vi.fn(() => ({ strong: true as const }))
     await TH.expectRefusal(Proving.checkStrength(42 as never, WorldScope, provingWorldOf({ strengthChecker })), 'bad_option')
