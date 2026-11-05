@@ -4,7 +4,7 @@ import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
 import { type VaultLogger, parseLogger } from '../helpers/logger'
-import { DefaultStrengthChecker } from '../helpers/passphrase-strength'
+import { DefaultStrengthChecker, loadStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
@@ -139,7 +139,7 @@ export class Bank implements VaultWorld {
   /** A sweep crossing it leaves `listing` disabled, which refuses. */
   async #bringUp(listing: VaultListing): Promise<void> {
     await this.keyDeriver.load?.()
-    await this.strengthChecker.load?.()
+    await loadStrengthChecker(this.strengthChecker)
     await listing.fetchBank()
     await this.#cacheDeviceRecord()
     await listing.hello()
