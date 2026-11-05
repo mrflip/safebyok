@@ -338,7 +338,7 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
 
 // == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and put take a duckish
 
-describe("Box and Storable entries: arguments checked before any demand (the Coach, 2026-10-31)", () => {
+describe("Box and Storable entries: arguments checked before any demand", () => {
   const whisper = { val: 'sk-test-0000' }
   const BadArgCases = [
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
@@ -359,19 +359,19 @@ describe("Box and Storable entries: arguments checked before any demand (the Coa
     })
   }
 
-  it("refuses put with a sidecar that fails its check as 'bad_option' while the vault is locked, putting nothing", async () => {
+  it("refuses put with a sidecar that fails its check while the vault is locked, putting nothing", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
     await TH.expectRefusal(box.put({ whisper, sidecar: [] as never }), 'bad_option')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("refuses subscribing anything but a function as 'bad_option'", async () => {
+  it("refuses subscribing anything but a function", async () => {
     const box = await builtOf(fullBoxRecord())
     TH.expectSyncRefusal(() => box.subscribe('call me' as never), 'bad_option')
   })
 
-  it("refuses LOCKED handed to put as 'bad_option', naming whisper and saying LOCKED is no whisper", async () => {
+  it("refuses LOCKED handed to put, naming whisper and saying LOCKED is no whisper", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
     held.mw.clearCalls()
@@ -384,7 +384,7 @@ describe("Box and Storable entries: arguments checked before any demand (the Coa
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("refuses a put whose scope fields name another box as 'bad_option', naming them, putting nothing", async () => {
+  it("refuses a put whose scope fields name another box, naming them, putting nothing", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.clearCalls()
     const err = await TH.expectRefusal(box.put({ ...fullBoxRecord({ boxlabel: 'openai_api_key' }), whisper, sidecar: {} }), 'bad_option')
@@ -392,13 +392,13 @@ describe("Box and Storable entries: arguments checked before any demand (the Coa
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("refuses a put whose factory field fails its check as 'bad_option', naming it, though the field would be ignored", async () => {
+  it("refuses a put whose factory field fails its check, naming it, though the field would be ignored", async () => {
     const box = await builtOf(fullBoxRecord())
     const err = await TH.expectRefusal(box.put({ ...fullBoxRecord(), am: 'q' as never, whisper, sidecar: {} }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['am'])
   })
 
-  it("refuses a put carrying a field no box record has as 'bad_option', as a bag a person typed", async () => {
+  it("refuses a put carrying a field no box record has", async () => {
     const box = await builtOf(fullBoxRecord())
     await TH.expectRefusal(box.put({ whisper, sidecar: {}, sidecarr: {} } as never), 'bad_option')
   })

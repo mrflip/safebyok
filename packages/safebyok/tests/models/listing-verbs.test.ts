@@ -82,14 +82,14 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.callsOf('put')[0]).to.include({ ifAbsent: 'fail', ifPresent: 'get' })
     })
 
-    it("refuses as 'bad_option' fetch's ifAbsent nil, before storage is called", async () => {
+    it("refuses fetch's ifAbsent nil, before storage is called", async () => {
       const { listing, box, next } = await putable()
       held.mw.clearCalls()
       await TH.expectRefusal(listing.put(next, { prior: box, ifAbsent: 'nil' } as never), 'bad_option')
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
-    it("refuses a box not full as 'bad_record' before storage is called", async () => {
+    it("refuses a box not full, before storage is called", async () => {
       const listing = boxListingOf(held.mw)
       const sparse = await listing.build(sparseBoxRecord())
       held.mw.clearCalls()
@@ -164,7 +164,7 @@ describe("listing.put: the versioned replace", () => {
 })
 
 describe("listing: an answer is for the scope the call asked about", () => {
-  it("refuses 'bad_record' a fetch answered with a record of another scope, making nothing", async () => {
+  it("refuses a fetch answered with a record of another scope, making nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willGet(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
     await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'bad_record')
@@ -178,13 +178,13 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
   const birth = fullBoxRecord({ revision_tok: 'rev-mine', revision_seq: 0 })
   const live  = fullBoxRecord()
 
-  it("refuses 'bad_option' an ifPresent it does not take, calling nothing", async () => {
+  it("refuses an ifPresent it does not take, calling nothing", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.put(birth, { prior: SX.VoidRevision, ifPresent: 'replace' } as never), 'bad_option')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("replaces it under 'repl', over its revision", async () => {
+  it("replaces the live record under 'repl', over its revision", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(live)
     const box = await listing.put(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }), { prior: live, ifPresent: 'repl' })

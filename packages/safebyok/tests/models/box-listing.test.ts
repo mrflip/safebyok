@@ -72,7 +72,7 @@ describe("BoxListing", () => {
       expect(listing.snapshot).to.have.lengthOf(1)
     })
 
-    it("refuses 'bad_record' a dna, which is no record, holding and storing nothing", async () => {
+    it("refuses a dna, which is no record, holding and storing nothing", async () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.build(dna() as never), 'bad_record')
       expect(listing.things).to.deep.equal([])
@@ -156,7 +156,7 @@ describe("boxListing.get(scoped, opts)", () => {
 })
 
 describe("boxListing.puttable(scoped, opts)", () => {
-  it("makes one void box for a slot with nothing held, timely, in things and not the snapshot, asking storage nothing", () => {
+  it("hands a void shell for an empty slot, asking storage nothing", () => {
     const listing = boxListingOf(held.mw)
     const shell = listing.puttable(held.mw.boxscope(Label))
     expect(shell.isPresent).to.be.false
@@ -189,7 +189,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(listing.at(scope)).to.be.null
   })
 
-  it("refuses 'bad_scope' and a bad option, making no void box", () => {
+  it("refuses a bad scope and a bad option, making no void box", () => {
     const listing = boxListingOf(held.mw)
     TH.expectSyncRefusal(() => listing.puttable({ ...held.mw.boxscope(Label), vaultlabel: 'mary' }), 'bad_scope')
     TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label), { ifAbsent: 'nil' } as never), 'bad_option')
@@ -213,7 +213,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
 
 // == [Arguments first]: every entry of BoxListing and Listing checks its arguments before any guard
 
-describe("BoxListing and Listing entries: arguments checked before any demand (the Coach, 2026-10-31)", () => {
+describe("BoxListing and Listing entries: arguments checked before any demand", () => {
   const BadDnaCases = [
     [() => undefined,                           'undefined'],
     [() => null,                                'null'],
@@ -257,13 +257,13 @@ describe("BoxListing and Listing entries: arguments checked before any demand (t
     })
   }
 
-  it("refuses at() a scope that fails its check as 'bad_scope'", () => {
+  it("refuses at() a scope that fails its check", () => {
     const listing = boxListingOf(held.mw)
     TH.expectSyncRefusal(() => listing.at(undefined), 'bad_scope')
     TH.expectSyncRefusal(() => listing.at({ ...held.mw.boxscope('anthropic_api_key'), boxlabel: 'B' }), 'bad_scope')
   })
 
-  it("refuses subscribing anything but a function as 'bad_option'", () => {
+  it("refuses subscribing anything but a function", () => {
     TH.expectSyncRefusal(() => boxListingOf(held.mw).subscribe(null as never), 'bad_option')
   })
 

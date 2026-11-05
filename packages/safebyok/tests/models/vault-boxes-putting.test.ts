@@ -259,7 +259,7 @@ describe("vault.putBox over a live box", () => {
     })
   }
 
-  it("refuses 'bad_option' opts before any guard", async () => {
+  it("refuses opts before any guard", async () => {
     const { vault } = await makeWorldWithBox()
     vault.lock()
     await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }, { ifPresent: 'shrug' } as never), 'bad_option')
@@ -297,7 +297,7 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("refuses 'bad_option' given box.whisper while locked, or with nothing exposed, storing nothing", async () => {
+  it("refuses box.whisper given while locked, or with nothing exposed, storing nothing", async () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     tryPutBox.mockClear()
     expect(box.whisper).to.be.null

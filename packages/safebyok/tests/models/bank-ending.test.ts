@@ -122,7 +122,7 @@ describe("bank.autolock", () => {
     expect(requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("relies on vault.lock() erasing the row cached for a vault already locked, as a fresh page's vault holds no lease", async () => {
+  it("relies on vault.lock() erasing the row cached for a vault already locked", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     const fresh = world.bankOn()
@@ -327,7 +327,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(again.isUnlocked).to.be.true
   })
 
-  it("does not let a hello crossing a sweep touch the bank's stage: its own caller hears the refusal, as an effect's cleanup does not want a flicker", async () => {
+  it("does not let a hello crossing a sweep touch the bank's stage: its own caller hears the refusal", async () => {
     const world = makeBankWorld()
     const bank = world.bankOn()
     const hello = bank.tryHello()

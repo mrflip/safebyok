@@ -235,7 +235,7 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.include({ am: 'a', vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
-  it("listing.buildVault refuses 'bad_option' a vault present in the slot, the dialog not shown", async () => {
+  it("listing.buildVault refuses a vault present in the slot, the dialog not shown", async () => {
     const { listing } = await makeBornVault()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
@@ -243,7 +243,7 @@ describe("building over a tombstone", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses 'bad_option' a vault present in the slot, no gating opened and no KDF run", async () => {
+  it("Vault.launchBirth refuses a vault present in the slot, no gating opened and no KDF run", async () => {
     const keyDeriver = { ...TH.testDeriver }
     const deriveKeyBytes = vi.spyOn(keyDeriver, 'deriveKeyBytes')
     const { listing, storedNow } = await makeBornVault(byPassphrase(Passphrase), { keyDeriver })
@@ -259,13 +259,13 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.deep.equal(before)
   })
 
-  it("a vault listing refuses 'bad_scope' to answer for another user, where another vault of this user is plainly not held", () => {
+  it("a vault listing refuses to answer for another user, where another vault of this user is plainly not held", () => {
     const { listing } = makeVaultWorld()
     TH.expectSyncRefusal(() => listing.at({ ...Dna, user_id: 'another_user' }), 'bad_scope')
     expect(listing.at({ ...Dna, vaultlabel: 'another_vault' })).to.be.null
   })
 
-  it("Vault.launchBirth refuses 'bad_scope' a scope of another user, nobody asked", async () => {
+  it("Vault.launchBirth refuses a scope of another user, nobody asked", async () => {
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
@@ -273,7 +273,7 @@ describe("building over a tombstone", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses 'bad_option' what is no listing, and 'bad_scope' what is no scope, nobody asked", async () => {
+  it("Vault.launchBirth refuses what is no listing, and what is no scope, nobody asked", async () => {
     await TH.expectRefusal(Vault.launchBirth(undefined as never, Dna), 'bad_option')
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
@@ -345,7 +345,7 @@ describe("the entrypoints, handed rubble", () => {
     expect(storedNow()).to.be.null
   })
 
-  it("listing.del refuses a duck that is no record, as its check does", async () => {
+  it("listing.del refuses a duck that is no record", async () => {
     const { listing } = makeVaultWorld()
     await TH.expectRefusal(listing.del(null as never), 'bad_scope')
   })

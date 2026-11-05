@@ -17,7 +17,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("refuses a world with no dialog as 'bad_option', holding no vault", async () => {
+  it("refuses a world with no dialog, holding no vault", async () => {
     const { listing } = makeVaultWorld()
     await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
     expect(listing.things).to.have.lengthOf(0)
@@ -31,7 +31,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("refuses 'bad_option' a dna for a scope already held, before the dialog is shown", async () => {
+  it("refuses a dna for a scope already held, before the dialog is shown", async () => {
     const { listing } = makeVaultWorld()
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const dialog = vi.fn()
@@ -58,7 +58,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     expect(listing.recordOf(vault)).to.deep.equal(record)
   })
 
-  it("has no gate in hand while it holds a sparse record, and refuses 'bad_option' until it is hydrated", async () => {
+  it("has no gate in hand while it holds a sparse record, and refuses until it is hydrated", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(listing.sparseOf(record))
@@ -67,13 +67,13 @@ describe("VaultListing.build of a record, and its constructor", () => {
     expect(vault.gate.pickle()).to.deep.equal(record.gate)
   })
 
-  it("refuses 'bad_option' a world without what a vault's gate and lease need", () => {
+  it("refuses a world without what a vault's gate and lease need", () => {
     const { opts } = makeVaultWorld()
     TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'deviceDB') }), 'bad_option')
     TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'keyDeriver') }), 'bad_option')
   })
 
-  it("refuses 'bad_option' a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
+  it("refuses a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
     const { opts } = makeVaultWorld()
     for (const verb of ['tryPeek', 'tryCache', 'tryVacate']) {
       const missing = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
@@ -94,7 +94,7 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     lease.evict()
   })
 
-  it("refuses 'bad_option' a vault of another stamp, before any key is touched", async () => {
+  it("refuses a vault of another stamp, before any key is touched", async () => {
     const { deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryCache.mockClear()
@@ -104,7 +104,7 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
 })
 
 describe("the friend a vault hands its leases", () => {
-  it("binds the deviceDB's lease verbs to the vault's scope, so no verb takes one", async () => {
+  it("calls the deviceDB under the vault's own scope", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
     await friend.tryPeekLease()
     await friend.tryUncacheLease()
@@ -115,7 +115,7 @@ describe("the friend a vault hands its leases", () => {
 })
 
 describe("vault.takeWorld(world)", () => {
-  it("refuses 'bad_record' a world that is no vault row", async () => {
+  it("refuses a world that is no vault row", async () => {
     const { vault } = await makeBornVault()
     TH.expectSyncRefusal(() => { vault.takeWorld({ am: 'nope' }) }, 'bad_record')
   })
@@ -176,7 +176,7 @@ describe("vault.ensureTimely(maxMillis)", () => {
     TH.expectSyncRefusal(() => vault.demandEnabled(), 'vault_gone')
   })
 
-  it("refuses a maxMillis out of range as 'bad_option'", async () => {
+  it("refuses a maxMillis out of range", async () => {
     const { vault } = await bornWithGets()
     await TH.expectRefusal(vault.ensureTimely(-1), 'bad_option')
   })

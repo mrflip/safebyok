@@ -103,12 +103,14 @@ describe("A refused erase of the row: the panic", () => {
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("with no onPanic, on a platform with no reportError, still vacates the vault", async () => {
-    const { vault, deviceDB } = await makeBornVault()
-    deviceDB.tryVacate.mockResolvedValue(TH.bad(Refusal))
-    vault.lock()
-    await TH.eventually(() => ! vault.isEnabled)
-    expect(deviceDB.tryVacate).toHaveBeenCalledTimes(2)
+  describe("with no onPanic and no reportError", () => {
+    it("still vacates the vault", async () => {
+      const { vault, deviceDB } = await makeBornVault()
+      deviceDB.tryVacate.mockResolvedValue(TH.bad(Refusal))
+      vault.lock()
+      await TH.eventually(() => ! vault.isEnabled)
+      expect(deviceDB.tryVacate).toHaveBeenCalledTimes(2)
+    })
   })
 
   it("with no onPanic reports it and vacates the vault; the vacate's own refusal finds that done", async () => {

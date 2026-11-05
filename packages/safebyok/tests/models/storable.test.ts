@@ -230,7 +230,7 @@ describe("Storable snapshot and subscription", () => {
   })
 
   describe("settle", () => {
-    it("notifies nobody when it changes nothing, and keeps the snapshot", async () => {
+    it("changes nothing when there is nothing to settle", async () => {
       const box = await builtBoxOf()
       const first = box.getSnapshot()
       const listener = vi.fn()
@@ -329,7 +329,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
   })
 
-  it("demandPuttable refuses a bad patch first, 'bad_option' while locked and over a record not whole", async () => {
+  it("demandPuttable refuses a bad patch first, whether locked or over a record not whole", async () => {
     const box = await boxListingOf(held.mw).build(sparseBoxRecord())
     held.mw.setLockState('locked')
     TH.expectSyncRefusal(() => box.demandPuttable({}), 'bad_option')
@@ -345,7 +345,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'disabled')
   })
 
-  it("demandPuttable under ifPresent 'fail' refuses a whole record as 'bad_option', saying its data would be recycled", async () => {
+  it("demandPuttable under ifPresent 'fail' refuses a whole record, saying its data would be recycled", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     const err = TH.expectSyncRefusal(() => box.demandPuttable({ ...fullBoxRecord() }, { ifPresent: 'fail' }), 'bad_option')
     expect(err.message).to.eq(Phrases.RecordForNewBox)

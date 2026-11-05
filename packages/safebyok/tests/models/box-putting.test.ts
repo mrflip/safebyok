@@ -73,7 +73,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
     expect(box.revision_seq).to.eq(3)
   })
 
-  it("fetches the full record of a box held sparse before its seal", async () => {
+  it("never seals over a sparse record", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.seedStore(fullBoxRecord())
     await box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } })
@@ -81,7 +81,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
-  it("refuses a live box still sparse once hydrated as 'bad_option', saying so, putting nothing", async () => {
+  it("refuses a live box still sparse once hydrated, saying so, putting nothing", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
     await TH.expectRefusal(box.put({ whisper: { val: 'sk-test-0000' }, sidecar: { account: 'home' } }), 'bad_option')
@@ -159,7 +159,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     expect(held.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
   })
 
-  it("refuses 'bad_option' an ifPresent off its menu, before putting anything", async () => {
+  it("refuses an ifPresent off its menu, before putting anything", async () => {
     const box = await builtOf(fullBoxRecord())
     const before = box._cheat_central
     held.mw.clearCalls()
@@ -193,7 +193,7 @@ describe("box.put(patch): a patch naming a half", () => {
     expect(err.message).to.contain(Phrases.BoxPatchAdvice)
   })
 
-  it("refuses 'bad_option' before its guards: a patch naming neither refuses so while the vault is locked, too", async () => {
+  it("refuses before its guards: a patch naming neither refuses while the vault is locked, too", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
     await TH.expectRefusal(box.put({}), 'bad_option')
@@ -220,7 +220,7 @@ describe("box.put(patch): a patch naming a half", () => {
 })
 // --
 
-describe("box.put holds its patch to boxPatch before any demand (the Coach, 2026-10-31)", () => {
+describe("box.put holds its patch to boxPatch before any demand", () => {
   it("refuses a patch that names neither half before it looks at the lock", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
@@ -228,7 +228,7 @@ describe("box.put holds its patch to boxPatch before any demand (the Coach, 2026
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("refuses it after the one fetch its ensure asks of a box held sparse", async () => {
+  it("refuses an empty patch over a sparse box, after its one fetch", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.seedStore(fullBoxRecord())
     await TH.expectRefusal(box.put({}), 'bad_option')

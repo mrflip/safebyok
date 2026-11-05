@@ -19,7 +19,7 @@ describe("Gate.make(stamp, passphraseWayin, passkeyWayin)", () => {
     expect(gate.passkey_wayin).to.be.null
   })
 
-  it("refuses a pickle where it wants a Wayin as 'bad_option'", async () => {
+  it("refuses a pickle where it wants a Wayin", async () => {
     const { gate } = await builtGate()
     TH.expectSyncRefusal(() => Gate.make(WorldStamp, gate.passphrase_wayin as never, null), 'bad_option')
   })
@@ -50,7 +50,7 @@ describe("new Gate(stamp, props): the props check", () => {
     })
   }
 
-  it("refuses a stamp with no vault_tok as 'bad_option'", async () => {
+  it("refuses a stamp with no vault_tok", async () => {
     const { gate } = await builtGate()
     TH.expectSyncRefusal(() => new Gate(TH.omitting(WorldStamp, 'vault_tok'), gate.pickle()), 'bad_option')
   })
@@ -103,7 +103,7 @@ describe("gate.pickle() and gate.toJSON()", () => {
 })
 
 describe("gate.demandPasskeyAddable()", () => {
-  it("passes a gate with no passkey and refuses one that holds one as 'bad_option'", async () => {
+  it("passes a gate with no passkey and refuses one that holds one", async () => {
     const { gate } = await builtGate()
     expect(() => { gate.demandPasskeyAddable() }).to.not.throw()
     const { gate: both } = await builtGate({ passkey: true })

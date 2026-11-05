@@ -39,7 +39,7 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
     expect(friend.cached).to.be.null
   })
 
-  it("makes its leaseKey non-extractable, usable only to wrap and unwrap (G4)", async () => {
+  it("makes its leaseKey non-extractable, usable only to wrap and unwrap", async () => {
     const { friend } = await grantedWorld()
     const { lease_key } = friend.cached as LeaseRecord
     expect(isLeaseKey(lease_key)).to.be.true
@@ -185,7 +185,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(friend.tryUncacheLease).not.toHaveBeenCalled()
   })
 
-  it("refuses 'bad_option' a friend its check refuses, where it tells no bad news", async () => {
+  it("refuses a friend its check refuses, where it tells no bad news", async () => {
     const friend = { ...fakeLeaseFriendOf(), tryPeekLease: undefined } as unknown as FakeLeaseFriend
     await TH.expectRefusal(Lease.buildFromCache(friend, GrantedAs.gate_epoch), 'bad_option')
     expect(friend.tellBadNews).not.toHaveBeenCalled()
@@ -220,7 +220,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   })
 
   const MalformedCases = [
-    [(record: LeaseRecord, extractableVaultKey: CryptoKey) => ({ ...record, lease_key: extractableVaultKey }), 'whose leaseKey is extractable (G4)'],
+    [(record: LeaseRecord, extractableVaultKey: CryptoKey) => ({ ...record, lease_key: extractableVaultKey }), 'whose leaseKey is extractable'],
     [(record: LeaseRecord) => ({ ...record, fmt: 7000 }),                          'of another fmt'],
     [(record: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: undefined }), 'with no wrapped vaultKey'],
     [(record: LeaseRecord) => ({ ...record, proved_at: undefined }),               'with no proved_at'],
@@ -291,7 +291,7 @@ describe("lease.vacate(), lease.evict() and isPresent", () => {
     await TH.expectBad(Lease.tryUncache(friend), 'unexpected_error')
   })
 
-  it("Lease.uncache refuses 'bad_option' a friend its check refuses, uncaching nothing", async () => {
+  it("Lease.uncache refuses a friend its check refuses, uncaching nothing", async () => {
     const friend = { ...fakeLeaseFriendOf(), lock: undefined } as unknown as FakeLeaseFriend
     await TH.expectRefusal(Lease.uncache(friend), 'bad_option')
     expect(friend.tryUncacheLease).not.toHaveBeenCalled()
@@ -349,7 +349,7 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
     })
   }
 
-  it("refuses a whisper that is no string as 'bad_option'", async () => {
+  it("refuses a whisper that is no string", async () => {
     const { lease } = await grantedWorld()
     await TH.expectRefusal(lease.sealWith(new TextEncoder().encode(WhisperText) as never, sealStampOf('b1')), 'bad_option')
   })
@@ -392,7 +392,7 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
     expect(TH.thrownText(err)).to.not.include(tampered.whisper_ciphered.ciphertext_b64)
   })
 
-  it("refuses sealed parts that are no ciphered bags as 'bad_option'", async () => {
+  it("refuses sealed parts that are no ciphered bags", async () => {
     const { lease } = await grantedWorld()
     const stamp = sealStampOf('b1')
     await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: 'wrapped' } as never, stamp), 'bad_option')
