@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
+import { LOCKED } from '../../src/helpers/consts'
+import type { WhisperHolder } from '../../src/shapes/shapes-vaultish'
 import { Sidecar, Whisper, boxlabel, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
@@ -275,11 +277,35 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("opens the stored whisper, never the one exposed", async () => {
+  it("neither reads nor clears the whisper exposed, opening the stored one for a put of the sidecar alone", async () => {
     const { box } = await makeWorldWithBox()
-    box.whisper = { val: 'sk-test-exposed' }
+    await box.expose()
+    await box.put({ whisper: { val: 'sk-test-0001' } })
+    expect(box.whisper).to.deep.equal(Whisper)
     await box.put({ sidecar: { note: 'home' } })
+    expect(box.whisper).to.deep.equal(Whisper)
+    expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0001' })
+  })
+
+  it("stores box.whisper handed to it, the exposed holder taken as any other", async () => {
+    const { box } = await makeWorldWithBox()
+    await box.expose()
+    const { revision_seq } = box
+    await box.put({ whisper: box.whisper as WhisperHolder, sidecar: { note: 'home' } })
+    expect(box.sidecar).to.deep.equal({ note: 'home' })
+    expect(box.revision_seq).to.eq(revision_seq + 1)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
+  })
+
+  it("refuses 'bad_option' given box.whisper while locked, or with nothing exposed, storing nothing", async () => {
+    const { vault, box, tryPutBox } = await makeWorldWithBox()
+    tryPutBox.mockClear()
+    expect(box.whisper).to.be.null
+    await TH.expectRefusal(box.put({ whisper: box.whisper as never, sidecar: {} }), 'bad_option')
+    vault.lock()
+    expect(box.whisper).to.eq(LOCKED)
+    await TH.expectRefusal(box.put({ whisper: box.whisper as never, sidecar: {} }), 'bad_option')
+    expect(tryPutBox).not.toHaveBeenCalled()
   })
 
   it("is what putBox of a sidecar alone does to a box held", async () => {

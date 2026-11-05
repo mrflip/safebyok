@@ -129,7 +129,7 @@ export const sidecar = Checker(() => whisperBag, 'bad_option')
 export type Sidecar = Z.infer<typeof sidecar>
 // --
 
-// == [Scopes]: bankScope, vaultScope, boxscope, BankScope, VaultScope, Boxscope, vaultBag, bankBag, VaultBag, BankBag
+// == [Scopes]: bankScope, vaultScope, boxscope, BankScope, VaultScope, Boxscope, bankedVaultScope, BankedVaultScope
 
 /** A scope as a frozen copy.
  * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
@@ -153,30 +153,25 @@ export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
 
-/** The bag naming one of a bank's vaults, as its calls are handed it, and what of a bank's scope a thing carries: each name checked, each optional but the `vaultlabel`. Each refuses 'bad_scope'.
- * Each takes whatever carries the names, a plain bag, a Vault object, its snapshot or a
- * BankVault, and leaves the rest. A store in the bag naming the vault refuses: it belongs in the
+/** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `applabel` and `user_id` invited, each name checked. It refuses 'bad_scope'.
+ * It takes whatever carries the names, a plain bag, a Vault object, its snapshot or a
+ * BankVault, and leaves the rest. A store in the scope refuses: it belongs in the
  * second bag, the options, and would be dropped unseen here.
  *
- * @example vaultBag.parse({ vaultlabel: 'main' })                          // { vaultlabel: 'main' }
- * @example vaultBag.parse(vault)                                           // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
- * @example vaultBag.parse({ vaultlabel: 'main', vaultDB })                 // throws 'bad_scope': stores go in the second bag
- * @example bankBag.parse(vault)                                            // { applabel: 'acme', user_id: 'u1' }
+ * @example bankedVaultScope.parse({ vaultlabel: 'main' })                   // { vaultlabel: 'main' }
+ * @example bankedVaultScope.parse(vault)                                    // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+ * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })          // throws 'bad_scope': stores go in the second bag
  */
-export const { vaultBag, bankBag } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
-  const bankBag = obj({ applabel: applabel.optional(), user_id: user_id.optional() })
-  const store   = never(Phrases.StoreInVaultBag).optional()
-  return { bankBag, vaultBag: bankBag.extend({ vaultlabel, vaultDB: store, deviceDB: store }) }
-})
+export const bankedVaultScope = Checker(({ obj, applabel, user_id, vaultlabel }) => {
+  const store = never(Phrases.StoreInVaultScope).optional()
+  return obj({ applabel: applabel.optional(), user_id: user_id.optional(), vaultlabel, vaultDB: store, deviceDB: store })
+}, 'bad_scope')
 
-/** The bag naming one of a bank's vaults, as {@link vaultBag} checks it: its `vaultlabel`, and the bank's own `applabel` and `user_id` if you like.
+/** The scope naming one of a bank's vaults, as {@link bankedVaultScope} checks it: its `vaultlabel`, and the bank's own `applabel` and `user_id` if you like.
  *
  * @example bank.ensureVault({ vaultlabel: 'main' })
  */
-export type VaultBag = Z.input<typeof vaultBag>
-
-/** What of a bank's scope a thing carries, as {@link bankBag} checks it: an `applabel` and a `user_id`, each optional. */
-export type BankBag = Z.input<typeof bankBag>
+export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 // --
 
 // == [Clock]: Clock, wallClock, clockShape

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
-import { BankBag, OtherBag, VaultBag, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
+import { BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
 
@@ -22,7 +22,7 @@ describe("bank.hello", () => {
     expect(load).toHaveBeenCalledOnce()
     expect(listener).toHaveBeenCalledOnce()
     const snapshot = bank.getSnapshot()
-    expect(snapshot).to.include({ ...BankBag, stage: 'ready', err: null, device_id: bank.device_id })
+    expect(snapshot).to.include({ ...BankScopeGiven, stage: 'ready', err: null, device_id: bank.device_id })
     expect(snapshot.vaults).to.deep.equal([])
     await bank.hello()
     expect(bank.getSnapshot()).to.equal(snapshot)
@@ -32,15 +32,15 @@ describe("bank.hello", () => {
   it("lists every vault and tombstone the vaultDB holds, locked, with no prompt, the tombstone in its slot but not its snapshot", async () => {
     const world = makeBankWorld()
     const { bank: elsewhere, vault } = await makeBankWithVault(world)
-    await elsewhere.ensureVault(OtherBag)
+    await elsewhere.ensureVault(OtherScopeGiven)
     await vault.delVaultPrompt()
     const requestCleartext = vi.fn()
     const bank = world.bankOnAnotherDevice({ requestCleartext })
     await bank.hello()
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(labelsOf(bank.snapshot)).to.deep.equal([OtherBag.vaultlabel])
-    expect(bank.vaultOf(OtherBag)?.isLocked).to.be.true
-    expect(bank.vaultOf(VaultBag)?.isPresent).to.be.false
+    expect(labelsOf(bank.snapshot)).to.deep.equal([OtherScopeGiven.vaultlabel])
+    expect(bank.vaultAt(OtherScopeGiven)?.isLocked).to.be.true
+    expect(bank.vaultAt(VaultScopeGiven)?.isPresent).to.be.false
   })
 
   it("on a second call receives a row of the same life into the vault held, and replaces one of a new life, the old vault vacated", async () => {
@@ -48,13 +48,13 @@ describe("bank.hello", () => {
     const { bank: elsewhere, vault } = await makeBankWithVault(world)
     const bank = world.bankOnAnotherDevice()
     await bank.hello()
-    const held = bank.vaultOf(VaultBag)
+    const held = bank.vaultAt(VaultScopeGiven)
     await bank.hello()
-    expect(bank.vaultOf(VaultBag)).to.equal(held)
+    expect(bank.vaultAt(VaultScopeGiven)).to.equal(held)
     await vault.delVaultPrompt()
-    await elsewhere.ensureVault(VaultBag)
+    await elsewhere.ensureVault(VaultScopeGiven)
     await bank.hello()
-    const reborn = bank.vaultOf(VaultBag)
+    const reborn = bank.vaultAt(VaultScopeGiven)
     expect(reborn).not.to.equal(held)
     expect(reborn?.isPresent).to.be.true
     expect(held?.isEnabled).to.be.false
@@ -65,13 +65,13 @@ describe("bank.hello", () => {
     const { vault } = await makeBankWithVault(world)
     const bank = world.bankOnAnotherDevice()
     await bank.hello()
-    const held = bank.vaultOf(VaultBag)
+    const held = bank.vaultAt(VaultScopeGiven)
     await vault.delVaultPrompt()
     await bank.hello()
-    expect(bank.vaultOf(VaultBag)).to.equal(held)
+    expect(bank.vaultAt(VaultScopeGiven)).to.equal(held)
     expect(held?.isPresent).to.be.false
     expect(bank.snapshot.vaults).to.deep.equal([])
-    const reborn = await bank.ensureVault(VaultBag)
+    const reborn = await bank.ensureVault(VaultScopeGiven)
     expect(reborn).not.to.equal(held)
     expect(reborn.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
@@ -83,8 +83,8 @@ describe("bank.hello", () => {
     world.vaultDB._cheat_refuseGets('storage_error')
     const refusal = await TH.expectRefusal(bank.hello(), 'storage_error')
     expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
-    await expect(bank.ensureVault(VaultBag)).rejects.toThrow(refusal)
-    expect(() => bank.vaultOf(VaultBag)).to.throw(refusal)
+    await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(refusal)
+    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(refusal)
     world.vaultDB._cheat_refuseGets(null)
     await bank.hello()
     expect(bank.snapshot).to.include({ stage: 'ready', err: null })
@@ -102,7 +102,7 @@ describe("bank.hello", () => {
 
   it("tells of a damaged vault row as bad news, and readies the bank without it", async () => {
     const world = makeBankWorld()
-    world.vaultDB._cheat_vaultRowsOf(BankBag).set('broken', { am: 'a', nonsense: true })
+    world.vaultDB._cheat_vaultRowsOf(BankScopeGiven).set('broken', { am: 'a', nonsense: true })
     const onBadNews = vi.fn()
     const bank = world.bankOn({ onBadNews })
     await bank.hello()
@@ -114,7 +114,7 @@ describe("bank.hello", () => {
   it("tells of a damaged vault row even where another row's delivery refuses the hello", async () => {
     const onBadNews = vi.fn()
     const { world, bank } = await makeBankWithVault(makeBankWorld(), { onBadNews })
-    const rows = world.vaultDB._cheat_vaultRowsOf(BankBag)
+    const rows = world.vaultDB._cheat_vaultRowsOf(BankScopeGiven)
     rows.set(Dna.vaultlabel, { ...(rows.get(Dna.vaultlabel) as object), revision_tok: 'rev-other' })
     rows.set('broken', { am: 'a', nonsense: true })
     await TH.expectRefusal(bank.hello(), 'record_conflict')
@@ -155,8 +155,8 @@ describe("bank.ensureVault", () => {
   it("refuses before any hello, asking nobody", async () => {
     const requestCleartext = vi.fn()
     const bank = makeBankWorld().bankOn({ requestCleartext })
-    await TH.expectRefusal(bank.ensureVault(VaultBag), 'bad_option')
-    expect(() => bank.vaultOf(VaultBag)).to.throw(VaultError)
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'bad_option')
+    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(VaultError)
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 
@@ -170,7 +170,7 @@ describe("bank.ensureVault", () => {
     vault.lock()
     expect(seen).toHaveBeenCalled()
     expect(bank.snapshot.vaults[0]?.lockState).to.eq('locked')
-    expect(await bank.ensureVault(VaultBag)).to.equal(vault)
+    expect(await bank.ensureVault(VaultScopeGiven)).to.equal(vault)
     expect(vault.isLocked).to.be.true
   })
 
@@ -182,17 +182,17 @@ describe("bank.ensureVault", () => {
       await gating.attempt(byPassphrase(Passphrase) as never)
     } })
     await bank.hello()
-    const asking = bank.ensureVault(VaultBag)
-    await TH.expectRefusal(bank.ensureVault(OtherBag), 'already_asking')
+    const asking = bank.ensureVault(VaultScopeGiven)
+    await TH.expectRefusal(bank.ensureVault(OtherScopeGiven), 'already_asking')
     closeDialog()
     await asking
     const silent = world.bankOnAnotherDevice({ requestCleartext: undefined })
     await silent.hello()
-    await TH.expectRefusal(silent.ensureVault(OtherBag), 'bad_option')
+    await TH.expectRefusal(silent.ensureVault(OtherScopeGiven), 'bad_option')
   })
 
   it("answers tryEnsureVault's refusal as an Outcome", async () => {
-    const { ok, err } = await makeBankWorld().bankOn().tryEnsureVault(VaultBag)
+    const { ok, err } = await makeBankWorld().bankOn().tryEnsureVault(VaultScopeGiven)
     expect(ok).to.be.false
     expect(err?.refusalkind).to.eq('bad_option')
   })
@@ -203,7 +203,7 @@ describe("bank.ensureVault", () => {
     const requestCleartext = vi.fn()
     const fresh = world.bankOn({ requestCleartext })
     await fresh.hello()
-    const vault = await fresh.ensureVault(VaultBag)
+    const vault = await fresh.ensureVault(VaultScopeGiven)
     expect(vault.isLocked).to.be.true
     await vault.ensureUnlocked()
     expect(vault.isUnlocked).to.be.true
@@ -248,7 +248,7 @@ describe("'identity_revoked' and bad news", () => {
     const attempts: Outcome<unknown>[] = []
     const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase) as never)) } })
     await bank.hello()
-    await TH.expectRefusal(bank.ensureVault(VaultBag), 'declined')
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'declined')
     const [attempted] = attempts
     expect(attempted?.err).to.include({ refusalkind: 'weak_passphrase' })
     expect(attempted?.err?.message).to.include('CUSTOMIZATION.md')
@@ -265,7 +265,7 @@ describe("'identity_revoked' and bad news", () => {
     vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the store is down')))
     const page = world.bankOn({ logger })
     await page.hello()
-    const unlocked = await page.vaultOf(VaultBag)?.ensureUnlocked()
+    const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()
     expect(unlocked?.isUnlocked).to.be.true
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not be erased'), expect.objectContaining({ call: 'Lease.buildFromCache' }), undefined)
   })
