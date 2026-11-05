@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
+import * as Phrases from '../../src/helpers/phrases'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRecord } from '../../src/shapes/shapes-storage'
@@ -56,13 +57,27 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryPutVault(vaultAt(8), { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: null })
     })
 
-    it("refuses bad_option for a record's revision_seq not one past its prior's, and for a bad field, quoting none of it", async () => {
+    it("refuses bad_option for a record's revision_seq not one past its prior's, and unexpected_error for a record failing its checks, quoting none of it", async () => {
       const vaultDB = new MemoryVaultDB()
       expect(await vaultDB.tryPutVault(vaultAt(3), { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'bad_option' })
       const secretish = 'hunter2'
       const answer = await vaultDB.tryPutVault({ ...vaultAt(), vaultlabel: `${secretish}^^bad label` }, { prior: SX.VoidRevision })
-      expect(answer).to.deep.include({ ok: false, act: 'bad_option', req_params: {} })
+      expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', req_params: {} })
       expect(JSON.stringify([answer.err?.message, answer.req_params])).to.not.include(secretish)
+    })
+
+    it("refuses unexpected_error for a box record, a box tombstone or a vault tombstone failing its checks, as it is safebyok's to prepare, storing nothing", async () => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      const answers = [
+        await vaultDB.tryPutBox({ ...boxAt(1), whisper_ciphered: 7 } as never, { prior: priorOf(box) }),
+        await vaultDB.tryDelBox({ ...boxTombstoneOf(box), am: 'a' } as never, { prior: priorOf(box) }),
+        await vaultDB.tryDelVault({ ...vaultTombstoneOf(vault), gate: vault.gate } as never, { prior: priorOf(vault) }),
+      ]
+      for (const answer of answers) {
+        expect(answer).to.deep.include({ ok: false, act: 'unexpected_error' })
+        expect(answer.err?.message).to.eq(Phrases.RecordPreparedWrong)
+      }
+      expect(await vaultDB.getBox({ ...boxscope, vault_tok: box.vault_tok })).to.deep.include({ val: box })
     })
   })
 
