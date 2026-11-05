@@ -39,24 +39,27 @@ const gate = { passphrase: { salt_b64: 'c2FsdA', memory_kib: 19_456 } }
 describe("Checkers", () => {
   afterEach(() => { Zod.config({ customError: undefined }) })
 
-  it("refuses a scope with a bad name as its call's kind, naming the field, as its first example shows", () => {
+  // Checkers @example 1
+  it("refuses a scope with a bad name as its call's kind, naming the field", () => {
     const err = TH.expectSyncRefusal(() => vaultScope.parse({ ...scope, vaultlabel: 'Main' }), 'bad_scope')
     expect(err.message).to.match(/^vaultlabel: A label is lowercase words/)
     expect(err.meta?.fieldnames).to.deep.equal(['vaultlabel'])
   })
 
-  it("hands back what passes, the rest of a bag left out, as Zod's object does", () => {
+  it("hands back what passes, leaving the rest of a bag out", () => {
     expect(vaultScope.parse({ ...scope, vault_tok: 'tok', lock: () => null })).to.deep.equal(scope)
   })
 
-  it("refuses an unknown field in a slice made in the call, as its second example shows", () => {
+  // Checkers @example 2
+  it("refuses an unknown field in a slice made in the call", () => {
     expect(boxSparse.parse(sparse)).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
     expect(err.message).to.eq("There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
     TH.expectSyncRefusal(() => boxRecord.parse(sparse), 'bad_record')
   })
 
-  it("spreads a module of validators into the kit, and a nested one refuses with the outer call's kind, as its third example shows", () => {
+  // Checkers @example 3
+  it("spreads a module of validators into the kit, and a nested one refuses with the outer call's kind", () => {
     expect(vaultRecord.parse({ ...scope, gate_epoch: 1, gate })).to.deep.equal({ ...scope, gate_epoch: 1, gate })
     expect(vaultRecord.parse({ ...scope, gate_epoch: 0, gate: null }).gate).to.be.null
     const err = TH.expectSyncRefusal(() => vaultRecord.parse({ ...scope, gate_epoch: 1, gate: { passphrase: { ...gate.passphrase, memory_kib: -1 } } }), 'bad_record')
@@ -64,7 +67,7 @@ describe("Checkers", () => {
     expect(err.meta?.fieldnames).to.deep.equal(['gate.passphrase.memory_kib'])
   })
 
-  it("repeats the keys of a schema keyed by its input in the refusal, as its doc warns", () => {
+  it("repeats the keys of a schema keyed by its input in the refusal", () => {
     const { tagged } = Checkers('bad_option', ({ label }) => ({ tagged: Zod.record(Zod.string(), label) }))
     const err = TH.expectSyncRefusal(() => tagged.parse({ host_chosen_key: 'Not A Label' }), 'bad_option')
     expect(err.meta?.fieldnames).to.deep.equal(['host_chosen_key'])
@@ -199,7 +202,8 @@ describe("Checkers", () => {
     expect(caught).to.not.be.instanceOf(Zod.ZodError)
   })
 
-  it("frames a refusal as the story asks, where before the failures and advice after, each ending the failures in a period, as its first example shows", () => {
+  // Checkers @example 1
+  it("frames a refusal as the story asks, where before the failures and advice after, each ending the failures in a period", () => {
     const bad = { applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' }
     const plain = TH.expectSyncRefusal(() => vaultScope.parse(bad), 'bad_scope')
     const where = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the scope naming the vault' }), 'bad_scope')
@@ -219,12 +223,13 @@ describe("Checkers", () => {
     expect(err.message).to.eq('Invalid input: expected object, received null')
   })
 
-  it("refuses 'bad_option' for a story that is none, a Zod parse context among them, whatever the input", () => {
+  it("refuses a story that is none, a Zod parse context among them, whatever the input", () => {
     TH.expectSyncRefusal(() => vaultScope.parse(scope, { error: () => 'quoted' } as object), 'bad_option')
     TH.expectSyncRefusal(() => vaultScope.parse(null, { where: 7 } as object), 'bad_option')
   })
 
-  it("parses and then holds the result to another bag with parseConsistent, refusing its call's kind, as its first example shows", () => {
+  // Checkers @example 1
+  it("parses and then holds the result to another bag with parseConsistent, refusing its call's kind", () => {
     expect(boxSparse.parseConsistent(sparse, { ...scope, written_at: undefined, gate_epoch: 4 })).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parseConsistent(sparse, { ...scope, user_id: 'u2' }), 'bad_record')
     expect(err.meta).to.deep.equal({ fieldnames: ['user_id'] })
@@ -261,14 +266,16 @@ describe("Checkers", () => {
 })
 
 describe("Checker", () => {
-  it("makes one validator, refusing 'bad_record' unless given a kind, as its first example shows", () => {
+  // Checker @example 1
+  it("makes one validator, refusing 'bad_record' unless given a kind", () => {
     const boxDamaged = Checker(({ obj, oneof, boxlabel, str }) => obj({ boxlabel, revision_tok: str.nullable(), damage: oneof(['damaged', 'newer_format']) }).strict())
     expect(boxDamaged.parse({ boxlabel: 'openai', revision_tok: null, damage: 'damaged' })).to.deep.equal({ boxlabel: 'openai', revision_tok: null, damage: 'damaged' })
     const err = TH.expectSyncRefusal(() => boxDamaged.parse({ boxlabel: 'openai', revision_tok: null, damage: 'lost' }), 'bad_record')
     expect(err.meta?.fieldnames).to.deep.equal(['damage'])
   })
 
-  it("refuses the kind it is given, as its second example shows", () => {
+  // Checker @example 2
+  it("refuses the kind it is given", () => {
     const callback = Checker(({ fn }) => fn(), 'bad_option')
     expect(callback.parse(Math.max)).to.eq(Math.max)
     TH.expectSyncRefusal(() => callback.parse('listener'), 'bad_option')
@@ -288,7 +295,7 @@ describe("Checker", () => {
 })
 
 describe("refusingAs", () => {
-  it("makes a validator's schema refuse another kind, naming the same failing fields, as its doc block says", () => {
+  it("makes a validator's schema refuse another kind, naming the same failing fields", () => {
     const asOption = boxSparse.refusingAs('bad_option')
     const refused = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, written_at: -1 }), 'bad_record')
     const reRefused = TH.expectSyncRefusal(() => asOption.parse({ ...sparse, written_at: -1 }), 'bad_option')
@@ -311,7 +318,8 @@ describe("refusingAs", () => {
 })
 
 describe("objCheck", () => {
-  it("makes one strict validator of an object from its fields, refusing 'bad_record' unless given a kind, as its first example shows", () => {
+  // objCheck @example 1
+  it("makes one strict validator of an object from its fields, refusing 'bad_record' unless given a kind", () => {
     const checkedScope = objCheck(bankScopeOf)
     expect(checkedScope.parse({ applabel: 'acme', user_id: 'u1' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
     const err = TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_record')
@@ -320,7 +328,8 @@ describe("objCheck", () => {
     expect(extra.message).to.eq("There are 2 fields it does not take (their names are not repeated): it takes only applabel, user_id. Check the spelling, or leave them out")
   })
 
-  it("drops a field it does not take, unread, under extras 'strip', as its second example shows", () => {
+  // objCheck @example 2
+  it("drops a field it does not take, unread, under extras 'strip'", () => {
     const checkedScope = objCheck(bankScopeOf, { refuseAs: 'bad_scope', extras: 'strip' })
     expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
     TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
@@ -332,7 +341,7 @@ describe("objCheck", () => {
     TH.expectSyncRefusal(() => checkedScope.parse({ ...scope }), 'bad_scope')
   })
 
-  it("refuses 'bad_option' for opts that are none, whatever it would check", () => {
+  it("refuses opts that are none, whatever it would check", () => {
     for (const opts of ['bad_kind', { extras: 'loose' }, { refuseAs: 'bad_kind' }, { kind: 'bad_scope' }, null]) {
       TH.expectSyncRefusal(() => objCheck(bankScopeOf, opts as never), 'bad_option')
     }
@@ -346,7 +355,8 @@ describe("objCheck", () => {
 })
 
 describe("consistent", () => {
-  it("is true for a record naming the same app, user and vault as a scope, whatever else it holds, as its first example shows", () => {
+  // consistent @example 1
+  it("is true for a record naming the same app, user and vault as a scope, whatever else it holds", () => {
     expect(consistent({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, TH.scopeOf('u1'))).to.be.true
   })
 
@@ -356,17 +366,19 @@ describe("consistent", () => {
     expect(consistent({ ...TH.scopeOf('u1'), applabel: 'other' }, TH.scopeOf('u1'))).to.be.false
   })
 
-  it("is true when no field is defined in both, as its second example shows", () => {
+  // consistent @example 2
+  it("is true when no field is defined in both", () => {
     expect(consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })).to.be.true
   })
 
-  it("refuses 'bad_option' for a bag that is not an object", () => {
+  it("refuses a bag that is not an object", () => {
     TH.expectSyncRefusal(() => consistent(null as unknown as object, scope), 'bad_option')
   })
 })
 
 describe("demandConsistent", () => {
-  it("returns true, or refuses as its refusal says, as its examples show", () => {
+  // demandConsistent @example
+  it("returns true, or refuses as its refusal says", () => {
     expect(demandConsistent(sparse, scope, { kind: 'damaged_vault' })).to.be.true
     const err = TH.expectSyncRefusal(() => demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` }), 'bad_scope')
     expect(err.message).to.eq('This names another user_id')
@@ -374,12 +386,14 @@ describe("demandConsistent", () => {
 })
 
 describe("verifyConsistent", () => {
-  it("returns the bag when each field both define is ===, as its first example shows", () => {
+  // verifyConsistent @example 1
+  it("returns the bag when each field both define is ===", () => {
     const bag = { ...sparse }
     expect(verifyConsistent(bag, scope, { kind: 'vault_mismatch' })).to.eq(bag)
   })
 
-  it("refuses the kind it is handed, naming each field that disagrees, in its message and meta.fieldnames, as its second example shows", () => {
+  // verifyConsistent @example 2
+  it("refuses the kind it is handed, naming each field that disagrees, in its message and meta.fieldnames", () => {
     const err = TH.expectSyncRefusal(() => verifyConsistent({ ...scope, user_id: 'u2', vaultlabel: 'other' }, scope, { kind: 'bad_scope' }), 'bad_scope')
     expect(err.message).to.contain('user_id and vaultlabel')
     expect(err.meta).to.deep.equal({ fieldnames: ['user_id', 'vaultlabel'] })
@@ -394,13 +408,14 @@ describe("verifyConsistent", () => {
     expect(err.message).to.eq('Another user_id and vaultlabel')
   })
 
-  it("passes by a field only one bag defines, or one defines as undefined, as its third example shows", () => {
+  // verifyConsistent @example 3
+  it("passes by a field only one bag defines, or one defines as undefined", () => {
     expect(() => verifyConsistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' }, { kind: 'bad_scope' })).to.not.throw()
     expect(() => verifyConsistent({ boxlabel: 'openai' }, { user_id: 'u1', boxlabel: undefined }, { kind: 'bad_scope' })).to.not.throw()
     expect(() => verifyConsistent({}, scope, { kind: 'bad_scope' })).to.not.throw()
   })
 
-  it("compares by ===, so null disagrees with a value, and two equal objects that are not the same object disagree", () => {
+  it("disagrees on null against a value, and on two equal objects that are not the same object", () => {
     TH.expectSyncRefusal(() => verifyConsistent({ gate: null }, { gate: {} }, { kind: 'bad_record' }), 'bad_record')
     TH.expectSyncRefusal(() => verifyConsistent({ gate: {} }, { gate: {} }, { kind: 'bad_record' }), 'bad_record')
     expect(() => verifyConsistent({ gate: null }, { gate: null }, { kind: 'bad_record' })).to.not.throw()
@@ -412,7 +427,7 @@ describe("verifyConsistent", () => {
     TH.expectSyncRefusal(() => verifyConsistent({ user_id: 'u2' }, scoped, { kind: 'bad_scope' }), 'bad_scope')
   })
 
-  it("refuses 'bad_option' for a bag that is not an object, or a refusal that is none", () => {
+  it("refuses a bag that is not an object, or a refusal that is none", () => {
     TH.expectSyncRefusal(() => verifyConsistent(scope, null as unknown as object, { kind: 'bad_scope' }), 'bad_option')
     TH.expectSyncRefusal(() => verifyConsistent('acme' as unknown as object, scope, { kind: 'bad_scope' }), 'bad_option')
     TH.expectSyncRefusal(() => verifyConsistent(scope, scope, { kind: 'no_such_kind' } as never), 'bad_option')

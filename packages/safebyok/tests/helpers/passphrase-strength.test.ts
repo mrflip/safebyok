@@ -38,7 +38,8 @@ describe("invokeStrengthChecker", () => {
     expect(await invokeStrengthChecker(neverStrong, scope)('acme acme acme')).to.deep.equal({ strong: false, reason: 'Pick a phrase nobody would guess.' })
   })
 
-  it("finds a blank passphrase weak before the checker hears it, as its first example shows", async () => {
+  // invokeStrengthChecker @example 1
+  it("finds a blank passphrase weak before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
     for (const blank of ['', ' '.repeat(3), '\t\n']) {
       const verdict = await invokeStrengthChecker(checker, scope)(blank)
@@ -48,7 +49,7 @@ describe("invokeStrengthChecker", () => {
     expect(checker).not.toHaveBeenCalled()
   })
 
-  it("refuses a passphrase that is no string as 'bad_option', before the checker hears it", async () => {
+  it("refuses a passphrase that is no string, before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
     const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope)(42 as never), 'bad_option')
     expect(err.message).to.match(/passphrase/i)
@@ -137,7 +138,7 @@ describe("invokeStrengthChecker's load", () => {
     expect(hostLoad.mock.contexts[0]).to.eq(checker)
   })
 
-  it("refuses a load that fails as an ordinary unexpected_error, what it threw the cause, as it heard no passphrase", async () => {
+  it("refuses a load that fails, with what it threw as the cause", async () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
     const checker = Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })
     const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope).load(), 'unexpected_error')
@@ -145,14 +146,15 @@ describe("invokeStrengthChecker's load", () => {
     expect(err.cause).to.eq(chunkLost)
   })
 
-  it("refuses a load that throws rather than rejecting, likewise", async () => {
+  it("refuses a load that throws rather than rejecting", async () => {
     const checker = Object.assign(() => StrongVerdict, { load: () => { throw new Error('no word list') } })
     await TH.expectRefusal(invokeStrengthChecker(checker, scope).load(), 'unexpected_error')
   })
 })
 
 describe("loadStrengthChecker", () => {
-  it("refuses a load that fails as 'unexpected_error', naming bank.hello(), what it threw the cause, as its example shows", async () => {
+  // loadStrengthChecker @example
+  it("refuses a load that fails, naming bank.hello(), with what it threw as the cause", async () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
     const err = await TH.expectRefusal(loadStrengthChecker(Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })), 'unexpected_error')
     expect(err.message).to.match(/bank\.hello\(\)/)
@@ -163,7 +165,8 @@ describe("loadStrengthChecker", () => {
 describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason points at", () => {
   const customization = readFileSync(new URL('../../CUSTOMIZATION.md', import.meta.url), 'utf8')
 
-  it("finds every passphrase weak, with a reason for the user that quotes none, as its example shows", async () => {
+  // DefaultStrengthChecker @example
+  it("finds every passphrase weak, with a reason for the user that quotes none", async () => {
     for (const passphrase of ['correct horse battery staple', 'pw', '']) {
       const verdict = await DefaultStrengthChecker(passphrase, scope)
       expect(verdict).to.have.property('strong', false)

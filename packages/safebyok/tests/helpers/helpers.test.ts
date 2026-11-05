@@ -6,7 +6,8 @@ type Handle = { label: string, vault?: { vault_tok: string } }
 const decorated = () => decorate<Handle>({ label: 'anthropic' }, { vault: { vault_tok: 'v1' } })
 
 describe("adorn", () => {
-  it("attaches the value under its name, hidden, and hands the value back, as its first example shows", () => {
+  // adorn @example 1
+  it("attaches the value under its name, hidden, and hands the value back", () => {
     const handle = { label: 'anthropic' }
     const vault = { vault_tok: 'v1' }
     expect(adorn(handle, 'vault', vault)).to.equal(vault)
@@ -15,7 +16,8 @@ describe("adorn", () => {
     expect(JSON.stringify(handle)).to.eq('{"label":"anthropic"}')
   })
 
-  it("lets a getter attach what it works out on the first read, which every later read finds in its place, as its second example shows", () => {
+  // adorn @example 2
+  it("lets a getter attach what it works out on the first read, which every later read finds in its place", () => {
     let workedOut = 0
     class Labelled {
       readonly label = 'anthropic'
@@ -33,13 +35,15 @@ describe("adorn", () => {
 })
 
 describe("decorate", () => {
-  it("attaches each entry, readable by name, and hands the object back, as its example shows", () => {
+  // decorate @example
+  it("attaches each entry, readable by name, and hands the object back", () => {
     const handle: Handle = { label: 'anthropic' }
     expect(decorate(handle, { vault: { vault_tok: 'v1' } })).to.equal(handle)
     expect(handle.vault).to.deep.equal({ vault_tok: 'v1' })
   })
 
-  it("hides what it attaches from keys, a spread and JSON, as its example shows", () => {
+  // decorate @example
+  it("hides what it attaches from keys, a spread and JSON", () => {
     const handle = decorated()
     expect(Object.keys(handle)).to.deep.equal(['label'])
     expect({ ...handle }).to.deep.equal({ label: 'anthropic' })
@@ -53,7 +57,7 @@ describe("decorate", () => {
     expect(JSON.stringify(handle)).to.eq('{"label":"box"}')
   })
 
-  it("leaves what it attached writable and configurable, as any property is, still hidden once written", () => {
+  it("leaves what it attached writable and configurable, still hidden once written", () => {
     const handle = decorated()
     expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.true
     expect(handle.vault).to.deep.equal({ vault_tok: 'v2' })
@@ -62,7 +66,7 @@ describe("decorate", () => {
     expect(handle.vault).to.be.undefined
   })
 
-  it("is fixed with the rest of an object frozen after it, as a model freezes itself", () => {
+  it("is fixed with the rest of an object frozen after it", () => {
     const handle = Object.freeze(decorated())
     expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.false
     expect(Reflect.deleteProperty(handle, 'vault')).to.be.false
@@ -100,7 +104,8 @@ describe("tattoo", () => {
     expect(handle.vault_tok).to.eq('v2')
   })
 
-  it("fixes for good what it attaches with configurable false, as its example shows", () => {
+  // tattoo @example
+  it("fixes for good what it attaches with configurable false", () => {
     const handle = {}
     tattoo(handle, { vault_tok: 'v1' }, { configurable: false })
     expect(Reflect.set(handle, 'vault_tok', 'v2')).to.be.false
@@ -119,7 +124,8 @@ describe("tattoo", () => {
 })
 
 describe("tattooProp", () => {
-  it("attaches one value as an enumerable own prop and hands it back, as its example shows", () => {
+  // tattooProp @example
+  it("attaches one value as an enumerable own prop and hands it back", () => {
     const handle = { label: 'anthropic' }
     expect(tattooProp(handle, 'vault_tok', 'v1')).to.eq('v1')
     expect(Object.keys(handle)).to.deep.equal(['label', 'vault_tok'])
@@ -136,7 +142,8 @@ describe("tattooProp", () => {
 })
 
 describe("nextMicrotask", () => {
-  it("resolves once every microtask queued before it has run, as its example shows", async () => {
+  // nextMicrotask @example
+  it("resolves once every microtask queued before it has run", async () => {
     const heard: string[] = []
     queueMicrotask(() => { heard.push('queued before') })
     await nextMicrotask()

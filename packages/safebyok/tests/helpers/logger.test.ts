@@ -34,20 +34,23 @@ describe("parseLogger", () => {
     })
   }
 
-  it("falls back to the console when given none, as its second example shows", () => {
+  // parseLogger @example 2
+  it("falls back to the console when given none", () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     parseLogger(undefined).warn('a refresh failed', { call: 'refresh' })
     expect(warn).toHaveBeenCalledWith('safebyok: a refresh failed', { call: 'refresh' })
     warn.mockRestore()
   })
 
-  it("answers the one default logger, DefaultLogger, whenever it is given none or null, as its third example shows", () => {
+  // parseLogger @example 3
+  it("answers the one default logger, DefaultLogger, whenever it is given none or null", () => {
     expect(parseLogger(undefined)).to.eq(DefaultLogger)
     expect(parseLogger(null)).to.eq(DefaultLogger)
     expect(parseLogger(DefaultLogger)).to.eq(DefaultLogger)
   })
 
-  it("guards the same host logger as the same object, however often it is handed in, as its fourth example shows", () => {
+  // parseLogger @example 4
+  it("guards the same host logger as the same object, however often it is handed in", () => {
     const telemetry = TH.spyLogger().logger
     expect(parseLogger(telemetry)).to.eq(parseLogger(parseLogger(telemetry)))
     expect(parseLogger(telemetry)).to.eq(parseLogger(telemetry))
@@ -146,7 +149,8 @@ describe("parseLogger", () => {
 describe("setDefaultLogger", () => {
   afterEach(() => { setDefaultLogger(undefined) })
 
-  it("sends what the default logger hears to the app's own, as its first example shows: a fallback taken before the call included", () => {
+  // setDefaultLogger @example 1
+  it("sends what the default logger hears to the app's own, a fallback taken before the call included", () => {
     const fallback = parseLogger(undefined)
     const telemetry = TH.spyLogger()
     setDefaultLogger(telemetry.logger)
@@ -155,7 +159,8 @@ describe("setDefaultLogger", () => {
     expect(telemetry.calls.map((call) => [call.level, call.message])).to.deep.equal([['warn', 'a refresh failed'], ['error', 'a listener threw']])
   })
 
-  it("puts the console back when given none or null, as its second example shows", () => {
+  // setDefaultLogger @example 2
+  it("puts the console back when given none or null", () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => { /* kept out of the test output */ })
     for (const none of [undefined, null]) {
       setDefaultLogger(TH.spyLogger().logger)
@@ -191,7 +196,7 @@ describe("setDefaultLogger", () => {
 })
 
 describe("VaultLogger", () => {
-  it("fits a logger typed as the Coach's signature, `story` as a record of any", () => {
+  it("fits a logger whose story is typed as a record of any", () => {
     type CoachsLogger = {
       log:   (message?: string, story?: Record<string, any>, err?: Error | null) => void
       warn:  (message?: string, story?: Record<string, any>, err?: Error | null) => void
