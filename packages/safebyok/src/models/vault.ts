@@ -1,6 +1,5 @@
 import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
-import { isListing } from '../helpers/consts'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
@@ -11,7 +10,7 @@ import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
-import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, listingExpected, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
+import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -76,7 +75,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
-    if (! isListing(listing)) { throw listingExpected() }
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
     const held = listing.at(checked)

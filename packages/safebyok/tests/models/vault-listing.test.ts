@@ -273,8 +273,7 @@ describe("building over a tombstone", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses what is no listing, and what is no scope, nobody asked", async () => {
-    await TH.expectRefusal(Vault.launchBirth(undefined as never, Dna), 'unexpected_error')
+  it("Vault.launchBirth refuses what is no scope, nobody asked", async () => {
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
