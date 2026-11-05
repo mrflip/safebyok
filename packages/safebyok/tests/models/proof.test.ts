@@ -9,7 +9,7 @@ import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
 import { Storable } from '../../src/models/storable'
 import * as TH from '../test-helpers'
-import { AutolockMinutes, VaultBag, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
+import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { ticks } from '../test-helpers/timing'
 import { NewPassphrase, Passphrase, byPasskey, byPassphrase } from '../test-helpers/vault-world'
 
@@ -84,13 +84,13 @@ const makeDialog = () => {
 }
 // --
 
-/** A bank past its `hello` with the vault of `VaultBag` built and unlocked, and the dialog that did it, cleared. */
+/** A bank past its `hello` with the vault of `VaultScopeGiven` built and unlocked, and the dialog that did it, cleared. */
 const buildHost = async () => {
   const world = makeBankWorld()
   const dialog = makeDialog()
   const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
   await bank.hello()
-  const vault = await bank.ensureVault(VaultBag)
+  const vault = await bank.ensureVault(VaultScopeGiven)
   dialog.shown.length = 0
   return { world, bank, vault, dialog }
 }
@@ -116,7 +116,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: no vaults'])
 
     // Build: the first vault asks the user for a passphrase, and comes up unlocked.
-    const vault = await bank.ensureVault(VaultBag)
+    const vault = await bank.ensureVault(VaultScopeGiven)
     expect(dialog.shown.splice(0)).to.deep.equal(['build_vault'])
     bankUi.expectRenders(['ready: main locked', 'ready: main unlocked'])
     const vaultUi = mountComponent(vault, vaultStatus)
@@ -185,7 +185,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main locked', 'ready: no vaults'])
     vaultUi.expectRenders(['main locked', 'main deleted'])
     await TH.expectRefusal(vault.fetch(), 'vault_gone')
-    expect(bank.vaultOf(VaultBag)).to.eq(vault)
+    expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
     boxesUi.expectRenders(['no boxes'])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     revealUi.expectRenders(['locked'])
@@ -193,7 +193,7 @@ describe("the proof", () => {
     await TH.expectRefusal(box.extractWhisper(), 'disabled')
 
     // Rebuild over the tombstone: a new life, a new instance, a new vault_tok.
-    const reborn = await bank.ensureVault(VaultBag)
+    const reborn = await bank.ensureVault(VaultScopeGiven)
     expect(dialog.shown.splice(0)).to.deep.equal(['build_vault'])
     expect(reborn).not.to.eq(vault)
     expect(reborn.vault_tok).not.to.eq(vault.vault_tok)
@@ -209,7 +209,7 @@ describe("the proof", () => {
     nextPageUi.expectRenders(['made: no vaults'])
     await nextPage.hello()
     nextPageUi.expectRenders(['made: main locked', 'ready: main locked'])
-    const pickedUp = await nextPage.ensureVault(VaultBag)
+    const pickedUp = await nextPage.ensureVault(VaultScopeGiven)
     expect(pickedUp.vault_tok).to.eq(reborn.vault_tok)
     await pickedUp.ensureUnlocked()
     expect(dialog.shown).to.deep.equal([])
@@ -306,7 +306,7 @@ describe("the proof", () => {
     lateUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
     expect(world.leaseRows()).to.have.lengthOf(1)
     const expiredRow = world.leaseRows()[0]
-    await latePage.vaultOf(VaultBag)?.ensureUnlocked()
+    await latePage.vaultAt(VaultScopeGiven)?.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     lateUi.expectRenders(['ready: main unlocked'])
     expect(world.leaseRows()).to.have.lengthOf(1)
@@ -330,7 +330,7 @@ describe("the proof", () => {
     world.advance(AutolockMillis + 1)
     const latePage = world.bankOn({ requestCleartext: undefined, onBadNews })
     await latePage.hello()
-    await TH.expectRefusal(latePage.vaultOf(VaultBag)!.ensureUnlocked(), 'vault_locked')
+    await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'vault_locked')
     expect(world.leaseRows()).to.have.lengthOf(1)
     bankUi.expectRenders([])
     await bank.autolock()
@@ -346,13 +346,13 @@ describe("the proof", () => {
 
     bank.vacate()
     bankUi.expectRenders(['made: main locked', 'made: no vaults'])
-    await TH.expectRefusal(bank.ensureVault(VaultBag), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'bad_option')
     expect(world.leaseRows()).to.have.lengthOf(0)
     await TH.expectRefusal(vault.ensureUnlocked(), 'disabled')
 
     await bank.hello()
     bankUi.expectRenders(['made: main locked', 'ready: main locked'])
-    const again = await bank.ensureVault(VaultBag)
+    const again = await bank.ensureVault(VaultScopeGiven)
     expect(again).not.to.eq(vault)
     await again.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
@@ -372,12 +372,12 @@ describe("the proof", () => {
     await TH.expectRefusal(bank.hello(), 'storage_error')
     bankUi.expectRenders(['refused: main unlocked'])
     expect(bank.snapshot.err?.refusalkind).to.eq('storage_error')
-    TH.expectSyncRefusal(() => bank.vaultOf(VaultBag), 'storage_error')
+    TH.expectSyncRefusal(() => bank.vaultAt(VaultScopeGiven), 'storage_error')
 
     world.vaultDB._cheat_refuseGets(null)
     await bank.hello()
     bankUi.expectRenders(['ready: main unlocked'])
-    expect(bank.vaultOf(VaultBag)).to.eq(vault)
+    expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
   })
 
   it("a second device: what it does reaches this one's components through the watch, with nobody asked and no lock", async () => {
@@ -393,7 +393,7 @@ describe("the proof", () => {
     const phone = makeDialog()
     const phoneBank = world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
     await phoneBank.hello()
-    const phoneVault = await phoneBank.ensureVault(VaultBag)
+    const phoneVault = await phoneBank.ensureVault(VaultScopeGiven)
     await phoneVault.ensureUnlocked()
     expect(phone.shown.splice(0)).to.deep.equal(['unlock_vault'])
     const phoneBox = await phoneVault.getBox(ApiKey.boxlabel)
@@ -466,7 +466,7 @@ describe("the proof", () => {
     await Promise.all([firstEffect, bank.hello()])
     bankUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
 
-    const vault = await bank.ensureVault(VaultBag)
+    const vault = await bank.ensureVault(VaultScopeGiven)
     await vault.ensureUnlocked()
     expect(dialog.shown).to.deep.equal([])
     bankUi.expectRenders(['ready: main unlocked'])

@@ -91,7 +91,7 @@ export type Merged<SourcesT extends readonly object[]> =
  *     return { bankScope, vaultScope }
  *   })
  *   vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' })  // throws 'bad_scope', "vaultlabel: A label is ..."
- *   vaultScope.parse(bag, { where: 'In the bag naming the vault', advice: 'Name it by its vaultlabel.' })  // throws 'bad_scope', "In the bag naming the vault: vaultlabel: A label is <...>. Name it by its vaultlabel."
+ *   vaultScope.parse(scope, { where: 'In the scope naming the vault', advice: 'Name it by its vaultlabel.' })  // throws 'bad_scope', "In the scope naming the vault: vaultlabel: A label is <...>. Name it by its vaultlabel."
  *   vaultScope.parseConsistent(box, bank.scope)  // box's scope, once it is the bank's app and user: 'bad_scope' otherwise
  * @example
  *   export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {

@@ -202,13 +202,13 @@ describe("Checkers", () => {
   it("frames a refusal as the story asks, where before the failures and advice after, each ending the failures in a period, as its first example shows", () => {
     const bad = { applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' }
     const plain = TH.expectSyncRefusal(() => vaultScope.parse(bad), 'bad_scope')
-    const where = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the bag naming the vault' }), 'bad_scope')
+    const where = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the scope naming the vault' }), 'bad_scope')
     const advice = TH.expectSyncRefusal(() => vaultScope.parse(bad, { advice: 'Name it by its vaultlabel.' }), 'bad_scope')
-    const both = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the bag naming the vault', advice: 'Name it by its vaultlabel.' }), 'bad_scope')
+    const both = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the scope naming the vault', advice: 'Name it by its vaultlabel.' }), 'bad_scope')
     expect(plain.message).to.match(/^vaultlabel: A label is [^.]*$/)
-    expect(where.message).to.eq(`In the bag naming the vault: ${plain.message}.`)
+    expect(where.message).to.eq(`In the scope naming the vault: ${plain.message}.`)
     expect(advice.message).to.eq(`${plain.message}. Name it by its vaultlabel.`)
-    expect(both.message).to.eq(`In the bag naming the vault: ${plain.message}. Name it by its vaultlabel.`)
+    expect(both.message).to.eq(`In the scope naming the vault: ${plain.message}. Name it by its vaultlabel.`)
     for (const refusal of [plain, where, advice, both]) { expect(refusal.meta).to.deep.equal({ fieldnames: ['vaultlabel'] }) }
   })
 
