@@ -1,5 +1,6 @@
 /** The vaultDB: the verbs the storables and listings call, and every invariant of them. A subclass writes only the generic `do*` calls, each one atomic step. */
 
+import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf } from '../refusals/outcome'
 import type { IfPresent, PutIfAbsent } from '../shapes/shapes-enums'
@@ -44,9 +45,7 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 }
 // --
 
-// == [What a store writes]: Awaitable, Landing, BoxLanding, PutTerms, RowOfVault, RowOfBox, VaultFetched, BoxFetched, Heard
-
-export type Awaitable<ValT> = ValT | Promise<ValT>
+// == [What a store writes]: Landing, BoxLanding, PutTerms, RowOfVault, RowOfBox, VaultFetched, BoxFetched, Heard
 
 /** The answer of a conditional write: whether it landed, and `ante`, the row it replaced, or that stands in its way. Null is a void row. */
 export type Landing = { landed: boolean, ante: unknown }

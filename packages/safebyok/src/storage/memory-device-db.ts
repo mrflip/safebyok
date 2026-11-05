@@ -1,11 +1,11 @@
 /** The deviceDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code, and starts its work before its caller can await. */
 
+import { ckeyOf } from '../helpers/helpers'
 import { DeviceDB } from './device-db-new'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { DeviceRecord, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
-const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 const leaseCkeyOf = ({ applabel, user_id, vaultlabel }: VaultScope): string => ckeyOf(applabel, user_id, vaultlabel)
 
 export class MemoryDeviceDB extends DeviceDB {
