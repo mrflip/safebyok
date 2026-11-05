@@ -453,19 +453,19 @@ export const DeviceRecordRewritten = "This device's record for the bank was dama
 export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --
 
-// == [Refusals: outcomes and helpers]: NoErrorGiven, StorageUnavailable, UnexpectedError, NothingThrown, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed
+// == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed
 
-/** The cause's message where a backend failed without giving an error. */
-export const NoErrorGiven = "The storage backend failed without giving an error."
+/** The cause's message where what failed threw null or undefined. */
+export const NoErrorGiven = "What failed threw nothing: null or undefined, not an Error."
+
+/** The cause's message where what failed threw a value that is neither an Error nor a string, `typeName` its typeof. */
+export const nonErrorThrown = (typeName: string): string => `What failed threw a value of type ${typeName}, not an Error; that value is this error's cause.`
 
 /** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
 export const StorageUnavailable = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
 
 /** A bug, in safebyok or in a function the app handed it. */
 export const UnexpectedError = "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause."
-
-/** The cause's message where an unexpected error came with nothing thrown. */
-export const NothingThrown = "Nothing was thrown with it."
 
 /** A cipher ctx handed no stamp, or a part or field that is undefined or null. */
 export const UnboundCipherCtx = "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it."
