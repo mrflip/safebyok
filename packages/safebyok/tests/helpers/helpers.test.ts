@@ -76,23 +76,6 @@ describe("decorate", () => {
   })
 })
 
-describe("nextMicrotask", () => {
-  it("resolves once every microtask queued before it has run, as its example shows", async () => {
-    const heard: string[] = []
-    queueMicrotask(() => { heard.push('queued before') })
-    await nextMicrotask()
-    heard.push('after')
-    expect(heard).to.deep.equal(['queued before', 'after'])
-  })
-
-  it("resolves before a task queued ahead of it runs", async () => {
-    const heard: string[] = []
-    setTimeout(() => { heard.push('task') }, 0)
-    await nextMicrotask()
-    expect(heard).to.deep.equal([])
-  })
-})
-
 describe("tattoo", () => {
   it("attaches each entry as an enumerable own prop, found by keys, a spread and JSON, and hands the entries back", () => {
     const handle = { label: 'anthropic' }
@@ -149,5 +132,22 @@ describe("tattooProp", () => {
     tattooProp(handle, 'revision_seq', 1, { writable: true })
     expect(Reflect.set(handle, 'revision_seq', 2)).to.be.true
     expect(handle).to.deep.equal({ revision_seq: 2 })
+  })
+})
+
+describe("nextMicrotask", () => {
+  it("resolves once every microtask queued before it has run, as its example shows", async () => {
+    const heard: string[] = []
+    queueMicrotask(() => { heard.push('queued before') })
+    await nextMicrotask()
+    heard.push('after')
+    expect(heard).to.deep.equal(['queued before', 'after'])
+  })
+
+  it("resolves before a task queued ahead of it runs", async () => {
+    const heard: string[] = []
+    setTimeout(() => { heard.push('task') }, 0)
+    await nextMicrotask()
+    expect(heard).to.deep.equal([])
   })
 })

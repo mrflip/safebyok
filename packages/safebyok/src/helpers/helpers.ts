@@ -1,6 +1,6 @@
-/** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, or what each of them finds, yielding to queued microtasks, and reading a stored row's field before the row is checked.
- * Not the `safebyok/utils` entry point (`utils.ts`), which is for the app around a vault.
- */
+/** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, or what each of them finds, and yielding to queued microtasks. */
+
+// == [Hidden]: adorn, decorate
 
 /** Set `obj[ckey]` to `val`, hidden, and return `val`.
  * - Hidden properties are not enumerable, so `Object.keys`, a `...` spread, console.log, and `JSON.stringify` pass by them.
@@ -10,15 +10,6 @@
  */
 export function adorn<VT>(obj: object, ckey: string, val: VT): VT {
   Object.defineProperty(obj, ckey, { value: val, enumerable: false, writable: true, configurable: true })
-  return val
-}
-
-/** Set `obj[propname]` to `val`, enumerable+readonly, and return `val`. Use `{configurable: false}` to make it truly immutable.
- * {@link tattoo} defines those terms.
- * @example tattooProp(this, 'vault_tok', vault_tok)   // => vault_tok; this.vault_tok is now readonly and visible
- */
-export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: TattooOpts = {}): VT {
-  Object.defineProperty(obj, propname, { value: val, enumerable: true, writable: opts.writable ?? false, configurable: opts.configurable ?? true })
   return val
 }
 
@@ -32,6 +23,9 @@ export const decorate = <OT extends object>(obj: OT, hidden: Partial<OT>): OT =>
   }
   return obj
 }
+// --
+
+// == [Shown]: TattooOpts, tattoo, tattooProp
 
 /** The options of {@link tattoo} and {@link tattooProp}: whether what they attach may be assigned anew (`writable`, false unless given true) or removed and redefined (`configurable`, true unless given false). */
 export type TattooOpts = { writable?: boolean, configurable?: boolean }
@@ -50,9 +44,22 @@ export function tattoo<BT extends object>(obj: object, shown: BT, opts: TattooOp
   return shown
 }
 
+/** Set `obj[propname]` to `val`, enumerable+readonly, and return `val`. Use `{configurable: false}` to make it truly immutable.
+ * {@link tattoo} defines those terms.
+ * @example tattooProp(this, 'vault_tok', vault_tok)   // => vault_tok; this.vault_tok is now readonly and visible
+ */
+export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: TattooOpts = {}): VT {
+  Object.defineProperty(obj, propname, { value: val, enumerable: true, writable: opts.writable ?? false, configurable: opts.configurable ?? true })
+  return val
+}
+// --
+
+// == [Microtasks]: nextMicrotask
+
 /** Yield to the end of the current microtask queue: what was queued before the call runs before it resolves.
  * Await it to batch requests made in the same task.
  *
  * @example await nextMicrotask()   // every promise settled earlier in this task has run its handlers
  */
 export function nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }
+// --
