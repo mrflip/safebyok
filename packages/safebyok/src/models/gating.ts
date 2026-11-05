@@ -1,4 +1,3 @@
-import { makeLifeTok } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
@@ -7,7 +6,6 @@ import type { GatingKind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import type { AnteProvings, AnyGating, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
-import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultWorld } from '../shapes/shapes-vaultish'
 import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, noRequestCleartext, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
@@ -118,7 +116,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
 
   async #attemptOnce(clears: ClearsForGatingkind[KindT]): Promise<Outcome<Vault>> {
-    const asked = { scope: this.#scope, vault: this.vault, world: this.#listing.world }
+    const asked = { scope: this.#scope, vault: this.vault, listing: this.#listing, world: this.#listing.world }
     const outcome = await outcomeOf(async () => this.#run(await this.#prove(asked, clears), this.#launchArgs))
     this.#isAttempting = false
     // A correctable refusal, short of the last attempt, leaves the clears unspent for the next.
@@ -161,7 +159,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   // --
 }
 
-// == [An attempt's runs]: RunForGatingkind, recordOfBirth
+// == [An attempt's runs]: RunForGatingkind
 
 /** Past the proving, the change the gating was launched for. Each hears provings, never a clear, and comes to its vault's private verbs by the friend. */
 const RunForGatingkind: { [KindT in GatingKind]: Run<KindT> } = {
@@ -170,7 +168,7 @@ const RunForGatingkind: { [KindT in GatingKind]: Run<KindT> } = {
     const passkeyWayin    = await passkeyProving?.buildWayin(passphraseProving) ?? null
 
     const gate   = Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin)
-    const record = recordOfBirth(gate, prior, listing.clock.now())
+    const record = listing.recordOfBirth(gate, prior)
     const vault  = await listing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
 
     // The row stored may be another's, born first: this proof opens only its own.
@@ -203,20 +201,15 @@ const RunForGatingkind: { [KindT in GatingKind]: Run<KindT> } = {
     return vault
   },
 }
-
-/** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
-const recordOfBirth = (gate: Gate, prior: VX.Revision, now: number): VaultRecord => (
-  { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...SX.nextRevisionOf(prior, now), gate: gate.pickle() }
-)
 // --
 
 // == [An attempt's provings]: Prove, ProveForGatingkind, timelyAnte, provePassphrase, checkedClears, isCorrectable, spendClears
 
 /** Past the enter key, the last to hear the clears. A birth's stamp is minted here, one per attempt. */
 const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
-  build_vault: async ({ scope, world }, clears) => {
+  build_vault: async ({ scope, listing, world }, clears) => {
     const { passphraseClear, passkeyClear } = checkedClears(GX.vaultBuildClears, clears)
-    const stamp = GX.vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: world.clock.now() })
+    const stamp = listing.stampOfBirth(scope)
     const passphraseProving = await PassphraseProving.buildNovel(stamp, passphraseClear, world)
     const passkeyProving = passkeyClear ? await PasskeyProving.buildNovel(stamp, passkeyClear, world) : null
     return { passphraseProving, passkeyProving }

@@ -1,18 +1,20 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { omit } from 'es-toolkit'
+import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../shapes/shapes-storage'
-import type { AnyGating } from '../shapes/shapes-gateish'
+import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import { type BoxesListed, type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from '../shapes/shapes-vaultish'
 import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
+import type { Gate } from './gate'
 import { Listing } from './listing'
 import { cmpRevisions } from './storable'
 import { Vault } from './vault'
@@ -53,6 +55,19 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   sparseOf(duck: unknown): VaultSparse { return vaultSparse.parse(duck) }
 
   recordOf(duck: unknown): VaultRecord { return vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
+  // --
+
+  // == [A birth's forms]: stampOfBirth, recordOfBirth
+
+  /** A new life's stamp under `scope`, one per attempt to build a vault. */
+  stampOfBirth(scope: VaultScope): VaultStamp {
+    return vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: this.clock.now() })
+  }
+
+  /** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
+  recordOfBirth(gate: Gate, prior: SX.Revision): VaultRecord {
+    return { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...SX.nextRevisionOf(prior, this.clock.now()), gate: gate.pickle() }
+  }
   // --
 
   // == [Fetching]: fetchBank, fetchListed

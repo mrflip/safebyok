@@ -359,7 +359,7 @@ export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, repla
 /** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch. */
 export type LaunchArgs<KindT extends EX.GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend }
 
-export type Asked<KindT extends EX.GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], world: VaultWorld }
+export type Asked<KindT extends EX.GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }
 
 export type Prove<KindT extends EX.GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
 // --
