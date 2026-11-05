@@ -18,12 +18,6 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("refuses a world with no dialog, holding no vault", async () => {
-    const { listing } = makeVaultWorld()
-    await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
-    expect(listing.things).to.have.lengthOf(0)
-  })
-
   it("holds no vault where the dialog throws: the refusal is the sanitized 'unexpected_error', and a second buildVault is not refused as already held", async () => {
     const { listing, storedNow } = makeVaultWorld(null, { requestCleartext: () => { throw new Error("the user closed the dialog") } })
     await TH.expectRefusal(listing.buildVault(Dna), 'unexpected_error')

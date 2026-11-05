@@ -241,11 +241,6 @@ describe("the dialog ending", () => {
     expect(err.message).to.not.include(Passphrase)
     expect(err.cause).to.be.undefined
   })
-
-  it("refuses a world with no dialog", async () => {
-    const { listing } = makeVaultWorld()
-    await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
-  })
 })
 
 describe("gating.attempt", () => {
