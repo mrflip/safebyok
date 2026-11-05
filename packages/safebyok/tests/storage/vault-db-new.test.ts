@@ -142,10 +142,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' }, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
     })
 
-    it("refuses vault_remade under a live row of another vault_tok, holding that row, whatever ifAbsent says", async () => {
+    it("refuses vault_mismatch under a live row of another vault_tok, holding that row, whatever ifAbsent says", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       const answer = await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'oldlife' }, { ifAbsent: 'nil' })
-      expect(answer).to.deep.include({ ok: false, act: 'vault_remade', world: vault, dbhas: vault })
+      expect(answer).to.deep.include({ ok: false, act: 'vault_mismatch', world: vault, dbhas: vault })
     })
 
     it("refuses vault_empty for a vault_tok no row holds, over no row or another life's tombstone", async () => {

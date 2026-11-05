@@ -16,7 +16,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `weak_passphrase`, `wrong_passkey`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `storage_unavailable`,
- *   `vault_gone`, `vault_remade`, `gating_landed`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
+ *   `vault_gone`, `vault_mismatch`, `gating_landed`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
  *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_box`, `damaged_lease`, `newer_format`,
@@ -55,7 +55,7 @@ export const refusalKindVals = [
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
-  'vault_remade',        // the vault a call was working on was deleted and made anew, under another vault_tok: a live vault stands where it stood
+  'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call holds
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
@@ -104,7 +104,7 @@ export const RefusalFamilyForKind = {
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
   vault_gone:          'condition',
-  vault_remade:        'condition',
+  vault_mismatch:      'condition',
   gating_landed:       'condition',
   damaged_lease:       'bad_news',
   attempt_in_flight:   'condition',

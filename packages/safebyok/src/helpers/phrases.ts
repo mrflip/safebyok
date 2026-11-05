@@ -204,13 +204,10 @@ export const ProvingBeforePassphrase = "This vault has no passphrase yet, so not
 export const VaultChangedInStorage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 // --
 
-// == [Vault: lifecycle]: VaultLocked, VaultRemade, GateMoved, GatingLanded
+// == [Vault: lifecycle]: VaultLocked, GateMoved, GatingLanded
 
 /** Why a call that needs the vault unlocked does nothing while it is locked. */
 export const VaultLocked = "The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user through requestCleartext, and call again."
-
-/** Why a call stops when its vault was deleted and made anew on another device as it worked. */
-export const VaultRemade = "The vault this call was working on was deleted and made anew on another device, so nothing more was read or written: what the call held belongs to the vault that was deleted. Ask the bank for the vault again (bank.ensureVault), and unlock the one stored now."
 
 /** Why a call stops when a wayin changed, here or on another device, as it worked. */
 export const GateMoved = "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on."
@@ -407,7 +404,7 @@ export const VaultDeleted = "This vault was deleted. Ask the bank for the vault 
 export const PasskeyHeldAlready = "This vault has a passkey already, and holds one at a time, so nothing was asked or changed: revoke it first (vault.revokePasskeyPrompt), then add the new one."
 
 /** Why a stale Vault's delete does not reach the vault made since in its slot. */
-export const DelOfOtherLife = "This Vault was deleted and made anew since it was read, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
+export const DelOfOtherLife = "The vault held in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
 // == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, NoRequestCleartext, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
