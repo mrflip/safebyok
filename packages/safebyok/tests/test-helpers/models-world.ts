@@ -84,7 +84,7 @@ export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse =
 
 /** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x' for a deletion or 'd' for damage, and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`.
  *
- * @example tombstoneBoxRecord({ revision_seq: 2 }, 'd')   // an entry of a `damaged_records`
+ * @example tombstoneBoxRecord({ revision_seq: 2 }, 'd')   // an entry of a `damaged_rows`
  */
 export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' | 'x' = 'x'): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am })
 // --

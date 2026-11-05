@@ -372,7 +372,7 @@ describe("a damaged row", () => {
     expect(vault.isLocked).to.be.false
   })
 
-  it("leaves when the customer names its vault row, as damaged_records lists it, past reading and with its peek", async () => {
+  it("leaves when the customer names its vault row, as damaged_rows lists it, past reading and with its peek", async () => {
     const rubble = { garbage: true }
     const { listing, restoreRow, storedNow, demandStored } = makeVaultWorld(await storedVaultRecord())
     const stored = demandStored()
