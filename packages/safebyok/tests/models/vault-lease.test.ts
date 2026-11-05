@@ -285,6 +285,22 @@ const valuesShownBy = (holder: object): unknown[] => {
 }
 
 describe("a vault and a lease show neither the lease friend nor the lease key handle, one level deep, by identity", () => {
+  it("no field of a gating shows the gating's friend, nor Object.keys or JSON.stringify, and a vault has no such verb", async () => {
+    const { vault, opts: { world } } = await makeBornVault()
+    let gatingShown: object | null = null
+    world.requestCleartext = (gating) => {
+      gatingShown = gating
+      gating.decline()
+    }
+    await TH.expectRefusal(vault.addPasskeyPrompt(), 'declined')
+    const json = JSON.stringify(gatingShown)
+    for (const named of ['friend', 'gatingFriend', 'launchArgs', 'landGate', 'unlockByProof']) {
+      expect(Object.keys(gatingShown!)).to.not.include(named)
+      expect(json).to.not.include(named)
+      expect(vault).to.not.have.property(named)
+    }
+  })
+
   it("no field or getter of a vault or its lease shows either, nor Object.keys or JSON.stringify", async () => {
     const { vault, deviceDB, friend, lease } = await makeBornVaultAndFriend()
     const row = deviceDB.cachedNow() as Record<string, unknown>

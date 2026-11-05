@@ -12,6 +12,16 @@ describe("wayinkind", () => {
   })
 })
 
+describe("gatingLaunchArgs", () => {
+  const friend = { unlockByProof: () => undefined, landGate: () => undefined }
+  const scope  = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+
+  it("takes a kind, a scope and the friend's two verbs, and refuses a friend short of one 'bad_option'", () => {
+    expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend }).gatingkind).to.eq('add_passkey')
+    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: { landGate: friend.landGate } }), 'bad_option')
+  })
+})
+
 // == [Proofs]: passkeyAnswer
 
 /** What is no passkey's answer, each refused as bad_option, and the field the refusal names. */
