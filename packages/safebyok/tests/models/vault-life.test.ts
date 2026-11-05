@@ -117,7 +117,7 @@ describe("The lock, with a box in hand", () => {
     await TH.expectRefusal(again.ensureUnlocked(), 'vault_locked')
   })
 
-  it("keeps the exposed whisper through the lock, as locking forgets nothing the box exposed: unlocked again by the passphrase, the box answers it again", async () => {
+  it("keeps the exposed whisper through the lock: unlocked again by the passphrase, the box answers it again", async () => {
     const { vault, box } = await makeVaultWithBox()
     await box.expose()
     vault.lock()

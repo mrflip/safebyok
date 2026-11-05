@@ -55,7 +55,7 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     expect(box?.sidecar).to.deep.equal({ note: 'moved' })
   })
 
-  it("delivers the vault's get, so a vault deleted elsewhere refuses 'vault_gone', listing nothing", async () => {
+  it("refuses 'vault_gone' for a vault deleted elsewhere, listing nothing", async () => {
     const { openNextSession, vault } = await makeWorldWithBox()
     const next = await openNextSession()
     await delTyping(vault)

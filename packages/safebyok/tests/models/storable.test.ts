@@ -181,7 +181,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.snapshot).to.eq(first)
     })
 
-    it("is one function with one identity, as useSyncExternalStore wants it, answering the current snapshot", async () => {
+    it("is one function with one identity, answering the current snapshot", async () => {
       const box = await builtBoxOf()
       expect(box.getSnapshot).to.eq(box.getSnapshot)
       const { getSnapshot } = box
