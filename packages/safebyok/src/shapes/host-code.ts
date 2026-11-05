@@ -1,11 +1,11 @@
 /** The shapes of the code a host hands in: the stores and libraries Bank.make takes, a logger, what `localVaultDB` is handed, and a callback. Each `parse` refuses 'bad_option', and only checks: what was handed in goes on as it came, prototype, `this` and all. */
 
-import { MaxSaltBytes } from '../consts'
+import { MaxSaltBytes } from '../helpers/consts'
 import type { KeyDeriver } from '../deriver/basederiver'
-import type { VaultLogger } from '../logger'
+import type { VaultLogger } from '../helpers/logger'
 import type { Clock } from './bank-opts'
-import * as Phrases from '../phrases'
-import { Checker, Checkers } from '../checks/validator'
+import * as Phrases from '../helpers/phrases'
+import { Checker, Checkers } from '../helpers/validator'
 import * as FX from './fields'
 
 // == [Stores and libraries]: vaultDBShape, deviceDBShape, clockShape, keyDeriverShape

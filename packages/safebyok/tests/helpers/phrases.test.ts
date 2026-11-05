@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import * as Phrases from '../src/phrases'
-import { ScopepathDelimiter } from '../src/consts'
+import * as Phrases from '../../src/helpers/phrases'
+import { ScopepathDelimiter } from '../../src/helpers/consts'
 
 describe("Phrases", () => {
   it("counts one unknown field in the singular, several in the plural, naming none, and lists the fields taken", () => {

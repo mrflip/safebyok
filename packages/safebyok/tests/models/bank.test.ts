@@ -1,9 +1,9 @@
 /** The bank of `src/models/` end to end, over a real vaultDB and deviceDB. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/errors'
-import * as Phrases from '../../src/phrases'
-import { makeLifeTok } from '../../src/crypto'
+import { VaultError } from '../../src/refusals/errors'
+import * as Phrases from '../../src/helpers/phrases'
+import { makeLifeTok } from '../../src/helpers/crypto'
 import type { LeaseRow } from '../../src/storage/device-db-shapes'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, BankBag, VaultBag, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'

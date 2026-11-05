@@ -2,7 +2,7 @@
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
 import type { AnyGating, VaultRecord } from '../../src/models/models-shapes'
 import { Vault } from '../../src/models/vault'

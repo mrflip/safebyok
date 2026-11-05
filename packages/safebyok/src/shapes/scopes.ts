@@ -1,11 +1,11 @@
 /** The checks for scopes, the bags naming a vault, and scopepaths, made in {@link Checkers}, with the names a scope is made of: a failed `parse` refuses 'bad_scope', quoting nothing. */
 
 import type * as Z from 'zod'
-import { ScopepathDelimiter } from '../consts'
-import * as Phrases from '../phrases'
+import { ScopepathDelimiter } from '../helpers/consts'
+import * as Phrases from '../helpers/phrases'
 import type * as PX from './primitives'
 import { never } from 'zod'
-import { Checkers } from '../checks/validator'
+import { Checkers } from '../helpers/validator'
 
 export { MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id } from './primitives'
 

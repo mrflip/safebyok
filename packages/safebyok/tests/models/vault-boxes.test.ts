@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultListing } from '../../src/models/vault-listing'
-import * as Phrases from '../../src/phrases'
+import * as Phrases from '../../src/helpers/phrases'
 import * as VS from '../../src/storage/vault-db-shapes'
 import * as TH from '../test-helpers'
 import { Passphrase, byPassphrase, delTyping, makeBornVault, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'

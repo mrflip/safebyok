@@ -1,6 +1,6 @@
 /** The refusals of a deviceDB. */
 
-import { VaultError, thrownNameOf } from '../errors'
+import { VaultError, thrownNameOf } from '../refusals/errors'
 
 /** A store's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the store is handed every lease row, and what it throws may quote one. */
 export const storeFailed = (call: string, thrown: unknown): VaultError => {

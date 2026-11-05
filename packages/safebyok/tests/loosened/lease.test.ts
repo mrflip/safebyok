@@ -1,8 +1,8 @@
 /** What a lease does today that a guarantee or the spec forbids, pinned as it is until the Coach rules. Each `it` names its source and line. */
 
 import { describe, expect, it } from 'vitest'
-import { VaultError } from '../../src/errors'
-import { bad } from '../../src/outcome'
+import { VaultError } from '../../src/refusals/errors'
+import { bad } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
 import { fakeLeaseFriendOf, makeGrantedLease, useFakeClock } from '../test-helpers/proving-world'
 

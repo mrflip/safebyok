@@ -1,6 +1,6 @@
-import { PassphraseKeyBytes } from '../consts'
-import { VaultError } from '../errors'
-import * as Phrases   from '../phrases'
+import { PassphraseKeyBytes } from '../helpers/consts'
+import { VaultError } from './errors'
+import * as Phrases   from '../helpers/phrases'
 import type * as VS   from '../storage/vault-db-shapes'
 
 // == [Vault Throwers]: goneError, lockedError, otherStoresError, behindError, listingExpected, unlockFirst, noProofToUnlock

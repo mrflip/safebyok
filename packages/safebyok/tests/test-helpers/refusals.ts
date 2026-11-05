@@ -1,8 +1,8 @@
 import { expect } from 'vitest'
-import { type RefusalKind, VaultError } from '../../src/errors'
-import type { Outcome } from '../../src/outcome'
+import { type RefusalKind, VaultError } from '../../src/refusals/errors'
+import type { Outcome } from '../../src/refusals/outcome'
 
-export { good, bad } from '../../src/outcome'
+export { good, bad } from '../../src/refusals/outcome'
 
 /** What {@link expectRefusal} sees in place of an error when the operation resolved. */
 const NotRefused = Symbol('not refused')

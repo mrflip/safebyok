@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { oneAtATime } from '../src/one-at-a-time'
-import * as TH from './test-helpers'
+import { oneAtATime } from '../../src/helpers/one-at-a-time'
+import * as TH from '../test-helpers'
 
 /**
  * A task each of whose runs waits until the test lets it end, failing when the test says: it keeps

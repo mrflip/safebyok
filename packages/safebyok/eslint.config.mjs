@@ -187,7 +187,7 @@ export default defineConfig([
   // == [3b. A library that holds secrets] ==
   // A library writes nothing to the console: what it has to say goes back to its caller, who
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
-  // The one exception is src/console-logger.ts, the fallback when a host passes no logger, which
+  // The one exception is src/helpers/console-logger.ts, the fallback when a host passes no logger, which
   // disables no-console for itself alone. The helpers published as `safebyok/testing`
   // (tests/test-helpers.ts and the parts it re-exports, in tests/test-helpers/) ship to hosts too,
   // so they keep the rules of src/ in this section and in 3c, besides the rules of the tests.

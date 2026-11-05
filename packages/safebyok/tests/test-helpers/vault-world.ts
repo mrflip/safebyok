@@ -6,7 +6,7 @@ import type { BoxWorld, RequestCleartext, VaultListingOpts, VaultRecord, VaultWo
 import type { VaultTombstone } from '../../src/storage/vault-db-shapes'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
-import type { Outcome } from '../../src/outcome'
+import type { Outcome } from '../../src/refusals/outcome'
 import type { VaultScope } from '../../src/shapes/scopes'
 import type * as VX from '../../src/shapes/vault'
 import { passphraseCleartext } from '../../src/shapes/vault'

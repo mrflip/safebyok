@@ -1,8 +1,8 @@
-import { consistent } from '../checks/validator'
-import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../crypto'
-import { tattoo } from '../helpers'
-import { type Outcome, outcomeOf, valOf } from '../outcome'
-import { damagedLease, leaseNotInForce, unopenedWhisper } from '../helpers/throwers'
+import { consistent } from '../helpers/validator'
+import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
+import { tattoo } from '../helpers/helpers'
+import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
+import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, type WayinKind, LeaseFormat, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from './models-shapes'
 
 // == [Lease]

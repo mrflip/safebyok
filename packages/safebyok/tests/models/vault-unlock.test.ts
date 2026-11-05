@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { makeLeaseKey } from '../../src/crypto'
-import { VaultError } from '../../src/errors'
+import { makeLeaseKey } from '../../src/helpers/crypto'
+import { VaultError } from '../../src/refusals/errors'
 import { LOCKED } from '../../src/models/models-shapes'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { DefaultLeaseMillis, Vault } from '../../src/models/vault'

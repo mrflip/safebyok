@@ -1,7 +1,7 @@
 import type * as Z from 'zod'
-import { Checkers } from '../checks/validator'
-import { MaxSaltBytes, PassphraseKeyBytes } from '../consts'
-import * as Phrases from '../phrases'
+import { Checkers } from '../helpers/validator'
+import { MaxSaltBytes, PassphraseKeyBytes } from '../helpers/consts'
+import * as Phrases from '../helpers/phrases'
 
 // == [Bounds]: MinArgon2SaltBytes, MaxMemoryKib, MinMemoryKibPerLane, Uint32Bound, ReservedLabelPrefix, TestLabelPrefix
 

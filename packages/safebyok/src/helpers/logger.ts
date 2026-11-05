@@ -1,4 +1,4 @@
-import * as HX from './shapes/host-code'
+import * as HX from '../shapes/host-code'
 import { consoleLogger } from './console-logger'
 
 /** Where a vault says what it has nobody to throw to, such as a background refresh that failed.

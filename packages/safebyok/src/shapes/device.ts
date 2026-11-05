@@ -1,8 +1,8 @@
 /** What a device keeps of a vault: its lease, what a lease is granted, and its device record, each `parse` refusing 'bad_record', each record strict; and the IndexedDB device store's options. */
 
 import type * as Z from 'zod'
-import * as Phrases from '../phrases'
-import { Checker, objCheck } from '../checks/validator'
+import * as Phrases from '../helpers/phrases'
+import { Checker, objCheck } from '../helpers/validator'
 import * as FX from './fields'
 
 // == [Lease]: LeaseFormat, isLeaseKey, leaseRecord, ModelsLeaseFormat, keptLeaseRow, leaseStamp, LeaseSparse, leaseGrant

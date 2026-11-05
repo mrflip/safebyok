@@ -1,7 +1,7 @@
 /** The test world of a models bank: a real {@link MemoryVaultDB} and {@link MemoryDeviceDB} any number of banks share, a dialog that types what the test says, and a clock the test moves. */
 
 import { afterEach } from 'vitest'
-import { VaultError, type RefusalKind } from '../../src/errors'
+import { VaultError, type RefusalKind } from '../../src/refusals/errors'
 import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'

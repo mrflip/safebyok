@@ -70,7 +70,7 @@ is a bug.
 * **The core's `src/shapes/` holds the validators a module exports**, one module to a concern,
   and no other module exports one. A validator a module keeps to itself stays beside its one user, made in a
   `Checkers` call at module level (lease.ts's `leaseSealProps`, vault.ts's `putBoxProps`,
-  checks/validator.ts's `Checks`): moving it to `src/shapes/` would export what no other module
+  helpers/validator.ts's `Checks`): moving it to `src/shapes/` would export what no other module
   calls.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
@@ -421,7 +421,7 @@ naturally, or a comparison with what the callee holds.
   several arguments does fit: check one object built from them, with `.refine` across its fields.
 
 **Validators are made inside a `Checkers(kind, kit => { ... }, sources?)` call**, or one of its
-one-validator forms, `Checker` and `objCheck` (`checks/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
+one-validator forms, `Checker` and `objCheck` (`helpers/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
 (`obj`, `arr`, `tuple`, `oneof`, `union`, `discrim`, `lit`, `lazy`, `custom`), its scalars
 ready made (`str`, `num`, `int`, `uint`, `bool`, `unk`), and the shared primitives (`label`,
 `user_id`, `epochMillis`, ...); and it wraps each schema it returns, so a failed `parse` throws a
@@ -490,7 +490,7 @@ export const boxStamp = Checker(({ vault_tok }) => boxSparse.extend({ vault_tok 
 * **Every sentence a check says lives in `phrases.ts`**, star-imported as `Phrases`, so
   wording, tone and the rule that none quotes its input are reviewed in one place.
 * **A refusal of a host's bag of options says what Zod found, in Zod's English**: a validator
-  made in a `Checkers` call does (`src/checks/validator.ts`), and a check of options names the
+  made in a `Checkers` call does (`src/helpers/validator.ts`), and a check of options names the
   call and says what to do in the parse's own story, `parse(opts, { where, advice })`, never in a
   catch that rethrows (`optionsCheck`, `readBankOpts`). Never `Z.config`, which is the host's
   Zod too. Zod's English names a refused value's type, never the value.
@@ -565,7 +565,7 @@ the scope.
   there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
   and module-local and good idea to put it near where used); use Checkers; namespace it, using
   Checkers or a star-import." The type is `Z.infer` of the shape, never a parallel written by
-  hand. The shape lives in the shared folders (`src/checks/`, `src/shapes/`) unless it is odd and
+  hand. The shape lives in the shared folders (`src/helpers/validator.ts`, `src/shapes/`) unless it is odd and
   local to one module, which keeps it beside its use. It is made in a `Checkers` call. It is
   namespaced as the object a `Checkers` call returns (`Checks.story`), or through its
   module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then

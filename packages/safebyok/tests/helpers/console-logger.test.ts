@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { consoleLogger } from '../src/console-logger'
+import { consoleLogger } from '../../src/helpers/console-logger'
 
 const quiet = () => { /* kept out of the test output */ }
 

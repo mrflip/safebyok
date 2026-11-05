@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { VaultError } from '../src/errors'
-import * as HostErrorSanitizer from '../src/host-error-sanitizer'
-import * as TH from './test-helpers'
+import { VaultError } from '../../src/refusals/errors'
+import * as HostErrorSanitizer from '../../src/refusals/host-error-sanitizer'
+import * as TH from '../test-helpers'
 
 /** An error from outside safebyok that quotes what it was handed, as a storage client's may. */
 const quotingError = () => {

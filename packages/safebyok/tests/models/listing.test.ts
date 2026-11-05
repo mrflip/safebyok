@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import * as VS from '../../src/storage/vault-db-shapes'
 import * as TH from '../test-helpers'

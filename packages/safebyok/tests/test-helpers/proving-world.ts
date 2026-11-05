@@ -7,14 +7,14 @@
  */
 
 import { afterEach, beforeEach, type Mock, vi } from 'vitest'
-import { PasskeySaltBytes } from '../../src/consts'
-import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/crypto'
+import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/models/models-shapes'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
-import { good } from '../../src/outcome'
+import { good } from '../../src/refusals/outcome'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import * as VX from '../../src/shapes/vault'
 import { anyStrengthChecker, testDeriver } from './builders'

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import * as MSX from '../../src/models/models-shapes'
 import * as VS from '../../src/storage/vault-db-shapes'

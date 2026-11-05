@@ -1,7 +1,7 @@
 /** The vaultDB: the verbs the storables and listings call, and every invariant of them. A subclass writes only the generic `do*` calls, each one atomic step. */
 
-import { type VaultError, isVaultError } from '../errors'
-import { type BadOutcome, type GoodOutcome, outcomeOf } from '../outcome'
+import { type VaultError, isVaultError } from '../refusals/errors'
+import { type BadOutcome, type GoodOutcome, outcomeOf } from '../refusals/outcome'
 import { type Clock, wallClock } from '../shapes/bank-opts'
 import * as Refuse from './vault-db-refusals'
 import * as VS from './vault-db-shapes'

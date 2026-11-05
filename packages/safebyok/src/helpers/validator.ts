@@ -2,8 +2,8 @@
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
-import { refusalKindVals, VaultError, type RefusalKind } from '../errors'
-import * as Phrases from '../phrases'
+import { refusalKindVals, VaultError, type RefusalKind } from '../refusals/errors'
+import * as Phrases from './phrases'
 import * as PX from '../shapes/primitives'
 
 // == [Kit]: isBytes, Kit, KitWith, Merged

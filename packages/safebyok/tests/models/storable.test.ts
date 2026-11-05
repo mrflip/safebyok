@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/errors'
+import { VaultError } from '../../src/refusals/errors'
 import type { BoxRecord, BoxSparse, CentralPolicy, Fetched, RecordShape, Reconciled } from '../../src/models/models-shapes'
 import * as MSX from '../../src/models/models-shapes'
 import { Box } from '../../src/models/box'
 import { cmpRevisions, Storable } from '../../src/models/storable'
-import * as Phrases from '../../src/phrases'
+import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type BoxAnswer, TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
