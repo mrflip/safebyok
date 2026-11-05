@@ -17,13 +17,18 @@ import { Listing } from './listing'
 import { cmpRevisions } from './storable'
 import { Vault } from './vault'
 
-// == [VaultListing]
-
 /** One bank's vaults, by vaultlabel. */
 export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault> {
+  // == [Props]: world, #openGating, openGating
+
   declare readonly world: VaultWorld
 
   #openGating: AnyGating | null = null
+
+  get openGating(): AnyGating | null { return this.#openGating }
+  // --
+
+  // == [Construction]: constructor, buildVault, tryBuildVault, boxListingOf, scopeOf, sparseOf, recordOf
 
   constructor(opts: VaultListingOpts) {
     super(opts)
@@ -35,6 +40,22 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope) }
 
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
+
+  /** The listing of `vault`'s boxes, its watch not started. Bad news of a box goes where this listing's goes. */
+  boxListingOf(vault: Vault): BoxListing {
+    const { boxRefreshMillis = this.maxMillisSinceRefresh } = this.world
+    return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis, onBadNews: (news) => { this.tellBadNews([news]) } })
+  }
+
+  /** The scope of `duck`, held to this bank: no listing answers for another's. */
+  scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
+
+  sparseOf(duck: unknown): VaultSparse { return vaultSparse.parse(duck) }
+
+  recordOf(duck: unknown): VaultRecord { return vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
+  // --
+
+  // == [Fetching]: fetchBank, fetchListed
 
   /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
   async fetchBank(): Promise<void> {
@@ -48,6 +69,17 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     this.tellBadNews(damaged_records.map((damaged) => vaultStoredDamaged(damaged)))
     await Promise.all(vaults.map((record) => this.build(record)))
   }
+
+  /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. */
+  async fetchListed(vault: Vault): Promise<BoxesListed> {
+    const asked = this.scopeOf(vault)
+    await this.ensureTimelyWorld()
+    this.demandEnabled()
+    const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
+    await this.deliver(vaultRowOf(answer))
+    return VX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
+  }
+  // --
 
   // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
 
@@ -83,9 +115,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [The one gating open]: openGating, holdGating, releaseGating, declineGatingAtLock, declineGatingAtDiscard, sweep, vacate
-
-  get openGating(): AnyGating | null { return this.#openGating }
+  // == [The one gating open]: holdGating, releaseGating, declineGatingAtLock, declineGatingAtDiscard, sweep, vacate
 
   /** Claims the one gating this bank may have open. */
   holdGating(gating: AnyGating): void {
@@ -118,23 +148,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  /** The listing of `vault`'s boxes, its watch not started. Bad news of a box goes where this listing's goes. */
-  boxListingOf(vault: Vault): BoxListing {
-    const { boxRefreshMillis = this.maxMillisSinceRefresh } = this.world
-    return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis, onBadNews: (news) => { this.tellBadNews([news]) } })
-  }
-
-  /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. */
-  async fetchListed(vault: Vault): Promise<BoxesListed> {
-    const asked = this.scopeOf(vault)
-    await this.ensureTimelyWorld()
-    this.demandEnabled()
-    const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
-    await this.deliver(vaultRowOf(answer))
-    return VX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
-  }
-
-  // == [Defined by the vault listing]
+  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): null { return null }
 
@@ -150,13 +164,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
   }
-
-  /** The scope of `duck`, held to this bank: no listing answers for another's. */
-  scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
-
-  sparseOf(duck: unknown): VaultSparse { return vaultSparse.parse(duck) }
-
-  recordOf(duck: unknown): VaultRecord { return vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
     return new Vault(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
@@ -177,7 +184,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected isOwnRow(row: VaultRow | BoxRow): row is VaultRow { return ! ('boxlabel' in row) }
   // --
 }
-// --
 
 // == [The vault's get]: NothingListed, vaultRowOf
 
