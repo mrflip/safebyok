@@ -349,7 +349,7 @@ const isKind = (kind: unknown): kind is RefusalKind => (refusalKindVals as reado
   none (`Infinity`, the default), nothing is counted, and how large a vault grows is yours to
   bound, by your own quotas. Nothing bounds a vault's bytes beyond that: your framework's request-size limit bounds
   each record. What the limit guarantees is
-  [the VaultDB contract's](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md) (lines 4.2 to 4.5), and no more:
+  [the VaultDB contract's](https://github.com/mrflip/safebyok/blob/main/packages/safebyok-old/VAULTDB.md) (lines 4.2 to 4.5), and no more:
   * **It is a best effort.** The check is a `count(*)` of the vault's boxes in the statement
     that inserts, as of that statement's start. Writes made one after another never take a vault
     past its limit. Writers racing for the last places may each count room and all land: with

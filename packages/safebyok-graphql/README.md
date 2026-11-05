@@ -167,7 +167,7 @@ one fails in GraphQL itself, before any VaultError is made, and reaches the brow
 store of your own keeps every field it was handed.
 
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
-[the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
+[the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok-old/VAULTDB.md)
 for the browser. Its line 3.3 in particular: a box write's expectation names the `vault_tok` the
 box was sealed for and the revision it read, and your VaultDB lands it only while storage still holds both,
 compared in the same atomic step as the write. `tests/yoga-recipe.test.ts` runs the shared suite

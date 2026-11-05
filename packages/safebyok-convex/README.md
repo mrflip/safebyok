@@ -171,7 +171,7 @@ Three tables, inside the component, beside nothing of your app's:
   the vault has a passkey, and its `credential_id` and `prf_salt_b64`, when each vault and box was first stored and each box last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row, and a write made over a revision since replaced
-  is refused, never merged: the vault's policy ([`VAULTDB.md`](../safebyok/VAULTDB.md), *Who does what*). An app that wants history
+  is refused, never merged: the vault's policy ([`VAULTDB.md`](../safebyok-old/VAULTDB.md), *Who does what*). An app that wants history
   keeps it in its own backups; Convex's backups and exports keep what they keep.
 * `user_id` leads the vault and box indexes, so one user's rows are one range of each.
 * **Each name is a label or a user id** by the time the component sees it: the client's VaultDB

@@ -333,11 +333,11 @@ the builder; `objCheck` makes one of an object from its fields, strict unless gi
 
 Extend `VaultDB` and implement its `do*` methods (`Bank.make` takes nothing but a `VaultDB`,
 whose public verbs check every record your code sees): its doc block says what each one owes, the
-[VaultDB contract](VAULTDB.md) says what an adapter promises in all and what it may leave
+[VaultDB contract](../safebyok-old/VAULTDB.md) says what an adapter promises in all and what it may leave
 undone, and `describeVaultDB` from `safebyok/testing` checks it, a group of tests to each of the
 contract's numbered lines. Give it `makeDevices` -- devices over one backend, each round trip
 through a turnstile -- and it races your writes from two devices, holding one before each round
-trip while the other moves ([Proving the races](VAULTDB.md#proving-the-races)). A backend with columns (Convex, SQL) keeps
+trip while the other moves ([Proving the races](../safebyok-old/VAULTDB.md#proving-the-races)). A backend with columns (Convex, SQL) keeps
 the applabel, user id, vaultlabel and boxlabel in columns of their own. A backend that holds rows
 under one string -- a key-value store, localStorage -- files each under its `Scopepath`, as
 `localVaultDB` and `idbVaultDB` do: the row's kind, then its names, joined on `^`.
@@ -710,7 +710,7 @@ The same rule holds for storage handing back an older copy of the vault than thi
 (kind `vault_behind`, *A vault behind this device*, below): storage the vault cannot trust with an unlocked
 vault locks it, in the call that met it or in a background refresh alike. There is no option to
 stay unlocked: an adapter that refuses `identity_revoked` for a passing fault, rather than
-`storage_unavailable`, breaks its contract (VAULTDB.md, line 5.5), and is the bug to fix.
+`storage_unavailable`, breaks its contract (`safebyok-old`'s VAULTDB.md, line 5.5), and is the bug to fix.
 
 Make the bank, and ask for the vault (`bank.ensureVault`), only once your backend knows who is signed in: a vault
 born while its auth is still loading meets `identity_revoked` at once, and revokes the lease with it (safe:
@@ -1173,7 +1173,7 @@ bank need not hold the vault, or have refused it, first, and nothing asks for an
 storage deletes the vault, and on `stale_write` too, the bank lets go its entry for the scope,
 whichever stores that was born from, so the next `bank.ensureVault` births what is stored; any other
 refusal leaves the entry as it was. A `VaultDB` that wraps
-another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
+another's public verbs hands `VaultDB.delDamagedVault` on too (`safebyok-old`'s `VAULTDB.md`, line 3.5). The
 deletion aims at the stored `vault_tok` alone, so a vault record rewritten under that same
 `vault_tok` between its read and the deletion goes too: it is the same vault, the one the user
 asked to delete.

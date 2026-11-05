@@ -170,7 +170,7 @@ saw vault props resolves `del()` without deleting anything, even if a vault has 
 "delete account" can report success while a vault is stored. And after a refused `del()`, an
 app's automatic retry deletes the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
-`packages/safebyok/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
+`packages/safebyok-old/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
 shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the Convex tests settle
 in their home ([#111](https://github.com/mrflip/safebyok/pull/111)). First check whether big_feats
 changed either.
