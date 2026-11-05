@@ -215,3 +215,49 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
   unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
 })
+
+/** The boxlabel of the one box the box-verb worlds hold. */
+export const boxlabel = 'anthropic_api_key'
+/** The whisper those worlds put in it. */
+export const Whisper  = Object.freeze({ val: 'sk-test-0000' })
+/** The sidecar those worlds put beside it. */
+export const Sidecar  = Object.freeze({ note: 'work' })
+
+/** A born vault, and the rows of its boxes as the vaultDB stores them. */
+export const makeWorld = async () => {
+  const world = await makeBornVault()
+  const boxrows = world.vaultDB._cheat_boxRowsOf(world.vault.scope, world.vault.vault_tok)
+  const tryGetVault = vi.spyOn(world.vaultDB, 'tryGetVault')
+  const tryPutBox   = vi.spyOn(world.vaultDB, 'tryPutBox')
+  const tryGetBox   = vi.spyOn(world.vaultDB, 'tryGetBox')
+  /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first holds. */
+  const openNextSession = async () => {
+    const vault = await world.anotherSession().build(world.demandStored())
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    return vault
+  }
+  return { ...world, boxrows, tryGetVault, tryPutBox, tryGetBox, openNextSession }
+}
+
+/** A world whose vault has a box stored, and a next session that has not yet listed it. */
+export const makeWorldWithBox = async () => {
+  const world = await makeWorld()
+  const box = await world.vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
+  return { ...world, box }
+}
+
+/** A next session that has listed nothing and fetched nothing, and spies cleared of the one before. */
+export const nextUnlisted = async () => {
+  const world = await makeWorldWithBox()
+  const next = await world.openNextSession()
+  world.tryGetBox.mockClear()
+  world.tryPutBox.mockClear()
+  return { ...world, next }
+}
+
+/** A vault whose box row a next session finds failing its checks. */
+export const makeWorldWithRubble = async () => {
+  const world = await makeWorldWithBox()
+  world.boxrows.set('rubble', { garbage: true })
+  return world
+}
