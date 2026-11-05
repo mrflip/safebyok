@@ -9,9 +9,7 @@ import * as Phrases from '../helpers/phrases'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { KeyDeriver } from '../deriver/basederiver'
 
-export { epochMillis, type EpochMillis } from './primitives'
-
-// == [Ciphered]: ciphered
+// == [Ciphered]: ciphered, Ciphered
 
 /** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
 export const ciphered = objCheck(({ str }) => ({
@@ -21,7 +19,9 @@ export const ciphered = objCheck(({ str }) => ({
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 
-// == [Record fields]: vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, VaultTok, BoxTok, RevisionTok, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
+// == [Record fields]: epochMillis, vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
+
+export { epochMillis, type EpochMillis } from './primitives'
 
 /** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` refuses 'bad_record', quoting none of it.
  * A token is plain text, as a host's adapter may write one by hand. An id or a label is plain
@@ -70,7 +70,7 @@ export type VaultKeyWayinWrapped = Z.infer<typeof vault_key_wayin_wrapped>
 export type VaultKeyLeaseWrapped = Z.infer<typeof vault_key_lease_wrapped>
 // --
 
-// == [Whisper and sidecar]: WhisperJson, whisper, isPlainBag, whisperBag, sidecar
+// == [Whisper and sidecar]: WhisperJson, Whisper, isPlainBag, whisper, whisperBag, sidecar, Sidecar
 
 /** The JSON a whisper is made of, `null` included inside an array or object: a whole {@link Whisper} cannot be null. */
 export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [ckey: string]: WhisperJson }
@@ -179,7 +179,7 @@ export type VaultBag = Z.input<typeof vaultBag>
 export type BankBag = Z.input<typeof bankBag>
 // --
 
-// == [Clock]: Clock, wallClock
+// == [Clock]: Clock, wallClock, clockShape
 
 /** A source of the time, `Bank.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
  * `Bank.make` reads it once, and refuses 'bad_option' for a reading outside `FarPast` to
@@ -189,33 +189,25 @@ export type Clock = { now(): number }
 
 /** The wall clock: the default `Clock`. */
 export const wallClock: Clock = { now: () => Date.now() }
+
+/** The check of a clock, by the verb the vault calls on it, refusing 'bad_option'. Bank.make keeps what it was handed, prototype and all. */
+export const clockShape = Checker(({ obj, fn }) => obj({ now: fn<Clock['now']>() }), 'bad_option')
 // --
 
-// == [Libraries]: clockShape, keyDeriverShape
+// == [Key deriver and logger]: keyDeriverShape, loggerShape
 
-/** The checks of the stores and libraries Bank.make takes, each by the verbs the vault calls on it and, for a keyDeriver, the fields it reads, each refusing 'bad_option'.
- * Bank.make keeps what it was handed, prototype and all.
- */
-export const { clockShape, keyDeriverShape } = Checkers('bad_option', ({ obj, fn, str, int }) => {
-  return {
-    clockShape:      obj({ now: fn<Clock['now']>() }),
-    keyDeriverShape: obj({
-      algorithm:         str.optional(),
-      key_deriver_label,
-      salt_bytes:        int.gte(1).lte(MaxSaltBytes),
-      deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
-      load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
-    }, Phrases.KeyDeriverShape),
-  }
-})
-// --
-
-// == [Host code and adapters' options]: loggerShape, localVaultDBOpts, callback
+/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads, refusing 'bad_option'. Bank.make keeps what it was handed, prototype and all. */
+export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
+  algorithm:         str.optional(),
+  key_deriver_label,
+  salt_bytes:        int.gte(1).lte(MaxSaltBytes),
+  deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
+  load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
+}, Phrases.KeyDeriverShape), 'bad_option')
 
 /** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: Bank.make keeps and calls the host's own logger, `this` and all. */
 export const loggerShape = Checker(({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
 }, 'bad_option')
-
 // --
