@@ -740,7 +740,10 @@ is the documentarian's.
   (`// every lock goes through here`) or a reason (`// The lock first: no box opens under a lease while the tombstone goes out.`).
 * `@param` and `@returns` only for a unit, a range, or what `null` or leaving an optional out means. A `{@link}` names
   something in scope in its file; anything else is backticks, a private member always.
-* **`@example`s are welcome**, one line each where they can be, and each has a test (*Tests*).
+* **An `@example` earns its lines by showing what the first line and the signature do not** `#example-earns-its-lines`: a
+  failure that reads several ways (a label `0__b_`), a shape the type hides, a call order that matters, an option value
+  with a consequence. An enum validator, a getter or a one-call method gets none; where a test already shows the case, the
+  test is the example. One line each where it can be, and each has a test (*Tests*).
 * **Facts come from the code** `#facts-from-the-code`, never from the old prose or the test titles. Where they disagree, write what the code does
   and raise it; the doc never changes behaviour.
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
