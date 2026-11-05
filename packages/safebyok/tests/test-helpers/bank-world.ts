@@ -7,7 +7,7 @@ import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BankScope, VaultScope } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { BankOpts } from '../../src/shapes/shapes-vaultish'
+import type { BankOpts, BankSnapshot } from '../../src/shapes/shapes-vaultish'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { quietLogger } from './logging'
 import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
@@ -17,6 +17,12 @@ export const AutolockMinutes = 60
 export const BankBag = Object.freeze({ applabel: Dna.applabel, user_id: Dna.user_id })
 
 export const VaultBag = Object.freeze({ vaultlabel: Dna.vaultlabel })
+
+/** A second vaultlabel, for a bank that holds two vaults. */
+export const OtherBag = Object.freeze({ vaultlabel: 'other' })
+
+/** The vaultlabels of a snapshot's vaults, in its order. */
+export const labelsOf = ({ vaults }: BankSnapshot): string[] => vaults.map(({ vaultlabel }) => vaultlabel)
 
 /** A {@link MemoryVaultDB} that refuses every vault get, once told to, as a store out of reach or a user signed out does. */
 export class RefusingVaultDB extends MemoryVaultDB {
