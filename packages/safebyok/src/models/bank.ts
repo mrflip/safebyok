@@ -1,5 +1,4 @@
 import { noop } from 'es-toolkit'
-import { verifyConsistent } from '../helpers/validator'
 import { FarFuture, FarPast, MinuteMillis } from '../helpers/consts'
 import { randomId } from '../helpers/crypto'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
@@ -112,7 +111,7 @@ export class Bank implements VaultWorld {
   }
 
   vaultScopeOf(bag: VaultBag): VaultScope {
-    const { vaultlabel } = verifyConsistent(vaultBag.parse(bag), this.scope, { kind: 'bad_scope', message: Phrases.otherScope })
+    const { vaultlabel } = vaultBag.parseConsistent(bag, this.scope, { message: Phrases.otherScope })
     return { ...this.scope, vaultlabel }
   }
   // --
