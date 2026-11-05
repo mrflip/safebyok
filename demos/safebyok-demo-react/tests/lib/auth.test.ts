@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { memoryStore, type StringStore } from 'safebyok'
+import { memoryStore, type StringStore } from 'safebyok-old'
 import { createAuth } from '../../src/lib/auth'
 
 /** Two fresh stores, a clock the test moves by hand, and the auth over them. */

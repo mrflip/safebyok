@@ -3,12 +3,12 @@ import { Client, Pool } from 'pg'
 import type { PoolConfig } from 'pg'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
-import type { Outcome, VaultDBOpts } from 'safebyok'
-import { boxOf, vaultRecordOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood, ensureGated } from 'safebyok/testing'
-import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok/testing'
+import type { Outcome, VaultDBOpts } from 'safebyok-old'
+import { boxOf, vaultRecordOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood, ensureGated } from 'safebyok-old/testing'
+import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok-old/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-old/testing'
 
 // ----------------------------------------------------------------------- which suites run, and where
 

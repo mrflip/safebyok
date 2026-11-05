@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, loadStrengthChecker, type StrengthChecker } from '../src/passphrase-strength'
 import type { PassphraseVerdict } from '../src/shapes/vault'
-import { zxcvbnStrengthChecker } from '../src/zxcvbn-strength-checker'
 import type { VaultScope } from '../src/shapes/scopes'
 import { VaultError } from '../src/errors'
 import * as TH from './test-helpers'
@@ -140,11 +139,6 @@ describe("guardStrengthChecker's load", () => {
 })
 
 describe("loadStrengthChecker", () => {
-  it("fetches zxcvbn for zxcvbnStrengthChecker and resolves, as its example shows", async () => {
-    await loadStrengthChecker(zxcvbnStrengthChecker)
-    expect(await zxcvbnStrengthChecker('correct horse battery staple')).to.deep.equal({ strong: true })
-  })
-
   it("refuses a load that fails as 'unexpected_error', naming bank.hello(), what it threw the cause, as its example shows", async () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
     const err = await TH.expectRefusal(loadStrengthChecker(Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })), 'unexpected_error')

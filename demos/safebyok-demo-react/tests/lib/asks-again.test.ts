@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FarFuture } from 'safebyok'
+import { FarFuture } from 'safebyok-old'
 import { asksAgain } from '../../src/lib/asks-again'
 
 describe("asksAgain", () => {

@@ -1,7 +1,4 @@
 import { vi } from 'vitest'
-import type { VaultScope } from '../../src/shapes/scopes'
-import type { VaultDB } from '../../src/vault-db'
-
 
 /**
  * Resolve after the macrotask queue has turned once: every promise already settled has run its
@@ -54,33 +51,6 @@ export const eventually = async (check: () => boolean): Promise<void> => {
 export const changeCounter = () => {
   const heard = { count: 0 }
   return { heard, onChange: () => { heard.count += 1 } }
-}
-
-/**
- * A watch on `scope` through `vaultDB`, once it is live, its calls counted from then: an adapter
- * whose server sends a change as the subscription starts (postgresVaultDB with a `listen`, a
- * GraphQL subscription) calls once at the start, and this resolves after that call, the count
- * back at zero. Waits up to two seconds for it; if the call never comes, it unsubscribes, then
- * rejects.
- *
- * @param vaultDB - The adapter to watch through.
- * @param scope - The vault to watch.
- * @returns `heard`, whose `count` rises with each change from here on; `unsubscribe`.
- *
- * @example const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), TH.scopeOf('u1'))
- */
-export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: VaultScope) => {
-  const heard = { count: 0 }
-  const unsubscribe = vaultDB.subscribe(scope, () => { heard.count += 1 })
-  try {
-    await eventually(() => heard.count > 0)
-  } catch (err) {
-    // A watch left live past its test would hold its connection open, and count in the next.
-    unsubscribe()
-    throw err
-  }
-  heard.count = 0
-  return { heard, unsubscribe }
 }
 
 /**
@@ -240,41 +210,6 @@ export const holdNextAnswer = <Target extends object>(target: Target, verb: Asyn
 export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Promise<void> => {
   await vault.refresh()
   await vault.refresh()
-}
-
-/**
- * A count of the storage watches `vaultDB` opens and closes from here on, kept by spying on its
- * `subscribe`: for a test that letting a vault go leaves no watch running that
- * nobody could end. Each watch still reaches the adapter's own `subscribe`.
- *
- * A watch counts as closed the first time it is closed: closing it again changes nothing, so a
- * double close cannot stand in for a watch that was never closed.
- *
- * @param vaultDB - The adapter whose watches to count.
- * @returns The tally, live: `opened` and `closed`, each a count so far.
- *
- * @example
- *   const tally = TH.tallyWatches(vaultDB)
- *   const vault = await TH.settledVault({ ...opts, vaultDB })
- *   TH.closeVault(vault)
- *   expect(tally.opened - tally.closed).to.eq(0)
- */
-export const tallyWatches = (vaultDB: Pick<VaultDB, 'subscribe'>) => {
-  const tally = { opened: 0, closed: 0 }
-  const subscribe = vaultDB.subscribe.bind(vaultDB)
-  vi.spyOn(vaultDB, 'subscribe').mockImplementation((scope, onChange) => {
-    tally.opened += 1
-    const unsubscribe = subscribe(scope, onChange)
-    let closedYet = false
-    return () => {
-      if (! closedYet) {
-        closedYet = true
-        tally.closed += 1
-      }
-      unsubscribe()
-    }
-  })
-  return tally
 }
 
 /** Resolves after `count` turns of the microtask queue. */

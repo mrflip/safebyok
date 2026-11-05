@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isVaultError, type BoxDamaged } from 'safebyok'
+import { isVaultError, type BoxDamaged } from 'safebyok-old'
 import { WhisperField, useVault, useVaultSnapshot } from 'safebyok-react'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 

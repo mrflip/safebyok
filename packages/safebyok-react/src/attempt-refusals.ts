@@ -1,4 +1,4 @@
-import { correctableKindVals, isVaultError } from 'safebyok'
+import { correctableKindVals, isVaultError } from 'safebyok-old'
 
 /** What a dialog does with a refusal a gating's attempt met.
  * * `in_place`: show its message beside the field and ask again. These are the core's

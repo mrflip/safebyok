@@ -1,5 +1,5 @@
-import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, splitStoredBoxes, vaultScope } from 'safebyok'
-import type { VaultScope, VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, VaultRecord, VaultDraft } from 'safebyok'
+import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, splitStoredBoxes, vaultScope } from 'safebyok-old'
+import type { VaultScope, VaultRecordExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, StoredVault, VaultRecord, VaultDraft } from 'safebyok-old'
 import * as Columns from './columns'
 import { VaultRowColumns, BoxSparseColumns, BoxColumns, TombstoneColumns, rowOfVaultRecord, vaultRecordOfRow } from './columns'
 import { VaultChangeChannel } from './vault-tables'

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type PasskeyAnswer, type RequestCleartext, type StrengthChecker, type Vault } from 'safebyok'
+import { type PasskeyAnswer, type RequestCleartext, type StrengthChecker, type Vault } from 'safebyok-old'
 import { GatingModal } from '../src/gating-modal'
 import type { DialogAnswer } from '../src/modal'
 import * as TH from './test-helpers'

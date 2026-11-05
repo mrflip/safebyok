@@ -1,17 +1,17 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import * as Safebyok from 'safebyok'
-import { localVaultDB, memoryStore } from 'safebyok'
-import type { GatedVaultRecord, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok'
-import { boxOf, closeVault, type FakeCiphered, memoryVaultOpts, settledVault, unlock } from 'safebyok/testing'
+import * as Safebyok from 'safebyok-old'
+import { localVaultDB, memoryStore } from 'safebyok-old'
+import type { GatedVaultRecord, Sidecar, StringStore, VaultScope, Whisper } from 'safebyok-old'
+import { boxOf, closeVault, type FakeCiphered, memoryVaultOpts, settledVault, unlock } from 'safebyok-old/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
 import { modules, register, schema } from '../src/test'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-old/testing'
 
 /** The component's functions, called directly as a root app's: no host wrapper, no auth. */
 export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']

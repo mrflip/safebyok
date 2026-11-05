@@ -1,5 +1,5 @@
-import { PasskeySaltBytes, VaultError, type GateSparse, type PasskeyAnswer, type PasskeyWayinSparse } from 'safebyok'
-import { fromB64, toB64 } from 'safebyok/utils'
+import { PasskeySaltBytes, VaultError, type GateSparse, type PasskeyAnswer, type PasskeyWayinSparse } from 'safebyok-old'
+import { fromB64, toB64 } from 'safebyok-old/utils'
 import { Messages } from './messages'
 
 /**

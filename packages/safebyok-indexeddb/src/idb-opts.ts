@@ -1,4 +1,4 @@
-import { Checkers, idbOpts, type VaultDBOpts } from 'safebyok'
+import { Checkers, idbOpts, type VaultDBOpts } from 'safebyok-old'
 
 /** What `idbVaultDB` and `inspectIdbVaultDB` are made with; `inspectIdbVaultDB` ignores `logger`. */
 export type IdbVaultDBOpts = VaultDBOpts & {

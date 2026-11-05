@@ -1,4 +1,4 @@
-import { FarFuture, MinuteMillis } from 'safebyok'
+import { FarFuture, MinuteMillis } from 'safebyok-old'
 
 /**
  * When the vault next asks for the passphrase, as the chip says it: a date, or "never" for a

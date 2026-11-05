@@ -4,7 +4,7 @@
 // PGlite, which runs one statement at a time. Here each device has a pool of its own, so the
 // statements the races hold and release run on separate connections, at once.
 import { describe, it } from 'vitest'
-import type { VaultDBOpts } from 'safebyok'
+import type { VaultDBOpts } from 'safebyok-old'
 import * as TH from './test-helpers'
 
 const getDb = TH.useFileDatabase()

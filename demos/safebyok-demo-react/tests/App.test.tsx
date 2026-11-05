@@ -3,7 +3,7 @@
 import 'fake-indexeddb/auto'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { BrowserOpts } from 'safebyok/browser'
+import type { BrowserOpts } from 'safebyok-old/browser'
 import { App } from '../src/App'
 import { Applabel, vaultDB } from '../src/lib/stores'
 
@@ -12,9 +12,9 @@ import { Applabel, vaultDB } from '../src/lib/stores'
 // through the dialog runs five of them. What these tests click through is the page, not the
 // deriver (the core's tests hold that), so the App's bag swaps in the cheap test deriver. One bag
 // for each of browserOpts' own, so its identity stays put, as the provider needs.
-vi.mock('safebyok/browser', async (importOriginal) => {
-  const browser = await importOriginal<typeof import('safebyok/browser')>()
-  const { testDeriver, quietLogger } = await import('safebyok/testing')
+vi.mock('safebyok-old/browser', async (importOriginal) => {
+  const browser = await importOriginal<typeof import('safebyok-old/browser')>()
+  const { testDeriver, quietLogger } = await import('safebyok-old/testing')
   const cheapened = new WeakMap<BrowserOpts, BrowserOpts>()
   const cheapOpts = (...args: Parameters<typeof browser.browserOpts>): BrowserOpts => {
     const bag = browser.browserOpts(...args)

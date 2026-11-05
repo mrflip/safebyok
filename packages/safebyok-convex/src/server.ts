@@ -1,7 +1,7 @@
 import { mutationGeneric, queryGeneric } from 'convex/server'
 import type { ApiFromModules, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
-import { VaultError } from 'safebyok'
+import { VaultError } from 'safebyok-old'
 import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
