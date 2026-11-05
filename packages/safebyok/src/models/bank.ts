@@ -1,4 +1,3 @@
-import { noop } from 'es-toolkit'
 import { FarFuture, FarPast, MinuteMillis } from '../helpers/consts'
 import { randomId } from '../helpers/crypto'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
@@ -122,7 +121,7 @@ export class Bank implements VaultWorld {
 
   ensureTimely(): Promise<void> { return Promise.resolve() }
 
-  takeWorld(): void { noop() }
+  takeWorld(): void { /* no world sits above a bank */ }
   // --
 
   // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord
