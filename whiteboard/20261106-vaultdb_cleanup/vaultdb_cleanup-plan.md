@@ -325,7 +325,14 @@ Postgres, GraphQL, Convex and IndexedDB READMEs, `memory-vault-db.ts:70`, `refus
 `graphql-vault-db.ts:31`, and the Postgres doc that gives the vault-row lock an exact cap as its
 reason (its real reason is compare-and-set). And it adds to CLAUDE.md's "Insert no retry logic,
 abort controllers or other whizbangs" sentence (*What the package promises*) that a lock where
-none was needed before is a last resort too. Touches every adapter package, so it is cut
+none was needed before is a last resort too.
+
+Salt caps (the Coach, 2026-11-06, in chat): asked "Have we tightened the cap on salt sizes: it
+should be only slightly larger than what we use now", then chose "32 bytes, both": `MaxSaltBytes`
+65,536 → 32 (`helpers/consts.ts`, the bound on a deriver spec's `salt_bytes`), and the stored
+`salt_b64` checked at no more than 32 bytes (`shapes-core.ts`, today only "not empty"). Today's
+deriver makes 16; the passkey salt is exactly 32 already. A changeset line: a host deriver spec
+asking for more than 32 salt bytes is refused at setup. Touches every adapter package, so it is cut
 from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
 mechanical; `sonnet` worker, `low` review.
 
