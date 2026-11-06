@@ -39,11 +39,6 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   `insertBox` in `safebyok-postgres/src/postgres-vault-db.ts` casts its row to a type naming only
   the four flags, its box columns untyped beside them. Type them, or return the box as
   one `row_to_json` column, next time Postgres is touched.
-* **GraphQL's `'plain'` field class.** From the reform2 sprint
-  ([#176](https://github.com/mrflip/safebyok/pull/176); the Coach: "yes", leave it for a later
-  sweep): `safebyok-graphql/src/fields.ts` classes `sidecar` as `'plain'`, a code name that
-  disagrees with VOCABULARY.md's *visible* (which notes the exception). Rename the class with
-  the next GraphQL change.
 * **`postgres` a required check, once it has run a while.** Ruled 2026-10-16
   ([#131](https://github.com/mrflip/safebyok/pull/131), the Postgres container): CI's `postgres`
   job runs the VaultDB battery, its races and the `23503` case over a real server, and is not

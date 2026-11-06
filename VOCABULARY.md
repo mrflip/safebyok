@@ -227,8 +227,6 @@ The **duckish** of a type is the validator that lets you round-trip an object of
 * **device key.** The key behind a lease is the leaseKey.
 * **public, plain, server-readable, of a stored field.** A field is visible (unencrypted and
   authenticated) or unencrypted (and possibly not authenticated). There are no public keys here.
-  The `'plain'` field class in `safebyok-graphql`'s `src/fields.ts` keeps its name as a code
-  identifier.
 * **KEK, DEK, KDF, AAD.** They appear above only so a security reviewer can map safebyok's names
   onto the usual ones. Nothing in safebyok's API asks you to learn them.
 
