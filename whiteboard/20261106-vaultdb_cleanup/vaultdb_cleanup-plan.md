@@ -183,6 +183,14 @@ between a gate verb's `doGetVault` and its `doPutVault` (expects `vault_gone`); 
 in parallel off this tip; anything they would each add to the core's exports belongs here.
 **Size:** M.
 
+*Review:* `medium`, fixed: every one of thread 1's 69 cases is in the battery; the cascade watch
+case now looks again after a while (async stores); VOCABULARY's **fmt** entry; one style fix.
+Left minor: same-named fixtures and checkers (*Orchestrator:* namespace imports, no rename);
+flags beside hooks; two ways to fail a store; chained titles; compound doc blocks; casts listed on
+the PR. *Orchestrator, YOLO, a rework before filing:* the failure case requires
+`storage_unavailable`; `onTestFinished(unwatch)`, unwatch safe twice; `objCheck` on the battery's
+opts; `vaultQuery`/`boxQuery` fixtures hoisted to `storage-world.ts`.
+
 ### 3. port_indexeddb
 
 > port the other adapters. Do not adopt their doc strings, which are rich in slop.

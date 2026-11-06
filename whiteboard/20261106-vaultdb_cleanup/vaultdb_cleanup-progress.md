@@ -44,7 +44,7 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 * Planning lesson: one compaction at ~157k just before the first justify, for a 12-file M thread.
   The L ports (postgres, graphql, convex) should be handed tight handoffs.
 
-## Thread 2: vaultdb_battery (#558, in review)
+## Thread 2: vaultdb_battery (#558, reviewed, small rework before filing)
 
 **For every port (threads 3, 4, 6):**
 * Run `TH.describeVaultDBBattery('<Store>', { makeVaultDB, _cheat_rowsOf })` from
@@ -58,6 +58,11 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
   answer and do* types, the memory stores, every storage shape, checker and row helper, the
   lease shapes, the throwers with VaultError and outcomeOf. Fixtures (scopes, wayins, `vaultAt`,
   `boxAt`, tombstone builders) from `safebyok/testing`.
+* Adapter tests import `safebyok/testing` as `TH` and `safebyok/storage` as `SX`: six names
+  (`bankScope`, `vaultScope`, `boxscope`, `passphraseWayin`, `passkeyWayin`, `boxTombstoneOf`) are
+  fixtures at one door and checkers at the other.
+* The battery's failure case requires `storage_unavailable` from `_cheat_failNextCall`; every
+  watch a case opens is closed at its end, so `unwatch` must be safe to call twice.
 * A new package entry needs its `typesVersions` line written by hand (tsdown does not; attw
   checks it).
 * Files to read for the shape: `packages/safebyok/src/storage/index.ts`,
