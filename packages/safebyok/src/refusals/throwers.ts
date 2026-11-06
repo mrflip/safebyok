@@ -210,7 +210,7 @@ export const suppliedSpecChanged = (label: string): VaultError => new VaultError
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => new VaultError('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
 // --
 
-// == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, damagedRecord, newerFormat, seqNotNext, recordPreparedWrong, storageError
+// == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, seqNotNext
 
 /* The refusals of a vaultDB, each read the same in an answer and an error: `meta` holds the `world` and `dbhas` the answer carries. */
 
@@ -250,15 +250,7 @@ export const vaultFull = (capacity: SX.Capacity): VaultError => (
   new VaultError('vault_full', Phrases.VaultFull, { meta: { capacity } })
 )
 
-export const damagedRecord = (): VaultError => new VaultError('damaged_row', Phrases.DamagedRecord)
-
-export const newerFormat = (): VaultError => new VaultError('newer_format', Phrases.NewerFormat)
-
 export const seqNotNext = (): VaultError => new VaultError('bad_option', Phrases.SeqNotNext)
-
-export const recordPreparedWrong = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.RecordPreparedWrong, { cause })
-
-export const storageError = (cause: unknown): VaultError => new VaultError('storage_unavailable', Phrases.StorageError, { cause })
 // --
 
 // == [DeviceDB Throwers]: storeFailed

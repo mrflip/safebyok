@@ -1,0 +1,5 @@
+---
+"safebyok": minor
+---
+
+The vaultDB (VaultDB, MemoryVaultDB) reads plainly, and some refusals change. A single vault or box row failing its checks, a later fmt among them, now refuses damaged_row, naming the field in meta.fieldnames (newer_format is left to a wayin naming an unknown key deriver; listings still mark a later fmt format_mismatch). A record or tombstone handed to a verb failing its checks refuses bad_option, not unexpected_error. A gate verb's params touching the other wayin refuse bad_option; gate_issue is left to a registered_at that disagrees. A good or bad answer no longer carries meta: the verb's name stays on err.meta.call. A thrown error a store does not make a VaultError reads as storage_unavailable, from anywhere in the verb. PutTerms is gone: a subclass's doPutVault and doPutBox take PutOptsGiven, doDelVault and doDelBox take DelOpts. The throwers storageError, recordPreparedWrong, damagedRecord and newerFormat are gone (an adapter throws storageUnavailable); foundVaultRow, foundBoxRow and PutOptsGiven are new. Stored rows are unchanged.
