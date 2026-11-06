@@ -15,7 +15,7 @@ takes the default kind; one serving none of those goes. No new code.
 | 3 | `models/box.ts:138` (`#unseal`), `VX.boxSparse.parse(record)` | pick: the stamp is exactly the sparse fields | **default kind**: `SX.boxSparse`, `bad_record` to `bad_option` |
 | 4 | `models/box.ts:259` (`sealedRecordOf`), `VX.boxSparse.parse(base)` | pick: `base` is the prior record spread with a new revision | **default kind**: `SX.boxSparse`, `bad_record` to `bad_option` |
 | 5 | `models/box.ts:262` (`sealedRecordOf`), `VX.boxRecord.parse({ ...sparse, sidecar, ... })` | a build, but it also copies the sidecar (`whisperBag`'s `structuredClone` overwrite), mints the `BoxKeyWrapped`/`WhisperCiphered` brands, and narrows `am` to `'a'` | **left**: removing it is not a bare removal (it needs `am: 'a'` and casts written in, and a ruling on the kept sidecar being shared between records). Its kind is `SX.boxRecord`'s own, no relabel |
-| 6 | `models/box-listing.ts:51` (`hello`), `VX.boxesListed.parse(listed)` | none: `vault-listing.ts` `fetchListed` parsed it one call earlier | **removed** (`damaged_row` gone) |
+| 6 | `models/box-listing.ts:51` (`hello`), `VX.boxesListed.parse(listed)` | boundary: `hello` is a public method on `vault.boxListing`, which the README hands to hosts | kept: a public entry point, parsed by its caller as well (`vault-listing.ts` `fetchListed`). Removed in the first build, restored on the coordinator's correction |
 | 7 | `models/gating.ts:182`, `GX.passphraseWayinRecord.parse(nextWayin.pickle())` | precondition: narrows the wayin union to the passphrase kind | **default kind**: the relabel in `shapes-gateish.ts` dropped, `bad_record` to `bad_option` |
 | 8 | `models/gating.ts:188`, `GX.passkeyWayinRecord.parse(passkeyWayin.pickle())` | precondition: narrows to the passkey kind | **default kind**: as 7 |
 | 9 | `models/proving.ts:84` (`buildLease`), `vaultStamp.parse(friend)` | none: `consistent` compares only fields both bags define, and `this.stamp` defines only the stamp's, so the pick changes nothing; `provingLeaseArgs` checked `friend` the line above | **removed**: `consistent(friend, this.stamp)` |
@@ -50,11 +50,10 @@ Not touched, by the ruling: the four clock builds (`vault-listing.ts:64`, `lease
 
 ## For the Coach
 
-* **`vault.boxListing.hello(listed)` no longer checks `listed`.** The README names
-  `vault.boxListing` to hosts, so a host calling `hello` with a malformed listing now meets a
-  `TypeError` rather than `damaged_row`. The test asserting the old refusal is deleted.
-  Recommendation: accept, as the ruling names this site; the listing argument is `vault.hello`'s
-  feed, and could later be made internal.
+* **`boxListing.hello`'s `listed` argument should become internal, in a thread of its own.** Row 6
+  stays because `hello` is a host-reachable entry point, so `vault.hello`'s listing is parsed twice.
+  The better fix is to take `listed` off the public signature (a private feed from the vault
+  listing), after which the second parse can go. Recommendation: a thread of its own.
 * **Rows 13 and 19 double-check one record at runtime.** Both callers of the private Lease
   constructor hand it a parsed record, and the constructor parses again. STYLE.md keeps the
   constructor's parse; the brand keeps the build's. Recommendation: leave both, unless the Coach

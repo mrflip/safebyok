@@ -71,6 +71,11 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     await expect(next.hello()).resolves.to.eq(next)
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
   })
+
+  it("refuses a boxListing.hello given a list that fails its check", async () => {
+    const { vault } = await makeWorld()
+    await TH.expectRefusal(vault.boxListing.hello({ boxes: 'none' } as never), 'damaged_row')
+  })
 })
 
 describe("the box verbs refuse a vault locked, or gone", () => {
