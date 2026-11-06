@@ -135,7 +135,7 @@ export type StorableOpts = Z.infer<typeof storableOpts>
 // == [The listing's world]: world, World, ListingWorld, ListingOpts, vaultDBDuck, listingOpts, putListingOpts, PutListingOpts
 
 /** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: the one `clock`. */
-export const world = objCheck(() => ({ clock: CX.clockShape }), { refusalKind: 'bad_option', extras: 'strip' })
+export const world = objCheck(() => ({ clock: CX.clockShape }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** The world a listing lives in: the vault for boxes, the bank for vaults. The one clock lives here. */
 export type World = Z.infer<typeof world>
@@ -220,7 +220,7 @@ export type BoxRecord = SX.BoxRecord
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
   const damaged = boxSparse.extend({ boxlabel: str }).and(obj({ damagekind: oneof(EX.damagekindVals) }))
   return { boxes: arr(boxSparse), damaged_rows: arr(damaged) }
-}, { refusalKind: 'damaged_row', extras: 'strip' })
+}, { refusalkind: 'damaged_row', extras: 'strip' })
 
 /** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */
 export type BoxesListed = Z.output<typeof boxesListed>
@@ -264,7 +264,7 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
 })
 
 /** The check of what `box.putExposed` takes: a sidecar, if any, and never a whisper. */
-export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.optional() }), { refusalKind: 'bad_option' }, [CX])
+export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.optional() }), { refusalkind: 'bad_option' }, [CX])
 
 /** A host's patch for `box.putExposed`, which seals the whisper exposed. */
 export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
@@ -288,7 +288,7 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 /** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers the seal verbs. Checks only. */
 export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
   world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn() }),
-}), { refusalKind: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
 /** The vault's face to its boxes: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
 export type BoxWorld = ListingWorld & {
@@ -337,7 +337,7 @@ export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCac
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn }) => ({
   world: obj({ ...GX.provingWorld.shape, logger: CX.loggerShape, leaseMillis: GX.leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn() }),
-}), { refusalKind: 'bad_option', extras: 'strip' })
+}), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
@@ -380,7 +380,7 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn().optional(),
   onPanic:             fn().optional(),
-}), { refusalKind: 'bad_option' }, [CX])
+}), { refusalkind: 'bad_option' }, [CX])
 
 export type BankOpts = {
   applabel:             string
