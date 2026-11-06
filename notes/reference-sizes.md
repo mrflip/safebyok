@@ -60,15 +60,19 @@ Anthropic API key. Its JSON is 124 bytes. **The sidecar sizes are the Coach's ch
 1,000 and 4,000 bytes of JSON. Each is a plausible host bag (`account_id`, `calls`, `tokens`, `model`, at 1,000 and
 up a `limits` string) padded through a `notes` string to exactly that length, all ASCII.
 
-| Box     | Whisper                                         | Whisper JSON | Sidecar JSON | Core's measure | JSON length | Convex weighs | Source   |
-| ------- | ----------------------------------------------- | ------------ | ------------ | -------------- | ----------- | ------------- | -------- |
-| mini    | the API key                                     | 124          | 2            | 781            | 781         | 901           | Measured |
-| medium  | the API key                                     | 124          | 150          | 1,087          | 1,087       | 1,355         | Measured |
-| large   | RSA-2048 public and private PEM, a field each   | 2,226        | 1,000        | 4,740          | 4,740       | 5,005         | Measured |
-| large-4096 | the same, RSA-4096                           | 4,168        | 1,000        | 7,329          | 7,329       | 7,594         | Measured |
-| xl      | an mTLS identity: RSA-4096 leaf key, leaf and issuing certs, root cert | 9,921 | 4,000 | 18,000 | 18,000 | 18,265        | Measured |
-| any     | its tombstone                                   | n/a          | n/a          | 366 to 524     | same        | n/a           | Measured |
+| Box     | Whisper                                         | Whisper JSON | Whisper encrypted | Sidecar JSON | Core's measure | JSON length | Convex weighs | Source   |
+| ------- | ----------------------------------------------- | ------------ | ----------------- | ------------ | -------------- | ----------- | ------------- | -------- |
+| mini    | the API key                                     | 124          | 243               | 2            | 781            | 781         | 901           | Measured |
+| medium  | the API key                                     | 124          | 243               | 150          | 1,087          | 1,087       | 1,355         | Measured |
+| large   | RSA-2048 public and private PEM, a field each   | 2,226        | 3,046             | 1,000        | 4,740          | 4,740       | 5,005         | Measured |
+| large-4096 | the same, RSA-4096                           | 4,168        | 5,635             | 1,000        | 7,329          | 7,329       | 7,594         | Measured |
+| xl      | an mTLS identity: RSA-4096 leaf key, leaf and issuing certs, root cert | 9,921 | 13,306 | 4,000 | 18,000 | 18,000 | 18,265        | Measured |
+| any     | its tombstone                                   | n/a          | n/a               | n/a          | 366 to 524     | same        | n/a           | Measured |
 
+* **Whisper encrypted** is the `whisper_ciphered` field as it sits in the box's JSON:
+  `{"cipher_iv_b64":"…","ciphertext_b64":"…"}`, the 16-character IV and the ciphertext of the whisper's JSON plus its
+  16-byte tag, each base64url without padding: 56 + ceil((W + 16) × 4 / 3) bytes for a whisper of W. Computed from the
+  measured rule above. The box's other ciphered field, `box_key_wrapped`, adds 136 bytes whatever the whisper.
 * **The core's measure** is what `box_too_large` judges against `maxRecordBytes`, in `vault-db-new.ts` `jsonBytes`:
   `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the sidecar is
   ASCII. **Convex weighs** is safebyok-convex's `weigh`, Convex's `getDocumentSize` of the stored document with its
