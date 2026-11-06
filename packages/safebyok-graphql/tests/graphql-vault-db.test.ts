@@ -8,11 +8,12 @@ import * as TH from './test-helpers'
 TH.bootDatabaseFirst()
 
 TH.describeVaultDBBattery("GraphQLVaultDB", {
-  makeVaultDB:         async (opts) => await TH.makeVaultDB(opts),
-  makeCappedVaultDB:   async (maxBoxes) => await TH.makeVaultDB({}, maxBoxes),
-  makeTwin:            TH.makeTwin,
-  _cheat_rowsOf:       () => TH.rowsOf(),
-  _cheat_failNextCall: (vaultDB) => { vaultDB.failNext() },
+  makeVaultDB:          async (opts) => await TH.makeVaultDB(opts),
+  makeCappedVaultDB:    async (maxBoxes) => await TH.makeVaultDB({}, maxBoxes),
+  makeTwin:             TH.makeTwin,
+  _cheat_rowsOf:        () => TH.rowsOf(),
+  _cheat_failNextCall:  (vaultDB) => { vaultDB.failNext() },
+  boxNoticesCarryVault: false,
 })
 
 describe("GraphQLVaultDB's constructor", () => {

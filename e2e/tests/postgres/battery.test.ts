@@ -25,10 +25,11 @@ const watching = (vaultDB: PostgresVaultDB, scope: SX.WatchScope = TH.vaultScope
 
 TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
   TH.describeVaultDBBattery("PostgresVaultDB", {
-    makeVaultDB:       async (opts = {}) => remembered(await TH.freshStore(getDb(), opts), opts),
-    makeCappedVaultDB: async (maxBoxes) => remembered(await TH.freshStore(getDb(), { maxBoxes }), { maxBoxes }),
-    makeTwin:          async (vaultDB) => await TH.storeOver(getDb(), optsOf.get(vaultDB)),
-    _cheat_rowsOf:     () => TH.rowsOf(getDb()),
+    makeVaultDB:          async (opts = {}) => remembered(await TH.freshStore(getDb(), opts), opts),
+    makeCappedVaultDB:    async (maxBoxes) => remembered(await TH.freshStore(getDb(), { maxBoxes }), { maxBoxes }),
+    makeTwin:             async (vaultDB) => await TH.storeOver(getDb(), optsOf.get(vaultDB)),
+    _cheat_rowsOf:        () => TH.rowsOf(getDb()),
+    boxNoticesCarryVault: false,
   })
 
   it("hears what another server stores, a box too large for a notice included", async () => {

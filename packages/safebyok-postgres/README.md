@@ -60,9 +60,11 @@ missing table or privilege (a code in class `42`) refuses as `unexpected_error`,
 ## Hearing other writes
 
 Each write sends a notification on its user's channel, `vaultChannelOf(user_id)`, which is
-`safebyok_` and the user_id, as it commits, carrying the rows it stored (or, for rows too long for a
-notification, where they are, which the listener reads afresh). `listen(channel, onNotify)` hands
-each notification's text on that channel to `onNotify` and answers how to stop.
+`safebyok_` and the user_id, as it commits. A vault's notification is its row as stored; a box's
+is one JSON array, its vault's fields but the wayins and then its own; a row too long for a
+notification is told by where it is, and the listener reads it afresh. `listen(channel, onNotify)`
+hands each notification's text on that channel to `onNotify`, as it came, and answers how to stop.
+A watch hears a box with a null `world`: the vault's own notifications bring it.
 
 LISTEN needs a connection of its own for as long as it listens, so share one among every watch.
 This recipe LISTENs on a channel the first time a watch asks for it and **never UNLISTENs**: the
