@@ -5,13 +5,10 @@ import { VaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { WatchScope } from '../../src/shapes/shapes-storage'
 import type { Notice, VaultDB } from '../../src/storage/vault-db-new'
-import { bankScope, vaultScope, boxscope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, priorOf } from './storage-world'
+import { bankScope, vaultScope, boxscope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, priorOf, vaultQuery, boxQuery } from './storage-world'
 import { aWhile, beforeNextCall } from './timing'
 import { gateParamsOf } from './vault-db-battery-puts'
 import type { BatteryWorld } from './vault-db-battery'
-
-const vaultQuery = { ...vaultScope, vault_tok: 'life1' }
-const boxQuery   = { ...boxscope, vault_tok: 'life1' }
 
 /** The answers that landed, and those refused. */
 const splitOf = <AnswerT extends { ok: boolean }>(answers: AnswerT[]) => ({

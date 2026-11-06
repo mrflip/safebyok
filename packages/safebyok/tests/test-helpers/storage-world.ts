@@ -10,6 +10,10 @@ export const bankScope  = { applabel: 'acme', user_id: 'u1' }
 export const vaultScope = { ...bankScope, vaultlabel: 'main' }
 /** The scope of the box the records stand in. */
 export const boxscope   = { ...vaultScope, boxlabel: 'openai' }
+/** The query for the vault the records stand in, in the life `life1`. */
+export const vaultQuery = { ...vaultScope, vault_tok: 'life1' }
+/** The query for the box the records stand in, in the life `life1`. */
+export const boxQuery   = { ...boxscope, vault_tok: 'life1' }
 /** The moment every record was registered and written at. */
 export const Now = Date.UTC(2026, 9, 15)
 

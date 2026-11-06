@@ -4,10 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRecord } from '../../src/shapes/shapes-storage'
-import { vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale } from './storage-world'
+import { vaultScope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
 
-const boxQuery = { ...boxscope, vault_tok: 'life1' }
 const anyIfPresent = ['repl', 'fail', 'get'] as const
 const anyIfAbsent  = ['add', 'fail'] as const
 

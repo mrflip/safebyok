@@ -2,11 +2,8 @@
 
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
-import { bankScope, vaultScope, boxscope, vaultScopeOf, boxscopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf } from './storage-world'
+import { bankScope, vaultScope, boxscope, vaultScopeOf, boxscopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, vaultQuery, boxQuery } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
-
-const vaultQuery = { ...vaultScope, vault_tok: 'life1' }
-const boxQuery   = { ...boxscope, vault_tok: 'life1' }
 
 /** User ids a store keying its rows by a joined string could run together. */
 const NearUserIds = ['u1', 'u1:', 'u1|', 'u1%', 'u1%3A', 'u1.', 'u1@', 'u1~', 'u1+']
