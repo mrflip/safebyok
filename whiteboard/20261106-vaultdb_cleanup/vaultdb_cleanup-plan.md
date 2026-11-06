@@ -322,6 +322,50 @@ none was needed before is a last resort too. Touches every adapter package, so i
 from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
 mechanical; `sonnet` worker, `low` review.
 
+### 8. graphql_schema (after the restack)
+
+The Coach's ruling on Open Matters, 2026-11-06 (proceed), verbatim. The matter was "Rows cross
+GraphQL as one JSON value", Rec (orchestrator): "a typed schema, the sidecar a JSON scalar, times
+an EpochMillis scalar, plus the drift test, built in the same post-restack thread that retires
+relay". Coach:
+
+> There's no real cost to keeping those shapes in sync. Any change to the shape that would
+> disrupt the interface will be a breaking one anyway
+>
+> Against that, I lose graphql error handling, and
+>
+> Above all, it means I'm not using graphql like graphql. This isn't a wire format, it's a service
+> that any graphql client could use to retrieve sidecar data: although we currently don't offer a
+> schema on it one is conjectured.
+>
+> If I grant that there is a cost to code maintenance in the one case, but a benefit to the needs
+> of the customer, an improvement in error reporting, and adherence to the principle of writing
+> simple natural code according to each frameworks best practices, am I leaving important
+> considerations out? Earnest question
+
+and, after the orchestrator's answer:
+
+> are we stripping fields.? That's a mistake, everything should be nulled as it leaves the first
+> validator it hits
+>
+> Damaged rows should be JSON plain.
+>
+> It's not the case that refusals should be graphql errors. Think of it as the try interface, not
+> the throwing interface: it's a polo that carries an err field, not an Error object.
+
+*Gloss.* `packages/safebyok-graphql`: a typed schema for records, rows and answers; the sidecar a
+JSON scalar; times an `EpochMillis` scalar (safe integers past GraphQL's 32-bit `Int`); a damaged
+row as plain JSON. Each operation answers the try\* answer as a typed object carrying an `err`
+field (a plain object: kind and meta), never a GraphQL error; GraphQL's own errors are left to
+what GraphQL refuses itself. Absent fields: no stripping at the client's edge; a value leaving
+the first validator it meets carries null for an absent field, so check what that asks of the
+core's checkers and say so before changing them. One drift test walks the core's checkers against
+the schema's types. **Waits on the relay row** (Open Matters, "A public door to the store's raw
+steps"): if the Coach adopts serving the public verbs, this thread also retires `relay` and
+rewrites the client as its own class over an exported VaultDB interface, so safebyok-graphql is
+rewritten once. **Depends on:** the restack, and the relay ruling. **Size:** L; `high` review
+(it touches the refusal surface).
+
 ## For the Coach
 
 * ~~**The demo loses its IndexedDB vault store** when thread 3 lands.~~ *Coach (2026-11-06):*
