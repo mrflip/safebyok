@@ -220,7 +220,7 @@ The **duckish** of a type is the validator that lets you round-trip an object of
   whisper is taken out of its box by `extract`. A sentence the user sees may still say "open".
 * **unlock, as a noun.** A way in is a wayin. What a device caches is a lease. `ensureUnlocked()`
   is the verb, and `unlock_vault` the gating.
-* **proof, ask.** What the user hands in is cleartext. Made into a key, it is a proving. The
+* **proof; ask, as a noun.** What the user hands in is cleartext. Made into a key, it is a proving. The
   request for it is a gating.
 * **device key.** The key behind a lease is the leaseKey.
 * **public, plain, server-readable, of a stored field.** A field is visible (unencrypted and
