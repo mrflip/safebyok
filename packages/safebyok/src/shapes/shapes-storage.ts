@@ -143,14 +143,14 @@ export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParam
 
 // == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutVaultOpts, DelOpts, ReqParams, VaultDBOpts, MemoryVaultDBOpts
 
-export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
+export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
   const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
   const putVaultOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(['fail', 'get']).default('fail') })
   const delOpts = obj({ prior: revision })
 
-  const reqParams = obj({ applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, ...revision.shape, prior: revision }).partial()
+  const reqParams = boxQuery.extend({ box_tok, ...revision.shape, prior: revision }).partial()
   return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
 }, [CX])
 
