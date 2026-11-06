@@ -389,4 +389,4 @@ Each is a Coach's call; none breaks a guarantee above.
    only refuses a put. It is the host's decision, which a host would
    otherwise make for itself without the guard. "whisper is unsafe by design and its
    implementation may change as we tune its unsafeness" (the Coach, 2026-10-31). The core's `Box`
-   of G6 holds no whisper; the models are not yet exported.
+   of G6 holds no whisper.
