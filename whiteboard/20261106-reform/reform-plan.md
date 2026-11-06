@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; the Closer Look
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; threads 18 (`deviceid_required`, on #527), 19 (`utils_port`, on #531) and 20 (`kind_promises`, on #531) building; a commit on #528 adds the guarded files; the Closer Look
 tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
@@ -427,6 +427,45 @@ no `browserOpts` (no zxcvbn checker in the new core; the IndexedDB device DB is 
 deriver on the front door. *Review (low, sonnet):* `fixed`; three fixes (a `lengthOf` assertion; the doc block's reason
 moved to a `//`; a two-outcome title split). Left: three refusal phrases still point a host at a `browserOpts()` the new
 core lacks (Cleanup, thread 7); the derivers' doc blocks (documentarian). **Filed** at c74195a12, a plain push on #529.
+
+### 18. `deviceid_required`
+
+**The Coach** (2026-11-06): "yes, remove. It's very easy to have the Provider source the string in time and hand it down,
+it's very tricky for Bank to do it." (On main minting a default `device_id` and caching a device record where the first id
+wins; earlier: "device_id is required. It has to be that way because of timing issues uncaching it.")
+
+*Gloss:* `device_id` required in `bankOpts` (still a `label`); the default mint, `Bank.#cacheDeviceRecord` and its
+first-cached-wins step, and the device record itself (`DeviceDB.cacheDeviceRecord`, the `deviceRecord` shape,
+`MemoryDeviceDB`'s rows, `_cheat_deviceRows`, their tests and helpers) all go; the DeviceDB keeps leases only; guarantees.md
+and VOCABULARY (a plain commit on #518) say so; minor changeset. **Levels:** worker `opus`; review `high`. **Depends on:**
+#527 (stacked). **Look-ahead:** the IndexedDB device DB port builds on a leases-only DeviceDB. **Size:** one context.
+
+### 19. `utils_port`
+
+**The Coach** (2026-11-06): "Go ahead with work to also serve the other safebyok/exports from the new codebase; don't
+modify the old code of course. Bring anything copied over up to our standards."
+
+*Gloss:* `mask`/`MaskOpts` (its validator as a checker in shapes), `fromB64`/`toB64` (re-export the new core's codec if
+it has one) and `WhisperFieldAttributes` into the new core's `safebyok/utils`, with the old tests ported to STYLE; the
+**mask** row back into VOCABULARY; minor changeset. The zxcvbn checker with `browserOpts`, and the IndexedDB device DB,
+follow in later threads once thread 18 settles the device record. **Levels:** worker `sonnet`; review `medium`. **Depends
+on:** #531 (stacked). **Size:** small.
+
+### 20. `kind_promises`
+
+**The Coach** (2026-11-06): "we did a survey and decided when to pin a refusal kind and when not, would you detail a
+worker to inventory those promises and strip them out? Just to be clear, if there is a test now that 'when the moon
+waxes Gemini, box.foo fails bad_record', the test should remain but without promising the kind. This also does not
+intend ripping out code to satisfy a promise. Just remove the words that an agent might take as a contract." And on a
+box verb after a `vault_gone` hello: "It doesn't matter what it throws, it's an impossible situation. Remove anything
+implying a contract on the refusal kind".
+
+*Gloss:* an inventory file of every stated kind (doc blocks, VOCABULARY, READMEs, guarantees.md listed only, tests),
+each marked contract (a host branches on it in normal use) or incidental; then the strips: doc blocks and VOCABULARY say
+only that the call refuses, tests keep their behaviour and assert a refusal without the kind (one kind-less matcher in the
+helpers if none exists); no `src/` change, no test deleted, `errors.ts`'s kinds and `throwers.ts` untouched; the unsure
+list reported. Empty changeset. **Levels:** worker `opus`; review `medium`. **Depends on:** #531 (stacked, for VOCABULARY).
+**Size:** one context; split at sixty sites.
 
 ## For the Coach
 
