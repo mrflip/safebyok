@@ -1,6 +1,6 @@
 # Thread 4: port_postgres (2026-11-06)
 
-Branch `20261106-port_postgres`, stacked on #558 (thread 2, `20261106-vaultdb_battery`). Justify: everything
+Branch `20261106-port_postgres`, PR #561, stacked on #558 (thread 2, `20261106-vaultdb_battery`). Justify: everything
 green except **safebyok-graphql**: its lint, typecheck and tests (232 of 360 red) still build the old
 `postgresVaultDB` and speak safebyok-old's VaultDB. That is thread 5's work (it depends on this one) and
 cannot be made green here short of porting graphql. safebyok-postgres 114 tests; e2e 216 (the Postgres
