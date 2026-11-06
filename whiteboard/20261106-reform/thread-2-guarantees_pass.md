@@ -1,6 +1,6 @@
 # Thread 2: the guarantees pass for G8's stale names (2026-11-06)
 
-Branch `20261106-guarantees_pass`, PR #PRNUM, off `main` 57f33ee9. Justify: JUSTIFY.
+Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/pull/517), off `main` 57f33ee9. Justify: green (safebyok 1827, safebyok-old 3537 + 37 skipped, react 326, scripts 302, every package; lint, types, build, size).
 
 * **Built**: `notes/guarantees.md`, names and paths only, every guarantee G1-G10, the table, the
   host-function paragraph, *Bytes*, the secret values and the access points, checked against
