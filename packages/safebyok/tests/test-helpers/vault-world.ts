@@ -43,7 +43,7 @@ const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Pro
   const { requestCleartext: asBefore } = world
   let heard: Outcome<unknown> | null = null
   const dialog: RequestCleartext = async (gating) => {
-    heard = await gating.attempt(await typing as never)
+    heard = await gating.attempt(await typing)
   }
   world.requestCleartext = dialog
   try {

@@ -63,7 +63,7 @@ describe("A lease renewed through a gate change", () => {
     const { world } = born.opts
     const { requestCleartext: asBefore } = world
     world.requestCleartext = async (gating) => {
-      const attempting = gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase } as never)
+      const attempting = gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase })
       vault.lock()
       await attempting
     }
