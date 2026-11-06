@@ -48,6 +48,18 @@ safebyok-convex 223, e2e 208, every other package as on its base).
   * The client keeps its sentences in its own `src/phrases.ts`; the export is the class alone
     (no `convexVaultDB` factory); `SafebyokApi` is a mapped type over `ComponentApi`.
 
+  * Rework (the Coach's ruling on *Deleted Convex boxes pile up*): a box tombstone counts toward
+    the row cap as a live box does, so a life holds at most 8,000 box rows of either kind. A
+    `putBox` over a tombstone (or a damaged row) takes that row's place and leaves the count as
+    it was; only a new boxlabel adds one. A `delBox` leaves the count alone, and moves only the
+    bytes. At the cap, a new boxlabel refuses `vault_full`, the same answer as for live boxes,
+    `capacity.boxes.used` counting tombstones. Within a live life nothing frees a tombstone's row
+    but a put under its boxlabel: `delVault` ends the life (the next starts empty) and `tidyGone`
+    then removes the old rows. The client's `maxBoxes` counts the same rows (one count, no second
+    tally). Tests: put and delete under fresh boxlabels until the cap refuses; a rebirth over a
+    tombstone in a full life; a full life freed by `delVault`; 8,000 planted tombstones refused,
+    listed, watched and deleted within Convex's transaction limits.
+
 * **Deviations**:
   * Old tests dropped, the battery covering their contract: the Bank-math sizing cases, the
     `not_permitted` kind, `getCapacity` (gone), and e2e's Bank flows (sign-out lock, two devices,
@@ -65,6 +77,8 @@ safebyok-convex 223, e2e 208, every other package as on its base).
     (`pnpm --filter safebyok-convex build`).
 
 * **For the Coach**:
+  * The Convex `maxBoxes` now counts tombstones; `MemoryVaultDB`'s counts live boxes only. The
+    battery's capped case (#558) puts no tombstone, so it passes both ways.
   * The battery writes as several users, so it runs against the component directly, past the
     wrapper's auth; the wrapper has its own tests, including a refusal for another `user_id`.
   * `watchRows` resends a whole bank on each change; `tidyGone` reads a whole bank in one mutation.
