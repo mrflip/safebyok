@@ -117,13 +117,16 @@ Read it through `box.whisper` each time: a reference you kept outlives a lock.
 screen), where React's dev tools do not list it:
 
 ```tsx
+import { BoxFields } from 'safebyok/dom'
+
 function ApiKeyField({ box }) {
+  const fields = BoxFields.of(box)
   const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
   return (
     <>
-      <input ref={box.field('apiKey')} type="password" autoComplete="off" spellCheck={false} />
+      <input ref={fields.bind('apiKey')} type="password" autoComplete="off" spellCheck={false} />
       {exposed
-        ? <button onClick={() => box.saveFields()}>Save</button>
+        ? <button onClick={() => fields.save()}>Save</button>
         : <button onClick={() => box.expose()}>Show</button>}
     </>
   )
@@ -131,9 +134,10 @@ function ApiKeyField({ box }) {
 ```
 
 The field goes blank at a lock or a veil, and an edit comes back with the value. Nothing is stored
-until `box.saveFields()`. When the last field unmounts the box unexposes, so the whisper lasts
-no longer than its field: expose after it mounts. Without React, `box.field('apiKey')(el)` binds any
-element with a `value`, and answers how to unbind it.
+until `fields.save()`. When the last field unmounts the box unexposes, so the whisper lasts no
+longer than its field: expose after it mounts. `BoxFields.of` answers the same instance for a box
+wherever it is called. Without React, `const unbind = BoxFields.of(box).bind('apiKey')(el)` binds
+any element with a `value`.
 
 **React that looks like React.** The hook needs no library code:
 
@@ -159,8 +163,8 @@ merges deeply, and an array replaces.
 ## Not done yet
 
 **A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
-`Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, and `safebyok/testing` adds a cheap `testDeriver`
-and an `anyStrengthChecker`. Nothing exports a `VaultDB`, a `DeviceDB`, a real key deriver or
+`Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
+`safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. Nothing exports a `VaultDB`, a `DeviceDB`, a real key deriver or
 strength checker; the only stores are in-memory ones the tests reach in for.
 
 ## Next

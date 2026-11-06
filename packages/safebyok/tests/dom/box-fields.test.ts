@@ -1,6 +1,7 @@
-/** A Box's fields: `box.field` following the whisper through a lock and a veil, reading edits on the way into hiding, `box.saveFields`, and the last unbind. */
+/** A box's fields: `fields.bind` following the whisper through a lock and a veil, reading edits on the way into hiding, `fields.save`, and the last unbind. */
 
 import { describe, expect, it, vi } from 'vitest'
+import { BoxFields } from '../../src/dom/box-fields'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
@@ -19,7 +20,21 @@ const unexposedOf = async (): Promise<TestableBox> => {
 
 const elOf = (text = ''): { value: string } => ({ value: text })
 
-describe("box.field: what an element shows", () => {
+describe("BoxFields.of", () => {
+  it("answers one instance per box", async () => {
+    const box = await unexposedOf()
+
+    expect(BoxFields.of(box)).to.eq(BoxFields.of(box))
+    expect(BoxFields.of(box).box).to.eq(box)
+  })
+
+  it("refuses what is not a box", () => {
+    const err = TH.expectSyncRefusal(() => BoxFields.of({ whisper: {} } as never), 'bad_option')
+    expect(err.message).to.include(Phrases.BoxExpected)
+  })
+})
+
+describe("fields.bind: what an element shows", () => {
   const LeafCases = [
     ['apiKey',    'sk-test-0000', 'a top-level string'],
     ['org.name',  'acme',         'a dotted path'],
@@ -36,7 +51,7 @@ describe("box.field: what an element shows", () => {
 
       await box.expose()
       const el = elOf('was here')
-      box.field(path)(el)
+      BoxFields.of(box).bind(path)(el)
       expect(el.value).to.eq(shown)
     })
   }
@@ -45,7 +60,7 @@ describe("box.field: what an element shows", () => {
     const box = await unexposedOf()
 
     const el = elOf('was here')
-    box.field('apiKey')(el)
+    BoxFields.of(box).bind('apiKey')(el)
     expect(el.value).to.eq('')
     await box.expose()
     expect(el.value).to.eq(Stored.apiKey)
@@ -54,24 +69,24 @@ describe("box.field: what an element shows", () => {
   it("answers the same ref callback for the same path, so a re-render does not unbind", async () => {
     const box = await unexposedOf()
 
-    expect(box.field('apiKey')).to.eq(box.field('apiKey'))
-    expect(box.field('apiKey')).not.to.eq(box.field('org.name'))
+    expect(BoxFields.of(box).bind('apiKey')).to.eq(BoxFields.of(box).bind('apiKey'))
+    expect(BoxFields.of(box).bind('apiKey')).not.to.eq(BoxFields.of(box).bind('org.name'))
   })
 
   it("does nothing given null, as a React before 19 hands a ref at an unmount", async () => {
     const box = await unexposedOf()
 
-    expect(box.field('apiKey')(null)).to.eq(undefined)
+    expect(BoxFields.of(box).bind('apiKey')(null)).to.eq(undefined)
   })
 
   it("refuses an empty path", async () => {
     const box = await unexposedOf()
 
-    TH.expectSyncRefusal(() => box.field(''), 'bad_option')
+    TH.expectSyncRefusal(() => BoxFields.of(box).bind(''), 'bad_option')
   })
 })
 
-describe("box.field: into hiding and back", () => {
+describe("fields.bind: into hiding and back", () => {
   const HidingCases = [
     ['a lock',  () => { held.mw.setLockState('locked') }, () => { held.mw.setLockState('unlocked') }],
     ['a veil',  (box: TestableBox) => { box.veil() }, (box: TestableBox) => { box.unveil() }],
@@ -83,8 +98,8 @@ describe("box.field: into hiding and back", () => {
       await box.expose()
       const keyEl = elOf()
       const seatsEl = elOf()
-      box.field('apiKey')(keyEl)
-      box.field('org.seats')(seatsEl)
+      BoxFields.of(box).bind('apiKey')(keyEl)
+      BoxFields.of(box).bind('org.seats')(seatsEl)
       hide(box)
       expect([keyEl.value, seatsEl.value]).to.deep.equal(['', ''])
       show(box)
@@ -96,7 +111,7 @@ describe("box.field: into hiding and back", () => {
 
       await box.expose()
       const el = elOf()
-      box.field('apiKey')(el)
+      BoxFields.of(box).bind('apiKey')(el)
       el.value = 'sk-edited'
       hide(box)
       expect(el.value).to.eq('')
@@ -111,7 +126,7 @@ describe("box.field: into hiding and back", () => {
       await box.expose()
       const exposed = box.whisper
       const el = elOf()
-      box.field('apiKey')(el)
+      BoxFields.of(box).bind('apiKey')(el)
       hide(box)
       el.value = 'typed while hidden'
       show(box)
@@ -125,9 +140,9 @@ describe("box.field: into hiding and back", () => {
 
     await box.expose()
     const el = elOf()
-    box.field('org.seats')(el)
+    BoxFields.of(box).bind('org.seats')(el)
     box.veil().unveil()
-    await box.saveFields()
+    await BoxFields.of(box).save()
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
 
@@ -136,7 +151,7 @@ describe("box.field: into hiding and back", () => {
 
     await box.expose()
     const el = elOf()
-    box.field('apiKey')(el)
+    BoxFields.of(box).bind('apiKey')(el)
     el.value = 'sk-editing'
     box.patchWhisper({ org: { seats: 4 } })
     expect(el.value).to.eq('sk-editing')
@@ -147,7 +162,7 @@ describe("box.field: into hiding and back", () => {
 
     await box.expose()
     const el = elOf()
-    box.field('apiKey')(el)
+    BoxFields.of(box).bind('apiKey')(el)
     box.patchWhisper({ apiKey: 'sk-patched' })
     expect(el.value).to.eq('sk-patched')
   })
@@ -157,9 +172,9 @@ describe("box.field: into hiding and back", () => {
 
     await box.expose()
     const el = elOf()
-    box.field('__proto__.polluted')(el)
+    BoxFields.of(box).bind('__proto__.polluted')(el)
     el.value = 'edited'
-    await box.saveFields()
+    await BoxFields.of(box).save()
     expect(({} as { polluted?: string }).polluted).to.eq(undefined)
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
@@ -175,7 +190,7 @@ describe("box.field: into hiding and back", () => {
 
       await box.expose()
       const el = elOf()
-      box.field('apiKey')(el)
+      BoxFields.of(box).bind('apiKey')(el)
       end(box)
       expect(el.value).to.eq('')
     })
@@ -186,25 +201,25 @@ describe("box.field: into hiding and back", () => {
 
     await box.expose()
     const el = elOf()
-    box.field('apiKey')(el)
+    BoxFields.of(box).bind('apiKey')(el)
     await box.del()
     expect(el.value).to.eq('')
   })
 })
 
-describe("box.saveFields", () => {
+describe("fields.save", () => {
   it("merges each edited field over the value, and seals one put", async () => {
     const box = await unexposedOf()
 
     await box.expose()
     const keyEl = elOf()
     const nameEl = elOf()
-    box.field('apiKey')(keyEl)
-    box.field('org.name')(nameEl)
+    BoxFields.of(box).bind('apiKey')(keyEl)
+    BoxFields.of(box).bind('org.name')(nameEl)
     keyEl.value = 'sk-saved'
     nameEl.value = 'zenith'
     const tryPutBox = vi.spyOn(held.mw.vaultDB, 'tryPutBox')
-    expect(await box.saveFields()).to.eq(box)
+    expect(await BoxFields.of(box).save()).to.eq(box)
     expect(tryPutBox).toHaveBeenCalledOnce()
     const merged = { ...Stored, apiKey: 'sk-saved', org: { name: 'zenith', seats: 3 } }
     expect(await box.extractWhisper()).to.deep.equal(merged)
@@ -218,13 +233,13 @@ describe("box.saveFields", () => {
     await box.expose()
     const exposed = box.whisper
     const el = elOf()
-    box.field('apiKey')(el)
-    await box.saveFields()
+    BoxFields.of(box).bind('apiKey')(el)
+    await BoxFields.of(box).save()
     expect(box.whisper).to.eq(exposed)
     const told = vi.fn()
     box.subscribe(told)
     el.value = 'sk-saved'
-    await box.saveFields()
+    await BoxFields.of(box).save()
     expect(box.whisper).not.to.eq(exposed)
     expect(exposed).to.deep.equal(Stored)
     expect(told).toHaveBeenCalled()
@@ -235,46 +250,46 @@ describe("box.saveFields", () => {
 
     await box.expose()
     const el = elOf()
-    box.field('apiKey')(el)
+    BoxFields.of(box).bind('apiKey')(el)
     el.value = 'sk-unsaved'
-    await TH.expectRefusal(box.saveFields({ ifPresent: 'nonesuch' as 'repl' }), 'bad_option')
+    await TH.expectRefusal(BoxFields.of(box).save({ ifPresent: 'nonesuch' as 'repl' }), 'bad_option')
     expect(box.whisper).to.deep.include({ apiKey: 'sk-unsaved' })
   })
 
   it("refuses with no field bound, with none exposed, while veiled, and while locked", async () => {
     const box = await unexposedOf()
 
-    const noFields = await TH.expectRefusal(box.saveFields(), 'bad_option')
+    const noFields = await TH.expectRefusal(BoxFields.of(box).save(), 'bad_option')
     expect(noFields.message).to.eq(Phrases.NoFieldsBound)
-    box.field('apiKey')(elOf())
-    const notExposed = await TH.expectRefusal(box.saveFields(), 'bad_option')
+    BoxFields.of(box).bind('apiKey')(elOf())
+    const notExposed = await TH.expectRefusal(BoxFields.of(box).save(), 'bad_option')
     expect(notExposed.message).to.eq(Phrases.NotExposed)
     await box.expose()
     box.veil()
-    const veiled = await TH.expectRefusal(box.saveFields(), 'bad_option')
+    const veiled = await TH.expectRefusal(BoxFields.of(box).save(), 'bad_option')
     expect(veiled.message).to.eq(Phrases.SavingVeiledFields)
     box.unveil()
     held.mw.setLockState('locked')
-    await TH.expectRefusal(box.saveFields(), 'vault_locked')
+    await TH.expectRefusal(BoxFields.of(box).save(), 'vault_locked')
   })
 
   it("has a try form answering an outcome", async () => {
     const box = await unexposedOf()
 
-    const outcome = await box.trySaveFields()
+    const outcome = await BoxFields.of(box).trySave()
     expect(outcome.ok).to.be.false
   })
 })
 
-describe("box.field: the last unbind", () => {
-  it("unexposes at the last, and not before, blanking each as it goes", async () => {
+describe("fields.bind: the last unbind", () => {
+  it("unexposes at the last unbind of every caller of BoxFields.of, and not before, blanking each as it goes", async () => {
     const box = await unexposedOf()
 
     await box.expose()
     const first = elOf()
     const second = elOf()
-    const unbindFirst = box.field('apiKey')(first)
-    const unbindSecond = box.field('org.name')(second)
+    const unbindFirst = BoxFields.of(box).bind('apiKey')(first)
+    const unbindSecond = BoxFields.of(box).bind('org.name')(second)
     unbindFirst?.()
     expect(first.value).to.eq('')
     expect(second.value).to.eq('acme')
@@ -289,7 +304,7 @@ describe("box.field: the last unbind", () => {
 
     await box.expose()
     const el = elOf()
-    const unbind = box.field('apiKey')(el)
+    const unbind = BoxFields.of(box).bind('apiKey')(el)
     unbind?.()
     el.value = 'let go'
     held.mw.setLockState('locked')
@@ -300,9 +315,9 @@ describe("box.field: the last unbind", () => {
     const box = await unexposedOf()
 
     const el = elOf()
-    box.field('apiKey')(el)?.()
+    BoxFields.of(box).bind('apiKey')(el)?.()
     await box.expose()
-    box.field('apiKey')(el)
+    BoxFields.of(box).bind('apiKey')(el)
     expect(el.value).to.eq(Stored.apiKey)
     held.mw.setLockState('locked')
     expect(el.value).to.eq('')

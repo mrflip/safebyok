@@ -1,5 +1,4 @@
 import { cloneDeep, mergeWith } from 'es-toolkit'
-import { get, setWith } from 'es-toolkit/compat'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { ENCRYPTED, LOCKED, VEILED } from '../helpers/consts'
@@ -10,22 +9,15 @@ import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
 import type { LockState } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxExposedPatch, type BoxFieldEl, type BoxFieldRef, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
+import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
 import { stableJsonify } from '../helpers/stable-jsonify'
-import { absentBoxError, noFieldsBound, notExposedError, recordForNewBox, savingVeiledFields, undecodedWhisper } from '../refusals/throwers'
+import { absentBoxError, notExposedError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 
-/** An element bound by `box.field`, and the text it was last given: null while hidden, so that what is typed there is never read back. */
-interface BoundField {
-  readonly el:   BoxFieldEl
-  readonly path: string
-  shown:         string | null
-}
-
 /** A box as this device holds it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled, #fieldRefs, #fields, #stopHearingFields, #subscribeWithVault
+  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled, #subscribeWithVault
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -41,10 +33,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   #exposed: Whisper | null = null
   /** Whether {@link veil} is hiding the whisper exposed. */
   #isVeiled = false
-  /** The ref callbacks `field` has answered: a React re-render handed a new one would unbind the old, and so unexpose. */
-  readonly #fieldRefs = new Map<string, BoxFieldRef>()
-  readonly #fields = new Set<BoundField>()
-  #stopHearingFields: (() => void) | null = null
 
   /** Unbound callback to enroll the given listener for this box's changes and its vault's. */
   readonly #subscribeWithVault = (listener: () => void): (() => void) => {
@@ -142,10 +130,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Merge `patch` over the whisper exposed, into a new object, arrays replaced, and tell the subscribers; nothing is stored. */
+  /** Merge `patch` over the whisper exposed, shown or hidden, into a new object, arrays replaced, and tell the subscribers; nothing is stored. */
   patchWhisper(patch: Whisper): this {
     const given = VX.whisperPatch.parse(patch)
-    this.demandExposable()
+    this.demandEnabled()
     if (this.#exposed === null) { throw notExposedError() }
     this.#replaceExposed(mergedOver(this.#exposed, given))
     return this
@@ -165,76 +153,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const held = CX.whisper.safeParse(parseJsonOrNull(whisperText))
     if (! held.success) { throw undecodedWhisper() }
     return held.data
-  }
-  // --
-
-  // == [Fields]: field, saveFields, trySaveFields, bindField, unbindField, renderFields, readFields
-
-  /** A ref callback showing the whisper at dotted `path` in an element, which reads blank while it will not show.
-   * When the last field unbinds, the box unexposes. */
-  field(path: string): BoxFieldRef {
-    const fieldPath = VX.boxFieldPath.parse(path)
-    const ref = this.#fieldRefs.get(fieldPath) ?? ((el) => ((el === null) ? undefined : this.#bindField({ el, path: fieldPath, shown: null })))
-    this.#fieldRefs.set(fieldPath, ref)
-    return ref
-  }
-
-  /** Read each bound field over the whisper exposed, and seal it in one put. */
-  async saveFields(opts: BoxPutOpts = {}): Promise<this> {
-    if (this.#fields.size === 0) { throw noFieldsBound() }
-    this.demandExposable()
-    if (this.#exposed === null) { throw notExposedError() }
-    if (this.#isVeiled) { throw savingVeiledFields() }
-    const next = this.#readFields(this.#exposed)
-    if (next !== this.#exposed) { this.#replaceExposed(next) }
-    return this.putExposed({}, opts)
-  }
-
-  trySaveFields(opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.saveFields(opts)) }
-
-  #bindField(field: BoundField): () => void {
-    this.#fields.add(field)
-    this.#stopHearingFields ??= this.subscribe(() => { this.#renderFields() })
-    this.#renderFields()
-    return () => { this.#unbindField(field) }
-  }
-
-  #unbindField(field: BoundField): void {
-    this.#fields.delete(field)
-    field.el.value = ''
-    if (this.#fields.size > 0) { return }
-    this.#stopHearingFields?.()
-    this.#stopHearingFields = null
-    this.unexpose()
-  }
-
-  /** Bring every field up to the whisper; on the way into hiding, an edit is read into the value first, to come back with it. */
-  #renderFields(): void {
-    if ((this.#exposed !== null) && (this.whisper === this.#exposed)) {
-      for (const field of this.#fields) {
-        const text = fieldTextOf(get(this.#exposed, field.path))
-        if (field.shown === text) { continue }
-        field.el.value = text
-        field.shown = text
-      }
-      return
-    }
-    if (this.#exposed !== null) { this.#exposed = this.#readFields(this.#exposed) }
-    for (const field of this.#fields) {
-      field.el.value = ''
-      field.shown = null
-    }
-  }
-
-  /** `exposed` with each edited field merged over it, in a new object, or `exposed` itself with none: a text left as shown leaves its leaf, a number say, alone. */
-  #readFields(exposed: Whisper): Whisper {
-    let next = exposed
-    for (const field of this.#fields) {
-      if ((field.shown === null) || (field.el.value === field.shown)) { continue }
-      next = mergedOver(next, setWith({}, field.path, field.el.value, Object))
-      field.shown = field.el.value
-    }
-    return next
   }
   // --
 
@@ -346,18 +264,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // --
 }
 
-// == [Merging and fields]: mergedOver, fieldTextOf
+// == [Merging]: mergedOver
 
 /** `patch` merged over a copy of `whisper`, arrays replaced, as a plain object merge. */
 const mergedOver = (whisper: Whisper, patch: Whisper): Whisper => (
   mergeWith(cloneDeep(whisper), patch, (_was, val) => (Array.isArray(val) ? val : undefined))
 )
-
-/** What a field shows of a leaf: its text, and a blank for an object, a list or nothing there. */
-const fieldTextOf = (leaf: unknown): string => {
-  if (typeof leaf === 'string') { return leaf }
-  return ((typeof leaf === 'number') || (typeof leaf === 'boolean')) ? String(leaf) : ''
-}
 // --
 
 // == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull

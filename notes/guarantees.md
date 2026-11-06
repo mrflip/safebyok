@@ -406,7 +406,8 @@ listed here, has no counterpart in the core.
    it, a plain object the host may edit, after `expose` until the host calls `box.unexpose()` or the box is swept, deleted or vacated.
    A lock and `box.veil()` keep it, answering a frozen bag marked `Whispered` in its place (`'locked'`, `'veiled'`), so neither takes it out of
    memory: to make it go away is `unexpose`, and a bag or a copy of one refuses at a put, so it can never replace the secret. Forging the mark
-   only refuses a put. `box.field` writes a leaf of it to an element's `value`, so it is also in the DOM while it shows; a lock or a veil writes a
-   blank over it, an edit having been read back into the `Box` first, and the element is never read while hidden. The last field to unbind
-   unexposes. It is the host's decision, which a host would otherwise make for itself without the guard. "whisper is unsafe by design and its
+   only refuses a put. `BoxFields` (`src/dom/box-fields.ts`, the `safebyok/dom` entry) writes a leaf of it to an element's `value`, through
+   `Box`'s public surface alone, so it is also in the DOM while it shows. A lock or a veil writes a blank over it, an edit having been read back
+   into the `Box` first by `box.patchWhisper`, which works while locked and stores nothing, and the element is never read while hidden. The last
+   field to unbind unexposes. It is the host's decision, which a host would otherwise make for itself without the guard. "whisper is unsafe by design and its
    implementation may change as we tune its unsafeness" (the Coach, 2026-10-31).

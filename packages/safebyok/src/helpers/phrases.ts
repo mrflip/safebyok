@@ -261,7 +261,7 @@ export const WayinStoredDamaged = "One of this vault's unlockers is stored damag
 export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
-// == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, SavingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, SavingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -285,11 +285,14 @@ export const WhisperedIsNoWhisper = "That is what a box shows for a whisper it w
 /** Why a call that works on the exposed whisper is refused on a box with none. */
 export const NotExposed = "This box has no whisper exposed: call box.expose() first."
 
-/** Why saving a box's fields is refused while they show a blank or a mask. */
+/** Why `BoxFields.of` refuses what is not a box. */
+export const BoxExpected = "BoxFields.of takes a Box, as vault.getBox answers one."
+
+/** Why saving a box's fields is refused while they show a blank. */
 export const SavingVeiledFields = "This box's whisper is veiled, so its fields hold no whisper to save: call box.unveil() first."
 
 /** Why saving a box's fields is refused with none to read. */
-export const NoFieldsBound = "This box has no field bound, so there is nothing to save: bind one with box.field(path), or call box.putExposed()."
+export const NoFieldsBound = "This box has no field bound, so there is nothing to save: bind one with BoxFields.of(box).bind(path), or call box.putExposed()."
 
 /** Why a record storage holds under the revision_seq held, but another revision_tok, is not taken in. */
 export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."

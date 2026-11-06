@@ -1,6 +1,7 @@
 /** The README's three recipes for showing a whisper, each run in its order on real seals: a script, a raw field, and React with the hook played by hand. */
 
 import { describe, expect, it, vi } from 'vitest'
+import { BoxFields } from '../../src/dom/box-fields'
 import { LOCKED, VEILED } from '../../src/helpers/consts'
 import type { Box } from '../../src/models/box'
 import type { Vault } from '../../src/models/vault'
@@ -65,7 +66,7 @@ describe("the README's raw field", () => {
     const { vault, box } = await makeRecipeBox()
     const hook = hookOf(box.subscribe, box.getSnapshot)
     const input = { value: '' }
-    const unmount = box.field('apiKey')(input)
+    const unmount = BoxFields.of(box).bind('apiKey')(input)
     expect(hook.current().exposed).to.be.false
     expect(input.value).to.eq('')
 
@@ -81,7 +82,7 @@ describe("the README's raw field", () => {
     expect(input.value).to.eq('sk-test-edited')
     expect(await box.extractWhisper()).to.deep.equal(Stored)
 
-    await box.saveFields()
+    await BoxFields.of(box).save()
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-edited' })
 
     unmount?.()

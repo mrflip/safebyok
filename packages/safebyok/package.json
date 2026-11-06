@@ -79,6 +79,11 @@
       "import": "./dist/browser.js",
       "require": "./dist/browser.cjs"
     },
+    "./dom": {
+      "@safebyok/source": "./src/dom/index.ts",
+      "import": "./dist/dom/index.js",
+      "require": "./dist/dom/index.cjs"
+    },
     "./testing": {
       "@safebyok/source": "./tests/test-helpers.ts",
       "import": "./dist/testing.js",
@@ -106,6 +111,9 @@
       "browser": [
         "./dist/browser.d.cts"
       ],
+      "dom": [
+        "./dist/dom/index.d.cts"
+      ],
       "testing": [
         "./dist/testing.d.cts"
       ],
@@ -123,6 +131,10 @@
       "./browser": {
         "import": "./dist/browser.js",
         "require": "./dist/browser.cjs"
+      },
+      "./dom": {
+        "import": "./dist/dom/index.js",
+        "require": "./dist/dom/index.cjs"
       },
       "./testing": {
         "import": "./dist/testing.js",

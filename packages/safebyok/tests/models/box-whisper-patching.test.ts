@@ -71,15 +71,27 @@ describe("box.patchWhisper", () => {
     expect(err.message).to.eq(Phrases.NotExposed)
   })
 
-  it("refuses while locked, exposed or not", async () => {
+  it("merges while locked, showing nothing and storing nothing, and the unlock shows it", async () => {
+    const box = await unexposedOf()
+
+    await box.expose()
+    lock()
+    const told = vi.fn()
+    box.subscribe(told)
+    const tryPutBox = vi.spyOn(held.mw.vaultDB, 'tryPutBox')
+    expect(box.patchWhisper({ apiKey: 'sk-patched' }).whisper).to.eq(LOCKED)
+    expect(told).toHaveBeenCalledOnce()
+    expect(tryPutBox).not.toHaveBeenCalled()
+    held.mw.setLockState('unlocked')
+    expect(box.whisper).to.deep.include({ apiKey: 'sk-patched' })
+  })
+
+  it("refuses while locked and not exposed", async () => {
     const box = await unexposedOf()
 
     lock()
-    TH.expectSyncRefusal(() => box.patchWhisper({ apiKey: 'x' }), 'vault_locked')
-    held.mw.setLockState('unlocked')
-    await box.expose()
-    lock()
-    TH.expectSyncRefusal(() => box.patchWhisper({ apiKey: 'x' }), 'vault_locked')
+    const err = TH.expectSyncRefusal(() => box.patchWhisper({ apiKey: 'x' }), 'bad_option')
+    expect(err.message).to.eq(Phrases.NotExposed)
   })
 
   const BadPatches = [

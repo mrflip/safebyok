@@ -231,7 +231,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
 
 // --
 
-// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, boxFieldPath, BoxFieldEl, BoxFieldRef, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
+// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
 /** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
 export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
@@ -262,15 +262,6 @@ export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
 
 /** The check of what `box.patchWhisper` takes: a whisper, to merge over the one exposed. */
 export const whisperPatch = Checker(() => CX.whisper, 'bad_option')
-
-/** The check of `box.field`'s path, dotted into the whisper. */
-export const boxFieldPath = Checker(({ str }) => str.min(1), 'bad_option')
-
-/** What a `box.field` writes to: anything with a `value` string, as an `<input>` is. */
-export type BoxFieldEl = { value: string }
-
-/** What `box.field` answers: a React 19 ref callback, which binds an element and answers how to unbind it. */
-export type BoxFieldRef = (el: BoxFieldEl | null) => (() => void) | undefined
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchGiven = Z.output<typeof boxPatch>
