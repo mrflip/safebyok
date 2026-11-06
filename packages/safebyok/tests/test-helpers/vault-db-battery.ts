@@ -1,6 +1,7 @@
 /** The battery every VaultDB runs: one call registers the cases a store must pass, over a fresh store for each. */
 
 import { afterEach, beforeEach, describe } from 'vitest'
+import { objCheck } from '../../src/helpers/validator'
 import { _cheat_clock, _cheat_clockReset } from '../../src/helpers/clock'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { Awaitable } from '../../src/helpers/helpers'
@@ -43,6 +44,16 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   watches?: boolean
 }
 // --
+
+/** The check of what a store hands the battery: each hook a function, judged by its interface alone. */
+const batteryOpts = objCheck(({ fn, bool }) => ({
+  makeVaultDB:         fn<VaultDBBatteryOpts['makeVaultDB']>(),
+  _cheat_rowsOf:       fn<VaultDBBatteryOpts['_cheat_rowsOf']>(),
+  makeTwin:            fn<NonNullable<VaultDBBatteryOpts['makeTwin']>>().optional(),
+  makeCappedVaultDB:   fn<NonNullable<VaultDBBatteryOpts['makeCappedVaultDB']>>().optional(),
+  _cheat_failNextCall: fn<NonNullable<VaultDBBatteryOpts['_cheat_failNextCall']>>().optional(),
+  watches:             bool.optional(),
+}), 'bad_option')
 
 // == [The world the cases share]: BatteryWorld, worldOf
 
@@ -92,8 +103,9 @@ const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWor
 
 // == [The battery]: describeVaultDBBattery
 
-/** Registers the cases every VaultDB must pass, under `label`. */
+/** Registers the cases every VaultDB must pass, under `label`; refuses, registering none, opts that lack a hook it needs. */
 export const describeVaultDBBattery = <DBT extends VaultDB>(label: string, opts: VaultDBBatteryOpts<DBT>): void => {
+  batteryOpts.parse(opts, { where: `describeVaultDBBattery("${label}")` })
   const world = worldOf(opts)
   describe(label, () => {
     beforeEach(() => { _cheat_clock(() => Now + 1) })

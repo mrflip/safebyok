@@ -33,6 +33,13 @@ TH.describeVaultDBBattery("MemoryVaultDB", {
   _cheat_failNextCall: failNextCall,
 })
 
+describe("describeVaultDBBattery", () => {
+  it("refuses opts that lack a hook it needs, before it registers a case", () => {
+    expect(() => { TH.describeVaultDBBattery("none", { _cheat_rowsOf: memoryRowsOf } as never) }).to.throw(VaultError)
+    expect(() => { TH.describeVaultDBBattery("none", { makeVaultDB: () => new MemoryVaultDB() } as never) }).to.throw(VaultError)
+  })
+})
+
 describe("MemoryVaultDB's constructor", () => {
   it("refuses a maxBoxes or maxRecordBytes it cannot use", () => {
     for (const opts of [{ maxBoxes: NaN }, { maxBoxes: -1 }, { maxRecordBytes: -1 }]) {
