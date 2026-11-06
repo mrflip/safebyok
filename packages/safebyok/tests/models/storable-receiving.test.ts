@@ -2,8 +2,9 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CentralPolicy, RecordShape } from '../../src/shapes/shapes-enums'
-import * as VX from '../../src/shapes/shapes-vaultish'
-import type { BoxRecord, BoxSparse, Fetched, Reconciled } from '../../src/shapes/shapes-vaultish'
+import * as SX from '../../src/shapes/shapes-storage'
+import type { Fetched, Reconciled } from '../../src/shapes/shapes-vaultish'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { TestableBox, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -220,7 +221,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
 
     it("other | newer | full | never stored takes 'adopt': a box born elsewhere first is the one storage holds", () => {
-      const box = boxOf(tombstoneBoxRecord({ revision_seq: VX.VoidRevisionSeq, revision_tok: 'rev-never' }))
+      const box = boxOf(tombstoneBoxRecord({ revision_seq: SX.VoidRevisionSeq, revision_tok: 'rev-never' }))
       const rcvd = fullBoxRecord({ revision_seq: 0, revision_tok: 'rev-b0', ...OtherLife })
       box.receive(rcvd)
       expect(box._cheat_central).to.deep.equal(rcvd)
@@ -231,8 +232,8 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
 
 describe("storable.receive(null)", () => {
   it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with", () => {
-    const box = boxOf(tombstoneBoxRecord({ revision_seq: VX.VoidRevisionSeq, revision_tok: 'rev-never' }))
-    expect(box._cheat_central.revision_seq).to.eq(VX.VoidRevisionSeq)
+    const box = boxOf(tombstoneBoxRecord({ revision_seq: SX.VoidRevisionSeq, revision_tok: 'rev-never' }))
+    expect(box._cheat_central.revision_seq).to.eq(SX.VoidRevisionSeq)
     expectReceivedUnchanged(box, null, 'same')
   })
 

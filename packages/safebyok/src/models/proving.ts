@@ -2,10 +2,10 @@ import { Checkers, consistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { PassphraseKeyBytes, brandGuarded } from '../helpers/consts'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
-import { VaultError } from '../refusals/errors'
+import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
 import { outcomeOf, valOf } from '../refusals/outcome'
-import type { WayinKind } from '../shapes/shapes-enums'
+import type { Wayinkind } from '../shapes/shapes-enums'
 import type { KeyDeriver } from '../deriver/basederiver'
 import * as CX from '../shapes/shapes-core'
 import type { VaultScope } from '../shapes/shapes-core'
@@ -46,7 +46,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   readonly #wayinKey: CryptoKey
   #wayin: Wayin | null = null
 
-  toJSON(): { wayinkind: WayinKind } { return { wayinkind: this.wayinkind } }
+  toJSON(): { wayinkind: Wayinkind } { return { wayinkind: this.wayinkind } }
   // --
 
   // == [Construction]: constructor
@@ -202,7 +202,8 @@ export type GuardedKeyDeriver = Readonly<{
 }>
 
 // Its interface is checked, never its choices (#the-host-is-not-our-threat-model): what its key bytes must be is
-// checked where they land, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing.
+// checked where they land, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
+// a VaultError it throws passes as it came.
 /** `hostDeriver` held to its interface: the one way a proving asks it for key bytes. */
 export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
   const { key_deriver_label, salt_bytes } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
@@ -210,6 +211,7 @@ export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
     try {
       await hostDeriver.load?.()
     } catch (err) {
+      if (isVaultError(err)) { throw err }
       throw keyDeriverLoadFailed(err)
     }
   }

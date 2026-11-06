@@ -17,7 +17,7 @@ import { consoleLogger } from './console-logger'
  * @example Bank.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
  * @example Bank.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
  */
-export type VaultLogger = {
+export interface VaultLogger {
   /** Something worth knowing, with nothing to act on. */
   log:   (message?: string, story?: Record<string, unknown>, err?: Error | null) => void
   /** Something went wrong, and the vault carried on safely: worth a look. */

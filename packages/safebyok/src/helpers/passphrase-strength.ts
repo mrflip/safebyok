@@ -1,4 +1,5 @@
 import { brandGuarded } from './consts'
+import { isVaultError } from '../refusals/errors'
 import { decorate } from './helpers'
 import * as Phrases from './phrases'
 import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
@@ -21,8 +22,8 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * A checker that needs something fetched or built first, such as a dictionary, carries it as
  * `load`, which each bank's `hello()` runs. Make the checker once, before any bank, and hand the
  * same one to each; make `load` cost nothing once it has succeeded, and forget a failure. Call
- * `load` yourself only to warm up. A `load` that fails refuses the hello, so a
- * vault that cannot check a new passphrase never opens.
+ * `load` yourself only to warm up. A `load` that fails refuses the hello, a `VaultError` it throws as
+ * it came and anything else with what it threw as the cause, so a vault that cannot check a new passphrase never opens.
  *
  * safebyok ships none: pass your own (CUSTOMIZATION.md). To ask it as the user types, call
  * `gating.checkStrength(typed)`, which answers its verdict.
@@ -65,7 +66,7 @@ export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
 // A blank passphrase is weak before the host's checker hears it. A throw is replaced, as the checker heard the passphrase;
-// a failed `load` keeps its throw as the cause, as it heard nothing.
+// a failed `load` keeps its throw as the cause, as it heard nothing; a VaultError it throws passes as it came.
 /** `hostChecker` held to its contract: the one way a vault, or a dialog checking as the user types, asks it. */
 export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStrengthChecker => {
   const host = GX.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
@@ -90,6 +91,7 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStren
     try {
       await host.load?.()
     } catch (err) {
+      if (isVaultError(err)) { throw err }
       throw strengthCheckerLoadFailed(err)
     }
   }

@@ -9,7 +9,7 @@ import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
-/** SLOPDOC: A deviceDB's base: calls reach the store in order, only `peek` answers a `lease_key`, no verb logs one. */
+/** The base a host's device store extends, writing only the generic `do*` calls, each one atomic step. */
 export abstract class DeviceDB {
   // == [Brand]: IsDeviceDB
 

@@ -3,13 +3,14 @@ import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import type { GatingKind, LockState } from '../shapes/shapes-enums'
+import type { Gatingkind, LockState } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
@@ -222,7 +223,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     landGate:      (vault, proved, commit) => vault.#landGate(proved, commit),
   }
 
-  get #launchArgs(): LaunchArgs<Exclude<GatingKind, 'build_vault'>> {
+  get #launchArgs(): LaunchArgs<Exclude<Gatingkind, 'build_vault'>> {
     return { listing: this.listing, scope: this.scope, vault: this, prior: null, friend: Vault.#gatingFriend }
   }
   // --
@@ -271,7 +272,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   // `receive` refuses `otherVaultTok` for a row of another life: the one consistency guard on this path.
-  takeWorld(world: unknown): void { this.receive(VX.vaultRow.parse(world)) }
+  takeWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
 
   /** Tell bad news of this vault's boxes where its own goes. */
   tellBadNews(badnews: readonly VaultError[]): void { this.world.tellBadNews(badnews) }

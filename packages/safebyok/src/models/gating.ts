@@ -3,12 +3,14 @@ import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
 import * as EX from '../shapes/shapes-enums'
-import type { GatingKind } from '../shapes/shapes-enums'
+import type { Gatingkind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import type { AnteProvings, AnyGating, AskUser, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { VaultRecord, VaultWorld } from '../shapes/shapes-vaultish'
+import type { VaultWorld } from '../shapes/shapes-vaultish'
+import * as SX from '../shapes/shapes-storage'
+import type { VaultRecord } from '../shapes/shapes-storage'
 import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
@@ -16,7 +18,7 @@ import type { Vault } from './vault'
 import type { VaultListing } from './vault-listing'
 
 /** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and settles once: launch answers with that outcome. */
-export class Gating<KindT extends GatingKind = GatingKind> {
+export class Gating<KindT extends Gatingkind = Gatingkind> {
   // == [Props]: gatingkind, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #settled, #settle, #outcome, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
@@ -72,7 +74,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
 
   /** SLOPDOC: Opens a new gating's dialog on this bank and resolves with the vault its run answers. */
-  static async launch<KindT extends GatingKind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
+  static async launch<KindT extends Gatingkind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
     const { scope } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend })
     const { askUser } = args.listing.world
     const gating = new Gating(gatingkind, { ...args, scope })
@@ -94,7 +96,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
 
   /** SLOPDOC: The one door for a clear: tries what the user typed once, and answers how it went as an Outcome. */
-  attempt(clears: ClearsForGatingkind[GatingKind]): Promise<Outcome<Vault>> {
+  attempt(clears: ClearsForGatingkind[Gatingkind]): Promise<Outcome<Vault>> {
     const refusal = this.#refusalOfAttempt()
     if (refusal !== null) {
       // A clear is spent even when refused at the door.
@@ -110,7 +112,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     return this.#isAttempting ? attemptInFlight() : null
   }
 
-  async #attemptOnce(clears: ClearsForGatingkind[GatingKind]): Promise<Outcome<Vault>> {
+  async #attemptOnce(clears: ClearsForGatingkind[Gatingkind]): Promise<Outcome<Vault>> {
     const asked = { scope: this.#scope, vault: this.vault, listing: this.#listing, world: this.#listing.world }
     const outcome = await outcomeOf(async () => this.#run(await this.#prove(asked, clears), this.#launchArgs))
     this.#isAttempting = false
@@ -160,7 +162,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
 // == [An attempt's runs]: RunForGatingkind
 
 /** Past the proving, the change the gating was launched for. Each hears provings, never a clear, and comes to its vault's private verbs by the friend. */
-const RunForGatingkind: { [KindT in GatingKind]: Run<KindT> } = {
+const RunForGatingkind: { [KindT in Gatingkind]: Run<KindT> } = {
   build_vault: async ({ passphraseProving, passkeyProving }, { listing, prior, friend }) => {
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin    = await passkeyProving?.buildWayin(passphraseProving) ?? null
@@ -178,13 +180,13 @@ const RunForGatingkind: { [KindT in GatingKind]: Run<KindT> } = {
 
   replace_passphrase: async ({ ante, anteProving, nextProving }, { listing, vault, friend }) => {
     const nextWayin        = await nextProving.buildWayin(anteProving)
-    const passphrase_wayin = GX.passphraseWayinRecord.parse(nextWayin.pickle())
+    const passphrase_wayin = SX.passphraseWayinRecord.parse(nextWayin.pickle())
     return friend.landGate(vault, anteProving, () => listing.replacePassphrase({ ...ante, gate: { passphrase_wayin } }))
   },
 
   add_passkey: async ({ ante, proved, passkeyProving }, { listing, vault, friend }) => {
     const passkeyWayin  = await passkeyProving.buildWayin(proved)
-    const passkey_wayin = GX.passkeyWayinRecord.parse(passkeyWayin.pickle())
+    const passkey_wayin = SX.passkeyWayinRecord.parse(passkeyWayin.pickle())
     return friend.landGate(vault, proved, () => listing.addPasskey({ ...ante, gate: { passkey_wayin } }))
   },
 
@@ -204,7 +206,7 @@ const RunForGatingkind: { [KindT in GatingKind]: Run<KindT> } = {
 // == [An attempt's provings]: Prove, ProveForGatingkind, timelyAnte, provePassphrase, checkedClears, isCorrectable, spendClears
 
 /** Past the enter key, the last to hear the clears. A birth's stamp is minted here, one per attempt. */
-const ProveForGatingkind: { [KindT in GatingKind]: Prove<KindT> } = {
+const ProveForGatingkind: { [KindT in Gatingkind]: Prove<KindT> } = {
   build_vault: async ({ scope, listing, world }, clears) => {
     const { passphraseClear, passkeyClear } = checkedClears(GX.vaultBuildClears, clears)
     const stamp = listing.stampOfBirth(scope)
@@ -259,7 +261,7 @@ const checkedClears = <ClearsT>(checker: { parse: (clears: unknown) => ClearsT }
   }
 }
 
-const isCorrectable = (err: VaultError): boolean => (EX.correctableKindVals as readonly string[]).includes(err.refusalkind)
+const isCorrectable = (err: VaultError): boolean => (EX.correctablekindVals as readonly string[]).includes(err.refusalkind)
 
 /** Zero a passkey answer's PRF bytes wherever `clears` carries them, checked or not and of any realm, a bare ArrayBuffer too, as WebAuthn hands one: an answer is single-use (G2). */
 const spendClears = (clears: unknown): void => {

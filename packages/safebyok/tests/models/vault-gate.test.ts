@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
-import type { GatingKind } from '../../src/shapes/shapes-enums'
+import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { Promptly } from '../../src/shapes/shapes-vaultish'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
@@ -23,7 +23,7 @@ const dialogOf = (world: Born) => {
   }
   return {
     shown,
-    gatingAt: <KindT extends GatingKind>() => vi.waitFor(() => {
+    gatingAt: <KindT extends Gatingkind>() => vi.waitFor(() => {
       if (shown.length === 0) { throw new Error("no dialog shown yet") }
       return shown[0] as Gating<KindT>
     }, { interval: 1 }),

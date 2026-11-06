@@ -114,7 +114,7 @@ export const MinutesShape = "Expected a number of minutes, zero or more, fractio
 export const VaultDBShape = "Expected a storage adapter, an instance of the VaultDB class: localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
 
 /** A `deviceDB` that is no device store. */
-export const DeviceDBShape = "Expected a DeviceDB: your device store, which extends the DeviceDB class and keeps its rows on this device"
+export const DeviceDBShape = "Expected a device store, an instance of the DeviceDB class: new MemoryDeviceDB(), or your own class that extends DeviceDB, both imported from 'safebyok'"
 
 /** A `keyDeriver` left out, or no object. */
 export const KeyDeriverShape = "Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes and a deriveKeyBytes function"

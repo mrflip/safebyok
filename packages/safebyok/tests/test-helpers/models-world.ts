@@ -27,9 +27,9 @@ import type { LockState } from '../../src/shapes/shapes-enums'
 import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
-import type { BoxQuery, BoxRow, BoxTombstone, DelOpts, IfAbsentOpts, PutOpts, ReqParams, Revision, VaultRecord, WatchScope } from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type BoxDna, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone, BoxFormat } from '../../src/shapes/shapes-vaultish'
+import { type BoxDna, type BoxWorld, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
+import { type BoxQuery, type BoxRow, type BoxTombstone, type DelOpts, type IfAbsentOpts, type PutOpts, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Notice } from '../../src/storage/vault-db-new'
@@ -82,7 +82,7 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
 })
 
 /** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise; a sidecar or sealed part it names is stripped. */
-export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => VX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
+export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => SX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
 
 /** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x' for a deletion or 'd' for damage, and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`.
  *

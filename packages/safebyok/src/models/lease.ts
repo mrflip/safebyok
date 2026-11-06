@@ -5,7 +5,7 @@ import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey
 import { tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
-import type { WayinKind } from '../shapes/shapes-enums'
+import type { Wayinkind } from '../shapes/shapes-enums'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
 
 /** A vault's vaultKey in force on this device, good for one `gate_epoch`. It holds the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
@@ -20,7 +20,7 @@ export class Lease implements LeaseStamp {
   declare readonly registered_at: number
   declare readonly gate_epoch:    number
   declare readonly proved_at:     number
-  declare readonly wayinkind:     WayinKind
+  declare readonly wayinkind:     Wayinkind
 
   /** All this lease hears of its vault. */
   readonly #friend: LeaseFriend

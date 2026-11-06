@@ -112,13 +112,31 @@ describe("bank.hello", () => {
   it("refuses when a key deriver will not load, what it threw the cause, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
     const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
-    const refused = new VaultError('storage_unavailable', 'no wasm here')
-    const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
+    const thrown = new Error('no wasm here')
+    const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(thrown) }) })
     const err = await TH.expectRefusal(bank.hello())
-    expect(err.cause).to.eq(refused)
+    expect(err.cause).to.eq(thrown)
     expect(err.message).to.match(/keyDeriver's load\(\) failed/)
     expect(bank.snapshot).to.include({ stage: 'refused', err })
     expect(listVaults).not.toHaveBeenCalled()
+  })
+
+  it("passes a VaultError a key deriver's load throws as it came", async () => {
+    const world = makeBankWorld()
+    const refused = new VaultError('storage_unavailable', 'no wasm here')
+    const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
+    const err = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
+    expect(err).to.eq(refused)
+    expect(bank.snapshot).to.include({ stage: 'refused', err })
+  })
+
+  it("passes a VaultError a strength checker's load throws as it came", async () => {
+    const world = makeBankWorld()
+    const refused = new VaultError('storage_unavailable', 'no word list here')
+    const bank = world.bankOn({ strengthChecker: Object.assign((() => ({ strong: true })) as typeof anyStrengthChecker, { load: () => Promise.reject(refused) }) })
+    const err = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
+    expect(err).to.eq(refused)
+    expect(bank.snapshot).to.include({ stage: 'refused', err })
   })
 
   it("tells of a damaged vault row as bad news, and readies the bank without it", async () => {

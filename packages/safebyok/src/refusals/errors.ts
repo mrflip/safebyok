@@ -2,7 +2,7 @@
 
 import type { Capacity } from '../shapes/shapes-storage'
 
-// == [Kinds and families]: refusalKindVals, RefusalKind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
+// == [Kinds and families]: refusalkindVals, Refusalkind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind's meaning sits beside it, and its family in {@link RefusalFamilyForKind}. The families
@@ -33,7 +33,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
  * altered, since decryption fails alike; the message says so.
  */
-export const refusalKindVals = [
+export const refusalkindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
@@ -69,13 +69,13 @@ export const refusalKindVals = [
   'gate_issue',          // a vaultDB gate verb whose params fail the integrity checks against the stored row
   'disabled',            // a call on an object let go by a sweep, a vacate or a delete: it answers nothing more, and the bank has a fresh one
 ] as const
-export type RefusalKind = typeof refusalKindVals[number]
+export type Refusalkind = typeof refusalkindVals[number]
 
-/** The three families a refusalkind belongs to, told apart by who handles it, as {@link refusalKindVals} describes them. */
+/** The three families a refusalkind belongs to, told apart by who handles it, as {@link refusalkindVals} describes them. */
 export const refusalFamilyVals = ['misuse', 'condition', 'bad_news'] as const
 export type RefusalFamily = typeof refusalFamilyVals[number]
 
-/** The family of each refusalkind in {@link refusalKindVals}, which a VaultError's `family` is read from. */
+/** The family of each refusalkind in {@link refusalkindVals}, which a VaultError's `family` is read from. */
 export const RefusalFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
@@ -111,7 +111,7 @@ export const RefusalFamilyForKind = {
   damaged_row:         'bad_news',
   gate_issue:          'misuse',
   disabled:            'misuse',
-} as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
+} as const satisfies Readonly<Record<Refusalkind, RefusalFamily>>
 // --
 
 // == [The error]: RefusalMeta, VaultErrorOpts, VaultError
@@ -151,8 +151,8 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  *   if (! ok && err.family === 'misuse') { throw err }
  */
 export class VaultError extends Error {
-  /** The kind of refusal, from {@link refusalKindVals}: what went wrong. */
-  readonly refusalkind:  RefusalKind
+  /** The kind of refusal, from {@link refusalkindVals}: what went wrong. */
+  readonly refusalkind:  Refusalkind
   /** Who handles it, read from {@link RefusalFamilyForKind}. */
   readonly family:       RefusalFamily
   /** The facts the refusal learned, when it learned any. */
@@ -162,7 +162,7 @@ export class VaultError extends Error {
    * @param message - What went wrong and what to do, calmly, for a non-expert. Never quotes secret material.
    * @param opts - `cause`, the lower-level failure kept for debugging, and `meta`. Neither may hold secret material.
    */
-  constructor(refusalkind: RefusalKind, message: string, opts?: VaultErrorOpts) {
+  constructor(refusalkind: Refusalkind, message: string, opts?: VaultErrorOpts) {
     const { meta, ...errorOpts } = opts ?? {}
     super(message, errorOpts)
     this.name = 'VaultError'
@@ -178,13 +178,13 @@ export class VaultError extends Error {
 /** What a `catch` binds: anything at all, since JavaScript lets any value be thrown. */
 export type Thrown = unknown
 
-/** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link refusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
+/** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link refusalkindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
  * A kind off the list is the thrower's own text, and may quote what it heard.
  *
  * @example listedKindOf(new Error('no luck with hunter2'))  // null
  */
-export const listedKindOf = (thrown: unknown): RefusalKind | null => (
-  isVaultError(thrown) && (refusalKindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
+export const listedKindOf = (thrown: unknown): Refusalkind | null => (
+  isVaultError(thrown) && (refusalkindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
 )
 
 /** The string `name` of `thrown` when it is an object carrying one, else null: all a refusal keeps of an error it replaces.
@@ -210,7 +210,7 @@ export const thrownNameOf = (thrown: unknown): string | null => (
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  */
-export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is VaultError => (
+export const isVaultError = (err: unknown, refusalkind?: Refusalkind): err is VaultError => (
   err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
 )
 

@@ -6,9 +6,9 @@ import { absentBoxError, notListedBoxError } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxCreateOpts, type BoxDna, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, type ListingOpts, boxDna, boxRecord, boxSparse } from '../shapes/shapes-vaultish'
+import { type BoxCreateOpts, type BoxDna, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, type ListingOpts, boxDna } from '../shapes/shapes-vaultish'
+import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import type { Notice } from '../storage/vault-db-new'
 import { Box } from './box'
 import { Listing } from './listing'
@@ -38,9 +38,9 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** The scope of `duck`, held to this vault: no listing answers for another's. */
   scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.world.scope) }
 
-  sparseOf(duck: unknown): BoxSparse { return boxSparse.parse(duck) }
+  sparseOf(duck: unknown): BoxSparse { return SX.boxSparse.parse(duck) }
 
-  recordOf(duck: unknown): BoxRecord { return boxRecord.parseConsistent(duck, this.world.scope) }
+  recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.world.scope) }
   // --
 
   // == [Methods]: list, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor

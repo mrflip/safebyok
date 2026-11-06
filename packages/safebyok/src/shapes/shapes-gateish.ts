@@ -18,37 +18,36 @@ import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type VaultScope, vaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
-import type { Revision, VaultRecord, VaultWorld } from './shapes-vaultish'
+import type { Revision, VaultRecord } from './shapes-storage'
+import type { VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
-/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinKindVals}. */
-export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinKindVals), 'bad_option')
+/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinkindVals}. */
+export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
 export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
 // --
 
-// == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
-
-export const { passphraseWayin: passphraseWayinRecord, passkeyWayin: passkeyWayinRecord } = SX
+// == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
 
 export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
-  const passphraseWayinHeader = SX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  const passkeyWayinHeader    = SX.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passphraseWayinHeader = SX.passphraseWayinRecord.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passkeyWayinHeader    = SX.passkeyWayinRecord.omit({ vault_key_wayin_wrapped: true }).strip()
   return {
     passphraseWayinHeader,
     passkeyWayinHeader,
     wayinHeader: discrim('wayinkind', [passphraseWayinHeader, passkeyWayinHeader]),
-    wayinRecord: discrim('wayinkind', [passphraseWayinRecord, passkeyWayinRecord]),
+    wayinRecord: discrim('wayinkind', [SX.passphraseWayinRecord, SX.passkeyWayinRecord]),
   }
 })
 
 export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
 export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
 export type WayinHeader           = Z.infer<typeof wayinHeader>
-export type PassphraseWayinRecord = Z.infer<typeof passphraseWayinRecord>
-export type PasskeyWayinRecord    = Z.infer<typeof passkeyWayinRecord>
+export type PassphraseWayinRecord = Z.infer<typeof SX.passphraseWayinRecord>
+export type PasskeyWayinRecord    = Z.infer<typeof SX.passkeyWayinRecord>
 export type WayinRecord           = Z.infer<typeof wayinRecord>
 // --
 
@@ -62,8 +61,8 @@ export const gateEpoch = Checker(({ int }) => int.positive(), 'bad_record')
 
 export const gateProps = objCheck(() => ({
   gate_epoch:       gateEpoch,
-  passphrase_wayin: passphraseWayinRecord,
-  passkey_wayin:    passkeyWayinRecord.nullable(),
+  passphrase_wayin: SX.passphraseWayinRecord,
+  passkey_wayin:    SX.passkeyWayinRecord.nullable(),
 }), 'bad_record')
 
 export type GateProps = Z.infer<typeof gateProps>
@@ -114,7 +113,7 @@ export const freshPasskeyAnswer = Checker(() => (
 ), 'bad_option')
 // --
 
-// == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict, StrengthChecker
+// == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict
 
 /** True for a {@link StrengthChecker}: a function, whose `load`, if it carries one, is a function too. */
 const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
@@ -135,8 +134,6 @@ export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ 
  * vault's 'weak_passphrase' refusal carries it as its message.
  */
 export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
-
-export type { StrengthChecker } from '../helpers/passphrase-strength'
 // --
 
 // == [The vault's stamp]: vaultStamp, VaultStamp
@@ -153,14 +150,19 @@ export type VaultStamp = Z.infer<typeof vaultStamp>
 
 // == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
+/** The check of what a proving hears of the bank, refusing 'bad_option'. */
 export const { provingWorld } = Checkers('bad_option', ({ obj, custom, device_id }) => ({
   provingWorld: obj({
+    /** The bank's key deriver, guarded: it turns a passphrase into key bytes. */
     keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
+    /** The bank's strength checker, guarded: it judges a new passphrase. */
     strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
+    /** This device's id, written into the wayin header a proving mints. */
     device_id,
   }),
 }), [CX])
 
+/** What a proving hears of the bank: its two guarded host functions and this device's id. */
 export type ProvingWorld = Z.infer<typeof provingWorld>
 
 /** The arguments of the provings' statics. A `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one; a `gate` is whatever carries a {@link vaultStamp} as `stamp`, and {@link gateProps}, as a `Gate` does. */
@@ -216,7 +218,7 @@ export type LeaseSparse = LeaseStamp
 export type LeaseRecord = Z.infer<typeof leaseRecord>
 // --
 
-// == [What a lease is handed]: sealedWhisper, leaseMillis, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, SealedWhisper, LeaseFriend, LeaseGrantOpts
+// == [What a lease is handed]: sealedWhisper, leaseMillis, guardedLogger, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
 export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
@@ -225,22 +227,28 @@ export type SealedWhisper = Z.infer<typeof sealedWhisper>
 /** The autolock duration in milliseconds, at most {@link ForeverMillis}. */
 export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis), 'bad_option')
 
+/** The check of a logger as the bank hands its models one: guarded by `parseLogger`. */
+export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
+
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
-export const leaseFriend = objCheck(({ fn, custom }) => ({
+export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
-  logger:          custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected),
+  logger:          guardedLogger,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
+  /** Cache a lease's record on this device, in place of any it held. */
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
+  /** Drop the lease this device has cached. */
   tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
+/** All a lease or a proving hears of its vault, once {@link leaseFriend} has checked it. */
 export type LeaseFriend = Z.infer<typeof leaseFriend>
 
 export const leaseGrantOpts = objCheck(() => ({
@@ -276,7 +284,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 /** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
 export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj }) => ({
-  gatingkind:              oneof(EX.gatingKindVals),
+  gatingkind:              oneof(EX.gatingkindVals),
   vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
     .refine(({ passphraseClear, passkeyClear = null }) => passphraseClear !== undefined || passkeyClear !== null, Phrases.ProofMissing),
@@ -288,10 +296,13 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
 
 /** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault takes a proving. */
 export const gatingFriend = objCheck(({ fn }) => ({
+  /** Unlock the vault with what a proving proved. */
   unlockByProof: fn<(vault: Vault, proved: Proving) => Promise<Vault>>(),
+  /** Store a changed gate by `commit`, then lease the vault under the epoch it landed. */
   landGate:      fn<(vault: Vault, proved: Proving, commit: () => Promise<VaultRecord>) => Promise<Vault>>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
+/** What a gating's run hears of its vault's private verbs, once {@link gatingFriend} has checked it. */
 export type GatingFriend = Z.infer<typeof gatingFriend>
 
 /** The check of what launches a gating. */
@@ -315,9 +326,13 @@ export type RequestCleartext = (gating: AnyGating) => unknown
 /** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */
 export type AskUser = (gating: AnyGating) => Promise<boolean>
 
-export type AnyGating = { [KindT in EX.GatingKind]: Gating<KindT> }[EX.GatingKind]
+export type AnyGating = { [KindT in EX.Gatingkind]: Gating<KindT> }[EX.Gatingkind]
 
-export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: EX.GatingKind }>
+/** A gating as a host's dialog renders it: the vault it asks for, and what it asks for. */
+export interface GatingSnapshot extends VaultScope {
+  /** What the gating does once the user's cleartext proves the gate: build, unlock or delete the vault, or change its gate. */
+  readonly gatingkind: EX.Gatingkind
+}
 
 /** What a build_vault attempt proves: the provings of a new vault's wayins, with no record to prove them against. */
 export type VaultBuildProvings = { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
@@ -345,14 +360,14 @@ export type ProvingsForGatingkind = {
 }
 
 /** The change a gating is launched for, past the enter key. It hears provings, never a clear. */
-export type Run<KindT extends EX.GatingKind> = (provings: ProvingsForGatingkind[KindT], launchArgs: LaunchArgs<KindT>) => Promise<Vault>
+export type Run<KindT extends EX.Gatingkind> = (provings: ProvingsForGatingkind[KindT], launchArgs: LaunchArgs<KindT>) => Promise<Vault>
 
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
 /** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch. */
-export type LaunchArgs<KindT extends EX.GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend }
+export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend }
 
-export type Asked<KindT extends EX.GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }
+export type Asked<KindT extends EX.Gatingkind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }
 
-export type Prove<KindT extends EX.GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
+export type Prove<KindT extends EX.Gatingkind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
 // --

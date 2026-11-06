@@ -8,7 +8,8 @@ import { reportToPlatform } from '../refusals/report-error'
 import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
-import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Revision, Settled, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
+import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Settled, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
+import type { Revision } from '../shapes/shapes-storage'
 
 // == [Revisions]: cmpRevisions
 

@@ -185,6 +185,7 @@ handful of named subtractions (STYLE.md, *Shapes and duck typing*).
 | **scope**     | The composite id: the names its scopepath is made of (`VaultScope`, `BankScope`, and `Boxscope`, the one that smushes its two words).                                     |
 | **dna**       | The partial duck of a type's required and optional props, along with those under the factory's control, which are ignored. It is what a caller hands `create`. Its validator is the type's duckish, below. |
 | **tombstone** | What a deletion leaves (`VaultTombstone`, `BoxTombstone`).                                                                                                                  |
+| **dated**     | A row's scope, `vault_tok` and the time it is judged by, without the rest of it: a cached lease and its `proved_at` (`LeaseDated`), as the deviceDB answers `leasesProvedBefore`. |
 | **snapshot**  | For a stateful thing, what a host renders: its sparse shape and what changes beside it (`VaultSnapshot`). It is frozen plain data that keeps its identity until something changes. |
 
 The **duckish** of a type is the validator that lets you round-trip an object of it, or

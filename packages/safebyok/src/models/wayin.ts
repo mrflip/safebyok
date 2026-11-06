@@ -1,7 +1,7 @@
 import type { Modelkind } from '../helpers/consts'
 import { cipherCtx } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
-import type { WayinKind } from '../shapes/shapes-enums'
+import type { Wayinkind } from '../shapes/shapes-enums'
 import type * as CX from '../shapes/shapes-core'
 import { type VaultStamp, type WayinHeader, type WayinRecord, vaultStamp, wayinHeader, wayinRecord } from '../shapes/shapes-gateish'
 
@@ -10,7 +10,7 @@ import { type VaultStamp, type WayinHeader, type WayinRecord, vaultStamp, wayinH
 export const PurposeForWayinkind = Object.freeze({
   passphrase: 'vault_key_passphrase_wrapped',
   passkey:    'vault_key_passkey_wrapped',
-} as const satisfies Readonly<Record<WayinKind, string>>)
+} as const satisfies Readonly<Record<Wayinkind, string>>)
 
 export const wayinCtxOf = (stamp: VaultStamp, header: WayinHeader): Uint8Array => {
   const checked = wayinHeader.parse(header)
@@ -21,7 +21,7 @@ export const wayinCtxOf = (stamp: VaultStamp, header: WayinHeader): Uint8Array =
 export class Wayin {
   // == [Props]: wayinkind, device_id, registered_at, vault_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
 
-  declare readonly wayinkind:               WayinKind
+  declare readonly wayinkind:               Wayinkind
   declare readonly device_id:               string
   declare readonly registered_at:           number
   declare readonly vault_key_wayin_wrapped: CX.VaultKeyWayinWrapped

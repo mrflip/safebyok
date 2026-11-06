@@ -82,15 +82,14 @@ export class Bank {
 
   constructor(opts: BankOpts) {
     checkSecureContext()
-    VX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
+    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = VX.bankOpts.parse(opts)
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.device_id = device_id
     this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.deviceDB = deviceDB
     this.panic = guardOnPanic(onPanic)
-    this.logger = parseLogger(opts.logger)
+    this.logger = parseLogger(logger)
     this.askUser = guardRequestCleartext(requestCleartext)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)

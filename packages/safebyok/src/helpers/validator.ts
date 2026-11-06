@@ -2,7 +2,7 @@
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
-import { refusalKindVals, VaultError, type RefusalKind } from '../refusals/errors'
+import { refusalkindVals, VaultError, type Refusalkind } from '../refusals/errors'
 import * as Phrases from './phrases'
 import * as PX from '../shapes/primitives'
 
@@ -100,7 +100,7 @@ export type Merged<SourcesT extends readonly object[]> =
  *   }, [GateChecks])
  */
 export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT extends readonly object[] = readonly []>(
-  kind: RefusalKind, build: (kit: KitWith<SourcesT>) => ValsT, sources?: SourcesT,
+  kind: Refusalkind, build: (kit: KitWith<SourcesT>) => ValsT, sources?: SourcesT,
 ): { [ValnameT in keyof ValsT]: Refusing<ValsT[ValnameT]> } => {
   const vals = build(kitWith(sources))
   return Object.fromEntries(Object.entries(vals).map(([valname, schema]) => [valname, refusing(kind, schema)])) as { [ValnameT in keyof ValsT]: Refusing<ValsT[ValnameT]> }
@@ -114,7 +114,7 @@ export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT
  * @example export const callback = Checker(({ fn }) => fn(), 'bad_option')
  */
 export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(
-  build: (kit: KitWith<SourcesT>) => SchemaT, kind: RefusalKind = 'bad_record', sources?: SourcesT,
+  build: (kit: KitWith<SourcesT>) => SchemaT, kind: Refusalkind = 'bad_record', sources?: SourcesT,
 ): Refusing<SchemaT> => refusing(kind, build(kitWith(sources)))
 
 /** Make one validator of an object: `build` gets the kit and returns the object's fields, and the object, strict unless `opts` says otherwise, comes back as a {@link Checker} hands one back.
@@ -140,7 +140,7 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
  *   boxCiphered.parse(boxRecord)  // its two ciphered fields, the rest dropped
  */
 export const objCheck = <ShapeT extends Z.ZodRawShape, const SourcesT extends readonly object[] = readonly []>(
-  build: (kit: KitWith<SourcesT>) => ShapeT, opts: RefusalKind | ObjCheckOpts = 'bad_record', sources?: SourcesT,
+  build: (kit: KitWith<SourcesT>) => ShapeT, opts: Refusalkind | ObjCheckOpts = 'bad_record', sources?: SourcesT,
 ): Refusing<Z.ZodObject<ShapeT>> => {
   const { refusalkind: kind, extras } = Checks.objCheckOpts.parse(typeof opts === 'string' ? { refusalkind: opts } : opts)
   const fields = build(kitWith(sources))
@@ -155,7 +155,7 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
   /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; a story that is none refuses, whatever `val`. */
   parse: (val: unknown, story?: Story) => Z.output<SchemaT>
   /** This validator's schema again, its `parse` and `parseConsistent` refusing `kind`. */
-  refusingAs: (kind: RefusalKind) => Refusing<SchemaT>
+  refusingAs: (kind: Refusalkind) => Refusing<SchemaT>
 } & (Z.output<SchemaT> extends object ? {
   /** `val`, parsed, once each field it holds that `other` holds too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
   parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal> & Story) => Z.output<SchemaT>
@@ -165,7 +165,7 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
 // == [Refusals]: refusing, InEnglish, English, fieldnamesOf, MaxFailuresSaid, fieldnameOf, sentenceOf, refusalOf, framed
 
 /** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then holds the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
-const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT): Refusing<SchemaT> => {
+const refusing = <SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT): Refusing<SchemaT> => {
   const parse = (val: unknown, story?: Story): Z.output<SchemaT> => {
     const framing = story === undefined ? {} : Checks.story.parse(story)
     const result = schema.safeParse(val, InEnglish)
@@ -177,7 +177,7 @@ const refusing = <SchemaT extends Z.ZodType>(kind: RefusalKind, schema: SchemaT)
   )
   // A clone, not `Object.create`: Zod binds each schema's own methods to it, so a schema that only
   // inherited them would render to JSON Schema as the one it came from, losing a pipe's or a lazy's place.
-  return Object.assign(schema.clone(), { parse, parseConsistent, refusingAs: (asKind: RefusalKind) => refusing(asKind, schema) }) as Refusing<SchemaT>
+  return Object.assign(schema.clone(), { parse, parseConsistent, refusingAs: (asKind: Refusalkind) => refusing(asKind, schema) }) as Refusing<SchemaT>
 }
 
 /** The error map every `parse` runs under: Zod's own English, whatever map the host set with `z.config`, which could quote the input.
@@ -207,7 +207,7 @@ const sentenceOf = (issue: Z.core.$ZodIssue): string => {
 }
 
 /** The VaultError of `kind` for a failed parse, its message and `meta.fieldnames` as {@link Checkers} says, framed as `story` asks. */
-const refusalOf = (kind: RefusalKind, err: Z.ZodError, story: Story): VaultError => {
+const refusalOf = (kind: Refusalkind, err: Z.ZodError, story: Story): VaultError => {
   const issues     = err.issues.slice(0, MaxFailuresSaid)
   const unsaid     = err.issues.length - issues.length
   const sentences  = [...issues.map((issue) => sentenceOf(issue)), ...(unsaid > 0 ? [Phrases.moreFailures(unsaid)] : [])]
@@ -272,27 +272,33 @@ const disagreeing = (bag: object, other: object): readonly string[] => {
 const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
   bag:                custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
   consistencyRefusal: obj({
-    kind:    oneof(refusalKindVals),
+    /** The kind a disagreement refuses with. */
+    kind:    oneof(refusalkindVals),
+    /** A sentence, or one made from the names of the fields that disagree, never their values. */
     message: union([str, custom<(fieldnames: readonly string[]) => string>((val) => typeof val === 'function')]).optional(),
   }).strict(),
-  story:              obj({ where: str.optional(), advice: str.optional() }).strict(),
+  story:              obj({
+    /** Where the input was judged, a lead-in before the failures: `In Bank.make's options`. */
+    where:  str.optional(),
+    /** What to do, a sentence after the failures: `Leave it out for the bank's own.` */
+    advice: str.optional(),
+  }).strict(),
   objCheckOpts:       obj({
-    refusalkind: oneof(refusalKindVals).default('bad_record'),
-    extras:    oneof(['strict', 'strip']).default('strict'),
+    /** The kind thrown; 'bad_record' by default. */
+    refusalkind: oneof(refusalkindVals).default('bad_record'),
+    /** `strict`, the default, refuses a field the object does not take; `strip` drops it unread. */
+    extras:      oneof(['strict', 'strip']).default('strict'),
   }).strict(),
 }))
 
 // Each is an interface extending its Z.infer, not a type alias of it: Refusing names both, and
 // each is read off a Refusing, a loop TypeScript follows only through an interface's deferred members.
-/** What a disagreement refuses with: its `kind`, and its `message`, a sentence or one made from the names of the fields that disagree, never their values. */
+/** What a disagreement refuses with. */
 export interface ConsistencyRefusal extends Z.infer<typeof Checks.consistencyRefusal> {}
 
-/** The words a refusal puts around the failures it names: `where` the input was judged, a lead-in before them (`In Bank.make's options`), and `advice`, what to do, a sentence after them (`Leave it out for the bank's own.`). Neither quotes the input. */
+/** The words a refusal puts around the failures it names, neither quoting the input. */
 export interface Story extends Z.infer<typeof Checks.story> {}
 
-/** How an {@link objCheck} validator refuses.
- * - `refusalkind`      -- the kind thrown (default: 'bad_record')
- * - `extras: 'strict'` -- refuse a field the object does not take (default)
- * - `extras: 'strip'`  -- drop it unread */
+/** How an {@link objCheck} validator refuses, as a caller hands it in, defaults unapplied. */
 export interface ObjCheckOpts extends Z.input<typeof Checks.objCheckOpts> {}
 // --

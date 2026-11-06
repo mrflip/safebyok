@@ -52,7 +52,7 @@ export type Times    = Readonly<Z.infer<typeof times>>
 // == [Scopes]: vaultQuery, boxQuery, watchScope, VaultQuery, BoxQuery, WatchScope
 
 // A scope's validator is CX's, frozen; `unwrap()` is its object, to extend.
-export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_option', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
+export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_scope', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
   vaultQuery: vaultScope.unwrap().extend({ vault_tok }),
   boxQuery:   boxscope.unwrap().extend({ vault_tok }),
   watchScope: bankScope.unwrap().extend({ vaultlabel: vaultlabel.optional() }),
@@ -63,13 +63,13 @@ export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
 export type WatchScope = Readonly<Z.input<typeof watchScope>>
 // --
 
-// == [Wayins and gate]: passphraseWayin, passkeyWayin, gate, Gate
+// == [Wayins and gate]: passphraseWayinRecord, passkeyWayinRecord, gate, Gate
 
-export const { passphraseWayin, passkeyWayin, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
-  const passphraseWayin = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
-  const passkeyWayin    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
-  const gate            = obj({ gate_epoch: uint.positive(), passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin.nullable() }).strict()
-  return { passphraseWayin, passkeyWayin, gate }
+export const { passphraseWayinRecord, passkeyWayinRecord, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
+  const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
+  const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
+  const gate                  = obj({ gate_epoch: uint.positive(), passphrase_wayin: passphraseWayinRecord, passkey_wayin: passkeyWayinRecord.nullable() }).strict()
+  return { passphraseWayinRecord, passkeyWayinRecord, gate }
 }, [CX])
 
 export type Gate = Readonly<Z.infer<typeof gate>>
@@ -130,8 +130,8 @@ export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
 export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit, unk }) => {
   // A vault record holding a gate that holds the wayin. A verb's other wayin is admitted here so that the vaultDB can refuse it against the row it read.
   const gateParams = vaultSparse.extend({ am: lit('a') })
-  const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayin, passkey_wayin: unk.optional() }).strict() }).strict()
-  const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayin, passphrase_wayin: unk.optional() }).strict() }).strict()
+  const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayinRecord, passkey_wayin: unk.optional() }).strict() }).strict()
+  const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayinRecord, passphrase_wayin: unk.optional() }).strict() }).strict()
   const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null), passphrase_wayin: unk.optional() }).strict() }).strict()
   return { replacePassphraseParams, passkeyAddParams, revokePasskeyParams }
 })
@@ -154,8 +154,17 @@ export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Check
   return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
 }, [CX])
 
-export const vaultDBOpts = objCheck(({ num }) => ({ maxRecordBytes: num.positive().optional() }), 'bad_option')
-export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape, maxBoxes: uint.optional() }), 'bad_option')
+/** The check of a vaultDB's options, refusing 'bad_option'. */
+export const vaultDBOpts = objCheck(({ num }) => ({
+  /** The most bytes one stored record may weigh; no limit by default. */
+  maxRecordBytes: num.positive().optional(),
+}), 'bad_option')
+/** The check of a memory vaultDB's options, refusing 'bad_option'. */
+export const memoryVaultDBOpts = objCheck(({ uint }) => ({
+  ...vaultDBOpts.shape,
+  /** The most live boxes one vault may hold; no limit by default. */
+  maxBoxes: uint.optional(),
+}), 'bad_option')
 
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
@@ -163,7 +172,9 @@ export type PutOpts = Readonly<Z.input<typeof putOpts>>
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
+/** What a vaultDB's constructor takes. */
 export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
+/** What a memory vaultDB's constructor takes. */
 export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 // --
 

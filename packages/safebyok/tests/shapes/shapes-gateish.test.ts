@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { parseLogger } from '../../src/helpers/logger'
 import * as GX from '../../src/shapes/shapes-gateish'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
@@ -12,6 +13,19 @@ describe("wayinkind", () => {
     expect(GX.wayinkind.safeParse('passkey').success).to.be.true
     expect(GX.wayinkind.parse('passphrase')).to.eq('passphrase')
     TH.expectSyncRefusal(() => GX.wayinkind.parse('hunter2'))
+  })
+})
+
+describe("guardedLogger", () => {
+  const bare = { log: () => undefined, warn: () => undefined, error: () => undefined }
+
+  it("takes a logger parseLogger guarded", () => {
+    const guarded = parseLogger(bare)
+    expect(GX.guardedLogger.parse(guarded)).to.eq(guarded)
+  })
+
+  it("refuses a bare logger", () => {
+    TH.expectSyncRefusal(() => GX.guardedLogger.parse(bare), 'bad_option')
   })
 })
 

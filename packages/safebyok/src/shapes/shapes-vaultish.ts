@@ -7,7 +7,7 @@ import { ForeverMillis, hasModelkind, isDeviceDB, isGuarded, isVaultDB } from '.
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
-import { type VaultLogger, isGuardedLogger } from '../helpers/logger'
+import type { VaultLogger } from '../helpers/logger'
 import type { Bank } from '../models/bank'
 import type { Listing } from '../models/listing'
 import type { Storable } from '../models/storable'
@@ -19,7 +19,8 @@ import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
-import type { AskUser, ProvingWorld, RequestCleartext, StrengthChecker } from './shapes-gateish'
+import type { AskUser, ProvingWorld, RequestCleartext } from './shapes-gateish'
+import type { StrengthChecker } from '../helpers/passphrase-strength'
 
 // == [Checks]: Checks
 
@@ -30,46 +31,30 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // --
 
-// == [Record forms]: am, revision, times, liveness, vaulted, sparseBase, tombstone, VoidRevisionSeq, isTombstone, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
-
-/** SLOPDOC: The checks of what the base knows of any record, from whatever carries it: record, storable or snapshot. */
-export const am         = SX.am.refusingAs('bad_record')
-export const revision   = SX.revision.refusingAs('bad_record')
-export const times      = SX.times.refusingAs('bad_record')
-export const vaulted    = SX.vaulted.refusingAs('bad_record')
-export const sparseBase = SX.sparseBase.refusingAs('bad_record')
+// == [Record forms]: liveness, tombstone, isTombstone, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
 
 export const { liveness, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
-  liveness:  obj({ am }),
-  tombstone: sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
+  liveness:  obj({ am: SX.am }),
+  tombstone: SX.sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
 }))
-
-/** A record's revision: its `revision_tok`, minted at each put and del, and its `revision_seq`, higher on the later one. */
-export type Revision = SX.Revision
-
-/** When this life of the thing began, and when the record in hand was written; on a tombstone, when it was deleted. */
-export type Times = SX.Times
 
 /** Whether a record is alive, damaged or gone: its `am`. */
 export type Liveness = Readonly<Z.infer<typeof liveness>>
 
 /** The `vault_tok` of the vault a record lies in, which every storable records and seals; a vault's is its own. */
-export type Vaulted = Readonly<Z.infer<typeof vaulted>>
+export type Vaulted = Readonly<Z.infer<typeof SX.vaulted>>
 
-/** The least a sparse form carries: the scope, and what {@link sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
-export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
+/** The least a sparse form carries: the scope, and what {@link SX.sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
+export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness & Vaulted
 
 /** SLOPDOC: The sparse form of a thing damaged or gone: its sparse props stay on it, the user's content goes. */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof EX.tombstoneAmVals[number] }>
 
-/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
+/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link SX.sparseBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
 /** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
-
-/** The `revision_seq` of a void row, and of a birth's prior: every populated row holds 0 or more. */
-export const { VoidRevisionSeq } = SX
 
 /** True for a record whose `am` says damaged or gone. */
 export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
@@ -80,7 +65,7 @@ export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched
 
 /** The checks of what reconciling passes: `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
 export const { reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
-  reconciled:    obj({ central: sparseBase, policy: oneof(EX.centralPolicyVals) }),
+  reconciled:    obj({ central: SX.sparseBase, policy: oneof(EX.centralPolicyVals) }),
   settled:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
 }), [Checks])
 
@@ -105,24 +90,42 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
   const maxMillis     = horizonMillis.optional()
-  const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
-  const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.default('fail') })
-  const boxPutOpts    = timelyOpts.extend({ ifAbsent: putIfAbsent.default('add'), ifPresent: ifPresent.default('repl') })
-  const boxCreateOpts = timelyOpts.extend({ ifAbsent: lit('add').default('add'), ifPresent: ifPresent.default('fail') })
+  const timelyOpts    = obj({
+    /** How long ago, at most, the record in hand was refreshed from the vaultDB; Infinity for no limit. */
+    maxMillisSinceRefresh: maxMillis,
+    /** How long ago, at most, the world the verb runs in was refreshed; Infinity for no limit. */
+    maxWorldMillis:        maxMillis,
+  })
+  const fetchOpts     = timelyOpts.extend({
+    /** What an absent thing does: `fail`, the default, refuses with the listing's absent refusal; `nil` resolves null. */
+    ifAbsent: ifAbsent.default('fail'),
+  })
+  const boxPutOpts    = timelyOpts.extend({
+    /** What an absent box does: `add`, the default, creates it. */
+    ifAbsent:  putIfAbsent.default('add'),
+    /** What a present box does: `repl`, the default, replaces it. */
+    ifPresent: ifPresent.default('repl'),
+  })
+  const boxCreateOpts = timelyOpts.extend({
+    /** Always `add`: a create creates. */
+    ifAbsent:  lit('add').default('add'),
+    /** What a present box does: `fail`, the default, refuses. */
+    ifPresent: ifPresent.default('fail'),
+  })
   const listener      = fn<() => void>()
   return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
 })
 
-/** How fresh the record in hand and the world must be before a verb goes on. The world heeds `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
+/** How fresh the record in hand and the world must be before a verb goes on. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
 
-/** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
+/** `fetch`'s options, as a caller hands them in, defaults unapplied. */
 export type FetchOpts = Z.input<typeof fetchOpts>
 
-/** `box.put`'s options: its {@link TimelyOpts}, and an upcreate unless `ifAbsent` or `ifPresent` says otherwise. */
+/** `box.put`'s options, as a caller hands them in, defaults unapplied: an upcreate unless they say otherwise. */
 export type BoxPutOpts = Z.input<typeof boxPutOpts>
 
-/** `create`'s options: {@link BoxPutOpts}, with `ifPresent` defaulting to `fail`, and `ifAbsent` always `add`. */
+/** `create`'s options, as a caller hands them in, defaults unapplied. */
 export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
@@ -159,7 +162,7 @@ export const listingOpts = objCheck(() => ({
 export const storableArgs = objCheck(({ custom }) => ({
   world:   listingWorld,
   listing: custom<object>((val) => hasModelkind(val, 'vault_listing', 'box_listing'), Phrases.ListingExpected),
-  central: sparseBase,
+  central: SX.sparseBase,
 }), 'bad_option')
 
 // --
@@ -183,29 +186,29 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 
 // --
 
-// == [The box's forms]: BoxFormat, boxRecord, boxSparse, BoxRecord, BoxSparse, BoxSnapshot
+// == [The box's forms]: BoxSnapshot
 
-/** The box format these forms describe, as each record carries it in `fmt`. */
-export const { BoxFormat } = SX
-
-/** SLOPDOC: The checks of a box's stored forms, full and sparse, from a record or a box ducking as one. */
-export const { boxRecord } = SX
-export const boxSparse = SX.boxSparse.refusingAs('bad_record')
-
-export type BoxSparse = SX.BoxSparse
-export type BoxRecord = SX.BoxRecord
-
-export type BoxSnapshot = Boxscope & Readonly<{
-  revision_tok:  string
-  revision_seq:  number
-  registered_at: number
-  written_at:    number
-  sidecar:       Sidecar | null
-  full:          boolean
-  present:       boolean
-  exposed:       boolean
-  veiled:        boolean
-}>
+/** A box as a host renders it: its scope, its revision and times, its sidecar, and what it shows. */
+export interface BoxSnapshot extends Boxscope {
+  /** The token of the revision in hand, new at each put and del. */
+  readonly revision_tok:  string
+  /** The count of the revision in hand, higher on the later one. */
+  readonly revision_seq:  number
+  /** When this life of the box began. */
+  readonly registered_at: number
+  /** When the revision in hand was written; for a box deleted, when it was deleted. */
+  readonly written_at:    number
+  /** Your app's data beside the whisper, never encrypted; null until the full record is fetched. */
+  readonly sidecar:       Sidecar | null
+  /** True when the full record is in hand, false for a box only listed or deleted. */
+  readonly full:          boolean
+  /** True unless the box is deleted or damaged. */
+  readonly present:       boolean
+  /** True while the box keeps its whisper exposed. */
+  readonly exposed:       boolean
+  /** True while `box.veil()` hides the whisper exposed. */
+  readonly veiled:        boolean
+}
 
 // --
 
@@ -219,7 +222,7 @@ const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown
 
 /** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`). */
 export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
-  const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
+  const factory = SX.boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
     whisper: whisper.default({}),
@@ -227,7 +230,7 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const boxPatch = SX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
   return { boxDna, boxPatch }
 })
@@ -267,28 +270,25 @@ export type BoxWorld = Pick<Vault, keyof ListingWorld | 'scope' | 'vault_tok' | 
 
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse, VaultSnapshot
+// == [The vault's forms]: VaultSnapshot
 
-/** The vault format these forms describe, as each record carries it in `fmt`. */
-export const { VaultFormat } = SX
-
-/** SLOPDOC: The checks of a vault's stored forms, sparse and with its gate, from a record or a vault ducking as one. */
-export const { vaultRecord } = SX
-export const vaultSparse = SX.vaultSparse.refusingAs('bad_record')
-export const vaultRow    = SX.vaultRow.refusingAs('damaged_row')
-
-export type VaultSparse = SX.VaultSparse
-export type VaultRecord = SX.VaultRecord
-
-export type VaultSnapshot = VaultScope & Readonly<{
-  vault_tok:     string
-  revision_tok:  string
-  revision_seq:  number
-  registered_at: number
-  written_at:    number
-  present:       boolean
-  lockState:     EX.LockState
-}>
+/** A vault as a host renders it: its scope, its life and revision, and whether it is unlocked. */
+export interface VaultSnapshot extends VaultScope {
+  /** The token of this life of the vault, new when the vault is made again for its scope. */
+  readonly vault_tok:     string
+  /** The token of the revision in hand, new at each put and del. */
+  readonly revision_tok:  string
+  /** The count of the revision in hand, higher on the later one. */
+  readonly revision_seq:  number
+  /** When this life of the vault began. */
+  readonly registered_at: number
+  /** When the revision in hand was written; for a vault deleted, when it was deleted. */
+  readonly written_at:    number
+  /** True unless the vault is deleted or damaged. */
+  readonly present:       boolean
+  /** `unlocked` while this device holds a lease in force, else `locked`. */
+  readonly lockState:     EX.LockState
+}
 
 // --
 
@@ -299,7 +299,7 @@ export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDevice
 
 /** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
 export const vaultWorld = Checker(({ custom, bankScope }) => listingWorld.extend({
-  ...GX.provingWorld.shape, scope: bankScope, logger: custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
+  ...GX.provingWorld.shape, scope: bankScope, logger: GX.guardedLogger, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
   askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected),
   panic:   custom<Panic>(isGuarded, Phrases.GuardedExpected),
 }), 'bad_option', [CX])
@@ -330,27 +330,43 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
   autolockMinutes:     positiveMinutes.optional(),
   vaultRefreshMinutes: refreshMinutes.optional(),
   boxRefreshMinutes:   refreshMinutes.optional(),
-  onBadNews:           fn().optional(),
+  onBadNews:           fn<BadNewsHandler>().optional(),
   onPanic:             custom<PanicHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
-export type BankOpts = {
+/** What a host hands `Bank.make`: who the bank is for, where it stores, and the functions it calls back. */
+export interface BankOpts {
+  /** Your app's own label, so several apps can share one backend. */
   applabel:             string
+  /** The signed-in user's stable, opaque id from your own auth, hashed first if it holds anything sensitive. */
   user_id:              string
+  /** Your id for this device, a random UUID you keep per device. */
   device_id:            string
+  /** The store the vaults are synchronized through, from a storage adapter. */
   vaultDB:              VaultDB
+  /** The store on this device that caches each vault's lease. */
   deviceDB:             DeviceDB
+  /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
   keyDeriver:           KeyDeriver
+  /** Your dialog, called with each gating that needs the user's passphrase or passkey. */
   requestCleartext:     RequestCleartext
+  /** Judges each new passphrase before a vault takes it; without one, every new passphrase is too weak (CUSTOMIZATION.md). */
   strengthChecker?:     StrengthChecker | undefined
+  /** Where the bank says what it has no caller to throw to; the console when left out. */
   logger?:              VaultLogger | undefined
+  /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?:     number | undefined
+  /** How recently a vault's record must have been fetched to be trusted, in minutes; 5 when left out. */
   vaultRefreshMinutes?: number | undefined
+  /** How recently a box's record must have been fetched to be trusted, in minutes; 5 when left out. */
   boxRefreshMinutes?:   number | undefined
+  /** Hears each refusal no caller waits on. */
   onBadNews?:           BadNewsHandler | undefined
   /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
   onPanic?:             PanicHandler | undefined
 }
+
+true satisfies Z.core.util.AssertEqual<BankOpts, Z.input<typeof bankOpts>>
 
 /** `Bank.make`'s `onBadNews`: hears each refusal no caller waits on. */
 export type BadNewsHandler = (news: VaultError) => unknown
@@ -364,6 +380,16 @@ export type Panic = (refusal: VaultError) => Promise<boolean>
 /** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'
 
-export type BankSnapshot = BankScope & Readonly<{ stage: BankStage, err: VaultError | null, device_id: string, vaults: readonly VaultSnapshot[] }>
+/** A bank as a host renders it: its scope, how far its `hello` got, and its vaults. */
+export interface BankSnapshot extends BankScope {
+  /** How far the bank's `hello` got: `made`, `ready` or `refused`. */
+  readonly stage:     BankStage
+  /** Why the last `hello` refused, or null. */
+  readonly err:       VaultError | null
+  /** Your id for this device, as `Bank.make` was given it. */
+  readonly device_id: string
+  /** A snapshot of each vault the bank lists. */
+  readonly vaults:    readonly VaultSnapshot[]
+}
 
 // --

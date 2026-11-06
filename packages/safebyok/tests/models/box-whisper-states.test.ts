@@ -2,7 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { ENCRYPTED, LOCKED, VEILED } from '../../src/helpers/consts'
-import type { BoxRecord, BoxSparse, Fetched } from '../../src/shapes/shapes-vaultish'
+import type { Fetched } from '../../src/shapes/shapes-vaultish'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
