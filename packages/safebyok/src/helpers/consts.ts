@@ -1,3 +1,12 @@
+import type { Bank } from '../models/bank'
+import type { Box } from '../models/box'
+import type { BoxListing } from '../models/box-listing'
+import type { Gate } from '../models/gate'
+import type { Gating } from '../models/gating'
+import type { Lease } from '../models/lease'
+import type { Vault } from '../models/vault'
+import type { VaultListing } from '../models/vault-listing'
+import type { Wayin } from '../models/wayin'
 import type { Whisper } from '../shapes/shapes-core'
 
 /** The character a scopepath joins its parts on: `^`, which no label or user_id may hold. */
@@ -43,10 +52,17 @@ export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
 export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (val !== null) && Object.hasOwn(val, Whispered)
 
-/** The tag a Listing answers true to, so a storable can tell one without importing it. */
-export const IsListing: unique symbol = Symbol('safebyok.listing')
+// A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
+// ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
+/** The model class each `modelkind` names: `ModelkindClasses['box']` is `Box`. */
+export type ModelkindClasses = {
+  bank: Bank, vault: Vault, box: Box, vault_listing: VaultListing, box_listing: BoxListing, gating: Gating, gate: Gate, wayin: Wayin, lease: Lease,
+}
 
-/** True for a Listing: an object that answers true to {@link IsListing}. */
-export const isListing = (val: unknown): val is { [IsListing]: true } => (
-  typeof val === 'object' && val !== null && (val as { [IsListing]?: unknown })[IsListing] === true
+/** What each model's `modelkind` getter answers: `box.modelkind` is `'box'`. */
+export type Modelkind = keyof ModelkindClasses
+
+/** True when `val` is a model of one of `modelkinds`, and typed as its class. */
+export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ModelkindClasses[MKT] => (
+  (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )

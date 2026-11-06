@@ -1,3 +1,4 @@
+import type { Modelkind } from '../helpers/consts'
 import { cipherCtx } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
 import type { WayinKind } from '../shapes/shapes-enums'
@@ -52,4 +53,7 @@ export class Wayin {
     return header
   }
   // --
+
+  /** Answers 'wayin', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'wayin' { return 'wayin' satisfies Modelkind }
 }

@@ -8,10 +8,10 @@ choice is who holds it, for how long, and what puts it away.
 | Audience | What they use | Where else it is in the clear | What ends it |
 |---|---|---|---|
 | A script | `box.expose`, `box.whisper` | nowhere new | `unexpose`, a sweep, the process exiting |
-| A team wanting a raw DOM field | `box.field` | the element's `value` | the last field unbinding |
+| A team wanting a raw DOM field | `BoxFields.of(box).bind` (`safebyok/dom`) | the element's `value` | the last field unbinding |
 | A React form | `box.whisper`, `box.patchWhisper` | the `value` prop and attribute, React's props | the form calling `unexpose` |
 
-`box.field` and `box.patchWhisper` are in #505, which is still open and whose names may change.
+`BoxFields` and `box.patchWhisper` are in #505, which is still open and whose names may change.
 
 ## The risk is time, not exposure
 
@@ -74,7 +74,7 @@ so does CSS injection, which can select on an attribute but not on a property. T
 floor: **while the text is in the field, any script in the page can read it.** The strict design also
 still passes the value through a local on its way in and out, and JavaScript strings can't be wiped.
 
-So the shift is small and the sacrifice is notable. `box.field` keeps the first two rows without most
+So the shift is small and the sacrifice is notable. `BoxFields` keeps the first two rows without most
 of the list above: it holds the value through a lock so edits survive, and ends the exposure when the
 last field unbinds. Anything derived from the value and controlled components stay out, because the
 value never reaches React.
@@ -149,7 +149,7 @@ without it the exposure lasts until a sweep. Call `box.expose()` from a button a
 StrictMode's simulated unmount would otherwise unexpose it.
 
 The input is still controlled here, so the first column of the table above applies. A form that
-wants the second column uses `box.field` and gives up React state for that value.
+wants the second column uses `BoxFields` and gives up React state for that value.
 
 ## A script without `expose` stashes it
 

@@ -1,6 +1,7 @@
+import { cloneDeep, mergeWith } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
-import { ENCRYPTED, LOCKED, VEILED } from '../helpers/consts'
+import { ENCRYPTED, LOCKED, VEILED, type Modelkind } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import * as CX from '../shapes/shapes-core'
@@ -84,7 +85,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   lockState(): LockState { return this.listing.lockState() }
   // --
 
-  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, veil, unveil, unseal
+  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, veil, unveil, patchWhisper, replaceExposed, unseal
 
   /** The timely stored whisper, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper> {
@@ -100,9 +101,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   async expose(opts: TimelyOpts = {}): Promise<this> {
     const exposed = await this.extractWhisper(opts)
     this.demandExposable()
-    this.#exposed = exposed
     this.#isVeiled = false
-    this.settle()
+    this.#replaceExposed(exposed)
     return this
   }
 
@@ -128,6 +128,23 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     this.#isVeiled = false
     this.settle()
     return this
+  }
+
+  /** Merge `patch` over the whisper exposed, shown or hidden, into a new object, arrays replaced, and tell the subscribers; nothing is stored. */
+  patchWhisper(patch: Whisper): this {
+    const given = VX.whisperPatch.parse(patch)
+    this.demandEnabled()
+    if (this.#exposed === null) { throw notExposedError() }
+    this.#replaceExposed(mergedOver(this.#exposed, given))
+    return this
+  }
+
+  /** Swap in a new whisper exposed, and tell the subscribers even where the snapshot, which holds none of it, has not moved. */
+  #replaceExposed(exposed: Whisper): void {
+    const ante = this.snapshot
+    this.#exposed = exposed
+    this.settle()
+    if (this.snapshot === ante) { this.tellListeners() }
   }
 
   /** The whisper of `record`, opened through the vault's seal verbs and held to `CX.whisper`. */
@@ -247,7 +264,18 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     })
   }
   // --
+
+  /** Answers 'box', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'box' { return 'box' satisfies Modelkind }
 }
+
+// == [Merging]: mergedOver
+
+/** `patch` merged over a copy of `whisper`, arrays replaced, as a plain object merge. */
+const mergedOver = (whisper: Whisper, patch: Whisper): Whisper => (
+  mergeWith(cloneDeep(whisper), patch, (_was, val) => (Array.isArray(val) ? val : undefined))
+)
+// --
 
 // == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
 

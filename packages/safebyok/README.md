@@ -77,30 +77,95 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* To show a whisper, `box.expose()` holds it on `box.whisper`, a plain object of the box's to edit,
-  until `box.unexpose()`. `box.veil()` and `box.unveil()` hide it and show it again. While it will
-  not show, `box.whisper` answers a frozen bag, whose `Whispered` symbol says why: `'encrypted'`
-  (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a put of one refuses. A lock
-  keeps the whisper, so the unlock brings the same object back. The lock is the vault's, shown on
-  its snapshot and not the box's; `box.subscribe` hears of a lock too, as `box.whisper` changes:
-
-  ```tsx
-  const { lockState } = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
-  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
-  if (lockState === 'locked') { return <button onClick={() => vault.ensureUnlocked()}>Unlock</button> }
-  if (! exposed) { return <button onClick={() => box.expose()}>Show</button> }
-  return <WhisperForm initial={box.whisper} onSave={(next) => box.put({ whisper: next })} />
-  ```
-
-  A script edits it in place, and `box.putExposed()` stores it:
-  `await box.expose(); box.whisper.org = 'acme'; await box.putExposed()`.
 * `bank.vacate()` is sign-out: it erases this device's leases and leaves the vaultDB alone.
+
+## Showing a whisper
+
+`box.expose()` holds a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
+`box.whisper` shows it. While it will not show, `box.whisper` answers a frozen bag, whose `Whispered`
+symbol says why: `'encrypted'` (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a
+put of one refuses. `box.veil()` and `box.unveil()` hide it and show it again; a lock hides it, and
+an unlock shows it again. `box.subscribe` hears of all of this. The lock is the vault's, on
+`vault.getSnapshot()`, not the box's.
+
+**A script.** Fetch the passphrase in `requestCleartext`, with a token the container already holds:
+
+```ts
+const bank = Bank.make({
+  /* ... */
+  requestCleartext: async (gating) => {
+    await gating.attempt({ passphraseClear: await doppler.get('VAULT_PASSPHRASE') })
+  },
+})
+await bank.hello()
+const vault = await bank.ensureVault({ vaultlabel: 'main' })
+await vault.hello()
+const box = await vault.getBox('stripe')
+
+await box.expose()
+await stripe.charge({ ...box.whisper, amount: 100 })
+box.whisper.org = 'acme'
+await box.putExposed()
+
+vault.lock()                 // box.whisper.apiKey is undefined
+await vault.ensureUnlocked() // and it is back, edit included
+```
+
+Read it through `box.whisper` each time: a reference you kept outlives a lock.
+
+**A raw field,** on React 19, whose ref cleanup unbinds it. The whisper reaches no prop or state of
+yours, so it is only in the DOM (and on the screen), where React's dev tools do not list it:
+
+```tsx
+import { BoxFields } from 'safebyok/dom'
+
+function ApiKeyField({ box }) {
+  const fields = BoxFields.of(box)
+  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
+  return (
+    <>
+      <input ref={fields.bind('apiKey')} type="password" autoComplete="off" spellCheck={false} />
+      {exposed
+        ? <button onClick={() => fields.trySave().then(showOutcome)}>Save</button>
+        : <button onClick={() => box.expose().catch(showRefusal)}>Show</button>}
+    </>
+  )
+}
+```
+
+The field goes blank at a lock or a veil, and an edit comes back with the value. Nothing is stored
+until `fields.save()`. Both buttons refuse while the vault is locked, so `showOutcome` and
+`showRefusal`, yours to write, say so. When the last field unmounts the box unexposes, so the whisper lasts no
+longer than its field: expose after it mounts. `BoxFields.of` answers the same instance for a box
+wherever it is called. Without React, `const unbind = BoxFields.of(box).bind('apiKey')(el)` binds
+any element with a `value`.
+
+**React that looks like React.** The hook needs no library code:
+
+```tsx
+function ApiKeyForm({ box }) {
+  const whisper = useSyncExternalStore(box.subscribe, () => box.whisper)
+  return (
+    <>
+      <input
+        type="password" value={whisper.apiKey ?? ''} readOnly={! box.isShowing}
+        onChange={(evt) => box.patchWhisper({ apiKey: evt.target.value })}
+      />
+      <button onClick={() => box.putExposed()}>Save</button>
+    </>
+  )
+}
+```
+
+While it will not show, `box.whisper` is a bag with no fields, so the input is blank. Never replace
+the prop or edit it in place here: `box.patchWhisper` makes the new object, and tells the hook. It
+merges deeply, and an array replaces.
 
 ## Not done yet
 
 **A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
-`Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, and `safebyok/testing` adds a cheap `testDeriver`
-and an `anyStrengthChecker`. Nothing exports a `VaultDB`, a `DeviceDB`, a real key deriver or
+`Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
+`safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. Nothing exports a `VaultDB`, a `DeviceDB`, a real key deriver or
 strength checker; the only stores are in-memory ones the tests reach in for.
 
 ## Next

@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { isListing } from '../helpers/consts'
+import { hasModelkind } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
@@ -179,7 +179,7 @@ export type PutListingOpts = Z.infer<typeof putListingOpts>
 /** The check of a storable's constructor arguments, as far as the base can tell. Checks only. */
 export const storableArgs = objCheck(({ custom }) => ({
   world,
-  listing: custom<object>(isListing, Phrases.ListingExpected),
+  listing: custom<object>((val) => hasModelkind(val, 'vault_listing', 'box_listing'), Phrases.ListingExpected),
   central: sparseBase,
   opts:    storableOpts,
 }), 'bad_option')
@@ -231,7 +231,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
 
 // --
 
-// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
+// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
 /** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
 export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
@@ -259,6 +259,9 @@ export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.opt
 
 /** A host's patch for `box.putExposed`, which seals the whisper exposed. */
 export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
+
+/** The check of what `box.patchWhisper` takes: a whisper, to merge over the one exposed. */
+export const whisperPatch = Checker(() => CX.whisper, 'bad_option')
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchGiven = Z.output<typeof boxPatch>

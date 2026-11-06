@@ -1,3 +1,4 @@
+import type { Modelkind } from '../helpers/consts'
 import { Checkers } from '../helpers/validator'
 import { decorate, tattoo } from '../helpers/helpers'
 import { passkeyHeldAlready } from '../refusals/throwers'
@@ -60,4 +61,7 @@ export class Gate {
     if (this.pkWayin !== null) { throw passkeyHeldAlready() }
   }
   // --
+
+  /** Answers 'gate', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'gate' { return 'gate' satisfies Modelkind }
 }

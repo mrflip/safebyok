@@ -297,6 +297,9 @@ export default defineConfig([
       'unicorn/prefer-iterator-to-array':       'off',
       'unicorn/prefer-promise-with-resolvers':  'off',
       'unicorn/prefer-combined-guards':         'off',
+      // A model's `modelkind` is a getter, not a readonly field: on the prototype it is no own key, so a spread,
+      // `Object.keys` and a strict record check never meet it. Off for tests, below.
+      '@typescript-eslint/class-literal-property-style': ['error', 'getters'],
     },
   },
 
@@ -425,6 +428,8 @@ export default defineConfig([
     files: ['tests/**/*.ts'],
     extends: [vitest.configs.recommended],
     rules: {
+      // A test's look-alike or duck holds its literals as own keys, which is what a check sees in the field.
+      '@typescript-eslint/class-literal-property-style': 'off',
       'vitest/no-disabled-tests': 'warn',
       'vitest/no-focused-tests': 'warn',
       // A type-level test asserts with `expectTypeOf` and has no runtime to check. Without
