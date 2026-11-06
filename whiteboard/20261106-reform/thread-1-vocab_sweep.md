@@ -60,3 +60,15 @@ safebyok-old 3537, every package passing; size budgets met).
     confirm it.
   - `mask` and the change bell are rows of things the core lacks, not retired names. They sit in
     old_vocabulary.md as "none yet"; say if they belong in VOCABULARY until they move.
+
+## After review
+
+The reviewer (opus) fixed six facts at tip 87090a0b3 and left four significant findings and one minor for a rework worker. Each is now a VOCABULARY.md commit, checked against `packages/safebyok/src`:
+
+* **passkey row**: `addPasskeyPrompt()` refuses `bad_option` while this vault's gate holds a passkey (`gate.demandPasskeyAddable`); the vaultDB's `addPasskey` refuses `camped` where storage holds one the gate did not show. The gating no longer "refuses `camped`".
+* **vault row**: a deleted Vault object takes its tombstone, keeps its slot in the bank's listing and refuses `vault_gone`; a newer life replaces it, or a vacate disables it at once, and it then refuses `disabled`. "A Vault object never stands for an absent vault" did not hold (a tombstoned one stands in the listing), so it now reads "only as a deleted one". The lifecycle wording awaits the Coach's confirmation.
+* **damaged and fmt rows**: a box row failing `boxRow` refuses `damaged_row`, or `newer_format` where its `fmt` is newer; `damaged_box` is kept for a whisper that will not unseal or unseals to no whisper. The fmt row's `newer_format` covers a fetched box row.
+* **revisionTok row and `_tok` paragraph**: a fresh `revision_tok` comes with each put or del.
+* **bank's listing row** (minor): the snapshot lists only the present vaults, and `vaultAt` answers a deleted one.
+
+Left as written, by instruction: the ban line on "ask", the deviceId privacy sentence (both the Coach's), `Wayinkind`, `Gatingkind` and `damaged_rows`. The other minor findings (act row's `added`/`revoked`/`tidied` undefined; boxTok and lease-eviction clauses dropped; leftover stand-in "one"s and "so/which/as" clauses) stay open.
