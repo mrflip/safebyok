@@ -1,7 +1,8 @@
 # Thread 2: claims the code on `main` no longer bears
 
 For the Coach, and for whoever strikes or rewrites these clauses. Each stands in `notes/guarantees.md`
-as it was written; the pass changed names and paths only. Checked at `main` 57f33ee9.
+as it was written; the pass changed names and paths only. Checked at `main` 57f33ee9. After review, F4, F6,
+F7 and F10 are acted on in the text, as the orchestrator called them, and F11's sentence is corrected.
 
 **F1. The old core's clauses describe `packages/safebyok-old`, not the published core.** The old core
 moved to the private, frozen `packages/safebyok-old` (pkgsplit), where every one of these names still
@@ -9,20 +10,24 @@ stands; `packages/safebyok` has none of them. Where a guarantee pairs an old-cor
 "In `src/models/`" twin, the twin is what `main` publishes, and the two sometimes disagree (G2: the old
 clause zeroes the PRF bytes in `PasskeyProving.seal`'s `finally`; the twin says no proving zeroes them).
 Old-core names left standing:
-- G1: `attemptOf`, `PassphraseProving.seal`, `vault.tryCheckStrength` in the chain sentence.
+- G1: `attemptOf`, `PassphraseProving.seal`, `vault.tryCheckStrength` in the chain sentence, and
+  `current === next` in `change_passphrase`.
 - G2: `PasskeyProving.seal`'s `finally`, `spendAnswer`.
 - G4: `KeptLease.tryGet`, the lease dropped at its `ask_passphrase_at`; *Kept by* `idb.ts` (the core
   has no IndexedDB DeviceDB: `storage/device-db-new.ts`, `storage/memory-device-db.ts`).
-- G6: `Box.seal`, `whisperBytesOf`, `#checkWhisperFits`, `extractWhisper`, `mask` from `safebyok/utils`
+- G6: `Box.seal`, `Lease.cipheredWith`, `whisperBytesOf`, `#checkWhisperFits`, `extractWhisper`, `mask` from `safebyok/utils`
   (no `safebyok/utils` entry point, no `mask`).
-- G9: `KeptLease`, `#loadFromStorage`, `#applyVault`, `leavesInForce`, `#takeUpFromPantry`,
+- G9: `KeptLease`, `DeviceDB.getLease`, `#loadFromStorage`, `#applyVault`, `leavesInForce`, `#takeUpFromPantry`,
   `#takeUpAtBirth`, `leaseOn(vault)`, `heldLeaseOf`, `vault[provingTools]`, `putLease`, `holdLease`.
 - The secret-values table: `KeptLease` (leaseKey row); `PasskeyProving.seal`, `spendAnswer` (PRF row);
   `Box.seal`, `box.extractWhisper` (whisper row).
 - Access points: the passphrase chain whole (`attemptPassphrase` to `checkedPassphraseHeader`), the
   passkey chain's first half (`attemptPasskey` to `spendAnswer`), the leaseKey's carried chain
-  (`DeviceDB.putLease`, `idb.ts`, `Lease.make`, `KeptLease`, `DeviceDB.getLease`, `DeviceDB.delLease`,
+  (`grantLease`, twice, `DeviceDB.putLease`, `idb.ts`, `Lease.make`, `KeptLease`, `DeviceDB.getLease`, `DeviceDB.delLease`,
   `vault.#lockNow`, `del-damaged-vault.ts`), the whisper's chain whole (`#sealAndPutBox` to `useWhisper`).
+- *Bytes*, the IndexedDB bullet: the leaseKey stored by structured clone "(`DeviceDB.cache`)" pairs a core call
+  with an IndexedDB store the core does not have; `safebyok-indexeddb` still runs on the old core. G4's
+  "written by `DeviceDB.cache` (IndexedDB keeps it by structured clone)" makes the same pairing.
 - The minimal-path paragraph: the passkey bytes "imported ... and zeroed" by `PasskeyProving.seal`. In the
   core `PasskeyProving.buildNovel` and `buildStored` zero nothing; `spendClears`
   (`models/gating.ts:266`) zeroes them after the attempt, or leaves them on a correctable refusal.
@@ -39,7 +44,9 @@ The deriver's guard is `models/proving.ts:196-199` `catch { throw keyDeriverThre
 dialog's `models/gating.ts:87-88` `catch { this.#endAsking(requestCleartextThrew()) }`: neither calls
 `refusalFor`. Both keep nothing of the throw, so the guarantee (no host throw kept) holds; the named
 route does not. G8's `deriverThrewRefusal (kind only, logged)` and `guardRequestCleartext (kind only,
-logged)`: the core logs neither. Threads 5 and 7 move these sites (thread 7 wraps the host functions once
+logged)`: the core logs neither. The three guards that list names, `deriverThrewRefusal`, `guardStrengthChecker`
+and `guardRequestCleartext`, are the old core's (`packages/safebyok-old/src/proving.ts`, `passphrase-strength.ts`, `vault-opts.ts`); the
+core's are `deriveKeyBytes`, `invokeStrengthChecker` and `Gating.#askHost`. Threads 5 and 7 move these sites (thread 7 wraps the host functions once
 in Bank's constructor); recommend the rewrite wait for thread 7.
 
 **F3. G8: "Every validator's refusal quotes no input: `tests/validators.test.ts`, *no refusal repeats
@@ -52,8 +59,8 @@ chose is not a secret), and a sweep is ported to the core.
 **F4. G8: "The invariant at the one catch that ends each Lease and Box throwing form (`refusalOf`,
 `outcome.ts`)."** `refusals/outcome.ts:81` defines `refusalOf`, and nothing in `packages/safebyok/src`
 calls it (`helpers/validator.ts:219`'s `refusalOf` is another function). The Lease and Box `try*` forms
-go through `outcomeOf`, which defaults to `unexpectedError`. Recommend naming `outcomeOf` there, a
-change of site the Coach should rule on.
+go through `outcomeOf`, which defaults to `unexpectedError`. Acted on: G8 names `outcomeOf`, the catch
+that ends each Lease and Box `try*` form; the throwing forms end in none.
 
 **F5. G9: "A `Box` reaches the Lease through the module-private `heldLeaseOf`."** The models' `Box`
 reaches it through public `Vault` methods: `models/vault.ts:276` `sealStampedString` and `:282`
@@ -61,10 +68,11 @@ reaches it through public `Vault` methods: `models/vault.ts:276` `sealStampedStr
 
 **F6. G9: "The entry points export `Lease` and `Proving` as types and classes alone."**
 `src/index.ts` exports neither: `Bank`, `Box`, `Gating`, `Vault`, `Whispered`, `VaultError`,
-`isVaultError`, and types. Recommend: "export neither `Lease` nor `Proving`".
+`isVaultError`, and types; nor does the `./testing` entry, `tests/test-helpers.ts`. Acted on:
+G9 now says the entry points export neither.
 
 **F7. Open item 2: "The core's `Box` of G6 holds no whisper; the models are not yet exported."**
-`src/index.ts:1-4` exports the models' `Bank`, `Box`, `Gating`, `Vault`.
+`src/index.ts:1-4` exports the models' `Bank`, `Box`, `Gating`, `Vault`. Acted on: the clause is struck.
 
 **F8. G10: "a deriver wearing a supplied label must carry exactly its parameters (`Bank.make`)."**
 `Bank.make` (`models/bank.ts:80`) checks no spec; `keyDeriverShape` (`shapes/shapes-core.ts:197`) has no
@@ -79,7 +87,8 @@ core: pre-existing. Recommend adding `crypto.randomUUID` to the sentence.
 **F10. *The construction*: the ctx names "for a wayin its `format`".** No wayin field is a format:
 `wayinCtxOf` (`models/wayin.ts:14`) binds `vaultStamp` (`shapes/shapes-gateish.ts:155`: applabel,
 user_id, vaultlabel, vault_tok, registered_at), the purpose, and the wayin header (`shapes-storage.ts:73`:
-wayinkind, key_deriver_label, salt_b64, device_id, registered_at). Recommend dropping the clause.
+wayinkind, key_deriver_label, salt_b64, device_id, registered_at; the passkey header's `:74` has
+credential_id and prf_salt_b64 in place of the label and salt). Acted on: the clause is dropped.
 
 **F11. G8's WebCrypto sentence is #511's, adopted verbatim.** It narrows the old claim: the old text
 counted "the cipher step of `Lease.cipheredWith`" among the caught; `Lease.sealWith`
