@@ -332,12 +332,14 @@ should be only slightly larger than what we use now", then chose "32 bytes, both
 65,536 → 32 (`helpers/consts.ts`, the bound on a deriver spec's `salt_bytes`), and the stored
 `salt_b64` checked at no more than 32 bytes (`shapes-core.ts`, today only "not empty"). Today's
 deriver makes 16; the passkey salt is exactly 32 already. A changeset line: a host deriver spec
-asking for more than 32 salt bytes is refused at setup.
+asking for more than 32 salt bytes is refused at setup. Thread 9 (#565) left fastkey's "longest salt"
+test cases at 65,536 and 65,537 bytes; they follow the cap down to 32 and 33.
 
 Also (2026-11-06): the Coach on the Postgres channel, in chat, "host controls the device_id and is
 responsible for RLS. That should be written down": the Postgres README says the host owns the
 database roles, row-level security and who may LISTEN (the channel's naming is an open row).
-And `e2e/package.json` drops `safebyok-old` once the restacked line leaves no e2e import of it. Touches every adapter package, so it is cut
+And `e2e/package.json` drops `safebyok-old` once the restacked line leaves no e2e import of it. And PROCESS.md, which still says the adapters peer on `safebyok-old`, says they
+peer on `safebyok` now. Touches every adapter package, so it is cut
 from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
 mechanical; `sonnet` worker, `low` review.
 
