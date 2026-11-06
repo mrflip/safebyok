@@ -182,6 +182,15 @@ describe('scripts/git-mergify', () => {
     expect(missing.stderr).to.include('#77 is not an open pull request against main')
   })
 
+  it('takes the numbers out of a pasted stack line, as one argument or many, in whatever order', () => {
+    seedStack(world)
+    world.open([{ number: 512, branch: 'top' }, { number: 518, branch: 'low' }, { number: 529, branch: 'mid' }])
+    const line = 'Stacked as main -> #518 -> [#529](https://example.com/o/r/pull/529) -> #512 (this PR)'
+    expect(world.run('--apply', line).status).to.equal(0)
+    expect(world.labeled()).to.deep.equal(['518', '529', '512'])
+    expect(world.run(...line.split(' ')).stdout).to.match(/^Stack, bottom first:\n {2}#518 /)
+  })
+
   it('says so when there is nothing to queue', () => {
     seedStack(world)
     world.open([{ number: 1, branch: 'low', draft: true }])
@@ -195,6 +204,7 @@ describe('scripts/git-mergify', () => {
   it('refuses arguments it does not understand', () => {
     expect(world.run('--hurry').status).to.equal(2)
     expect(world.run('seven').status).to.equal(2)
+    expect(world.run('Stacked', 'as', 'main').status).to.equal(2)
     expect(world.run('--base').status).to.equal(2)
   })
 })
