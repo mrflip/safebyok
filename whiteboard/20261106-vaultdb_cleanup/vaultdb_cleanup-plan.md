@@ -94,6 +94,12 @@
   A verb's branches are a flat run of `if (predicate) { throw refusal(...) }` /
   `return this.#answerX(...)` lines up front; a helper may hide how a refusal or answer is built,
   never a branch the caller should see.
+* **Adapters triage their store's errors** (the Coach, 2026-11-06): "Adapters are encouraged to
+  catch and triage errors into VaultError subclasses, or to synthesize them based on what their
+  query returns." A port turns what its store throws, or what its query answers, into the
+  refusal that says what happened (`storageUnavailable`, `vaultFull`, a stale write...); the
+  base's method-wide catch is only the backstop. Thread 2's battery covers it where a store can
+  be made to fail.
 * **Exports are free** (the Coach): anything, large or small, may be exported from `safebyok` or
   any package where it helps.
 * **Classify once, then branch on a non-null type.** A stored row is parsed by a checker that
@@ -142,6 +148,10 @@ against the gallant sections above). **Depends on:** nothing; cut from `origin/m
 smallest a SQL, IndexedDB or Convex store can meet atomically; thread 2 turns its tests into a
 battery, so keep tests calling only the public verbs and `_cheat_*` backdoors through one
 helper. **Size:** M. No size line moves (the core is not measured).
+
+*Review:* pending. *Coach rulings (2026-11-06)* on its open matters: the wide catch stays, with
+adapters triaging; damaged_row for a later fmt, tidyGone ("for hosts to call"), the put acts,
+and the gate put's `ifAbsent: 'fail'` all kept.
 
 ### 2. vaultdb_battery
 
