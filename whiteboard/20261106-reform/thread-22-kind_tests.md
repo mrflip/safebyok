@@ -1,6 +1,6 @@
 # Thread 22: tests stop promising the incidental refusal kinds (2026-11-06)
 
-Branch `20261106-kind_tests`, cut from main at a19292549. PR: see below. Justify: see the PR's **Tests:** line.
+Branch `20261106-kind_tests`, PR #549, cut from main at a19292549. Justify green; safebyok 66 files, 2189 tests.
 
 * **Built**: `expectRefusal`, `expectBad` and `expectSyncRefusal` (`tests/test-helpers/refusals.ts`) take
   `refusalkind` as optional: left out, any `VaultError` passes. `holdsCases` (`tests/test-helpers/cases.ts`)
