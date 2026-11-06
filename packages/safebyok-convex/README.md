@@ -69,8 +69,8 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
   `ConvexReactClient` you give `ConvexProvider`, so the vault shares its socket and its signed-in
   user. `safebyok-convex` imports nothing of React's.
 * **`api`** is `api.safebyok`, the functions above.
-* **`maxBoxes`**, optional, caps the live boxes in one vault, under the component's own limit; a
-  put past it refuses as `vault_full`.
+* **`maxBoxes`**, optional, caps the box rows in one vault, deleted boxes' tombstones among them,
+  under the component's own limit; a put past it refuses as `vault_full`.
 * **`maxRecordBytes`**, optional, as every vaultDB takes it, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the vault once the Convex client is authenticated (in React, once
@@ -92,7 +92,7 @@ Three tables, inside the component:
 | ----------------- | ------------------ | ------------------------------------------------------- | ------------------------------------------------------------------ |
 | `safebyok_vaults` | vault              | its scope and its vault row, live or a tombstone        | `by_scope`: `user_id`, `applabel`, `vaultlabel`                    |
 | `safebyok_boxes`  | box, in each life  | its scope, its life's `vault_tok`, and its box row      | `by_box`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`, `boxlabel` |
-| `safebyok_tallies`| life of a vault    | its live boxes' count and their bytes                   | `by_life`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`        |
+| `safebyok_tallies`| life of a vault    | its box rows' count and their bytes                     | `by_life`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`        |
 
 `user_id` leads every index, so one user's rows are one range of each. Rows are stored as the core
 writes them: encrypted, each whisper, each box's boxKey and the vaultKey once for each way in; in
@@ -103,11 +103,14 @@ finished with, and the tallies of ended lives.
 changelog; Convex will not deploy a schema the stored rows do not match, so clear the component's
 tables first (on the dashboard's Data page, pick the `safebyok` component).
 
-**How big a vault can be.** The component holds every life of a vault to **8,000 boxes** and
+**How big a vault can be.** The component holds every life of a vault to **8,000 box rows** and
 **7 MiB less 1 KiB** of them as Convex weighs a document, whatever the client asks, so that one
-`delVault` can always reach the whole vault within a Convex transaction's limits. A put that would
-take a vault past either and leave it larger refuses as `vault_full`; a replacement no heavier, and
-every delete, always lands.
+`delVault` can always reach the whole vault within a Convex transaction's limits. A deleted box
+leaves its tombstone in its row, which counts toward both limits as a live box does; a box put
+again under the same boxlabel takes that row back. A put that would take a vault past either limit
+and leave it larger refuses as `vault_full`; a replacement no heavier, and every delete, always
+lands. A vault filled with tombstones is emptied only by deleting it: its next life starts with
+none, and `tidyGone` removes the old life's rows.
 
 ## Testing your own functions
 

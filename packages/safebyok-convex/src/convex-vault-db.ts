@@ -44,7 +44,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
   client: ConvexVaultClient
   /** The safebyok functions the app serves, `api.safebyok`. */
   api: SafebyokApi
-  /** The most live boxes a vault holds, under the component's own limit. */
+  /** The most box rows a vault holds, live or tombstoned, under the component's own limit. */
   maxBoxes?: number | undefined
 }
 

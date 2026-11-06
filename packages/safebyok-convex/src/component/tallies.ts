@@ -1,14 +1,15 @@
 import { getDocumentSize } from 'convex/values'
 import type { Value } from 'convex/values'
 import type { WithoutSystemFields } from 'convex/server'
-import * as SX from 'safebyok/storage'
 import type { Doc } from './_generated/dataModel'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
 // A vault is held to limits, whatever its client asks, so that one transaction can always tombstone
 // it whole: `delVault` reads every box row of the life once and writes each live one, and a Convex
 // transaction may read 16 MiB and write 16,000 documents. The limits are half of each, leaving room
-// for the vault row and the tally, as a modified client need not keep its vault small.
+// for the vault row and the tally, as a modified client need not keep its vault small. A box's
+// tombstone is a row `delVault` reads as surely as a live box, so it counts toward both limits:
+// putting and deleting under fresh boxlabels fills a life as putting alone does.
 
 // == [Limits]: MaxVaultBoxes, MaxVaultBoxBytes
 
@@ -24,7 +25,7 @@ const ConvexTransactionWrittenDocuments = 16_000
 /** Room for the tally row beside the vault row. */
 const TallyReserveBytes = 1024
 
-/** The most live boxes one life of a vault holds. */
+/** The most box rows one life of a vault holds, live or tombstoned. */
 export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
 /** The most one life's box rows weigh together, live or tombstoned, in bytes as Convex counts a document. */
@@ -36,7 +37,7 @@ export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumen
 /** The labels and token that name one life of one vault. */
 export type Life = { applabel: string, user_id: string, vaultlabel: string, vault_tok: string }
 
-/** A life's live boxes, and what all its box rows weigh. */
+/** How many box rows a life holds, live or tombstoned, and what they weigh. */
 export type Tally = { box_count: number, box_bytes: number }
 
 /** A life's tally as a put finds it: the row it is kept in, if any, and the count, null for a life past a limit. */
@@ -66,7 +67,7 @@ export const reckon = async (db: DatabaseReader, life: Life): Promise<Reckoning>
   // A loop rather than a reduce: it reads the rows as it goes, and stops reading past a limit.
   let tally: Tally = { box_count: 0, box_bytes: 0 }
   for await (const boxDoc of lifeBoxQuery(db, life)) {
-    tally = plus(tally, { box_count: (SX.isLiveRow(boxDoc.box) ? 1 : 0), box_bytes: weigh(boxDoc) })
+    tally = plus(tally, { box_count: 1, box_bytes: weigh(boxDoc) })
     if ((tally.box_count > MaxVaultBoxes) || (tally.box_bytes > MaxVaultBoxBytes)) { return { kept: null, tally: null } }
   }
   return { kept: null, tally }
