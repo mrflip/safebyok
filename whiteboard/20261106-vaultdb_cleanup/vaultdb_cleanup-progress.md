@@ -22,7 +22,7 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 * *Orchestrator:* consumers of the old adapters: `demos/safebyok-demo-react/src/lib/stores.ts`
   and `persist-storage.ts` (indexeddb), `e2e/tests/postgres/*`, `e2e/tests/convex/*`.
 
-## Thread 1: vaultdb_plain (#555, reviewed `fixed`, filing)
+## Thread 1: vaultdb_plain (#555, filed at eb6569b17 after a rebase over #548, #549)
 
 * The `do*` contract: `doPutVault(record, PutOptsGiven)`, `doPutBox(record, PutOptsGiven)`,
   `doDelVault(tombstone, DelOpts)`, `doDelBox(tombstone, DelOpts)`, each one atomic step
@@ -43,3 +43,7 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
   is the backstop. All five of its open matters ruled keep.
 * Planning lesson: one compaction at ~157k just before the first justify, for a 12-file M thread.
   The L ports (postgres, graphql, convex) should be handed tight handoffs.
+
+## Thread 2: vaultdb_battery
+
+*(underway, cut from eb6569b17)*

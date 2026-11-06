@@ -5,7 +5,7 @@
   (opus, inherited); style pass on `style-reviewer`'s pin (sonnet).
 * Threads at once: 3.
 * Sprint branch: `20261106-vaultdb_cleanup`, worktree `/workspace/byok-vaultdb_cleanup`.
-* **Status:** planned; thread 1 underway.
+* **Status:** thread 1 filed (#555); thread 2 building.
 
 ## The Coach's request, verbatim
 
