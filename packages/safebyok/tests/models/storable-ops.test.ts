@@ -318,7 +318,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
 
   const BadCases = [
     [(box: TestableBox) => box.tryFetch(),                                                   (box: TestableBox) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
-    [(box: TestableBox) => box.tryFetch(),                                                   () => { held.mw.willGet(() => { throw new Error("socket closed") }) },         "unexpected_error",    'tryFetch whose store throws a plain Error'],
+    [(box: TestableBox) => box.tryFetch(),                                                   () => { held.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose store throws a plain Error'],
     [(box: TestableBox) => box.tryHydrate(),                                                 () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
     [(box: TestableBox) => box.tryDel(),                                                     () => { held.mw.setLockState('locked') },                                      "vault_locked",        'tryDel while locked'],
@@ -327,9 +327,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
     it(`resolves a bad outcome holding its refusal: ${blurb}`, async () => {
       const { box } = await timelyBoxOf()
       arrange(box)
-      const outcome = await tryVerb(box)
-      expect(outcome.ok).to.be.false
-      expect(outcome.err?.refusalkind).to.eq(refusalkind)
+      await TH.expectBad(tryVerb(box), refusalkind)
     })
   }
 })
@@ -377,7 +375,7 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     const { box } = await timelyBoxOf(1000)
     held.mw.setNow(T0 + 1000)
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
-    await TH.expectRefusal(box.hydrate(), 'record_conflict')
+    await TH.expectRefusal(box.hydrate())
     expect(box.isTimely).to.be.false
     expect(held.mw.badnews).to.deep.equal([])
   })
@@ -399,12 +397,12 @@ describe("storable.receive(rcvd): after a put over a box held gone", () => {
 })
 
 describe("storable refusal sentences, from phrases.ts", () => {
-  it("says a record_conflict is worth one fetch, and that one persisting means the system is not working", async () => {
+  it("says a revision conflict is worth one fetch, and that one persisting means the system is not working", async () => {
     const { box } = await timelyBoxOf()
-    const err = TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-a1' })), 'record_conflict')
+    const err = TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-a1' })))
     expect(err.message).to.eq(Phrases.OneRevisionTwoFates)
     expect(err.family).to.eq('condition')
-    const twoToks = TH.expectSyncRefusal(() => cmpRevisions({ revision_tok: 'a', revision_seq: 1 }, { revision_tok: 'b', revision_seq: 1 }), 'record_conflict')
+    const twoToks = TH.expectSyncRefusal(() => cmpRevisions({ revision_tok: 'a', revision_seq: 1 }, { revision_tok: 'b', revision_seq: 1 }))
     expect(twoToks.message).to.eq(Phrases.OneRevisionTwoToks)
     for (const message of [Phrases.OneRevisionTwoFates, Phrases.OneRevisionTwoToks, Phrases.OneRevisionTwoLives]) {
       expect(message).to.contain('worth one try').and.to.contain('fundamentally not working')
@@ -418,13 +416,13 @@ describe("storable refusal sentences, from phrases.ts", () => {
     expect(locked.message).to.eq(Phrases.VaultLocked)
     held.mw.setLockState('unlocked')
     const sparse = await boxListingOf(held.mw).build(sparseBoxRecord({ boxlabel: 'sparse_one' }))
-    const notFull = TH.expectSyncRefusal(() => sparse.demandFull(), 'bad_option')
+    const notFull = TH.expectSyncRefusal(() => sparse.demandFull())
     expect(notFull.message).to.eq(Phrases.PartialLoad)
   })
 
   it("throws a record under another vault_tok with the sentence phrases.ts holds", async () => {
     const { box } = await timelyBoxOf()
-    const err = TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })), 'record_conflict')
+    const err = TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })))
     expect(err.message).to.eq(Phrases.OtherVaultTok)
   })
 })

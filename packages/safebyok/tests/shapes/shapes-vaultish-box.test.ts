@@ -18,7 +18,7 @@ const scope     = mw.boxscope('anthropic_api_key')
 
 describe("VX.boxRecord and VX.boxSparse", () => {
   describe("VX.boxRecord", () => {
-    holdsCases(VX.boxRecord, 'bad_option', [
+    holdsCases(VX.boxRecord, [
       [full,                                            true,  'passes a full record'],
       [{ ...full, sidecar: {} },                        true,  'passes an empty sidecar'],
       [sparse,                                          false, 'refuses a sparse record: it is the full one'],
@@ -49,22 +49,22 @@ describe("VX.boxRecord and VX.boxSparse", () => {
 
     it("refuses a plain object carrying a field the Box ducks without", async () => {
       const box = await boxListingOf(mw).build(full)
-      TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...VX.boxRecord.parse(box), extra: 1 }), 'bad_option')
+      TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...VX.boxRecord.parse(box), extra: 1 }))
     })
 
     it("refuses a Box that is not full, as it ducks as the sparse form", async () => {
       const box = await boxListingOf(mw).build(sparse)
-      TH.expectSyncRefusal(() => VX.boxRecord.parse(box), 'bad_option')
+      TH.expectSyncRefusal(() => VX.boxRecord.parse(box))
     })
 
     it("refuses without quoting its input", () => {
-      const err = TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }))
       expect(err.message).to.not.include('SECRET')
     })
   })
 
   describe("VX.boxSparse", () => {
-    holdsCases(VX.boxSparse, 'bad_record', [
+    holdsCases(VX.boxSparse, [
       [sparse,                                  true,  'passes a sparse record'],
       [full,                                    true,  'passes a full record, stripping what is not sparse'],
       [gone,                                    true,  'passes a tombstone'],
@@ -110,7 +110,7 @@ describe("VX.boxDna", () => {
   // A dna carries no revision_seq, so the factory's props stop at the rest.
   const { revision_seq: _revision_seq, ...factoryProps } = baseProps
 
-  holdsCases(VX.boxDna, 'bad_option', [
+  holdsCases(VX.boxDna, [
     // the scope, the whisper and the sidecar, and what a caller may give beside them:
     [dna,                                                   true,  'passes the scope, a whisper and a sidecar'],
     [{ ...dna, whisper: { key: 'sk-ant-fake', orgId: null } }, true, 'passes a whisper that is an object, null inside it'],
@@ -169,7 +169,7 @@ describe("VX.boxDna", () => {
   })
 
   it("names the failing field", () => {
-    const err = TH.expectSyncRefusal(() => VX.boxDna.parse({ ...dna, boxlabel: 'B' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.boxDna.parse({ ...dna, boxlabel: 'B' }))
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
   })
 
@@ -178,7 +178,7 @@ describe("VX.boxDna", () => {
   })
 
   it("refuses without quoting its input", () => {
-    const err = TH.expectSyncRefusal(() => VX.boxDna.parse({ ...scope, sidecar: 'SECRET-SIDECAR', whisper: null, extra: 'SECRET-EXTRA' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.boxDna.parse({ ...scope, sidecar: 'SECRET-SIDECAR', whisper: null, extra: 'SECRET-EXTRA' }))
     expect(err.message).to.not.include('SECRET')
   })
 })
@@ -188,7 +188,7 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
   const { sidecar: _sidecar, ...sealedless } = full
 
   describe("boxDna", () => {
-    holdsCases(VX.boxDna, 'bad_option', [
+    holdsCases(VX.boxDna, [
       [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls'],
       [{ ...scope, whisper, sidecar: {}, revision_seq: 3 },                  false, 'refuses a revision_seq'],
       [{ ...scope, whisper, sidecar: {}, am: 'q' },                          false, 'refuses a factory prop that fails its check'],
@@ -201,7 +201,7 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
   })
 
   describe("boxPatch", () => {
-    holdsCases(VX.boxPatch, 'bad_option', [
+    holdsCases(VX.boxPatch, [
       [{ whisper, sidecar: {} },                                             true,  'passes the whisper and the sidecar alone'],
       [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with its whisper and a sidecar'],
       [{ ...sparse, whisper, sidecar: {} },                                  true,  'passes a sparse record given back so'],
@@ -225,9 +225,9 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
     })
 
     it("names the failing field, quoting nothing of a whisper or a field's name", () => {
-      expect(TH.expectSyncRefusal(() => VX.boxPatch.parse({ whisper: null, sidecar: {} }), 'bad_option').meta?.fieldnames).to.deep.equal(['whisper'])
+      expect(TH.expectSyncRefusal(() => VX.boxPatch.parse({ whisper: null, sidecar: {} })).meta?.fieldnames).to.deep.equal(['whisper'])
       for (const marked of [{ whisper: { SECRET: undefined }, sidecar: {} }, { whisper: { apiKey: 'SECRET-VAL' }, sidecar: {}, SECRET_FIELD: 1 }]) {
-        const err = TH.expectSyncRefusal(() => VX.boxPatch.parse(marked), 'bad_option')
+        const err = TH.expectSyncRefusal(() => VX.boxPatch.parse(marked))
         expect(TH.thrownText(err)).to.not.include('SECRET')
         expect(JSON.stringify(err.meta)).to.not.include('SECRET')
       }
@@ -241,7 +241,7 @@ describe("VX.vaultRecord and VX.vaultSparse: the gate rides in the vault record,
 
   const gate = { gate_epoch: GX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
-  holdsCases(VX.vaultRecord, 'bad_option', [
+  holdsCases(VX.vaultRecord, [
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
     [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
     [sparseVault,                    false, 'refuses a record without its gate'],

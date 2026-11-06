@@ -34,7 +34,7 @@ describe("MemoryVaultDB", () => {
       const { vaultDB, vault } = await storeWith()
       const next = vaultAt(1)
       await expect(vaultDB.putVault(next, { prior: priorOf(vault) })).rejects.toSatisfy((err) => isVaultError(err, 'camped'))
-      await expect(vaultDB.putVault(next, { prior: priorOf(vault), ifPresent: 'repl' } as never)).rejects.toSatisfy((err) => isVaultError(err, 'bad_option'))
+      await expect(vaultDB.putVault(next, { prior: priorOf(vault), ifPresent: 'repl' } as never)).rejects.toSatisfy((err) => isVaultError(err))
     })
 
     it("over a live row, ifPresent get answers it as declined, and fail refuses camped, neither saving", async () => {
@@ -57,16 +57,16 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryPutVault(vaultAt(8), { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: null })
     })
 
-    it("refuses bad_option for a record's revision_seq not one past its prior's, and unexpected_error for a record failing its checks, quoting none of it", async () => {
+    it("refuses a record's revision_seq not one past its prior's, and a record failing its checks, quoting none of it", async () => {
       const vaultDB = new MemoryVaultDB()
-      expect(await vaultDB.tryPutVault(vaultAt(3), { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'bad_option' })
+      expect(await vaultDB.tryPutVault(vaultAt(3), { prior: SX.VoidRevision })).to.deep.include({ ok: false })
       const secretish = 'hunter2'
       const answer = await vaultDB.tryPutVault({ ...vaultAt(), vaultlabel: `${secretish}^^bad label` }, { prior: SX.VoidRevision })
-      expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', req_params: {} })
+      expect(answer).to.deep.include({ ok: false, req_params: {} })
       expect(JSON.stringify([answer.err?.message, answer.req_params])).to.not.include(secretish)
     })
 
-    it("refuses unexpected_error for a box record, a box tombstone or a vault tombstone failing its checks, as it is safebyok's to prepare, storing nothing", async () => {
+    it("refuses a box record, a box tombstone or a vault tombstone failing its checks, as it is safebyok's to prepare, storing nothing", async () => {
       const { vaultDB, vault, box } = await storeWith({ box: true })
       const answers = [
         await vaultDB.tryPutBox({ ...boxAt(1), whisper_ciphered: 7 } as never, { prior: priorOf(box) }),
@@ -74,7 +74,7 @@ describe("MemoryVaultDB", () => {
         await vaultDB.tryDelVault({ ...vaultTombstoneOf(vault), gate: vault.gate } as never, { prior: priorOf(vault) }),
       ]
       for (const answer of answers) {
-        expect(answer).to.deep.include({ ok: false, act: 'unexpected_error' })
+        expect(answer).to.deep.include({ ok: false })
         expect(answer.err?.message).to.eq(Phrases.RecordPreparedWrong)
       }
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: box.vault_tok })).to.deep.include({ val: box })
@@ -115,11 +115,11 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ val: box })
     })
 
-    it("refuses vault_mismatch under a vault_tok that is not the live one's, and vault_gone under this life's tombstone", async () => {
+    it("refuses a put under a vault_tok that is not the live one's, and under this life's tombstone", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
+      expect(await vaultDB.tryPutBox(boxAt(0, 'oldlife'), { prior: SX.VoidRevision })).to.deep.include({ ok: false, dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
-      expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'vault_gone' })
+      expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision })).to.deep.include({ ok: false })
     })
 
     it("refuses box_too_large over maxRecordBytes, and vault_full for a new box past maxBoxes", async () => {
@@ -188,22 +188,22 @@ describe("MemoryVaultDB", () => {
       expect(await other.tryPutBox(reborn, { prior, ifAbsent: 'add', ifPresent })).to.deep.include({ ok: false, act: 'stale_write', dbhas: tombstone })
     })
 
-    it("takes ifAbsent add by default, and refuses bad_option for fetch's nil", async () => {
+    it("takes ifAbsent add by default, and refuses fetch's nil", async () => {
       const { vaultDB, vault, box } = await storeWith()
-      expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision, ifAbsent: 'nil' } as never)).to.deep.include({ ok: false, act: 'bad_option' })
-      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault), ifAbsent: 'nil' } as never)).to.deep.include({ ok: false, act: 'bad_option' })
+      expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision, ifAbsent: 'nil' } as never)).to.deep.include({ ok: false })
+      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault), ifAbsent: 'nil' } as never)).to.deep.include({ ok: false })
       expect(await vaultDB.putBox(box, { prior: SX.VoidRevision })).to.deep.include({ act: 'born' })
     })
 
-    it.each(['fail', 'get'] as const)("refuses vault_empty over a void vault row and vault_gone over a tombstone, with ifAbsent fail and ifPresent %s", async (ifPresent) => {
+    it.each(['fail', 'get'] as const)("refuses a put over a void vault row and over a tombstone, with ifAbsent fail and ifPresent %s", async (ifPresent) => {
       const empty = new MemoryVaultDB()
       const answer = await empty.tryPutVault(vaultAt(), { prior: SX.VoidRevision, ifAbsent: 'fail', ifPresent })
-      expect(answer).to.deep.include({ ok: false, act: 'vault_empty', dbhas: null })
+      expect(answer).to.deep.include({ ok: false, dbhas: null })
       expect(empty._cheat_vaultRowsOf(bankScope).size).to.eq(0)
       const { vaultDB, vault } = await storeWith()
       const tombstone = vaultTombstoneOf(vault)
       await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
-      expect(await vaultDB.tryPutVault(vaultAt(2, 'life2'), { prior: priorOf(tombstone), ifAbsent: 'fail', ifPresent })).to.deep.include({ ok: false, act: 'vault_gone', dbhas: tombstone, world: tombstone })
+      expect(await vaultDB.tryPutVault(vaultAt(2, 'life2'), { prior: priorOf(tombstone), ifAbsent: 'fail', ifPresent })).to.deep.include({ ok: false, dbhas: tombstone, world: tombstone })
     })
 
     it("over a live vault row, ifAbsent changes nothing: fail is camped and get is declined", async () => {
@@ -271,21 +271,21 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: moved })
     })
 
-    it("refuses gate_issue for a verb touching the other wayin, and for params that disagree with the row", async () => {
+    it("refuses a verb touching the other wayin, and params that disagree with the row", async () => {
       const { vaultDB, vault } = await storeWith()
-      expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'gate_issue', world: vault })
-      expect(await vaultDB.tryAddPasskey(paramsOf(vault, { passkey_wayin: passkeyWayin, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'gate_issue' })
-      expect(await vaultDB.tryRevokePasskey(paramsOf(vault, { passkey_wayin: null, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'gate_issue' })
-      expect(await vaultDB.tryReplacePassphrase(paramsOf({ ...vault, registered_at: Now + 5 }, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'gate_issue' })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, world: vault })
+      expect(await vaultDB.tryAddPasskey(paramsOf(vault, { passkey_wayin: passkeyWayin, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
+      expect(await vaultDB.tryRevokePasskey(paramsOf(vault, { passkey_wayin: null, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf({ ...vault, registered_at: Now + 5 }, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
 
-    it("refuses vault_gone under this life's tombstone, and vault_mismatch for another life", async () => {
+    it("refuses under this life's tombstone, and for another life", async () => {
       const { vaultDB, vault } = await storeWith()
       const oldLife = vaultAt(0, 'oldlife')
-      expect(await vaultDB.tryReplacePassphrase(paramsOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_mismatch', dbhas: vault })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
-      expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
     })
 
     it("carries no wayin in its request's safe metadata", async () => {

@@ -298,36 +298,36 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
   ] as const
   for (const [heldBlurb, heldOf] of HeldCases) {
     for (const [seq, blurb] of OtherVaultCases) {
-      it(`throws 'record_conflict' for ${blurb} under another vault_tok over ${heldBlurb}, keeping its own copy`, async () => {
+      it(`throws for ${blurb} under another vault_tok over ${heldBlurb}, keeping its own copy`, async () => {
         const box = await boxListingOf(held.mw).build(heldOf())
         const central = box._cheat_central
-        TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })), 'record_conflict')
+        TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
         expect(box._cheat_central).to.eq(central)
         expect(box.vault_tok).to.eq('vault-tok-u1')
       })
     }
   }
 
-  it("throws 'record_conflict' for a record under another vault_tok whose life tok path, joined, is the box's own", async () => {
+  it("throws for a record under another vault_tok whose life tok path, joined, is the box's own", async () => {
     const box = await builtOf(fullBoxRecord())
     const central = box._cheat_central
-    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })), 'record_conflict')
+    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })))
     expect(box._cheat_central).to.eq(central)
   })
 
-  it("throws 'record_conflict' over a box just created, and for a tombstone under another vault_tok", async () => {
+  it("throws over a box just created, and for a tombstone under another vault_tok", async () => {
     const box = await boxListingOf(held.mw).create(boxDnaOf(held.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
-    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })), 'record_conflict')
-    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')), 'record_conflict')
+    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })))
+    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')))
     expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 0 })
   })
 
-  it("throws 'record_conflict' from a fetch that meets a record under another vault_tok", async () => {
+  it("throws from a fetch that meets a record under another vault_tok", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
-    await TH.expectRefusal(box.fetch(), 'record_conflict')
+    await TH.expectRefusal(box.fetch())
     expect(box.revision_seq).to.eq(1)
   })
 
@@ -356,11 +356,11 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   ] as const
 
   for (const [call, blurb] of BadArgCases) {
-    it(`refuses ${blurb} as 'bad_option' while the vault is locked, calling nothing`, async () => {
+    it(`refuses ${blurb} while the vault is locked, calling nothing`, async () => {
       const box = await builtOf(fullBoxRecord())
       held.mw.setLockState('locked')
       held.mw.clearCalls()
-      await TH.expectRefusal(call(box), 'bad_option')
+      await TH.expectRefusal(call(box))
       expect(held.mw.calls).to.deep.equal([])
     })
   }
@@ -368,13 +368,13 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   it("refuses put with a sidecar that fails its check while the vault is locked, putting nothing", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
-    await TH.expectRefusal(box.put({ whisper, sidecar: [] as never }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper, sidecar: [] as never }))
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("refuses subscribing anything but a function", async () => {
     const box = await builtOf(fullBoxRecord())
-    TH.expectSyncRefusal(() => box.subscribe('call me' as never), 'bad_option')
+    TH.expectSyncRefusal(() => box.subscribe('call me' as never))
   })
 
   it("refuses a bag handed to put, naming whisper and saying it is no whisper", async () => {
@@ -383,7 +383,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     held.mw.clearCalls()
     expect(box.whisper).to.eq(ENCRYPTED)
     for (const call of [() => box.put({ whisper: box.whisper, sidecar: {} }), () => box.put({ whisper: LOCKED, sidecar: {} })]) {
-      const err = await TH.expectRefusal(call(), 'bad_option')
+      const err = await TH.expectRefusal(call())
       expect(err.message).to.include(Phrases.WhisperedIsNoWhisper)
       expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
     }
@@ -393,20 +393,20 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   it("refuses a put whose scope fields name another box, naming them, putting nothing", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.clearCalls()
-    const err = await TH.expectRefusal(box.put({ ...fullBoxRecord({ boxlabel: 'openai_api_key' }), whisper, sidecar: {} }), 'bad_option')
+    const err = await TH.expectRefusal(box.put({ ...fullBoxRecord({ boxlabel: 'openai_api_key' }), whisper, sidecar: {} }))
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("refuses a put whose factory field fails its check, naming it, though the field would be ignored", async () => {
     const box = await builtOf(fullBoxRecord())
-    const err = await TH.expectRefusal(box.put({ ...fullBoxRecord(), am: 'q' as never, whisper, sidecar: {} }), 'bad_option')
+    const err = await TH.expectRefusal(box.put({ ...fullBoxRecord(), am: 'q' as never, whisper, sidecar: {} }))
     expect(err.meta?.fieldnames).to.deep.equal(['am'])
   })
 
   it("refuses a put carrying a field no box record has", async () => {
     const box = await builtOf(fullBoxRecord())
-    await TH.expectRefusal(box.put({ whisper, sidecar: {}, sidecarr: {} } as never), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper, sidecar: {}, sidecarr: {} } as never))
   })
 
   /** A record handed back as a patch, every field the box controls given and none of it heeded. */

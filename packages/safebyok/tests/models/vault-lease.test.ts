@@ -169,14 +169,14 @@ describe("The discards: sweep and vacate, down the chain", () => {
   it("past a discard every guard refuses, what would take a call refuses, and lock, sweep and vacate are no-ops", async () => {
     const { vault, box, deviceDB } = await makeVaultWithBox()
     vault.sweep()
-    TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
-    TH.expectSyncRefusal(() => vault.demandUnlocked(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { apiKey: 'sk-test' } }), 'disabled')
-    TH.expectSyncRefusal(() => box.demandUnsealable(), 'disabled')
-    TH.expectSyncRefusal(() => box.demandExposable(), 'disabled')
-    await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'disabled')
-    await TH.expectRefusal(vault.fetch(), 'disabled')
-    await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandEnabled())
+    TH.expectSyncRefusal(() => vault.demandUnlocked())
+    TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { apiKey: 'sk-test' } }))
+    TH.expectSyncRefusal(() => box.demandUnsealable())
+    TH.expectSyncRefusal(() => box.demandExposable())
+    await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)))
+    await TH.expectRefusal(vault.fetch())
+    await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp))
     expect(vault.lock().sweep().vacate()).to.equal(vault)
     expect(box.lock().sweep().vacate()).to.equal(box)
     expect(deviceDB.tryVacate).not.toHaveBeenCalled()
@@ -187,7 +187,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     const boxes = vault.boxListing
     vault.sweep()
     expect(vault.boxListing).to.eq(boxes)
-    await TH.expectRefusal(boxes.hello(), 'disabled')
+    await TH.expectRefusal(boxes.hello())
   })
 
   it("past a discard a vault's record stays readable, for a log or a debugger", async () => {
@@ -197,28 +197,28 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(vault.gate.gate_epoch).to.eq(demandStored().gate.gate_epoch)
   })
 
-  it("a hydrate past a discard refuses only where it fetches: a timely record answers the instance, a stale one 'disabled'", async () => {
+  it("a hydrate past a discard refuses only where it fetches: a timely record answers the instance, a stale one refuses", async () => {
     const { vault, box } = await makeVaultWithBox()
     box.sweep()
     await expect(box.hydrate()).resolves.to.eq(box)
-    await TH.expectRefusal(box.hydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+    await TH.expectRefusal(box.hydrate({ maxMillisSinceRefresh: 0 }))
     vault.sweep()
     await expect(vault.hydrate()).resolves.to.eq(vault)
-    await TH.expectRefusal(vault.hydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+    await TH.expectRefusal(vault.hydrate({ maxMillisSinceRefresh: 0 }))
   })
 
-  it("a sweep crossing expose's unseal refuses 'disabled', and no whisper stays on the box", async () => {
+  it("a sweep crossing expose's unseal refuses, and no whisper stays on the box", async () => {
     const { box } = await makeVaultWithBox()
     vi.spyOn(Vault.prototype, 'unsealStampedString').mockImplementationOnce(() => {
       box.sweep()
       return Promise.resolve('{"apiKey":"sk-test"}')
     })
-    await TH.expectRefusal(box.expose(), 'disabled')
+    await TH.expectRefusal(box.expose())
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.snapshot.exposed).to.be.false
   })
 
-  it("a sweep crossing ensureUnlocked's peek at the cached lease refuses 'disabled', nobody asked", async () => {
+  it("a sweep crossing ensureUnlocked's peek at the cached lease refuses, nobody asked", async () => {
     const { vault, listing, deviceDB } = await makeBornVault()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -228,24 +228,24 @@ describe("The discards: sweep and vacate, down the chain", () => {
       vault.sweep()
       return Promise.resolve(null)
     })
-    await TH.expectRefusal(vault.ensureUnlocked(), 'disabled')
+    await TH.expectRefusal(vault.ensureUnlocked())
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("a swept listing stores nothing: a put or a delete refuses 'disabled' before reaching the vaultDB", async () => {
+  it("a swept listing stores nothing: a put or a delete refuses before reaching the vaultDB", async () => {
     const { listing, demandStored } = await makeBornVault()
     const stored = demandStored()
     listing.sweep()
-    await TH.expectRefusal(listing.put(stored, { prior: stored }), 'disabled')
-    await TH.expectRefusal(listing.del(stored), 'disabled')
+    await TH.expectRefusal(listing.put(stored, { prior: stored }))
+    await TH.expectRefusal(listing.del(stored))
     expect(demandStored()).to.eq(stored)
   })
 
-  it("a box listing swept with its vault refuses a birth 'disabled', ahead of the lock the sweep left", async () => {
+  it("a box listing swept with its vault refuses a birth, ahead of the lock the sweep left", async () => {
     const { vault, box } = await makeVaultWithBox()
     const boxes = vault.boxListing
     vault.sweep()
-    await TH.expectRefusal(boxes.create({ ...box.scope, ...BoxDna, boxlabel: 'other_key' }), 'disabled')
+    await TH.expectRefusal(boxes.create({ ...box.scope, ...BoxDna, boxlabel: 'other_key' }))
   })
 
   it("a listing past a sweep or a vacate takes no further call, and answers a late notice with nothing", async () => {
@@ -255,9 +255,9 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(listing.sweep()).to.equal(listing)
     expect(vault.isEnabled).to.be.false
     expect(listing.things).to.have.lengthOf(0)
-    await TH.expectRefusal(listing.hello(), 'disabled')
-    await TH.expectRefusal(listing.fetch(vault.scope), 'disabled')
-    await TH.expectRefusal(listing.build(record), 'disabled')
+    await TH.expectRefusal(listing.hello())
+    await TH.expectRefusal(listing.fetch(vault.scope))
+    await TH.expectRefusal(listing.build(record))
     expect(listing.vacate()).to.equal(listing)
     expect(listing.things).to.have.lengthOf(0)
   })

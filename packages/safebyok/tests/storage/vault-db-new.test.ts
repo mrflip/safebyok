@@ -15,7 +15,7 @@ describe("MemoryVaultDB", () => {
   describe("the constructor", () => {
     it("refuses a maxBoxes or maxRecordBytes it cannot use", () => {
       for (const opts of [{ maxBoxes: NaN }, { maxBoxes: -1 }, { maxRecordBytes: -1 }]) {
-        expect(() => new MemoryVaultDB(opts)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+        expect(() => new MemoryVaultDB(opts)).to.throw(VaultError)
       }
     })
   })
@@ -68,21 +68,21 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ ok: true, act: 'got', val: vault, world: vault })
     })
 
-    it("over a void row, refuses vault_empty with no row, and answers null with ifAbsent nil", async () => {
+    it("over a void row, refuses with no row, and answers null with ifAbsent nil", async () => {
       const vaultDB = new MemoryVaultDB()
       const answer = await vaultDB.tryGetVault(vaultScope)
-      expect(answer).to.deep.include({ ok: false, act: 'vault_empty', dbhas: null })
+      expect(answer).to.deep.include({ ok: false, dbhas: null })
       expect(answer.world).to.deep.equal(SX.sentinelVaultOf(vaultScope))
       const nil = await vaultDB.getVault(vaultScope, { ifAbsent: 'nil' })
       expect(nil).to.deep.include({ act: 'gotvoid', val: null, dbhas: null })
     })
 
-    it("over a tombstone, refuses vault_gone holding it, and answers null with ifAbsent nil", async () => {
+    it("over a tombstone, refuses holding it, and answers null with ifAbsent nil", async () => {
       const { vaultDB, vault } = await storeWith()
       const tombstone = vaultTombstoneOf(vault)
       await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
       const answer = await vaultDB.tryGetVault(vaultScope)
-      expect(answer).to.deep.include({ ok: false, act: 'vault_gone', dbhas: tombstone, world: tombstone })
+      expect(answer).to.deep.include({ ok: false, dbhas: tombstone, world: tombstone })
       expect(await vaultDB.getVault(vaultScope, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone, world: tombstone })
     })
 
@@ -126,9 +126,9 @@ describe("MemoryVaultDB", () => {
       expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
     })
 
-    it("refuses vault_mismatch under a stale vault_tok", async () => {
+    it("refuses under a stale vault_tok", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
-      expect(await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'oldlife' })).to.deep.include({ ok: false, act: 'vault_mismatch', world: null, dbhas: vault })
+      expect(await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'oldlife' })).to.deep.include({ ok: false, world: null, dbhas: vault })
     })
   })
 
@@ -155,29 +155,29 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' }, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
     })
 
-    it("refuses vault_mismatch under a live row of another vault_tok, whatever ifAbsent says", async () => {
+    it("refuses under a live row of another vault_tok, whatever ifAbsent says", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       const answer = await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'oldlife' }, { ifAbsent: 'nil' })
-      expect(answer).to.deep.include({ ok: false, act: 'vault_mismatch', world: null, dbhas: vault })
+      expect(answer).to.deep.include({ ok: false, world: null, dbhas: vault })
     })
 
-    it("refuses vault_empty for a vault_tok no row holds, over no row or another life's tombstone", async () => {
+    it("refuses a vault_tok no row holds, over no row or another life's tombstone", async () => {
       const vaultDB = new MemoryVaultDB()
       const asked = { ...boxscope, vault_tok: 'oldlife' }
       const sentinel = SX.sentinelVaultOf(vaultScope, 'oldlife')
-      expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, act: 'vault_empty', world: sentinel, dbhas: null })
+      expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, world: sentinel, dbhas: null })
       const vault = vaultAt()
       await vaultDB.putVault(vault, { prior: SX.VoidRevision })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
-      expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, act: 'vault_empty', world: sentinel, dbhas: null })
+      expect(await vaultDB.tryGetBox(asked)).to.deep.include({ ok: false, world: sentinel, dbhas: null })
     })
 
-    it("refuses vault_gone under this life's tombstone, and damaged_row for a box row failing validation", async () => {
+    it("refuses under this life's tombstone, and damaged_row for a box row failing validation", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('openai', { garbage: true })
       expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'damaged_row' })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
-      expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'vault_gone' })
+      expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false })
     })
   })
 

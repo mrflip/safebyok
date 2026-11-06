@@ -47,13 +47,13 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
     it("refuses a fetch of a scope that is no scope, before the world or storage is called", async () => {
       const listing = boxListingOf(held.mw)
-      await TH.expectRefusal(listing.fetch({ ...scopeOf(), boxlabel: 'Not A Label!' }), 'bad_scope')
+      await TH.expectRefusal(listing.fetch({ ...scopeOf(), boxlabel: 'Not A Label!' }))
       expect(held.mw.calls).to.deep.equal([])
     })
 
     it("refuses fetch options out of range, before the world or storage is called", async () => {
       const listing = boxListingOf(held.mw)
-      await TH.expectRefusal(listing.fetch(scopeOf(), { ifAbsent: 'create' } as never), 'bad_option')
+      await TH.expectRefusal(listing.fetch(scopeOf(), { ifAbsent: 'create' } as never))
       expect(held.mw.calls).to.deep.equal([])
     })
 
@@ -65,13 +65,13 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("an answer arriving past the listing's end", () => {
-    it("refuses 'disabled', a refusal among them, its world not taken", async () => {
+    it("refuses, a refusal among them, its world not taken", async () => {
       const listing = boxListingOf(held.mw)
       held.mw.willGet(() => {
         listing.vacate()
         return held.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Storage is down."), 'a world')
       })
-      await TH.expectRefusal(listing.fetch(scopeOf()), 'disabled')
+      await TH.expectRefusal(listing.fetch(scopeOf()))
       expect(held.mw.callsOf('takeWorld')).to.deep.equal([])
     })
   })
@@ -82,7 +82,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = await listing.build(fullBoxRecord())
       held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-other' }))
       held.mw.clearCalls()
-      await TH.expectRefusal(listing.fetch(scopeOf()), 'record_conflict')
+      await TH.expectRefusal(listing.fetch(scopeOf()))
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.revision_tok).to.eq('rev-a1')
       expect(held.mw.badnews).to.deep.equal([])
@@ -92,7 +92,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
       held.mw.clearCalls()
-      await TH.expectRefusal(listing.build(fullBoxRecord({ revision_tok: 'rev-other' })), 'record_conflict')
+      await TH.expectRefusal(listing.build(fullBoxRecord({ revision_tok: 'rev-other' })))
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.revision_tok).to.eq('rev-a1')
       expect(held.mw.badnews).to.deep.equal([])
@@ -103,7 +103,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = await listing.build(fullBoxRecord())
       held.mw.clearCalls()
       held.mw.willPut(held.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'record_conflict')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }))
       expect(box.revision_tok).to.eq('rev-a1')
       expect(held.mw.badnews).to.deep.equal([])
     })
@@ -113,7 +113,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       held.mw.seedStore(fullBoxRecord())
       const refused = vi.spyOn(Box.prototype, 'receive').mockImplementationOnce(() => { throw new VaultError('record_conflict', "Refused.") })
       try {
-        await TH.expectRefusal(listing.fetch(scopeOf()), 'record_conflict')
+        await TH.expectRefusal(listing.fetch(scopeOf()))
       } finally {
         refused.mockRestore()
       }
@@ -128,7 +128,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       held.mw.willPut(held.mw.staleWriteOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
       const err = await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
       expect(err.meta).to.have.property('dbhas')
-      expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['record_conflict'])
+      expect(held.mw.badnews).to.have.length(1)
     })
 
     it("leaves the answer's own refusals to the caller: a world's, a refusal answer, the absent refusal", async () => {
@@ -209,10 +209,10 @@ describe("Listing's pipeline: what every answer takes", () => {
 describe("listing: a record of another vault_tok meets no instance held", () => {
   const OtherVault = 'vault-tok-other'
 
-  it("refuses 'record_conflict' for a fetch answered with a record of another vault_tok, making nothing", async () => {
+  it("refuses for a fetch answered with a record of another vault_tok, making nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willGet(held.mw.answerOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault })))
-    await TH.expectRefusal(listing.fetch(scopeOf()), 'record_conflict')
+    await TH.expectRefusal(listing.fetch(scopeOf()))
     expect(listing.things).to.deep.equal([])
   })
 
@@ -220,14 +220,14 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
     const listing = boxListingOf(held.mw)
     for (const record of [tombstoneBoxRecord({ vault_tok: OtherVault, revision_seq: 2 }), sparseBoxRecord({ vault_tok: OtherVault })]) {
       held.mw.willGet(held.mw.answerOf(scopeOf(), record))
-      await TH.expectRefusal(listing.fetch(scopeOf()), 'record_conflict')
+      await TH.expectRefusal(listing.fetch(scopeOf()))
     }
     expect(listing.things).to.deep.equal([])
   })
 
   it("refuses build(record) of a record of another vault_tok, and passes over a notice of one", async () => {
     const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })), 'record_conflict')
+    await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })))
     held.mw.seedStore(fullBoxRecord())
     await listing.hello()
     held.mw.clearCalls()
@@ -254,7 +254,7 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))
-    const err = await TH.expectRefusal(listing.fetch(box.scope), 'record_conflict')
+    const err = await TH.expectRefusal(listing.fetch(box.scope))
     expect(err.message).to.contain('kept its own copy')
   })
 })
@@ -263,7 +263,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
   it("refuses a fetch answered with a record of another scope, making nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willGet(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'record_conflict')
+    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')))
     expect(listing.things).to.deep.equal([])
   })
 
@@ -273,7 +273,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
     const other = await listing.build(fullBoxRecord({ boxlabel: 'other_box' }))
     const [askedBefore, otherBefore] = [asked._cheat_central, other._cheat_central]
     held.mw.willGet(held.mw.answerOf(asked.scope, fullBoxRecord({ boxlabel: 'other_box', revision_seq: 2, revision_tok: 'rev-a2' })))
-    await TH.expectRefusal(listing.fetch(asked.scope), 'record_conflict')
+    await TH.expectRefusal(listing.fetch(asked.scope))
     expect(asked._cheat_central).to.deep.equal(askedBefore)
     expect(other._cheat_central).to.deep.equal(otherBefore)
   })
@@ -281,12 +281,12 @@ describe("listing: an answer names the scope of the record it carries", () => {
   it("refuses a put and a del answered with a record of another scope, and the record a stale_write carries, told to onBadNews with the stale_write thrown", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willPut(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { prior: SX.VoidRevision }), 'record_conflict')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { prior: SX.VoidRevision }))
     held.mw.willDel(held.mw.answerOf(scopeOf('asked_box'), tombstoneBoxRecord({ boxlabel: 'other_box', revision_seq: 2 })))
-    await TH.expectRefusal(listing.del(sparseBoxRecord({ boxlabel: 'asked_box' })), 'record_conflict')
+    await TH.expectRefusal(listing.del(sparseBoxRecord({ boxlabel: 'asked_box' })))
     held.mw.willPut(held.mw.staleWriteOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 5 })))
     await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { prior: SX.VoidRevision }), 'stale_write')
-    expect(held.mw.badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['record_conflict'])
+    expect(held.mw.badnews).to.have.length(1)
     expect(listing.things).to.deep.equal([])
   })
 

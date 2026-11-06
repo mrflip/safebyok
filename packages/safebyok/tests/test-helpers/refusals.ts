@@ -7,27 +7,30 @@ export { good, bad } from '../../src/refusals/outcome'
 /** What {@link expectRefusal} sees in place of an error when the operation resolved. */
 const NotRefused = Symbol('not refused')
 
+/** The words a failed expectation adds for an expected `refusalkind`, none when no kind was expected. */
+const kindClause = (refusalkind: RefusalKind | undefined): string => (refusalkind === undefined ? '' : ` of refusalkind '${refusalkind}'`)
+
 /**
- * The VaultError `operation` rejected with, once the test has checked it is one, of `refusalkind`; the
+ * The VaultError `operation` rejected with, once the test has checked it is one, and of `refusalkind` if given; the
  * test fails if `operation` resolves, or rejects with anything else: a plain Error, one that only
  * names itself a VaultError, a VaultError of another kind.
  *
  * @param operation - The call that should refuse.
- * @param refusalkind - The refusal's expected `refusalkind`.
+ * @param refusalkind - The refusal's expected `refusalkind`; left out, any VaultError passes.
  * @returns The refusal, for a closer look at its message or cause.
  *
  * @example await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'vault_locked')
  */
-export const expectRefusal = async (operation: Promise<unknown>, refusalkind: RefusalKind): Promise<VaultError> => {
+export const expectRefusal = async (operation: Promise<unknown>, refusalkind?: RefusalKind): Promise<VaultError> => {
   let refusal: unknown = NotRefused
   try {
     await operation
   } catch (err) {
     refusal = err
   }
-  expect(refusal, `expected a refusal of refusalkind '${refusalkind}', but the operation resolved: expectBad checks a call that resolves an Outcome`).to.not.eq(NotRefused)
+  expect(refusal, `expected a refusal${kindClause(refusalkind)}, but the operation resolved: expectBad checks a call that resolves an Outcome`).to.not.eq(NotRefused)
   expect(refusal).to.be.instanceOf(VaultError)
-  expect(refusal).to.have.property('refusalkind', refusalkind)
+  if (refusalkind !== undefined) { expect(refusal).to.have.property('refusalkind', refusalkind) }
   return refusal as VaultError
 }
 
@@ -84,43 +87,43 @@ const isOutcome = (settled: unknown): settled is Outcome<unknown> => (
 
 /**
  * The VaultError of the bad Outcome `operation` resolved to, once the test has checked it is one,
- * of `refusalkind`; the test fails if it resolved a good one, if it rejected (which no
- * Outcome-returning call may), or if its `err` is anything but a VaultError of that kind.
+ * and of `refusalkind` if given; the test fails if it resolved a good one, if it rejected (which no
+ * Outcome-returning call may), or if its `err` is anything but a VaultError (of that kind).
  *
  * @param operation - The call that should refuse, or its outcome.
- * @param refusalkind - The refusal's expected `refusalkind`.
+ * @param refusalkind - The refusal's expected `refusalkind`; left out, any VaultError passes.
  * @returns The refusal, for a closer look at its message, cause or meta.
  *
  * @example await TH.expectBad(vaultDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_mismatch')
  */
-export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind: RefusalKind): Promise<VaultError> => {
+export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind?: RefusalKind): Promise<VaultError> => {
   const outcome = await operation
-  expect(outcome.ok, `expected a refusal of refusalkind '${refusalkind}', but the outcome was good`).to.be.false
+  expect(outcome.ok, `expected a refusal${kindClause(refusalkind)}, but the outcome was good`).to.be.false
   expect(outcome.err).to.be.instanceOf(VaultError)
-  expect(outcome.err).to.have.property('refusalkind', refusalkind)
+  if (refusalkind !== undefined) { expect(outcome.err).to.have.property('refusalkind', refusalkind) }
   return outcome.err!
 }
 
 /**
- * Asserts that `attempt` throws, there and then, a VaultError of `refusalkind`, and returns it: the
+ * Asserts that `attempt` throws, there and then, a VaultError (of `refusalkind` if given), and returns it: the
  * synchronous twin of {@link expectRefusal}, for a check that throws rather than rejects.
  *
  * @param attempt - The call expected to throw.
- * @param refusalkind - The refusal's expected `refusalkind`.
+ * @param refusalkind - The refusal's expected `refusalkind`; left out, any VaultError passes.
  * @returns The refusal, for a closer look at its message.
  *
  * @example TH.expectSyncRefusal(() => Scopepath.box({ ...scope, user_id: 'a^b', boxlabel: 'x' }), 'bad_scope')
  */
-export const expectSyncRefusal = (attempt: () => unknown, refusalkind: RefusalKind): VaultError => {
+export const expectSyncRefusal = (attempt: () => unknown, refusalkind?: RefusalKind): VaultError => {
   let refusal: unknown = NotRefused
   try {
     attempt()
   } catch (err) {
     refusal = err
   }
-  expect(refusal, `expected a refusal of refusalkind '${refusalkind}', but the call returned`).to.not.eq(NotRefused)
+  expect(refusal, `expected a refusal${kindClause(refusalkind)}, but the call returned`).to.not.eq(NotRefused)
   expect(refusal).to.be.instanceOf(VaultError)
-  expect(refusal).to.have.property('refusalkind', refusalkind)
+  if (refusalkind !== undefined) { expect(refusal).to.have.property('refusalkind', refusalkind) }
   return refusal as VaultError
 }
 

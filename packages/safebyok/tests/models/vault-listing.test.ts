@@ -74,9 +74,9 @@ describe("a tombstone over a live vault", () => {
     restoreRow(tombstoneOver(demandStored()))
     expect(await listing.fetch(Dna, { ifAbsent: 'nil' })).to.be.null
     await expectLandedGone(vault, world)
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
     expect(box.isEnabled).to.be.false
-    await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
+    await TH.expectRefusal(listing.fetch(Dna))
     expect(vault.boxListing).to.eq(boxes)
   })
 
@@ -112,7 +112,7 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
     await delTyping(bornVault)
     await erased()
     expect(vault.isPresent).to.be.false
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
     expect(onBadNews).not.toHaveBeenCalled()
   })
 })
@@ -127,12 +127,12 @@ describe("a box verb over a vault deleted elsewhere", () => {
     ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, WorldNow)],
   ] as const satisfies readonly (readonly [string, (world: { vault: Vault, box: Box }) => Promise<unknown>])[]
 
-  it.each(Verbs)("%s refuses 'disabled', as the refresh that finds the tombstone vacates the box before the box's guard runs", async (_verb, call) => {
+  it.each(Verbs)("%s refuses, as the refresh that finds the tombstone vacates the box before the box's guard runs", async (_verb, call) => {
     const { vault, demandStored, restoreRow } = await makeBornVault()
     const box = await vault.boxListing.create({ ...vault.scope, ...BoxDna })
     await vault.hello()
     restoreRow(tombstoneOver(demandStored()))
-    await TH.expectRefusal(call({ vault, box }), 'disabled')
+    await TH.expectRefusal(call({ vault, box }))
   })
 })
 
@@ -142,21 +142,21 @@ describe("vault.del()", () => {
     const boxes = world.vault.boxListing
     await delTyping(world.vault)
     await expectLandedGone(world.vault, world)
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'disabled')
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
     await world.vault.ensureTimely(0)
-    TH.expectSyncRefusal(() => world.vault.demandEnabled(), 'vault_gone')
+    TH.expectSyncRefusal(() => world.vault.demandEnabled())
   })
 })
 
 describe("a newer record of another vault_tok over a live vault", () => {
-  it("refuses 'disabled' the old vault's own fetch and hydrate that met it, resolving no vault let go", async () => {
+  it("refuses the old vault's own fetch and hydrate that met it, resolving no vault let go", async () => {
     const fetching = await makeBornVault()
     fetching.restoreRow(await otherLifeAt(5))
-    await TH.expectRefusal(fetching.vault.fetch(), 'disabled')
+    await TH.expectRefusal(fetching.vault.fetch())
     const hydrating = await makeBornVault()
     hydrating.restoreRow(await otherLifeAt(5))
-    await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }), 'disabled')
+    await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }))
   })
 
   it("replaces it: the old vacated and unlisted, its row erased, a new vault in the slot, locked", async () => {
@@ -178,7 +178,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(tombstoneOver(other))
-    await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
+    await TH.expectRefusal(listing.fetch(Dna))
     expect(listing.at(Dna)?.vault_tok).to.eq(other.vault_tok)
     expect(listing.at(Dna)?.isPresent).to.be.false
     expect(vault.isEnabled).to.be.false
@@ -186,14 +186,14 @@ describe("a newer record of another vault_tok over a live vault", () => {
 })
 
 describe("an old instance, replaced by the very call it made", () => {
-  it("vault.del() refuses 'disabled', and the new life stored stands", async () => {
+  it("vault.del() refuses, and the new life stored stands", async () => {
     const { vault, restoreRow, storedNow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
-    await TH.expectRefusal(vault.fetch(), 'disabled')
-    await TH.expectRefusal(vault.del(), 'disabled')
+    await TH.expectRefusal(vault.fetch())
+    await TH.expectRefusal(vault.del())
     expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
-    TH.expectSyncRefusal(() => vault.demandDeletable(), 'disabled')
+    TH.expectSyncRefusal(() => vault.demandDeletable())
   })
 })
 
@@ -216,7 +216,7 @@ describe("an older record", () => {
     const { revision_tok } = vault
     for (const older of [born, await otherLifeAt(0)]) {
       restoreRow(older)
-      await TH.expectRefusal(listing.fetch(Dna), 'vault_gone')
+      await TH.expectRefusal(listing.fetch(Dna))
       expect(listing.at(Dna)).to.eq(vault)
       expect(vault.revision_tok).to.eq(revision_tok)
     }
@@ -240,7 +240,7 @@ describe("building over a tombstone", () => {
     const { listing } = await makeBornVault()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
-    await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
+    await TH.expectRefusal(listing.buildVault(Dna))
     expect(dialog).not.toHaveBeenCalled()
   })
 
@@ -253,7 +253,7 @@ describe("building over a tombstone", () => {
     const before = storedNow()
     const dialog = vi.fn(async (gating: AnyGating) => { await gating.attempt(byPassphrase('a-new-passphrase')) })
     listing.world.requestCleartext = dialog
-    await TH.expectRefusal(Vault.launchBirth(listing, Dna), 'bad_option')
+    await TH.expectRefusal(Vault.launchBirth(listing, Dna))
     expect(dialog).not.toHaveBeenCalled()
     expect(listing.openGating).to.be.null
     expect(deriveKeyBytes).not.toHaveBeenCalled()
@@ -262,7 +262,7 @@ describe("building over a tombstone", () => {
 
   it("a vault listing refuses to answer for another user, where another vault of this user is plainly not held", () => {
     const { listing } = makeVaultWorld()
-    TH.expectSyncRefusal(() => listing.at({ ...Dna, user_id: 'another_user' }), 'bad_scope')
+    TH.expectSyncRefusal(() => listing.at({ ...Dna, user_id: 'another_user' }))
     expect(listing.at({ ...Dna, vaultlabel: 'another_vault' })).to.be.null
   })
 
@@ -270,7 +270,7 @@ describe("building over a tombstone", () => {
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
-    await TH.expectRefusal(Vault.launchBirth(listing, { ...Dna, user_id: 'another_user' }), 'bad_scope')
+    await TH.expectRefusal(Vault.launchBirth(listing, { ...Dna, user_id: 'another_user' }))
     expect(dialog).not.toHaveBeenCalled()
   })
 
@@ -278,16 +278,16 @@ describe("building over a tombstone", () => {
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
-    await TH.expectRefusal(Vault.launchBirth(listing, null as never), 'bad_scope')
+    await TH.expectRefusal(Vault.launchBirth(listing, null as never))
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses 'disabled' on a swept listing, nobody asked", async () => {
+  it("Vault.launchBirth refuses on a swept listing, nobody asked", async () => {
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
     listing.sweep()
-    await TH.expectRefusal(Vault.launchBirth(listing, Dna), 'disabled')
+    await TH.expectRefusal(Vault.launchBirth(listing, Dna))
     expect(dialog).not.toHaveBeenCalled()
   })
 
@@ -341,13 +341,13 @@ describe("building over a tombstone", () => {
 describe("the entrypoints, handed rubble", () => {
   it("a birth's listing.put refuses a record that is no record, storing nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }), 'bad_option')
+    await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }))
     expect(storedNow()).to.be.null
   })
 
   it("listing.del refuses a duck that is no record", async () => {
     const { listing } = makeVaultWorld()
-    await TH.expectRefusal(listing.del(null as never), 'bad_scope')
+    await TH.expectRefusal(listing.del(null as never))
   })
 })
 

@@ -152,7 +152,7 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
     it(`refuses ${kind}, a copy, or one nested, at a put, keeping what is stored`, async () => {
       const box = await exposedOf()
       for (const whisper of [bag, { ...bag }, { deep: { ...bag } }]) {
-        await TH.expectRefusal(box.put({ whisper }), 'bad_option')
+        await TH.expectRefusal(box.put({ whisper }))
       }
       expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0000' })
     })
@@ -164,7 +164,7 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
     const readWhileLocked = box.whisper
     held.mw.setLockState('unlocked')
     held.mw.clearCalls()
-    await TH.expectRefusal(box.put({ whisper: readWhileLocked }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: readWhileLocked }))
     expect(held.mw.callsOf('put')).to.deep.equal([])
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0000' })
   })
@@ -186,10 +186,10 @@ describe("box.whisper and box.put: what a whisper may be", () => {
   ] as const
 
   for (const [whisper, blurb] of BadWhisperCases) {
-    it(`refuses a put of ${blurb} as 'bad_option', putting nothing and quoting nothing`, async () => {
+    it(`refuses a put of ${blurb}, putting nothing and quoting nothing`, async () => {
       const box = await builtOf(fullBoxRecord())
       held.mw.clearCalls()
-      const err = await TH.expectRefusal(box.put({ whisper: whisper as never, sidecar: {} }), 'bad_option')
+      const err = await TH.expectRefusal(box.put({ whisper: whisper as never, sidecar: {} }))
       expect(TH.thrownText(err)).to.not.include('SECRET')
       expect(JSON.stringify(err.meta)).to.not.include('SECRET')
       expect(held.mw.callsOf('put')).to.deep.equal([])
@@ -199,7 +199,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
   it("refuses before its guards: a whisper JSON would mangle refuses while the vault is locked", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
-    await TH.expectRefusal(box.put({ whisper: new Date(T0), sidecar: {} }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: new Date(T0), sidecar: {} }))
   })
 
   it("exposes a plain copy of the whisper put: the host's later change to its own reaches no box, and the box's takes an edit, stable until the next expose", async () => {

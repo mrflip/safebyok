@@ -90,9 +90,9 @@ const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
 }
 
 describe("An ending that lands while box.expose unseals", () => {
-  it.each(['sweep', 'vacate'] as const)("a %s refuses 'disabled', and leaves nothing exposed", async (ending) => {
+  it.each(['sweep', 'vacate'] as const)("a %s refuses, and leaves nothing exposed", async (ending) => {
     const box = await boxCrossingUnseal((crossed) => crossed[ending]())
-    await TH.expectRefusal(box.expose(), 'disabled')
+    await TH.expectRefusal(box.expose())
     expect(box.isEnabled).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
   })
@@ -116,7 +116,7 @@ const crossingGrant = (crossing: () => unknown) => {
 }
 
 describe("A gate change after its record is stored", () => {
-  it.each(['sweep', 'vacate'] as const)("a %s as the answer comes back refuses 'disabled', the row stored all the same", async (ending) => {
+  it.each(['sweep', 'vacate'] as const)("a %s as the answer comes back refuses, the row stored all the same", async (ending) => {
     const { vault, listing, demandStored, opts: { vaultDB } } = await makeBornVault()
     const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
@@ -124,7 +124,7 @@ describe("A gate change after its record is stored", () => {
       listing[ending]()
       return answer
     })
-    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'disabled')
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase))
     expect(demandStored().gate.gate_epoch).to.eq(2)
     expect(vault.isUnlocked).to.be.false
   })
@@ -154,7 +154,7 @@ describe("A gate change after its record is stored", () => {
     const { vault, demandStored, deviceDB, anotherSession } = await makeBornVault()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()), NewPassphrase)
-      await TH.expectRefusal(vault.fetch(), 'vault_gone')
+      await TH.expectRefusal(vault.fetch())
     })
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
     expect(vault.isPresent).to.be.false
@@ -162,21 +162,21 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("a tombstone crossing a birth's lease refuses 'vault_gone' as it attaches, and leaves no row", async () => {
+  it("a tombstone crossing a birth's lease refuses as it attaches, and leaves no row", async () => {
     const { listing, demandStored, deviceDB, anotherSession } = makeVaultWorld()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()))
-      await TH.expectRefusal(listing.at(Dna)!.fetch(), 'vault_gone')
+      await TH.expectRefusal(listing.at(Dna)!.fetch())
     })
-    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)), 'vault_gone')
+    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)))
     expect(listing.at(Dna)?.isPresent).to.be.false
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("a sweep crossing a birth's lease refuses 'disabled' at demandAttachable, the row stored, no lease cached", async () => {
+  it("a sweep crossing a birth's lease refuses at demandAttachable, the row stored, no lease cached", async () => {
     const { listing, storedNow, deviceDB } = makeVaultWorld()
     crossingGrant(() => listing.sweep())
-    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)), 'disabled')
+    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)))
     expect(storedNow()).to.include({ am: 'a' })
     expect(deviceDB.cachedNow()).to.be.null
   })

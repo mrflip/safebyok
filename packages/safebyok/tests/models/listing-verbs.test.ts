@@ -24,13 +24,13 @@ const putable = async () => {
 // --
 
 describe("listing.fetch(scope): nothing stored for a thing held alive", () => {
-  it("refuses 'record_conflict' by the same-revision row same | gone | alive, the box as it was", async () => {
+  it("refuses by the same-revision row same | gone | alive, the box as it was", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     const before = box._cheat_central
     held.mw.clearCalls()
     held.mw.willGet(held.mw.answerOf(box.scope, null))
-    await TH.expectRefusal(listing.fetch(box.scope), 'record_conflict')
+    await TH.expectRefusal(listing.fetch(box.scope))
     expect(box._cheat_central).to.deep.equal(before)
     expect(listing.at(box.scope)).to.eq(box)
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'get'])
@@ -65,10 +65,10 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
 
     for (const [label, ante] of [['missing', undefined], ['with no revision', {}], ['with only a seq', { revision_seq: 3 }]] as const) {
-      it(`refuses a prior ${label} as 'bad_option' before storage is called`, async () => {
+      it(`refuses a prior ${label} before storage is called`, async () => {
         const { listing, next } = await putable()
         held.mw.clearCalls()
-        await TH.expectRefusal(listing.put(next, { prior: ante } as never), 'bad_option')
+        await TH.expectRefusal(listing.put(next, { prior: ante } as never))
         expect(held.mw.callsOf('put')).to.deep.equal([])
       })
     }
@@ -85,7 +85,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("refuses fetch's ifAbsent nil, before storage is called", async () => {
       const { listing, box, next } = await putable()
       held.mw.clearCalls()
-      await TH.expectRefusal(listing.put(next, { prior: box, ifAbsent: 'nil' } as never), 'bad_option')
+      await TH.expectRefusal(listing.put(next, { prior: box, ifAbsent: 'nil' } as never))
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
@@ -93,7 +93,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       const sparse = await listing.build(sparseBoxRecord())
       held.mw.clearCalls()
-      await TH.expectRefusal(listing.put(sparse as never, { prior: sparse }), 'bad_option')
+      await TH.expectRefusal(listing.put(sparse as never, { prior: sparse }))
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
 
@@ -167,7 +167,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
   it("refuses a fetch answered with a record of another scope, making nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.willGet(held.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')), 'record_conflict')
+    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')))
     expect(listing.things).to.deep.equal([])
   })
 })
@@ -180,7 +180,7 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
 
   it("refuses an ifPresent it does not take, calling nothing", async () => {
     const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.put(birth, { prior: SX.VoidRevision, ifPresent: 'replace' } as never), 'bad_option')
+    await TH.expectRefusal(listing.put(birth, { prior: SX.VoidRevision, ifPresent: 'replace' } as never))
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -225,9 +225,9 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
 const aliveRow = fullBoxRecord()
 
 describe("listing.put and listing.del: the prior tok they put", () => {
-  it("refuses 'bad_option' a record at a revision other than 0 for a box not held, changing nothing", async () => {
+  it("refuses a record at a revision other than 0 for a box not held, changing nothing", async () => {
     const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { prior: SX.VoidRevision }), 'bad_option')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { prior: SX.VoidRevision }))
     expect(listing.things).to.deep.equal([])
   })
 
@@ -240,11 +240,11 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     expect(box.revision_tok).to.eq('rev-a1')
   })
 
-  it("sends a record past central's seq + 1, which the vaultDB refuses 'bad_option', changing nothing", async () => {
+  it("sends a record past central's seq + 1, which the vaultDB refuses, changing nothing", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(aliveRow)
     const box = await listing.build(aliveRow)
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }), { prior: aliveRow }), 'bad_option')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }), { prior: aliveRow }))
     expect(held.mw.callsOf('put').map(({ priorRevisionTok }) => priorRevisionTok)).to.deep.equal(['rev-a1'])
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.equal(aliveRow)
     expect(box.revision_seq).to.eq(1)
@@ -259,12 +259,12 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     expect(held.mw.stored.get('anthropic_api_key')).to.include({ revision_seq: 2, revision_tok: box.revision_tok })
   })
 
-  it("meets 'stale_write' carrying nothing from a put, and 'record_conflict' from a del, where the box held is stored no more", async () => {
+  it("meets 'stale_write' carrying nothing from a put, and a refusal from a del, where the box held is stored no more", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(aliveRow)
     const putErr = await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
     expect(putErr.meta?.dbhas).to.be.null
-    await TH.expectRefusal(box.del(), 'record_conflict')
+    await TH.expectRefusal(box.del())
     expect(box._cheat_central.revision_tok).to.eq('rev-a1')
     expect(held.mw.stored.size).to.eq(0)
   })

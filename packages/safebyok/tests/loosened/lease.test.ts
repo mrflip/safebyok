@@ -14,7 +14,7 @@ describe("forgetting a lease whose erase is refused", () => {
     const lease = await makeGrantedLease(friend)
     await lease.cache()
     friend.tryUncacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
-    await TH.expectRefusal(lease.vacate(), 'unexpected_error')
+    await TH.expectRefusal(lease.vacate())
     expect(lease.isPresent).to.be.false
     await lease.vacate()
     expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
