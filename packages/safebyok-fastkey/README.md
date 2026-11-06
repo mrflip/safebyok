@@ -19,14 +19,14 @@ pnpm add safebyok safebyok-fastkey
 
 ## Use
 
-Pass the deriver as `keyDeriver`, after any `browserOpts()` spread, so it wins:
+Pass the deriver as `keyDeriver`:
 
 ```ts
 import { Bank } from 'safebyok'
-import { browserOpts } from 'safebyok/browser'
 import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
-const bank = Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', user_id: session.user_id, vaultDB })
+const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, deviceDB, strengthChecker, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
+await bank.hello()
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
@@ -38,7 +38,7 @@ to each other byte for byte, and both to Argon2id's reference test vector.
 A spec of your own works the same way, through either implementation:
 
 ```ts
-import { Argon2idWebV1 } from 'safebyok'
+import { Argon2idWebV1 } from 'safebyok/browser'
 import { argon2idWasmDeriver } from 'safebyok-fastkey'
 
 const spec = { ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 }
@@ -47,7 +47,7 @@ const keyDeriver = argon2idWasmDeriver(spec)  // derives what argon2idDeriver(sp
 
 It refuses (`bad_option`) what the core's factory refuses -- a spec Argon2id cannot run, or one
 wearing a supplied spec's label without its parameters -- in the core's own words, since it calls
-the core's `parseKeyDeriverSpec`.
+the core's `parseKeyDeriverSpec` (from `safebyok/browser`).
 
 ## How fast
 
@@ -72,7 +72,7 @@ supplied one, consider running the vault's unlock where a pause does not show.
 
 Where WebAssembly is missing or will not compile, `deriveKeyBytes` refuses with `bad_option` (the
 host's to fix), saying which. The vault, having handed the deriver a passphrase, keeps nothing of
-what it threw, as a throw may quote the passphrase: its `unlock()` refuses `unexpected_error`, and
+what it threw, as a throw may quote the passphrase: unlocking the vault (`ensureVault`, `ensureUnlocked`) refuses `unexpected_error`, and
 its logger hears that the deriver threw and the kind it threw (`bad_option`), not the words. Read
 the log for which. It never falls back to the core's deriver on its own: choose one per platform yourself, as `keyDeriver`.
 
