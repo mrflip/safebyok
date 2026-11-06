@@ -3,11 +3,10 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as SX from 'safebyok/storage'
 import type { Notice } from 'safebyok/storage'
-import * as TH from 'safebyok/testing'
 import { PostgresVaultDB, VaultChangeChannel } from '../src/index'
-import * as PG from './test-helpers'
+import * as TH from './test-helpers'
 
-PG.bootDatabaseFirst()
+TH.bootDatabaseFirst()
 
 /** A client whose every statement fails with `err`. */
 const throwingClient = (err: Error) => ({
@@ -24,16 +23,16 @@ const watching = (vaultDB: PostgresVaultDB) => {
 }
 
 TH.describeVaultDBBattery("PostgresVaultDB", {
-  makeVaultDB:         async (opts) => await PG.makeVaultDB(opts),
-  makeCappedVaultDB:   async (maxBoxes) => await PG.makeVaultDB({ maxBoxes }),
-  makeTwin:            PG.makeTwin,
-  _cheat_rowsOf:       () => PG.rowsOf(),
-  _cheat_failNextCall: PG.failNextCall,
+  makeVaultDB:         async (opts) => await TH.makeVaultDB(opts),
+  makeCappedVaultDB:   async (maxBoxes) => await TH.makeVaultDB({ maxBoxes }),
+  makeTwin:            TH.makeTwin,
+  _cheat_rowsOf:       () => TH.rowsOf(),
+  _cheat_failNextCall: TH.failNextCall,
 })
 
 describe("PostgresVaultDB's constructor", () => {
   it("refuses a client, listen or maxBoxes it cannot use", async () => {
-    const client = PG.flakyClientOf(await PG.database())
+    const client = TH.flakyClientOf(await TH.database())
     const unusable = [{}, { client: { query: client.query } }, { client, listen: 'yes' }, { client, maxBoxes: -1 }, { client, maxRecordBytes: 0 }]
     for (const opts of unusable) { TH.expectSyncRefusal(() => new PostgresVaultDB(opts as never), 'bad_option') }
   })
@@ -41,12 +40,12 @@ describe("PostgresVaultDB's constructor", () => {
 
 describe("PostgresVaultDB's rows", () => {
   it("stores each record whole as jsonb, beside the columns it is found by", async () => {
-    const vaultDB = await PG.makeVaultDB()
+    const vaultDB = await TH.makeVaultDB()
     const vault = TH.vaultAt()
     const box = TH.boxAt()
     await vaultDB.putVault(vault, { prior: SX.VoidRevision })
     await vaultDB.putBox(box, { prior: SX.VoidRevision })
-    const db = await PG.database()
+    const db = await TH.database()
     const { rows: vaultrows } = await db.query('SELECT applabel, user_id, vaultlabel, vault FROM safebyok_vaults')
     const { rows: boxrows } = await db.query('SELECT applabel, user_id, vaultlabel, vault_tok, boxlabel, box FROM safebyok_boxes')
     expect(vaultrows).to.deep.equal([{ ...TH.vaultScope, vault }])
@@ -65,8 +64,8 @@ describe("PostgresVaultDB's refusals", () => {
   })
 
   it("keeps a driver error's name, message and code as the cause, and none of the statement's parameters", async () => {
-    const vaultDB = await PG.makeVaultDB()
-    PG.failNextCall(vaultDB)
+    const vaultDB = await TH.makeVaultDB()
+    TH.failNextCall(vaultDB)
     const { err } = await vaultDB.tryPutBox(TH.boxAt(), { prior: SX.VoidRevision })
     expect(SX.isVaultError(err, 'storage_unavailable')).to.be.true
     expect(err?.cause).to.deep.include({ message: 'terminating connection due to administrator command', code: '57P01' })
@@ -76,7 +75,7 @@ describe("PostgresVaultDB's refusals", () => {
 
 describe("PostgresVaultDB's watch", () => {
   it("hears a write whose rows will not fit in a notification as the rows then stand", async () => {
-    const vaultDB = await PG.makeVaultDB()
+    const vaultDB = await TH.makeVaultDB()
     const vault = TH.vaultAt()
     await vaultDB.putVault(vault, { prior: SX.VoidRevision })
     const notices = watching(vaultDB)
@@ -86,18 +85,18 @@ describe("PostgresVaultDB's watch", () => {
   })
 
   it("passes over a notification on its channel that no write of ours sent", async () => {
-    const vaultDB = await PG.makeVaultDB()
+    const vaultDB = await TH.makeVaultDB()
     const vault = TH.vaultAt()
     const notices = watching(vaultDB)
-    const db = await PG.database()
+    const db = await TH.database()
     await db.query('SELECT pg_notify($1, $2), pg_notify($1, $3)', [VaultChangeChannel, 'not json', '{"applabel":"acme"}'])
     await vaultDB.putVault(vault, { prior: SX.VoidRevision })
     await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
   })
 
   it("hears nothing without a listen", async () => {
-    await PG.emptyTables()
-    const vaultDB = new PostgresVaultDB({ client: PG.flakyClientOf(await PG.database()) })
+    await TH.emptyTables()
+    const vaultDB = new PostgresVaultDB({ client: TH.flakyClientOf(await TH.database()) })
     const notices = watching(vaultDB)
     await vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
     await TH.aWhile()

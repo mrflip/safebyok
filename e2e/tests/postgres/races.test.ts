@@ -3,12 +3,11 @@
 
 import { expect, it } from 'vitest'
 import * as SX from 'safebyok/storage'
-import * as TH from 'safebyok/testing'
-import * as PX from './test-helpers'
+import * as TH from './test-helpers'
 
-const getDb = PX.useFileDatabase()
+const getDb = TH.useFileDatabase()
 
-PX.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres", () => {
+TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres", () => {
   const Cap = 5
   const Racers = 8
   const Rounds = 5
@@ -16,10 +15,10 @@ PX.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
   it("lands exactly as many racing writers as the cap has room for, and refuses the rest as full", async () => {
     const db = getDb()
     for (let round = 0; round < Rounds; round += 1) {
-      const first = await PX.freshStore(db, { maxBoxes: Cap })
+      const first = await TH.freshStore(db, { maxBoxes: Cap })
       await first.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
       for (const boxlabel of ['one', 'two', 'three', 'four']) { await first.putBox(TH.boxAt(0, 'life1', { boxlabel }), { prior: SX.VoidRevision }) }
-      const racers = await Promise.all(Array.from({ length: Racers }, async () => await PX.storeOver(db, { maxBoxes: Cap })))
+      const racers = await Promise.all(Array.from({ length: Racers }, async () => await TH.storeOver(db, { maxBoxes: Cap })))
 
       const answers = await Promise.all(racers.map(async (racer, idx) => await racer.tryPutBox(TH.boxAt(0, 'life1', { boxlabel: `racer_${String(idx)}` }), { prior: SX.VoidRevision })))
 
@@ -32,17 +31,17 @@ PX.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
 
   it("leaves no live box under a vault deleted while boxes were written to it", async () => {
     const db = getDb()
-    const first = await PX.freshStore(db)
+    const first = await TH.freshStore(db)
     const vault = TH.vaultAt()
     await first.putVault(vault, { prior: SX.VoidRevision })
-    const writers = await Promise.all(Array.from({ length: Racers }, async () => await PX.storeOver(db)))
+    const writers = await Promise.all(Array.from({ length: Racers }, async () => await TH.storeOver(db)))
 
     await Promise.all([
       first.delVault(TH.vaultTombstoneOf(vault), { prior: SX.revisionOf(vault) }),
       ...writers.map(async (writer, idx) => await writer.tryPutBox(TH.boxAt(0, 'life1', { boxlabel: `writer_${String(idx)}` }), { prior: SX.VoidRevision })),
     ])
 
-    const boxrows = await PX.rowsOf(db).boxRowsOf(TH.vaultScope, 'life1')
+    const boxrows = await TH.rowsOf(db).boxRowsOf(TH.vaultScope, 'life1')
     expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.deep.equal([])
   })
 })

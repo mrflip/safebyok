@@ -4,15 +4,14 @@
 import { expect, it, onTestFinished, vi } from 'vitest'
 import * as SX from 'safebyok/storage'
 import type { Notice } from 'safebyok/storage'
-import * as TH from 'safebyok/testing'
 import type { PostgresVaultDB } from 'safebyok-postgres'
-import * as PX from './test-helpers'
+import * as TH from './test-helpers'
 
-const getDb = PX.useFileDatabase()
+const getDb = TH.useFileDatabase()
 
-const optsOf = new WeakMap<PostgresVaultDB, PX.StoreOpts>()
+const optsOf = new WeakMap<PostgresVaultDB, TH.StoreOpts>()
 
-const remembered = (vaultDB: PostgresVaultDB, opts: PX.StoreOpts): PostgresVaultDB => {
+const remembered = (vaultDB: PostgresVaultDB, opts: TH.StoreOpts): PostgresVaultDB => {
   optsOf.set(vaultDB, opts)
   return vaultDB
 }
@@ -24,18 +23,18 @@ const watching = (vaultDB: PostgresVaultDB): Notice[] => {
   return notices
 }
 
-PX.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
+TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
   TH.describeVaultDBBattery("PostgresVaultDB", {
-    makeVaultDB:       async (opts = {}) => remembered(await PX.freshStore(getDb(), opts), opts),
-    makeCappedVaultDB: async (maxBoxes) => remembered(await PX.freshStore(getDb(), { maxBoxes }), { maxBoxes }),
-    makeTwin:          async (vaultDB) => await PX.storeOver(getDb(), optsOf.get(vaultDB)),
-    _cheat_rowsOf:     () => PX.rowsOf(getDb()),
+    makeVaultDB:       async (opts = {}) => remembered(await TH.freshStore(getDb(), opts), opts),
+    makeCappedVaultDB: async (maxBoxes) => remembered(await TH.freshStore(getDb(), { maxBoxes }), { maxBoxes }),
+    makeTwin:          async (vaultDB) => await TH.storeOver(getDb(), optsOf.get(vaultDB)),
+    _cheat_rowsOf:     () => TH.rowsOf(getDb()),
   })
 
   it("hears what another server stores, a box too large for a notice included", async () => {
     const db = getDb()
-    const notices = watching(await PX.freshStore(db))
-    const other = await PX.storeOver(db)
+    const notices = watching(await TH.freshStore(db))
+    const other = await TH.storeOver(db)
     const vault = TH.vaultAt()
     const box = TH.boxAt(0, 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
 
