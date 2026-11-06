@@ -300,8 +300,9 @@ device store gave its error, kept by the device-store conditions until a redact
 lands; the Coach, 2026-10-28). No validator's refusal quotes an input value. It names a failing field by its
 path, so a key a host chose, which is no secret, may be named (`tests/helpers/validator.test.ts`, *repeats the keys of
 a schema keyed by its input in the refusal*). `tests/helpers/validator.test.ts`, *every checker a shapes module
-exports*, hands each checker the shapes modules export a marked value, whole, in each field and one level down, and
-finds the marker in no refusal's message, stack, meta or cause. The three host functions that hear the passphrase have their throws
+exports*, hands each checker the shapes modules export, and each field under it at any depth, parsed alone, a marked
+value, whole, in a list and in an object, and finds the marker in no refusal's message, stack, meta or cause. A check
+over a whole object runs only once its fields pass, so the sweep does not reach it. The three host functions that hear the passphrase have their throws
 replaced, never kept as a `cause`: by `deriveKeyBytes` (`models/proving.ts`, `keyDeriverThrew`), by
 `invokeStrengthChecker` (`helpers/passphrase-strength.ts`) through `HostErrorSanitizer.refusalFor`, and by
 `Gating.#askHost` (`requestCleartextThrew`). The gating's `checkedClears` does the same for a getter or proxy of

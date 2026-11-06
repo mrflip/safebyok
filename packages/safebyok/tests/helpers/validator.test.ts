@@ -470,7 +470,7 @@ describe("Kit", () => {
   })
 })
 
-// == [The values sweep]: ShapeModules, ExportedCheckers, Marker, markedInputsOf, refusalTextOf
+// == [The values sweep]: ShapeModules, ExportedCheckers, Marker, MarkedInputs, shapesOf, partsOf, refusalTextOf
 
 /** Every module of the package's shapes, each star-imported: its exports made in a `Checkers`, `Checker` or `objCheck` call are swept below. */
 const ShapeModules = { KX, CX, EX, GX, SX, VX }
@@ -484,12 +484,25 @@ const ExportedCheckers = Object.fromEntries(Object.entries(ShapeModules).flatMap
 /** What every input below carries as a value, never as a key: a refusal holding it quoted its input. */
 const Marker = 'zqxMarkerValue7'
 
-/** Inputs for `schema` carrying the marker as a value: whole, in a list, in each field it takes, and one level down in each. */
-const markedInputsOf = (schema: unknown): unknown[] => {
-  const fieldnames = schema instanceof Zod.ZodObject ? Object.keys(schema.shape) : []
-  const fieldsAs = (val: unknown) => Object.fromEntries(fieldnames.map((fieldname) => [fieldname, val]))
-  return [Marker, [Marker], { inner: Marker }, fieldsAs(Marker), fieldsAs([Marker]), fieldsAs({ inner: Marker }), fieldsAs([{ inner: Marker }])]
+/** The inputs each part of a checker is handed, each carrying the marker as a value. */
+const MarkedInputs = [Marker, [Marker], { inner: Marker }]
+
+/** The object shapes `schema` stands on: its own, or those under a wrapper, a list, a pipe's input or a union's options. */
+const shapesOf = (schema: unknown): Zod.ZodRawShape[] => {
+  if (schema instanceof Zod.ZodObject) { return [schema.shape] }
+  if (schema instanceof Zod.ZodReadonly || schema instanceof Zod.ZodOptional || schema instanceof Zod.ZodNullable || schema instanceof Zod.ZodDefault) { return shapesOf(schema.def.innerType) }
+  if (schema instanceof Zod.ZodArray) { return shapesOf(schema.def.element) }
+  if (schema instanceof Zod.ZodPipe) { return shapesOf(schema.def.in) }
+  if (schema instanceof Zod.ZodUnion) { return schema.def.options.flatMap((option) => shapesOf(option)) }
+  return []
 }
+
+// Each field is parsed on its own: handed every field at once, a checker names eight failures and
+// counts the rest, and a union refuses at its discriminator before any other field is heard.
+/** `schema` and every field schema under it, at any depth. */
+const partsOf = (schema: unknown): Zod.ZodType[] => (
+  schema instanceof Zod.ZodType ? [schema, ...shapesOf(schema).flatMap((shape) => Object.values(shape).flatMap((field) => partsOf(field)))] : []
+)
 
 /** What a refusal of `attempt` says, its message, stack, meta and every cause; null when it passes. */
 const refusalTextOf = (attempt: () => unknown): string | null => {
@@ -508,7 +521,8 @@ describe("every checker a shapes module exports", () => {
 
   for (const [checkername, checker] of Object.entries(ExportedCheckers)) {
     it(`${checkername} quotes no value it refuses`, () => {
-      const refusals = markedInputsOf(checker).map((input) => refusalTextOf(() => checker.parse(input))).filter((text) => text !== null)
+      const parts = partsOf(checker).map((part) => Checker(() => part, 'bad_option'))
+      const refusals = parts.flatMap((part) => MarkedInputs.map((input) => refusalTextOf(() => part.parse(input)))).filter((text) => text !== null)
       expect(refusals, checkername).to.not.be.empty
       for (const text of refusals) { expect(text, checkername).to.not.include(Marker) }
     })
