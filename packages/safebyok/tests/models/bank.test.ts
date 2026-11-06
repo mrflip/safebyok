@@ -247,7 +247,18 @@ describe("bank.ensureVault", () => {
   })
 
   it("can never ask with no dialog, as Bank.make refuses without a requestCleartext", () => {
-    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }))
+    const refusal = TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }))
+    expect(refusal.message).to.match(/^requestCleartext: /)
+  })
+
+  it.each([
+    ['keyDeriver',      { keyDeriver: 3 }],
+    ['strengthChecker', { strengthChecker: 3 }],
+    ['logger',          { logger: 3 }],
+    ['onPanic',         { onPanic: 3 }],
+  ])("refuses at Bank.make a %s that is none, naming it", (fieldname, overrides) => {
+    const refusal = TH.expectSyncRefusal(() => makeBankWorld().bankOn(overrides as never))
+    expect(refusal.message.startsWith(`${fieldname}: `)).to.be.true
   })
 
   it.each([

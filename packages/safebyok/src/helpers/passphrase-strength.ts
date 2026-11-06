@@ -68,7 +68,7 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
 // a failed `load` keeps its throw as the cause, as it heard nothing.
 /** `hostChecker` held to its contract: the one way a vault, or a dialog checking as the user types, asks it. */
 export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStrengthChecker => {
-  const host = GX.strengthChecker.parse(hostChecker)
+  const host = GX.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
   const check = async (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict> => {
     // Frozen, so the host's checker can change nothing of what it is told.
     const told = CX.vaultScope.parse(scope)

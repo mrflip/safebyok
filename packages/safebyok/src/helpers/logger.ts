@@ -49,7 +49,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
 export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLogger => {
   if (candidate === undefined || candidate === null) { return DefaultLogger }
   if (guardedOnes.has(candidate)) { return candidate }
-  CX.loggerShape.parse(candidate)
+  CX.loggerShape.parse(candidate, { where: 'logger' })
   const known = guardedFor.get(candidate)
   if (known !== undefined) { return known }
   const made = guarded(candidate)

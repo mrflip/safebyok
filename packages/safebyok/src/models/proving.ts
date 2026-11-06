@@ -205,7 +205,7 @@ export type GuardedKeyDeriver = Readonly<{
 // checked where they land, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing.
 /** `hostDeriver` held to its interface: the one way a proving asks it for key bytes. */
 export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
-  const { key_deriver_label, salt_bytes } = CX.keyDeriverShape.parse(hostDeriver)
+  const { key_deriver_label, salt_bytes } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
   const load = async (): Promise<void> => {
     try {
       await hostDeriver.load?.()

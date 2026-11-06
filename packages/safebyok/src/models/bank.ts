@@ -300,7 +300,7 @@ const HostChecks = Checkers('bad_option', ({ fn }) => ({
 // What the dialog throws is dropped: it may quote what the user typed.
 /** `requestCleartext` held to its contract: the one way a gating asks the user. */
 export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUser => {
-  const host = HostChecks.requestCleartext.parse(requestCleartext)
+  const host = HostChecks.requestCleartext.parse(requestCleartext, { where: 'requestCleartext' })
   return brandGuarded(async (gating: AnyGating): Promise<boolean> => {
     try {
       await host(gating)
@@ -313,7 +313,7 @@ export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUs
 
 /** `onPanic` held to its contract: the one way a bank or a vault tells the host of a cached lease that survived its erase. */
 export const guardOnPanic = (onPanic: PanicHandler | undefined): Panic => {
-  const host = HostChecks.onPanic.parse(onPanic)
+  const host = HostChecks.onPanic.parse(onPanic, { where: 'onPanic' })
   return brandGuarded(async (refusal: VaultError): Promise<boolean> => {
     if (host === undefined) {
       reportToPlatform(refusal)

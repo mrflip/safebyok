@@ -320,21 +320,22 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
-export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
+// The host's functions and logger are checked once, by the guard that wraps each; here they are only named.
+export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) => ({
   applabel,
   user_id,
   device_id,
   vaultDB:             brandedVaultDB,
   deviceDB:            brandedDeviceDB,
-  keyDeriver:          CX.keyDeriverShape,
-  requestCleartext:    fn(),
-  strengthChecker:     GX.strengthChecker.optional(),
-  logger:              CX.loggerShape.optional(),
+  keyDeriver:          custom<KeyDeriver>(),
+  requestCleartext:    custom<RequestCleartext>(),
+  strengthChecker:     custom<StrengthChecker>().optional(),
+  logger:              custom<VaultLogger>().optional(),
   autolockMinutes:     positiveMinutes.optional(),
   vaultRefreshMinutes: refreshMinutes.optional(),
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn().optional(),
-  onPanic:             fn().optional(),
+  onPanic:             custom<PanicHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
 export type BankOpts = {
