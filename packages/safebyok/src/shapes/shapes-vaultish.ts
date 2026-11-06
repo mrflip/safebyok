@@ -126,7 +126,7 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
 
-// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, brandedVaultDB, listingOpts, putListingOpts, PutListingOpts
+// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, brandedVaultDB, listingOpts
 
 /** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
 export const listingWorld = objCheck(({ fn }) => ({ lockState: fn(), ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
@@ -150,10 +150,6 @@ export const listingOpts = objCheck(() => ({
   maxMillisSinceRefresh: horizonMillis,
 }), 'bad_option')
 
-/** The check of what `listing.put` is told: the revision `prior` it goes over, and how it meets a row absent or live. */
-export const putListingOpts = objCheck(() => ({ prior: revision, ifAbsent: putIfAbsent.optional(), ifPresent: ifPresent.optional() }), 'bad_option')
-
-export type PutListingOpts = Z.infer<typeof putListingOpts>
 
 // --
 
