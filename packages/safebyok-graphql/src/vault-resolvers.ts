@@ -119,12 +119,15 @@ const crossing = (thrown: unknown): GraphQLError => {
 }
 
 /** A refusal's kind, with the room it reports and the fields it names, as the browser's VaultDB rebuilds them. */
-const extensionsOf = ({ refusalkind, meta }: SX.VaultError): Record<string, unknown> => ({
-  kind: refusalkind,
-  // Parsed for the wire: a limit of Infinity, which JSON cannot carry, becomes the largest safe integer.
-  ...(meta?.capacity && { capacity: SX.capacity.parse(meta.capacity) }),
-  ...(meta?.fieldnames && { fieldnames: meta.fieldnames }),
-})
+const extensionsOf = ({ refusalkind, meta }: SX.VaultError): Record<string, unknown> => {
+  // Checked for the wire: a limit of Infinity, which JSON cannot carry, becomes the largest safe integer.
+  const capacity = SX.capacity.safeParse(meta?.capacity)
+  return {
+    kind: refusalkind,
+    ...(capacity.success && { capacity: capacity.data }),
+    ...(meta?.fieldnames && { fieldnames: meta.fieldnames }),
+  }
+}
 
 /** What the relay's watch hears of `scope`, as the async iterator a subscription resolver answers; ending it stops the watch. */
 const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs): AsyncIterableIterator<SX.Heard> => {
