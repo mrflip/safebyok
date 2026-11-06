@@ -18,7 +18,7 @@ export const argon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver =>
 
 /** Argon2id at the supplied `Argon2idWebV1` spec through WebAssembly: a stand-in for safebyok's `argon2idWebV1Deriver`.
  *
- * @example Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', user_id: session.user_id, vaultDB })
+ * @example Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, deviceDB, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
  */
 export const argon2idWasmWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
 
