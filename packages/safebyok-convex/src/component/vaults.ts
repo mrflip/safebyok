@@ -88,7 +88,8 @@ export const putBox = mutation({
     const ante = anteDoc?.box ?? null
     const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
     if (! landed) { return { landed, ante, vault } }
-    const cap = Math.min(maxBoxes, Tallies.MaxVaultBoxes)
+    // Convex passes NaN as a number, and Math.min would carry it past the limit: no box count exceeds NaN.
+    const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const boxDoc = { ...life, boxlabel: record.boxlabel, box: record }
     const growth = { box_count: (SX.isLiveRow(ante) ? 0 : 1), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
     const reckoning = await Tallies.reckon(ctx.db, life)

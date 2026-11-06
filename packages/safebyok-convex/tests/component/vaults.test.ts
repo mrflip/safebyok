@@ -215,6 +215,7 @@ describe("putBox's count cap", () => {
     const full = { capacity: { boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: 1000, max: MaxVaultBoxBytes } } }
     expect(await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth, maxBoxes: 1_000_000 })).to.deep.equal(full)
     expect(await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth })).to.deep.equal(full)
+    expect(await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth, maxBoxes: NaN })).to.deep.equal(full)
   })
 })
 
