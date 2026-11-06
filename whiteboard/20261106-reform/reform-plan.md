@@ -547,6 +547,13 @@ case; it keeps the *keep* and *definitional* sites as marked; no code or test ch
 Rides along: a report in the thread file of every throw site of `damaged_box`, `damaged_lease`, `damaged_row` and
 `newer_format` whose logic exceeds a try-catch-throw. guarantees.md's five incidental sites stay (Cleanup). Empty
 changeset. **Levels:** worker `sonnet`; review `low`. **Depends on:** nothing unmerged. **Size:** small.
+*Built (PR #548, on main, docs only, no review):* about 32 doc-block and `@example` sites lost `bad_option`, `bad_record`,
+`bad_scope`, `unexpected_error` and `gate_issue` across `helpers/validator.ts`, `passphrase-strength.ts`, `logger.ts`,
+`crypto.ts`, `shapes/primitives.ts`, `shapes-core.ts`, `shapes-gateish.ts`, `shapes-storage.ts`, `storage/vault-db-new.ts`;
+`locked_while_asking` out of `declineAtLock`'s doc block, `already_asking` out of VOCABULARY's gating row; `vault_gone` had
+no doc-block site outside `refusals/`. Keep and definitional sites untouched; empty changeset. The bad-news report: two
+throw sites exceed try-catch-throw (`unreadableRowOf`'s second parse to choose `newer_format`; `Lease.#vaultKey`'s lock and
+evict before `damaged_lease`), an Open Matters row. Filing at 88ec97a50.
 
 ### 22. `kind_tests`
 
