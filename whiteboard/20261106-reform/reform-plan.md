@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) built on #523, in review; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (`browser_entry`) building on #529; the Closer Look
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; the Closer Look
 tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
@@ -394,7 +394,8 @@ telling a host what `vault.hello` now refuses). Left: after a `vault_gone` hello
 the hello path; Open Matters); a reborn vault is not swapped in by hello, the watch heals it (Open Matters, Rec accept);
 the two `list()` tails repeat; new exports without doc blocks; `BankListed` to `VaultsListed` later. *Rework:* the
 Coach's consistency guard; `Storable.receive` already throws `otherVaultTok` one call down, so a `//` line in `takeWorld`
-names it rather than duplicating it.
+names it rather than duplicating it. **Filed** at 344b10025 (a plain push on #523's stack; no `file-thread`, its base
+being unmerged).
 
 ### 16. `utils_mash`
 
@@ -423,7 +424,9 @@ on:** #529 (stacked; in the line's territory, plain pushes only). **Size:** smal
 *Built (PR #531):* `src/browser.ts` exports `argon2idDeriver`, `argon2idWebV1Deriver` and the `KeyDeriver` types, wired
 as `./utils`; three tests, one that neither deriver is on the front door; `TestDeriverNotice` names `safebyok/browser`;
 no `browserOpts` (no zxcvbn checker in the new core; the IndexedDB device DB is an adapter). The split never had the
-deriver on the front door. In review (low).
+deriver on the front door. *Review (low, sonnet):* `fixed`; three fixes (a `lengthOf` assertion; the doc block's reason
+moved to a `//`; a two-outcome title split). Left: three refusal phrases still point a host at a `browserOpts()` the new
+core lacks (Cleanup, thread 7); the derivers' doc blocks (documentarian). **Filed** at c74195a12, a plain push on #529.
 
 ## For the Coach
 

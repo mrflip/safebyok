@@ -5,12 +5,14 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06, 05:15: paused)
+## State (2026-11-06, 07:15: paused again)
 
-The sprint is paused: every unstarted thread (5 to 10) waits on PRs #511 and #513 reaching `main`, which the Coach's
-queue line delivers. `human/20261106-sprint_reform_paused.md` says where each thread stands. Resume: when
-`git grep refusalkind origin/main -- packages/safebyok/src/helpers/validator.ts` hits and #513 is an ancestor of
-`origin/main`, cut thread 5 from `origin/main` and go on down the plan; thread 10 last from the top of the line.
+Seventeen threads planned, twelve filed (1, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17 and the sprint's own 16/17 stack);
+threads 5 to 10 wait on #511 reaching `main` (#513 did at 05:10). Resume: when
+`git grep refusalkind origin/main -- packages/safebyok/src/helpers/validator.ts` hits, cut thread 5 from `origin/main`
+(it now also carries the Cleanup directives: the `checked.friend` fix, the whisper-zeroing test, the dead phrases, the
+stale clock consts) and go on down the plan; thread 10 last from the top of the line. Open for the Coach: the Closer Look
+triage, `device_id` required-or-minted, the guarded-file list, box verbs after a `vault_gone` hello.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
@@ -23,15 +25,15 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
   carries the core's names (rebase onto it, drop the duplicate `requestCleartextThrew` clause); the host-function
   paragraph still says all three guards reach `refusalFor`; only `invokeStrengthChecker` does. **For thread 8:** the
   values sweep's `ShapeModules` list wants a directory check; `KX` wants a row in STYLE's alias table.
-* Thread 15 `list_boxes`: reviewed `fixed` (PR #530 on #523); a rework adds the Coach's `takeWorld` note (the guard is
-  `Storable.receive`'s `otherVaultTok`); then a plain push, no `file-thread` (its base #523 is unmerged). Two behaviours
+* Thread 15 `list_boxes`: filed, PR #530 at 344b10025 on #523 (plain push). The Coach's `takeWorld` guard is
+  `Storable.receive`'s `otherVaultTok`, named in a `//` line. Two behaviours
   for the Coach: box verbs refuse `disabled` after a `vault_gone` hello; hello under a reborn vault refuses
   `vault_mismatch` and leaves the swap to the watch. **For threads 5 to 8:** `getBank` is `listVaults`,
   `VaultListing.list()`/`BoxListing.list()`, `fetchListed`/`vaultRowOf`/`VX.boxesListed`/`_takeListed` gone; `takeWorld`
   parses and receives only. **For thread 6:** keep `takeWorld` on the `BoxWorld` Pick.
 * Thread 16 `utils_mash`: filed, PR #529 at c947caaf8 on #518 (plain push; in the line's territory). The core's
   `safebyok/utils` entry exists now; the root size budget has no new-core lines yet (a later thread adds them together).
-* Thread 17 `browser_entry`: built, PR #531 on #529, in review (low). `safebyok/browser` exports both Argon2id derivers
+* Thread 17 `browser_entry`: filed, PR #531 at c74195a12 on #529 (plain push). `safebyok/browser` exports both Argon2id derivers
   and the `KeyDeriver` types; thread 7 imports from there.
 * **Rulings of 06:40:** no change to the fate code (ground rule 14, restated); a one-line consistency guard in
   `takeWorld` after all (thread 15 rework); box size is checked, whisper size is not, as the code already does;
