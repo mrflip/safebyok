@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../../src/helpers/logger'
+import { DefaultLogger, asError, isGuardedLogger, parseLogger, setDefaultLogger, type VaultLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
 
 /** What a host might hand Bank.make as its logger that is not one. */
@@ -142,6 +142,17 @@ describe("parseLogger", () => {
     } finally {
       process.off('unhandledRejection', unhandled)
     }
+  })
+})
+
+describe("isGuardedLogger", () => {
+  it("knows a logger parseLogger made safe, and the DefaultLogger, from the host's bare one", () => {
+    const spy = TH.spyLogger()
+    expect(isGuardedLogger(parseLogger(spy.logger))).to.be.true
+    expect(isGuardedLogger(DefaultLogger)).to.be.true
+    expect(isGuardedLogger(spy.logger)).to.be.false
+    expect(isGuardedLogger(null)).to.be.false
+    expect(isGuardedLogger(undefined)).to.be.false
   })
 })
 
