@@ -35,9 +35,15 @@ export { leaseQuery, leaseSparse, leaseRow, cutoff } from '../shapes/shapes-stor
 export type { LeaseQuery, LeaseRow, LeaseSparse } from '../shapes/shapes-storage'
 // --
 
+// == [Validators]: the makers an adapter checks its own options and rows with
+export { Checker, Checkers, objCheck } from '../helpers/validator'
+export type { ObjCheckOpts, Refusing } from '../helpers/validator'
+// --
+
 // == [The refusals]: the throwers an adapter raises, and how a refusal reads
 export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../refusals/throwers'
 export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, seqNotNext, storeFailed } from '../refusals/throwers'
+export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalKindVals } from '../refusals/errors'
 export type { RefusalKind, RefusalMeta, Thrown, VaultErrorOpts } from '../refusals/errors'
 export { outcomeOf, storageTroubleOf } from '../refusals/outcome'
