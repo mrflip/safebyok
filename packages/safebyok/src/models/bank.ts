@@ -1,22 +1,24 @@
-import { FarFuture, FarPast, MinuteMillis, type Modelkind } from '../helpers/consts'
+import { FarFuture, FarPast, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
-import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
+import { Checkers } from '../helpers/validator'
+import { isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
 import { type VaultLogger, parseLogger } from '../helpers/logger'
-import { DefaultStrengthChecker, loadStrengthChecker } from '../helpers/passphrase-strength'
+import { DefaultStrengthChecker, type GuardedStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { LockState } from '../shapes/shapes-enums'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseSparse } from '../shapes/shapes-storage'
-import type { RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
+import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankOpts, BankSnapshot, BankStage } from '../shapes/shapes-vaultish'
+import type { BadNewsHandler, BankOpts, BankSnapshot, BankStage, Panic, PanicHandler } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db-new'
 import { helloFirst, insecureContext } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
+import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
 import { VaultListing } from './vault-listing'
 
 // == [Given to a bank]: DefaultRefreshMillis
@@ -25,26 +27,26 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
 export class Bank {
-  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, requestCleartext, strengthChecker, leaseMillis, onPanic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, askUser, strengthChecker, leaseMillis, panic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #lastHello, #snapshot, #getSnapshot, #subscribe
 
   declare readonly applabel: string
   declare readonly user_id:  string
   readonly scope:            BankScope
   readonly device_id:        string
-  readonly keyDeriver:       KeyDeriver
+  readonly keyDeriver:       GuardedKeyDeriver
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
   /** The host's dialog. */
-  readonly requestCleartext: RequestCleartext
-  readonly strengthChecker:  StrengthChecker
+  readonly askUser:          AskUser
+  readonly strengthChecker:  GuardedStrengthChecker
   readonly leaseMillis:      number
-  /** Hears a refused erase of a cached lease, and no secret material. */
-  readonly onPanic:          ((refusal: VaultError) => unknown) | undefined
+  /** Tells the host of a refused erase of a cached lease, and no secret material. */
+  readonly panic:            Panic
   /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
 
   readonly #makeListing: () => VaultListing
-  readonly #onBadNews:   ((news: VaultError) => unknown) | undefined
+  readonly #onBadNews:   BadNewsHandler | undefined
   readonly #listeners = new Set<() => void>()
   #vaultListing:         VaultListing
   /** The outcome of the last `hello`, null with none since the bank was made, swept or vacated. */
@@ -85,12 +87,12 @@ export class Bank {
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.device_id = device_id
-    this.keyDeriver = keyDeriver
+    this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.deviceDB = deviceDB
-    this.onPanic = onPanic
+    this.panic = guardOnPanic(onPanic)
     this.logger = parseLogger(opts.logger)
-    this.requestCleartext = requestCleartext
-    this.strengthChecker = strengthChecker
+    this.askUser = guardRequestCleartext(requestCleartext)
+    this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
     this.#onBadNews = onBadNews
@@ -136,14 +138,14 @@ export class Bank {
 
   /** A sweep crossing it leaves `listing` disabled, which refuses. */
   async #bringUp(listing: VaultListing): Promise<void> {
-    await this.keyDeriver.load?.()
-    await loadStrengthChecker(this.strengthChecker)
+    await this.keyDeriver.load()
+    await this.strengthChecker.load()
     await listing.list()
     await listing.hello()
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, scanOwnLeasesProvedBefore, eraseOwnLeases, eraseLease, panic
+  // == [Ending]: autolock, lock, vacate, sweep, scanOwnLeasesProvedBefore, eraseOwnLeases, eraseLease
 
   /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
@@ -202,20 +204,8 @@ export class Bank {
 
   async #eraseLease(row: LeaseSparse): Promise<void> {
     const vacated = await this.deviceDB.tryVacate(row)
-    if (! vacated.ok) { await this.#panic(vacated.err) }
-  }
-
-  /** A cached lease that survived its erase, as a vault's own panic tells it, with no vault to vacate. */
-  async #panic(refusal: VaultError): Promise<void> {
-    if (this.onPanic === undefined) {
-      reportToPlatform(refusal)
-      return
-    }
-    try {
-      await this.onPanic(refusal)
-    } catch (err) {
-      reportToPlatform(err)
-    }
+    // As a vault's own panic tells it, but with no vault to vacate.
+    if (! vacated.ok) { await this.panic(vacated.err) }
   }
   // --
 
@@ -299,6 +289,45 @@ export class Bank {
   /** Answers 'bank', which marks this model to a check: {@link Modelkind}. */
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
+
+// == [Host functions]: HostChecks, guardRequestCleartext, guardOnPanic
+
+const HostChecks = Checkers('bad_option', ({ fn }) => ({
+  requestCleartext: fn<RequestCleartext>(),
+  onPanic:          fn<PanicHandler>().optional(),
+}))
+
+// What the dialog throws is dropped: it may quote what the user typed.
+/** `requestCleartext` held to its contract: the one way a gating asks the user. */
+export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUser => {
+  const host = HostChecks.requestCleartext.parse(requestCleartext)
+  return brandGuarded(async (gating: AnyGating): Promise<boolean> => {
+    try {
+      await host(gating)
+      return true
+    } catch {
+      return false
+    }
+  })
+}
+
+/** `onPanic` held to its contract: the one way a bank or a vault tells the host of a cached lease that survived its erase. */
+export const guardOnPanic = (onPanic: PanicHandler | undefined): Panic => {
+  const host = HostChecks.onPanic.parse(onPanic)
+  return brandGuarded(async (refusal: VaultError): Promise<boolean> => {
+    if (host === undefined) {
+      reportToPlatform(refusal)
+      return false
+    }
+    try {
+      await host(refusal)
+    } catch (err) {
+      reportToPlatform(err)
+    }
+    return true
+  })
+}
+// --
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext
 

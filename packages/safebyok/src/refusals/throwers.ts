@@ -161,7 +161,7 @@ export const proofMissing = (): VaultError => new VaultError('bad_option', Phras
 export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
 // --
 
-// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver, provingOfOtherVault, leaseOfOtherVault
+// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver, provingOfOtherVault, leaseOfOtherVault
 
 export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
 
@@ -170,6 +170,8 @@ export const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_erro
 export const wayinMadeAlready = (): VaultError => new VaultError('unexpected_error', Phrases.WayinMadeAlready)
 
 export const keyDeriverThrew = (): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverThrew)
+
+export const keyDeriverLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.KeyDeriverLoadFailed, { cause })
 
 export const weakPassphrase = (reason: string): VaultError => new VaultError('weak_passphrase', reason)
 

@@ -66,3 +66,15 @@ export type Modelkind = keyof ModelkindClasses
 export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ModelkindClasses[MKT] => (
   (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )
+
+/** The tag a host's function answers true to once a bank has wrapped it, so a world can tell it from the bare one. */
+export const IsGuarded: unique symbol = Symbol('safebyok.guarded')
+
+/** True for a host's function as a bank wraps it: one that answers true to {@link IsGuarded}. */
+export const isGuarded = (val: unknown): boolean => (
+  (typeof val === 'function' || (typeof val === 'object' && val !== null)) && (val as { [IsGuarded]?: unknown })[IsGuarded] === true
+)
+
+// A getter, never an own enumerable field, so the brand neither serializes nor rides along in a spread.
+/** `made`, frozen, answering true to {@link IsGuarded}. */
+export const brandGuarded = <MadeT extends object>(made: MadeT): MadeT => Object.freeze(Object.defineProperty(made, IsGuarded, { get: () => true }))

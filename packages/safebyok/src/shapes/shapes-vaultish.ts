@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { hasModelkind } from '../helpers/consts'
+import { hasModelkind, isGuarded } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
@@ -19,7 +19,7 @@ import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
-import type { ProvingWorld, RequestCleartext, StrengthChecker } from './shapes-gateish'
+import type { AskUser, ProvingWorld, RequestCleartext, StrengthChecker } from './shapes-gateish'
 
 // == [Checks]: Checks
 
@@ -302,16 +302,18 @@ export type VaultSnapshot = VaultScope & Readonly<{
 export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
 
 /** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
-export const vaultWorld = Checker(({ fn, bankScope, loggerShape }) => listingWorld.extend({
-  ...GX.provingWorld.shape, scope: bankScope, logger: loggerShape, leaseMillis: GX.leaseMillis, deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn(), boxRefreshMillis: horizonMillis,
+export const vaultWorld = Checker(({ custom, bankScope, loggerShape }) => listingWorld.extend({
+  ...GX.provingWorld.shape, scope: bankScope, logger: loggerShape, leaseMillis: GX.leaseMillis, deviceDB: deviceDBDuck, boxRefreshMillis: horizonMillis,
+  askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected),
+  panic:   custom<Panic>(isGuarded, Phrases.GuardedExpected),
 }), 'bad_option', [CX])
 
 /** The bank, as far as its vaults reach into it. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'onPanic' | 'requestCleartext' | 'boxRefreshMillis'>
+export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'askUser' | 'panic' | 'boxRefreshMillis'>
 
 // --
 
-// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, BankStage, BankSnapshot
+// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, BadNewsHandler, PanicHandler, Panic, BankStage, BankSnapshot
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
@@ -348,10 +350,19 @@ export type BankOpts = {
   autolockMinutes?:     number | undefined
   vaultRefreshMinutes?: number | undefined
   boxRefreshMinutes?:   number | undefined
-  onBadNews?:           ((news: VaultError) => unknown) | undefined
+  onBadNews?:           BadNewsHandler | undefined
   /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
-  onPanic?:             ((refusal: VaultError) => unknown) | undefined
+  onPanic?:             PanicHandler | undefined
 }
+
+/** `Bank.make`'s `onBadNews`: hears each refusal no caller waits on. */
+export type BadNewsHandler = (news: VaultError) => unknown
+
+/** `Bank.make`'s `onPanic`: hears a cached lease that survived its erase. */
+export type PanicHandler = (refusal: VaultError) => unknown
+
+/** `onPanic` as a bank keeps it, wrapped by `guardOnPanic`: false when the host gave none. Never throws. */
+export type Panic = (refusal: VaultError) => Promise<boolean>
 
 /** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'

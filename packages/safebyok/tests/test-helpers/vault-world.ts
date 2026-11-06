@@ -6,8 +6,9 @@ import type { Lease } from '../../src/models/lease'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type { VaultTombstone } from '../../src/shapes/shapes-storage'
 import type * as GX from '../../src/shapes/shapes-gateish'
-import { type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import type { BoxWorld, ListingOpts, VaultRecord, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import { type AskUser, type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
+import type { BoxWorld, ListingOpts, PanicHandler, VaultRecord, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import { guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/refusals/outcome'
@@ -15,7 +16,8 @@ import { VaultListing } from '../../src/models/vault-listing'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { quietLogger } from './logging'
-import { anyStrengthChecker, passkeyOf, testDeriver } from './builders'
+import { passkeyOf } from './builders'
+import { type ProvingWorldGiven, provingWorldOf } from './proving-world'
 
 /** The clock's first reading: 31 October 2026. */
 export const T0 = Date.UTC(2026, 9, 31)
@@ -40,20 +42,20 @@ export type Typing = Typed | Promise<Typed>
 type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: GX.PasskeyAnswer | null }
 
 /** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
-const askTyping = async <ValT>(world: { requestCleartext: RequestCleartext }, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
-  const { requestCleartext: asBefore } = world
+const askTyping = async <ValT>(world: { askUser: AskUser }, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
+  const { askUser: asBefore } = world
   let heard: Outcome<unknown> | null = null
   const dialog: RequestCleartext = async (gating) => {
     heard = await gating.attempt(await typing)
   }
-  world.requestCleartext = dialog
+  world.askUser = guardRequestCleartext(dialog)
   try {
     return await ask()
   } catch (err) {
     const attempted = heard as Outcome<unknown> | null
     throw attempted?.ok === false ? attempted.err : err
   } finally {
-    world.requestCleartext = asBefore
+    world.askUser = asBefore
   }
 }
 
@@ -108,11 +110,15 @@ const makeDeviceDB = () => {
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
-/** The bank a vault listing's test world fakes: a {@link VaultWorld} whose members a test may replace. */
-export type FakeBank = { -readonly [K in keyof VaultWorld]: VaultWorld[K] }
+/** The bank a vault listing's test world fakes: a {@link VaultWorld} whose members a test may replace, and the host's dialog its `askUser` asks, which a test may swap. */
+export type FakeBank = { -readonly [K in keyof VaultWorld]: VaultWorld[K] } & { requestCleartext: RequestCleartext }
+
+/** What a test may say of a {@link makeVaultWorld} world: its members, and the host's own functions, which it wraps as a bank does. */
+export type VaultWorldGiven = Partial<Omit<FakeBank, keyof ProvingWorldGiven>> & ProvingWorldGiven & { onPanic?: PanicHandler | undefined }
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
-export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: Partial<VaultWorld> = {}) => {
+export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: VaultWorldGiven = {}) => {
+  const { onPanic, keyDeriver, strengthChecker, device_id = 'device_1', ...overrides } = worldOverrides
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
@@ -123,15 +129,14 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     tellBadNews:  nothing,
     scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
     logger:       quietLogger,
-    keyDeriver:   testDeriver,
-    strengthChecker: anyStrengthChecker,
-    device_id:    'device_1',
+    ...provingWorldOf({ keyDeriver, strengthChecker, device_id }),
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
-    onPanic:      undefined,
+    askUser:      guardRequestCleartext((gating) => fakeBank.requestCleartext(gating)),
+    panic:        guardOnPanic(onPanic),
     boxRefreshMillis: 10 * 60_000,
-    ...worldOverrides,
+    ...overrides,
   }
   const vaultDB = new MemoryVaultDB()
   const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
@@ -181,7 +186,7 @@ export const storedVaultRecord = async (passphrase: string = Passphrase): Promis
 }
 
 /** A vault created of `Dna` by `typing` (under {@link Passphrase} unless told otherwise), in a fresh world: unlocked, its lease cached on the device. `worldOverrides` says otherwise of the world. */
-export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), worldOverrides: Partial<VaultWorld> = {}) => {
+export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), worldOverrides: VaultWorldGiven = {}) => {
   const world = makeVaultWorld(null, worldOverrides)
   const vault = await buildTyping(world.listing, Dna, typing)
   return { ...world, vault }
@@ -212,7 +217,7 @@ export const vaultRoundTrip = async (sealer: Vault, opener: Vault): Promise<stri
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
 export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
-  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, device_id: 'device_1' })
+  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), provingWorldOf({ device_id: 'device_1' }))
   await proving.buildWayin(NOVEL)
   return proving
 }

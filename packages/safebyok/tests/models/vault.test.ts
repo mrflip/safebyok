@@ -70,13 +70,15 @@ describe("VaultListing.build of a record, and its constructor", () => {
     TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'boxRefreshMillis'), opts))
   })
 
-  it("refuses a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
+  it("refuses a deviceDB missing a verb the friend binds, and a host's bare function where the bank holds it wrapped", () => {
     const { fakeBank, opts } = makeVaultWorld()
     for (const verb of ['tryPeek', 'tryCache', 'tryVacate']) {
       const missing = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
       TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: missing as never }, opts))
     }
-    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, onPanic: 'call me' as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, panic: vi.fn() as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, askUser: vi.fn() as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, keyDeriver: TH.testDeriver as never }, opts))
   })
 })
 

@@ -5,6 +5,7 @@ import type { GatingKind } from '../../src/shapes/shapes-enums'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { Promptly } from '../../src/shapes/shapes-vaultish'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
+import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
 import { NewPassphrase, Passphrase, addPasskeyTyping, delTyping, makeBornVault, makeBornVaultWithPasskey, replaceTyping, revokeTyping, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
@@ -61,7 +62,7 @@ describe("vault.replacePassphrasePrompt()", () => {
   it("leaves the dialog open on a wrong ante, a weak next or the same passphrase, storing nothing, and the next attempt lands", async () => {
     const born = await makeBornVault()
     const { vault, storedNow, fakeBank: world } = born
-    world.strengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: "too short" } : { strong: true as const })
+    world.strengthChecker = guardStrengthChecker((passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: "too short" } : { strong: true as const }))
     const ante = storedNow()
     const { gatingAt } = dialogOf(born)
     const replacing = vault.replacePassphrasePrompt()
@@ -138,12 +139,12 @@ describe("vault.replacePassphrasePrompt()", () => {
   it("spreads the record the attempt read, not the live vault: a record delivered during the proving refuses 'stale_write', overwriting nothing", async () => {
     const born = await makeBornVault()
     const { vault, demandStored, storeBehindOurBack, fakeBank: world } = born
-    world.strengthChecker = async () => {
+    world.strengthChecker = guardStrengthChecker(async () => {
       const moved = storeBehindOurBack(demandStored())
       await vault.fetch()
       expect(vault.revision_seq).to.eq(moved.revision_seq)
       return { strong: true as const }
-    }
+    })
     await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase), 'stale_write')
     await proveBy(born, Passphrase)
   })

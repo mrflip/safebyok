@@ -2,7 +2,10 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
+import { isGuarded } from '../../src/helpers/consts'
+import { guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
 import { DefaultLeaseMillis } from '../../src/models/vault'
+import type { AnyGating } from '../../src/shapes/shapes-gateish'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
@@ -106,13 +109,15 @@ describe("bank.hello", () => {
     expect(listVaults).not.toHaveBeenCalled()
   })
 
-  it("refuses when a key deriver will not load, its refusal as it came, asking nothing of the vaultDB", async () => {
+  it("refuses when a key deriver will not load, what it threw the cause, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
     const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
-    const refused = new VaultError('unexpected_error', 'no wasm here')
+    const refused = new VaultError('storage_unavailable', 'no wasm here')
     const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
-    await TH.expectRefusal(bank.hello())
-    expect(bank.snapshot.err).to.equal(refused)
+    const err = await TH.expectRefusal(bank.hello())
+    expect(err.cause).to.eq(refused)
+    expect(err.message).to.match(/keyDeriver's load\(\) failed/)
+    expect(bank.snapshot).to.include({ stage: 'refused', err })
     expect(listVaults).not.toHaveBeenCalled()
   })
 
@@ -156,6 +161,48 @@ describe("bank.hello", () => {
     await makeBankWithVault(world)
     await TH.eventually(() => bank.snapshot.vaults.length === 1)
     expect(listener).toHaveBeenCalled()
+  })
+})
+
+describe("the host's functions, as a bank holds them", () => {
+  it("holds each wrapped and branded, never the host's own on a prop", () => {
+    const requestCleartext = vi.fn()
+    const onPanic = vi.fn()
+    const bank = makeBankWorld().bankOn({ requestCleartext, onPanic })
+    for (const held of [bank.askUser, bank.panic, bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
+    expect(Object.values(bank)).to.not.include.members([requestCleartext, onPanic, testDeriver, anyStrengthChecker])
+  })
+
+  it("asks the dialog, answering true once it closes and false when it throws, keeping nothing of the throw", async () => {
+    const gating = {} as AnyGating
+    const dialog = vi.fn()
+    expect(await guardRequestCleartext(dialog)(gating)).to.be.true
+    expect(dialog).toHaveBeenCalledWith(gating)
+    expect(await guardRequestCleartext(() => { throw new Error(Passphrase) })(gating)).to.be.false
+  })
+
+  it("tells onPanic, answering true even when it throws, which goes to the platform", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const refusal = new VaultError('storage_unavailable', 'no store')
+    const thrown = new Error('panic handler broke')
+    expect(await guardOnPanic(() => { throw thrown })(refusal)).to.be.true
+    expect(reported).toHaveBeenCalledWith(thrown)
+    vi.unstubAllGlobals()
+  })
+
+  it("answers false with no onPanic, telling the platform the refusal", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const refusal = new VaultError('storage_unavailable', 'no store')
+    expect(await guardOnPanic(undefined)(refusal)).to.be.false
+    expect(reported).toHaveBeenCalledWith(refusal)
+    vi.unstubAllGlobals()
+  })
+
+  it("refuses a requestCleartext or an onPanic that is no function", () => {
+    TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_option')
+    TH.expectSyncRefusal(() => guardOnPanic('call me' as never), 'bad_option')
   })
 })
 

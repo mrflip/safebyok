@@ -51,10 +51,13 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultScope = "A vault's stores go in the second bag, its options, not in the scope naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
+
+/** A host's bare function, or anything else, where a bank's world holds that function as the bank wraps it. */
+export const GuardedExpected = "Expected a host's function as Bank.make wraps it"
 
 /** Anything but bytes, a Uint8Array, `count` of them when that many are asked. */
 export const bytesExpected = (count?: number): string => (count === undefined ? "Expected bytes, a Uint8Array" : `Expected ${String(count)} bytes, a Uint8Array`)
@@ -249,16 +252,13 @@ export const VaultGoneWhileGettingBox = "The vault this device held was deleted,
 export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
 // --
 
-// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, BadNewsHandlerThrew
+// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged
 
 /** Bad news of a box stored damaged, which its meta.box_listed names. */
 export const BoxStoredDamaged = "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it."
 
 /** Bad news of a wayin stored damaged, which its meta.wayin_listed names. */
 export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
-
-/** Why the vault's trouble holds a throw from the host's onBadNews handler. */
-export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
 // == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, SavingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
@@ -447,7 +447,7 @@ export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait
 export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --
 
-// == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed
+// == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed, KeyDeriverLoadFailed
 
 /** The cause's message where what failed threw null or undefined. */
 export const NoErrorGiven = "What failed threw nothing: null or undefined, not an Error."
@@ -469,6 +469,9 @@ export const StrengthCheckerMisanswered = "The strengthChecker handed to Bank.ma
 
 /** The strengthChecker's load() failing at bank.hello(). */
 export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
+
+/** The keyDeriver's load() failing at bank.hello(). */
+export const KeyDeriverLoadFailed = "The keyDeriver's load() failed, so the bank could not derive a key from a passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a deriver that fetches its code, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
 // --
 
 // == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, boxTooLarge, VaultFull, DamagedRecord, NewerFormat, SeqNotNext, RecordPreparedWrong, StorageError, storeFailed, storeThrew

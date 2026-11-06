@@ -6,10 +6,9 @@ import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import type { GatingKind } from '../../src/shapes/shapes-enums'
 import type { AnyGating, ClearsForGatingkind, RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { VaultWorld } from '../../src/shapes/shapes-vaultish'
 import { PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { type VaultWorldGiven, Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -40,7 +39,7 @@ const makeDialog = () => {
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
 /** A fresh world with a dialog, nothing stored. */
-const birthWorld = (worldOverrides: Partial<VaultWorld> = {}) => {
+const birthWorld = (worldOverrides: VaultWorldGiven = {}) => {
   const dialog = makeDialog()
   return { ...dialog, ...makeVaultWorld(null, { requestCleartext: dialog.requestCleartext, ...worldOverrides }) }
 }

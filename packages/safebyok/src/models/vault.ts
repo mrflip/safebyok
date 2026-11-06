@@ -3,7 +3,6 @@ import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { reportToPlatform } from '../refusals/report-error'
 import type { GatingKind, LockState } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -183,19 +182,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! vacated.ok) { await onRefused(vacated.err) }
   }
 
-  /** Tell `onPanic` that a cached lease survived a lock; with none, tell the platform and vacate this vault. */
+  /** Tell the host that a cached lease survived a lock, vacating this vault when it has no `onPanic` to hear it. */
   async #panic(refusal: VaultError): Promise<void> {
-    const { onPanic } = this.world
-    if (onPanic === undefined) {
-      reportToPlatform(refusal)
-      this.vacate()
-      return
-    }
-    try {
-      await onPanic(refusal)
-    } catch (err) {
-      reportToPlatform(err)
-    }
+    if (! await this.world.panic(refusal)) { this.vacate() }
   }
 
   /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
