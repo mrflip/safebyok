@@ -41,15 +41,15 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
-* 2026-11-05 (whisper_fields, branch `20261105-whisper_fields`; amended 2026-11-06 (whisper_fields)): **`box.field(path)` writes a whisper leaf's plaintext straight to a
-  DOM element's `value`, and the lock clears the screen, not the memory.** In `packages/safebyok/src/models/box.ts` (*Fields*), the plaintext
+* 2026-11-05 (whisper_fields, branch `20261105-whisper_fields`; amended 2026-11-06 (whisper_fields)): **`BoxFields.of(box).bind(path)` writes a whisper leaf's plaintext straight to a
+  DOM element's `value`, and the lock clears the screen, not the memory.** In `packages/safebyok/src/dom/box-fields.ts` (the `safebyok/dom` entry; amended 2026-11-06 (whisper_fields): named `box.field(path)`, in `src/models/box.ts`, when this was written), the plaintext
   reaches no prop or state of the host's, so it is in the DOM and on the screen and not in React's dev tools: a small improvement over a value
   held in app state, not a protection, as any script on the page can read `el.value`. While the whisper is hidden (vault locked, or box veiled)
   the element is blank (amended 2026-11-06 (whisper_fields): the masks, `box.whisperMasked` and `box.field`'s `whenLocked`, were cut, so a blank is all a hidden field shows), and the library never reads the element back while hidden, so a blank cannot be saved
   through a field. The plaintext stays in the box's private `#exposed` through a lock, edits included, which are read from the element on the
   way into hiding. The exposure lasts as long as the fields: when the last unbinds, the box calls `unexpose()` and the element is blanked as
   it unbinds; an `expose` in flight at that moment leaves the whisper exposed (a row in `notes/wontfix.md`). `box.patchWhisper` works behind a
-  veil, so a host's form that sends the blank it reads to `patchWhisper` while veiled makes the blank the value, and `putExposed` stores it.
+  veil (amended 2026-11-06 (whisper_fields): and while the vault is locked, as it shows and stores nothing), so a host's form that sends the blank it reads to `patchWhisper` while veiled or locked makes the blank the value, and `putExposed` stores it once the vault is unlocked.
   The README's recipe makes the input read-only while `box.isShowing` is false; left as a host's responsibility, pending the Coach's word.
   The whisper's shape (key names and nesting) does not show while hidden: `box.whisper` is a bag with no fields.
 * 2026-11-05 (whisper_object, branch `20261105-whisper_object`): **A box that will not show its exposed whisper answers `box.whisper`
