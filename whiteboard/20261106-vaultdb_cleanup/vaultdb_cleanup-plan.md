@@ -157,7 +157,7 @@ contract says, and consults the old battery only as a reference for coverage (wh
 are worth a case). Export from `safebyok`
 (index, or a new `./storage` entry: the worker's call, recorded) what an adapter needs: `VaultDB`
 and the `do*` types, the storage shapes and checkers an adapter validates with, and the refusal
-throwers an adapter raises (`vaultFull`, `storageError`). Damage rows the battery plants go
+throwers an adapter raises (`vaultFull`, `storageUnavailable`: *Orchestrator:* thread 1 renamed it). Damage rows the battery plants go
 through a hook the adapter supplies. **Depends on:** 1. **Look-ahead:** threads 3, 4 and 6 run
 in parallel off this tip; anything they would each add to the core's exports belongs here.
 **Size:** M.

@@ -7,7 +7,7 @@ orchestrator; workers look things up here and write in their own thread files.
 
 *Orchestrator:* https://claude.ai/artifact/LJYRKB5uG4bzR8VWBVti1j (doc 9c50a432-987f-4fd0-9fa9-0b3e23352d26).
 Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, matters table m3dgc82559j.353,
-bookmark rev 269), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
+bookmark rev 270), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
 m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 
 ## Settled before the first thread
@@ -22,6 +22,23 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 * *Orchestrator:* consumers of the old adapters: `demos/safebyok-demo-react/src/lib/stores.ts`
   and `persist-storage.ts` (indexeddb), `e2e/tests/postgres/*`, `e2e/tests/convex/*`.
 
-## Thread 1: vaultdb_plain
+## Thread 1: vaultdb_plain (#555, in review)
 
-*(underway)*
+* The `do*` contract: `doPutVault(record, PutOptsGiven)`, `doPutBox(record, PutOptsGiven)`,
+  `doDelVault(tombstone, DelOpts)`, `doDelBox(tombstone, DelOpts)`, each one atomic step
+  returning a `Landing` (`BoxLanding` for box calls, with the vault row read in the same step).
+  `PutTerms` is gone.
+* Adapters throw `storageUnavailable`; `storageError`, `recordPreparedWrong`, `damagedRecord`,
+  `newerFormat` are gone from the throwers.
+* Rows are classified by `foundVaultRow` / `foundBoxRow` (shapes-storage.ts, exported), with
+  `PutOptsGiven`.
+* Tests call only public verbs and reach rows only through `_cheat_rowsOf(vaultDB).vaultrows()`
+  and `.boxrows(tok?, scope?)` in `tests/test-helpers/storage-world.ts`: the seam thread 2's
+  battery asks each adapter to supply.
+* Refusals moved: single-row damage, a later `fmt` included, is `damaged_row` with
+  `meta.fieldnames`; a bad record handed to a verb is `bad_option`; gate params are strict
+  (`bad_option`), `gate_issue` only a `registered_at` mismatch; answers carry no `meta`, the verb
+  name stays on `err.meta.call`. The method-wide catch turns any foreign throw into
+  `storage_unavailable` (an Open Matters row).
+* Planning lesson: one compaction at ~157k just before the first justify, for a 12-file M thread.
+  The L ports (postgres, graphql, convex) should be handed tight handoffs.
