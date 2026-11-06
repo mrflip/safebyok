@@ -97,14 +97,14 @@ has been tampered with, decryption fails.
 | **ciphertext**           | The encrypted bytes, with their authentication tag on the end.                                                                                                       | ciphertext           |
 | **vaultTok**             | A random token that changes on every life of the vault (`vault_tok`). It is minted when the vault is made for its scope, and never changes within that life. The scope finds the vault. The token tells one **life** of that scope from the next, so a vault deleted and made anew is never taken for the old one. Every ctx binds it. Every vaultDB call on a box or a gate checks it against the vault stored. A live vault under the same scope with another `vault_tok` is a new life, and a call made under the old one refuses `vault_mismatch`. | --                   |
 | **boxTok**               | A random token that changes on every life of a box under its boxlabel (`box_tok`). It is minted at the box's birth, and every later revision of that life keeps it. A box's life is its vault's and its own, `vault_tok` and `box_tok`. So a box deleted and made anew elsewhere is told from the one this device held. vaultTok and boxTok are the **life toks**, made by `makeLifeTok`. | --                   |
-| **revisionTok**          | A fresh token for each put of a record, vault or box (`revision_tok`). Its `revision_seq` counts up beside it, and the higher seq is the newer. Both are part of the box's stamp. Storage refuses a put made from a stale fetch (`stale_write`).              | version, CAS token   |
+| **revisionTok**          | A fresh token for each put or del of a record, vault or box (`revision_tok`). Its `revision_seq` counts up beside it, and the higher seq is the newer. Both are part of the box's stamp. Storage refuses a put made from a stale fetch (`stale_write`).              | version, CAS token   |
 | **gateEpoch**            | A counter that goes up whenever the vault's wayins change (`gate_epoch`). A passphrase replaced, a passkey added and a passkey revoked each move it, so other devices and leases know to ask again. | key epoch            |
 | **deviceId**             | A random id for this device in a bank's scope (`device_id`). `Bank.make` mints one unless it is given one. The bank's `hello()` caches it in the device record, and the first one cached for the scope wins. Each wayin carries the deviceId of the device that built it. It is never drawn from anything about the device. It is minted per bank scope, which the `user_id` already names, so it links nothing new. | installation id (scoped) |
 
 **An `_id` is a hard identifier. A `_tok` is only compared.** A stored field ending `_id` names one
 thing for good, and a record is found by it (`device_id`, and the `credential_id` and `user_id`
 that come from outside). A random token that is checked and never looked up by is a `_tok`. It
-changes on every life of what it marks. `revision_tok` turns on every put of a record. `vault_tok`
+changes on every life of what it marks. `revision_tok` turns on every put or del of a record. `vault_tok`
 turns on every life of a vault in its scope. `box_tok` turns on every life of a box under its
 boxlabel. In code they are `vaultTok`, `boxTok` and `revisionTok`.
 
