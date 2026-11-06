@@ -280,7 +280,12 @@ describes. **Size:** small.
 `Z.infer` or an interface held to it, by the reader; a DB across the package boundary carries a brand; a host's function is
 wrapped once on its way in; stale examples replaced; 94 to 111 lines. **For thread 9:** a checker typed `Z.ZodType<T>`
 loses `.pick`/`.extend`/`.shape`, so widen only what the package exports and derive shapes from the un-widened one; the
-`Boxlabel` alias the section cites does not exist. In review (medium, opus).
+`Boxlabel` alias the section cites does not exist.
+*Review (medium, opus):* `fixed`; three docs fixes (a rewrap; `Z.ZodType<BankOpts>` made an illustration, not a ruling on
+one type; the wrap rule's list of host functions made open-ended, `onBadNews` being one too). Left: `Boxlabel` and the
+`Z.ZodType<T>` derivation question (thread 9); "never a type literal written out" is a new rule with instances in the code
+today (gating.ts:249); `ListingWorld` has no single class and thread 6 keeps it; "world" has two senses (Open Matters).
+Filing onto main.
 
 ## For the Coach
 
