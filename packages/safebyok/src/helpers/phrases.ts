@@ -471,7 +471,7 @@ export const StrengthCheckerMisanswered = "The strengthChecker handed to Bank.ma
 export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, SeqNotNext, storeFailed, storeThrew
+// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, storeFailed, storeThrew
 
 /** No row stored for this life of the vault, where one was. */
 export const VaultEmpty = "Nothing is stored for this life of the vault: read the vault again by its scope."
@@ -502,6 +502,9 @@ export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string
 
 /** A vault holding as many boxes as its storage allows. */
 export const VaultFull = "This vault holds as many boxes as its storage allows."
+
+/** A write the storage itself had no room for. */
+export const StorageFull = "The vault's storage has no room left for this write: free some, then try again. The storage adapter's own error is this error's cause."
 
 /** A put whose revision_seq is not one past its prior's. */
 export const SeqNotNext = "A record's revision_seq must be one past its prior's."

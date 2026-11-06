@@ -28,6 +28,7 @@ export { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } from '
 export type { AddPasskeyParams, ReplacePassphraseParams, RevokePasskeyParams } from '../shapes/shapes-storage'
 export { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
 export type { Capacity, DelOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReqParams, VaultDBOpts } from '../shapes/shapes-storage'
+export { Checker, Checkers, objCheck } from '../helpers/validator'
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'
@@ -37,7 +38,7 @@ export type { LeaseQuery, LeaseRow, LeaseSparse } from '../shapes/shapes-storage
 
 // == [The refusals]: the throwers an adapter raises, and how a refusal reads
 export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../refusals/throwers'
-export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, seqNotNext, storeFailed } from '../refusals/throwers'
+export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, storeFailed } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalKindVals } from '../refusals/errors'
 export type { RefusalKind, RefusalMeta, Thrown, VaultErrorOpts } from '../refusals/errors'
 export { outcomeOf, storageTroubleOf } from '../refusals/outcome'
