@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mash } from '../src/utils'
 import * as TH from './test-helpers'
-import { user_id, label } from '../src/shapes/primitives'
+import * as PX from '../src/shapes/primitives'
 
 describe("mash", () => {
   // mash @example
@@ -28,8 +28,8 @@ describe("mash", () => {
 
   it("answers an id that passes the user_id rule and fails the label rule", async () => {
     const mashed = await mash('ada@example.com')
-    expect(user_id.safeParse(mashed).success).to.be.true
-    expect(label.safeParse(mashed).success).to.be.false
+    expect(PX.user_id.safeParse(mashed).success).to.be.true
+    expect(PX.label.safeParse(mashed).success).to.be.false
   })
 
   it("refuses a value that is not a string", async () => {
