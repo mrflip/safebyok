@@ -43,7 +43,9 @@ triage, the kind_promises follow-on threads, the deviceId privacy line, the rebo
   `device_id` required-or-minted is an open question (the Coach recalls removing the mint; main still mints and caches).
 * Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
   `d` + 32 hex.
-* Thread 5 `module_clock`: built, PR #535 at 363c1905e on main, in review. One module clock: `nowMillis()` in
+* Thread 5 `module_clock`: reviewed (`fixed`), PR #535 at 6b13daff7 on main, filing. **For thread 6:** `_cheat_clock` is one
+  setting for the package: a test that builds two worlds should share one `now` or build the models world first
+  (`box-seal.test.ts` `sealWorld()`, `vault-life.test.ts` `makeVaultWithBox()`). One module clock: `nowMillis()` in
   `helpers/clock.ts`; `_cheat_clock`/`_cheat_clockReset` through `safebyok/testing` only; a vitest `setupFiles` hook
   (`tests/vitest-setup.ts`) resets it after every test. **For thread 6:** `VX.world` is an empty strip check and `World`
   is `object` until the worlds are Picks. **For a sweep some time:** `consistent(raw, ...)` reads only own fields, so a

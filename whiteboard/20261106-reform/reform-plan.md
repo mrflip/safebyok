@@ -203,7 +203,14 @@ after every test; STYLE, VOCABULARY, wontfix and G4 no longer speak of a host cl
 landed, one commit each (the `checked.friend` fix with its prototype-getter test; the zeroing test; the two phrases;
 the consts prose, `MinuteMillis` too; the two comments; `isVaultError`'s example). Pulled forward: `BoxDamagedBeyondNaming`
 deleted. **For thread 6:** `VX.world` stays as an empty strip check and `World` is `object`; replace both when the worlds
-become Picks. Compacted once, after its first justify. In review (`opus`, high).
+become Picks. Compacted once, after its first justify.
+*Review (high, opus):* `fixed`; the six directives verified, `_cheat_clock` reachable only through `safebyok/testing`,
+G4 true; four fixes (the changeset names `vault.clock`; the module holder is `clock`, not `reading`; a `//` beside
+`World = object`; a blank line). Left, minor: one `_cheat_clock` setting for the whole package, so a test that builds a
+vault world at T0 and then a models world moves `nowMillis()` back to 2023 (`box-seal.test.ts`, `vault-life.test.ts`;
+nothing reads the time there today: a directive to thread 6, which is in those helpers); the global reset takes the clock
+from module-scope worlds (shape tests, Cleanup); `buildLease` hands the raw friend to `buildGranted`, which parses it
+again (internal caller, left: Cleanup); `makeProving` built by hand (taste). Tip 6b13daff7; filing.
 
 ### 6. `worlds_picks`
 
