@@ -17,9 +17,6 @@ const NotRefused = Symbol('not refused')
  * @returns The refusal, for a closer look at its message or cause.
  *
  * @example await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'vault_locked')
- * @example
- *   const err = await TH.expectRefusal(TH.settledVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
- *   expect(err.message).to.include('safebyok/browser')
  */
 export const expectRefusal = async (operation: Promise<unknown>, refusalkind: RefusalKind): Promise<VaultError> => {
   let refusal: unknown = NotRefused
@@ -41,8 +38,6 @@ export const expectRefusal = async (operation: Promise<unknown>, refusalkind: Re
  *
  * @param operation - The call that should succeed, or its outcome.
  * @returns Its `val`.
- *
- * @example expect(await TH.expectGood(vaultDB.tryGetVault(scope))).to.be.null
  */
 export const expectGood = async <ValT>(operation: Outcome<ValT> | Promise<Outcome<ValT>>): Promise<ValT> => {
   const outcome = await operation
@@ -137,8 +132,6 @@ export const expectSyncRefusal = (attempt: () => unknown, refusalkind: RefusalKi
  * @param bag - A complete bag of options.
  * @param ckey - The field to leave out.
  * @returns A copy of `bag` without that field.
- *
- * @example TH.settledVault(TH.omitting(opts, 'keyDeriver'))  // refuses: no keyDeriver
  */
 export const omitting = <Bag extends object>(bag: Bag, ckey: keyof Bag): Bag => {
   const { [ckey]: _omitted, ...rest } = bag

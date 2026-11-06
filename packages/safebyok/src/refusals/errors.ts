@@ -75,13 +75,7 @@ export type RefusalKind = typeof refusalKindVals[number]
 export const refusalFamilyVals = ['misuse', 'condition', 'bad_news'] as const
 export type RefusalFamily = typeof refusalFamilyVals[number]
 
-/** The family of each refusalkind in {@link refusalKindVals}, which a VaultError's `family` is read from.
- *
- * @example RefusalFamilyForKind.bad_option           // 'misuse'
- * @example RefusalFamilyForKind.bad_record           // 'misuse'
- * @example RefusalFamilyForKind.storage_unavailable  // 'condition'
- * @example RefusalFamilyForKind.damaged_box          // 'bad_news'
- */
+/** The family of each refusalkind in {@link refusalKindVals}, which a VaultError's `family` is read from. */
 export const RefusalFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
@@ -153,10 +147,6 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  * `cause`, the `meta`, or any other property.
  *
  * @example
- *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
- *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
- *   }
- * @example
  *   const { ok, val, err } = await vaultDB.tryGetVault(scope)
  *   if (! ok && err.family === 'misuse') { throw err }
  */
@@ -188,7 +178,6 @@ export class VaultError extends Error {
 /** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link refusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
  * A kind off the list is the thrower's own text, and may quote what it heard.
  *
- * @example listedKindOf(new VaultError('storage_unavailable', 'The word list would not load.'))  // 'storage_unavailable'
  * @example listedKindOf(new Error('no luck with hunter2'))  // null
  */
 export const listedKindOf = (thrown: unknown): RefusalKind | null => (
@@ -200,7 +189,6 @@ export const listedKindOf = (thrown: unknown): RefusalKind | null => (
  * host gave it, kept as it is until a redact lands.
  *
  * @example thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))  // 'QuotaExceededError'
- * @example thrownNameOf('a bare string')  // null
  */
 export const thrownNameOf = (thrown: unknown): string | null => (
   typeof thrown === 'object' && thrown !== null && 'name' in thrown && typeof thrown.name === 'string' ? thrown.name : null

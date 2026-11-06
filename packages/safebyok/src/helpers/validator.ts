@@ -94,13 +94,6 @@ export type Merged<SourcesT extends readonly object[]> =
  *   vaultScope.parse(scope, { where: 'In the scope naming the vault', advice: 'Name it by its vaultlabel.' })  // throws 'bad_scope', "In the scope naming the vault: vaultlabel: A label is <...>. Name it by its vaultlabel."
  *   vaultScope.parseConsistent(box, bank.scope)  // box's scope, once it is the bank's app and user: 'bad_scope' otherwise
  * @example
- *   export const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
- *     const boxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
- *     const boxSparse = boxRecord.omit({ whisper_ciphered: true })
- *     return { boxRecord, boxSparse }
- *   })
- *   boxSparse.parse({ ...sparse, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
- * @example
  *   export const { vaultRecord } = Checkers('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
  *     const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
  *     return { vaultRecord }
@@ -117,9 +110,7 @@ export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT
  * It refuses as a {@link Checkers} call's validators do, and takes `sources` as one does.
  *
  * @example
- *   export const boxDamaged = Checker(({ obj, oneof, boxlabel, revision_tok }) => (
- *     obj({ boxlabel, revision_tok: revision_tok.nullable(), damage: oneof(boxDamageVals) }).strict()
- *   ), 'bad_record', [CX])
+ *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)), 'bad_record')
  * @example export const callback = Checker(({ fn }) => fn(), 'bad_option')
  */
 export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(
@@ -241,7 +232,6 @@ const framed = (said: string, { where, advice }: Story): string => {
  * is held to: hand it only the fields meant. An absent field passes, so a value an absent field
  * must fail is parsed first. Either bag not an object refuses 'bad_option'.
  *
- * @example consistent(deviceRecord, scope)   // true when its applabel, user_id and vaultlabel are the scope's
  * @example consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })   // true: no field is defined in both
  */
 export const consistent = (bag: object, other: object): boolean => disagreeing(bag, other).length === 0
@@ -250,7 +240,6 @@ export const consistent = (bag: object, other: object): boolean => disagreeing(b
  * The kind is the caller's to choose, as the caller knows what a disagreement means: a scope of
  * another user, a record of another vault. A `refusal` that is none refuses 'bad_option'.
  *
- * @example demandConsistent(stored, scope, { kind: 'damaged_row' })   // true, when its applabel, user_id and vaultlabel are the scope's
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */
 export const demandConsistent = (bag: object, other: object, refusal: ConsistencyRefusal): true => {
@@ -261,10 +250,7 @@ export const demandConsistent = (bag: object, other: object, refusal: Consistenc
   throw new VaultError(kind, said ?? Phrases.fieldsDisagree(fieldnames), { meta: { fieldnames } })
 }
 
-/** `bag`, once it is {@link consistent} with `other`: refuses as {@link demandConsistent} does. For a bag already parsed; a {@link Refusing}'s `parseConsistent` is this over its `parse`.
- *
- * @example const tombstone = verifyConsistent(answered, scope, { kind: 'record_conflict' })   // the tombstone, when it is of the scope
- */
+/** `bag`, once it is {@link consistent} with `other`: refuses as {@link demandConsistent} does. For a bag already parsed; a {@link Refusing}'s `parseConsistent` is this over its `parse`. */
 export const verifyConsistent = <BagT extends object>(bag: BagT, other: object, refusal: ConsistencyRefusal): BagT => {
   demandConsistent(bag, other, refusal)
   return bag

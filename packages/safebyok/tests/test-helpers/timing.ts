@@ -6,8 +6,6 @@ import { vi } from 'vitest'
  * by a write) settle before they look.
  *
  * @returns A promise for the next tick.
- *
- * @example await wakeupAtNextTick() // a refresh already settled has run its continuation
  */
 export const wakeupAtNextTick = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0) })
 
@@ -27,8 +25,6 @@ export const aWhile = (): Promise<void> => new Promise((resolve) => { setTimeout
  * thing that never comes to pass fails its test rather than hanging it.
  *
  * @param check - Whether the thing has come to pass yet.
- *
- * @example await TH.eventually(() => heard.count === 1)
  */
 export const eventually = async (check: () => boolean): Promise<void> => {
   for (let ii = 0; ii < 400; ii += 1) {
@@ -43,10 +39,6 @@ export const eventually = async (check: () => boolean): Promise<void> => {
  * to look at.
  *
  * @returns `onChange`, to subscribe with; `heard`, whose `count` it raises.
- *
- * @example
- *   const { heard, onChange } = TH.changeCounter()
- *   const unsubscribe = vaultDB.subscribe(TH.scopeOf('u1'), onChange)
  */
 export const changeCounter = () => {
   const heard = { count: 0 }
@@ -63,10 +55,7 @@ export const changeCounter = () => {
  * @example
  *   const latch = TH.makeLatch()
  *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await latch.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
- *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the latch
- *   await latch.reached
- *   await vault.lock()                     // lands mid-unlock: the unlock refuses, nothing unlocked
- *   latch.release()
+ *   // then as holdNextCall's: await latch.reached, act, latch.release()
  */
 export const makeLatch = () => {
   const opened = deferred()

@@ -17,10 +17,6 @@ import { VaultError, type RefusalKind } from './errors'
  * @param message - What went wrong and what to do, calmly, quoting nothing.
  *
  * @example
- *   try { handed = await keyDeriver.deriveKeyBytes(passphrase, saltBytes) } catch (err) {
- *     throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
- *   }
- * @example
  *   try { return await client.mutation(fnRef, args) } catch (err) {
  *     throw HostErrorSanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
  *   }

@@ -27,21 +27,14 @@ export const randomId = (): string => crypto.randomUUID()
 /** A fresh life tok, a thing's `vault_tok` or `box_tok`: random, minted at each birth of the thing it marks, and only ever compared. */
 export const makeLifeTok = (): string => randomId()
 
-/** Bytes as unpadded base64url text: the `_b64` form every stored record uses.
- *
- * @example toB64(new TextEncoder().encode('cred-laptop'))  // 'Y3JlZC1sYXB0b3A'
- */
+/** Bytes as unpadded base64url text: the `_b64` form every stored record uses. */
 export const toB64 = (bytes: Uint8Array): string => base64urlnopad.encode(bytes)
 
-/** Base64url text back to bytes; throws on other text, where {@link fromB64OrNull} answers null.
- *
- * @example new TextDecoder().decode(fromB64('Y3JlZC1sYXB0b3A'))  // 'cred-laptop'
- */
+/** Base64url text back to bytes; throws on other text, where {@link fromB64OrNull} answers null. */
 export const fromB64 = (b64: string): Uint8Array => base64urlnopad.decode(b64)
 
 /** Base64url text back to bytes, or null for text that is not base64url: for judging a salt's shape.
  *
- * @example fromB64OrNull('Y3JlZC1sYXB0b3A')?.length   // 11
  * @example fromB64OrNull('not/base64url+!')           // null
  */
 export const fromB64OrNull = (b64: string): Uint8Array | null => {
