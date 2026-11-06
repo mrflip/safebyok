@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (`refusalof_removed`, the Coach's ruling) building from main; threads 5 to 10 wait on #511 and #513 reaching main
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526, `refusalof_removed`, the Coach's ruling) filed on main; threads 5 to 10 wait on #511 and #513 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
@@ -297,6 +297,9 @@ nobody is using it, remove".
 and the test helper of that name stay; `notes/guarantees.md`'s mention is already rewritten by #517. Not on the public
 surface, so an empty changeset unless the entry points reach it. **Levels:** worker `sonnet`; review `low`. **Depends on:**
 nothing (cut from main at 374098121). **Size:** tiny.
+
+*Review (low, sonnet):* `clean`; justify green, run unmasked by the reviewer. **Filed** at 255d2c5d7, as cut, on main (PR
+#526). Merge with or after #517, which rewrites guarantees.md's one mention of `refusalOf`.
 
 ## For the Coach
 

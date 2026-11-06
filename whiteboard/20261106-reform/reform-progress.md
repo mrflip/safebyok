@@ -17,7 +17,8 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
   core test is coming (plan, ground rule 10).
 * Thread 3 `example_pointers`: filed, PR #522 at 51741eb57; in the Coach's line.
 * Thread 4 `hello_listed`: filed, PR #523 at 895949623 on #513's current tip (not in the Coach's line).
-* Thread 11 `duck_calibration`: filed, PR #525 at 781f7e625, on main. **For thread 9:** a `Z.ZodType<T>` checker loses
+* Thread 11 `duck_calibration`: filed, PR #525 at 781f7e625, on main.
+* Thread 12 `refusalof_removed`: filed, PR #526 at 255d2c5d7, on main; merge with or after #517. **For thread 9:** a `Z.ZodType<T>` checker loses
   `.pick`/`.extend`/`.shape`: widen only what the package exports; the `Boxlabel` alias STYLE.md cites does not exist.
 * **The Coach keeps a merge line** (plan, ground rule 9): #513, #517, #521, #522, #512, #518, #519, #520, #511 in that
   order. #511 and #513 conflict with each other in `refusals/throwers.ts` and `tests/test-helpers/models-world.ts`; the

@@ -11,6 +11,7 @@ Every unstarted thread waits on a merge. Nothing is broken; nothing is unfiled.
 | 3 `example_pointers` | #522 | 51741eb57 | the Coach's line, on #521; the two review fixes on top |
 | 4 `hello_listed` | #523 | 895949623 | on #513's current tip (7828cb089), not in the line; "Stacked on #513" |
 | 11 `duck_calibration` | #525 | 781f7e625 | on main (374098121) |
+| 12 `refusalof_removed` | #526 | 255d2c5d7 | on main; merge with or after #517 (guarantees.md's one mention of `refusalOf`) |
 
 Each has its reviewer's comment on the PR and a `*Review:*` line under its entry in `reform-plan.md`. No worktree of
 theirs remains. The sprint PR is #516.
