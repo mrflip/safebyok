@@ -4,15 +4,14 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as SX from 'safebyok/storage'
-import * as TH from 'safebyok/testing'
 import { VaultTablesSql } from '../src/index'
-import * as PG from './test-helpers'
+import * as TH from './test-helpers'
 
-PG.bootDatabaseFirst()
+TH.bootDatabaseFirst()
 
 /** Each column of `table` as information_schema describes it: its name, type and nullability. */
 const columnsOf = async (table: string): Promise<string[][]> => {
-  const db = await PG.database()
+  const db = await TH.database()
   const { rows } = await db.query<{ column_name: string, data_type: string, is_nullable: string }>(
     'SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position', [table],
   )
@@ -21,7 +20,7 @@ const columnsOf = async (table: string): Promise<string[][]> => {
 
 /** Each primary, unique, foreign or check key of `table`, as Postgres defines it. */
 const keysOf = async (table: string): Promise<string[]> => {
-  const db = await PG.database()
+  const db = await TH.database()
   const { rows } = await db.query<{ definition: string }>(
     "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f', 'c')", [table],
   )
@@ -34,9 +33,9 @@ describe("VaultTablesSql", () => {
   })
 
   it("is safe to run again, keeping the rows already stored", async () => {
-    const vaultDB = await PG.makeVaultDB()
+    const vaultDB = await TH.makeVaultDB()
     await vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
-    const db = await PG.database()
+    const db = await TH.database()
     await db.exec(VaultTablesSql)
     expect(await vaultDB.getVault(TH.vaultScope)).to.deep.include({ act: 'got', val: TH.vaultAt() })
   })
@@ -53,7 +52,7 @@ describe("VaultTablesSql", () => {
   })
 
   it("turns on row-level security for both tables", async () => {
-    const db = await PG.database()
+    const db = await TH.database()
     const { rows } = await db.query<{ relname: string, relrowsecurity: boolean }>(
       "SELECT relname, relrowsecurity FROM pg_class WHERE relname IN ('safebyok_vaults', 'safebyok_boxes') ORDER BY relname",
     )

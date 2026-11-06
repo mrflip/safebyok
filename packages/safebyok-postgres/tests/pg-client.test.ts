@@ -1,7 +1,7 @@
 /** pgClientOf: a transaction on one connection checked out of a pg Pool. */
 
 import { describe, expect, it } from 'vitest'
-import * as TH from 'safebyok/testing'
+import * as TH from './test-helpers'
 import { pgClientOf } from '../src/index'
 import type { PgPool } from '../src/index'
 

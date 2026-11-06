@@ -7,6 +7,9 @@ import type * as TH from 'safebyok/testing'
 import { PostgresVaultDB, VaultChangeChannel, VaultTablesSql } from '../src/index'
 import type { PostgresClient, PostgresListen, PostgresVaultDBOpts } from '../src/index'
 
+// Everything the core's tests use too, so a test here star-imports this one module as TH.
+export * from 'safebyok/testing'
+
 // == [The database]: BootMillis, database, bootDatabaseFirst
 
 // A PGlite's WebAssembly compiles cold on a CI runner in eight seconds or more, past a test's timeout.

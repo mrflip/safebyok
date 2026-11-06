@@ -7,6 +7,9 @@ import type * as TH from 'safebyok/testing'
 import { PostgresVaultDB, VaultChangeChannel, VaultTablesSql, pgClientOf } from 'safebyok-postgres'
 import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 
+// Everything the core's tests use too, so a test here star-imports this one module as TH.
+export * from 'safebyok/testing'
+
 // == [Which suites run]: PgUrlVar, PostgresSuite, OnRealPostgres, postgresUrl, runsOnPostgres, describeOnPostgres
 
 /** The environment variable naming the Postgres these tests run against: a connection string for a role that may CREATE DATABASE. */
