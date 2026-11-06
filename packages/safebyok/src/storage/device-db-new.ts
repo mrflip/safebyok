@@ -1,4 +1,4 @@
-/** The deviceDB: what the slim models cache on this device, a lease for each vault and one device record for the bank, and every invariant of the verbs. A subclass writes only the generic `do*` calls, each one atomic step. */
+/** The deviceDB: what the slim models cache on this device, a lease for each vault, and every invariant of the verbs. A subclass writes only the generic `do*` calls, each one atomic step. */
 
 import type { Awaitable } from '../helpers/helpers'
 import { isVaultError } from '../refusals/errors'
@@ -6,10 +6,7 @@ import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { DeviceRecord, LeaseQuery, LeaseRow, LeaseSparse } from '../shapes/shapes-storage'
-
-/** `born` for the first record of a bank scope, `held` for one already cached, which stands, and `rewrote` for a damaged one written over: bad news for the bank. `record` is what the device now holds. */
-export type DeviceCached = { act: 'born' | 'held' | 'rewrote', record: DeviceRecord }
+import type { LeaseQuery, LeaseRow, LeaseSparse } from '../shapes/shapes-storage'
 
 /** SLOPDOC: A deviceDB's base: calls reach the store in order, only `peek` answers a `lease_key`, no verb logs one. */
 export abstract class DeviceDB {
@@ -51,21 +48,7 @@ export abstract class DeviceDB {
   tryLeasesProvedBefore(cutoff: number): Promise<Outcome<LeaseSparse[]>> { return outcomeOf(() => this.leasesProvedBefore(cutoff)) }
   // --
 
-  // == [Device record verbs]: cacheDeviceRecord, tryCacheDeviceRecord
-
-  /** Caches the bank scope's device record unless a good one is there: the first `device_id` cached is the bank's. A damaged record is written over, `rewrote`. */
-  async cacheDeviceRecord(record: DeviceRecord): Promise<DeviceCached> {
-    const wanted = SX.deviceRecord.parse(record)
-    const ante = await adapted('cacheDeviceRecord', () => this.doCacheDeviceRecord(wanted, (stored) => SX.deviceRecord.safeParse(stored).success))
-    if (ante === null) { return { act: 'born', record: wanted } }
-    const held = SX.deviceRecord.safeParse(ante)
-    return held.success ? { act: 'held', record: held.data } : { act: 'rewrote', record: wanted }
-  }
-
-  tryCacheDeviceRecord(record: DeviceRecord): Promise<Outcome<DeviceCached>> { return outcomeOf(() => this.cacheDeviceRecord(record)) }
-  // --
-
-  // == [Protected, for a subclass to write]: doCache, doPeek, doVacate, doLeasesProvedBefore, doCacheDeviceRecord
+  // == [Protected, for a subclass to write]: doCache, doPeek, doVacate, doLeasesProvedBefore
 
   // A store starts each call's work in the order called, or a `vacate` made after a `cache` may not erase it.
   /** Stores `row` as the lease of its vault scope, over any row there. */
@@ -76,8 +59,6 @@ export abstract class DeviceDB {
   protected abstract doVacate(asked: LeaseQuery): Awaitable<void>
   /** Every row whose `proved_at` is under `cutoff`, oldest first: an index range scan. */
   protected abstract doLeasesProvedBefore(cutoff: number): Awaitable<unknown[]>
-  /** In one step, stores `record` at its bank scope unless `isHeld` accepts the row stored there, and resolves that row, or null for none. */
-  protected abstract doCacheDeviceRecord(record: DeviceRecord, isHeld: (stored: unknown) => boolean): Awaitable<unknown>
   // --
 }
 

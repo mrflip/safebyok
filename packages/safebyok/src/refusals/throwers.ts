@@ -56,13 +56,11 @@ export const unexpectedError = (thrown: Thrown): VaultError => (
 )
 // --
 
-// == [Bank Throwers]: insecureContext, helloFirst, deviceRecordRewritten
+// == [Bank Throwers]: insecureContext, helloFirst
 
 export const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
 
 export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
-
-export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_row', Phrases.DeviceRecordRewritten)
 // --
 
 // == [Vault Throwers]: lockedError, unlockFirst, stampOfOtherVault

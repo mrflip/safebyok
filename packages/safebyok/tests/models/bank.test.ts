@@ -6,7 +6,6 @@ import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
 import { BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
-import { LabelPattern, MaxLabelChars } from '../../src/shapes/primitives'
 import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
 
@@ -137,22 +136,14 @@ describe("bank.hello", () => {
     expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
   })
 
-  it("adopts the first device_id cached for the bank, whatever it was handed, and is told of a damaged record written over", async () => {
+  it("keeps the device_id it was handed, as a second bank on the device keeps its own", async () => {
     const world = makeBankWorld()
     const first = world.bankOn({ device_id: 'device_first' })
     await first.hello()
-    expect(first.device_id).to.eq('device_first')
     const second = world.bankOn({ device_id: 'device_second' })
     await second.hello()
-    expect(second.device_id).to.eq('device_first')
-    expect(second.snapshot.device_id).to.eq('device_first')
-    const rows = world.deviceDB._cheat_deviceRows()
-    for (const ckey of rows.keys()) { rows.set(ckey, { broken: true }) }
-    const onBadNews = vi.fn()
-    const third = world.bankOn({ device_id: 'device_third', onBadNews })
-    await third.hello()
-    expect(third.device_id).to.eq('device_third')
-    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
+    expect(first.snapshot.device_id).to.eq('device_first')
+    expect(second.snapshot.device_id).to.eq('device_second')
   })
 
   it("hears a vault made elsewhere over the watch it starts", async () => {
@@ -219,10 +210,8 @@ describe("bank.ensureVault", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }), 'bad_option')
   })
 
-  it("mints a device_id that is itself a label, for a bank handed none", () => {
-    const { device_id } = makeBankWorld().bankOn({})
-    expect(device_id).to.match(LabelPattern)
-    expect(device_id).to.have.length.lessThanOrEqual(MaxLabelChars)
+  it("refuses 'bad_option' at Bank.make with no device_id", () => {
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }), 'bad_option')
   })
 
   it("answers tryEnsureVault's refusal as an Outcome", async () => {
