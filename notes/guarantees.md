@@ -373,14 +373,14 @@ the crypto imports.
   `argon2idDeriver` (`deriver/argon2id-webv1.ts`, over `@noble/hashes`); a fresh random salt per wayin
   (`mintPassphraseHeader`, `models/proving.ts`); a wayin under another label refuses `newer_format`
   (`PassphraseProving.buildStored`), so there is no silent downgrade (`tests/models/proving.test.ts`, *refuses a
-  wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver wearing a supplied
-  label must carry exactly its parameters, and no other may wear the reserved prefix `argon2id_web_`:
-  `checkSuppliedSpecKept` (`deriver/basederiver.ts`), reached through `parseKeyDeriverSpec` from `argon2idDeriver`
-  alone. A host's own deriver is checked by its interface, `keyDeriverShape` (`shapes/shapes-core.ts`, at `Bank.make`
-  and in each proving's world), not by its parameters: a host bent on weak ones would find a way
-  (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). The published entry points export neither
-  `argon2idDeriver` nor `argon2idWebV1Deriver`, and no test of the core reaches `deriver/`; safebyok-fastkey's
-  hash-wasm deriver runs on the old core.
+  wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver `argon2idDeriver`
+  makes under a supplied label must carry exactly its parameters, and it makes none under another label with the
+  reserved prefix `argon2id_web_`: `checkSuppliedSpecKept` (`deriver/basederiver.ts`), reached through
+  `parseKeyDeriverSpec` from `argon2idDeriver` alone. A host's own deriver is checked by its interface,
+  `keyDeriverShape` (`shapes/shapes-core.ts`, at `Bank.make` and in each proving's world), not by its parameters: a
+  host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). The published
+  entry points export neither `argon2idDeriver` nor `argon2idWebV1Deriver`, and no test of the core calls
+  `argon2idDeriver` or `checkSuppliedSpecKept`; safebyok-fastkey's hash-wasm deriver runs on the old core.
 * *Randomness* from `crypto.getRandomValues`, `crypto.randomUUID` and `subtle.generateKey` alone (`randomBytes`,
   `randomId`, the key makers).
 * *No secret is compared.* A wrong passphrase or passkey is learned from the AEAD tag failing to
