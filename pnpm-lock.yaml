@@ -389,6 +389,9 @@ importers:
       react:
         specifier: ^19.3.1
         version: 19.3.1
+      safebyok:
+        specifier: workspace:*
+        version: link:../packages/safebyok
       safebyok-convex:
         specifier: workspace:*
         version: link:../packages/safebyok-convex
@@ -793,7 +796,7 @@ importers:
         version: 4.1.3
       es-toolkit:
         specifier: ^1.52.0
-        version: 1.52.0
+        version: 1.53.0
       idb-keyval:
         specifier: ^6.3.0
         version: 6.3.0
@@ -912,9 +915,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok-old:
+      safebyok:
         specifier: workspace:*
-        version: link:../safebyok-old
+        version: link:../safebyok
       tsdown:
         specifier: ^0.23.3
         version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)

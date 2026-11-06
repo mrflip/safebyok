@@ -1,0 +1,6 @@
+---
+"safebyok-postgres": minor
+"safebyok": minor
+---
+
+**safebyok-postgres is rewritten onto the new VaultDB.** `postgresVaultDB(opts)` gives way to `new PostgresVaultDB({ client, listen?, maxBoxes?, maxRecordBytes? })`, a `VaultDB` from `safebyok/storage`; `client` runs `query` and `transaction`, which a PGlite does as it is and `pgClientOf(pool)` makes of a `pg` Pool. The per-request `user_id` gate is gone: the route that builds each scope decides who reaches which bank. **Stored format:** two tables, `safebyok_vaults` and `safebyok_boxes`, each row's record one `jsonb` column beside the columns it is keyed by; `safebyok_vault_tombstones`, the foreign key and the column-per-field layout are gone, and so are `VaultNotifySql` and its triggers: each write now sends its own notification on `VaultChangeChannel`, with the rows it stored, which `listen` hears. Drop the old tables and run `VaultTablesSql` again; no vault stored before is read. A failed statement refuses as `storage_unavailable`, or `unexpected_error` for a missing table or privilege, its cause only the driver's message and code. **`safebyok/storage` exports `Checker`, `Checkers` and `objCheck`**, with the types `ObjCheckOpts` and `Refusing`, for an adapter's own options and rows.
