@@ -586,4 +586,4 @@ missed, stripped. `vitest/valid-title` warnings in `tests/models` went 116 to 73
 changeset.
 *Review (low, sonnet, by hand):* `clean`; 103 titles reworded, none dropped; the kind-less helpers still demand a
 `VaultError`; no contract or bad-news kind stripped; `validator.test.ts` and `refusals/*.test.ts` kept as definitional is
-sound. Not checked: every `disabled` and `insecure_context` strip site. Filing at 4bbdb9f87.
+sound. Not checked: every `disabled` and `insecure_context` strip site. **Filed** at 4bbdb9f87, as cut, on main.
