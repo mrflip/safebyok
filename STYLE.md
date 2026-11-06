@@ -565,9 +565,9 @@ the scope.
 * **A shape's type is `Z.infer` of its validator, or an interface held to it: choose by the
   reader.** An in-repo bag's is `Z.infer` of an `objCheck` with a `/** */` on each prop. A
   host-facing contract, whose `.d.ts` is the product, gets an `interface` beside its checker, a doc
-  block on each member; the checker is exported as `Z.ZodType<BankOpts>`, and an equality assertion
-  of the two at the file's foot keeps them from drifting. Either way cmd-click lands on a member
-  with its doc block.
+  block on each member; the checker is exported as a `Z.ZodType<T>` of it (`Z.ZodType<BankOpts>`,
+  say), and an equality assertion of the two at the file's foot keeps them from drifting. Either
+  way cmd-click lands on a member with its doc block.
 * **A shape and its checker follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
   there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
   and module-local and good idea to put it near where used); use Checkers; namespace it, using
