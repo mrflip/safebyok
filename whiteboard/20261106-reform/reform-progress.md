@@ -5,16 +5,12 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06, 08:05: running)
+## State (2026-11-06, 09:10: running)
 
-Twenty threads planned. Filed: 1, 2 (merged), 3, 4, 11, 12, 13, 14, 15, 16, 17. In review: 18 (#532), 19 (#534). Built,
-docs only, filing after the restack: 20 (#533). Filed: 5 (#535, on main, outside the line,
-with its six directives). Building: 6 (`worlds_picks`, on #535's tip). Next: 7 to 10 in turn. Every open PR sits in one line on main
-(08:30; plan, ground rule 9), tips: #512 2ac0d37b5, #518 8d6270435, #529 e144c2b12, #531 0ac1b0165, #533 bb36a4c66, #522
-a1c189622, #525 ec4474df5, #526 fa8d83e22, #527 c3e9780d2, #532 45ac0ff84, #528 ac3ae3b1b, #519 9091491a8, #520 3cec98bed,
-#523 8108f4b21, #530 d9de40864, #534 b55ff151c, #516 on top. #530 over #511 took #530's verbs with #511's names
-(`damaged_rows`, `refusalkind`); main's VOCABULARY "am" row still says `damaged_records`, which #518 removes in the line. Open for the Coach: the Closer Look
-triage, the kind_promises follow-on threads, the deviceId privacy line, the reborn-vault hello row.
+Twenty threads planned. Merged to main (the line, 08:40 to 09:00): 1, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.
+Filed, on the pre-merge main, being brought onto main by an agent of the Coach's: 5 (#535). Cut, holding for #535's new
+tip: 6 (`worlds_picks`). Next: 7 to 10 in turn. Open for the Coach: the Closer Look triage, the kind_promises follow-on
+threads, the deviceId privacy line, the raw-UUID label row, the reborn-vault hello row.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
