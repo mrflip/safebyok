@@ -231,10 +231,10 @@ describe("putBox's count cap", () => {
 
   it("lets a box reborn over its tombstone take the tombstone's row, in a life full of them", async () => {
     const backend = await withVault()
-    const tombstones = ['anthropic', 'openai'].map((boxlabel) => TH.boxTombstoneOf(boxOf(boxlabel)))
-    await plantBoxes(backend, tombstones)
-    const reborn = boxOf('anthropic', { revision_seq: tombstones[0]!.revision_seq + 1 })
-    expect(await backend.mutation(api.putBox, { record: reborn, opts: { ...birth, prior: SX.revisionOf(tombstones[0]!) }, maxBoxes: 2 })).to.deep.include({ landed: true })
+    const tombstone = TH.boxTombstoneOf(boxOf('anthropic'))
+    await plantBoxes(backend, [tombstone, TH.boxTombstoneOf(boxOf('openai'))])
+    const reborn = boxOf('anthropic', { revision_seq: tombstone.revision_seq + 1 })
+    expect(await backend.mutation(api.putBox, { record: reborn, opts: { ...birth, prior: SX.revisionOf(tombstone) }, maxBoxes: 2 })).to.deep.include({ landed: true })
     expect(await keptTally(backend)).to.deep.equal(await weighedTally(backend))
     expect(await keptTally(backend)).to.have.property('box_count', 2)
   })
