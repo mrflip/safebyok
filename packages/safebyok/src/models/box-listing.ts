@@ -14,15 +14,15 @@ import { Listing } from './listing'
 
 /** One vault's boxes, by boxlabel. */
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box> {
-  // == [Props]: world, #damagedRecords, damaged_records
+  // == [Props]: world, #damagedRows, damaged_rows
 
   declare readonly world: BoxWorld
 
   /** The rows the vault's get set aside as damaged. */
-  #damagedRecords: readonly DamagedBox[] = Object.freeze([])
+  #damagedRows: readonly DamagedBox[] = Object.freeze([])
 
   /** The rows of this vault found damaged, set aside until `del` names one. */
-  get damaged_records(): readonly DamagedBox[] { return this.#damagedRecords }
+  get damaged_rows(): readonly DamagedBox[] { return this.#damagedRows }
   // --
 
   // == [Construction]: constructor, scopeOf, sparseOf, recordOf
@@ -48,23 +48,23 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   override async hello(listed?: BoxesListed): Promise<void> {
     await super.hello()
     if (listed === undefined) { return }
-    const { boxes, damaged_records } = VX.boxesListed.parse(listed)
-    this.#damagedRecords = Object.freeze(damaged_records)
-    for (const { boxlabel } of damaged_records) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
+    const { boxes, damaged_rows } = VX.boxesListed.parse(listed)
+    this.#damagedRows = Object.freeze(damaged_rows)
+    for (const { boxlabel } of damaged_rows) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
   }
 
-  /** The entry of {@link damaged_records} under `scope`, or null. */
+  /** The entry of {@link damaged_rows} under `scope`, or null. */
   damagedAt(scope: Boxscope): DamagedBox | null {
     const { boxlabel } = this.scopeOf(scope)
-    return this.#damagedRecords.find((damaged) => damaged.boxlabel === boxlabel) ?? null
+    return this.#damagedRows.find((damaged) => damaged.boxlabel === boxlabel) ?? null
   }
 
   /** Delete the box `duck` names, and stop setting its row aside as damaged. */
   override async del(duck: BoxSparse | Box): Promise<Box | null> {
     const thing = await super.del(duck)
     const { boxlabel } = this.scopeOf(duck)
-    this.#damagedRecords = Object.freeze(this.#damagedRecords.filter((damaged) => damaged.boxlabel !== boxlabel))
+    this.#damagedRows = Object.freeze(this.#damagedRows.filter((damaged) => damaged.boxlabel !== boxlabel))
     return thing
   }
 

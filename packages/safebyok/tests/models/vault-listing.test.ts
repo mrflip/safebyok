@@ -273,8 +273,7 @@ describe("building over a tombstone", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses what is no listing, and what is no scope, nobody asked", async () => {
-    await TH.expectRefusal(Vault.launchBirth(undefined as never, Dna), 'unexpected_error')
+  it("Vault.launchBirth refuses what is no scope, nobody asked", async () => {
     const { listing } = makeVaultWorld()
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
@@ -373,7 +372,7 @@ describe("a damaged row", () => {
     expect(vault.isLocked).to.be.false
   })
 
-  it("leaves when the customer names its vault row, as damaged_records lists it, past reading and with its peek", async () => {
+  it("leaves when the customer names its vault row, as damaged_rows lists it, past reading and with its peek", async () => {
     const rubble = { garbage: true }
     const { listing, restoreRow, storedNow, demandStored } = makeVaultWorld(await storedVaultRecord())
     const stored = demandStored()

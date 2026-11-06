@@ -173,7 +173,10 @@ export class VaultError extends Error {
 }
 // --
 
-// == [What a refusal keeps of a thrown]: listedKindOf, thrownNameOf
+// == [What a refusal keeps of a thrown]: Thrown, listedKindOf, thrownNameOf
+
+/** What a `catch` binds: anything at all, since JavaScript lets any value be thrown. */
+export type Thrown = unknown
 
 /** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link refusalKindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
  * A kind off the list is the thrower's own text, and may quote what it heard.

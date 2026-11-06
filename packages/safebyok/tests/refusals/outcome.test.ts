@@ -71,7 +71,7 @@ describe("outcomeOf", () => {
 
   it("turns a thrown string, or a rejection with nothing, into unexpected_error with a cause that is never null", async () => {
     const fromString = await outcomeOf(() => { throw 'down' })  // eslint-disable-line @typescript-eslint/only-throw-error -- a body that throws a string is what this guards against
-    expect(fromString.err?.cause).to.eq('down')
+    expect((fromString.err?.cause as Error).message).to.eq('down')
     const fromNothing = await outcomeOf(() => Promise.reject(undefined))  // eslint-disable-line @typescript-eslint/prefer-promise-reject-errors -- likewise, a rejection with nothing
     expect(fromNothing.err?.refusalkind).to.eq('unexpected_error')
     expect(fromNothing.err?.cause).to.be.instanceOf(Error)
@@ -146,7 +146,7 @@ describe("refusalOf", () => {
     const err = refusalOf(bug)
     expect(err).to.be.instanceOf(VaultError).and.to.have.property('refusalkind', 'unexpected_error')
     expect(err.cause).to.eq(bug)
-    expect(refusalOf('a bare string').cause).to.eq('a bare string')
+    expect((refusalOf('a bare string').cause as Error).message).to.eq('a bare string')
     expect(refusalOf(undefined).cause).to.be.instanceOf(Error)
   })
 

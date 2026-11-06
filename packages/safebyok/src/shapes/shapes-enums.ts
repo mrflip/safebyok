@@ -2,14 +2,14 @@
 
 // == [Records]: amVals, Am, tombstoneAmVals, damagekindVals, Damagekind
 
-/** Whether a record is alive (`a`), damaged (`d`: it failed its check, and is set aside in `damaged_records`) or gone (`x`: deleted). */
+/** Whether a record is alive (`a`), damaged (`d`: it failed its check, and is set aside in `damaged_rows`) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
 export type Am = typeof amVals[number]
 
 /** The `am` a tombstone carries: damaged or gone, never alive. */
 export const tombstoneAmVals = ['d', 'x'] as const
 
-/** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_row`, anything else that failed its check. */
+/** Why a row is in `damaged_rows`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_row`, anything else that failed its check. */
 export const damagekindVals = ['format_mismatch', 'damaged_row'] as const
 export type Damagekind = typeof damagekindVals[number]
 // --

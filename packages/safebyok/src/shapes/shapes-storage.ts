@@ -266,14 +266,14 @@ export const damagedVaultOf = (scope: VaultScope, raw: unknown): DamagedVault =>
 /** A box row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
 export const damagedBoxOf = (scope: Boxscope, vault_tok: string, raw: unknown): DamagedBox => ({ ...sentinelBoxOf(scope, vault_tok), ...peekOf(raw), vault_tok, am: 'd', damagekind: damagekindOf(raw, BoxFormat) })
 
-/** True when `raw` fails a vault row's checks, and `tombstone` over `prior` names it as `damaged_records` lists it: `am` 'd' at its revision and `vault_tok`, or their sentinels. */
+/** True when `raw` fails a vault row's checks, and `tombstone` over `prior` names it as `damaged_rows` lists it: `am` 'd' at its revision and `vault_tok`, or their sentinels. */
 export const isDamagedVaultAt = (raw: unknown, tombstone: VaultTombstone, prior: Revision): boolean => {
   if ((raw === null) || vaultRow.safeParse(raw).success) { return false }
   const listed = damagedVaultOf(tombstone, raw)
   return (listed.vault_tok === tombstone.vault_tok) && isRowAt(listed, prior)
 }
 
-/** True when `raw` fails a box row's checks, and `prior` names it as `damaged_records` lists it. */
+/** True when `raw` fails a box row's checks, and `prior` names it as `damaged_rows` lists it. */
 export const isDamagedBoxAt = (raw: unknown, tombstone: BoxTombstone, prior: Revision): boolean => (
   (raw !== null) && (! boxRow.safeParse(raw).success) && isRowAt(damagedBoxOf(tombstone, tombstone.vault_tok, raw), prior)
 )
