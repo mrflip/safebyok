@@ -1,77 +1,72 @@
 # Thread 6: port_convex (2026-11-06)
 
-Branch `20261106-port_convex`, PR (draft, see the branch), stacked on #558. Justify: **red** --
-the component and the core additions are done; the client, server, testing and their tests are
-still the old design's, and no longer typecheck against the rewritten validators. Blocked on the
-handoff's two-compaction rule, not on a question.
+Branch `20261106-port_convex`, PR #559, stacked on #558. Justify: green (safebyok 2270,
+safebyok-convex 223, e2e 208, every other package as on its base).
 
 * **Built**:
-  * `packages/safebyok-convex/package.json` -- on `safebyok` (`workspace:*` dev, `workspace:^`
-    peer), off `safebyok-old`.
-  * `src/component/validators.ts` -- each scope and record converted from the core's checker
-    (`zodToConvex`; `zodOutputToConvex` for `putOpts` and `capacity`, defaults filled); answers
-    hold rows as `v.any()`; one args object per function, shared with the host wrapper to come.
-  * `src/component/schema.ts` -- `safebyok_vaults`, `safebyok_boxes` (one row per box per life,
-    keyed by `vault_tok`), `safebyok_tallies` (per life). `user_id` leads every index.
-  * `src/component/tallies.ts` -- per-life live-box count and all-row byte weight, kept in a
-    tally row, counted afresh when none is kept; hard limits sized so one `delVault` can always
-    tombstone a life in one transaction.
-  * `src/component/vaults.ts` -- queries `listVaults`, `getVault`, `listBoxes`, `getBox`,
-    `watchRows`; mutations `putVault`, `putBox`, `delVault`, `delBox`, `tidyGone`, each mirroring
-    `memory-vault-db.ts`'s do* step for step and answering a Landing. `putBox` answers
-    `{ capacity }` instead when the life has no room.
-  * `src/refusals.ts` -- `SafebyokErrorData = { kind: 'identity_revoked' }`, no message.
-  * Core: `storageFailed(call, thrown)` (`storage_unavailable`, naming only the call and the
-    thrown name, no cause) and `identityRevoked()` in `refusals/throwers.ts`, their phrases, both
-    on the storage door with `Checker, Checkers, objCheck` and tests.
-  * `_generated/` untouched: it is generic, and needs no regeneration while the modules stay
-    under `component/` and the schema in `schema.ts`.
+  * `packages/safebyok-convex` on `safebyok` (dev `workspace:*`, peer `workspace:^`), off
+    `safebyok-old`.
+  * The component (`src/component/`): `validators.ts` converts each scope and record from the
+    core's checker (`zodToConvex`; `zodOutputToConvex` for `putOpts` and `capacity`); `schema.ts`
+    has `safebyok_vaults`, `safebyok_boxes` (a row per box per life, keyed by `vault_tok`) and
+    `safebyok_tallies` (per life), `user_id` leading every index; `tallies.ts` keeps each life's
+    live-box count and byte weight, with hard limits (8000 boxes, 7 MiB less 1 KiB) sized so one
+    `delVault` reaches a whole life in one transaction; `vaults.ts` has the queries `listVaults`,
+    `getVault`, `listBoxes`, `getBox`, `watchRows` and the mutations `putVault`, `putBox`,
+    `delVault`, `delBox`, `tidyGone`, each mirroring `memory-vault-db.ts`'s do* step for step.
+  * `src/convex-vault-db.ts`: `ConvexVaultDB extends VaultDB`, one do* per function, over a
+    `ConvexClient` or a `ConvexReactClient`. Convex errors are triaged: `identity_revoked` data
+    becomes `SX.identityRevoked()`, anything else `SX.storageFailed(call, err)`, quoting nothing.
+  * `src/server.ts`: `new SafebyokComponent(components.safebyok).api({ getUserId })`, each function
+    refusing `ConvexError({ kind: 'identity_revoked' })` unless the caller is the `user_id` named.
+  * `src/testing.ts`: the fake deployment, with a new `arrange(change)` that runs a backend change
+    in turn and pushes the watched queries it changes.
+  * Core: `storageFailed` and `identityRevoked` throwers and phrases; `safebyok/storage` exports
+    them, `Checker, Checkers, objCheck`, and the `Sidecar` and `WhisperJson` types `BoxRecord` names.
+  * Tests: the battery over a real `ConvexClient` (`tests/convex-vault-db.test.ts`) and again over a
+    `ConvexReactClient` (`e2e/tests/convex/convex-vault-db.test.ts`, hooks copied, a comment says
+    so); the wrapper's own tests; component tests of watches, tidying, tallies, caps, validators
+    and Convex's transaction limits (convex-test's `transactionLimits`).
+  * README written fresh; changeset `.changeset/20261106-port_convex.md` (both packages minor).
 
 * **Decisions taken**:
-  * Rows are stored whole as `v.any()` under their labels, so the battery's damaged plants
-    round-trip, and the component judges rows only by SX predicates (`isLiveRow`,
-    `isCheckedLiveVault`, `isLifeOver`, `boxTombstoneOf`, ...).
-  * `vault_full` travels as a `{ capacity }` answer from `putBox`, and the client throws
-    `SX.vaultFull(capacity)`; the cap is the client's `maxBoxes` (for `makeCappedVaultDB`),
-    min'd with the component's `MaxVaultBoxes`.
-  * Tallies drop at `delVault`'s tombstone sweep and go with the box rows at `tidyGone`.
+  * Rows are stored whole as `v.any()` beside their labels, so the battery's damaged plants
+    round-trip; the component judges rows only by the core's predicates.
+  * `vault_full` travels as a `{ capacity }` answer from `putBox`; the client throws
+    `SX.vaultFull`. The cap is the client's `maxBoxes`, capped at the component's limit.
+  * `watch`: the first `watchRows` answer is an unheard baseline; each later one is diffed by
+    `JSON.stringify` per row key. On a `ConvexReactClient` already watching the same rows,
+    `watchQuery` sends no first answer, so the client reads `localQueryResult()` at once.
+  * The live-record validators are typed as the core's `VaultRecord` and `BoxRecord`. Convex's
+    own copy of those types carries zod brands, which a declaration file cannot name, so the
+    build failed. For a box, the copy also recursed past TypeScript's depth (TS2589). Typed this
+    way, the casts that dodged TS2589 in the client and the tests are gone. `boxRecord` is
+    `as unknown as Validator<SX.BoxRecord, ...>`, since even the assignment check recurses.
+    Set aside: importing zod's `$brand` into each module so the emitter can name it (works only
+    with a dummy use of the import, in every module whose exports carry it, the public
+    `server.ts` included).
+  * The client keeps its sentences in its own `src/phrases.ts`; the export is the class alone
+    (no `convexVaultDB` factory); `SafebyokApi` is a mapped type over `ComponentApi`.
 
-* **What remains** (in order; a fresh agent can take it from here):
-  1. `src/convex-vault-db.ts` -- `ConvexVaultDB extends VaultDB` from `safebyok/storage`, one
-     do* per component function, `maxRecordBytes` 1 MiB. Keep the old mechanics: calls as
-     thunks (`ConvexReactClient.query` throws at once), `isConvexClient`, `isSafebyokApi` by
-     `getFunctionName(ref).endsWith(':'+fnName)`, both client flavours for watching
-     (`ConvexClient.onUpdate(ref, args, cb, onError)`; `ConvexReactClient.watchQuery().onUpdate`
-     reading `localQueryResult()`). Triage: `ConvexError` whose data `isSafebyokErrorData` with
-     `identity_revoked` -> `SX.identityRevoked()`; anything else -> `SX.storageFailed(call, err)`.
-     doWatch: first `watchRows` result is an unheard baseline; diff by key (vaultlabel;
-     vaultlabel+vault_tok+boxlabel) by `JSON.stringify`, hear `{vault}` or `{vault, box}`;
-     guard unwatch to run once (Convex unsubscribes count down per call).
-  2. `src/server.ts` -- `SafebyokComponent(component).api({ getUserId })` with
-     queryGeneric/mutationGeneric over the validators' args objects, refusing a `user_id` that
-     is not the caller's with `ConvexError({ kind: 'identity_revoked' })`.
-  3. `src/testing.ts` (FakeDeployment over convex-test: one `createTest()`, serialized calls,
-     watched queries rerun after each mutation -- keep its mechanics), `src/test.ts`,
-     `src/index.ts`; doc blocks one line, fresh.
-  4. `tests/convex-vault-db.test.ts` -- the battery: component at the root of
-     `convexTest({schema, modules})`, `api = anyApi.vaults`, plants through `backend.run`,
-     `makeTwin` a second client, `makeCappedVaultDB` passing `maxBoxes`, `_cheat_failNextCall`
-     rejecting the next call with `new Error('[Request ID: ...] Server Error')`. Close clients
-     in afterEach. Then server, refusals, testing, test and component tests.
-  5. `e2e/tests/convex/*` onto the new contract; drop `safebyok-old` from `e2e/package.json` only
-     if nothing else uses it (thread 4 edits the same file).
-  6. Changeset: safebyok-convex breaking rewrite; safebyok minor for the throwers.
+* **Deviations**:
+  * Old tests dropped, the battery covering their contract: the Bank-math sizing cases, the
+    `not_permitted` kind, `getCapacity` (gone), and e2e's Bank flows (sign-out lock, two devices,
+    opened before sign-in), which need the old Bank.
+  * `e2e/package.json` gains `safebyok` (one line, beside `safebyok-old`, which stays: other e2e
+    tests use it). Thread 4 edits the same file.
+  * Pulled forward: `Sidecar` and `WhisperJson` on `safebyok/storage`, which the build needed.
 
 * **Discoveries**:
-  * Convex field names may not start with `$` or be non-ASCII, in args and in nested stored
-    values, so a row whose sidecar keys break that rule cannot be stored.
-  * `safebyok` must be rebuilt (`pnpm --filter safebyok build`) after a core change before the
-    convex tests see it.
+  * Convex field names may not start with `$` or be non-ASCII, nested values included, so a box
+    whose sidecar has such keys cannot be stored (left as is, per the handoff).
+  * `ConvexClient.query` answers from its cache while a query is watched, so a test changes the
+    backend through `arrange`, not `as(...).run`.
+  * `tsc --noEmit` does not catch a declaration that cannot be named; only the build does
+    (`pnpm --filter safebyok-convex build`).
 
 * **For the Coach**:
-  * The battery writes several `user_id`s, so it runs against the component directly, past the
-    host wrapper's auth; the wrapper gets its own tests.
-  * `watchRows` over a bank rereads and resends every row on each change.
-  * `tidyGone` reads a whole bank in one mutation.
-  * Threads 3 and 4 add the same `Checker, Checkers, objCheck` line to the storage door at other
-    places: a merge conflict to resolve by keeping one.
+  * The battery writes as several users, so it runs against the component directly, past the
+    wrapper's auth; the wrapper has its own tests, including a refusal for another `user_id`.
+  * `watchRows` resends a whole bank on each change; `tidyGone` reads a whole bank in one mutation.
+  * Threads 3 and 4 add the same `Checker, Checkers, objCheck` line to the storage door elsewhere:
+    a merge conflict, resolved by keeping one.
