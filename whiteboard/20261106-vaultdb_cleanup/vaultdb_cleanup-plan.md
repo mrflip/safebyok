@@ -7,7 +7,10 @@
 * Sprint branch: `20261106-vaultdb_cleanup`, worktree `/workspace/byok-vaultdb_cleanup`.
 * **Status:** threads 1-6 filed: #555, #558, #561 (threads 4 and 5), #559, #560. Waiting on the
   restack into main → #555 → #558 → #561 → #559 → #560 → #554, through /restacker; thread 7
-  (storage_door) is cut from its top. A Closer Look is running.
+  (storage_door) is cut from its top. The Closer Look tab awaits the Coach's replies.
+  **On hold (the Coach, 2026-11-06): "Can you pause on the Postgres and graphql while I catch
+  up?"** Nothing on safebyok-postgres or safebyok-graphql starts (thread 8, thread 7's Postgres
+  and GraphQL parts, any flipped Postgres or GraphQL row) until the Coach lifts it.
 
 ## The Coach's request, verbatim
 
