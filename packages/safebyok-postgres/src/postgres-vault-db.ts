@@ -1,7 +1,7 @@
 /** The vaultDB over Postgres: two tables of jsonb rows, each generic call one statement or one transaction. */
 
 import * as SX from 'safebyok/storage'
-import type { Awaitable, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultDBOpts, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
+import type { Awaitable, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultDBOpts, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
 
@@ -61,37 +61,79 @@ const ListBoxesWithVaultSql = `SELECT ${VaultOfScope} AS vault, COALESCE((
 const NotifySql = 'SELECT pg_notify($1, told) FROM unnest($2::text[]) AS told'
 // --
 
-// == [Notices]: vaultChannelOf, Told, toldCheck, toldTextOf, toldOf
+// == [Notices]: vaultChannelOf, VaultPropFields, BoxPropFields, noticeTextOf, toldOf
 
 // A user_id whose channel passes 63 bytes, Postgres's longest identifier, cannot be notified: a write under it that would send a notice refuses.
 /** The channel the notices of `user_id`'s writes are sent on, which a `PostgresListen` you hand the vaultDB listens to. */
 export const vaultChannelOf = (user_id: string): string => `safebyok_${user_id}`
 
-/** What a write tells its listeners: where it landed, and the rows as stored when they fit in a notification. */
-type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
+// A vault's notice is its row as stored. A box's is one JSON array, [...vault props, ...box props], in the order of these lists:
+// the vault row without its wayins, then the box row without what the vault props already say. A box tombstone's props end at
+// whisper_schema_version, and a ciphered field is [cipher_iv_b64, ciphertext_b64].
+const VaultPropFields = ['applabel', 'user_id', 'vaultlabel', 'fmt', 'am', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'vault_tok', 'gate_epoch'] as const
+const BoxPropFields = ['boxlabel', 'am', 'fmt', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar', 'box_key_wrapped', 'whisper_ciphered'] as const
+const CipheredFields: ReadonlySet<string> = new Set(['box_key_wrapped', 'whisper_ciphered'])
 
 // Postgres refuses a notification of 8000 bytes or more.
 const NoticeMaxBytes = 7999
 
-const toldCheck = SX.objCheck(({ applabel, user_id, vaultlabel, str, obj, unk }) => ({
-  applabel, user_id, vaultlabel,
-  vault_tok: str.optional(),
-  boxlabel:  str.optional(),
-  heard:     obj({ vault: unk, box: unk.optional() }).optional(),
+/** What a notice tells its listeners: where the write landed, and the rows as stored when they fit in a notification. */
+type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
+
+const toldWhere = SX.objCheck(({ applabel, user_id, vaultlabel, str }) => ({
+  applabel, user_id, vaultlabel, vault_tok: str.optional(), boxlabel: str.optional(),
 }), { refusalkind: 'bad_record', extras: 'strip' })
 
-/** The notification text of `told`: without its rows when they will not fit, which a listener then reads afresh. */
-const toldTextOf = (told: Told): string => {
-  const text = JSON.stringify(told)
+/** The notification text for `vault`, or for `box` under it, as {@link toldOf} reads it back. */
+const noticeTextOf = (vault: VaultRow, box?: BoxRow): string => {
+  const text = JSON.stringify((box === undefined) ? vault : [...vaultPropsOf(vault), ...boxPropsOf(box)])
   if (new TextEncoder().encode(text).length <= NoticeMaxBytes) { return text }
-  return JSON.stringify({ ...told, heard: undefined })
+  return JSON.stringify((box === undefined) ? vaultPropsOf(vault) : [...vaultPropsOf(vault), box.boxlabel])
 }
 
-/** The {@link Told} in a notification's text, or null for text no write of ours sent. */
+/** The {@link Told} in a notification's text, read as {@link noticeTextOf} writes it, or null for text no write of ours sent. */
 const toldOf = (text: string): Told | null => {
+  const sent = jsonOrNull(text)
+  if (! Array.isArray(sent)) {
+    const where = toldWhere.safeParse(sent)
+    return where.success ? { ...scopeOf(where.data), heard: { vault: sent } } : null
+  }
+  const props: unknown[] = sent
+  const boxProps = props.slice(VaultPropFields.length)
+  const where = toldWhere.safeParse({ ...fieldsOf(VaultPropFields, props), boxlabel: boxProps[0] })
+  if (! where.success) { return null }
+  if (boxProps.length <= 1) { return where.data }
+  const box = { ...scopeOf(where.data), vault_tok: where.data.vault_tok, ...fieldsOf(BoxPropFields, boxProps) }
+  return { ...where.data, heard: { box } }
+}
+
+const vaultPropsOf = (vault: VaultRow): unknown[] => {
+  const fields: Record<string, unknown> = { ...vault, gate_epoch: (vault.am === 'a') ? vault.gate.gate_epoch : null }
+  return VaultPropFields.map((field) => fields[field])
+}
+
+const boxPropsOf = (box: BoxRow): unknown[] => {
+  const fields: Record<string, unknown> = box
+  return BoxPropFields.filter((field) => fields[field] !== undefined).map((field) => {
+    if (! CipheredFields.has(field)) { return fields[field] }
+    const { cipher_iv_b64, ciphertext_b64 } = fields[field] as BoxRecord['whisper_ciphered']
+    return [cipher_iv_b64, ciphertext_b64]
+  })
+}
+
+/** The fields `props` hold, named in the order of `fieldnames`, a ciphered field's pair made whole again. */
+const fieldsOf = (fieldnames: readonly string[], props: unknown[]): Record<string, unknown> => (
+  Object.fromEntries(props.slice(0, fieldnames.length).map((prop, idx) => {
+    const field = fieldnames[idx] ?? ''
+    if (! (CipheredFields.has(field) && Array.isArray(prop))) { return [field, prop] }
+    const [cipher_iv_b64, ciphertext_b64] = prop as unknown[]
+    return [field, { cipher_iv_b64, ciphertext_b64 }]
+  }))
+)
+
+const jsonOrNull = (text: string): unknown => {
   try {
-    const parsed = toldCheck.safeParse(JSON.parse(text))
-    return parsed.success ? parsed.data : null
+    return JSON.parse(text)
   } catch { return null }
 }
 
@@ -195,7 +237,7 @@ export class PostgresVaultDB extends SX.VaultDB {
       const ante = await lockedVaultRowOf(tx, record)
       if (! isPutAllowed(ante, opts)) { return { landed: false, ante } }
       if (! await storeVaultRow(tx, record, ante)) { return { landed: false, ante: await vaultRowOf(tx, record) } }
-      await notify(tx, record, [{ ...scopeOf(record), heard: { vault: record } }])
+      await notify(tx, record, [noticeTextOf(record)])
       return { landed: true, ante }
     })
   }
@@ -208,7 +250,7 @@ export class PostgresVaultDB extends SX.VaultDB {
       if (landed) {
         await this.#demandRoom(tx, record, ante)
         await storeBoxRow(tx, record, record.boxlabel, record)
-        await notify(tx, record, [boxToldOf(record, record.boxlabel, { vault, box: record })])
+        await notify(tx, record, [noticeTextOf(vault as VaultRecord, record)])  // isCheckedLiveVault has checked it
       }
       return { landed, ante, vault }
     })
@@ -223,16 +265,18 @@ export class PostgresVaultDB extends SX.VaultDB {
       // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
       if ((! landed) && (isOurs || isDamaged)) { return { landed, ante } }
       if (landed) { await storeVaultRow(tx, tombstone, ante) }
-      const vault = landed ? tombstone : ante
-      const told: Told[] = landed ? [{ ...scopeOf(tombstone), heard: { vault } }] : []
+      // Past the stop above, a row that is not ours is a tombstone, another life's row, or none; only a tombstone of this life tells its boxes.
+      const vault = landed ? tombstone : ante as VaultRow | null
+      const world = (vault?.vault_tok === tombstone.vault_tok) ? vault : null
+      const texts = landed ? [noticeTextOf(tombstone)] : []
       const boxes = await boxesOfLife(tx, tombstone, tombstone.vault_tok)
       for (const { boxlabel, box } of boxes) {
         const boxTombstone = SX.boxTombstoneOf(box, tombstone.written_at)
         if (boxTombstone === null) { continue }
         await storeBoxRow(tx, tombstone, boxlabel, boxTombstone)
-        told.push(boxToldOf(tombstone, boxlabel, { vault, box: boxTombstone }))
+        if (world !== null) { texts.push(noticeTextOf(world, boxTombstone)) }
       }
-      await notify(tx, tombstone, told)
+      await notify(tx, tombstone, texts)
       return { landed, ante }
     })
   }
@@ -245,7 +289,7 @@ export class PostgresVaultDB extends SX.VaultDB {
       const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
       if (landed) {
         await storeBoxRow(tx, tombstone, tombstone.boxlabel, tombstone)
-        await notify(tx, tombstone, [boxToldOf(tombstone, tombstone.boxlabel, { vault, box: tombstone })])
+        await notify(tx, tombstone, [noticeTextOf(vault as VaultRecord, tombstone)])  // isCheckedLiveVault has checked it
       }
       return { landed, ante, vault }
     })
@@ -328,7 +372,7 @@ const unlistenOnceListening = async (listening: Promise<(() => unknown) | null>)
 }
 // --
 
-// == [Rows in a transaction]: rowsFrom, scopeOf, boxToldOf, vaultRowOf, lockedVaultRowOf, storeVaultRow, boxRowOf, boxesOfLife, storeBoxRow, notify
+// == [Rows in a transaction]: rowsFrom, scopeOf, vaultRowOf, lockedVaultRowOf, storeVaultRow, boxRowOf, boxesOfLife, storeBoxRow, notify
 
 const rowsFrom = async (queryable: PostgresQueryable, text: string, params: unknown[]): Promise<unknown[]> => {
   const { rows } = await queryable.query(text, params)
@@ -336,10 +380,6 @@ const rowsFrom = async (queryable: PostgresQueryable, text: string, params: unkn
 }
 
 const scopeOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScope => ({ applabel, user_id, vaultlabel })
-
-const boxToldOf = (where: VaultScope & { vault_tok: string }, boxlabel: string, heard: Heard): Told => (
-  { ...scopeOf(where), vault_tok: where.vault_tok, boxlabel, heard }
-)
 
 const vaultRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel }: VaultScope): Promise<unknown> => (
   firstOf(await rowsFrom(tx, GetVaultSql, [applabel, user_id, vaultlabel]), 'vault')
@@ -371,8 +411,8 @@ const storeBoxRow = async (tx: PostgresQueryable, { applabel, user_id, vaultlabe
 }
 
 // Notifications sent in a transaction go out when it commits, and not at all when it rolls back.
-const notify = async (tx: PostgresQueryable, { user_id }: BankScope, told: Told[]): Promise<void> => {
-  if (told.length === 0) { return }
-  await tx.query(NotifySql, [vaultChannelOf(user_id), told.map((each) => toldTextOf(each))])
+const notify = async (tx: PostgresQueryable, { user_id }: BankScope, texts: string[]): Promise<void> => {
+  if (texts.length === 0) { return }
+  await tx.query(NotifySql, [vaultChannelOf(user_id), texts])
 }
 // --

@@ -50,7 +50,7 @@ const answers = SX.Checkers('record_conflict', ({ obj, arr, str, unk, bool, uint
   const landing      = obj({ landed: bool, ante: unk })
   const boxLanding   = obj({ landed: bool, ante: unk, vault: unk })
   const tidied       = obj({ totalCount: uint })
-  const heard        = obj({ vault: unk, box: unk.optional() })
+  const heard        = obj({ vault: unk.optional(), box: unk.optional() })
   return { rowsOfVault, boxesFetched, boxFetched, landing, boxLanding, tidied, heard }
 })
 

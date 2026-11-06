@@ -42,34 +42,38 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   _cheat_failNextCall?: (vaultDB: DBT) => Awaitable<void>
   /** False for a store whose watch hears nothing; its cases are then skipped. */
   watches?: boolean
+  /** False for a store whose box notices come without their vault row, which a watch then hears with a null world. */
+  boxNoticesCarryVault?: boolean
 }
 // --
 
 /** The check of what a store hands the battery: each hook a function, judged by its interface alone. */
 const batteryOpts = objCheck(({ fn, bool }) => ({
-  makeVaultDB:         fn<VaultDBBatteryOpts['makeVaultDB']>(),
-  _cheat_rowsOf:       fn<VaultDBBatteryOpts['_cheat_rowsOf']>(),
-  makeTwin:            fn<NonNullable<VaultDBBatteryOpts['makeTwin']>>().optional(),
-  makeCappedVaultDB:   fn<NonNullable<VaultDBBatteryOpts['makeCappedVaultDB']>>().optional(),
-  _cheat_failNextCall: fn<NonNullable<VaultDBBatteryOpts['_cheat_failNextCall']>>().optional(),
-  watches:             bool.optional(),
+  makeVaultDB:          fn<VaultDBBatteryOpts['makeVaultDB']>(),
+  _cheat_rowsOf:        fn<VaultDBBatteryOpts['_cheat_rowsOf']>(),
+  makeTwin:             fn<NonNullable<VaultDBBatteryOpts['makeTwin']>>().optional(),
+  makeCappedVaultDB:    fn<NonNullable<VaultDBBatteryOpts['makeCappedVaultDB']>>().optional(),
+  _cheat_failNextCall:  fn<NonNullable<VaultDBBatteryOpts['_cheat_failNextCall']>>().optional(),
+  watches:              bool.optional(),
+  boxNoticesCarryVault: bool.optional(),
 }), 'bad_option')
 
 // == [The world the cases share]: BatteryWorld, worldOf
 
 /** What each part of the battery is handed: stores made fresh, and the hooks, over any store the world made. */
 export type BatteryWorld = {
-  fresh:         (opts?: VaultDBOpts) => Promise<VaultDB>
-  storeWith:     (opts?: { box?: boolean }) => Promise<{ vaultDB: VaultDB, vault: ReturnType<typeof vaultAt>, box: ReturnType<typeof boxAt> }>
-  rowsOf:        (vaultDB: VaultDB) => VaultDBRowCheats
-  twinOf:        (vaultDB: VaultDB) => Promise<VaultDB>
+  fresh:                (opts?: VaultDBOpts) => Promise<VaultDB>
+  storeWith:            (opts?: { box?: boolean }) => Promise<{ vaultDB: VaultDB, vault: ReturnType<typeof vaultAt>, box: ReturnType<typeof boxAt> }>
+  rowsOf:               (vaultDB: VaultDB) => VaultDBRowCheats
+  twinOf:               (vaultDB: VaultDB) => Promise<VaultDB>
   /** Whether the store gave {@link VaultDBBatteryOpts.makeCappedVaultDB}; without it, `makeCapped` throws. */
-  hasCap:        boolean
-  makeCapped:    (maxBoxes: number) => Promise<VaultDB>
+  hasCap:               boolean
+  makeCapped:           (maxBoxes: number) => Promise<VaultDB>
   /** Whether the store gave {@link VaultDBBatteryOpts._cheat_failNextCall}; without it, `failNextCall` throws. */
-  canFail:       boolean
-  failNextCall:  (vaultDB: VaultDB) => Promise<void>
-  watches:       boolean
+  canFail:              boolean
+  failNextCall:         (vaultDB: VaultDB) => Promise<void>
+  watches:              boolean
+  boxNoticesCarryVault: boolean
 }
 
 /** Stands in for a hook the store did not give, in a case that is skipped without it. */
@@ -77,7 +81,7 @@ const notGiven = (hookname: string) => (): never => { throw new TypeError(`The s
 
 // Every store a world's hooks are handed is one its own factories made, so the narrowing to DBT holds.
 const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
-  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, _cheat_failNextCall, watches = true } = opts
+  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, _cheat_failNextCall, watches = true, boxNoticesCarryVault = true } = opts
   const fresh = async (dbOpts?: VaultDBOpts): Promise<VaultDB> => await makeVaultDB(dbOpts)
   const storeWith = async ({ box: withBox = false } = {}) => {
     const vaultDB = await fresh()
@@ -97,6 +101,7 @@ const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWor
     canFail:      _cheat_failNextCall !== undefined,
     failNextCall: _cheat_failNextCall ? async (vaultDB) => { await _cheat_failNextCall(vaultDB as DBT) } : notGiven('_cheat_failNextCall'),
     watches,
+    boxNoticesCarryVault,
   }
 }
 // --

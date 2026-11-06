@@ -100,10 +100,11 @@ const makeVaultDB = async (opts: SX.VaultDBOpts = {}, maxBoxes?: number): Promis
 // --
 
 TH.describeVaultDBBattery("the README's Yoga recipe", {
-  makeVaultDB:       async (opts) => await makeVaultDB(opts),
-  makeCappedVaultDB: async (maxBoxes) => await makeVaultDB({}, maxBoxes),
-  makeTwin:          (vaultDB) => browserFor(routes.get(vaultDB)!, signedInAsAsked),
-  _cheat_rowsOf:     () => TH.rowsOf(),
+  makeVaultDB:          async (opts) => await makeVaultDB(opts),
+  makeCappedVaultDB:    async (maxBoxes) => await makeVaultDB({}, maxBoxes),
+  makeTwin:             (vaultDB) => browserFor(routes.get(vaultDB)!, signedInAsAsked),
+  _cheat_rowsOf:        () => TH.rowsOf(),
+  boxNoticesCarryVault: false,
 })
 
 describe("the README's Yoga recipe", () => {

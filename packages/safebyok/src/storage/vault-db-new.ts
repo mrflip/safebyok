@@ -30,8 +30,8 @@ export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_ro
 export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 export type Tidied      = { totalCount: number }
 
-/** A row that changed, as a watch hears it. Nothing may count on hearing one. */
-export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: VaultRow }
+/** A row that changed, as a watch hears it, with its vault row where the store sent one. Nothing may count on hearing one. */
+export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: VaultRow | null }
 
 const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<GoodAnswer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
   const outcome = await outcomeOf(thunk)
@@ -54,7 +54,8 @@ export type RowOfVault = { vaultlabel: string, vault: unknown }
 export type RowOfBox   = { boxlabel: string, box: unknown }
 export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
 export type BoxFetched   = { vault: unknown, box: unknown }
-export type Heard = { vault: unknown, box?: unknown }
+// A box's notice may come without its vault row: the vault changes slowly, and arrives in its own notices.
+export type Heard = { vault?: unknown, box?: unknown }
 
 /** A VaultDB's generic calls, for a server to carry to a VaultDB in a browser: each checks what it is handed, as its verb does. */
 export type VaultDBRelay = {
@@ -363,14 +364,14 @@ export abstract class VaultDB {
   /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. Nothing may count on a notice arriving. */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
     return this.doWatch(SX.watchScope.parse(scope), ({ vault, box }) => {
-      const world = SX.vaultRow.safeParse(vault)
-      if (! world.success) { return }
+      const world = (vault === undefined) ? null : SX.vaultRow.safeParse(vault)
+      if ((world !== null) && (! world.success)) { return }
       if (box === undefined) {
-        onNotice({ act: (world.data.am === 'x') ? 'gone' : 'got', val: world.data, world: world.data })
+        if (world !== null) { onNotice({ act: (world.data.am === 'x') ? 'gone' : 'got', val: world.data, world: world.data }) }
         return
       }
       const val = SX.boxRow.safeParse(box)
-      if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gone' : 'got', val: val.data, world: world.data }) }
+      if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gone' : 'got', val: val.data, world: world?.data ?? null }) }
     })
   }
   // --
