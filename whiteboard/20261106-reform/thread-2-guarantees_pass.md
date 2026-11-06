@@ -1,6 +1,6 @@
 # Thread 2: the guarantees pass for G8's stale names (2026-11-06)
 
-Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/pull/517), off `main` 57f33ee9. Justify: green (safebyok 1827, safebyok-old 3537 + 37 skipped, react 326, scripts 302, every package; lint, types, build, size).
+Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/pull/517), off `main` 57f33ee9. Justify: green after review (safebyok 1827, safebyok-old 3537 + 37 skipped, react 326, scripts 302, every package; lint, types, build, size).
 
 * **Built**: `notes/guarantees.md`, names and paths only, every guarantee G1-G10, the table, the
   host-function paragraph, *Bytes*, the secret values and the access points, checked against
@@ -15,7 +15,7 @@ Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/
     `sealLeaseRecord` to `Lease.buildGranted`, `Lease.cipheredWith` / `decipherWith` / `#vaultKeyOrNull` /
     `#openedOrNull` to `sealWith` / `unsealWith` / `#vaultKey` / `#opened`, `deviceTrouble` to `storeFailed`,
     `idbDeviceDB.putLease` and `DeviceDB.putLease` to `DeviceDB.cache`, `isLeaseKey` to `shapes-gateish.ts`,
-    `current === next` to `antePassphraseClear === nextPassphraseClear`, `vault.tryCheckStrength` (G9) to
+    `vault.tryCheckStrength` (G9) to
     `Proving.checkStrength` and `invokeStrengthChecker`, and the tests to `tests/models/`,
     `tests/storage/`). A name with no counterpart doing the same stays verbatim and becomes a finding.
   - *The table's old-core rows* (proving, lease, gating, box) point at `packages/safebyok-old/src/`,
@@ -23,9 +23,8 @@ Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/
   - *Old-core clauses beside a models twin* (G1, G2, G6, the passkey chain) stay verbatim: renaming them
     to the core's names would make them false where the twin already says what the core does (G2's
     zeroing). They are finding F1.
-  - *G8's WebCrypto sentence and its `refusalOf` tail, and the two `isSafelyAllZero` edits,* are #511's,
-    verbatim, so that #511's restack meets identical text. The passkey chain's `isSafelyAllZero` sits in
-    an old-core sentence (F1); kept for the restack all the same.
+  - *G8's WebCrypto sentence and the passkey chain's zero check* are #511's, verbatim, so that #511's
+    restack meets identical text (corrected in both after review; see below).
   - *Set aside*: rewriting the passphrase, whisper and leaseKey access chains from the core's code. That
     is new text, not a name; the gloss forbids it here. Recommended as a follow-up (F1).
 * **Deviations**: none from the gloss. `storeFailed` is fenced (ground rule 3), and is cited as it stands.
@@ -42,3 +41,23 @@ Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/
   "Both go by the host's clock" sentence. No guarantee cites `parseLogger`.
 * **For the Coach**: findings F1-F11, each with a recommendation, in
   [thread-2-findings.md](thread-2-findings.md).
+* **After review** (the reviewer's comment on #517, the orchestrator's calls), one commit each:
+  - #511 `ac7ecf8e9`: G8's route sentence says what the code does. A grant or a wayin runs inside the
+    gating's `outcomeOf`; a seal's WebCrypto error reaches the host thrown from `putBox`, `box.put` and
+    `putExposed`, and an `unexpected_error` only from their `try*` forms. The passkey chain's zero check is
+    `passkeyAnswer`'s inline `reduce`, not `isSafelyAllZero` (private to `models/proving.ts`, passphraseKey
+    bytes only). #511's changeset tells a host `putBox` can throw a DOMException as it came.
+  - `360725479` carries those two sentences here word for word.
+  - `06bafa49a` (F4) G8 names `outcomeOf`, the catch ending each Lease and Box `try*` form, for `refusalOf`.
+  - `d017f7fe8` (F6) G9: the entry points export neither `Lease` nor `Proving`.
+  - `418a31be2` (F7) open item 2: "not yet exported" struck.
+  - `a66efc475` (F10) the ctx row: "for a wayin its `format`" dropped.
+  - `794ff5481` G2 cites `tests/wayin.test.ts` as written again: the pass's swap to
+    `tests/models/wayin.test.ts` named a file testing none of G2. Finding F12. F11 records the correction.
+  - `62f1874eb` (minor) G1's old-core sentence keeps `current === next` in `change_passphrase` verbatim; the
+    pass had half renamed it. Still true of `packages/safebyok-old/src/gating.ts:370`.
+  - `52bb27626` findings: F1 gains `Lease.cipheredWith`, `grantLease` (twice), `DeviceDB.getLease`, G1's
+    comparison and the *Bytes* IndexedDB bullet; F2 names `guardStrengthChecker` among the old core's guards.
+  - Read as the thread's rule, not the handoff's letter: G2's line restores the old citation verbatim and
+    the findings file says it is a finding; no marker was written into `notes/guarantees.md`, as no other
+    finding has one.
