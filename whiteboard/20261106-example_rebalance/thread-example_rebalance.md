@@ -1,5 +1,5 @@
 # Thread: example rebalance (2026-11-06)
-# Thread: example rebalance (2026-11-06)
+
 Branch `20261106-example_rebalance`, PR #514, off `origin/main` at 57f33ee9, hand-spawned (no sprint). Justify: green;
 safebyok 61 files, 1834 tests.
 
