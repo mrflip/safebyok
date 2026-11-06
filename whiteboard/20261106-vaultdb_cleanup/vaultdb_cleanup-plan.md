@@ -244,6 +244,14 @@ fallback; rows on a public NOTIFY channel (→ a TOP Open Matters row); copied i
 isHeardIn (→ export after the ports); opts type; documentarian work. Pushed at b72a514b6 without
 file-thread (graphql red until thread 5 joins).
 
+*Rework (thread 4, on the Coach's channel and payload rulings):* a channel per user,
+`vaultChannelOf(user_id)` = `safebyok_` + user_id (a user_id past 54 characters fails, tested);
+the README recipe never UNLISTENs; box notices `[...vault props, ...box props]`, a vault notice its
+row; `Notice.world` may be null, the listing's one guard. Review `medium`, fixed: the recipe left a
+user deaf after a failed LISTEN; a test that missed the adapter; titles. Left: `vaultChannelOf`
+unchecked, the too-long refusal kind (→ Open Matters); `mash(email)` user_ids cannot write (TOP);
+the batched boxes notice unbuilt; e2e LISTEN timing; doc blocks. Filed at 1b1a203bd.
+
 ### 5. port_graphql
 
 > port the other adapters. Do not adopt their doc strings, which are rich in slop.
