@@ -169,7 +169,7 @@ export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 
 // == [Key deriver and logger]: keyDeriverShape, loggerShape
 
-/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads. Bank.make keeps what it was handed, prototype and all. */
+/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads. */
 export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
   algorithm:         str.optional(),
   key_deriver_label,
