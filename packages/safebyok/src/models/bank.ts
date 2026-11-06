@@ -267,7 +267,7 @@ export class Bank implements VaultWorld {
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
     const prior = this.#snapshot
-    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.device_id === prior.device_id) && (next.vaults === prior.vaults)) { return }
+    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.vaults === prior.vaults)) { return }
     this.#snapshot = next
     for (const listener of this.#listeners) {
       try {
