@@ -1,4 +1,6 @@
 import { anyApi, defineSchema } from 'convex/server'
+import type { FunctionReference } from 'convex/server'
+import type { PutOptsGiven } from 'safebyok/storage'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import type { ComponentRegistration } from 'convex-test'
@@ -15,6 +17,10 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 
 /** The component's functions at the root, as a client calls them: no host wrapper, no auth. */
 export const rootApi = anyApi['vaults'] as unknown as SafebyokApi
+
+// Convex's copy of a sidecar's type recurses past TypeScript's depth, so a test passes a box record as the core checked it.
+/** A putBox function's reference, taking any box record. */
+export const loosePutBox = (putBox: unknown) => putBox as FunctionReference<'mutation', 'public', { record: unknown, opts: PutOptsGiven, maxBoxes?: number }>
 
 /** A fresh in-memory backend holding only the component, its functions at the root, held to Convex's transaction limits if asked. */
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
