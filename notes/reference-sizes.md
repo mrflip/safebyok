@@ -283,37 +283,57 @@ The rates are the Professional plan's overage prices: $2 per million calls and $
 
 ## The Coach's Postgres payload shapes
 
-Each box below has the Coach's sidecar and the labels used earlier. *Plain* is the box row alone as JSON, with no
-vault row as `world`. *Values* is the box row's values as a JSON array in its field order, keys dropped, with each
-ciphered field as `[iv, ciphertext]` and the sidecar as its JSON. *Sparse* is
-`[applabel, user_id, vaultlabel, vault_tok, vault_epoch, boxlabel, revision_seq, revision_tok, written_at]`.
+These are the notice shapes as built: safebyok-postgres at `byok-port_postgres` 229ae95d4, `VaultPropFields`,
+`BoxPropFields` and `noticeTextOf`. The encoder is not exported, so `sizes.test.ts` copies it line for line and runs
+it on real sealed rows.
 
-Today's records have no `vault_epoch` (the gate has `gate_epoch`), so the integer 2 stands in. The listings share one
-vault:
-* *Listing* is `{applabel, user_id, vaultlabel, vault_tok, vault_epoch, boxes}`. Each box row in it drops the four
-  scope fields the envelope carries.
-* *Listing tuple* is the same envelope as an array, with each box as its values array.
-* *Sparse listing* is the envelope with `boxes: [[boxlabel, revision_seq, revision_tok, written_at], …]`. The Coach
-  left that array unnamed; JSON needs a key.
+* **A vault notice** is the vault row as stored, a JSON object.
+* **A box notice** is one JSON array, `[...vault props, ...box props]`.
+  * The vault props are `applabel, user_id, vaultlabel, fmt, am, revision_tok, revision_seq, registered_at,
+    written_at, vault_tok, gate_epoch`, with `gate_epoch` null for a tombstone. That is the Coach's sparse vault
+    (`vault_tok`, `revision_seq`, `revision_tok`, `gate_epoch`) plus the scope, `fmt`, `am` and the two times.
+  * The box props are `boxlabel, am, fmt, revision_tok, revision_seq, registered_at, written_at, box_tok,
+    whisper_codec, whisper_schema_version, sidecar, box_key_wrapped, whisper_ciphered`. Each ciphered field goes as
+    `[iv, ciphertext]`, and a tombstone's array ends at `whisper_schema_version`.
+* **Over 7,999 bytes**, a vault notice goes as `[...vault props]`, a box notice as `[...vault props, boxlabel]`, and the
+  listener re-reads.
 
-| Box (sidecar)        | Plain      | Values     | Sparse | Source   |
-| -------------------- | ---------- | ---------- | ------ | -------- |
-| mini (2)             | 781        | 490        | 116    | Measured |
-| medium (150)         | 1,087      | 796        | 274    | Measured |
-| large (1,000)        | 4,740      | 4,449      | 274    | Measured |
-| large-4096 (1,000)   | 7,329      | 7,038      | 274    | Measured |
-| xl (4,000)           | **18,000** | **17,709** | 274    | Measured |
+| Box (sidecar)      | Box row | Built notice | Sent        | Today's notice, passphrase and passkey vault | Source   |
+| ------------------ | ------- | ------------ | ----------- | -------------------------------------------- | -------- |
+| mini (2)           | 781     | 570          | whole       | 1,914                                        | Measured |
+| medium (150)       | 1,087   | 876          | whole       | 2,508                                        | Measured |
+| large (1,000)      | 4,740   | 4,529        | whole       | 6,161                                        | Measured |
+| large-4096 (1,000) | 7,329   | 7,118        | whole       | **8,750: header**                            | Measured |
+| xl (4,000)         | 18,000  | **17,789**   | 297, header | **19,421: header**                           | Measured |
 
-Bold is over pg_notify's 7,999. Sent without the vault row, a large-4096 box fits; today's notice for one does not.
+* A built box notice is its box row less 211 bytes, at any label length. The keys it drops outweigh the vault props it
+  adds. So it stays whole up to a box row of 8,210 bytes, where today's notice stops near 6,600.
+* The header fallback is 139 bytes at minimum labels and 297 at 75%. A box tombstone's notice is 268 or 426.
+* A vault notice is 669 to 1,237 bytes (passphrase, and passphrase and passkey, up to maximum labels). Its tombstone
+  is 286 to 423. Every vault notice is sent whole.
 
-| Listing shape  | Envelope, mini / others | Bytes per box: mini / medium / large / large-4096 / xl | Boxes in 7,200 B: same order | Boxes in 128 KiB: same order | Source   |
-| -------------- | ----------------------- | ------------------------------------------------------ | ---------------------------- | ---------------------------- | -------- |
-| Listing        | 127 / 257               | 683 / 859 / 4,512 / 7,101 / 17,772                     | 10 / 8 / 1 / 0 / 0           | 172 / 137 / 26 / 16 / 6      | Measured |
-| Listing tuple  | 59 / 189                | 438 / 614 / 4,267 / 6,856 / 17,527                     | 16 / 11 / 1 / 1 / 0          | 269 / 191 / 27 / 17 / 6      | Measured |
-| Sparse listing | 127 / 257               | 62 / 90 / 90 / 90 / 90                                 | 114 / 77 / 77 / 77 / 77      | 1,900 / 1,307 / 1,307 / 1,307 / 1,307 | Measured |
+The batched boxes shape, `[...vault props, [[...box props], …]]`, was specified but not built.
 
-The envelope's size depends on the label lengths: minimum labels for mini, 75% for the others. A sparse listing's
-size depends only on the length of the boxlabel.
+| Batched boxes | Envelope, mini / others | Bytes per box: mini / medium / large / large-4096 / xl | Boxes in 7,200 B | Boxes in 128 KiB | Source   |
+| ------------- | ----------------------- | ------------------------------------------------------ | ---------------- | ---------------- | -------- |
+| as specified  | 137 / 267               | 438 / 614 / 4,267 / 6,856 / 17,527                     | 16 / 11 / 1 / 1 / 0 | 269 / 191 / 27 / 17 / 6 | Computed |
+
+The xl variants have medium's labels and keep xl's 4,000-byte sidecar bag, with the certificates added to it.
+* **xl (a)**: the whisper holds only the RSA-4096 private key. The leaf, issuing and root certificates move to the sidecar.
+* **xl (b)**: as (a), but the root certificate is dropped. A SHA-256 fingerprint of it, 64 hex characters, goes in
+  the whisper as a pointer.
+* **xl (c)**: as (b), but the issuing certificate in the sidecar is replaced by its SHA-256 fingerprint.
+
+| Box    | Whisper JSON | Sidecar JSON | Box row: under 16 KiB? | Built notice: under 7,999? | Source   |
+| ------ | ------------ | ------------ | ---------------------- | -------------------------- | -------- |
+| xl     | 9,921        | 4,000        | 18,000: no             | 17,789: no, header         | Measured |
+| xl (a) | 3,342        | 10,579       | 15,807: yes            | 15,596: no, header         | Measured |
+| xl (b) | 3,421        | 8,583        | 13,916: yes            | 13,705: no, header         | Measured |
+| xl (c) | 3,421        | 6,496        | 11,829: yes            | 11,618: no, header         | Measured |
+
+A certificate moved from the whisper to the sidecar saves about a third of its size: the sidecar is stored as plain
+JSON, while the whisper is sealed and base64-encoded. No xl variant carries its rows in a notice. That needs a box row
+of 8,210 bytes or less, about 3,600 bytes less than (c).
 
 ## How far to trust these
 
