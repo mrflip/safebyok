@@ -215,7 +215,7 @@ describe("bank.ensureVault", () => {
     ['capitals',                      "Device_One"],
     ['an empty string',               ""],
     ['more than 40 characters',       `d${'a'.repeat(40)}`],
-  ])("refuses at Bank.make a device_id with %s, as a device_id must be a label", (_what, device_id) => {
+  ])("refuses at Bank.make a device_id with %s", (_what, device_id) => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }), 'bad_option')
   })
 
