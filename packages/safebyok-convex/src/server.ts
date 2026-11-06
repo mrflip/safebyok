@@ -72,7 +72,7 @@ export class SafebyokComponent {
       getVault: publicQuery({
         args:    CVX.getVaultArgs,
         returns: v.any(),
-        handler: async (ctx, args): Promise<unknown> => {
+        handler: async (ctx, args) => {
           await demandCaller(ctx, args.scope.user_id)
           return await ctx.runQuery(vaults.getVault, args)
         },

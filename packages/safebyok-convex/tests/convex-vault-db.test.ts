@@ -1,27 +1,23 @@
-// The loops below over `ClientCases` have copies in `e2e/tests/convex/convex-vault-db.test.ts`, which
-// run over `ConvexReactClient` (this package lists no framework): a change to a looped test is
-// made in both.
+/** ConvexVaultDB: the battery every VaultDB runs, over a real ConvexClient, and the triage and options of its own. */
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { anyApi } from 'convex/server'
-import { ConvexError } from 'convex/values'
-import { Bank, VaultError, memoryDeviceDB } from 'safebyok-old'
-import type { Outcome } from 'safebyok-old'
+import type { ConvexClient } from 'convex/browser'
+import type { Boxscope, VaultScope } from 'safebyok/storage'
 import * as TH from './test-helpers'
-import { convexVaultDB } from '../src/index'
-import { MaxVaultBoxes } from '../src/component/tallies'
-import type { ConvexVaultClient, SafebyokApi } from '../src/index'
-import type { GetUserId, SafebyokErrorData } from '../src/server'
+import { ConvexVaultDB } from '../src/index'
+import type { ConvexVaultDBOpts } from '../src/index'
 import { fakeDeployment } from '../src/testing'
-import type { FakeDeployment } from '../src/testing'
+import type { FakeDeployment, FakeHost } from '../src/testing'
 
-type Deployment = FakeDeployment<ReturnType<typeof TH.hostWith>>
+type ComponentDeployment = FakeDeployment<ReturnType<typeof TH.componentHost>>
+type ComponentBackend = ReturnType<ComponentDeployment['as']>
 
 // Every deployment a test makes is closed after it, so no client keeps its socket's timers alive.
-const deployments: Deployment[] = []
-// These tests refuse mutations on purpose, and a client logs each as an error: a spy catches them, so
-// the output stays clean.
-const deploy = (getUserId: GetUserId = TH.bySubject) => {
-  const deployment = fakeDeployment(TH.hostWith(getUserId), { logger: TH.spyLogger().logger })
+// The battery refuses mutations on purpose, and a client logs each as an error: a spy keeps the output clean.
+const deployments: FakeDeployment<FakeHost>[] = []
+const deploy = <Host extends FakeHost>(host: Host): FakeDeployment<Host> => {
+  const deployment = fakeDeployment(host, { logger: TH.spyLogger().logger })
   deployments.push(deployment)
   return deployment
 }
@@ -29,479 +25,116 @@ afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
 })
 
-/**
- * The clients convexVaultDB accepts that need no framework, each connected to `deployment` and
- * signed in as `subject`. `ConvexReactClient` is run in `e2e/`, which holds React.
- */
-const ClientCases: [string, (deployment: Deployment, subject: string | null) => ConvexVaultClient][] = [
-  ['ConvexClient', (deployment, subject) => deployment.client(subject)],
-]
+// The battery writes as several users, so its vaults reach the component directly, past the host's wrapper.
+const madeOn = new WeakMap<ConvexVaultDB, { deployment: ComponentDeployment, client: ConvexClient, opts: VaultDBOnOpts }>()
 
-/**
- * Devices over a fresh deployment, each with clients of its own whose queries and mutations pass
- * the race's turnstile. The fake deployment runs one call at a time, as Convex's serializable
- * transactions let a mutation behave; its limit is its own, so `maxBoxes` asks nothing of it.
- */
-const devicesOver = (connect: (deployment: Deployment, subject: string | null) => ConvexVaultClient): TH.MakeVaultDBDevices => (turnstile) => {
-  const deployment = deploy()
-  return () => TH.perUser((user_id) => convexVaultDB({ client: TH.throughTurnstile(turnstile, connect(deployment, user_id), ['query', 'mutation']), api: deployment.api.safebyok }))
+type VaultDBOnOpts = Omit<ConvexVaultDBOpts, 'client' | 'api'>
+
+const vaultDBOn = (deployment: ComponentDeployment, opts: VaultDBOnOpts = {}): ConvexVaultDB => {
+  const client = deployment.client(null)
+  const vaultDB = new ConvexVaultDB({ ...opts, client, api: TH.rootApi })
+  madeOn.set(vaultDB, { deployment, client, opts })
+  return vaultDB
 }
 
-for (const [clientTitle, connect] of ClientCases) {
-  TH.describeVaultDB(`convexVaultDB over a ${clientTitle}`, (vaultDBOpts) => {
-    const deployment = deploy()
-    return TH.perUser((user_id) => convexVaultDB({ ...vaultDBOpts, client: connect(deployment, user_id === '' ? null : user_id), api: deployment.api.safebyok }))
-  }, {
-    makeVaultDBFor: () => {
-      const deployment = deploy()
-      return (user_id) => convexVaultDB({ client: connect(deployment, user_id), api: deployment.api.safebyok })
+const madeOf = (vaultDB: ConvexVaultDB) => {
+  const made = madeOn.get(vaultDB)
+  if (! made) { throw new Error('The vaultDB was not made by this test file.') }
+  return made
+}
+
+const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
+  const { deployment } = madeOf(vaultDB)
+  // Plants are changes the clients hear of, as a write from elsewhere would be.
+  const run: ComponentBackend['run'] = async (fn) => await deployment.arrange(async (backend) => await backend.run(fn))
+  const findVaultDoc = async (db: Parameters<Parameters<ComponentBackend['run']>[0]>[0]['db'], { applabel, user_id, vaultlabel }: VaultScope) => (
+    await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
+  )
+  return {
+    plantVaultRow: async (scope, row) => {
+      await run(async ({ db }) => {
+        const { applabel, user_id, vaultlabel } = scope
+        const vaultDoc = await findVaultDoc(db, scope)
+        if (vaultDoc) { await db.replace('safebyok_vaults', vaultDoc._id, { applabel, user_id, vaultlabel, vault: row }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault: row }) }
+      })
     },
-    makeDevices: devicesOver(connect),
-    pushes:      true,
-  })
-
-  describe(`convexVaultDB's devices over a ${clientTitle}, for the battery's races`, () => {
-    it("send every write's mutation through the race's turnstile", async () => {
-      await TH.expectRoundTripsThroughTurnstile(devicesOver(connect))
-    })
-  })
-}
-
-const u1 = TH.scopeOf('u1')
-
-describe("convexVaultDB, as it is made", () => {
-  it("holds at most Convex's document limit in one record", () => {
-    const deployment = deploy()
-    expect(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok }).maxRecordBytes).to.eq(1_048_576)
-  })
-
-  it("holds at most half of what one Convex function may read in one vault, since deleting reads it twice", () => {
-    const deployment = deploy()
-    expect(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok }).maxVaultBytes).to.eq(8 * 1024 * 1024)
-  })
-
-  it("declares the component's own limit on boxes, which the component enforces", () => {
-    const deployment = deploy()
-    expect(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok }).maxBoxes).to.eq(MaxVaultBoxes)
-    expect(MaxVaultBoxes).to.eq(8000)
-  })
-
-  const NotClientCases = [
-    [null,                                     'refuses null for a client'],
-    [{},                                       'refuses an object with no Convex calls'],
-    [{ query: () => null, mutation: () => null }, 'refuses a client that cannot watch a query'],
-  ] as const
-
-  for (const [notClient, blurb] of NotClientCases) {
-    it(blurb, () => {
-      const deployment = deploy()
-      expect(() => convexVaultDB({ client: notClient as unknown as ConvexVaultClient, api: deployment.api.safebyok })).to.throw(VaultError, /needs a Convex client/)
-    })
-  }
-
-  it("refuses the whole generated api, where it wants api.safebyok", () => {
-    const deployment = deploy()
-    const client = deployment.client('u1')
-    // A host's generated `api` answers any property, as anyApi does.
-    expect(() => convexVaultDB({ client, api: anyApi as unknown as SafebyokApi })).to.throw(VaultError, /api\.safebyok/)
-    expect(() => convexVaultDB({ client, api: {} as SafebyokApi })).to.throw(VaultError, /api\.safebyok/)
-    expect(convexVaultDB({ client, api: anyApi['safebyok'] as unknown as SafebyokApi }).maxRecordBytes).to.eq(1_048_576)
-  })
-})
-
-/** `vaultDB`'s `u1` vault, made and filled with eight boxes of 900,000 bytes: a little under the component's limit. */
-const nearlyFull = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
-  await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-  for (let ii = 0; ii < 8; ii++) {
-    await TH.expectingGood(vaultDB).tryPutBox(u1, TH.noBoxYet, TH.heavyBox(`heavy_${String(ii)}`, 900_000))
-  }
-}
-
-/** What a component of another version might answer a box write with, and what each is. */
-const UnknownAnswers = [
-  [null,                                                     'null'],
-  [TH.boxOf('anthropic_api_key', 'a1'),                      'the bare box an older component answered with'],
-  [{ landed: 'yes', box_stored: null },                      'a landed flag that is no boolean'],
-  [{ landed: false, refusalkind: 'stale_write' },            'a stale write without its box_stored'],
-  [{ landed: false, refusalkind: 'vault_full' },             'a full vault saying nothing of how full'],
-  [{ landed: false, refusalkind: 'quota_exceeded' },         'a refusal of a kind this client does not know'],
-] as const
-
-/** Answers a box read might meet from a component of another version: none this client knows. */
-const UnknownReadAnswers = [
-  [TH.boxOf('anthropic_api_key', 'a1'),                      'the bare box an older component answered with'],
-  [{ got: true },                                            'a read carrying no box_stored, not even null'],
-  [{ got: false, refusalkind: 'stale_write' },               'a refusal of a kind no read makes'],
-  [{ read: true, box_stored: null },                         'the answer of a component that still says read, not got'],
-] as const
-
-describe("convexVaultDB, answered by a component of another version", () => {
-  for (const [answer, blurb] of UnknownReadAnswers) {
-    it(`refuses a box read answered with ${blurb} as corrupt_record, saying the deployed component is out of date`, async () => {
-      const deployment = deploy()
-      const client = deployment.client('u1')
-      const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-      await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-      vi.spyOn(client, 'query').mockResolvedValue(answer)
-      const refusal = await TH.expectBad(vaultDB.tryGetBox(u1, 'anthropic_api_key', TH.inThisVault), 'corrupt_record')
-      expect(refusal.message).to.match(/deployed safebyok component is out of date/)
-      expect(refusal).to.not.have.property('cause')
-    })
-  }
-
-  for (const [answer, blurb] of UnknownAnswers) {
-    it(`refuses a box write answered with ${blurb} as corrupt_record, saying the deployed component is out of date`, async () => {
-      const deployment = deploy()
-      const client = deployment.client('u1')
-      const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-      await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-      vi.spyOn(client, 'mutation').mockResolvedValue(answer)
-      const refusal = await TH.expectBad(vaultDB.tryPutBox(u1, TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')), 'corrupt_record')
-      expect(refusal.message).to.match(/deployed safebyok component is out of date/)
-      expect(refusal).to.not.have.property('cause')
-    })
-  }
-})
-
-describe("convexVaultDB, refusing", () => {
-  // Every verb's identity_revoked is the battery's line 5.4: these are what Convex's own says.
-  for (const [clientTitle, connect] of ClientCases) {
-    it(`refuses over a ${clientTitle} as identity_revoked when no one is signed in, saying so, its ConvexError as the cause`, async () => {
-      const deployment = deploy()
-      const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
-      const refusal = await TH.expectBad(vaultDB.tryGetVault(u1), 'identity_revoked')
-      expect(refusal).to.be.instanceOf(VaultError)
-      expect(refusal.message).to.eq('No one is signed in, so this vault cannot be reached: sign in, then try again.')
-      expect(refusal.cause).to.be.instanceOf(ConvexError).with.deep.property('data', { kind: 'identity_revoked', message: refusal.message })
-    })
-
-    it(`refuses over a ${clientTitle} as identity_revoked for another user's vault, saying so, its ConvexError as the cause`, async () => {
-      const deployment = deploy()
-      const vaultDB = convexVaultDB({ client: connect(deployment, 'u2'), api: deployment.api.safebyok })
-      const refusal = await TH.expectBad(vaultDB.tryPutBox(u1, TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')), 'identity_revoked')
-      expect(refusal.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
-      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'identity_revoked')
-    })
-
-    it(`refuses over a ${clientTitle} as not_permitted what the host's getUserId refuses so, its ConvexError as the cause (Contract: VaultDB, What an adapter must do)`, async () => {
-      const deployment = deploy(() => { throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'Guests may not keep a vault.' }) })
-      const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      const refusal = await TH.expectBad(vaultDB.tryEnsureVault(TH.gatelessOf('u1')), 'not_permitted')
-      expect(refusal.message).to.eq('Guests may not keep a vault.')
-      expect(refusal.family).to.eq('condition')
-      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'not_permitted')
-    })
-  }
-
-  it("leaves a vault refused not_permitted unlocked, and its next call answered: the refusal locks nothing", async () => {
-    const refusing = { now: false }
-    const deployment = deploy(async (ctx) => {
-      if (refusing.now) { throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'Writes are paused for this account.' }) }
-      return await TH.bySubject(ctx)
-    })
-    const vault = await openOver(deployment.client('u1'), deployment.api.safebyok)
-    await TH.unlock(vault, TH.RealPassphrase)
-    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-    refusing.now = true
-    await TH.expectRefusal(vault.putBox({ boxlabel: 'openai_api_key' }, 'sk-test-not-a-real-key'), 'not_permitted')
-    expect(TH.stateOf(vault.getSnapshot())).to.eq('unlocked')
-    refusing.now = false
-    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    TH.closeVault(vault)
-  })
-
-  it("lists a box the component holds but safebyok would never write as damaged, under its boxlabel", async () => {
-    const deployment = deploy()
-    const client = deployment.client('u1')
-    const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-    await TH.ensureGated(vaultDB, TH.vaultRecordOf('u1'))
-    await TH.expectingGood(vaultDB).tryPutBox(u1, TH.noBoxYet, TH.boxOf('openai', 'two'))
-    // Past the adapter's own checks, straight to the component, which bounds no time's form.
-    const box = { ...TH.boxOf('anthropic', 'one'), written_at: Date.UTC(2026, 9, 14) + 0.5 }
-    await client.mutation(deployment.api.safebyok.putBox, { ...u1, box, expected: TH.noBoxYet })
-    const read = await TH.expectingGood(vaultDB).tryGetVault(u1)
-    expect(read?.boxes.map((box) => box.boxlabel)).to.deep.equal(['openai'])
-    expect(read?.damagedBoxes).to.deep.equal([{ boxlabel: 'anthropic', revision_tok: 'rev-one', damage: 'damaged' }])
-    expect(await TH.expectingGood(vaultDB).tryDelBox(u1, 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'deleted' })
-    expect(await TH.damagedBoxesOf(vaultDB, u1)).to.have.lengthOf(0)
-    expect(await TH.boxesOf(vaultDB, u1)).to.have.lengthOf(1)
-  })
-
-  for (const [clientTitle, connect] of ClientCases) {
-    it(`refuses a box the component has no room for over a ${clientTitle} as vault_full, saying how full the vault is`, async () => {
-      const deployment = deploy()
-      const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      await nearlyFull(vaultDB)
-      const refusal = await TH.expectBad(vaultDB.tryPutBox(u1, TH.noBoxYet, TH.heavyBox('one_too_many', 200_000)), 'vault_full')
-      expect(refusal.message).to.match(/bytes its storage holds of one vault/)
-      expect(refusal.meta?.capacity).to.deep.equal(await TH.expectingGood(vaultDB).tryGetCapacity(u1))
-      expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: 8, max: MaxVaultBoxes })
-      const listed = await TH.boxesOf(vaultDB, u1)
-      expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')
-    })
-  }
-
-  it("has a vault's putBox() refuse as vault_full a box the component has no room for, under the vault's own maxBoxes", async () => {
-    const deployment = deploy()
-    const client = deployment.client('u1')
-    const vault = await openOver(client, deployment.api.safebyok)
-    await TH.unlock(vault, TH.RealPassphrase)
-    // Boxes the vault never opens, leaving less room than one whisper of 40,000 bytes takes.
-    const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
-    const vaultRecord = await TH.vaultRecordIn(vaultDB, u1)
-    const vaultTok = vaultRecord?.vault_tok ?? ''
-    for (const [ii, bytes] of [...Array.from({ length: 8 }, () => 900_000), 120_000].entries()) {
-      await TH.expectingGood(vaultDB).tryPutBox(u1, { vault_tok: vaultTok, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
-    }
-    const refusal = await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key' }, 'x'.repeat(40_000)), 'vault_full')
-    expect(refusal.message).to.match(/no room for this one/)
-    expect(refusal.meta?.capacity?.boxes.used).to.eq(9)
-    expect(vault.getSnapshot().boxes.map((box) => box.boxlabel)).to.not.include('anthropic_api_key')
-    TH.closeVault(vault)
-  })
-
-  it("makes any other failure storage_unavailable, carrying nothing of Convex's error", async () => {
-    const deployment = deploy(() => { throw new Error('the auth provider is down') })
-    const refusal = await TH.expectBad(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok }).tryGetVault(u1), 'storage_unavailable')
-    expect(refusal.cause).to.be.undefined
-    expect(refusal.message).to.include("your Convex deployment's logs, or, for trouble before the call left, the browser console")
-    expect(TH.thrownText(refusal)).to.not.include('the auth provider is down')
-  })
-})
-
-describe("a record the deployment refused", () => {
-  // Distinctive values throughout, so that finding one in what is thrown means it was quoted.
-  const subject = 'user_quotable'
-  const scope = { applabel: 'quotable_app', user_id: subject, vaultlabel: 'quotable_vault' }
-  const quotableWayin = { device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) }
-  const quotableWayins = { passphrase: TH.wayinOf('quotable_phrase', quotableWayin), passkey: TH.passkeyWayinOf('quotable_passkey', quotableWayin) }
-  const storedVaultRecord = TH.vaultRecordOf(subject, { ...scope, gate_epoch: 52_871, gate: quotableWayins })
-  const nextVaultRecord = { ...storedVaultRecord, gate_epoch: 52_872, gate: { ...quotableWayins, passphrase: { ...quotableWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_quotable') } } }
-  const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar: { note: 'a quotable sidecar' } })
-  // The whisper's codec and schema version are the same in every box, so nothing to quote.
-  const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = box
-
-  // A rival of every record above, in the same shapes with other values. Whatever a record shares
-  // with it -- the format literals, the test deriver's label, the fake salt -- is public and the
-  // same in every record, so finding it in a refusal is no leak; only what varies per record counts.
-  const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
-  const rivalWayin = { device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) }
-  const rivalWayins = { passphrase: TH.wayinOf('rival_phrase', rivalWayin), passkey: TH.passkeyWayinOf('rival_passkey', rivalWayin) }
-  const rivalVaultRecord = TH.vaultRecordOf('user_rival', { ...rivalScope, gate_epoch: 7, gate: rivalWayins })
-  const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar: { note: 'a rival note' } })
-  const rivalLeaves = new Set(TH.leafTexts({ ...rivalScope, record: [rivalVaultRecord, { ...rivalVaultRecord, gate_epoch: 8, gate: { ...rivalWayins, passphrase: { ...rivalWayins.passphrase, vault_key_wayin_wrapped: TH.fakeCiphered('rewrapped_rival') } } }, rivalBox] }))
-  const perRecordLeaves = (record: unknown) => TH.leafTexts({ ...scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
-
-  const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
-    ['putVaultRecord', nextVaultRecord, (vaultDB) => vaultDB.tryPutVaultRecord(nextVaultRecord, { vault_tok: storedVaultRecord.vault_tok, gate_epoch: 52_871 })],
-    ['putBox',        quotableBox, (vaultDB) => vaultDB.tryPutBox(scope, { vault_tok: storedVaultRecord.vault_tok, revision_tok: null }, box)],
-  ]
-
-  for (const [verb, record, write] of RefusedWrites) {
-    it(`is quoted nowhere in the refusal ${verb} resolves: message, properties or causes`, async () => {
-      const deployment = deploy()
-      const client = deployment.client(subject)
-      await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), storedVaultRecord)
-      // The core refuses a field it does not know, so this one strays in on the wire, past it,
-      // where Convex's validator refuses the call. convex-test's validator names the field; a
-      // dev deployment's quotes the arguments too (notes/security.md). The refusal carries none of it.
-      const straying: ConvexVaultClient = {
-        query:    client.query.bind(client),
-        onUpdate: client.onUpdate.bind(client),
-        mutation: (mutationRef, args) => client.mutation(mutationRef, { ...args, stray_field: 'x' }),
-      }
-      const vaultDB = convexVaultDB({ client: straying, api: deployment.api.safebyok })
-      const refusal = await TH.expectBad(write(vaultDB), 'storage_unavailable')
-      expect(refusal.cause).to.be.undefined
-      const thrown = TH.thrownText(refusal)
-      expect(thrown).to.not.include('stray_field')
-      const quotables = perRecordLeaves(record)
-      expect(quotables, 'the leak sweep looks for what varies per record').to.include('quotable_app')
-      expect(quotables, 'and not for the public constants every record shares').to.not.include.members(['test_digest_v0'])
-      for (const leaf of quotables) {
-        expect(thrown).to.not.include(leaf)
-      }
-      expect(await TH.vaultRecordIn(vaultDB, scope)).to.deep.equal(storedVaultRecord)
-      expect(await TH.expectingGood(vaultDB).tryGetBox(scope, 'quotable_box', { vault_tok: storedVaultRecord.vault_tok })).to.be.null
-    })
-  }
-
-  it("is quoted nowhere in the refusal putBox resolves when Convex's validator quotes the refused argument", async () => {
-    const deployment = deploy()
-    const client = deployment.client(subject)
-    await TH.ensureGated(convexVaultDB({ client, api: deployment.api.safebyok }), storedVaultRecord)
-    const expected = { vault_tok: storedVaultRecord.vault_tok, revision_tok: null }
-    const quotedArgs = withRevisionNotText({ ...scope, box, expected })
-    await expect(client.mutation(deployment.api.safebyok.putBox, quotedArgs)).rejects.toThrow('quoted_by_convex')
-    const quoting: ConvexVaultClient = {
-      query:    client.query.bind(client),
-      onUpdate: client.onUpdate.bind(client),
-      mutation: (mutationRef, args) => client.mutation(mutationRef, withRevisionNotText(args)),
-    }
-    const vaultDB = convexVaultDB({ client: quoting, api: deployment.api.safebyok })
-    const refusal = await TH.expectBad(vaultDB.tryPutBox(scope, expected, box), 'storage_unavailable')
-    expect(refusal.cause).to.be.undefined
-    expect(TH.thrownText(refusal)).to.not.include('quoted_by_convex')
-    expect(await TH.expectingGood(vaultDB).tryGetBox(scope, 'quotable_box', { vault_tok: storedVaultRecord.vault_tok })).to.be.null
-  })
-})
-
-/** `args` with its box's revision not text, past the core's checks: convex-test's validator quotes it. */
-const withRevisionNotText = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, box: { ...(args as { box?: object }).box, revision_tok: ['quoted_by_convex'] } })
-
-/** Resolves once every message already sent to `vaultDB`'s client has arrived: one round trip behind them. */
-const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await TH.vaultRecordIn(vaultDB, u1) }
-
-/**
- * A watch of `u1`'s vault through `vaultDB`, once its first result has come in: its `onChange`,
- * how often that had been called by then (`heardBefore`), and its `unsubscribe`.
- */
-const settledWatch = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
-  const onChange = vi.fn()
-  const unsubscribe = vaultDB.subscribe(u1, onChange)
-  await vi.waitFor(() => { expect(onChange).toHaveBeenCalled() })
-  return { onChange, unsubscribe, heardBefore: onChange.mock.calls.length }
-}
-
-describe("convexVaultDB.subscribe", () => {
-  for (const [clientTitle, connect] of ClientCases) {
-    it(`calls onChange over a ${clientTitle} when another device writes to the vault`, async () => {
-      const deployment = deploy()
-      const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      const there = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      const watch = await settledWatch(here)
-      await TH.ensureGated(there, TH.vaultRecordOf('u1'))
-      await vi.waitFor(() => { expect(watch.onChange.mock.calls.length).to.be.greaterThan(watch.heardBefore) })
-    })
-
-    it(`hears nothing over a ${clientTitle} of another vault's writes`, async () => {
-      const deployment = deploy()
-      const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      const watch = await settledWatch(here)
-      await TH.ensureGated(here, { ...TH.vaultRecordOf('u1'), vaultlabel: 'work' })
-      await caughtUp(here)
-      expect(watch.onChange.mock.calls.length).to.eq(watch.heardBefore)
-    })
-
-    it(`unsubscribes once over a ${clientTitle}, however often it is called, leaving another watch of the vault be`, async () => {
-      const deployment = deploy()
-      const client = connect(deployment, 'u1')
-      const alongside = await settledWatch(convexVaultDB({ client, api: deployment.api.safebyok }))
-      const unsubscribe = convexVaultDB({ client, api: deployment.api.safebyok }).subscribe(u1, () => undefined)
-      unsubscribe()
-      unsubscribe()
-      const heardBefore = alongside.onChange.mock.calls.length
-      await TH.ensureGated(convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok }), TH.vaultRecordOf('u1'))
-      await vi.waitFor(() => { expect(alongside.onChange.mock.calls.length).to.be.greaterThan(heardBefore) })
-    })
-
-    it(`calls onChange over a ${clientTitle} when a sign-out fails its watch, so the vault looks again`, async () => {
-      const deployment = deploy()
-      const spy = TH.spyLogger()
-      const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok, logger: spy.logger })
-      await TH.ensureGated(here, TH.vaultRecordOf('u1'))
-      const watch = await settledWatch(here)
-      deployment.signOut()
-      await vi.waitFor(() => { expect(watch.onChange.mock.calls.length).to.be.greaterThan(watch.heardBefore) })
-      await TH.expectBad(here.tryGetVault(u1), 'identity_revoked')
-    })
-
-    it(`subscribes calmly over a ${clientTitle} while signed out, and throws nothing later`, async () => {
-      const deployment = deploy()
-      const spy = TH.spyLogger()
-      const here = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok, logger: spy.logger })
-      const unsubscribe = here.subscribe(u1, () => undefined)
-      // The refused watch arrives with the next round trip; an error thrown from inside the
-      // client's socket would fail this test as unhandled.
-      await TH.expectBad(here.tryGetVault(u1), 'identity_revoked')
-      unsubscribe()
-    })
-  }
-
-  it("calls onChange for the first result too: the vault's first read may have missed a write", async () => {
-    const deployment = deploy()
-    const here = convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok })
-    const onChange = vi.fn()
-    here.subscribe(u1, onChange)
-    await vi.waitFor(() => { expect(onChange).toHaveBeenCalledTimes(1) })
-  })
-})
-
-/** The README's example: a vault opened over the app's own Convex client. */
-const openOver = (client: ConvexVaultClient, api: SafebyokApi) => TH.settledVault(TH.memoryVaultOpts({ vaultDB: convexVaultDB({ client, api }) }))
-
-const resolvesNull = () => Promise.resolve(null)
-const unwatches = () => undefined
-
-/** A ConvexClient whose one watch the test drives by hand: `heard` delivers, `failed` errs. */
-const handDrivenClient = () => {
-  const watch = { heard: (): unknown => undefined, failed: (_err: Error): unknown => undefined }
-  const client = {
-    query:    resolvesNull,
-    mutation: resolvesNull,
-    onUpdate: (_queryRef: unknown, _args: unknown, onUpdate: (result: unknown) => unknown, onError: (err: Error) => unknown) => {
-      watch.heard = () => onUpdate(null)
-      watch.failed = onError
-      return unwatches
+    // A planted row is not tallied, so the life's tally is dropped, to be counted afresh.
+    plantBoxRow: async (scope: Boxscope, vault_tok, row) => {
+      await run(async ({ db }) => {
+        const { applabel, user_id, vaultlabel, boxlabel } = scope
+        const boxDoc = await db.query('safebyok_boxes')
+          .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
+          .unique()
+        const planted = { applabel, user_id, vaultlabel, vault_tok, boxlabel, box: row }
+        if (boxDoc) { await db.replace('safebyok_boxes', boxDoc._id, planted) } else { await db.insert('safebyok_boxes', planted) }
+        const tallyDoc = await db.query('safebyok_tallies')
+          .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+          .unique()
+        if (tallyDoc) { await db.delete('safebyok_tallies', tallyDoc._id) }
+      })
+    },
+    vaultRowOf: async (scope) => await run(async ({ db }) => {
+      const vaultDoc = await findVaultDoc(db, scope)
+      return (vaultDoc?.vault ?? null) as unknown
+    }),
+    boxRowsOf: async ({ applabel, user_id, vaultlabel }, vault_tok) => {
+      const boxDocs = await run(async ({ db }) => await db.query('safebyok_boxes')
+        .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+        .collect())
+      return new Map(boxDocs.map(({ boxlabel, box }) => [boxlabel, box as unknown]))
     },
   }
-  return { client: client as unknown as ConvexVaultClient, watch }
 }
 
-describe("convexVaultDB.subscribe, when its ConvexClient watch fails", () => {
-  it("warns once for a failing streak, calling onChange each time, and again once it has heard between", () => {
-    const spy = TH.spyLogger()
-    const { client, watch } = handDrivenClient()
-    const onChange = vi.fn()
-    convexVaultDB({ client, api: anyApi['safebyok'] as unknown as SafebyokApi, logger: spy.logger }).subscribe(u1, onChange)
-    watch.failed(new Error('socket closed'))
-    watch.failed(new Error('socket closed'))
-    expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn'])
-    expect(onChange).toHaveBeenCalledTimes(2)
-    watch.heard()
-    watch.failed(new Error('socket closed again'))
-    expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn', 'warn'])
-    expect(spy.calls[1]!.err?.message).to.eq('socket closed again')
-    expect(onChange).toHaveBeenCalledTimes(4)
+// The next query or mutation the vault's client makes fails as Convex reports a server error, its text the host's.
+const failNextCall = (vaultDB: ConvexVaultDB, text = '[Request ID: 0123456789abcdef] Server Error'): void => {
+  const calls = madeOf(vaultDB).client as unknown as Record<'query' | 'mutation', () => Promise<unknown>>
+  const spies = [vi.spyOn(calls, 'query'), vi.spyOn(calls, 'mutation')]
+  const fail = async (): Promise<never> => {
+    for (const spy of spies) { spy.mockRestore() }
+    throw new Error(text)
+  }
+  for (const spy of spies) { spy.mockImplementationOnce(fail) }
+}
+
+TH.describeVaultDBBattery("ConvexVaultDB over a ConvexClient", {
+  makeVaultDB:         (opts) => vaultDBOn(deploy(TH.componentHost()), opts),
+  makeTwin:            (vaultDB) => vaultDBOn(madeOf(vaultDB).deployment, madeOf(vaultDB).opts),
+  makeCappedVaultDB:   (maxBoxes) => vaultDBOn(deploy(TH.componentHost()), { maxBoxes }),
+  _cheat_rowsOf:       convexRowsOf,
+  _cheat_failNextCall: (vaultDB) => { failNextCall(vaultDB) },
+})
+
+describe("ConvexVaultDB's refusals", () => {
+  it("are identity_revoked when the host's functions refuse the caller", async () => {
+    const deployment = deploy(TH.hostWith(TH.bySubject))
+    const vaultDB = new ConvexVaultDB({ client: deployment.client('u2'), api: deployment.api.safebyok })
+    await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
+    await TH.expectBad(vaultDB.tryListVaults(TH.bankScope), 'identity_revoked')
+  })
+
+  it("are storage_unavailable for any other failure, and quote nothing of its text", async () => {
+    const vaultDB = vaultDBOn(deploy(TH.componentHost()))
+    failNextCall(vaultDB, 'host detail sk-live-0000')
+    const refusal = await TH.expectBad(vaultDB.tryListVaults(TH.bankScope), 'storage_unavailable')
+    expect(TH.thrownText(refusal)).not.to.include('sk-live-0000')
   })
 })
 
-describe("a vault over convexVaultDB, opened before sign-in", () => {
-  for (const [clientTitle, connect] of ClientCases) {
-    it(`is refused as identity_revoked over a ${clientTitle}, its entry refused with no Vault object, and leaves no watch live on the deployment once let go`, async () => {
-      const deployment = deploy()
-      const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
-      const { vaultlabel, ...bankOpts } = TH.memoryVaultOpts({ vaultDB })
-      const bank = Bank.make(bankOpts)
-      await TH.expectRefusal(bank.ensureVault({ vaultlabel }), 'identity_revoked')
-      expect(bank.bankVaultOf({ vaultlabel })).to.deep.include({ lifecycle: 'refused' })
-      expect(bank.vaultOf({ vaultlabel })).to.be.null
-      bank.closeVault({ vaultlabel })
-      await vi.waitFor(() => { expect(deployment.watching()).to.deep.equal([]) })
-    })
-  }
-})
+describe("ConvexVaultDB's constructor", () => {
+  it("refuses a client that is not a Convex client", () => {
+    TH.expectSyncRefusal(() => new ConvexVaultDB({ client: {} as never, api: TH.rootApi }), 'bad_option')
+  })
 
-describe("a vault over convexVaultDB, when its user signs out", () => {
-  for (const [clientTitle, connect] of ClientCases) {
-    it(`locks over a ${clientTitle} while idle, revoking its lease, and erases nothing`, async () => {
-      const deployment = deploy()
-      const spy = TH.spyLogger()
-      const deviceDB = memoryDeviceDB()
-      const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok, logger: spy.logger })
-      const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
-      await TH.unlock(vault, TH.RealPassphrase)
-      await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-      deployment.signOut()
-      await vi.waitFor(() => { expect(TH.stateOf(vault.getSnapshot())).to.eq('locked') })
-      expect(await TH.expectingGood(deviceDB).tryGetLease(u1)).to.be.null
-      // Storage it cannot trust has the vault say hello afresh at its next call, refused as ever.
-      await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
-      await TH.expectRefusal(TH.unlock(vault, TH.RealPassphrase), 'identity_revoked')
-      expect(spy.calls.map((heard) => heard.level)).to.include('log')
-      const stored = await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })
-      expect(stored?.boxes).to.have.lengthOf(1)
-      TH.closeVault(vault)
-    })
-  }
+  it("refuses the whole generated api in place of its safebyok module", () => {
+    const deployment = deploy(TH.componentHost())
+    TH.expectSyncRefusal(() => new ConvexVaultDB({ client: deployment.client(null), api: anyApi as never }), 'bad_option')
+  })
+
+  it("refuses a maxBoxes it cannot use", () => {
+    const deployment = deploy(TH.componentHost())
+    for (const maxBoxes of [-1, 1.5, Number.NaN]) {
+      TH.expectSyncRefusal(() => new ConvexVaultDB({ client: deployment.client(null), api: TH.rootApi, maxBoxes }), 'bad_option')
+    }
+  })
 })

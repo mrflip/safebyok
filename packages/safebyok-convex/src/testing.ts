@@ -128,6 +128,19 @@ export class FakeDeployment<Host extends FakeHost> {
     return this.backendAs(subject) as ReturnType<Host['createTest']>
   }
 
+  /** Runs `change` on the backend in turn with the clients' calls, then pushes each watched query that now answers differently. */
+  async arrange<T>(change: (backend: ReturnType<Host['createTest']>) => Promise<T>): Promise<T> {
+    const answer = await this.enqueue(async () => {
+      const changed = await change(this.backend as ReturnType<Host['createTest']>)
+      this.ts += 1
+      await this.pushChanges()
+      return changed
+    })
+    // A socket delivers on a timer, so one more turn of it lands every push before the caller goes on.
+    await new Promise((resolve) => { setTimeout(resolve) })
+    return answer
+  }
+
   /** The functions every connected socket watches right now, by path: the live queries a client holds open here. */
   watching(): string[] {
     return Array.from(this.sessions.values(), (session) => Array.from(session.watched.values(), (watch) => watch.udfPath)).flat()
@@ -135,7 +148,7 @@ export class FakeDeployment<Host extends FakeHost> {
 
   /** Signs every connected socket out, as a client's `clearAuth` would, and pushes each watched query that now answers differently. */
   signOut(): void {
-    this.enqueue(async () => {
+    void this.enqueue(async () => {
       for (const session of this.sessions.values()) { session.subject = null }
       await this.pushChanges()
     })
@@ -154,7 +167,7 @@ export class FakeDeployment<Host extends FakeHost> {
   private socketsFor(subject: string | null): typeof WebSocket {
     const line: SocketLine = {
       opened:  (socket) => { this.sessions.set(socket, { socket, subject, version: { querySet: 0, ts: 0, identity: 0 }, watched: new Map() }) },
-      heard:   (socket, message) => { this.enqueue(() => this.heard(socket, message)) },
+      heard:   (socket, message) => { void this.enqueue(() => this.heard(socket, message)) },
       hungUp:  (socket) => { this.sessions.delete(socket) },
     }
     return class extends FakeSocket {
@@ -164,11 +177,11 @@ export class FakeDeployment<Host extends FakeHost> {
 
   // One message at a time, in arrival order: a fake failing is a bug in the test, so it rejects
   // where vitest reports it, and the queue carries on.
-  private enqueue(job: () => Promise<void>) {
+  private async enqueue<T>(job: () => Promise<T>): Promise<T> {
     const before = this.work
     const done = (async () => {
       await before
-      await job()
+      return await job()
     })()
     this.work = (async () => {
       try {
@@ -177,7 +190,7 @@ export class FakeDeployment<Host extends FakeHost> {
         // The queue carries on past a failed job.
       }
     })()
-    void done
+    return await done
   }
 
   private async heard(socket: FakeSocket, message: ClientMessage): Promise<void> {
