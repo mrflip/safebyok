@@ -82,7 +82,11 @@ events; a Client with a WebSocket exchange for subscriptions serves as well.
 One vaultDB serves every request. **`userIdOf(context)`** answers the user your own auth signed
 in for this request, or null. Each operation names the bank it reaches (its `user_id`, or its
 record's or tombstone's), and the resolvers serve it only when that is the signed-in user's;
-anything else refuses as `identity_revoked`, before the vaultDB is called.
+anything else refuses as `identity_revoked`, before the vaultDB is called. A `watch` subscription
+asks `userIdOf` again at each change it would send, and closes when the answer is no longer the
+user it subscribed as: a `userIdOf` that looks the session up live, rather than reading what the
+request carried, is what lets a revoked session's open stream close. An idle stream stays open
+until its next change.
 
 The resolvers check what they are sent as the browser's vaultDB checks it before sending, so a
 caller that skips those checks, or is not a browser at all, is refused the same.

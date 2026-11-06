@@ -86,7 +86,9 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     },
     Subscription: {
       safebyokHeard: {
-        subscribe: async (_parent, args, context) => await served(context, args.user_id, () => heardOf(relay, args)),
+        subscribe: async (_parent, args, context) => await served(context, args.user_id, () => (
+          heardOf(relay, args, async () => isSignedInAs(await userIdOf(context), args.user_id))
+        )),
         resolve:   (heard) => heard,
       },
     },
@@ -94,13 +96,16 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
 }
 // --
 
-// == [Helpers]: demandSignedInAs, userIdIn, crossing, extensionsOf, heardOf
+// == [Helpers]: isSignedInAs, demandSignedInAs, userIdIn, crossing, extensionsOf, heardOf
 
 const NotSignedInAs = "This request is not signed in as the user whose vaults it asks for."
 
+/** Whether the request is signed in, and as the user it asks for. */
+const isSignedInAs = (signedIn: string | null, asked: unknown): boolean => (signedIn !== null && asked === signedIn)
+
 /** Refuses unless the request is signed in, and as the user it asks for. */
 const demandSignedInAs = (signedIn: string | null, asked: unknown): void => {
-  if (signedIn === null || asked !== signedIn) { throw new SX.VaultError('identity_revoked', NotSignedInAs) }
+  if (! isSignedInAs(signedIn, asked)) { throw new SX.VaultError('identity_revoked', NotSignedInAs) }
 }
 
 /** The user_id a record or tombstone names, before it is checked. */
@@ -129,8 +134,8 @@ const extensionsOf = ({ refusalkind, meta }: SX.VaultError): Record<string, unkn
   }
 }
 
-/** What the relay's watch hears of `scope`, as the async iterator a subscription resolver answers; ending it stops the watch. */
-const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs): AsyncIterableIterator<SX.Heard> => {
+/** What the relay's watch hears of `scope`, while `stillSignedIn` answers true, as a subscription resolver answers it; ending it stops the watch. */
+const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs, stillSignedIn: () => Promise<boolean>): AsyncIterableIterator<SX.Heard> => {
   // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
   // `next`, which for a quiet bank is forever, so a subscriber gone while it waited would keep the
   // watch open. A reader's `cancel` ends the pending read at once.
@@ -145,12 +150,25 @@ const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs): AsyncIterableIt
     cancel: () => { unwatch() },
   }, { highWaterMark: Infinity })
   const reader = heards.getReader()
+  const ended = async (): Promise<IteratorReturnResult<undefined>> => {
+    await reader.cancel()
+    return { done: true, value: undefined }
+  }
   const iterator: AsyncIterableIterator<SX.Heard> = {
-    next:   async () => await reader.read() as IteratorResult<SX.Heard>,
-    return: async () => {
-      await reader.cancel()
-      return { done: true, value: undefined }
+    next: async () => {
+      const heard = await reader.read() as IteratorResult<SX.Heard>
+      if (heard.done) { return heard }
+      // Asked again at each notice, so a session revoked since it subscribed hears no more of its bank;
+      // a stillSignedIn that throws ends the watch too, and its error crosses as any other refusal.
+      try {
+        if (await stillSignedIn()) { return heard }
+      } catch (err) {
+        await ended()
+        throw crossing(err)
+      }
+      return await ended()
     },
+    return: ended,
     [Symbol.asyncIterator]: () => iterator,
   }
   return iterator
