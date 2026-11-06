@@ -2,7 +2,6 @@
 
 import * as SX from 'safebyok/storage'
 import type { Awaitable, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultDBOpts, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
-import { VaultChangeChannel } from './vault-tables'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
 
@@ -62,7 +61,11 @@ const ListBoxesWithVaultSql = `SELECT ${VaultOfScope} AS vault, COALESCE((
 const NotifySql = 'SELECT pg_notify($1, told) FROM unnest($2::text[]) AS told'
 // --
 
-// == [Notices]: Told, toldCheck, toldTextOf, toldOf
+// == [Notices]: vaultChannelOf, Told, toldCheck, toldTextOf, toldOf
+
+// A user_id whose channel passes 63 bytes, Postgres's longest identifier, cannot be notified: a write under it that would send a notice refuses.
+/** The channel the notices of `user_id`'s writes are sent on, which a `PostgresListen` you hand the vaultDB listens to. */
+export const vaultChannelOf = (user_id: string): string => `safebyok_${user_id}`
 
 /** What a write tells its listeners: where it landed, and the rows as stored when they fit in a notification. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
@@ -192,7 +195,7 @@ export class PostgresVaultDB extends SX.VaultDB {
       const ante = await lockedVaultRowOf(tx, record)
       if (! isPutAllowed(ante, opts)) { return { landed: false, ante } }
       if (! await storeVaultRow(tx, record, ante)) { return { landed: false, ante: await vaultRowOf(tx, record) } }
-      await notify(tx, [{ ...scopeOf(record), heard: { vault: record } }])
+      await notify(tx, record, [{ ...scopeOf(record), heard: { vault: record } }])
       return { landed: true, ante }
     })
   }
@@ -205,7 +208,7 @@ export class PostgresVaultDB extends SX.VaultDB {
       if (landed) {
         await this.#demandRoom(tx, record, ante)
         await storeBoxRow(tx, record, record.boxlabel, record)
-        await notify(tx, [boxToldOf(record, record.boxlabel, { vault, box: record })])
+        await notify(tx, record, [boxToldOf(record, record.boxlabel, { vault, box: record })])
       }
       return { landed, ante, vault }
     })
@@ -229,7 +232,7 @@ export class PostgresVaultDB extends SX.VaultDB {
         await storeBoxRow(tx, tombstone, boxlabel, boxTombstone)
         told.push(boxToldOf(tombstone, boxlabel, { vault, box: boxTombstone }))
       }
-      await notify(tx, told)
+      await notify(tx, tombstone, told)
       return { landed, ante }
     })
   }
@@ -242,7 +245,7 @@ export class PostgresVaultDB extends SX.VaultDB {
       const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
       if (landed) {
         await storeBoxRow(tx, tombstone, tombstone.boxlabel, tombstone)
-        await notify(tx, [boxToldOf(tombstone, tombstone.boxlabel, { vault, box: tombstone })])
+        await notify(tx, tombstone, [boxToldOf(tombstone, tombstone.boxlabel, { vault, box: tombstone })])
       }
       return { landed, ante, vault }
     })
@@ -280,7 +283,7 @@ export class PostgresVaultDB extends SX.VaultDB {
       const heard = await this.#heardOrNull(told)
       if ((heard !== null) && isHeeding) { hear(heard) }
     }
-    const listening = listenOrNull(listen, onNotify)
+    const listening = listenOrNull(listen, vaultChannelOf(scope.user_id), onNotify)
     return () => {
       if (! isHeeding) { return }
       isHeeding = false
@@ -307,9 +310,9 @@ export class PostgresVaultDB extends SX.VaultDB {
 // == [Listening]: listenOrNull, unlistenOnceListening
 
 /** Starts `listen` at once, answering how to stop, or null when it failed: a watch that hears nothing is all a watch promises. */
-const listenOrNull = async (listen: PostgresListen, onNotify: (text: string) => void): Promise<(() => unknown) | null> => {
+const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (text: string) => void): Promise<(() => unknown) | null> => {
   try {
-    return await listen(VaultChangeChannel, onNotify)
+    return await listen(channel, onNotify)
   } catch {
     return null
   }
@@ -368,8 +371,8 @@ const storeBoxRow = async (tx: PostgresQueryable, { applabel, user_id, vaultlabe
 }
 
 // Notifications sent in a transaction go out when it commits, and not at all when it rolls back.
-const notify = async (tx: PostgresQueryable, told: Told[]): Promise<void> => {
+const notify = async (tx: PostgresQueryable, { user_id }: BankScope, told: Told[]): Promise<void> => {
   if (told.length === 0) { return }
-  await tx.query(NotifySql, [VaultChangeChannel, told.map((each) => toldTextOf(each))])
+  await tx.query(NotifySql, [vaultChannelOf(user_id), told.map((each) => toldTextOf(each))])
 }
 // --

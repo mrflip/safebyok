@@ -31,5 +31,3 @@ ALTER TABLE safebyok_vaults ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safebyok_boxes  ENABLE ROW LEVEL SECURITY;
 `
 
-/** The channel each write's notice is sent on, which a `PostgresListen` you hand the vaultDB listens to. */
-export const VaultChangeChannel = 'safebyok_vault_changes'

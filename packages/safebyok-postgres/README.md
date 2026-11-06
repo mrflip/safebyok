@@ -59,32 +59,53 @@ missing table or privilege (a code in class `42`) refuses as `unexpected_error`,
 
 ## Hearing other writes
 
-Each write sends a notification on `VaultChangeChannel` as it commits, carrying the rows it stored
-(or, for rows too long for a notification, where they are, which the listener reads afresh).
-`listen(channel, onNotify)` hands each notification's text to `onNotify` and answers how to stop.
-LISTEN needs a connection of its own for as long as it listens, so share one among every watch:
+Each write sends a notification on its user's channel, `vaultChannelOf(user_id)`, which is
+`safebyok_` and the user_id, as it commits, carrying the rows it stored (or, for rows too long for a
+notification, where they are, which the listener reads afresh). `listen(channel, onNotify)` hands
+each notification's text on that channel to `onNotify` and answers how to stop.
+
+LISTEN needs a connection of its own for as long as it listens, so share one among every watch.
+This recipe LISTENs on a channel the first time a watch asks for it and **never UNLISTENs**: the
+stop it answers only drops that watch's handler, and the connection stays listening on every
+channel it has been asked for until it closes.
 
 ```ts
-import { Client } from 'pg'
-import { VaultChangeChannel, type PostgresListen } from 'safebyok-postgres'
+import { Client, escapeIdentifier } from 'pg'
+import { type PostgresListen } from 'safebyok-postgres'
 
 const listener = new Client({ connectionString: process.env.DATABASE_URL })
 // Unheard, a dropped connection crashes the process; heard, every watch goes quiet until you listen again.
 listener.on('error', (err) => { console.warn('safebyok listener lost:', err.message) })
 await listener.connect()
-await listener.query(`LISTEN ${VaultChangeChannel}`)
-const heeders = new Set<(text: string) => void>()
-listener.on('notification', ({ payload }) => { for (const onNotify of heeders) { onNotify(payload ?? '') } })
+const heedersOf = new Map<string, Set<(text: string) => void>>()
+listener.on('notification', ({ channel, payload = '' }) => {
+  const heeders = heedersOf.get(channel) ?? []
+  for (const onNotify of heeders) { onNotify(payload) }
+})
 
-const listen: PostgresListen = (_channel, onNotify) => {
+const listen: PostgresListen = async (channel, onNotify) => {
+  const heeders = heedersOf.get(channel) ?? new Set()
+  if (! heedersOf.has(channel)) {
+    heedersOf.set(channel, heeders)
+    // A user_id has capitals and punctuation that LISTEN reads only in a quoted identifier.
+    await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
+  }
   heeders.add(onNotify)
   return () => heeders.delete(onNotify)
 }
 const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool), listen })
 ```
 
-A PGlite's own `listen` fits as it is, but takes its turn behind the statements already queued, so
-a write made just after a watch begins can go unheard.
+A write made just after a watch's first LISTEN can go unheard, as can any notification while the
+listener is reconnecting: a watch is a hint, and a device that missed one learns of the write when
+it next reads. A PGlite's own `listen` fits as it is, given the channel quoted (`"safebyok_..."`),
+but takes its turn behind the statements already queued.
+
+**A user_id whose channel passes 63 bytes cannot write.** A channel is a Postgres identifier, at
+most 63 bytes, so a user_id of more than 54 characters (a user_id is ASCII, a byte a character, and
+a percent-encoded character is three) makes every write that would send a notice refuse as
+`storage_unavailable`, its cause Postgres's `channel name too long`. Keep user_ids to 54 characters
+with this package for now.
 
 ## What is stored
 
@@ -95,7 +116,10 @@ deleted vault or box leaves its tombstone in place, and `tidyGone` removes the b
 ended lives. Row-level security is on with no policy, so of the roles you grant the tables to,
 only their owner, the role your server connects as, reaches the rows; a superuser, or a role that
 bypasses row-level security, reaches them too. A notification is not a table: any role that may
-connect can LISTEN on `VaultChangeChannel` and hear the rows each write stores.
+connect can LISTEN on any user's channel and hear the rows each write stores.
+
+**You own the database's roles, and are responsible for its row-level security** and for who may
+connect and LISTEN: this package grants nothing and creates no role or policy.
 
 Every write locks its vault's row first (`SELECT ... FOR UPDATE`), so writes under one vault take
 turns, and the checks a write makes before it lands read rows no other write can change meanwhile.
