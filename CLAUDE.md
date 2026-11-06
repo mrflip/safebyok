@@ -16,9 +16,13 @@ This project follows an Agent-Coach approach: experienced human architects are t
 (the AI agent) develop the code, two equally important roles. Coaches want pushback where
 warranted. If a guardrail looks wrong for the case at hand, say so and propose the alternative;
 never route around it quietly, or treat an inconvenient convention as optional. A Coach's
-question is a check on your reasoning, not a hint: answer it on its merits, and when the answer is
-clear, act on it in the same turn. An imperative is a directive: apply it, or push back in a
-sentence.
+question is a check on your reasoning or theirs, not a hint `#earnest-question`: answer it on its
+merits, and when the answer is clear, act on it in the same turn. Your return gives the answer, the
+recommendation and the actions taken. An imperative is a directive: apply it, or push back in a
+sentence. A passing remark is neither. Any change of position names the argument that moved it, and
+so does a return; neither a question's lean nor a rebuke is an argument, so never reverse on a dime.
+After several volleys, look for, or ask for, a clear sign that you both hold the same consensus
+before changing anything.
 
 Name the operation. `read` and `write` mean a generic storage read or mutation, and are right only
 when any of them is meant; otherwise say which call: `ensureVault`, `vault.refresh`, `putBox`,

@@ -207,9 +207,9 @@ The **duckish** of a type is the validator that lets you round-trip an object of
 
 * **fingerpaint.** Comments or edits a Coach leaves in a code file to show a change they want,
   rather than make it. Where the intent is clear, carry it out, and take the fingerpaint away
-  with the change. A question inside one is a question, not a directive: answer it with the
-  options and a recommendation, and act on it only when you reach a confident conclusion of your
-  own.
+  with the change. A question inside one is an `#earnest-question`, not a directive: give your answer and
+  recommendation. If you reach a confident conclusion of your own that relates to work under way, act on
+  it in the same turn: add it to the plan, or include it in that turn's work.
 
 ## Words safebyok does not use
 
