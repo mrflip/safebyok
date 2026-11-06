@@ -1,7 +1,8 @@
 /** `mask`, the outline of a secret text that is safe to show. */
 
 import { Checker } from './validator'
-import { maskOpts, type MaskOpts } from '../shapes/shapes-utils'
+import * as UX from '../shapes/shapes-utils'
+import type { MaskOpts } from '../shapes/shapes-utils'
 
 const maskInput = Checker(({ str }) => str, 'bad_option')
 
@@ -53,7 +54,7 @@ const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Rec
  */
 export const mask = (text: string, opts?: MaskOpts): string => {
   const secret = maskInput.parse(text)
-  const { head, tail, minStars, maxLen } = maskOpts.parse(opts ?? {})
+  const { head, tail, minStars, maxLen } = UX.maskOpts.parse(opts ?? {})
   if (secret === '') { return '' }
   const plain = plainLine(secret)
   return plainLine(butcher(codePointsOf(plain), { head, tail, minStars, maxLen }))
