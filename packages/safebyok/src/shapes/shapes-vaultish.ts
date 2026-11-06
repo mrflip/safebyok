@@ -367,7 +367,7 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
 export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   applabel,
   user_id,
-  device_id:           device_id.optional(),
+  device_id,
   vaultDB:             vaultDBDuck,
   deviceDB:            deviceDBDuck,
   keyDeriver:          CX.keyDeriverShape,
@@ -385,7 +385,7 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
 export type BankOpts = {
   applabel:             string
   user_id:              string
-  device_id?:           string | undefined
+  device_id:            string
   vaultDB:              VaultDB
   deviceDB:             DeviceDB
   keyDeriver:           KeyDeriver

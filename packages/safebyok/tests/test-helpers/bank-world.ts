@@ -62,7 +62,7 @@ export const makeBankWorld = () => {
   const deviceDB = new MemoryDeviceDB()
   const dialog = { typing: byPassphrase(Passphrase) as object }
   const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing as never) }
-  const baseOpts: BankOpts = { ...BankScopeGiven, vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, clock, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
+  const baseOpts: BankOpts = { ...BankScopeGiven, device_id: 'device_one', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, clock, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
   /** A bank over this world's stores: called twice, two pages on one device. */
   const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
     const bank = Bank.make({ ...baseOpts, ...overrides })
@@ -74,7 +74,7 @@ export const makeBankWorld = () => {
     /** Move the clock on by `millis`; no timer fires. */
     advance:   (millis: number) => { now += millis },
     /** A bank on another device: this world's vaultDB, and a deviceDB of its own. */
-    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ deviceDB: new MemoryDeviceDB(), ...overrides }),
+    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_id: 'device_two', deviceDB: new MemoryDeviceDB(), ...overrides }),
     leaseRows: (): unknown[] => [...deviceDB._cheat_leaseRows().values()],
   }
 }

@@ -3,7 +3,7 @@ import { VaultError } from '../../src/refusals/errors'
 import { makeLeaseKey } from '../../src/helpers/crypto'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { DeviceDB } from '../../src/storage/device-db-new'
-import type { DeviceRecord, LeaseRow } from '../../src/shapes/shapes-storage'
+import type { LeaseRow } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 
 const T0 = Date.UTC(2026, 10, 3)
@@ -12,7 +12,6 @@ const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
 const asked = { ...scope, vault_tok: 'tok_one' }
 
 const leaseRowOf = async (over: Partial<LeaseRow> = {}): Promise<LeaseRow> => ({ ...asked, proved_at: T0, lease_key: await makeLeaseKey(), wrapped: 'opaque', ...over })
-const deviceRecordOf = (over: Partial<DeviceRecord> = {}): DeviceRecord => ({ applabel: 'acme', user_id: 'u1', device_id: 'dev_one', ...over })
 
 /** A store whose every generic call throws what it is told. */
 class BrokenDeviceDB extends DeviceDB {
@@ -22,7 +21,6 @@ class BrokenDeviceDB extends DeviceDB {
   protected doPeek(): never { throw this.thrown }
   protected doVacate(): never { throw this.thrown }
   protected doLeasesProvedBefore(): never { throw this.thrown }
-  protected doCacheDeviceRecord(): never { throw this.thrown }
 }
 
 describe("deviceDB.cache(row), peek(asked)", () => {
@@ -171,48 +169,6 @@ describe("deviceDB.leasesProvedBefore(cutoff)", () => {
   })
 })
 
-describe("deviceDB.cacheDeviceRecord(record)", () => {
-  it("caches the first record of a bank scope: born", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    expect(await deviceDB.cacheDeviceRecord(deviceRecordOf())).to.deep.equal({ act: 'born', record: deviceRecordOf() })
-  })
-
-  it("keeps the first device_id: a later record is held off, and the first answered", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    await deviceDB.cacheDeviceRecord(deviceRecordOf())
-    expect(await deviceDB.cacheDeviceRecord(deviceRecordOf({ device_id: 'dev_two' }))).to.deep.equal({ act: 'held', record: deviceRecordOf() })
-    expect(deviceDB._cheat_deviceRows().get(JSON.stringify(['acme', 'u1']))).to.deep.equal(deviceRecordOf())
-  })
-
-  it("holds one record for each bank scope", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    await deviceDB.cacheDeviceRecord(deviceRecordOf())
-    const other = await deviceDB.cacheDeviceRecord(deviceRecordOf({ user_id: 'u2', device_id: 'dev_two' }))
-    expect(other.act).to.eq('born')
-  })
-
-  it("writes a damaged record over, and says so: rewrote", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    deviceDB._cheat_deviceRows().set(JSON.stringify(['acme', 'u1']), { applabel: 'acme', user_id: 'u1', device_id: 7 })
-    expect(await deviceDB.cacheDeviceRecord(deviceRecordOf({ device_id: 'dev_two' }))).to.deep.equal({ act: 'rewrote', record: deviceRecordOf({ device_id: 'dev_two' }) })
-    const again = await deviceDB.cacheDeviceRecord(deviceRecordOf())
-    expect(again.act).to.eq('held')
-  })
-
-  it("lets the first of two calls made together win", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    const [first, second] = await Promise.all([deviceDB.cacheDeviceRecord(deviceRecordOf()), deviceDB.cacheDeviceRecord(deviceRecordOf({ device_id: 'dev_two' }))])
-    expect([first.act, second.act]).to.deep.equal(['born', 'held'])
-    expect(second.record.device_id).to.eq('dev_one')
-  })
-
-  it("refuses a record without a device_id or with a stray field", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    await TH.expectBad(deviceDB.tryCacheDeviceRecord({ applabel: 'acme', user_id: 'u1' } as DeviceRecord), 'bad_option')
-    await TH.expectBad(deviceDB.tryCacheDeviceRecord({ ...deviceRecordOf(), extra: 1 } as DeviceRecord), 'bad_option')
-  })
-})
-
 describe("a deviceDB whose store throws", () => {
   it("refuses every verb 'storage_unavailable', naming the verb and the thrown name, never quoting the thrown message", async () => {
     const thrown = new DOMException('lease_key secret-looking text', 'QuotaExceededError')
@@ -223,7 +179,6 @@ describe("a deviceDB whose store throws", () => {
       await TH.expectBad(deviceDB.tryPeek(asked), 'storage_unavailable'),
       await TH.expectBad(deviceDB.tryVacate(asked), 'storage_unavailable'),
       await TH.expectBad(deviceDB.tryLeasesProvedBefore(T0), 'storage_unavailable'),
-      await TH.expectBad(deviceDB.tryCacheDeviceRecord(deviceRecordOf()), 'storage_unavailable'),
     ]
     for (const err of refusals) {
       expect(err.message).to.include('QuotaExceededError')
