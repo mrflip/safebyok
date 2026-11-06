@@ -52,7 +52,7 @@ export type Times    = Readonly<Z.infer<typeof times>>
 // == [Scopes]: vaultQuery, boxQuery, watchScope, VaultQuery, BoxQuery, WatchScope
 
 // A scope's validator is CX's, frozen; `unwrap()` is its object, to extend.
-export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_option', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
+export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_scope', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
   vaultQuery: vaultScope.unwrap().extend({ vault_tok }),
   boxQuery:   boxscope.unwrap().extend({ vault_tok }),
   watchScope: bankScope.unwrap().extend({ vaultlabel: vaultlabel.optional() }),
