@@ -1,273 +1,238 @@
+import * as SX from 'safebyok/storage'
+import type { PutOptsGiven, VaultScope, WatchScope } from 'safebyok/storage'
+import type { WithoutSystemFields } from 'convex/server'
 import { v } from 'convex/values'
-import type { Infer } from 'convex/values'
-import { Expectations } from 'safebyok-old'
-import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
-import type { Doc, Id } from './_generated/dataModel'
+import type { Doc } from './_generated/dataModel'
 import * as Tallies from './tallies'
+import type { Life } from './tallies'
 import * as CVX from './validators'
 
-/** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
- * That wrapper authenticates first: inside the component every call is trusted to be its
- * `user_id`'s own. Each function keeps the contract of the `VaultDB` method it serves, and says
- * only where it differs.
- *
- * Convex runs mutations serializably, so each check and its write hold together, and a query reads
- * one snapshot. A failed expectation is not an error: it resolves `false`, `null` for a box
- * deletion, or an answer naming what is stored, which the client refuses as `stale_write`.
- *
- * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
- * always be deleted whole. A delete is never refused for room.
- *
- * Each takes and returns the core's records as `./validators` types them, a salt the core brands
- * keeping its {@link $brand}.
- */
+// One function for each of the VaultDB's generic calls, reached through the host's wrapper, which
+// has already proved the caller is the user each call names. Convex runs a mutation as one
+// serializable transaction, so each put and del is one atomic step: it reads the rows it judges,
+// decides by the core's own predicates, and writes, or not, in one go. A query reads one snapshot.
 
-// ------------------------------------------------------------------------------- the vault
+// == [Gets]: listVaults, getVault, listBoxes, getBox
 
-/** The vault record and every box without its two ciphered fields, from one query's snapshot, or null when the vault was never created. */
+/** Every vault row of a bank, by vaultlabel. */
+export const listVaults = query({
+  args:    CVX.listVaultsArgs,
+  returns: v.array(CVX.rowOfVault),
+  handler: async (ctx, { scope }) => {
+    const vaultDocs = await scopeVaultQuery(ctx.db, scope).collect()
+    return vaultDocs.map(({ vaultlabel, vault }) => ({ vaultlabel, vault }))
+  },
+})
+
+/** The vault row at `scope`, or null. */
 export const getVault = query({
-  args:    { ...CVX.vaultScope.fields },
-  returns: v.nullable(CVX.vaultAnswer),
-  handler: async (ctx, scope) => {
-    const row = await findVaultRecordRow(ctx.db, scope)
-    return row && { vault: vaultRecordOfRow(row), boxes: boxSparsesOf(await vaultBoxRows(ctx.db, scope)) }
+  args:    CVX.getVaultArgs,
+  returns: v.any(),
+  handler: async (ctx, { scope }) => (await findVaultDoc(ctx.db, scope))?.vault ?? null,
+})
+
+/** The box rows of one life of a vault, and the vault row, from one snapshot. */
+export const listBoxes = query({
+  args:    CVX.listBoxesArgs,
+  returns: CVX.boxesFetched,
+  handler: async (ctx, { asked }) => {
+    const vault = (await findVaultDoc(ctx.db, asked))?.vault ?? null
+    const boxDocs = await Tallies.lifeBoxQuery(ctx.db, asked).collect()
+    return { vault, boxes: boxDocs.map(({ boxlabel, box }) => ({ boxlabel, box })) }
   },
 })
 
-/** Store `draft` only if its scope holds no vault record, and return whichever vault record is stored there afterwards, with every box, from one transaction.
- * Over a tombstone the new vault's `vault_epoch` is the tombstone's, and the tombstone goes: a new
- * life, the counter carried on, as the core's `Expectations.newLifeOf` makes it.
- */
-export const ensureVault = mutation({
-  args:    { draft: CVX.novelVaultRecord },
-  returns: CVX.vaultAnswer,
-  handler: async (ctx, { draft }) => {
-    const scope = scopeOf(draft)
-    const storedRow = await findVaultRecordRow(ctx.db, scope)
-    if (storedRow) { return { vault: vaultRecordOfRow(storedRow), boxes: boxSparsesOf(await vaultBoxRows(ctx.db, scope)) } }
-    const tombstone = await findTombstoneRow(ctx.db, scope)
-    const life = Expectations.newLifeOf(draft, tombstone) ?? draft
-    if (tombstone) { await ctx.db.delete('safebyok_vault_tombstones', tombstone._id) }
-    await ctx.db.insert('safebyok_vaults', life)
-    return { vault: life, boxes: boxSparsesOf(await vaultBoxRows(ctx.db, scope)) }
-  },
-})
-
-// ------------------------------------------------------------------------------- the vault record
-
-/** Replace the vault record, only while the one stored has `expected.vault_tok` and `expected.gate_epoch`, resolving a {@link CVX.putVaultRecordAnswer}.
- * What lands is `vaultRecord` with its `vault_epoch` the stored one plus one, whatever it carries.
- * It also misses, writing nothing, for a vault record that names another vault or does not move
- * `gate_epoch` forward. A miss names the stored vault record, or null for none.
- */
-export const putVaultRecord = mutation({
-  args:    { vaultRecord: CVX.vaultRecord, expected: CVX.vaultRecordExpectation },
-  returns: CVX.putVaultRecordAnswer,
-  handler: async (ctx, { vaultRecord, expected }): Promise<Infer<typeof CVX.putVaultRecordAnswer>> => {
-    const storedRow = await findVaultRecordRow(ctx.db, scopeOf(vaultRecord))
-    // The core's comparison, then the server's own: the record written stays the vault's, its gate moving forward.
-    const movesForward = storedRow !== null
-      && Expectations.vaultRecordMeets(storedRow, expected)
-      && vaultRecord.vault_tok === storedRow.vault_tok
-      && vaultRecord.gate_epoch > storedRow.gate_epoch
-    if (! movesForward) { return { landed: false, vault_stored: storedRow && vaultRecordOfRow(storedRow) } }
-    const written = Expectations.vaultRecordPutOf(vaultRecord, storedRow)
-    await ctx.db.replace('safebyok_vaults', storedRow._id, written)
-    return { landed: true, vault_stored: written }
-  },
-})
-
-// ----------------------------------------------------------------------------- the boxes
-
-/** Read the box under `boxlabel` as `VaultDB`'s `doGetBox` does, resolving a {@link CVX.getBoxAnswer} where that throws.
- * The vault record and the box are read from one query's snapshot.
- */
+/** One box row of one life of a vault, or null, and the vault row, from one snapshot. */
 export const getBox = query({
-  args:    { ...CVX.boxscope.fields, expected: CVX.boxGetExpectation },
-  returns: CVX.getBoxAnswer,
-  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof CVX.getBoxAnswer>> => {
-    const vaultRow = await findVaultRecordRow(ctx.db, scope)
-    if (! Expectations.vaultMeets(vaultRow, expected)) {
-      return { got: false, refusalkind: 'vault_mismatch' }
-    }
-    const row = await findBoxRow(ctx.db, scope, boxlabel)
-    return { got: true, box_stored: row && boxOfRow(row) }
+  args:    CVX.getBoxArgs,
+  returns: CVX.boxFetched,
+  handler: async (ctx, { asked }) => {
+    const vault = (await findVaultDoc(ctx.db, asked))?.vault ?? null
+    const box = (await findBoxDoc(ctx.db, asked, asked.boxlabel))?.box ?? null
+    return { vault, box }
+  },
+})
+// --
+
+// == [Puts]: putVault, putBox
+
+/** Store a vault row where `opts` allow it over the row found, answering the landing. */
+export const putVault = mutation({
+  args:    CVX.putVaultArgs,
+  returns: CVX.landing,
+  handler: async (ctx, { record, opts }) => {
+    const anteDoc = await findVaultDoc(ctx.db, record)
+    const ante = anteDoc?.vault ?? null
+    const landed = isPutAllowed(ante, opts)
+    if (landed) { await storeVaultDoc(ctx.db, anteDoc, record) }
+    return { landed, ante }
   },
 })
 
-/** Write `box` as `VaultDB`'s `doPutBox` does, resolving a {@link CVX.putBoxAnswer} where that throws.
- * Beside its refusals, it resolves `vault_full` for a write that would take the vault past {@link
- * Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes} bytes and leave it larger: a new
- * box in a full vault, or a heavier replacement. A vault with no tally yet is counted first,
- * reading it once.
- */
+/** Store a box row where its life is the vault's live one and `opts` allow it, answering the landing, or the capacity of a full vault. */
 export const putBox = mutation({
-  args:    { ...CVX.vaultScope.fields, expected: CVX.boxExpectation, box: CVX.boxRecord },
+  args:    CVX.putBoxArgs,
   returns: CVX.putBoxAnswer,
-  handler: async (ctx, { expected, box, ...scope }): Promise<Infer<typeof CVX.putBoxAnswer>> => {
-    const vaultRow = await findVaultRecordRow(ctx.db, scope)
-    if (vaultRow === null || ! Expectations.vaultMeets(vaultRow, expected)) {
-      return { landed: false, refusalkind: 'vault_mismatch' }
-    }
-    const storedRow = await findBoxRow(ctx.db, scope, box.boxlabel)
-    if (Expectations.boxRefusalOf(vaultRow, storedRow, expected)) {
-      return { landed: false, refusalkind: 'stale_write', box_stored: storedRow && boxOfRow(storedRow) }
-    }
-    //
-    const row = boxRowOf(scope, box)
-    const reckoning = await Tallies.reckon(ctx.db, vaultRow._id, vaultBoxQuery(ctx.db, scope))
-    const storedBytes = storedRow === null ? 0 : Tallies.weigh(storedRow)
-    // A new row is weighed with Convex's estimate of an `_id` until it has one.
-    const growthAs = (rowId?: Id<'safebyok_boxes'>) => ({
-      box_count: storedRow === null ? 1 : 0,
-      box_bytes: Tallies.weigh(row, rowId) - storedBytes,
-    })
-    if (Tallies.refuses(reckoning.tally, growthAs(storedRow?._id))) {
-      return { landed: false, refusalkind: 'vault_full', capacity: Tallies.capacityOf(reckoning.tally) }
-    }
-    const rowId = storedRow === null
-      ? await ctx.db.insert('safebyok_boxes', row)
-      : await replaceBoxRow(ctx.db, storedRow._id, row)
-    await Tallies.record(ctx.db, vaultRow._id, reckoning, growthAs(rowId))
-    // The row just written, which this transaction reads back as it left it.
-    const written = await ctx.db.get('safebyok_boxes', rowId)
-    if (written === null) { throw new Error('A box row this mutation wrote could not be read back in the same transaction.') }
-    return { landed: true, box_stored: boxOfRow(written) }
+  handler: async (ctx, { record, opts, maxBoxes = Tallies.MaxVaultBoxes }) => {
+    const vault = (await findVaultDoc(ctx.db, record))?.vault ?? null
+    const life = lifeOf(record)
+    const anteDoc = await findBoxDoc(ctx.db, life, record.boxlabel)
+    const ante = anteDoc?.box ?? null
+    const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
+    if (! landed) { return { landed, ante, vault } }
+    const cap = Math.min(maxBoxes, Tallies.MaxVaultBoxes)
+    const boxDoc = { ...life, boxlabel: record.boxlabel, box: record }
+    const growth = { box_count: (SX.isLiveRow(ante) ? 0 : 1), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
+    const reckoning = await Tallies.reckon(ctx.db, life)
+    if (Tallies.refuses(reckoning.tally, growth, cap)) { return { capacity: Tallies.capacityOf(reckoning.tally, cap) } }
+    await storeBoxDoc(ctx.db, anteDoc, boxDoc)
+    await Tallies.record(ctx.db, life, reckoning, growth)
+    return { landed, ante, vault }
   },
 })
+// --
 
-/** How full the vault is: its tally against the component's limits, as a box write checks them.
- * A vault with no tally yet is counted afresh, reading it once; a scope holding no vault is empty.
- */
-export const getCapacity = query({
-  args:    { ...CVX.vaultScope.fields },
-  returns: CVX.capacity,
-  handler: async (ctx, scope) => {
-    const vaultRow = await findVaultRecordRow(ctx.db, scope)
-    if (vaultRow === null) { return Tallies.capacityOf({ box_count: 0, box_bytes: 0 }) }
-    const { tally } = await Tallies.reckon(ctx.db, vaultRow._id, vaultBoxQuery(ctx.db, scope))
-    return Tallies.capacityOf(tally)
-  },
-})
+// == [Dels]: delVault, delBox
 
-/** Remove the box under `boxlabel` as `VaultDB`'s `doDelBox` does, and take it off the vault's tally. */
-export const delBox = mutation({
-  args:    { ...CVX.boxscope.fields, expected: CVX.boxDelExpectation },
-  returns: v.nullable(CVX.boxDeletion),
-  handler: async (ctx, { boxlabel, expected, ...scope }): Promise<Infer<typeof CVX.boxDeletion> | null> => {
-    const vaultRow = await findVaultRecordRow(ctx.db, scope)
-    if (vaultRow === null || ! Expectations.vaultMeets(vaultRow, expected)) { return null }
-    const storedRow = await findBoxRow(ctx.db, scope, boxlabel)
-    const deletion = Expectations.deletionOf(storedRow, expected)
-    if (storedRow) {
-      await ctx.db.delete('safebyok_boxes', storedRow._id)
-      await Tallies.forget(ctx.db, vaultRow._id, storedRow)
-    }
-    return deletion
-  },
-})
-
-// --------------------------------------------------------------------------------- the vault
-
-/** Remove the vault record, every box and the tally in one transaction, only while the vault record has `expected.vault_tok` and, unless it is null, `expected.gate_epoch`, leaving a tombstone, which it resolves.
- * The tombstone takes the vault's place in the scope, its `vault_epoch` the vault's plus one.
- * Null when the vault record does not meet the expectation, or none is stored.
- */
+/** Store a vault's tombstone over its live or damaged row at `opts.prior`, tombstoning the boxes of its life, answering the landing. */
 export const delVault = mutation({
-  args:    { ...CVX.vaultScope.fields, expected: CVX.vaultDelExpectation },
-  returns: v.nullable(CVX.vaultTombstone),
-  handler: async (ctx, { expected, ...scope }): Promise<Infer<typeof CVX.vaultTombstone> | null> => {
-    const vaultRow = await findVaultRecordRow(ctx.db, scope)
-    const tombstone = vaultRow && Expectations.tombstoneOf(vaultRow, scope, expected)
-    if (! vaultRow || ! tombstone) { return null }
-    const boxes = await vaultBoxRows(ctx.db, scope)
-    await Promise.all(boxes.map((row) => ctx.db.delete('safebyok_boxes', row._id)))
-    await Tallies.drop(ctx.db, vaultRow._id)
-    await ctx.db.delete('safebyok_vaults', vaultRow._id)
-    await ctx.db.insert('safebyok_vault_tombstones', tombstone)
-    return tombstone
+  args:    CVX.delVaultArgs,
+  returns: CVX.landing,
+  handler: async (ctx, { tombstone, opts: { prior } }) => {
+    const anteDoc = await findVaultDoc(ctx.db, tombstone)
+    const ante = anteDoc?.vault ?? null
+    const isOurs = SX.isLiveRowUnder(ante, tombstone.vault_tok)
+    const isDamaged = (ante !== null) && (! SX.vaultRow.safeParse(ante).success)
+    const landed = (isOurs && SX.isRowAt(ante, prior)) || SX.isDamagedVaultAt(ante, tombstone, prior)
+    // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
+    if ((! landed) && (isOurs || isDamaged)) { return { landed, ante } }
+    if (landed) { await storeVaultDoc(ctx.db, anteDoc, tombstone) }
+    await tombstoneBoxes(ctx.db, lifeOf(tombstone), tombstone.written_at)
+    return { landed, ante }
   },
 })
 
-/** The vault's change signature, for a client to subscribe to: it changes when, and only when, a write lands in the vault.
- * Each run reads every box document whole, ciphertext and all, as a Convex query cannot read some
- * of a document's fields. The tallies' limits keep that within one query's reads.
- */
-export const watchVault = query({
-  args:    { ...CVX.vaultScope.fields },
-  returns: CVX.vaultSignature,
-  handler: async (ctx, scope) => {
-    const vaultRow = await findVaultRecordRow(ctx.db, scope)
-    const boxes = await vaultBoxRows(ctx.db, scope)
+/** Store a box's tombstone over its live or damaged row at `opts.prior`, in the vault's live life, answering the landing. */
+export const delBox = mutation({
+  args:    CVX.delBoxArgs,
+  returns: CVX.boxLanding,
+  handler: async (ctx, { tombstone, opts: { prior } }) => {
+    const vault = (await findVaultDoc(ctx.db, tombstone))?.vault ?? null
+    const life = lifeOf(tombstone)
+    const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
+    const ante = anteDoc?.box ?? null
+    const isDeletable = (SX.isLiveRow(ante) && SX.isRowAt(ante, prior)) || SX.isDamagedBoxAt(ante, tombstone, prior)
+    const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+    if (landed) {
+      const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
+      await storeBoxDoc(ctx.db, anteDoc, boxDoc)
+      await Tallies.forget(ctx.db, life, { box_count: (SX.isLiveRow(ante) ? -1 : 0), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
+    }
+    return { landed, ante, vault }
+  },
+})
+// --
+
+// == [Upkeep]: tidyGone, watchRows
+
+/** Remove the box rows and tallies of every life of a bank that has ended, answering how many box rows remain. */
+export const tidyGone = mutation({
+  args:    CVX.tidyGoneArgs,
+  returns: CVX.tidied,
+  handler: async (ctx, { scope }) => {
+    const vaultDocs = await scopeVaultQuery(ctx.db, scope).collect()
+    const vaultsByLabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
+    const isOver = ({ vaultlabel, vault_tok }: Life) => SX.isLifeOver(vaultsByLabel.get(vaultlabel) ?? null, vault_tok)
+    const boxDocs = await scopeBoxQuery(ctx.db, scope).collect()
+    const overBoxDocs = boxDocs.filter(isOver)
+    const overTallyDocs = (await scopeTallyQuery(ctx.db, scope).collect()).filter(isOver)
+    await Promise.all(overBoxDocs.map(({ _id }) => ctx.db.delete('safebyok_boxes', _id)))
+    await Promise.all(overTallyDocs.map(({ _id }) => ctx.db.delete('safebyok_tallies', _id)))
+    return { totalCount: boxDocs.length - overBoxDocs.length }
+  },
+})
+
+/** Every vault row and box row under `scope`, for a client to subscribe to. */
+// A Convex query reads whole documents, so a bank-wide watch reads every row of the bank on each run.
+export const watchRows = query({
+  args:    CVX.watchRowsArgs,
+  returns: CVX.rowsWatched,
+  handler: async (ctx, { scope }) => {
+    const vaultDocs = await scopeVaultQuery(ctx.db, scope).collect()
+    const boxDocs = await scopeBoxQuery(ctx.db, scope).collect()
     return {
-      vault_tok:  vaultRow?.vault_tok ?? null,
-      gate_epoch: vaultRow?.gate_epoch ?? null,
-      boxes:      boxes.map((row) => [row.boxlabel, row.revision_tok]),
+      vaults: vaultDocs.map(({ vaultlabel, vault }) => ({ vaultlabel, vault })),
+      boxes:  boxDocs.map(({ vaultlabel, vault_tok, boxlabel, box }) => ({ vaultlabel, vault_tok, boxlabel, box })),
     }
   },
 })
+// --
 
-// ------------------------------------------------------------------------------------ helpers
+// == [Helpers]: isPutAllowed, lifeOf, findVaultDoc, findBoxDoc, storeVaultDoc, storeBoxDoc, tombstoneBoxes, scope queries
 
-type VaultScope = Infer<typeof CVX.vaultScope>
-type VaultRecord = Infer<typeof CVX.vaultRecord>
-type BoxRecord = Infer<typeof CVX.boxRecord>
+/** True when a put under `opts` may land over `ante`, the row it would replace. */
+const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
+  SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
+)
 
-/** The scope vault record names: its three names picked out, and nothing else. */
-const scopeOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScope => ({ applabel, user_id, vaultlabel })
+/** The life a record is filed under. */
+const lifeOf = ({ applabel, user_id, vaultlabel, vault_tok }: Life): Life => ({ applabel, user_id, vaultlabel, vault_tok })
 
-// `.unique()` throws on a second row: find-or-insert never makes one, so two would be damage,
-// and damage surfaces rather than being papered over.
-const findVaultRecordRow = (db: DatabaseReader, scope: VaultScope) => (
+// `.unique()` throws on a second document: one is inserted only where none was found, in the same
+// transaction, so two would be damage, which surfaces rather than being papered over.
+const findVaultDoc = (db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope) => (
   db.query('safebyok_vaults')
-    .withIndex('by_scope', (idx) => idx.eq('user_id', scope.user_id).eq('applabel', scope.applabel).eq('vaultlabel', scope.vaultlabel))
+    .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel))
     .unique()
 )
 
-/** The tombstone a deleted vault left in `scope`, whose counter a new life there carries on, or null where none is stored. */
-const findTombstoneRow = (db: DatabaseReader, scope: VaultScope) => (
-  db.query('safebyok_vault_tombstones')
-    .withIndex('by_scope', (idx) => idx.eq('user_id', scope.user_id).eq('applabel', scope.applabel).eq('vaultlabel', scope.vaultlabel))
-    .unique()
-)
-
-const findBoxRow = (db: DatabaseReader, scope: VaultScope, boxlabel: string) => (
+const findBoxDoc = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string) => (
   db.query('safebyok_boxes')
-    .withIndex('by_box', (idx) => idx.eq('user_id', scope.user_id).eq('applabel', scope.applabel).eq('vaultlabel', scope.vaultlabel).eq('boxlabel', boxlabel))
+    .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()
 )
 
-// One vault's range of one index: bounded by that vault, not by the table.
-const vaultBoxQuery = (db: DatabaseReader, scope: VaultScope) => (
-  db.query('safebyok_boxes')
-    .withIndex('by_box', (idx) => idx.eq('user_id', scope.user_id).eq('applabel', scope.applabel).eq('vaultlabel', scope.vaultlabel))
-)
-
-// Every box row of one vault, which the tallies' limits keep within one transaction's reads.
-const vaultBoxRows = (db: DatabaseReader, scope: VaultScope) => vaultBoxQuery(db, scope).collect()
-
-/** Replace a box row in place, handing back its `_id`, which a replacement keeps. */
-const replaceBoxRow = async (db: DatabaseWriter, rowId: Id<'safebyok_boxes'>, row: ReturnType<typeof boxRowOf>) => {
-  await db.replace('safebyok_boxes', rowId, row)
-  return rowId
+/** Store `vault` in place of `anteDoc`, or as a new document. */
+const storeVaultDoc = async (db: DatabaseWriter, anteDoc: Doc<'safebyok_vaults'> | null, vault: SX.VaultRecord | SX.VaultTombstone): Promise<void> => {
+  const { applabel, user_id, vaultlabel } = vault
+  if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { applabel, user_id, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault }) }
 }
 
-/** A vault row as the vault record it holds: Convex's system fields stripped. */
-const vaultRecordOfRow = ({ _id, _creationTime, ...vaultRecord }: Doc<'safebyok_vaults'>): VaultRecord => vaultRecord
-
-/** A box row as the record it holds: system fields and scope columns stripped. */
-const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {
-  const { _id, _creationTime, applabel: _applabel, user_id: _user_id, vaultlabel: _vaultlabel, ...box } = row
-  return box
+/** Store `boxDoc` in place of `anteDoc`, or as a new document. */
+const storeBoxDoc = async (db: DatabaseWriter, anteDoc: Doc<'safebyok_boxes'> | null, boxDoc: WithoutSystemFields<Doc<'safebyok_boxes'>>): Promise<void> => {
+  if (anteDoc) { await db.replace('safebyok_boxes', anteDoc._id, boxDoc) } else { await db.insert('safebyok_boxes', boxDoc) }
 }
 
-/** Box rows as a listing returns them: each box's sparse shape, its record without its two ciphered fields. */
-const boxSparsesOf = (rows: Doc<'safebyok_boxes'>[]): Infer<typeof CVX.boxSparse>[] => rows.map((row) => {
-  const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...sparse } = boxOfRow(row)
-  return sparse
-})
+/** Tombstone every live box row of `life`, and drop its tally. */
+const tombstoneBoxes = async (db: DatabaseWriter, life: Life, written_at: number): Promise<void> => {
+  const boxDocs = await Tallies.lifeBoxQuery(db, life).collect()
+  await Promise.all(boxDocs.map(async (boxDoc) => {
+    const boxTombstone = SX.boxTombstoneOf(boxDoc.box, written_at)
+    if (boxTombstone !== null) { await db.patch('safebyok_boxes', boxDoc._id, { box: boxTombstone }) }
+  }))
+  await Tallies.drop(db, life)
+}
 
-/** The row a box is stored as: its scope columns added. */
-const boxRowOf = (scope: VaultScope, box: BoxRecord) => ({ ...scope, ...box })
+/** The vault documents of a bank, or of the one vault a scope names. */
+const scopeVaultQuery = (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope) => (
+  db.query('safebyok_vaults').withIndex('by_scope', (idx) => {
+    const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
+    return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
+  })
+)
+
+/** The box documents of a bank, or of the one vault a scope names, every life. */
+const scopeBoxQuery = (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope) => (
+  db.query('safebyok_boxes').withIndex('by_box', (idx) => {
+    const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
+    return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
+  })
+)
+
+/** The tally documents of a bank. */
+const scopeTallyQuery = (db: DatabaseReader, { applabel, user_id }: WatchScope) => (
+  db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel))
+)
+// --
