@@ -293,7 +293,7 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
   autolockMinutes:     positiveMinutes.optional(),
   vaultRefreshMinutes: refreshMinutes.optional(),
   boxRefreshMinutes:   refreshMinutes.optional(),
-  onBadNews:           fn().optional(),
+  onBadNews:           fn<BadNewsHandler>().optional(),
   onPanic:             custom<PanicHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
