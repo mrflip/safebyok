@@ -1,6 +1,6 @@
 # Thread 4: hello_listed (2026-11-06)
 
-Branch `20261106-hello_listed`, stacked on #513. Justify green: safebyok 1834 tests, root 302, safebyok-old 3537; lint 0 errors.
+Branch `20261106-hello_listed`, PR #523, stacked on #513. Justify green: safebyok 1834 tests, root 302, safebyok-old 3537; lint 0 errors.
 
 * **Built**: `boxListing.hello()` takes no argument (the base `Listing.hello`, no override). `BoxListing._takeListed(listed)` holds the boxes sparse and sets the damaged rows aside; `vault.hello` calls it after `boxListing.hello()`. The second `VX.boxesListed.parse` is gone: `vaultListing.fetchListed` parses the list once, where it is fetched.
 * **Decisions taken**: the non-public path is a method named with a leading underbar, `_takeListed`, since a `#`-private method cannot be called by the vault. `no-underscore-dangle` is off, but `unicorn/prefer-private-class-fields` flags the underbar name, so it carries one `eslint-disable-line`, as the `_cheat_` methods do. Not a `_cheat_` name (that is for test backdoors) and not a friend object (machinery for one call). Calling order is as before: `hello()` (watch started) then the listed boxes.
