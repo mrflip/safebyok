@@ -178,9 +178,13 @@ export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
   load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
 }, Phrases.KeyDeriverShape), 'bad_option')
 
+true satisfies Z.core.util.AssertEqual<KeyDeriver, Readonly<Z.input<typeof keyDeriverShape>>>
+
 /** The shape a VaultLogger must have. It only checks: `parseLogger` guards the host's own logger, and calls it `this` and all. */
 export const loggerShape = Checker(({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
 }, 'bad_option')
+
+true satisfies Z.core.util.AssertEqual<VaultLogger, Z.input<typeof loggerShape>>
 // --
