@@ -107,3 +107,27 @@ describe("Refusals.unexpectedError", () => {
     expect(cause.cause).to.deep.equal({ code: 7 })
   })
 })
+
+describe("Refusals.storageFailed", () => {
+  it("names the call and what was thrown by its name, carrying nothing else of it", () => {
+    const thrown = new Error("[Request ID: 1a2b] Server Error: Uncaught Error in putBox with args {\"whisper_ciphered\":\"c2VjcmV0\"}")
+    const err = Refusals.storageFailed('putBox', thrown)
+    expect(err).to.include({ refusalkind: 'storage_unavailable' })
+    expect(err).not.to.have.property('cause')
+    expect(err.message).to.equal(Phrases.storageFailed('putBox', Phrases.storeThrew('Error')))
+    expect(err.message).not.to.include('c2VjcmV0')
+  })
+
+  it("names no thrown at all for a throw that has no name", () => {
+    expect(Refusals.storageFailed('getVault', undefined).message).to.equal(Phrases.storageFailed('getVault', ''))
+  })
+})
+
+describe("Refusals.identityRevoked", () => {
+  it("refuses as identity_revoked, saying to open the vault again", () => {
+    const err = Refusals.identityRevoked()
+    expect(err).to.be.instanceOf(VaultError)
+    expect(err).to.include({ refusalkind: 'identity_revoked' })
+    expect(err.message).to.match(/Open the vault again/)
+  })
+})

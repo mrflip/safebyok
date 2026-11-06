@@ -527,3 +527,12 @@ export const storeFailed = (call: string, named: string): string => `This device
 /** The sentence naming what a device store threw, by its `name` alone. */
 export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
 // --
+
+// == [Refusals: storage backends]: storageFailed, IdentityRevoked
+
+/** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
+export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
+
+/** A storage backend that no longer serves the user the call names. */
+export const IdentityRevoked = "The vault's storage no longer serves this user: they signed out, or another user signed in. Open the vault again for the user signed in."
+// --
