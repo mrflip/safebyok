@@ -7,7 +7,7 @@ The design is the Coach's Recommendation B in the sprint's `listing-responsibili
 
 * **Built**:
   * **vaultDB** (`storage/vault-db-new.ts`):
-    * `listBoxes({ ...vaultScope, vault_tok })` and `tryListBoxes` answer `{ boxes, damaged_records }` (`BoxesListed`)
+    * `listBoxes({ ...vaultScope, vault_tok })` and `tryListBoxes` answer `{ boxes, damaged_rows }` (`BoxesListed`)
       with the vault row as `world`, checked by `checkedVaultLife`, so a stale tok answers `vault_mismatch`.
     * `doListBoxes(query)` answers `{ vault, boxes }` (`BoxesFetched`), read in one step.
     * `getVault` and `doGetVault` answer the row alone; `#moveGate` reads through the narrowed `doGetVault`.
