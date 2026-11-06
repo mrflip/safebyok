@@ -64,14 +64,14 @@ describe("SafebyokComponent.api, for the user a call names", () => {
 
 describe("SafebyokComponent.api, for anyone else", () => {
   for (const [fnname, call] of EveryCall) {
-    it(`refuses ${fnname} as identity_revoked when no one is signed in, and changes nothing`, async () => {
+    it(`refuses ${fnname} when no one is signed in`, async () => {
       const backend = await seeded()
       const before = await heldBy(backend)
       expect(await TH.convexRefusalOf(call(backend))).to.deep.equal({ kind: 'identity_revoked' })
       expect(await heldBy(backend)).to.deep.equal(before)
     })
 
-    it(`refuses ${fnname} as identity_revoked for a user it does not name, and changes nothing`, async () => {
+    it(`refuses ${fnname} to a user it does not name`, async () => {
       const backend = await seeded()
       const before = await heldBy(backend)
       const stranger = backend.withIdentity({ subject: 'u2' })

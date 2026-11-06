@@ -124,7 +124,7 @@ describe("Refusals.storageFailed", () => {
 })
 
 describe("Refusals.identityRevoked", () => {
-  it("refuses as identity_revoked, saying to open the vault again", () => {
+  it("says to open the vault again", () => {
     const err = Refusals.identityRevoked()
     expect(err).to.be.instanceOf(VaultError)
     expect(err).to.include({ refusalkind: 'identity_revoked' })
