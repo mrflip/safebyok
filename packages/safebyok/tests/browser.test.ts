@@ -14,8 +14,11 @@ const CheapSpec = {
 
 const salt = new Uint8Array(16).fill(7)
 
+// One derivation at full strength (64 MiB, three passes) in pure JS takes 3-4 s on a CI runner under coverage, past vitest's 5 s default when the runner is busy.
+const FullStrengthDeriveMillis = 30_000
+
 describe("safebyok/browser", () => {
-  it("derives a 32-byte key under the argon2id_web_v1 label with argon2idWebV1Deriver", async () => {
+  it("derives a 32-byte key under the argon2id_web_v1 label with argon2idWebV1Deriver", { timeout: FullStrengthDeriveMillis }, async () => {
     expect(argon2idWebV1Deriver.key_deriver_label).to.eq('argon2id_web_v1')
     const keyBytes = await argon2idWebV1Deriver.deriveKeyBytes('a short passphrase', salt)
     expect(keyBytes).to.have.lengthOf(32)
