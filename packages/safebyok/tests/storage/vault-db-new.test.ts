@@ -20,10 +20,10 @@ describe("MemoryVaultDB", () => {
     })
   })
 
-  describe("getBank", () => {
+  describe("listVaults", () => {
     it("answers gotvoid over a bank with no vaults, its world the scope", async () => {
       const vaultDB = new MemoryVaultDB()
-      const answer = await vaultDB.getBank(bankScope)
+      const answer = await vaultDB.listVaults(bankScope)
       expect(answer).to.deep.include({ ok: true, act: 'gotvoid', world: bankScope })
       expect(answer.val).to.deep.equal({ vaults: [], damaged_rows: [] })
     })
@@ -32,7 +32,7 @@ describe("MemoryVaultDB", () => {
       const { vaultDB, vault } = await storeWith()
       vaultDB._cheat_vaultRowsOf(bankScope).set('broken', { revision_tok: 'r9', revision_seq: 9, am: 'a', vault_tok: 'life9', garbage: true })
       vaultDB._cheat_vaultRowsOf(bankScope).set('rubble', 'not even an object')
-      const { act, val } = await vaultDB.getBank(bankScope)
+      const { act, val } = await vaultDB.listVaults(bankScope)
       expect(act).to.eq('got')
       expect(val.vaults).to.deep.equal([vault])
       expect(val.damaged_rows.map(({ vaultlabel, am, revision_seq, vault_tok }) => ({ vaultlabel, am, revision_seq, vault_tok }))).to.deep.equal([
@@ -46,7 +46,7 @@ describe("MemoryVaultDB", () => {
       const { vaultDB } = await storeWith()
       vaultDB._cheat_vaultRowsOf(bankScope).set('newer', { fmt: SX.VaultFormat + 1, revision_seq: 9 })
       vaultDB._cheat_vaultRowsOf(bankScope).set('rubble', 'not even an object')
-      const { val } = await vaultDB.getBank(bankScope)
+      const { val } = await vaultDB.listVaults(bankScope)
       expect(val.damaged_rows.map(({ vaultlabel, damagekind }) => ({ vaultlabel, damagekind }))).to.deep.equal([
         { vaultlabel: 'newer',  damagekind: 'format_mismatch' },
         { vaultlabel: 'rubble', damagekind: 'damaged_row' },
@@ -56,40 +56,16 @@ describe("MemoryVaultDB", () => {
     it("lists a row under a label failing its check among the damaged, and the rest as ever", async () => {
       const { vaultDB, vault } = await storeWith()
       vaultDB._cheat_vaultRowsOf(bankScope).set('Not A Label', { garbage: true })
-      const { val } = await vaultDB.getBank(bankScope)
+      const { val } = await vaultDB.listVaults(bankScope)
       expect(val.vaults).to.deep.equal([vault])
       expect(val.damaged_rows.map(({ vaultlabel, am }) => ({ vaultlabel, am }))).to.deep.equal([{ vaultlabel: 'Not A Label', am: 'd' }])
     })
   })
 
   describe("getVault", () => {
-    it("answers the record, its sparse boxes tombstones included, and the rows it set aside", async () => {
-      const { vaultDB, vault, box } = await storeWith({ box: true })
-      const other = boxAt(0, 'life1', { boxlabel: 'other' })
-      await vaultDB.putBox(other, { prior: SX.VoidRevision })
-      await vaultDB.delBox(boxTombstoneOf(other), { prior: priorOf(other) })
-      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('rubble', 12)
-      const { act, val, world } = await vaultDB.getVault(vaultScope)
-      expect(act).to.eq('got')
-      expect(world).to.deep.equal(vault)
-      expect(val?.gate).to.deep.equal(vault.gate)
-      expect(val?.boxes).to.deep.equal([SX.boxSparse.parse(box), SX.boxSparse.parse(boxTombstoneOf(other))])
-      expect(val?.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
-    })
-
-    it("says format_mismatch of a box row of a later fmt", async () => {
-      const { vaultDB, vault } = await storeWith()
-      vaultDB._cheat_boxRowsOf(vaultScope, vault.vault_tok).set('newer', { fmt: SX.BoxFormat + 1 })
-      const { val } = await vaultDB.getVault(vaultScope)
-      expect(val?.damaged_rows.map(({ boxlabel, damagekind }) => ({ boxlabel, damagekind }))).to.deep.equal([{ boxlabel: 'newer', damagekind: 'format_mismatch' }])
-    })
-
-    it("lists a box under a label failing its check among the damaged", async () => {
-      const { vaultDB } = await storeWith({ box: true })
-      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('Not A Label', { garbage: true })
-      const { val } = await vaultDB.getVault(vaultScope)
-      expect(val?.boxes.map(({ boxlabel }) => boxlabel)).to.deep.equal(['openai'])
-      expect(val?.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
+    it("answers the record alone, and the record as world", async () => {
+      const { vaultDB, vault } = await storeWith({ box: true })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ ok: true, act: 'got', val: vault, world: vault })
     })
 
     it("over a void row, refuses vault_empty with no row, and answers null with ifAbsent nil", async () => {
@@ -119,6 +95,43 @@ describe("MemoryVaultDB", () => {
     })
   })
 
+  describe("listBoxes", () => {
+    const vaultQuery = { ...vaultScope, vault_tok: 'life1' }
+
+    it("answers the sparse boxes, tombstones included, the rows it set aside, and the vault row as world", async () => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      const other = boxAt(0, 'life1', { boxlabel: 'other' })
+      await vaultDB.putBox(other, { prior: SX.VoidRevision })
+      await vaultDB.delBox(boxTombstoneOf(other), { prior: priorOf(other) })
+      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('rubble', 12)
+      const { act, val, world } = await vaultDB.listBoxes(vaultQuery)
+      expect(act).to.eq('got')
+      expect(world).to.deep.equal(vault)
+      expect(val.boxes).to.deep.equal([SX.boxSparse.parse(box), SX.boxSparse.parse(boxTombstoneOf(other))])
+      expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
+    })
+
+    it("says format_mismatch of a box row of a later fmt", async () => {
+      const { vaultDB } = await storeWith()
+      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('newer', { fmt: SX.BoxFormat + 1 })
+      const { val } = await vaultDB.listBoxes(vaultQuery)
+      expect(val.damaged_rows.map(({ boxlabel, damagekind }) => ({ boxlabel, damagekind }))).to.deep.equal([{ boxlabel: 'newer', damagekind: 'format_mismatch' }])
+    })
+
+    it("lists a box under a label failing its check among the damaged", async () => {
+      const { vaultDB } = await storeWith({ box: true })
+      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('Not A Label', { garbage: true })
+      const { val } = await vaultDB.listBoxes(vaultQuery)
+      expect(val.boxes.map(({ boxlabel }) => boxlabel)).to.deep.equal(['openai'])
+      expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
+    })
+
+    it("refuses vault_mismatch under a stale vault_tok, as the box verbs do", async () => {
+      const { vaultDB, vault } = await storeWith({ box: true })
+      expect(await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'oldlife' })).to.deep.include({ ok: false, act: 'vault_mismatch', world: null, dbhas: vault })
+    })
+  })
+
   describe("getBox", () => {
     it("answers the record, and the vault row as world", async () => {
       const { vaultDB, vault, box } = await storeWith({ box: true })
@@ -142,10 +155,10 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' }, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
     })
 
-    it("refuses vault_mismatch under a live row of another vault_tok, holding that row, whatever ifAbsent says", async () => {
+    it("refuses vault_mismatch under a live row of another vault_tok, that row its dbhas and not its world, whatever ifAbsent says", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       const answer = await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'oldlife' }, { ifAbsent: 'nil' })
-      expect(answer).to.deep.include({ ok: false, act: 'vault_mismatch', world: vault, dbhas: vault })
+      expect(answer).to.deep.include({ ok: false, act: 'vault_mismatch', world: null, dbhas: vault })
     })
 
     it("refuses vault_empty for a vault_tok no row holds, over no row or another life's tombstone", async () => {
@@ -170,22 +183,22 @@ describe("MemoryVaultDB", () => {
 
   describe("a store's own failure", () => {
     class FailingVaultDB extends MemoryVaultDB {
-      protected override doGetBank(): never { throw new Error('socket closed') }
+      protected override doListVaults(): never { throw new Error('socket closed') }
     }
 
     it("reads as storage_unavailable, the store's error its cause, by a throw and by an answer alike", async () => {
       const vaultDB = new FailingVaultDB()
-      await expect(vaultDB.getBank(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
-      const answer = await vaultDB.tryGetBank(bankScope)
-      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, req_params: bankScope, meta: { call: 'getBank' } })
+      await expect(vaultDB.listVaults(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
+      const answer = await vaultDB.tryListVaults(bankScope)
+      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, req_params: bankScope, meta: { call: 'listVaults' } })
       expect((answer.err?.cause as Error).message).to.eq('socket closed')
     })
 
     it("a VaultError a store throws passes up unchanged, with the request's safe metadata", async () => {
       class RefusingVaultDB extends MemoryVaultDB {
-        protected override doGetBank(): never { throw new VaultError('storage_unavailable', 'Storage is down.') }
+        protected override doListVaults(): never { throw new VaultError('storage_unavailable', 'Storage is down.') }
       }
-      expect(await new RefusingVaultDB().tryGetBank(bankScope)).to.deep.include({ ok: false, act: 'storage_unavailable', req_params: bankScope })
+      expect(await new RefusingVaultDB().tryListVaults(bankScope)).to.deep.include({ ok: false, act: 'storage_unavailable', req_params: bankScope })
     })
   })
 

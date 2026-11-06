@@ -10,9 +10,9 @@ useVaultWorlds()
 
 describe("vault.hello: the host's call for the list and the pushes", () => {
   it("is run by no box verb, a getBox fetching only its own box and holding only that one", async () => {
-    const { openNextSession, tryGetVault, tryGetBox } = await makeWorldWithBox()
+    const { openNextSession, tryListBoxes, tryGetBox } = await makeWorldWithBox()
     const next = await openNextSession()
-    tryGetVault.mockClear()
+    tryListBoxes.mockClear()
     tryGetBox.mockClear()
     expect(next.boxListing.things).to.deep.equal([])
     const box = await next.getBox(boxlabel)
@@ -20,19 +20,19 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     expect(box?.isFull).to.be.true
     expect(next.boxListing.things).to.deep.equal([box])
     expect(tryGetBox).toHaveBeenCalledOnce()
-    expect(tryGetVault).not.toHaveBeenCalled()
+    expect(tryListBoxes).not.toHaveBeenCalled()
   })
 
   it("lists each box sparse, a get then hydrating it", async () => {
-    const { openNextSession, tryGetVault } = await makeWorldWithBox()
+    const { openNextSession, tryListBoxes } = await makeWorldWithBox()
     const next = await openNextSession()
-    tryGetVault.mockClear()
+    tryListBoxes.mockClear()
     await expect(next.hello()).resolves.to.eq(next)
     const listed = next.boxListing.at({ ...next.scope, boxlabel })
     expect(listed?.isFull).to.be.false
     await next.getBox(boxlabel)
     expect(listed?.isFull).to.be.true
-    expect(tryGetVault).toHaveBeenCalledOnce()
+    expect(tryListBoxes).toHaveBeenCalledOnce()
   })
 
   it("lists the boxes of a vault still locked; getBox answers one, and its whisper refuses", async () => {
@@ -60,26 +60,17 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     const next = await openNextSession()
     await delTyping(vault)
     await TH.expectRefusal(next.hello(), 'vault_gone')
-    await TH.expectRefusal(next.getBox(boxlabel), 'vault_gone')
+    expect(next.isPresent).to.be.false
+    expect(next.boxListing.things).to.deep.equal([])
   })
 
-  it("passes a get's failure up, and the next hello lists the boxes", async () => {
-    const { openNextSession, tryGetVault } = await makeWorldWithBox()
+  it("passes a listing's failure up, and the next hello lists the boxes", async () => {
+    const { openNextSession, tryListBoxes } = await makeWorldWithBox()
     const next = await openNextSession()
-    tryGetVault.mockRejectedValueOnce(new Error('the wire is down'))
+    tryListBoxes.mockRejectedValueOnce(new Error('the wire is down'))
     await expect(next.hello()).rejects.toThrow('the wire is down')
     await expect(next.hello()).resolves.to.eq(next)
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
-  })
-
-  it("refuses a vault.hello whose listed boxes fail their check", async () => {
-    const { openNextSession, tryGetVault, vaultDB } = await makeWorldWithBox()
-    const next = await openNextSession()
-    const answer = await vaultDB.tryGetVault(next.scope)
-    if (! answer.ok) { throw answer.err }
-    tryGetVault.mockResolvedValueOnce({ ...answer, val: { ...answer.val!, boxes: 'none' } } as never)
-    await TH.expectRefusal(next.hello(), 'damaged_row')
-    expect(next.boxListing.things).to.deep.equal([])
   })
 })
 

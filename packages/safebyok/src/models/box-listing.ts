@@ -7,7 +7,7 @@ import { type Boxscope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxCreateOpts, type BoxDna, type BoxesListed, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from '../shapes/shapes-vaultish'
+import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from '../shapes/shapes-vaultish'
 import type { Notice } from '../storage/vault-db-new'
 import { Box } from './box'
 import { Listing } from './listing'
@@ -18,7 +18,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   declare readonly world: BoxWorld
 
-  /** The rows the vault's get set aside as damaged. */
+  /** The rows the vaultDB's listing set aside as damaged. */
   #damagedRows: readonly DamagedBox[] = Object.freeze([])
 
   /** The rows of this vault found damaged, set aside until `del` names one. */
@@ -42,11 +42,18 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return boxRecord.parseConsistent(duck, this.world.scope) }
   // --
 
-  // == [Methods]: _takeListed, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
+  // == [Methods]: list, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
 
-  // The underbar says this is `vault.hello`'s to call, not a host's; the vault has parsed `listed` already.
-  /** Hold the boxes `vault.hello` listed, sparse, and set its damaged rows aside. */
-  async _takeListed({ boxes, damaged_rows }: BoxesListed): Promise<void> { // eslint-disable-line unicorn/prefer-private-class-fields
+  /** Hold every box the vaultDB lists for this vault, sparse, and set its damaged rows aside. */
+  async list(): Promise<void> {
+    this.demandEnabled()
+    const answer = await this.vaultDB.tryListBoxes({ ...this.world.scope, vault_tok: this.world.vault_tok })
+    if (answer.world !== null) { this.world.takeWorld(answer.world) }
+    if (! answer.ok) {
+      this.tellIfRevoked(answer.err)
+      throw answer.err
+    }
+    const { boxes, damaged_rows } = answer.val
     this.#damagedRows = Object.freeze(damaged_rows)
     for (const { boxlabel } of damaged_rows) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))

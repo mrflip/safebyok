@@ -136,7 +136,7 @@ export class Bank implements VaultWorld {
   async #bringUp(listing: VaultListing): Promise<void> {
     await this.keyDeriver.load?.()
     await loadStrengthChecker(this.strengthChecker)
-    await listing.fetchBank()
+    await listing.list()
     await listing.hello()
   }
   // --

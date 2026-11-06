@@ -95,24 +95,24 @@ describe("bank.hello", () => {
 
   it("refuses 'unexpected_error' when a strength checker will not load, what it threw the cause, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
-    const getBank = vi.spyOn(world.vaultDB, 'tryGetBank')
+    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
     const thrown = new Error('no word list here')
     const bank = world.bankOn({ strengthChecker: Object.assign((() => ({ strong: true })) as typeof anyStrengthChecker, { load: () => Promise.reject(thrown) }) })
     const err = await TH.expectRefusal(bank.hello(), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
     expect(bank.snapshot).to.include({ stage: 'refused', err })
-    expect(getBank).not.toHaveBeenCalled()
+    expect(listVaults).not.toHaveBeenCalled()
   })
 
   it("refuses when a key deriver will not load, its refusal as it came, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
-    const getBank = vi.spyOn(world.vaultDB, 'tryGetBank')
+    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
     const refused = new VaultError('unexpected_error', 'no wasm here')
     const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
     await TH.expectRefusal(bank.hello(), 'unexpected_error')
     expect(bank.snapshot.err).to.equal(refused)
-    expect(getBank).not.toHaveBeenCalled()
+    expect(listVaults).not.toHaveBeenCalled()
   })
 
   it("tells of a damaged vault row as bad news, and readies the bank without it", async () => {

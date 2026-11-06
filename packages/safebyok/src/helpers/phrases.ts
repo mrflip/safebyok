@@ -443,7 +443,7 @@ export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark 
 
 export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait for it first."
 
-/** Bad news of a vault row `getBank` set aside. */
+/** Bad news of a vault row `listVaults` set aside. */
 export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --
 

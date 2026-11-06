@@ -1,6 +1,5 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
-import { omit } from 'es-toolkit'
 import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
@@ -10,8 +9,8 @@ import * as SX from '../shapes/shapes-storage'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxesListed, type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from '../shapes/shapes-vaultish'
-import type { Answer, Notice, VaultDB } from '../storage/vault-db-new'
+import { type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from '../shapes/shapes-vaultish'
+import type { Answer, Notice } from '../storage/vault-db-new'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import type { Gate } from './gate'
@@ -70,12 +69,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [Fetching]: fetchBank, fetchListed
+  // == [Fetching]: list
 
   /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
-  async fetchBank(): Promise<void> {
+  async list(): Promise<void> {
     this.demandEnabled()
-    const answer = await this.vaultDB.tryGetBank(this.world.scope)
+    const answer = await this.vaultDB.tryListVaults(this.world.scope)
     if (! answer.ok) {
       this.tellIfRevoked(answer.err)
       throw answer.err
@@ -83,16 +82,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     const { vaults, damaged_rows } = answer.val
     this.world.tellBadNews(damaged_rows.map((damaged) => vaultStoredDamaged(damaged)))
     await Promise.all(vaults.map((record) => this.build(record)))
-  }
-
-  /** Deliver a get of `vault` as a fetch does, and answer the boxes it listed: none where it found no vault, as `vault` then tells by its own state. */
-  async fetchListed(vault: Vault): Promise<BoxesListed> {
-    const asked = this.scopeOf(vault)
-    await this.ensureTimelyWorld()
-    this.demandEnabled()
-    const answer = await this.vaultDB.tryGetVault(asked, { ifAbsent: 'nil' })
-    await this.deliver(vaultRowOf(answer))
-    return VX.boxesListed.parse(answer.ok ? (answer.val ?? NothingListed) : NothingListed)
   }
   // --
 
@@ -186,8 +175,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }
 
-  /** The vault row alone: the boxes `getVault` lists with it are the vault's box listing's to take. */
-  protected async tryGetRow(scope: VaultScope) { return vaultRowOf(await this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' })) }
+  protected tryGetRow(scope: VaultScope) { return this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' }) }
 
   /** The vaultDB refuses `repl` on a vault: a record moves only by a gate verb. */
   protected tryPutRow(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts as PutVaultOpts) }
@@ -199,13 +187,3 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected isOwnRow(row: VaultRow | BoxRow): row is VaultRow { return ! ('boxlabel' in row) }
   // --
 }
-
-// == [The vault's get]: NothingListed, vaultRowOf
-
-const NothingListed: BoxesListed = Object.freeze({ boxes: [], damaged_rows: [] })
-
-/** `answer` with its `val` the vault row alone, as a listing delivers it. */
-const vaultRowOf = (answer: Awaited<ReturnType<VaultDB['tryGetVault']>>) => (
-  (answer.ok && (answer.val !== null)) ? { ...answer, val: omit(answer.val, ['boxes', 'damaged_rows']) } : answer
-)
-// --

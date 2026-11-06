@@ -216,8 +216,8 @@ export const vaultEmpty = (world: SX.VaultRow): VaultError => (
   new VaultError('vault_empty', Phrases.VaultEmpty, { meta: { world, dbhas: null } })
 )
 
-export const vaultMismatch = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_mismatch', Phrases.VaultMismatch, { meta: { world, dbhas: world } })
+export const vaultMismatch = (stored: SX.VaultRow): VaultError => (
+  new VaultError('vault_mismatch', Phrases.VaultMismatch, { meta: { world: null, dbhas: stored } })
 )
 
 export const vaultGone = (tombstone: SX.VaultRow): VaultError => (

@@ -1,10 +1,10 @@
 /** The vaultDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code. */
 
-import { type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, type VaultFetched, VaultDB } from './vault-db-new'
+import { type BoxesFetched, type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, VaultDB } from './vault-db-new'
 import { ckeyOf } from '../helpers/helpers'
 import * as Refuse from '../refusals/throwers'
 import * as SX from '../shapes/shapes-storage'
-import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultRecord, VaultScope, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
 
@@ -83,17 +83,17 @@ export class MemoryVaultDB extends VaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of VaultDB]: doGetBank, doGetVault, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of VaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
-  protected doGetBank(scope: BankScope): RowOfVault[] {
+  protected doListVaults(scope: BankScope): RowOfVault[] {
     return Array.from(this._cheat_vaultRowsOf(scope), ([vaultlabel, vault]) => ({ vaultlabel, vault: structuredClone(vault) }))
   }
 
-  protected doGetVault(scope: VaultScope): VaultFetched {
-    const vault = this.#vaultRowOf(scope)
-    const vault_tok = SX.rowPeek.safeParse(vault).data?.vault_tok
-    const boxes = (vault_tok === undefined) ? [] : Array.from(this._cheat_boxRowsOf(scope, vault_tok), ([boxlabel, box]) => ({ boxlabel, box: structuredClone(box) }))
-    return { vault: structuredClone(vault), boxes }
+  protected doGetVault(scope: VaultScope): unknown { return structuredClone(this.#vaultRowOf(scope)) }
+
+  protected doListBoxes(asked: VaultQuery): BoxesFetched {
+    const boxes = Array.from(this._cheat_boxRowsOf(asked, asked.vault_tok), ([boxlabel, box]) => ({ boxlabel, box: structuredClone(box) }))
+    return { vault: structuredClone(this.#vaultRowOf(asked)), boxes }
   }
 
   protected doGetBox(asked: BoxQuery): BoxFetched {
