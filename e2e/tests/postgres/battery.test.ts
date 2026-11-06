@@ -46,7 +46,7 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
   })
 
-  it("hears another server's write for a user_id of capitals and punctuation, LISTENed as the README's recipe quotes it", async () => {
+  it("hears another server's write for a user_id of capitals and punctuation", async () => {
     const db = getDb()
     const user_id = 'Auth0|Ab.C@x.io~:-+%2B'
     const notices = watching(await TH.freshStore(db), { ...TH.bankScope, user_id })
