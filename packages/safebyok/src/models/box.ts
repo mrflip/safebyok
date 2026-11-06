@@ -138,7 +138,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The whisper of `record`, opened through the vault's seal verbs and held to `CX.whisper`. */
   async #unseal(record: BoxRecord): Promise<Whisper> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
-    const stamp = boxStampOf(VX.boxSparse.parse(record), sidecar)
+    const stamp = boxStampOf(SX.boxSparse.parse(record), sidecar)
     const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
     const held = CX.whisper.safeParse(parseJsonOrNull(whisperText))
     if (! held.success) { throw undecodedWhisper() }
@@ -259,7 +259,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
 /** The full record of `base` with `sidecar`, `whisper` sealed through `world`: as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
 const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> => {
-  const sparse = VX.boxSparse.parse(base)
+  const sparse = SX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
   const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper) ?? '', stamp)
   return VX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })

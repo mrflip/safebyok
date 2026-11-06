@@ -27,8 +27,8 @@ permissions:
 jobs:
   # Lint first, as the likelier of the two to fail for a reason worth reading, then typecheck, then
   # a pull request's changeset, and last the workflows themselves. A merge commit in a pull
-  # request's branch is not refused here: Mergify rebases each one onto main as it queues it
-  # (.mergify.yml), which keeps main's history semi-linear (PROCESS.md).
+  # request's branch is not refused here: a stack's pull requests land in order, each as one merge
+  # commit with its SHAs unchanged (.mergify.yml), which keeps main's history semi-linear (PROCESS.md).
   lint-typecheck:
     runs-on: ubuntu-latest
     steps:

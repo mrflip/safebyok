@@ -42,15 +42,21 @@ Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
 
 ## The history we keep
 
-* **History on main is semi-linear.** Every PR branch is rebased onto the tip of `main` and lands
-  as one merge commit, so `git log --first-parent main` reads one line per PR and
-  `git revert -m 1 <merge>` backs a PR out whole.
+* **History on main is semi-linear.** Every PR lands as one merge commit, and its commits keep
+  the SHAs they had on the branch, so `git log --first-parent main` reads one line per PR and
+  `git revert -m 1 <merge>` backs a PR out whole. Commits stay in straight lines because PRs
+  are built as a stack: each branch is cut from the tip of the one below it (*A worktree per
+  thread*), and the bottom one from `main`.
 * **Never merge `main` into a branch**, and never use GitHub's "Update branch" in merge mode:
-  rebase.
-* **Mergify's queue lands each PR** (`.mergify.yml`): it rebases the PR onto `main`, waits for CI
-  on the rebased branch, and merges it, one PR at a time. The Coach queues a PR by labeling it
-  `queue`; an agent never adds that label. Once a PR is queued, Mergify owns its branch: push
-  to it only to fix what the queue refused.
+  rebase. A branch is rebased by hand, before it is queued, when it has fallen behind `main` and
+  is not part of a stack; a rebase moves its SHAs, so it is `/restacker`'s work or the thread's own.
+* **Mergify's queue lands each PR** (`.mergify.yml`): it tests the queued PRs together once, on a
+  draft PR, then merges each PR at its own head, in the order they were queued. It never rebases
+  or updates a branch. The Coach queues a stack by labeling its PRs `queue`, bottom first; an
+  agent never adds that label. Once a PR is queued, push to it only to fix what the queue refused.
+* **A PR's page shows the commits between it and its base.** In a stack every PR has base `main`
+  (the "Stacked on #N" line carries the order), so it lists the PRs below it until they merge,
+  then only its own commits.
 * **Every commit lands in main individually**, so each should pass `pnpm justify`. An
   intermediate red commit is allowed only when it isolates something, say a large mechanical
   change from the thoughtful repairs after it, and the PR says so.
