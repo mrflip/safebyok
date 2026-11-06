@@ -77,7 +77,10 @@ current enough for a fresh worker to continue, and leave e2e for last.
 
 *(cut from edbceeae2, building side by side)*
 
-* **Thread 6** (#559, draft): the first worker compacted twice and stopped with the component
+* **Thread 6** (#559, ready at ee7f63d13, in `high` review; two workers, four compactions). The second
+  worker finished the client, server wrapper, testing, battery and e2e; fixed a declaration-build
+  failure (zod's `$brand`) by typing the component's record validators as the core's records (one
+  `as unknown as` left); exported `Sidecar`, `WhisperJson`; README fresh; changeset at minor. The first worker compacted twice and stopped with the component
   rewritten (three tables; each put/del one mutation following memory-vault-db.ts; tallies per
   life with hard limits so one delVault tombstones a life in one transaction) and core throwers
   added (`storageFailed(call, thrown)` = `storage_unavailable` naming the call and the error's
