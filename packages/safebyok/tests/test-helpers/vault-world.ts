@@ -168,7 +168,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
 /** `world`, but that `onBadNews` hears its bad news, each news by itself, as a bank's host does. */
-export const hearingBadNews = (world: VaultWorld, onBadNews: (news: unknown) => unknown): VaultWorld => ({
+export const hearingBadNews = (world: FakeBank, onBadNews: (news: unknown) => unknown): FakeBank => ({
   ...world,
   tellBadNews: (badnews) => { for (const news of badnews) { onBadNews(news) } },
 })
