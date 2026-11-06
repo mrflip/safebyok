@@ -1,7 +1,7 @@
 /** The box's seal through a real vault's lease, the one place a box meets real cryptography in `tests/models/`. */
 
 import { describe, expect, it } from 'vitest'
-import type { BoxRecord } from '../../src/shapes/shapes-vaultish'
+import type { BoxRecord } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { TestableBoxListing } from '../test-helpers/models-world'
 import { Dna, Passphrase, boxWorldOf, makeVaultWorld, useVaultWorlds, buildTyping } from '../test-helpers/vault-world'

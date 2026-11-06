@@ -4,7 +4,6 @@ import { ENCRYPTED } from '../../src/helpers/consts'
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
-import * as VX from '../../src/shapes/shapes-vaultish'
 import type { BoxDna } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -233,7 +232,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     const [put] = held.mw.callsOf('put')
     expect(put?.priorRevisionTok).to.be.null
     expect(put?.record).to.include({ revision_seq: 0, am: 'a' })
-    expect(VX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
+    expect(SX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
   })
 
   it("seals the dna's sidecar in beside the whisper", async () => {

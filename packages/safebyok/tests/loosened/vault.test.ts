@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { PrfSalt } from '../../src/shapes/shapes-core'
-import type { VaultRecord } from '../../src/shapes/shapes-vaultish'
+import type { VaultRecord } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, storedVaultRecord, vaultRoundTrip, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 

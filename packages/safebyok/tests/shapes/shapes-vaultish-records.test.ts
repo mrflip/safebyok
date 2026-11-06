@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
+import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import { holdsCases } from '../test-helpers/cases'
@@ -16,8 +17,8 @@ const revision  = { revision_tok: 'rev-a1', revision_seq: 1 }
 const baseProps = { revision_tok: 'rev-a1', revision_seq: 1, registered_at: T0, written_at: T0, am: 'a', vault_tok: 'vault-tok-u1' }
 
 describe("The checks of what the base knows of a record", () => {
-  describe("VX.am", () => {
-    holdsCases(VX.am, [
+  describe("SX.am", () => {
+    holdsCases(SX.am, [
       // each am:
       ["a",       true,  'passes alive'],
       ["d",       true,  'passes damaged'],
@@ -30,11 +31,11 @@ describe("The checks of what the base knows of a record", () => {
     ])
   })
 
-  describe("VX.revision", () => {
-    holdsCases(VX.revision, [
+  describe("SX.revision", () => {
+    holdsCases(SX.revision, [
       // good:
       [revision,                                   true,  'passes a tok and a seq'],
-      [{ ...revision, revision_seq: VX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
+      [{ ...revision, revision_seq: SX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
       [{ ...revision, am: 'a', extra: 1 },         true,  'passes a bag carrying more, stripping the rest'],
       // bad:
       [{ revision_seq: 1 },                        false, 'refuses a missing tok'],
@@ -46,12 +47,12 @@ describe("The checks of what the base knows of a record", () => {
     ])
 
     it("hands back the two fields and no more", () => {
-      expect(VX.revision.parse({ ...revision, am: 'a', extra: 1 })).to.deep.equal(revision)
+      expect(SX.revision.parse({ ...revision, am: 'a', extra: 1 })).to.deep.equal(revision)
     })
   })
 
-  describe("VX.times", () => {
-    holdsCases(VX.times, [
+  describe("SX.times", () => {
+    holdsCases(SX.times, [
       [{ registered_at: T0, written_at: T0 },       true,  'passes two epoch milliseconds'],
       [{ registered_at: T0 },                       false, 'refuses a missing written_at'],
       [{ registered_at: 5, written_at: T0 },        false, 'refuses a small number, seconds or a count'],
@@ -61,20 +62,20 @@ describe("The checks of what the base knows of a record", () => {
     ])
   })
 
-  describe("VX.liveness and VX.vaulted", () => {
+  describe("VX.liveness and SX.vaulted", () => {
     holdsCases(VX.liveness, [
       [{ am: 'a' },  true,  'passes liveness with an am'],
       [{},           false, 'refuses liveness without an am'],
     ])
-    holdsCases(VX.vaulted, [
+    holdsCases(SX.vaulted, [
       [{ vault_tok: 'vault-tok-u1' }, true,  'passes a vault_tok'],
       [{ vault_tok: '' },             false, 'refuses an empty vault_tok'],
       [{},                            false, 'refuses a missing vault_tok'],
     ])
   })
 
-  describe("VX.sparseBase", () => {
-    holdsCases(VX.sparseBase, [
+  describe("SX.sparseBase", () => {
+    holdsCases(SX.sparseBase, [
       // each form of a record:
       [full,                                  true,  'passes a full record'],
       [sparse,                                true,  'passes a sparse record'],
@@ -91,16 +92,16 @@ describe("The checks of what the base knows of a record", () => {
     ])
 
     it("takes the six props from a record and strips the rest", () => {
-      expect(VX.sparseBase.parse(full)).to.deep.equal(baseProps)
+      expect(SX.sparseBase.parse(full)).to.deep.equal(baseProps)
     })
 
     it("takes the six props from a box, which ducks as its record", async () => {
       const box = await boxListingOf(mw).build(full)
-      expect(VX.sparseBase.parse(box)).to.deep.equal(baseProps)
+      expect(SX.sparseBase.parse(box)).to.deep.equal(baseProps)
     })
 
     it("refuses without quoting its input", () => {
-      const err = TH.expectSyncRefusal(() => VX.sparseBase.parse({ ...baseProps, vault_tok: 'SECRET-TOK', am: 'SECRET-AM' }))
+      const err = TH.expectSyncRefusal(() => SX.sparseBase.parse({ ...baseProps, vault_tok: 'SECRET-TOK', am: 'SECRET-AM' }))
       expect(err.message).to.not.include('SECRET')
     })
   })
@@ -114,7 +115,7 @@ describe("The checks of what the base knows of a record", () => {
     ])
   })
 
-  describe("VX.isTombstone and VX.VoidRevisionSeq", () => {
+  describe("VX.isTombstone and SX.VoidRevisionSeq", () => {
     it("tells a damaged or gone record from an alive one, whatever its form", () => {
       expect(VX.isTombstone(gone)).to.be.true
       expect(VX.isTombstone(ouch)).to.be.true
@@ -123,7 +124,7 @@ describe("The checks of what the base knows of a record", () => {
     })
 
     it("marks a central never stored with a seq below any a store puts", () => {
-      expect(VX.VoidRevisionSeq).to.be.lessThan(0)
+      expect(SX.VoidRevisionSeq).to.be.lessThan(0)
     })
   })
 })

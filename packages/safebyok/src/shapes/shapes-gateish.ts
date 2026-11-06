@@ -18,7 +18,8 @@ import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type VaultScope, vaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
-import type { Revision, VaultRecord, VaultWorld } from './shapes-vaultish'
+import type { Revision, VaultRecord } from './shapes-storage'
+import type { VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { LOCKED } from '../../src/helpers/consts'
-import type { VaultRecord } from '../../src/shapes/shapes-vaultish'
+import type { VaultRecord } from '../../src/shapes/shapes-storage'
 import type { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { TestableBoxListing } from '../test-helpers/models-world'

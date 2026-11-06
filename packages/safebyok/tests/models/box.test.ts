@@ -3,7 +3,8 @@
 import * as Phrases from '../../src/helpers/phrases'
 import { describe, expect, it, vi } from 'vitest'
 import { ENCRYPTED, LOCKED } from '../../src/helpers/consts'
-import type { BoxRecord, BoxSnapshot, BoxSparse, Fetched } from '../../src/shapes/shapes-vaultish'
+import type { BoxSnapshot, Fetched } from '../../src/shapes/shapes-vaultish'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 

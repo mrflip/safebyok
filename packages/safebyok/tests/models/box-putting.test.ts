@@ -2,7 +2,8 @@
 
 import { ENCRYPTED, VEILED } from '../../src/helpers/consts'
 import { describe, expect, it } from 'vitest'
-import { type BoxHalves, type BoxRecord, type BoxSparse, type Fetched } from '../../src/shapes/shapes-vaultish'
+import { type BoxHalves, type Fetched } from '../../src/shapes/shapes-vaultish'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, type TestableBox, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0, type TestableBoxListing } from '../test-helpers/models-world'

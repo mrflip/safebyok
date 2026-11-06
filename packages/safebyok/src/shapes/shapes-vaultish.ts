@@ -30,46 +30,30 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // --
 
-// == [Record forms]: am, revision, times, liveness, vaulted, sparseBase, tombstone, VoidRevisionSeq, isTombstone, Revision, Times, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
-
-/** SLOPDOC: The checks of what the base knows of any record, from whatever carries it: record, storable or snapshot. */
-export const am         = SX.am.refusingAs('bad_record')
-export const revision   = SX.revision.refusingAs('bad_record')
-export const times      = SX.times.refusingAs('bad_record')
-export const vaulted    = SX.vaulted.refusingAs('bad_record')
-export const sparseBase = SX.sparseBase.refusingAs('bad_record')
+// == [Record forms]: liveness, tombstone, isTombstone, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
 
 export const { liveness, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
-  liveness:  obj({ am }),
-  tombstone: sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
+  liveness:  obj({ am: SX.am }),
+  tombstone: SX.sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
 }))
-
-/** A record's revision: its `revision_tok`, minted at each put and del, and its `revision_seq`, higher on the later one. */
-export type Revision = SX.Revision
-
-/** When this life of the thing began, and when the record in hand was written; on a tombstone, when it was deleted. */
-export type Times = SX.Times
 
 /** Whether a record is alive, damaged or gone: its `am`. */
 export type Liveness = Readonly<Z.infer<typeof liveness>>
 
 /** The `vault_tok` of the vault a record lies in, which every storable records and seals; a vault's is its own. */
-export type Vaulted = Readonly<Z.infer<typeof vaulted>>
+export type Vaulted = Readonly<Z.infer<typeof SX.vaulted>>
 
-/** The least a sparse form carries: the scope, and what {@link sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
-export type SparseBase<ScopeT> = ScopeT & Revision & Times & Liveness & Vaulted
+/** The least a sparse form carries: the scope, and what {@link SX.sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
+export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness & Vaulted
 
 /** SLOPDOC: The sparse form of a thing damaged or gone: its sparse props stay on it, the user's content goes. */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof EX.tombstoneAmVals[number] }>
 
-/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link sparseBase} checks what the base knows of any of the three. */
+/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link SX.sparseBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
 /** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
-
-/** The `revision_seq` of a void row, and of a birth's prior: every populated row holds 0 or more. */
-export const { VoidRevisionSeq } = SX
 
 /** True for a record whose `am` says damaged or gone. */
 export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
@@ -80,7 +64,7 @@ export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched
 
 /** The checks of what reconciling passes: `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
 export const { reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
-  reconciled:    obj({ central: sparseBase, policy: oneof(EX.centralPolicyVals) }),
+  reconciled:    obj({ central: SX.sparseBase, policy: oneof(EX.centralPolicyVals) }),
   settled:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
 }), [Checks])
 
@@ -159,7 +143,7 @@ export const listingOpts = objCheck(() => ({
 export const storableArgs = objCheck(({ custom }) => ({
   world:   listingWorld,
   listing: custom<object>((val) => hasModelkind(val, 'vault_listing', 'box_listing'), Phrases.ListingExpected),
-  central: sparseBase,
+  central: SX.sparseBase,
 }), 'bad_option')
 
 // --
@@ -183,17 +167,7 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 
 // --
 
-// == [The box's forms]: BoxFormat, boxRecord, boxSparse, BoxRecord, BoxSparse, BoxSnapshot
-
-/** The box format these forms describe, as each record carries it in `fmt`. */
-export const { BoxFormat } = SX
-
-/** SLOPDOC: The checks of a box's stored forms, full and sparse, from a record or a box ducking as one. */
-export const { boxRecord } = SX
-export const boxSparse = SX.boxSparse.refusingAs('bad_record')
-
-export type BoxSparse = SX.BoxSparse
-export type BoxRecord = SX.BoxRecord
+// == [The box's forms]: BoxSnapshot
 
 export type BoxSnapshot = Boxscope & Readonly<{
   revision_tok:  string
@@ -219,7 +193,7 @@ const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown
 
 /** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`). */
 export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
-  const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
+  const factory = SX.boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
     whisper: whisper.default({}),
@@ -227,7 +201,7 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const boxPatch = SX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
   return { boxDna, boxPatch }
 })
@@ -267,18 +241,7 @@ export type BoxWorld = Pick<Vault, keyof ListingWorld | 'scope' | 'vault_tok' | 
 
 // --
 
-// == [The vault's forms]: VaultFormat, vaultRecord, vaultSparse, vaultRow, VaultRecord, VaultSparse, VaultSnapshot
-
-/** The vault format these forms describe, as each record carries it in `fmt`. */
-export const { VaultFormat } = SX
-
-/** SLOPDOC: The checks of a vault's stored forms, sparse and with its gate, from a record or a vault ducking as one. */
-export const { vaultRecord } = SX
-export const vaultSparse = SX.vaultSparse.refusingAs('bad_record')
-export const vaultRow    = SX.vaultRow.refusingAs('damaged_row')
-
-export type VaultSparse = SX.VaultSparse
-export type VaultRecord = SX.VaultRecord
+// == [The vault's forms]: VaultSnapshot
 
 export type VaultSnapshot = VaultScope & Readonly<{
   vault_tok:     string

@@ -9,7 +9,8 @@ import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
 import type { LockState } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
+import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
+import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { absentBoxError, notExposedError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
@@ -284,7 +285,7 @@ const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: 
   const sparse = SX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
   const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper) ?? '', stamp)
-  return VX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
+  return SX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
 }
 
 /** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */
