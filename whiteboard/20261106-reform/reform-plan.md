@@ -11,8 +11,9 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) filed on main; threads 13 (`guarantees_models`) and 14 (`deviceid_label`) building; #513 and #517 merged
-05:10; threads 5 to 10 wait on #511 reaching main
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) built, in review; the Closer Look and the listing
+recommendation are tabs of the sprint doc awaiting the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
+#511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
@@ -331,6 +332,15 @@ leftovers (open item 2, G9's friend sentence, G8's two leftovers, the seal list 
 worker `opus`; review `high`. **Depends on:** #517 (merged 05:10; cut from its tip, rebased onto main). **Size:** one context;
 split F1 off if the first justify is not reached.
 
+*Built (PR #528):* G1, G2, G4, G6, G9, the secret-values table, the access chains, the minimal path, the IndexedDB bullet,
+the files table, open item 1 and the header rewritten from the core; "no counterpart" sentences for `vaultRecordHeldBy`,
+a whisper's sizing copy, `mask`, an IndexedDB DeviceDB; the values sweep *every checker a shapes module exports*; G8
+narrowed to values; F8 and F9 in G10; the second review's tidies. Deviations: the four safebyok-old rows struck from the
+files table (accepted, Cleanup); G8's host-guard sentence lost "(kind only, logged)" since the core logs neither. **For
+thread 7:** only `invokeStrengthChecker` reaches `HostErrorSanitizer.refusalFor`; the host-function paragraph still says
+all three. Open Matters: no whisper size check in the core; the Argon2id deriver is not exported. Cleanup: a whisper
+zeroing test (thread 5); `passkeyAnswer`'s stale doc block. In review (high, opus).
+
 ### 14. `deviceid_label`
 
 **The Coach** (2026-11-06): "What validation do we apply to device_id? Let's make it `label` and cater to the first
@@ -340,6 +350,13 @@ complaint".
 minted id must pass it too (a finding if not); tests updated, the refusal case added; `minor` changeset naming the rule and
 "cater to the first complaint". The VOCABULARY sentence the Coach gave is a commit on #518. **Levels:** worker `sonnet`;
 review `low`. **Depends on:** nothing (cut from main at 4e63ae760). **Size:** small.
+
+*Built (PR #527):* `device_id` is the kit's `label` in the one checker (shapes-core.ts:37), reaching bank options, the
+proving world, both wayins and the device record; `Bank` mints its default as `d` plus the UUID's 32 hex (the
+orchestrator's call, an Open Matters row); fixtures renamed; refusal cases and a minted-id test added; minor changeset
+saying an old non-label record reads as damaged or absent. *Review (low, sonnet):* `fixed`; two style fixes in
+bank.test.ts; left: a bulk list's `[blurb, input]` shape, VOCABULARY's deviceId row not yet saying "a label". **Filed**
+at 846f0d285, as cut, on main.
 
 ## For the Coach
 

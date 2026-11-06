@@ -19,8 +19,17 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
 * Thread 4 `hello_listed`: filed, PR #523 at 895949623 on #513's current tip (not in the Coach's line).
 * Thread 11 `duck_calibration`: filed, PR #525 at 781f7e625, on main.
 * Thread 12 `refusalof_removed`: filed, PR #526 at 255d2c5d7, on main; merge with or after #517.
-* Thread 13 `guarantees_models`: building (opus), from #517's merged tip; the F1/F3/F8/F9 rulings.
-* Thread 14 `deviceid_label`: building (sonnet), from main at 4e63ae760.
+* Thread 13 `guarantees_models`: built, PR #528, in review (high). **For thread 7:** the host-function paragraph still
+  says all three guards go through `refusalFor`; only `invokeStrengthChecker` does.
+* Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
+  `d` + 32 hex.
+* **The Closer Look** (sprint doc tab, 2026-11-06 06:00) at 3b1b38999: its 1.1 is a real regression from #513 (`buildLease`
+  hands `consistent` the raw friend; fix `checked.friend`, one token, on thread 5 once triaged); 1.2 the self-built-value
+  kind (ruled on #513, errors.ts's paragraph now disagrees); 1.3 `_takeListed`; 1.4 `box.isShowing` (#515); 1.5 prose ahead
+  of code; 1.6 "open" still in identifiers (thread 5/6 territory: `Lease.#opened`, `unopenedWhisper`); 1.7 two cores in
+  guarantees.md (thread 13); 1.8 a console spy. Nothing new in the undergrowth. Triage waits on the Coach.
+* **Listing responsibilities** (tab and `listing-responsibilities.md`): recommendation B, a `listBoxes` verb and `getVault`
+  the row alone, as thread 15 `list_boxes` after thread 7, pending the Coach's word.
 * **Merged 05:10:** #513 and #517 (and #521, the Coach's queue tooling). #511 is still the gate for threads 5 to 10.
 * **Rulings of 05:30** (sprint doc, Resolved): `#the-host-is-not-our-threat-model`; brands are getters; "world is as listing
   has it: bank for vaults, vault for boxes"; the deviceId sentence; the orchestrator owes a listing-responsibilities
