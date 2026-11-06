@@ -10,8 +10,11 @@ look things up here; they do not read it whole.
 Twenty threads planned. Filed: 1, 2 (merged), 3, 4, 11, 12, 13, 14, 15, 16, 17. In review: 18 (#532), 19 (#534). Built,
 docs only, filing after the restack: 20 (#533). Building: 5 (`module_clock`, on main at fbe760e0f, with the Cleanup
 directives: the `checked.friend` fix, the whisper-zeroing test, the dead phrases, the stale clock consts, the two stale
-comments, #511's stale example). Next: 6 on 5's tip once 5 files, and so on down to 10. The Coach is restacking every
-open PR onto main in families (#511 merged 07:55; the merge line is dissolved). Open for the Coach: the Closer Look
+comments, #511's stale example). Next: 6 on 5's tip once 5 files, and so on down to 10. Every open PR sits in one line on main
+(08:30; plan, ground rule 9), tips: #512 2ac0d37b5, #518 8d6270435, #529 e144c2b12, #531 0ac1b0165, #533 bb36a4c66, #522
+a1c189622, #525 ec4474df5, #526 fa8d83e22, #527 c3e9780d2, #532 45ac0ff84, #528 ac3ae3b1b, #519 9091491a8, #520 3cec98bed,
+#523 8108f4b21, #530 d9de40864, #534 b55ff151c, #516 on top. #530 over #511 took #530's verbs with #511's names
+(`damaged_rows`, `refusalkind`); main's VOCABULARY "am" row still says `damaged_records`, which #518 removes in the line. Open for the Coach: the Closer Look
 triage, the kind_promises follow-on threads, the deviceId privacy line, the reborn-vault hello row.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).

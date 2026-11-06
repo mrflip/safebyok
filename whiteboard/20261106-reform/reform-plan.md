@@ -14,8 +14,7 @@ RefusalkindVals, etc.").
 stack on it in turn. Filed: 1 (#518), 2 (#517, merged), 3 (#522), 4 (#523), 11 (#525), 12 (#526), 13 (#528, amended
 adf4ea68b), 14 (#527), 15 (#530 on #523), 16 (#529 on #518), 17 (#531 on #529). Built, in review: 18 (#532 on #527), 19
 (#534 on #531). Built, docs only, to file after the restack: 20 (#533 on #531; its code and test strips proposed as three
-follow-on threads, Open Matters). The Coach asked for every open PR restacked onto main in families (the merge line is
-dissolved; ground rule 9 lapses with it); the restack is under way. The Closer Look tab awaits the Coach's triage.
+follow-on threads, Open Matters). Every open PR is restacked into one line on main (ground rule 9 has the line); the Coach hands it to mergify from #512 up. The Closer Look tab awaits the Coach's triage.
 
 ## Read first
 
@@ -54,9 +53,12 @@ dissolved; ground rule 9 lapses with it); the restack is under way. The Closer L
    sees; docs are `--empty`.
 8. **One worktree, one PR, base `main`**, a stacked PR saying "Stacked on #N" (PROCESS.md *Pull requests*). Never run
    justify under `rebase --exec`.
-9. **The Coach's merge line** (from 04:31): `main -> #513 -> #517 -> #521 -> #522 -> #512 -> #518 -> #519 -> #520 -> #511`,
-   written as "Stacked as main -> ..." in each body. A PR in it takes plain pushes on top only: no `file-thread`, no rebase,
-   no force-push. A thread stacked on a line PR files by rebasing onto that PR's current origin tip, not onto main.
+9. **The merge line** (restacked 08:30 on the Coach's ask, every PR rebased onto the one below it, every base `main`,
+   each body's first line "Stacked as main -> ..."): `main -> #512 -> #518 -> #529 -> #531 -> #533 -> #522 -> #525 -> #526
+   -> #527 -> #532 -> #528 -> #519 -> #520 -> #523 -> #530 -> #534 -> #516`. A PR in it takes plain pushes on top only, and
+   only on the top code PR (#534) or the sprint PR (#516), so the line stays linear: no `file-thread`, no rebase, no
+   force-push below the top. Thread 5 (#535) sits on main outside the line; threads 6 to 10 stack on it and join the top
+   at the wrap-up restack. A restack goes to the `/restacker` skill, runs no justify, and lets CI judge.
 10. **A stale test citation gets its test** (the Coach on F12, 2026-11-06): where a guarantee or doc cites a test the core
    lacks, write or find the core's test and cite it; only a claim about behaviour the code no longer bears is a finding.
    Thread 2's "verbatim" rule was overstrong there.
