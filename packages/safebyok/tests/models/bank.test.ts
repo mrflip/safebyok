@@ -263,6 +263,12 @@ describe("bank.ensureVault", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }))
   })
 
+  it("takes a fraction of a minute to the nearest millisecond, and Infinity as Infinity", () => {
+    const bank = makeBankWorld().bankOn({ autolockMinutes: 1 / 7, boxRefreshMinutes: 0.000025 })
+    expect([bank.leaseMillis, bank.boxRefreshMillis]).to.deep.equal([8571, 2])
+    expect(makeBankWorld().bankOn({ autolockMinutes: Infinity }).leaseMillis).to.eq(Infinity)
+  })
+
   it("leases for DefaultLeaseMillis where the host names no autolockMinutes", () => {
     const bank = makeBankWorld().bankOn({ autolockMinutes: undefined })
     expect(bank.leaseMillis).to.eq(DefaultLeaseMillis)

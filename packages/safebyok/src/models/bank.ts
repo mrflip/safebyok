@@ -331,7 +331,7 @@ export const guardOnPanic = (onPanic: PanicHandler | undefined): Panic => {
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext
 
-const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : minutes * MinuteMillis)
+const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : Math.round(minutes * MinuteMillis))
 
 const stageOf = (hello: Outcome<void> | null): BankStage => {
   if (hello === null) { return 'made' }
