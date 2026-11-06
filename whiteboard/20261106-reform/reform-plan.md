@@ -336,7 +336,15 @@ four destructure defaults deleted (`FetchOpts`, `BoxPutOpts` now `Z.input`); `GX
 `Infinity` becomes `ForeverMillis` in `millisOf` and `horizonMillis` (`bank.autolockMinutes` reads back finite: changeset
 minor). The second survey (thread file): VX re-exports SX names, GX aliases `passphraseWayin`, `maxMillisSinceRefresh`
 checked in `listingOpts` and `storableOpts`, Bank parses `bankOpts` and discards the result: folded into thread 9's
-directives. Compacted once, after its first justify. In review (medium).
+directives. Compacted once, after its first justify.
+*Review (medium):* `fixed`; every row a subtraction, `ForeverMillis` safe against the autolock arithmetic, the brand
+spread-proof; six fixes (the `Listing` constructor kept raw opts after parsing, so `horizonMillis`'s cap missed the
+listing; the `Symbol.for` reason to a `//`; STYLE's stale `PutListingOpts` example; a test for `isGuardedLogger`; two style
+nits). Left, minor: `VaultDB` refuses a bad scope `bad_scope` from the scope verbs and `bad_option` from the query verbs,
+and hands `do*` a frozen scope (thread 9 unifies); `listing.put`'s `SX.putOpts` strips where `objCheck` refused (internal
+callers); the guarded-logger checker written twice and three copies of the brand test (thread 9); gallant.md:854's stale
+`PutListingOpts` (Cleanup); `LeaseDated` outside STYLE's shape set (VOCABULARY row with thread 9); `brandedVaultDB` names the
+checker not the parameter. **Filed** at b2bf857de on #552's tip, by a plain push.
 
 ### 9. `types_ab`
 
@@ -361,6 +369,11 @@ same name with another refusal kind (one definition, two import paths: keep one)
 `passphraseWayinRecord` (one name); `maxMillisSinceRefresh` is checked in `listingOpts` and again in `storableOpts` (once);
 Bank's constructor parses `bankOpts` and throws the result away (use what you parsed, or parse once in the guards and not
 again). Each a subtraction, with thread 9's inferred-versus-handrolled call made for the types it touches.*
+*Directives (thread 8's review): `VaultDB`'s scope verbs refuse a bad scope `bad_scope` and its query verbs `bad_option`
+(one kind for a bad scope or query, decided and applied); `custom<VaultLogger>(isGuardedLogger, ...)` is written in
+`GX.leaseFriend` and `VX.vaultWorld` (one `GX.guardedLogger` Checker); `isVaultDB`, `isDeviceDB` and `isListing` are three
+copies of one brand test, two answering `boolean` and one a predicate (one shape); a VOCABULARY row for `LeaseDated` if
+the name survives your typing pass.*
 
 ### 10. `kindvals_smush`
 

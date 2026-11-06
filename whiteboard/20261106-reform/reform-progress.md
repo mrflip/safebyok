@@ -61,7 +61,7 @@ the Closer Look triage; three Open Matters rows.
   types `AskUser`, `Panic`, `PanicHandler`, `BadNewsHandler`, `GuardedKeyDeriver`, `GuardedStrengthChecker`; `ProvingWorld`
   and `VaultWorld` stay inferred. **Surface gap:** neither entry exports a device store, so a host cannot build the
   `deviceDB` that `Bank.make` requires (Open Matters, TOP). Compacted twice (09:13, 09:23), after its first justify.
-* Thread 8 `checkers_once`: built, PR #553 at 7f83837bc on #552, in review. Scopes in CX only; `LeaseDated`; `Symbol.for`
+* Thread 8 `checkers_once`: filed, PR #553 at b2bf857de on #552's tip (plain push). Scopes in CX only; `LeaseDated`; `Symbol.for`
   brands on the DB base classes (two eslint-disables on the getters); host functions and the logger checked once, by their
   guards; a host's `Infinity` is `ForeverMillis` inside. **For thread 9:** the second survey's four rows (plan, thread 9's
   directives); `FetchOpts` and `BoxPutOpts` are `Z.input` now. The values sweep now covers PX and UX.
