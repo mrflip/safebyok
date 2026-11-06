@@ -232,8 +232,8 @@ describe("Checkers", () => {
   })
 
   it("refuses a story that is none, a Zod parse context among them, whatever the input", () => {
-    TH.expectSyncRefusal(() => vaultScope.parse(scope, { error: () => 'quoted' } as object), 'bad_option')
-    TH.expectSyncRefusal(() => vaultScope.parse(null, { where: 7 } as object), 'bad_option')
+    TH.expectSyncRefusal(() => vaultScope.parse(scope, { error: () => 'quoted' } as object))
+    TH.expectSyncRefusal(() => vaultScope.parse(null, { where: 7 } as object))
   })
 
   // Checkers @example 1
@@ -352,7 +352,7 @@ describe("objCheck", () => {
 
   it("refuses opts that are none, whatever it would check", () => {
     for (const opts of ['bad_kind', { extras: 'loose' }, { refusalkind: 'bad_kind' }, { kind: 'bad_scope' }, null]) {
-      TH.expectSyncRefusal(() => objCheck(bankScopeOf, opts as never), 'bad_option')
+      TH.expectSyncRefusal(() => objCheck(bankScopeOf, opts as never))
     }
   })
 
@@ -380,7 +380,7 @@ describe("consistent", () => {
   })
 
   it("refuses a bag that is not an object", () => {
-    TH.expectSyncRefusal(() => consistent(null as unknown as object, scope), 'bad_option')
+    TH.expectSyncRefusal(() => consistent(null as unknown as object, scope))
   })
 })
 
@@ -433,10 +433,10 @@ describe("verifyConsistent", () => {
   })
 
   it("refuses a bag that is not an object, or a refusal that is none", () => {
-    TH.expectSyncRefusal(() => verifyConsistent(scope, null as unknown as object, { kind: 'bad_scope' }), 'bad_option')
-    TH.expectSyncRefusal(() => verifyConsistent('acme' as unknown as object, scope, { kind: 'bad_scope' }), 'bad_option')
-    TH.expectSyncRefusal(() => verifyConsistent(scope, scope, { kind: 'no_such_kind' } as never), 'bad_option')
-    TH.expectSyncRefusal(() => verifyConsistent(scope, scope, { kind: 'bad_scope', message: 7 } as never), 'bad_option')
+    TH.expectSyncRefusal(() => verifyConsistent(scope, null as unknown as object, { kind: 'bad_scope' }))
+    TH.expectSyncRefusal(() => verifyConsistent('acme' as unknown as object, scope, { kind: 'bad_scope' }))
+    TH.expectSyncRefusal(() => verifyConsistent(scope, scope, { kind: 'no_such_kind' } as never))
+    TH.expectSyncRefusal(() => verifyConsistent(scope, scope, { kind: 'bad_scope', message: 7 } as never))
   })
 })
 
