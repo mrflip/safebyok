@@ -19,14 +19,17 @@ merge_protections_settings:
     - label = queue
 
 merge_queue:
-  max_parallel_checks: 1
+  max_parallel_checks: 3
 
 queue_rules:
   - name: default
     merge_method: merge
     # A stack is labeled within this window to land as one batch, tested once.
     batch_size: 10
-    batch_max_wait_time: 2 minutes
+    batch_max_wait_time: 1 minute
+    # CI takes up to four minutes, so a batch still pending at ten minutes is dropped from the
+    # queue rather than holding the line.
+    checks_timeout: 10 minutes
     # The `mainly main` ruleset's rules (an approval, review threads resolved, its required checks)
     # join these by themselves; these name CI's jobs, each its own check.
     merge_conditions:
