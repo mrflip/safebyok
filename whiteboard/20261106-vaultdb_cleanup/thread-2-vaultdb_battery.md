@@ -1,6 +1,6 @@
 # Thread 2: vaultdb_battery (2026-11-06)
 
-Branch `20261106-vaultdb_battery`, PR #558, stacked on #555. Justify: green (safebyok 2265 tests in
+Branch `20261106-vaultdb_battery`, PR #558, stacked on #555. Justify: green (safebyok 2267 tests in
 68 files; memory-vault-db and vault-db-new 100 between them).
 
 * **Built**:
@@ -23,7 +23,7 @@ Branch `20261106-vaultdb_battery`, PR #558, stacked on #555. Justify: green (saf
     cap); bank isolation over near user_ids (`u1:`, `u1|`, `u1%3A`, ...); box isolation under a
     near vaultlabel and another applabel; a sidecar kept byte for byte; 25 boxes listed; watch
     scope (bank vs vault), unwatch, a twin's writes heard; a store's own failure answering a
-    VaultError, then the next call working.
+    `storage_unavailable`, then the next call working.
   * **`safebyok/storage`**, a new package entry (`src/storage/index.ts`; tsdown entry;
     package.json `typesVersions` by hand, as `dom`). It exports VaultDB, DeviceDB, MemoryVaultDB,
     MemoryDeviceDB, the answer and do* types, Awaitable, ckeyOf, every storage shape, checker and
@@ -45,7 +45,16 @@ Branch `20261106-vaultdb_battery`, PR #558, stacked on #555. Justify: green (saf
   * The twin defaults to the store itself. An adapter whose twin is a second client (Postgres,
     Convex) gives `makeTwin` for the real race.
   * No teardown hook. An adapter that must close connections tracks what its factory made and
-    closes it in its own afterEach.
+    closes it in its own afterEach. Every watch a case opens is closed by the battery itself
+    (`onTestFinished`), and unwatch twice is part of the contract, with a case.
+  * The failure case asserts `storage_unavailable`: `_cheat_failNextCall` must fail the store as
+    its storage would (an outage), and the adapter's triage must land on that kind.
+  * `describeVaultDBBattery` parses its opts with an `objCheck` ('bad_option') at registration: a
+    missing `makeVaultDB` or `_cheat_rowsOf` throws there, registering no case. Functions are
+    judged by interface only.
+  * `vaultQuery` and `boxQuery` stand once in `storage-world.ts`. Adapter tests use namespace
+    imports (`TH.` for safebyok/testing, `SX.` for safebyok/storage), so the six fixtures that
+    share a name with a checker (`vaultQuery` and `boxQuery` among them) need no rename.
   * Titles carry no refusal kind (#549); a kind is asserted where it is the behaviour.
 * **Deviations**: I pulled the storage fixtures' export forward, since adapters will want them.
   The battery's doc blocks are one line; the `@example` was dropped for that reason.
