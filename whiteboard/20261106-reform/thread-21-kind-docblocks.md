@@ -1,6 +1,6 @@
 # Thread 21: kind docblocks (2026-11-06)
 
-Branch `20261106-kind_docblocks`, PR #TBD, cut from main. Justify: see the PR (green at ready).
+Branch `20261106-kind_docblocks`, PR #548, cut from main. Justify: green.
 
 * **Built**: the doc-block half of thread 20's strip. Ten files in `packages/safebyok/src/`
   (`helpers/{validator,passphrase-strength,logger,crypto}.ts`, `shapes/{primitives,shapes-core,
