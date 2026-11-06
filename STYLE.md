@@ -575,10 +575,10 @@ the scope.
   the shared folders (`src/helpers/validator.ts`, `src/shapes/`) unless it is odd and local to one
   module, which keeps it beside its use. It is made in a `Checkers` call. It is namespaced as the
   object a `Checkers` call returns (`Checks.story`), or through its module's star import,
-  conventionally `CX` (`import * as CX from './shapes/shapes-core'`, then `CX.vaultScope`). A good reason
-  for another exception is said beside it. A type its own validator's type names (`Story`, which
-  `Refusing` names and a `Refusing` makes) is an `interface` extending the `Z.infer`, whose members
-  TypeScript resolves on demand.
+  conventionally `CX` (`import * as CX from './shapes/shapes-core'`, then `CX.vaultScope`). A good
+  reason for another exception is said beside it. A type its own validator's type names (`Story`,
+  which `Refusing` names and a `Refusing` makes) is an `interface` extending the `Z.infer`, whose
+  members TypeScript resolves on demand.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
