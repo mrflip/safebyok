@@ -134,7 +134,7 @@ export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
 // == [Gate verbs' params]: replacePassphraseParams, passkeyAddParams, revokePasskeyParams, ReplacePassphraseParams, AddPasskeyParams, RevokePasskeyParams
 
 export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit, unk }) => {
-  // A vault record holding a gate that holds the wayin. A verb's other wayin is admitted here so that the vaultDB can refuse it 'gate_issue', against the row it read.
+  // A vault record holding a gate that holds the wayin. A verb's other wayin is admitted here so that the vaultDB can refuse it against the row it read.
   const gateParams = vaultSparse.extend({ am: lit('a') })
   const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayin, passkey_wayin: unk.optional() }).strict() }).strict()
   const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayin, passphrase_wayin: unk.optional() }).strict() }).strict()
@@ -178,8 +178,7 @@ export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 /** How much room a vault has: boxes against the most it holds, and bytes against the most its storage holds of one vault.
  * A vault reckons it from its last read; a VaultDB from storage, in `getCapacity` and a
  * `vault_full`'s `meta.capacity`. Either is an estimate: storage checks again on every write, and
- * its answer wins. A limit storage reports as `Infinity` reads as `Number.MAX_SAFE_INTEGER`. Its
- * `parse` refuses 'bad_record'.
+ * its answer wins. A limit storage reports as `Infinity` reads as `Number.MAX_SAFE_INTEGER`.
  *
  * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
  */

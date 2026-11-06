@@ -38,7 +38,7 @@ const guardedOnes = new WeakSet<object>()
 const guardedFor = new WeakMap<object, VaultLogger>()
 
 /** The host's logger made safe to call, dropping whatever it throws or rejects with; {@link DefaultLogger} for null or undefined.
- * A binding says what it has to say beside the vault through it. It refuses 'bad_option' for
+ * A binding says what it has to say beside the vault through it. It refuses
  * anything without `log`, `warn` and `error` functions.
  *
  * It keeps identity: a logger it made safe comes back as itself, and the same host logger always

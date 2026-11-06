@@ -21,7 +21,7 @@ import type { Revision, VaultRecord, VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
-/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinKindVals}. Its `parse` refuses 'bad_option'. */
+/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinKindVals}. */
 export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinKindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
@@ -70,7 +70,7 @@ export type GateProps = Z.infer<typeof gateProps>
 
 // == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
 
-/** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` refuses 'bad_option', quoting none of it.
+/** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` quotes none of it.
  * What a blank one means is the gating's to say.
  */
 export const passphraseCleartext = Checker(() => zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(), 'bad_option')
@@ -81,11 +81,11 @@ export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
 /** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
 export const PrfAnswerBytes = 32
 
-/** What a passkey's answer must carry: its credential's id, the salt it answered for, and its PRF bytes, judged by their tag, so bytes from an iframe pass. Its `parse` refuses 'bad_option', quoting none of it, as its bytes are secret.
+/** What a passkey's answer must carry: its credential's id, the salt it answered for, and its PRF bytes, judged by their tag, so bytes from an iframe pass. Its `parse` quotes none of it, as its bytes are secret.
  * An answer already used, its bytes zeroed by the proving sealed of it, is refused too: sealed
  * again, it would make a key anyone could rebuild.
  *
- * @example passkeyAnswer.parse(usedAnswer)  // throws 'bad_option': its bytes were zeroed at its first use
+ * @example passkeyAnswer.parse(usedAnswer)  // throws: its bytes were zeroed at its first use
  */
 export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   /** Base64url, as `PublicKeyCredential.id` gives it. */
@@ -103,10 +103,10 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
  */
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 
-/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` refuses 'bad_option', quoting none of it.
+/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` quotes none of it.
  * A passkey wayin sealed over another salt would read as damaged at every later unlock.
  *
- * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws 'bad_option'
+ * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws
  */
 export const freshPasskeyAnswer = Checker(() => (
   passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] })
@@ -120,7 +120,7 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
   typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
 )
 
-/** The checks of a `strengthChecker` and of the verdict it answers, each refusing 'bad_option'. */
+/** The checks of a `strengthChecker` and of the verdict it answers. */
 export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ custom, union, obj, lit, str }) => ({
   strengthChecker: custom<StrengthChecker>(isStrengthChecker, Phrases.StrengthCheckerShape),
   passphraseVerdict: union([
