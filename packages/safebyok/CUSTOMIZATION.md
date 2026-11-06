@@ -22,13 +22,13 @@ type StrengthChecker = {
 }
 ```
 
-* Answer, never throw. A checker that throws is refused `unexpected_error`, and nothing of what the checker
+* Answer, never throw. A checker that throws is refused, and nothing of what the checker
   threw is kept: it heard the passphrase, so its error might quote it. A checker that answers
-  anything but a verdict is refused `bad_option`.
+  anything but a verdict is refused too.
 * Whatever it needs fetched or built first -- a word list, say -- it fetches in `load`, which the
   bank's `hello()` runs, once, before any vault is born: so `load` is idempotent, costing nothing
   once it has succeeded, and forgets a failure, so the next hello tries again. A `load` that
-  fails fails the hello, `unexpected_error` with what it threw as the cause, and leaves the bank
+  fails fails the hello, with what it threw as the cause, and leaves the bank
   `refused`: a bank that cannot judge a new passphrase births no vault, rather than failing
   later, when the user chooses one.
 * A blank passphrase (empty, or only spaces) is weak before the checker hears it.
@@ -81,7 +81,7 @@ const bank = Bank.make({ ...opts, ...browserOpts(), strengthChecker })
 ```
 
 A wrapper that leaves `load` behind still works -- zxcvbn loads at the first check instead -- but
-a chunk that will not load then fails that check, `unexpected_error`, as the user chooses a
+a chunk that will not load then fails that check as the user chooses a
 passphrase, rather than the hello.
 
 ### Your own
