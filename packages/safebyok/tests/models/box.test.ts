@@ -24,7 +24,7 @@ const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord(
   return box.getSnapshot()
 }
 
-const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'full', 'present', 'exposed', 'veiled', 'lockState']
+const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'full', 'present', 'exposed', 'veiled']
 
 describe("Box own props", () => {
   it("are exactly the nine the base tattoos: the four of the scope, registered_at, vault_tok and the three revision props", async () => {
@@ -88,20 +88,17 @@ describe("Box sidecar, locked or not", () => {
     }
   })
 
-  it("is the snapshot's sidecar too; a lock tells a listener through the vault, and the snapshot moves once, to the new lockState", async () => {
+  it("is the snapshot's sidecar too, which a lock leaves alone: a listener is told through the vault, and the snapshot holds", async () => {
     const box = await boxOf()
     const listener = vi.fn()
     box.subscribe(listener)
     const before = box.getSnapshot()
-    expect(before.lockState).to.eq('unlocked')
     held.mw.setLockState('locked')
     expect(listener).toHaveBeenCalledTimes(1)
-    const after = box.getSnapshot()
-    expect(after).to.not.eq(before)
-    expect(after).to.deep.include({ lockState: 'locked', sidecar: before.sidecar })
-    expect(box.getSnapshot()).to.eq(after)
+    expect(box.getSnapshot()).to.eq(before)
+    expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'a test box' })
     box.settle()
-    expect(box.getSnapshot()).to.eq(after)
+    expect(box.getSnapshot()).to.eq(before)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -143,7 +140,7 @@ describe("Box sidecar, locked or not", () => {
 })
 
 describe("Box snapshot", () => {
-  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present, exposed, veiled and lockState, and no more", async () => {
+  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present, exposed and veiled, and no more", async () => {
     const box = await boxOf()
     expect(box.getSnapshot()).to.deep.equal({
       ...held.mw.boxscope('anthropic_api_key'),
@@ -156,7 +153,6 @@ describe("Box snapshot", () => {
       present:       true,
       exposed:       false,
       veiled:        false,
-      lockState:     'unlocked',
     })
     expect(Object.keys(box.getSnapshot())).to.have.members(SnapshotKeys)
   })
@@ -206,7 +202,6 @@ describe("Box snapshot", () => {
         present:       true,
         exposed:       false,
         veiled:        false,
-        lockState:     'unlocked',
       })
     })
 

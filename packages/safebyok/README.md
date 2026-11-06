@@ -81,10 +81,12 @@ Easy to get wrong:
   until `box.unexpose()`. `box.veil()` and `box.unveil()` hide it and show it again. While it will
   not show, `box.whisper` answers a frozen bag, whose `Whispered` symbol says why: `'encrypted'`
   (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a put of one refuses. A lock
-  keeps the whisper, so the unlock brings the same object back. `box.subscribe` hears of a lock too:
+  keeps the whisper, so the unlock brings the same object back. The lock is the vault's, shown on
+  its snapshot and not the box's; `box.subscribe` hears of a lock too, as `box.whisper` changes:
 
   ```tsx
-  const { exposed, lockState } = useSyncExternalStore(box.subscribe, box.getSnapshot)
+  const { lockState } = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
+  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
   if (lockState === 'locked') { return <button onClick={() => vault.ensureUnlocked()}>Unlock</button> }
   if (! exposed) { return <button onClick={() => box.expose()}>Show</button> }
   return <WhisperForm initial={box.whisper} onSave={(next) => box.put({ whisper: next })} />

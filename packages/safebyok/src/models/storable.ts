@@ -232,7 +232,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Settling]: settle, becomeNotifiable, remakeSnapshot, replaceSnapshot
+  // == [Settling]: settle, becomeNotifiable, replaceSnapshot
 
   /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
   settle(): Settled {
@@ -245,9 +245,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#snapshot ??= this.makeSnapshot()
     return this
   }
-
-  /** Make the snapshot again, telling no one, for a subclass whose snapshot follows something that tells its listeners itself. */
-  protected remakeSnapshot(): void { this.#snapshot = this.makeSnapshot() }
 
   /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */
   #replaceSnapshot(): void {

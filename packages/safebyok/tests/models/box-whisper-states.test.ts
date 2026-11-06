@@ -250,33 +250,29 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(Object.keys(box)).to.not.include('lockState')
   })
 
-  it("works detached, as useSyncExternalStore takes them", async () => {
-    const { subscribe, getSnapshot } = await showingOf()
+  it("works detached, as useSyncExternalStore takes them, telling a lock once and keeping the snapshot", async () => {
+    const box = await showingOf()
+    const { subscribe, getSnapshot } = box
     const listener = vi.fn()
     const unsubscribe = subscribe(listener)
     const before = getSnapshot()
-    expect(getSnapshot()).to.eq(before)
     held.mw.setLockState('locked')
     expect(listener).toHaveBeenCalledTimes(1)
-    const after = getSnapshot()
-    expect(after).to.not.eq(before)
-    expect(after.lockState).to.eq('locked')
-    expect(getSnapshot()).to.eq(after)
+    expect(box.whisper).to.eq(LOCKED)
+    expect(getSnapshot()).to.eq(before)
     unsubscribe()
     held.mw.setLockState('unlocked')
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it("moves the snapshot on a read after a lock, with no subscriber, and keeps its identity while the state holds", async () => {
+  it("keeps the snapshot through a lock and an unlock, which are the vault's to show", async () => {
     const box = await unexposedOf()
     const before = box.getSnapshot()
+    expect(before).to.not.have.property('lockState')
     held.mw.setLockState('locked')
-    const locked = box.getSnapshot()
-    expect(locked).to.not.eq(before)
-    expect(locked.lockState).to.eq('locked')
-    expect(box.getSnapshot()).to.eq(locked)
+    expect(box.getSnapshot()).to.eq(before)
     held.mw.setLockState('unlocked')
-    expect(box.getSnapshot().lockState).to.eq('unlocked')
+    expect(box.getSnapshot()).to.eq(before)
   })
 
   it("unsubscribes from the box and the vault both", async () => {

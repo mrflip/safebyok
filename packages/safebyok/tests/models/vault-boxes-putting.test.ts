@@ -379,9 +379,10 @@ describe("extractWhisper", () => {
 
 // == [The README's recipe]: expose, subscribe, lock, unlock, put
 
-/** The README's component, without React: what it paints from the box's snapshot and box.whisper. */
-const paintOf = ({ box }: Pick<Awaited<ReturnType<typeof makeWorldWithBox>>, 'box'>) => () => {
-  const { lockState, exposed } = box.getSnapshot()
+/** The README's component, without React: what it paints from the vault's snapshot, the box's and box.whisper. */
+const paintOf = ({ vault, box }: Pick<Awaited<ReturnType<typeof makeWorldWithBox>>, 'vault' | 'box'>) => () => {
+  const { lockState } = vault.getSnapshot()
+  const { exposed } = box.getSnapshot()
   if (lockState === 'locked') { return 'unlock button' }
   if (! exposed) { return 'show button' }
   return box.whisper
@@ -390,7 +391,7 @@ const paintOf = ({ box }: Pick<Awaited<ReturnType<typeof makeWorldWithBox>>, 'bo
 describe("the README's recipe for showing a whisper", () => {
   it("paints the button, then the form; a lock tells the box's subscribers too, and an unlock paints the same object again", async () => {
     const { vault, box } = await makeWorldWithBox()
-    const paint = paintOf({ box })
+    const paint = paintOf({ vault, box })
     const toldBox = vi.fn()
     box.subscribe(toldBox)
     await box.put({ whisper: { apiKey: 'sk-test-0000' } })
