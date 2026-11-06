@@ -449,6 +449,12 @@ and VOCABULARY (a plain commit on #518) say so; minor changeset. **Levels:** wor
 no device record). The VOCABULARY rows (**deviceId**, **device record**, a trim to **deviceDB**) sit in the thread file for
 the orchestrator to carry onto #518. Meets #511 in `throwers.ts`, `phrases.ts` and `bank-world.ts` (keep both sides). In
 review (`opus`, high).
+*Review (high, opus):* `fixed`; three fixes (the snapshot's always-true `device_id` compare gone; the device_id test checks
+`bank.device_id` too; two titles). Left, minor: `crypto.randomUUID()` fails the `label` rule and the core exports no minter
+(Open Matters); #518's `sha256Hex` advice cannot apply to `device_id` (a 64-hex digest exceeds 40 chars: limit it to
+`user_id` when the rows are carried); #527's changeset still says the core mints (drop the sentence, plain push on #527);
+`BankOpts.device_id` has no doc line and `device-db-new.ts`'s header reads the body aloud (documentarian). Tip 892a57dfb,
+pushed; files into the chain the restacker is building.
 
 ### 19. `utils_port`
 

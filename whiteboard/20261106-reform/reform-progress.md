@@ -47,7 +47,7 @@ triage, the kind_promises follow-on threads, the deviceId privacy line, the rebo
 * Thread 20 `kind_promises`: built, PR #533 at f853139b1 on #531, docs only (the inventory, five VOCABULARY and four
   CUSTOMIZATION strips). The doc-block and test strips are three proposed threads; the test helpers want an optional
   `refusalkind` first. Line numbers in the inventory are as of c74195a12: search by text after #511.
-* Thread 18 `deviceid_required`: built, PR #532 at 1e54de7aa on #527, in review. `device_id` is required (no mint, no device
+* Thread 18 `deviceid_required`: reviewed (`fixed`), PR #532 at 892a57dfb on #527, pushed, joining the chain. `device_id` is required (no mint, no device
   record); the DeviceDB keeps leases only: `cache`, `peek`, `vacate`, `leasesProvedBefore`, each with its `do*` hook.
   **For thread 7:** the Bank constructor's options destructure is one plain line, no default on `device_id`. **For the
   IndexedDB device DB port:** leases only. Test worlds: `bank-world.ts` gives `device_one`, `bankOnAnotherDevice`
