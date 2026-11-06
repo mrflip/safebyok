@@ -52,6 +52,11 @@ export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
 export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (val !== null) && Object.hasOwn(val, Whispered)
 
+/** True for an object that answers true to `tag`. */
+const answersTrueTo = <TagT extends symbol>(val: unknown, tag: TagT): val is Record<TagT, true> => (
+  typeof val === 'object' && val !== null && (val as Partial<Record<TagT, unknown>>)[tag] === true
+)
+
 // A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
 // ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
 /** The model class each `modelkind` names: `ModelkindClasses['box']` is `Box`. */
@@ -72,18 +77,14 @@ export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds:
 export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
 
 /** True for a VaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsVaultDB}. */
-export const isVaultDB = (val: unknown): boolean => (
-  typeof val === 'object' && val !== null && (val as { [IsVaultDB]?: unknown })[IsVaultDB] === true
-)
+export const isVaultDB = (val: unknown): val is { [IsVaultDB]: true } => answersTrueTo(val, IsVaultDB)
 
 // `Symbol.for`, for the same reason as IsVaultDB.
 /** The tag a DeviceDB answers true to, so a model can tell one from a duck. */
 export const IsDeviceDB: unique symbol = Symbol.for('@safebyok/devicedb')
 
 /** True for a DeviceDB, made by whichever copy of safebyok: an object that answers true to {@link IsDeviceDB}. */
-export const isDeviceDB = (val: unknown): boolean => (
-  typeof val === 'object' && val !== null && (val as { [IsDeviceDB]?: unknown })[IsDeviceDB] === true
-)
+export const isDeviceDB = (val: unknown): val is { [IsDeviceDB]: true } => answersTrueTo(val, IsDeviceDB)
 
 /** The tag a host's function answers true to once a bank has wrapped it, so a world can tell it from the bare one. */
 export const IsGuarded: unique symbol = Symbol('safebyok.guarded')
