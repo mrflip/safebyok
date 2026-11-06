@@ -1,6 +1,6 @@
 # Thread 6: the worlds as Picks (2026-11-06)
 
-Branch `20261106-worlds_picks`, PR #TBD, base `main` (cut from `a19292549`). Justify: green; safebyok 66 files, 2185 tests.
+Branch `20261106-worlds_picks`, PR #550, base `main` (cut from `a19292549`). Justify: green; safebyok 66 files, 2185 tests.
 
 * **Built**:
   * `Listing`, `VaultListing` and `BoxListing` take `(world, opts)`. `ListingOpts` keeps `vaultDB` and `maxMillisSinceRefresh` (`src/shapes/shapes-vaultish.ts`).
