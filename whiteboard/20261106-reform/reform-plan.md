@@ -10,7 +10,7 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06: threads 1 (#518) and 2 (#517) ready and in review; threads 3 to 10 wait for PRs #511, #513 and #514 to
+**Status:** 2026-11-06, later: threads 1 (#518) and 2 (#517) reviewed `flagged`, rework workers running; thread 3 cut from main (#514 merged) and building; threads 4 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
 ## Read first
@@ -71,6 +71,14 @@ Coach reads this file as the cast. No new names without a `human/` question. **L
 (no code), the worker reads its own rows aloud; style pass `opus` on the vocabulary. **Depends on:** nothing. **Size:**
 one context.
 
+*Review (high, raised from none; opus style pass):* `flagged`. Kept six fixes (one verb per sentence in five rows; `ckeys`;
+a wayin's own `registered_at`; `DeviceRecord` named again; the *Standard term* pointer; old_vocabulary's header). Four facts
+the code contradicts go to a rework worker: the passkey row's `camped` (it is `bad_option` at the vault, `camped` at the
+vaultDB); a deleted vault's object keeps its slot and refuses `vault_gone`, not `disabled`; `damaged_box` is only an
+unsealable or undecodable whisper, a bad row is `damaged_row` or `newer_format`; a `revision_tok` moves on put or del.
+Left as minor: names ahead of thread 10 and #511; undefined `added`/`revoked`/`tidied`; two dropped clauses; "ask" as a
+verb (Open Matters); the deviceId sentence for a host-given `device_id` (Open Matters).
+
 ### 2. `guarantees_pass`
 
 **The Coach:** "the guarantees pass for G8's stale names".
@@ -85,6 +93,15 @@ Coach, with the code that contradicts it. Each other correction is a name or a p
 `high`, a code-reader checking every changed citation against the code (this is the one docs thread that gets a
 reviewer: it states security claims). **Depends on:** nothing; rebase onto #511 once merged, which touched G8. **Size:**
 one context.
+
+*Review (high; sonnet style pass):* `flagged`. Kept two fixes (the amendment paragraph in five sentences; "#517's open
+questions"). Every changed citation checked against main; F1 to F11 confirmed. Significant, to a rework worker: G8's
+adopted route sentence (from #511) says a seal failure reaches `outcomeOf`; `putBox`, `box.put` and `putExposed` reach
+`Lease.sealWith` with none, so the DOMException reaches the host raw; only the `try*` forms wrap it. Corrected in #511
+first, then carried here. Minor, to the same worker: the passkey chain's `isSafelyAllZero` (it is an inline `reduce` in
+`passkeyAnswer`); F1 gains `Lease.cipheredWith`, `grantLease`, `DeviceDB.getLease`, `guardStrengthChecker` and the
+*Bytes* IndexedDB bullet; G2's wayin test citation becomes a finding (Open Matters); G1's half-renamed sentence. F10 and F6
+are stronger than stated.
 
 ### 3. `example_pointers`
 

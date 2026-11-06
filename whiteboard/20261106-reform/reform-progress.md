@@ -7,9 +7,12 @@ look things up here; they do not read it whole.
 
 ## State (2026-11-06)
 
-* Thread 1 `vocab_sweep`: ready, PR #518, in review (high, opus style pass); compacted once before its first justify.
-* Thread 2 `guarantees_pass`: ready, PR #517, in review (high).
-* Threads 3 to 10 wait for PRs #511, #513 and #514 to merge (plan, *Ground rules* 1).
+* Thread 1 `vocab_sweep`: PR #518 reviewed `flagged`; a rework worker corrects four facts (plan, thread 1 *Review*).
+* Thread 2 `guarantees_pass`: PR #517 reviewed `flagged`; a rework worker corrects G8's route sentence in #511 and #517,
+  and lands the Cleanup calls F4, F6, F7, F10.
+* Thread 3 `example_pointers`: building, cut from main at #514's merge (3d95d186e).
+* Threads 4 to 10 wait for PRs #511 and #513 to merge (plan, *Ground rules* 1). The Coach is reworking the mergify queue
+  (2026-11-06); the sprint proceeds without the merges where it can.
 
 ## Facts the threads start from
 
@@ -33,7 +36,11 @@ Cleanup calls. **For thread 5:** G4 says "Both go by the host's clock"; the cloc
 leaves the options. **For thread 7:** G8 and *Where the guarantees are kept* cite `deriveKeyBytes`/`keyDeriverThrew`,
 `invokeStrengthChecker` and `Gating.#askHost`/`requestCleartextThrew` as they stand; thread 7 moves all three and rewrites
 those sentences with F2 (only the strength checker's throw goes through `refusalFor` today; the deriver's and the dialog's
-guards do not, and nothing logs). No guarantee cites `parseLogger`.
+guards do not, and nothing logs). No guarantee cites `parseLogger`. **From the review:** G8's route
+sentence adopted from #511 was wrong for the throwing verbs: `putBox`, `box.put` and `putExposed` reach `Lease.sealWith`
+with no `outcomeOf`, so a WebCrypto DOMException reaches the host raw; only the `try*` forms wrap it (the guarantee holds:
+a DOMException carries no key). **For thread 7:** the wrap it builds is the place to decide whether the seal path should
+go through `outcomeOf` too; today it does not.
 
 *Orchestrator, from thread 1 (#518):* VOCABULARY now describes the new core alone; the old design's rows moved whole to
 `notes/old_vocabulary.md`. It writes `Wayinkind` and `Gatingkind` already (thread 10) and `damaged_rows` ahead of #511 (the
