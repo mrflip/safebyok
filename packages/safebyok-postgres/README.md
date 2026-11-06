@@ -69,6 +69,8 @@ import { Client } from 'pg'
 import { VaultChangeChannel, type PostgresListen } from 'safebyok-postgres'
 
 const listener = new Client({ connectionString: process.env.DATABASE_URL })
+// Unheard, a dropped connection crashes the process; heard, every watch goes quiet until you listen again.
+listener.on('error', (err) => { console.warn('safebyok listener lost:', err.message) })
 await listener.connect()
 await listener.query(`LISTEN ${VaultChangeChannel}`)
 const heeders = new Set<(text: string) => void>()
