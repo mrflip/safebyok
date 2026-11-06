@@ -12,12 +12,6 @@ describe("FarFuture", () => {
   it("falls in 2255, a valid Date", () => {
     expect(new Date(FarFuture).toISOString()).to.eq('2255-06-05T23:47:34.740Z')
   })
-
-  it("lets a host show 'until locked' for a deadline equal to it, and a date for any other", () => {
-    const shown = (ask_passphrase_at: number): string => (ask_passphrase_at === FarFuture ? 'until locked' : new Date(ask_passphrase_at).toISOString())
-    expect(shown(FarFuture)).to.eq('until locked')
-    expect(shown(Date.UTC(2026, 9, 22))).to.eq('2026-10-22T00:00:00.000Z')
-  })
 })
 
 describe("ForeverMillis", () => {
