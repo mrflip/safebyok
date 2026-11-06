@@ -82,7 +82,7 @@ export class Bank implements VaultWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     VX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
+    const { applabel, user_id, device_id = `d${randomId().replaceAll('-', '')}`, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.#device_id = device_id

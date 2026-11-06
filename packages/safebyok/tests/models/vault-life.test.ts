@@ -177,7 +177,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
 
 /** The vault as another device holds it: its own deviceDB, caching no lease yet, over the record this device stored, after its hello. */
 const openOtherDevice = async (stored: VaultRecord) => {
-  const other = makeVaultWorld(stored, { device_id: 'device-2' })
+  const other = makeVaultWorld(stored, { device_id: 'device_2' })
   const vault = await other.listing.build(other.demandStored())
   await other.listing.hello()
   return { ...other, vault }

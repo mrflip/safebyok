@@ -342,8 +342,8 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
 
   it("keeps the snapshot's device_id with the bank's where a sweep crosses the hello that cached it, and tells its listeners", async () => {
     const world = makeBankWorld()
-    await world.bankOn({ device_id: 'device-first' }).hello()
-    const bank = world.bankOn({ device_id: 'device-second' })
+    await world.bankOn({ device_id: 'device_first' }).hello()
+    const bank = world.bankOn({ device_id: 'device_second' })
     const listener = vi.fn()
     bank.subscribe(listener)
     const caching = world.deviceDB.cacheDeviceRecord.bind(world.deviceDB)
@@ -354,8 +354,8 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     })
     const { err } = await bank.tryHello()
     expect(err?.refusalkind).to.eq('disabled')
-    expect(bank.device_id).to.eq('device-first')
-    expect(bank.snapshot).to.include({ stage: 'made', device_id: 'device-first' })
+    expect(bank.device_id).to.eq('device_first')
+    expect(bank.snapshot).to.include({ stage: 'made', device_id: 'device_first' })
     expect(listener).toHaveBeenCalled()
   })
 

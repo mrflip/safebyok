@@ -103,7 +103,7 @@ export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string,
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
 /** The `device_id` a {@link provingWorldOf} world carries. */
-export const DeviceId = 'device-laptop'
+export const DeviceId = 'device_laptop'
 
 /** A proving's world: a clock on `Date.now()`, the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}. */
 export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWorld => ({

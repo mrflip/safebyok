@@ -91,7 +91,7 @@ describe("wayin.pickle(): the stored record", () => {
     const wayin = new Wayin(record)
     expect(Object.keys(wayin)).to.have.members(Object.keys(record))
     expect(wayin.salt_b64).to.eq(record['salt_b64'])
-    expect(() => { (wayin as { device_id: string }).device_id = 'device-other' }).to.throw(TypeError)
+    expect(() => { (wayin as { device_id: string }).device_id = 'device_other' }).to.throw(TypeError)
     expect(Object.isFrozen(wayin)).to.be.true
   })
 })
