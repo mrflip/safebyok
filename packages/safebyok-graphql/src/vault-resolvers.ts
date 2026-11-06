@@ -166,7 +166,7 @@ const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs, stillSignedIn: (
         await ended()
         throw crossing(err)
       }
-      return await ended()
+      return ended()
     },
     return: ended,
     [Symbol.asyncIterator]: () => iterator,
