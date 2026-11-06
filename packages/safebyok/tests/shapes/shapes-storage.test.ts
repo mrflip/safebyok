@@ -30,7 +30,7 @@ describe("capacity", () => {
     [{ boxes: { used: -1, max: 5 }, bytes: { used: 0, max: 5 } },         'a negative count used'],
     [{ boxes: { used: 1, max: 0 }, bytes: { used: 0, max: 5 } },          'a max of zero'],
     [{ boxes: { used: 1.5, max: 5 }, bytes: { used: 0, max: 5 } },        'a fractional count used'],
-    ['full',                                                              'text'],
+    ["full",                                                              'text'],
   ] as const
   for (const [given, blurb] of BadCapacities) {
     it(`refuses ${blurb}`, () => {
