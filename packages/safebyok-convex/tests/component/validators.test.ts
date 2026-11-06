@@ -1,295 +1,73 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
-import * as Zod from 'zod'
-import { defineTestApp } from 'convex-test'
-import { defineSchema } from 'convex/server'
-import { v } from 'convex/values'
-import type { GenericValidator, Infer } from 'convex/values'
-import * as Safebyok from 'safebyok-old'
-import type {
-  VaultRecordExpectation as CoreVaultRecordExpectation, VaultDelExpectation as CoreVaultDelExpectation, BoxGetExpectation as CoreBoxGetExpectation, BoxExpectation as CoreBoxExpectation,
-  BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
-} from 'safebyok-old'
-import * as CVX from '../../src/component/validators'
+import { describe, expect, it } from 'vitest'
+import * as SX from 'safebyok/storage'
 import * as TH from '../test-helpers'
 
-/**
- * A record's shape, as both validator libraries can be read: which fields, which optional, and
- * each field's base type. The literals a field allows are part of its shape, a `format` among
- * them; so is whether a field may be null, as a vault record's `gate` may.
- */
-type Shape =
-  | { kind: 'string' | 'number' | 'null' | 'any' }
-  | { kind: 'literal', values: string[] }
-  | { kind: 'object', fields: Record<string, { optional: boolean, shape: Shape }> }
-  | { kind: 'array', element: Shape }
-  | { kind: 'nullable', inner: Shape }
-  | { kind: 'union', members: Shape[] }
+// The component's validators are converted from the core's checkers: these cases hold the
+// conversion to its purpose, a record the core writes goes in whole and a misshapen one stops at the door.
 
-/** Zod's half: read from its public `def`. */
-type ZodLike = {
-  def: {
-    type: string, values?: unknown[], entries?: Record<string, unknown>, innerType?: ZodLike, in?: ZodLike,
-    shape?: Record<string, ZodLike>, element?: ZodLike, options?: ZodLike[],
-  },
+type Backend = ReturnType<typeof TH.componentTest>
+
+const api = TH.rootApi
+const putBox = TH.loosePutBox(api.putBox)
+const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const vault = TH.vaultAt()
+const box = TH.boxAt()
+
+/** Every document of the component's tables, but their system fields. */
+const storedRows = (backend: Backend) => backend.run(async ({ db }) => {
+  const vaultDocs = await db.query('safebyok_vaults').collect()
+  const boxDocs = await db.query('safebyok_boxes').collect()
+  const tallyDocs = await db.query('safebyok_tallies').collect()
+  return { vaults: vaultDocs.map(({ vault: row }): unknown => row), boxes: boxDocs.map(({ box: row }): unknown => row), tallies: tallyDocs.length }
+})
+
+/** A backend holding the vault, live, as every box put needs. */
+const withVault = async (): Promise<Backend> => {
+  const backend = TH.componentTest()
+  await backend.mutation(api.putVault, { record: vault, opts: birth })
+  return backend
 }
 
-/** The values of a union whose members are all literals, sorted, as one literal; null where any member is not one. */
-const literalsOf = (shapes: Shape[]): Shape | null => {
-  const values = shapes.flatMap((shape) => (shape.kind === 'literal' ? shape.values : []))
-  return values.length === shapes.length ? { kind: 'literal', values: values.toSorted((one, two) => one.localeCompare(two)) } : null
-}
-
-/** A literal's values, or an enum's, as one literal: null for a schema that is neither. Null, as Zod's null or the core kit's literal null, is a shape of its own. */
-const zodLiteralShape = ({ def }: ZodLike): Shape | null => {
-  if (def.type === 'null' || (def.type === 'literal' && def.values?.length === 1 && def.values[0] === null)) { return { kind: 'null' } }
-  if (def.type !== 'literal' && def.type !== 'enum') { return null }
-  const values = def.type === 'enum' ? Object.values(def.entries ?? {}) : (def.values ?? [])
-  return { kind: 'literal', values: values.map(String).toSorted((one, two) => one.localeCompare(two)) }
-}
-
-/** The core's half: its schema as Convex can check it. Refinements (min, max, regex, int, a record's rule
- * across its fields) are set aside: Convex has none. A custom check is any value under a box's
- * sidecar and has no shape anywhere else; a transform or a frozen copy is what it takes in.
- */
-const zodShape = (schema: ZodLike, fieldname?: string): Shape => {
-  const { def } = schema
-  if (def.type === 'string' || def.type === 'number') { return { kind: def.type } }
-  // A box's sidecar: a check of a plain object of JSON values, which the core alone runs. It alone
-  // converts to v.any(): a custom check on any other field has no shape here, so a new one fails.
-  if (fieldname === 'sidecar' && def.type === 'custom') { return { kind: 'any' } }
-  if (def.type === 'pipe' && def.in) { return zodShape(def.in, fieldname) }
-  if (def.type === 'readonly' && def.innerType) { return zodShape(def.innerType, fieldname) }
-  if (def.type === 'object') {
-    const fields = Object.entries(def.shape ?? {}).map(([ckey, field]) => {
-      const optional = field.def.type === 'optional'
-      return [ckey, { optional, shape: zodShape(optional && field.def.innerType ? field.def.innerType : field, ckey) }] as const
-    })
-    return { kind: 'object', fields: Object.fromEntries(fields) }
-  }
-  if (def.type === 'array' && def.element) { return { kind: 'array', element: zodShape(def.element) } }
-  if (def.type === 'nullable' && def.innerType) { return { kind: 'nullable', inner: zodShape(def.innerType, fieldname) } }
-  if (def.type === 'union' && def.options) {
-    const members = def.options.map((option) => zodShape(option))
-    return literalsOf(members) ?? { kind: 'union', members }
-  }
-  const literal = zodLiteralShape(schema)
-  if (literal) { return literal }
-  throw new Error(`no shape for a Zod ${def.type}`)
-}
-
-/**
- * Convex's half: a union of literals is the set of its values, as a `format` field widens; a
- * union of one validator and null is that validator, nullable.
- */
-const convexShape = (validator: GenericValidator): Shape => {
-  switch (validator.kind) {
-  case 'string':  { return { kind: 'string' } }
-  case 'float64': { return { kind: 'number' } }
-  case 'null':    { return { kind: 'null' } }
-  case 'any':     { return { kind: 'any' } }
-  case 'literal': { return { kind: 'literal', values: [String(validator.value)] } }
-  case 'union': {
-    const nonNulls = validator.members.filter((member) => member.kind !== 'null')
-    if (nonNulls.length === 1 && validator.members.length === 2) { return { kind: 'nullable', inner: convexShape(nonNulls[0]!) } }
-    const members = validator.members.map((member) => convexShape(member))
-    return literalsOf(members) ?? { kind: 'union', members }
-  }
-  case 'array': { return { kind: 'array', element: convexShape(validator.element) } }
-  case 'object': {
-    const fields = Object.entries(validator.fields).map(([ckey, field]) => (
-      [ckey, { optional: field.isOptional === 'optional', shape: convexShape(field) }] as const
-    ))
-    return { kind: 'object', fields: Object.fromEntries(fields) }
-  }
-  default: { throw new Error(`no shape for a Convex ${validator.kind}`) }
-  }
-}
-
-const ShapeCases = [
-  [Safebyok.ciphered,               CVX.ciphered,               'ciphered: the shared encrypted-value shape'],
-  [Safebyok.vaultScope,             CVX.vaultScope,             'vaultScope: what names one vault, which the core hands out frozen'],
-  [Safebyok.boxscope,               CVX.boxscope,               "boxscope: a vault's scope and a boxlabel"],
-  [Safebyok.vaultRecord,            CVX.vaultRecord,            "vaultRecord: every field, its gate nested and nullable, the wayins' ciphered wraps nested in it"],
-  [Safebyok.gateRecord,             CVX.gate,                   'gate: the passphrase, and the passkey or null'],
-  [Safebyok.vaultDraft,             CVX.novelVaultRecord,       'novelVaultRecord: every field, gate_epoch 0 and no gate'],
-  [Safebyok.boxRecord,              CVX.boxRecord,              'boxRecord: every field, the sidecar any value, both ciphered fields nested'],
-  [Safebyok.boxSparse,              CVX.boxSparse,              'boxSparse: the record without its ciphered fields, format kept'],
-  [Safebyok.vaultTombstone,         CVX.vaultTombstone,         'vaultTombstone: the scope, its format and the counter carried on'],
-  [Safebyok.capacity,               CVX.capacity,               'capacity: each max a number or Infinity, as the core takes it in'],
-  [Safebyok.vaultRecordExpectation, CVX.vaultRecordExpectation, 'vaultRecordExpectation: vault_tok and gate_epoch'],
-  [Safebyok.boxGetExpectation,      CVX.boxGetExpectation,      'boxGetExpectation: vault_tok'],
-  [Safebyok.boxExpectation,         CVX.boxExpectation,         'boxExpectation: vault_tok, and revision_tok or null'],
-  [Safebyok.vaultDelExpectation,    CVX.vaultDelExpectation,    'vaultDelExpectation: vault_tok, and gate_epoch or null'],
-  [Safebyok.boxDelExpectation,      CVX.boxDelExpectation,      'boxDelExpectation: vault_tok, and revision_tok or null'],
-  [Safebyok.boxDeletion,            CVX.boxDeletion,            'boxDeletion: one of three outcomes'],
-] as const
-
-describe("the Convex validators, field for field with the core's Zod validators they are made from", () => {
-  for (const [zodRecord, convexRecord, blurb] of ShapeCases) {
-    it(blurb, () => {
-      expect(convexShape(convexRecord)).to.deep.equal(zodShape(zodRecord as unknown as ZodLike))
-    })
-  }
-
-  it("reads a custom check as any value for the sidecar alone, so a second custom in a stored record fails here", () => {
-    const custom = Zod.custom<Record<string, unknown>>((val) => typeof val === 'object')
-    expect(zodShape(Zod.object({ sidecar: custom }) as unknown as ZodLike)).to.deep.equal(
-      { kind: 'object', fields: { sidecar: { optional: false, shape: { kind: 'any' } } } },
-    )
-    expect(() => zodShape(Zod.object({ note: custom }) as unknown as ZodLike)).to.throw('no shape for a Zod custom')
+describe("the component's validators, against what the core writes", () => {
+  it("take a vault record and its tombstone, a box record and its tombstone, whole", async () => {
+    const backend = await withVault()
+    await backend.mutation(putBox, { record: box, opts: birth })
+    expect(await storedRows(backend)).to.deep.equal({ vaults: [vault], boxes: [box], tallies: 1 })
+    await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: SX.revisionOf(box) } })
+    await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: SX.revisionOf(vault) } })
+    expect(await storedRows(backend)).to.deep.equal({ vaults: [TH.vaultTombstoneOf(vault)], boxes: [TH.boxTombstoneOf(box)], tallies: 0 })
   })
 
-  it("type the same records, expectations and summaries as the core", () => {
-    // What the core writes is what Convex takes: each record the core checks is one Convex's type takes.
-    expectTypeOf<Safebyok.VaultRecord>().toExtend<Infer<typeof CVX.vaultRecord>>()
-    expectTypeOf<Safebyok.VaultDraft>().toExtend<Infer<typeof CVX.novelVaultRecord>>()
-    expectTypeOf<Safebyok.BoxRecord>().toExtend<Infer<typeof CVX.boxRecord>>()
-    expectTypeOf<Safebyok.BoxSparse>().toExtend<Infer<typeof CVX.boxSparse>>()
-    expectTypeOf<Safebyok.VaultTombstone>().toExtend<Infer<typeof CVX.vaultTombstone>>()
-    expectTypeOf<Safebyok.Capacity>().toExtend<Infer<typeof CVX.capacity>>()
-    expectTypeOf<Readonly<Infer<typeof CVX.vaultScope>>>().toEqualTypeOf<Safebyok.VaultScope>()
-    expectTypeOf<Infer<typeof CVX.vaultRecordExpectation>>().toEqualTypeOf<CoreVaultRecordExpectation>()
-    expectTypeOf<Infer<typeof CVX.boxGetExpectation>>().toEqualTypeOf<CoreBoxGetExpectation>()
-    expectTypeOf<Infer<typeof CVX.boxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
-    expectTypeOf<Infer<typeof CVX.vaultDelExpectation>>().toEqualTypeOf<CoreVaultDelExpectation>()
-    expectTypeOf<Infer<typeof CVX.boxDelExpectation>>().toEqualTypeOf<CoreBoxDelExpectation>()
-    expectTypeOf<Infer<typeof CVX.boxDeletion>>().toEqualTypeOf<CoreBoxDeletion>()
+  it("take a sidecar of any JSON the core admits, and store it as it came", async () => {
+    const backend = await withVault()
+    const sidecar = { label: 'work', tags: ['a', 'b'], nested: { count: 2, on: true, none: null } }
+    const record = TH.boxAt(0, 'life1', { sidecar })
+    await backend.mutation(putBox, { record, opts: birth })
+    expect(await backend.query(api.getBox, { asked: { ...TH.boxscope, vault_tok: record.vault_tok } })).to.deep.equal({ vault, box: record })
   })
 })
 
-// A probe app whose only functions take a record and do nothing: whether a call is refused is
-// whether Convex's validator refuses the record.
-const probeApp = defineTestApp({ schema: defineSchema({}) })
-const { api: probeApi, createTest } = probeApp.defineModules({
-  probe: {
-    takeVaultRecord: probeApp.mutation({ args: { vaultRecord: CVX.vaultRecord }, returns: v.null(), handler: () => null }),
-    takeBox: probeApp.mutation({ args: { box: CVX.boxRecord }, returns: v.null(), handler: () => null }),
-    takeCapacity: probeApp.mutation({ args: { capacity: CVX.capacity }, returns: v.null(), handler: () => null }),
-  },
-})
+const { gate: _gate, ...gateless } = vault
+const { whisper_ciphered: _whisperCiphered, ...whisperless } = box
 
-const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
-  try {
-    await call
-    return true
-  } catch {
-    return false
-  }
-}
-
-const { vault_tok: _vaultTok, ...vaultRecordWithoutVaultTok } = TH.vaultRecordOf('u1')
-const { sidecar: _sidecar, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
-const { registered_at: _vaultRecordTime, ...vaultRecordWithoutTime } = TH.vaultRecordOf('u1')
-const { gate: _gate, ...vaultRecordWithoutWayins } = TH.vaultRecordOf('u1')
-const { passkey: _noPasskey, ...gateWithoutPasskey } = TH.gateOf('u1')
-const vaultRecordWithoutPasskey = { ...TH.vaultRecordOf('u1'), gate: gateWithoutPasskey }
-/** A vault record as this format held it before its gate was nested: the two ways in flat beside its fields. */
-const flatVaultRecord = { ...vaultRecordWithoutWayins, ...TH.gateOf('u1') }
-/** The three fields the vault record held its one passphrase in, before it held ways in. */
-const OldWayinFields = {
-  key_deriver_label:            'test_digest_v0',
-  // base64 of the literal text 'salt': a fake salt, public material anyway
-  passphrase_salt_b64:          'c2FsdA',
-  vault_key_passphrase_wrapped: TH.fakeCiphered('old'),
-}
-const { registered_at: _boxRegistered, written_at: _boxWritten, ...boxWithoutTimes } = TH.boxOf('anthropic_api_key', 'a1')
-const boxV3 = { ...boxWithoutTimes, format: 'safebyok-box-v3', registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
-/** An ISO time, as records stored them before every time became epoch milliseconds. */
-const OldIso = '2026-10-14T00:00:00.000Z'
-
-const VaultRecordCases = [
-  // both accept:
-  [TH.vaultRecordOf('u1'),                                                    true,   true,   'whole vault record'],
-  // names are any text to Convex: the client's VaultDB checks them
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop') }) },     true,   true,   'vault record with a passphrase and a passkey'],
-  // both refuse -- what Convex can see:
-  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-vault-v7' },              false,  false,  'a format this package does not know'],
-  [{ ...TH.vaultRecordOf('u1'), format: 'safebyok-box-v1' },                false,  false,  "another record's format"],
-  [vaultRecordWithoutVaultTok,                                              false,  false,  'vault record missing its vault_tok'],
-  [{ ...TH.vaultRecordOf('u1'), gate_epoch: '1' },                          false,  false,  'an epoch written as text'],
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }) }, false, false, 'a ciphered wayin missing its ciphertext'],
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }) }, false, false, 'a wayinkind this package does not know'],
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passkey: TH.wayinOf('laptop', { wayinkind: 'passkey' as never }) as never }) }, false, false, "a passphrase's fields in the passkey slot"],
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passphrase: TH.passkeyWayinOf('laptop') as never }) },  false,  false,  'a passkey in the passphrase slot'],
-  [vaultRecordWithoutPasskey,                                               false,  false,  'a gate with no passkey field: null is written when there is none'],
-  [vaultRecordWithoutWayins,                                                false,  false,  'a record with no gate field: null is written while the vault is novel'],
-  [flatVaultRecord,                                                         false,  false,  'a record from before its gate was nested, its ways in flat beside its fields'],
-  [{ ...vaultRecordWithoutWayins, wayins: [TH.wayinOf('passphrase')] },     false,  false,  'vault record holding a list of wayins, as v4 did'],
-  [{ ...vaultRecordWithoutWayins, ...OldWayinFields },                        false,  false,  'vault record from before its wayins were a list'],
-  [{ ...TH.vaultRecordOf('u1'), registered_at: null },                        false,  false,  'a null registered_at'],
-  [{ ...TH.vaultRecordOf('u1'), registered_at: '2026-10-14T00:00:00.000Z' },  false,  false,  'a registered_at as an ISO string'],
-  [{ ...vaultRecordWithoutTime, created_at: OldIso, updated_at: OldIso },     false,  false,  'vault record from before its time was named registered_at'],
-  // Both refuse: a stored record is strict, so a field neither record has never reaches storage.
-  [{ ...TH.vaultRecordOf('u1'), passphrase_text: 'not-a-real-passphrase' },   false,  false,  'a field the record does not have'],
-  // Zod refuses, Convex accepts -- the finer rules are the client's:
-  [{ ...TH.vaultRecordOf('u1'), vault_tok: '' },                              false,  true,   'an empty vault_tok'],
-  [{ ...TH.vaultRecordOf('u1'), gate_epoch: 0 },                              false,  true,   'a gate at gate_epoch 0: the rule across the two is the client\'s'],
-  [{ ...TH.gatelessOf('u1'), gate_epoch: 1 },                                false,  true,   'no gate at gate_epoch 1'],
-  [{ ...TH.vaultRecordOf('u1'), gate_epoch: 1.5 },                            false,  true,   'a fractional epoch'],
-  [{ ...TH.vaultRecordOf('u1'), registered_at: 1_792_022_400 },               false,  true,   'a registered_at in epoch seconds, before 1981'],
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passphrase: TH.wayinOf('passphrase', { salt_b64: '' as never }) }) }, false, true, 'a passphrase with an empty salt'],
-  [{ ...TH.vaultRecordOf('u1'), gate: TH.gateOf('u1', { passkey: TH.passkeyWayinOf('laptop', { credential_id: '' }) }) }, false, true, 'a passkey with an empty credential_id'],
+const MisshapenCases = [
+  [() => ({ record: gateless, opts: birth }),                                'putVault', 'a vault record missing a field'],
+  [() => ({ record: { ...vault, colour: 'red' }, opts: birth }),             'putVault', 'a vault record with a field the core has not'],
+  [() => ({ record: { ...vault, revision_seq: '0' }, opts: birth }),         'putVault', 'a vault record with a field of the wrong type'],
+  [() => ({ record: vault, opts: { ...birth, ifPresent: 'merge' } }),        'putVault', 'options of a choice the core has not'],
+  [() => ({ record: whisperless, opts: birth }),                             'putBox',   'a box record missing its whisper'],
+  [() => ({ record: { ...box, colour: 'red' }, opts: birth }),               'putBox',   'a box record with a field the core has not'],
+  [() => ({ record: { ...box, am: 'x' }, opts: birth }),                     'putBox',   'a box record marked as a tombstone'],
+  [() => ({ record: box, opts: birth, maxBoxes: '2' }),                      'putBox',   'a cap written as text'],
 ] as const
 
-const BoxCases = [
-  // both accept:
-  [TH.boxOf('anthropic_api_key', 'a1'),                                      true,   true,   'a whole box'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} },                 true,   true,   'a box with an empty sidecar'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: { list: ['a', 1, { beta: true }], gone: null } }, true, true, 'a box with a sidecar of any JSON values'],
-  // both refuse:
-  [boxWithoutSidecar,                                                        false,  false,  'a box with no sidecar: one is always written'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_codec: 'json_v2' },     false,  false,  'a whisper codec neither knows'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_schema_version: 2 },    false,  false,  'a whisper schema version neither knows'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-box-v2' },    false,  false,  'a box from before the sidecar'],
-  [boxV3,                                                                    false,  false,  'a box from before written_at, holding changed_at'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-vault-v1' },  false,  false,  "another record's format"],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_ciphered: 'ct-flat' },  false,  false,  'a whisper ciphered as bare text, not a wayin'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: '1792022400000' },  false,  false,  'a written_at written as text'],
-  [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a box from before its times were named registered_at and changed_at'],
-  // Zod refuses, Convex accepts:
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: { note: undefined } }, false, true,   'a sidecar holding what JSON cannot carry'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_tok: '' },             false,  true,   'an empty revision_tok'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: Infinity },         false,  true,   'a written_at that never comes'],
-  [{ ...TH.boxOf('مفتاح العمل', 'a1') },                                    false,  true,   'a boxlabel that is no label: the name rules are the client\'s'],
-  // The sidecar is any value to Convex: the core's custom check of a JSON object converts to v.any().
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: null },               false,  true,   'a null sidecar'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: ['a', 1] },           false,  true,   'a sidecar that is an array'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: 'work account' },     false,  true,   'a sidecar that is text'],
-] as const
-
-describe("the Convex validators, against the core's Zod records, record by record", () => {
-  for (const [vaultRecord, zodOk, convexOk, blurb] of VaultRecordCases) {
-    it(`vault record: ${blurb}`, async () => {
-      expect(Safebyok.vaultRecord.safeParse(vaultRecord).success).to.eq(zodOk)
-      expect(await convexAccepts(createTest().mutation(probeApi.probe.takeVaultRecord, { vaultRecord: vaultRecord as never }))).to.eq(convexOk)
-    })
-  }
-
-  for (const [box, zodOk, convexOk, blurb] of BoxCases) {
-    it(`box: ${blurb}`, async () => {
-      expect(Safebyok.boxRecord.safeParse(box).success).to.eq(zodOk)
-      expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
-    })
-  }
-})
-
-const CapacityCases = [
-  // both accept:
-  [{ boxes: { used: 12, max: 8000 }, bytes: { used: 48_000, max: 7_339_008 } },     true,   true,   'a vault with room'],
-  [{ boxes: { used: 12, max: Infinity }, bytes: { used: 48_000, max: Infinity } },  true,   true,   "a store's Infinity, which the core takes for no limit"],
-  // both refuse:
-  [{ boxes: { used: 12, max: '8000' }, bytes: { used: 48_000, max: 7_339_008 } },   false,  false,  'a max written as text'],
-  [{ boxes: { used: 12, max: 8000 } },                                              false,  false,  'no bytes'],
-  // Zod refuses, Convex accepts:
-  [{ boxes: { used: -1, max: 8000 }, bytes: { used: 48_000, max: 7_339_008 } },     false,  true,   'a count below zero'],
-  [{ boxes: { used: 12, max: 0 }, bytes: { used: 48_000, max: 7_339_008 } },        false,  true,   'a max of zero'],
-] as const
-
-describe("the Convex validator of a vault's capacity, against the core's", () => {
-  for (const [capacity, zodOk, convexOk, blurb] of CapacityCases) {
-    it(blurb, async () => {
-      expect(Safebyok.capacity.safeParse(capacity).success).to.eq(zodOk)
-      expect(await convexAccepts(createTest().mutation(probeApi.probe.takeCapacity, { capacity: capacity as never }))).to.eq(convexOk)
+describe("the component's validators, against a misshapen call", () => {
+  for (const [argsOf, fnName, blurb] of MisshapenCases) {
+    it(`refuse ${blurb}, storing nothing`, async () => {
+      const backend = await withVault()
+      const fnRef = (fnName === 'putVault') ? api.putVault : putBox
+      await expect(backend.mutation(fnRef, argsOf() as never)).rejects.toThrow(/Validator/)
+      expect(await storedRows(backend)).to.deep.equal({ vaults: [vault], boxes: [], tallies: 0 })
     })
   }
 })
