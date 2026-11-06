@@ -26,7 +26,7 @@ const failNextCall = (vaultDB: MemoryVaultDB): void => {
   for (const spy of spies) { spy.mockImplementationOnce(fail) }
 }
 
-TH.describeVaultDBBattery('MemoryVaultDB', {
+TH.describeVaultDBBattery("MemoryVaultDB", {
   makeVaultDB:         (opts) => new MemoryVaultDB(opts),
   makeCappedVaultDB:   (maxBoxes) => new MemoryVaultDB({ maxBoxes }),
   _cheat_rowsOf:       memoryRowsOf,
