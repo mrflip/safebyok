@@ -218,7 +218,7 @@ describe("putBox's count cap", () => {
     expect(await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth, maxBoxes: NaN })).to.deep.equal(full)
   })
 
-  it("counts a box's tombstone as a row, so putting and deleting under fresh boxlabels fills the life", async () => {
+  it("counts a box's tombstone as a row", async () => {
     const backend = await withVault()
     for (const boxlabel of ['anthropic', 'openai', 'github']) {
       const box = boxOf(boxlabel)
@@ -239,7 +239,7 @@ describe("putBox's count cap", () => {
     expect(await keptTally(backend)).to.have.property('box_count', 2)
   })
 
-  it("frees a life's tombstones only when the vault is deleted, its next life counted afresh", async () => {
+  it("frees a life's tombstones only when the vault is deleted", async () => {
     const backend = await withVault()
     await plantBoxes(backend, [TH.boxTombstoneOf(boxOf('anthropic'))])
     expect(await backend.mutation(api.putBox, { record: boxOf('openai'), opts: birth, maxBoxes: 1 })).to.have.property('capacity')
@@ -328,7 +328,7 @@ describe("a large vault, within Convex's per-transaction limits", () => {
     expect(await listWatchDel(backend)).to.deep.equal({ listedCount: MaxVaultBoxes, watchedCount: MaxVaultBoxes, landed: true, liveCount: 0 })
   }, 60_000)
 
-  it("lists, watches and deletes a life filled to its count limit with tombstones, refusing one box more", async () => {
+  it("lists, watches and deletes a life filled to its count limit with tombstones", async () => {
     const backend = await withVault(true)
     const tombstones = Array.from({ length: MaxVaultBoxes }, (_slot, ii) => TH.boxTombstoneOf(boxOf(`b${String(ii).padStart(4, '0')}`)))
     await plantBoxes(backend, tombstones)
