@@ -386,6 +386,8 @@ export abstract class VaultDB {
       getBox:     async (asked) => await relayed(() => this.doGetBox(SX.boxQuery.parse(asked))),
       putVault:   async (record, opts) => await relayed(() => {
         const vaultRecord = SX.vaultRecord.parse(record)
+        // putOpts, not the putVault verb's putVaultOpts: a gate verb in the browser moves a live vault
+        // row through doPutVault with `ifPresent: 'repl'`, and its checks of the gate run there alone.
         const putOpts = SX.putOpts.parse(opts)
         demandNextSeq(vaultRecord, putOpts.prior)
         return this.doPutVault(vaultRecord, putOpts)
