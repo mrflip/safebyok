@@ -174,6 +174,7 @@ export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape,
 
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
+/** A put's options as parsed, defaults filled in: what a subclass's `doPutVault` and `doPutBox` receive. */
 export type PutOptsGiven = Readonly<Z.output<typeof putOpts>>
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
