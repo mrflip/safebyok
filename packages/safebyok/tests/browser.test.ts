@@ -18,13 +18,13 @@ describe("safebyok/browser", () => {
   it("derives a 32-byte key under the argon2id_web_v1 label with argon2idWebV1Deriver", async () => {
     expect(argon2idWebV1Deriver.key_deriver_label).to.eq('argon2id_web_v1')
     const keyBytes = await argon2idWebV1Deriver.deriveKeyBytes('a short passphrase', salt)
-    expect(keyBytes).to.have.length(32)
+    expect(keyBytes).to.have.lengthOf(32)
   })
 
   it("derives alike for equal passphrase and salt, and apart for another passphrase, with argon2idDeriver", async () => {
     const deriver = argon2idDeriver(CheapSpec)
     const first = await deriver.deriveKeyBytes('a short passphrase', salt)
-    expect(first).to.have.length(32)
+    expect(first).to.have.lengthOf(32)
     expect(await deriver.deriveKeyBytes('a short passphrase', salt)).to.deep.eq(first)
     expect(await deriver.deriveKeyBytes('another passphrase', salt)).to.not.deep.eq(first)
   })
