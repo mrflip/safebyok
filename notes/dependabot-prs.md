@@ -10,15 +10,13 @@ Nothing forbids it, but it changes who owns the branch:
 
 * **Dependabot stops managing it.** Once a commit that is not Dependabot's is on the branch,
   Dependabot stops rebasing it, and `@dependabot rebase` does nothing. The PR is maintained by
-  hand from then on, and Mergify's queue rebases it like any other (PROCESS.md, *The history we
-  keep*).
+  hand from then on, and rebased by hand like any other (PROCESS.md, *The history we keep*).
 * **CI reads it as an ordinary PR.** The changeset is `notes/ci.md`'s: when the PR moves a public
   package's runtime dependencies, `dependabot-changeset.yml` has already written it, once, and
   will not again. After a push that changes what the PR does, check that changeset still says it.
 * **The seven-day rule still holds.** Do not use `minimumReleaseAgeExclude` to turn a red PR green.
   That is for a security fix that cannot wait, with its entry in `notes/security.md`.
-* **Never force-push over Dependabot's commits.** Add commits on top; a rebase is Dependabot's,
-  or Mergify's.
+* **Never force-push over Dependabot's commits.** Add commits on top; a rebase is Dependabot's.
 
 ## First, find the cause
 

@@ -22,8 +22,8 @@ pnpm --filter safebyok test:watch   # one package's tests, as you edit
   block. For anything touching a secret, also a test that the wrong passphrase, tampered data or a
   malformed record is refused, and that no error carries the secret.
 * **A doc block** on everything exported, written for the developer calling it.
-* **A branch rebased onto `main`**, with no merge commits in it: the merge queue rebases it
-  again as it lands.
+* **A branch on the tip of `main`, or of the PR it stacks on**, with no merge commits in it: the
+  merge queue lands it as it stands, without rebasing, so a stale branch is rebased by hand first.
 * **A changeset**, if it changes a published package: `pnpm changeset` asks which packages, how
   big a bump, and a sentence for the CHANGELOG. A change that needs no release (tests, tooling,
   docs) adds an empty one, `pnpm changeset --empty`. CI asks for one or the other.
