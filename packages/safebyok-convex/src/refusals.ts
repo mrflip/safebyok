@@ -1,25 +1,15 @@
-import type { RefusalKind } from 'safebyok-old'
+/** The refusals the host's wrapper throws as a `ConvexError`, for the client to read back as the VaultError of the same kind. */
 
-/** Every refusal safebyok's Convex functions throw, as the `kind` in a `ConvexError`'s `data`; the host's `getUserId` may throw them too.
- * Each is the `VaultError` kind of the same name. A failed expectation, and a box write with no
- * room, are not refusals: an update or delete resolves `false` or `null`, and a box write resolves
- * why it did not land.
- */
-export const safebyokErrorKindVals = ['identity_revoked', 'not_permitted'] as const satisfies readonly RefusalKind[]
+/** Each `kind` a `ConvexError` from the wrapper carries. */
+export const safebyokErrorKindVals = ['identity_revoked'] as const
+
 /** One of {@link safebyokErrorKindVals}. */
 export type SafebyokErrorKind = typeof safebyokErrorKindVals[number]
 
-/** The `data` of a `ConvexError` safebyok's functions throw: a `kind` to branch on, and a calm message.
- * Neither ever names a user or quotes a record.
- */
-export type SafebyokErrorData = {
-  kind:    SafebyokErrorKind
-  message: string
-}
+/** The `data` of a `ConvexError` the wrapper throws. */
+export type SafebyokErrorData = { kind: SafebyokErrorKind }
 
-/** True when `data`, a `ConvexError`'s, is one of safebyok's own refusals. */
+/** True when `data`, a `ConvexError`'s, is one of the wrapper's refusals. */
 export const isSafebyokErrorData = (data: unknown): data is SafebyokErrorData => (
-  typeof data === 'object' && data !== null
-  && (safebyokErrorKindVals as readonly unknown[]).includes((data as { kind?: unknown }).kind)
-  && typeof (data as { message?: unknown }).message === 'string'
+  (typeof data === 'object') && (data !== null) && ('kind' in data) && (safebyokErrorKindVals as readonly unknown[]).includes(data.kind)
 )

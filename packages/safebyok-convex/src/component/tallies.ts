@@ -1,140 +1,96 @@
 import { getDocumentSize } from 'convex/values'
-import type { Value } from 'convex/values'
-import type { Doc, Id } from './_generated/dataModel'
+import type { WithoutSystemFields } from 'convex/server'
+import * as SX from 'safebyok/storage'
+import type { Doc } from './_generated/dataModel'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
-/** Each vault's tally, and the limits the component holds every vault to, so that it can always be deleted whole.
- * `delVault` reads every row twice in one transaction, and a Convex transaction may read 16 MiB and
- * 32,000 documents, and write 16,000. A modified client need not keep its vault small, so the
- * component checks these limits on every box write, against a tally kept in step with each write
- * and delete.
- */
+// A vault is held to limits, whatever its client asks, so that one transaction can always tombstone
+// it whole: `delVault` reads every box row of the life once and writes each live one, and a Convex
+// transaction may read 16 MiB and write 16,000 documents. The limits are half of each, leaving room
+// for the vault row and the tally, as a modified client need not keep its vault small.
 
-/** Convex's most for one document, in bytes: 1 MiB. */
+// == [Limits]: MaxVaultBoxes, MaxVaultBoxBytes
+
+/** Convex's most for one document, in bytes. */
 const ConvexDocumentBytes = 1_048_576
 
-/** Convex's most for one transaction to read, in bytes: 16 MiB. */
+/** Convex's most for one transaction to read, in bytes. */
 const ConvexTransactionReadBytes = 16_777_216
 
 /** Convex's most documents for one transaction to write. */
 const ConvexTransactionWrittenDocuments = 16_000
 
-/** Room for the vault's tally row, which a delete reads twice as well: several times its weight. */
+/** Room for the tally row beside the vault row. */
 const TallyReserveBytes = 1024
 
-/** The most boxes one vault holds: half the documents a Convex transaction may write.
- * A delete, a deletion and two reads per box, then stays inside every per-transaction limit.
- */
+/** The most live boxes one life of a vault holds. */
 export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
-/** The most one vault's boxes weigh together, in bytes as Convex counts a document: 7 MiB less 1 KiB.
- * That is half of what a transaction may read, as a delete reads every row twice, less a whole
- * document for the vault record and room for the tally.
- */
+/** The most one life's box rows weigh together, live or tombstoned, in bytes as Convex counts a document. */
 export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumentBytes - TallyReserveBytes
+// --
 
-/** How full a vault is: how many boxes it holds, and what they weigh in bytes, as Convex counts them. */
-export type Tally = {
-  box_count: number
-  box_bytes: number
+// == [Tallies]: Life, Tally, Reckoning, weigh, capacityOf, reckon, refuses, record, forget, drop
+
+/** The labels and token that name one life of one vault. */
+export type Life = { applabel: string, user_id: string, vaultlabel: string, vault_tok: string }
+
+/** A life's live boxes, and what all its box rows weigh. */
+export type Tally = { box_count: number, box_bytes: number }
+
+/** A life's tally as a put finds it: the row it is kept in, if any, and the count, null for a life past a limit. */
+export type Reckoning = { kept: Doc<'safebyok_tallies'> | null, tally: Tally | null }
+
+/** What `boxDoc` weighs toward its life's limit, its system fields at Convex's estimate. */
+export const weigh = (boxDoc: WithoutSystemFields<Doc<'safebyok_boxes'>> | null): number => {
+  if (boxDoc === null) { return 0 }
+  const { applabel, user_id, vaultlabel, vault_tok, boxlabel, box } = boxDoc
+  return getDocumentSize({ applabel, user_id, vaultlabel, vault_tok, boxlabel, box })
 }
 
-/** How full a vault is, from its tally, against the component's limits.
- * Its boxes, and their bytes as Convex counts a document. A vault past a limit and left uncounted
- * (a null tally) is answered as full by both, as {@link refuses} treats it.
- *
- * @example capacityOf({ box_count: 12, box_bytes: 48_000 })  // { boxes: { used: 12, max: 8000 }, bytes: { used: 48000, max: MaxVaultBoxBytes } }
- */
-export const capacityOf = (tally: Tally | null) => ({
-  boxes: { used: tally?.box_count ?? MaxVaultBoxes, max: MaxVaultBoxes },
+/** How full a life is against the cap `maxBoxes`, a life past a limit answered as full. */
+export const capacityOf = (tally: Tally | null, maxBoxes: number) => ({
+  boxes: { used: tally?.box_count ?? maxBoxes, max: maxBoxes },
   bytes: { used: tally?.box_bytes ?? MaxVaultBoxBytes, max: MaxVaultBoxBytes },
 })
 
-/** A vault's tally as a write finds it: its stored row, if any, and the count.
- * The count is null when counting afresh stopped at a limit: the vault is past it by an unknown amount.
- */
-export type Reckoning = {
-  kept:  Doc<'safebyok_vault_tallies'> | null
-  tally: Tally | null
-}
-
-/** What a box row weighs toward its vault's limit: its size as Convex counts the document.
- *
- * @param rowId - The `_id` of a row not yet read back; without one, a row lacking its `_id` is
- *   weighed with Convex's estimate of one.
- *
- * @example weigh(storedRow)           // a row read from the table
- * @example weigh(row, insertedId)     // a row just inserted
- */
-export const weigh = (row: Record<string, Value>, rowId?: Id<'safebyok_boxes'>): number => (
-  getDocumentSize(rowId === undefined ? row : { ...row, _id: rowId, _creationTime: 0 })
-)
-
-/** The vault's tally as it is now, for a box write to check: the one kept, or one counted afresh from `boxRows`.
- * Counting stops at the first row past a limit, so it never reads much more than a vault may hold.
- * The tally then comes back null, and the vault is refused anything that adds to it until deleted
- * boxes bring it back in.
- */
-export const reckon = async (
-  db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>, boxRows: AsyncIterable<Doc<'safebyok_boxes'>>,
-): Promise<Reckoning> => {
-  const kept = await findTallyRow(db, vaultRowId)
+/** The life's tally as it stands: the one kept, or one counted from its box rows, stopping past a limit. */
+export const reckon = async (db: DatabaseReader, life: Life): Promise<Reckoning> => {
+  const kept = await findTallyRow(db, life)
   if (kept) { return { kept, tally: { box_count: kept.box_count, box_bytes: kept.box_bytes } } }
   // A loop rather than a reduce: it reads the rows as it goes, and stops reading past a limit.
   let tally: Tally = { box_count: 0, box_bytes: 0 }
-  for await (const row of boxRows) {
-    tally = plus(tally, { box_count: 1, box_bytes: weigh(row) })
-    if (tally.box_count > MaxVaultBoxes || tally.box_bytes > MaxVaultBoxBytes) {
-      return { kept: null, tally: null }
-    }
+  for await (const boxDoc of lifeBoxQuery(db, life)) {
+    tally = plus(tally, { box_count: (SX.isLiveRow(boxDoc.box) ? 1 : 0), box_bytes: weigh(boxDoc) })
+    if ((tally.box_count > MaxVaultBoxes) || (tally.box_bytes > MaxVaultBoxBytes)) { return { kept: null, tally: null } }
   }
   return { kept: null, tally }
 }
 
-/** True when a write that changes the vault by `growth` must be refused: it leaves the vault past a limit, and larger by that measure.
- * A write that adds nothing by a measure (a replacement, by count; one no heavier, by weight) is
- * never refused by it, so a vault over its limits can always shrink.
- *
- * @param tally - The vault's tally before the write, or null for a vault past a limit, uncounted.
- * @param growth - What the write adds: a box for a new one, and its weight less any it replaces.
- *
- * @example refuses({ box_count: 8000, box_bytes: 4096 }, { box_count: 1, box_bytes: 512 })  // => true
- * @example refuses({ box_count: 8000, box_bytes: 4096 }, { box_count: 0, box_bytes: 512 })  // => false
- */
-export const refuses = (tally: Tally | null, growth: Tally): boolean => {
-  if (tally === null) { return growth.box_count > 0 || growth.box_bytes > 0 }
+/** True when a put growing the life by `growth` would leave it past `maxBoxes` or the byte limit, and larger by that measure. */
+export const refuses = (tally: Tally | null, growth: Tally, maxBoxes: number): boolean => {
+  if (tally === null) { return (growth.box_count > 0) || (growth.box_bytes > 0) }
   const after = plus(tally, growth)
-  return (growth.box_count > 0 && after.box_count > MaxVaultBoxes)
-    || (growth.box_bytes > 0 && after.box_bytes > MaxVaultBoxBytes)
+  return ((growth.box_count > 0) && (after.box_count > maxBoxes)) || ((growth.box_bytes > 0) && (after.box_bytes > MaxVaultBoxBytes))
 }
 
-/** Keep the vault's tally in step with a box write that landed: moved by `growth`, or stored for the first time.
- * A vault whose count stopped at a limit keeps no tally: its next write counts it again.
- */
-export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
+/** Move the life's tally by a put's `growth`, storing it the first time; a life past a limit keeps none. */
+export const record = async (db: DatabaseWriter, life: Life, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
   if (tally === null) { return }
-  const moved = plus(tally, growth)
-  if (kept) {
-    await db.patch('safebyok_vault_tallies', kept._id, moved)
-  } else {
-    await db.insert('safebyok_vault_tallies', { vault_row_id: vaultRowId, ...moved })
-  }
+  if (kept) { await db.patch('safebyok_tallies', kept._id, plus(tally, growth)) } else { await db.insert('safebyok_tallies', { ...life, ...plus(tally, growth) }) }
 }
 
-/** Take a deleted box off its vault's tally, when the vault has one.
- * A delete never counts a vault that has none: a vault too large to read whole must still be
- * deletable, a box at a time.
- */
-export const forget = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, deleted: Doc<'safebyok_boxes'>): Promise<void> => {
-  const kept = await findTallyRow(db, vaultRowId)
-  if (! kept) { return }
-  await db.patch('safebyok_vault_tallies', kept._id, plus(kept, { box_count: -1, box_bytes: -weigh(deleted) }))
+/** Move the life's tally by a del's `growth`, where it has one. */
+// A del never counts a life afresh: a life too large to read whole must still shrink, a box at a time.
+export const forget = async (db: DatabaseWriter, life: Life, growth: Tally): Promise<void> => {
+  const kept = await findTallyRow(db, life)
+  if (kept) { await db.patch('safebyok_tallies', kept._id, plus(kept, growth)) }
 }
 
-/** Remove the vault's tally, when it has one: its vault is being deleted. */
-export const drop = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>): Promise<void> => {
-  const kept = await findTallyRow(db, vaultRowId)
-  if (kept) { await db.delete('safebyok_vault_tallies', kept._id) }
+/** Remove the life's tally, where it has one. */
+export const drop = async (db: DatabaseWriter, life: Life): Promise<void> => {
+  const kept = await findTallyRow(db, life)
+  if (kept) { await db.delete('safebyok_tallies', kept._id) }
 }
 
 const plus = (tally: Tally, growth: Tally): Tally => ({
@@ -143,9 +99,16 @@ const plus = (tally: Tally, growth: Tally): Tally => ({
 })
 
 // `.unique()` throws on a second row: a tally is inserted only where none was found, in the same
-// transaction, so two would be damage, and damage surfaces rather than being papered over.
-const findTallyRow = (db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>) => (
-  db.query('safebyok_vault_tallies')
-    .withIndex('by_vault_row', (idx) => idx.eq('vault_row_id', vaultRowId))
+// transaction, so two would be damage, which surfaces rather than being papered over.
+const findTallyRow = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
+  db.query('safebyok_tallies')
+    .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
     .unique()
 )
+
+/** The box rows of one life, in boxlabel order. */
+export const lifeBoxQuery = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
+  db.query('safebyok_boxes')
+    .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+)
+// --
