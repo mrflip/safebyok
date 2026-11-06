@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as PX from '../../src/shapes/primitives'
+import * as KX from '../../src/deriver/shapes'
+import * as CX from '../../src/shapes/shapes-core'
+import * as EX from '../../src/shapes/shapes-enums'
+import * as GX from '../../src/shapes/shapes-gateish'
+import * as SX from '../../src/shapes/shapes-storage'
+import * as VX from '../../src/shapes/shapes-vaultish'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
@@ -463,3 +469,49 @@ describe("Kit", () => {
     expect(Kit.epochMillis.safeParse(1_792_022_400).success).to.be.false
   })
 })
+
+// == [The values sweep]: ShapeModules, ExportedCheckers, Marker, markedInputsOf, refusalTextOf
+
+/** Every module of the package's shapes, each star-imported: its exports made in a `Checkers`, `Checker` or `objCheck` call are swept below. */
+const ShapeModules = { KX, CX, EX, GX, SX, VX }
+
+/** Each checker a shapes module exports, by `<module>.<name>`: a schema whose `parse` refuses with a VaultError, as `refusingAs` tells one. */
+const ExportedCheckers = Object.fromEntries(Object.entries(ShapeModules).flatMap(([modname, mod]) => (
+  Object.entries(mod).filter(([_exportname, exported]) => exported instanceof Zod.ZodType && typeof (exported as { refusingAs?: unknown }).refusingAs === 'function')
+    .map(([exportname, exported]) => [`${modname}.${exportname}`, exported as Zod.ZodType])
+)))
+
+/** What every input below carries as a value, never as a key: a refusal holding it quoted its input. */
+const Marker = 'zqxMarkerValue7'
+
+/** Inputs for `schema` carrying the marker as a value: whole, in a list, in each field it takes, and one level down in each. */
+const markedInputsOf = (schema: unknown): unknown[] => {
+  const fieldnames = schema instanceof Zod.ZodObject ? Object.keys(schema.shape) : []
+  const fieldsAs = (val: unknown) => Object.fromEntries(fieldnames.map((fieldname) => [fieldname, val]))
+  return [Marker, [Marker], { inner: Marker }, fieldsAs(Marker), fieldsAs([Marker]), fieldsAs({ inner: Marker }), fieldsAs([{ inner: Marker }])]
+}
+
+/** What a refusal of `attempt` says, its message, stack, meta and every cause; null when it passes. */
+const refusalTextOf = (attempt: () => unknown): string | null => {
+  try {
+    attempt()
+    return null
+  } catch (err) {
+    return TH.thrownText(err)
+  }
+}
+
+describe("every checker a shapes module exports", () => {
+  it("is found by the sweep, the stored records' and the host's options' among them", () => {
+    expect(Object.keys(ExportedCheckers)).to.include.members(['SX.leaseRow', 'CX.whisper', 'CX.keyDeriverShape', 'GX.passphraseCleartext', 'VX.boxPatch', 'KX.keyDeriverSpec'])
+  })
+
+  for (const [checkername, checker] of Object.entries(ExportedCheckers)) {
+    it(`${checkername} quotes no value it refuses`, () => {
+      const refusals = markedInputsOf(checker).map((input) => refusalTextOf(() => checker.parse(input))).filter((text) => text !== null)
+      expect(refusals, checkername).to.not.be.empty
+      for (const text of refusals) { expect(text, checkername).to.not.include(Marker) }
+    })
+  }
+})
+// --
