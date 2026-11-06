@@ -162,7 +162,7 @@ describe("fakeDeployment", () => {
     const heard = vi.fn()
     client.onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, heard)
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
-    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.eq(null)
+    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.be.null
     const answer = await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyok.putVault, putVaultArgs))
     expect(answer).to.deep.equal({ landed: true, ante: null })
     expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ vaults: [{ vaultlabel: vault.vaultlabel, vault }] })

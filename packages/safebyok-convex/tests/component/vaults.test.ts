@@ -179,7 +179,7 @@ describe("a life's tally", () => {
   it("is counted, for a life planted without one, at its next box put, the life reading as ever until then", async () => {
     const backend = await withVault()
     await plantBoxes(backend, [boxOf('anthropic'), boxOf('openai')])
-    expect(await keptTally(backend)).to.equal(null)
+    expect(await keptTally(backend)).to.be.null
     expect(await listedBoxlabels(backend)).to.deep.equal(['anthropic', 'openai'])
     //
     await backend.mutation(api.putBox, { record: boxOf('anthropic', { revision_seq: 1 }), opts: over(boxOf('anthropic')) })
@@ -191,7 +191,7 @@ describe("a life's tally", () => {
     const backend = await withVault()
     await plantBoxes(backend, [boxOf('anthropic'), boxOf('openai')])
     await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('anthropic')), opts: { prior: SX.revisionOf(boxOf('anthropic')) } })
-    expect(await keptTally(backend)).to.equal(null)
+    expect(await keptTally(backend)).to.be.null
     await backend.mutation(api.putBox, { record: boxOf('github'), opts: birth })
     expect(await keptTally(backend)).to.deep.equal(await weighedTally(backend))
     expect(await keptTally(backend)).to.have.property('box_count', 2)
