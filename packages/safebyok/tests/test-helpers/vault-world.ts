@@ -238,8 +238,8 @@ export const makeWorld = async () => {
   const world = await makeBornVault()
   const boxrows = world.vaultDB._cheat_boxRowsOf(world.vault.scope, world.vault.vault_tok)
   const tryListBoxes = vi.spyOn(world.vaultDB, 'tryListBoxes')
-  const tryPutBox   = vi.spyOn(world.vaultDB, 'tryPutBox')
-  const tryGetBox   = vi.spyOn(world.vaultDB, 'tryGetBox')
+  const tryPutBox    = vi.spyOn(world.vaultDB, 'tryPutBox')
+  const tryGetBox    = vi.spyOn(world.vaultDB, 'tryGetBox')
   /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first holds. */
   const openNextSession = async () => {
     const vault = await world.anotherSession().build(world.demandStored())
