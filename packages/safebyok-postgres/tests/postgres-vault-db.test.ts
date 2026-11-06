@@ -121,7 +121,7 @@ const vaultPropsOf = (vault: SX.VaultRecord) => [
 ]
 
 describe("PostgresVaultDB's notices", () => {
-  it("sends a vault's row whole, and a box's as one array of its vault's props without the wayins, then its own", async () => {
+  it("sends a box as one array of its vault's props and then its own", async () => {
     const vaultDB = await TH.makeVaultDB()
     const sent = await sentOn()
     const vault = TH.vaultAt()
@@ -186,7 +186,7 @@ describe("PostgresVaultDB's notices", () => {
 })
 
 describe("PostgresVaultDB's channels", () => {
-  it("listens for a watch on its user's channel, and stops only that watch's handler", async () => {
+  it("listens for a watch on its user's channel", async () => {
     const listened: string[] = []
     const stopped: string[] = []
     const listen: PostgresListen = async (channel, onNotify) => {
@@ -214,7 +214,7 @@ describe("PostgresVaultDB's channels", () => {
   })
 
   // The channel is 'safebyok_' (9 bytes) and the user_id; Postgres refuses a channel past 63 bytes.
-  it("refuses each write for a user_id past 54 bytes, its channel too long to notify, and stores nothing", async () => {
+  it("refuses each write for a user_id past 54 bytes", async () => {
     const vaultDB = await TH.makeVaultDB()
     const longest = 'u'.repeat(54)
     await vaultDB.putVault(TH.vaultAt(0, 'life1', { user_id: longest }), { prior: SX.VoidRevision })
