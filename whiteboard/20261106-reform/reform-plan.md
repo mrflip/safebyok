@@ -373,6 +373,11 @@ again). Each a subtraction, with thread 9's inferred-versus-handrolled call made
 `GX.leaseFriend` and `VX.vaultWorld` (one `GX.guardedLogger` Checker); `isVaultDB`, `isDeviceDB` and `isListing` are three
 copies of one brand test, two answering `boolean` and one a predicate (one shape); a VOCABULARY row for `LeaseDated` if
 the name survives your typing pass.*
+*Directives (the Coach, 12:05, on thread 7's rows): export `DeviceDB` and `MemoryDeviceDB` from `src/index.ts` ("yes
+thanks"), with doc blocks for the host, an entry test and a minor changeset; both load guards rethrow a `VaultError`
+unchanged, anything else still `unexpected_error` with the throw as cause ("yeah pass a vaultError as it is"), with a test
+per guard, the guarantees sentence and the changeset. Leave to spill either into 9b if the context is tight. The zxcvbn
+section's removal from CUSTOMIZATION.md stands (took the Rec).*
 
 ### 10. `kindvals_smush`
 
