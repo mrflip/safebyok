@@ -55,8 +55,7 @@ Look triage; the Open Matters table is empty.
   `new VaultListing(this, { vaultDB, maxMillisSinceRefresh })`. A vault's world must carry `leaseMillis` and
   `boxRefreshMillis`. `halpimonfire.test.ts` and `loosened.test.ts` build the models world in `beforeEach`, so the vault
   world's later clock wins there.
-* Thread 7 `host_branding`: reviewed (`fixed`), PR #552 at 4a7799751 on #550, a security.md entry being added, then
-  filed by a plain push (it stays on #550's tip). Each host function is wrapped once in Bank's
+* Thread 7 `host_branding`: filed, PR #552 at d12188789 on #550's tip (plain push; security.md entry included). Each host function is wrapped once in Bank's
   constructor and branded `IsGuarded` (a frozen getter); Bank holds `askUser` and `panic`, not the host's functions.
   **For thread 8:** the logger's WeakSet brand can replace `loggerShape` in the worlds. **For thread 9:** the handrolled
   types `AskUser`, `Panic`, `PanicHandler`, `BadNewsHandler`, `GuardedKeyDeriver`, `GuardedStrengthChecker`; `ProvingWorld`

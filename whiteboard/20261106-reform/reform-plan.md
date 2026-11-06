@@ -297,7 +297,8 @@ are parsed twice on the way in (`bankOpts` and the guards; thread 8 drops one la
 `keyDeriverLoadFailed` relabels a host `VaultError` (Open Matters); `vault.tryCheckStrength` cited in two docs but absent
 (thread 8); the new exported types name unexported types (thread 9); `DeviceDBShape` names the unexported `DeviceDB`
 (Open Matters, TOP); a tiny `autolockMinutes` rounds to 0 ms and is refused on `leaseMillis`; doc-block and test-title
-style for the documentarian. A security.md entry added by a sonnet subagent before filing.
+style for the documentarian. A security.md entry added by a sonnet subagent (d12188789). **Filed** at d12188789 on
+#550's tip, by a plain push.
 
 ### 8. `checkers_once`
 
