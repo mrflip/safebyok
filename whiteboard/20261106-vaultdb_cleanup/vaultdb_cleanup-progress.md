@@ -44,7 +44,7 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 * Planning lesson: one compaction at ~157k just before the first justify, for a 12-file M thread.
   The L ports (postgres, graphql, convex) should be handed tight handoffs.
 
-## Thread 2: vaultdb_battery (#558, reviewed, small rework before filing)
+## Thread 2: vaultdb_battery (#558, filed at edbceeae2)
 
 **For every port (threads 3, 4, 6):**
 * Run `TH.describeVaultDBBattery('<Store>', { makeVaultDB, _cheat_rowsOf })` from
@@ -72,3 +72,7 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 **Planning lesson:** threads 1 and 2 (M) each compacted near 160k, thread 2 twice in 12
 minutes. The L ports will too: each handoff says commit at every milestone, keep the thread file
 current enough for a fresh worker to continue, and leave e2e for last.
+
+## Threads 3, 4, 6: the ports
+
+*(cut from edbceeae2, building side by side)*

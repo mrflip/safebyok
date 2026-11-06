@@ -5,7 +5,7 @@
   (opus, inherited); style pass on `style-reviewer`'s pin (sonnet).
 * Threads at once: 3.
 * Sprint branch: `20261106-vaultdb_cleanup`, worktree `/workspace/byok-vaultdb_cleanup`.
-* **Status:** thread 1 filed (#555); thread 2 building.
+* **Status:** threads 1 and 2 filed (#555, #558); threads 3, 4 and 6 building side by side.
 
 ## The Coach's request, verbatim
 
@@ -189,7 +189,9 @@ Left minor: same-named fixtures and checkers (*Orchestrator:* namespace imports,
 flags beside hooks; two ways to fail a store; chained titles; compound doc blocks; casts listed on
 the PR. *Orchestrator, YOLO, a rework before filing:* the failure case requires
 `storage_unavailable`; `onTestFinished(unwatch)`, unwatch safe twice; `objCheck` on the battery's
-opts; `vaultQuery`/`boxQuery` fixtures hoisted to `storage-world.ts`.
+opts; `vaultQuery`/`boxQuery` fixtures hoisted to `storage-world.ts`. Second review (`low`, sonnet):
+fixed, one doc-block and one title fix; left: `vaultQuery`/`boxQuery` not on the testing door
+(the ports add them if needed). Filed at edbceeae2.
 
 ### 3. port_indexeddb
 
