@@ -99,6 +99,10 @@
 * **The old code is no authority** (the Coach, mid-sprint). Neither `describeVaultDB` nor an old
   adapter's behaviour says how the new VaultDB works; what `src/models` needs, and readability,
   do. The old battery and adapters are references for coverage and for each store's mechanics.
+* **An `-old` copy is allowed, not expected** (the Coach's offer, 2026-11-06): where warranted,
+  an adapter's old code may move to a private `packages/safebyok-<x>-old` and the new be written
+  in `packages/safebyok-<x>`. *Orchestrator:* not by default; thread 3 may take it for indexeddb
+  if moving the demo onto `localVaultDB` proves uglier than a copied package.
 
 ## Threads
 
@@ -188,6 +192,6 @@ compacts twice.
 
 ## For the Coach
 
-* **The demo loses its IndexedDB vault store** when thread 3 lands: it runs on the old Bank,
-  which cannot take a new-design adapter. Default (YOLO): the demo moves to the old core's
-  `localVaultDB` over localStorage until it moves to the new core. An Open Matters row.
+* ~~**The demo loses its IndexedDB vault store** when thread 3 lands.~~ *Coach (2026-11-06):*
+  "lgtm" to moving it onto the old core's `localVaultDB` over localStorage.
+* *Coach (2026-11-06)* on thread 2's split: "love it, yes".
