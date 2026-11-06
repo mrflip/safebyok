@@ -169,7 +169,7 @@ To be deleted at 1.0.0.
 
 ## The old design's names the new core does not have
 
-Moved from VOCABULARY.md by the sweep of 2026-11-06. A row whose New column says "none yet" names
+These rows moved from VOCABULARY.md in the sweep of 2026-11-06. A row whose New column says "none yet" names
 a thing the new core has not built. Where VOCABULARY.md's row was about the old design alone, it
 stands here whole.
 
