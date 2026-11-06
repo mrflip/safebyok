@@ -378,7 +378,7 @@ export abstract class VaultDB {
   protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
   /** Stores `record` where the row stands at `opts.prior`, live and `ifPresent` 'repl', or absent and `ifAbsent` 'add'; atomic on `revision_tok`. */
   protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Landing>
-  /** Stores `record` as {@link doPutVault} would, where the vault row also passes its checks live under its `vault_tok`. */
+  /** Stores `record` as `doPutVault` would, where the vault row also passes its checks live under its `vault_tok`. */
   protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxLanding>
   /** In one step, stores `tombstone` over this life's live row at `opts.prior`, or the damaged row it names, and tombstones the life's box rows. */
   protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
