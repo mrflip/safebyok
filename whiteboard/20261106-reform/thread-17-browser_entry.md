@@ -1,6 +1,6 @@
 # Thread 17: browser_entry (2026-11-06)
 
-Branch `20261106-browser_entry`, PR TBD, stacked on #529. Justify: green (core 1855 tests, 3 new in `tests/browser.test.ts`; every package passing; size budgets met; attw and publint clean in the build).
+Branch `20261106-browser_entry`, PR #531, stacked on #529. Justify: green (core 1855 tests, 3 new in `tests/browser.test.ts`; every package passing; size budgets met; attw and publint clean in the build).
 
 * **Built**: the new core's `safebyok/browser` entry. `packages/safebyok/src/browser.ts` re-exports `argon2idDeriver` and `argon2idWebV1Deriver` from `src/deriver/argon2id-webv1.ts`, and the types `KeyDeriver`, `Argon2idKeyDeriver` and `KeyDeriverSpec` (types a deriver's signature names). Wired as #529 wired `./utils`: `exports["./browser"]` (`@safebyok/source`, `import`, `require`), `typesVersions`, `publishConfig.exports`, and `src/browser.ts` in the tsdown entry list. `src/index.ts` and `deriver/*.ts` are untouched; neither deriver is on the front door (a test asserts it). Changeset `minor`.
 * **Decisions taken**:
