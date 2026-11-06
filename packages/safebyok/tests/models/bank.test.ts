@@ -136,7 +136,7 @@ describe("bank.hello", () => {
     expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
   })
 
-  it("keeps the device_id it was handed, as a second bank on the device keeps its own", async () => {
+  it("keeps the device_id each bank was handed", async () => {
     const world = makeBankWorld()
     const first = world.bankOn({ device_id: 'device_first' })
     await first.hello()
@@ -210,7 +210,7 @@ describe("bank.ensureVault", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }), 'bad_option')
   })
 
-  it("refuses 'bad_option' at Bank.make with no device_id", () => {
+  it("refuses at Bank.make no device_id", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }), 'bad_option')
   })
 
