@@ -187,4 +187,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected isOwnRow(row: VaultRow | BoxRow): row is VaultRow { return ! ('boxlabel' in row) }
   // --
+
+  /** Tells a check that this is a vault listing without importing the class, across two copies of the package too. */
+  get modelkind(): 'vault_listing' { return 'vault_listing' }
 }

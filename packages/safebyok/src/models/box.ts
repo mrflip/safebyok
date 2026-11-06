@@ -264,6 +264,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     })
   }
   // --
+
+  /** Tells a check that this is a box without importing the class, across two copies of the package too. */
+  get modelkind(): 'box' { return 'box' }
 }
 
 // == [Merging]: mergedOver

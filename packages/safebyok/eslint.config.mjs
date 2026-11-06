@@ -297,6 +297,9 @@ export default defineConfig([
       'unicorn/prefer-iterator-to-array':       'off',
       'unicorn/prefer-promise-with-resolvers':  'off',
       'unicorn/prefer-combined-guards':         'off',
+      // A model's `modelkind` is a getter, not a readonly field: on the prototype it is no own key, so a spread,
+      // `Object.keys` and a strict record check never meet it.
+      '@typescript-eslint/class-literal-property-style': 'off',
     },
   },
 

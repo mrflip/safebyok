@@ -177,7 +177,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
       [{ ...args, central: { am: 'a' } },              false, 'refuses a central that fails sparseBase'],
-      [{ ...args, listing: {} },                       false, 'refuses a listing that answers to no IsListing'],
+      [{ ...args, listing: {} },                       false, 'refuses a listing with no listing modelkind'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
       [{ ...args, world: null },                       false, 'refuses a null world'],
       [{ ...args, opts: {} },                          false, 'refuses options with no horizon'],

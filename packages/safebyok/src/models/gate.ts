@@ -60,4 +60,7 @@ export class Gate {
     if (this.pkWayin !== null) { throw passkeyHeldAlready() }
   }
   // --
+
+  /** Tells a check that this is a gate without importing the class, across two copies of the package too. */
+  get modelkind(): 'gate' { return 'gate' }
 }

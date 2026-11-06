@@ -198,6 +198,9 @@ export class Lease implements LeaseStamp {
     return this.#record
   }
   // --
+
+  /** Tells a check that this is a lease without importing the class, across two copies of the package too. */
+  get modelkind(): 'lease' { return 'lease' }
 }
 
 // == [Judging the cached record]: isPastAutolock, uncacheForgotten

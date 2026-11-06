@@ -1,7 +1,8 @@
 import { get, setWith } from 'es-toolkit/compat'
+import { modelkindOf } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 import { Checker } from '../helpers/validator'
-import { Box } from '../models/box'
+import type { Box } from '../models/box'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { notExposedError } from '../refusals/throwers'
@@ -17,7 +18,7 @@ export type BoxFieldEl = { value: string }
 export type BoxFieldRef = (el: BoxFieldEl | null) => (() => void) | undefined
 
 /** The check of `BoxFields.of`'s box. */
-const fieldsBox = Checker(({ custom }) => custom<Box>((val) => val instanceof Box, Phrases.BoxExpected), 'bad_option')
+const fieldsBox = Checker(({ custom }) => custom<Box>((val) => modelkindOf(val) === 'box', Phrases.BoxExpected), 'bad_option')
 
 /** The check of `fields.bind`'s path, dotted into the whisper. */
 const fieldPath = Checker(({ str }) => str.min(1), 'bad_option')

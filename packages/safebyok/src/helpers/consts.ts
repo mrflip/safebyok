@@ -43,10 +43,10 @@ export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
 export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (val !== null) && Object.hasOwn(val, Whispered)
 
-/** The tag a Listing answers true to, so a storable can tell one without importing it. */
-export const IsListing: unique symbol = Symbol('safebyok.listing')
+/** What each model's `modelkind` getter answers, so a check can tell one without importing its class. */
+export type Modelkind = 'bank' | 'vault' | 'box' | 'vault_listing' | 'box_listing' | 'gating' | 'gate' | 'wayin' | 'lease'
 
-/** True for a Listing: an object that answers true to {@link IsListing}. */
-export const isListing = (val: unknown): val is { [IsListing]: true } => (
-  typeof val === 'object' && val !== null && (val as { [IsListing]?: unknown })[IsListing] === true
+/** The `modelkind` of `val`, or undefined for anything that has none. */
+export const modelkindOf = (val: unknown): unknown => (
+  ((typeof val === 'object') && (val !== null)) ? (val as { modelkind?: unknown }).modelkind : undefined
 )

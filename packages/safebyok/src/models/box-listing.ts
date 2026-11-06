@@ -130,4 +130,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** A box row of this life of the vault: one under another `vault_tok` is no row. */
   protected isOwnRow(row: VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (row.vault_tok === this.world.vault_tok) }
   // --
+
+  /** Tells a check that this is a box listing without importing the class, across two copies of the package too. */
+  get modelkind(): 'box_listing' { return 'box_listing' }
 }

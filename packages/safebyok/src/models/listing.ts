@@ -2,7 +2,6 @@
 
 import { verifyConsistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
-import { IsListing } from '../helpers/consts'
 import { VaultError, isVaultError } from '../refusals/errors'
 import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { IfAbsent, LockState } from '../shapes/shapes-enums'
@@ -18,15 +17,12 @@ import type { Storable } from './storable'
 
 /** SLOPDOC: The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone. */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>> {
-  // == [Props]: world, maxMillisSinceRefresh, vaultDB, IsListing, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
+  // == [Props]: world, maxMillisSinceRefresh, vaultDB, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
   protected readonly maxMillisSinceRefresh: number
   protected readonly vaultDB: VaultDB
-
-  /** The tag a storable's constructor checks for. */
-  readonly [IsListing] = true as const
 
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()

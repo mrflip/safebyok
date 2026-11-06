@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { FarFuture, FarPast, ForeverMillis, IsListing, isListing } from '../../src/helpers/consts'
+import { FarFuture, FarPast, ForeverMillis, modelkindOf } from '../../src/helpers/consts'
 import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
 
 describe("FarFuture", () => {
@@ -28,17 +28,20 @@ describe("FarPast", () => {
   })
 })
 
-describe("isListing and IsListing", () => {
+describe("modelkindOf", () => {
   const mw = makeModelsWorld({ fakeTimers: false })
   afterEach(() => { mw.dispose() })
 
-  it("tell a listing from anything else, by its tag", () => {
-    expect(isListing(boxListingOf(mw))).to.be.true
-    expect(isListing({ [IsListing]: true })).to.be.true
-    expect(isListing({ [IsListing]: 1 })).to.be.false
-    expect(isListing({})).to.be.false
-    expect(isListing(null)).to.be.false
-    expect(isListing(undefined)).to.be.false
-    expect(isListing('listing')).to.be.false
+  it("answers a model's modelkind, and undefined for anything without one", () => {
+    expect(modelkindOf(boxListingOf(mw))).to.eq('box_listing')
+    expect(modelkindOf({ modelkind: 'box' })).to.eq('box')
+    expect(modelkindOf({})).to.be.undefined
+    expect(modelkindOf(null)).to.be.undefined
+    expect(modelkindOf(undefined)).to.be.undefined
+    expect(modelkindOf('box')).to.be.undefined
+  })
+
+  it("is no own key of a model, so a spread and Object.keys leave it out", () => {
+    expect(Object.keys(boxListingOf(mw))).not.to.include('modelkind')
   })
 })

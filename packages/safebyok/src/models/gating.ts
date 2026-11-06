@@ -156,6 +156,9 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     this.#settle(outcome)
   }
   // --
+
+  /** Tells a check that this is a gating without importing the class, across two copies of the package too. */
+  get modelkind(): 'gating' { return 'gating' }
 }
 
 // == [An attempt's runs]: RunForGatingkind

@@ -439,4 +439,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     })
   }
   // --
+
+  /** Tells a check that this is a vault without importing the class, across two copies of the package too. */
+  get modelkind(): 'vault' { return 'vault' }
 }

@@ -52,4 +52,7 @@ export class Wayin {
     return header
   }
   // --
+
+  /** Tells a check that this is a wayin without importing the class, across two copies of the package too. */
+  get modelkind(): 'wayin' { return 'wayin' }
 }

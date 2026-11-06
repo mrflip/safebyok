@@ -292,6 +292,9 @@ export class Bank implements VaultWorld {
     valOf(this.#lastHello)
   }
   // --
+
+  /** Tells a check that this is a bank without importing the class, across two copies of the package too. */
+  get modelkind(): 'bank' { return 'bank' }
 }
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext
