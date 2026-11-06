@@ -12,4 +12,4 @@
 
 **`box.expose()` always tells the subscribers,** so a repeat `expose` is heard though `box.getSnapshot()`, which holds nothing of the value, does not move. Read the value through `box.whisper`. The types `BoxPutOpts` and `Outcome`, which `Box`'s signatures name, are now exported from `safebyok`. The README has one recipe each for a script, a raw field and React.
 
-**Every model answers a `modelkind`** (`box.modelkind === 'box'`, and so on for a bank, vault, listing, gating, gate, wayin and lease), as a getter, so it is no own key and no spread or `Object.keys` shows it. The type `Modelkind` is exported. `BoxFields.of` checks it in place of `instanceof Box`, so a box from the other of the ESM and CommonJS builds passes.
+**Every model answers a `modelkind`** (`box.modelkind === 'box'`, and so on for a bank, vault, listing, gating, gate, wayin and lease), as a getter, so it is no own key and no spread or `Object.keys` shows it. The types `Modelkind` and `ModelkindClasses` are exported. `BoxFields.of` checks it in place of `instanceof Box`, so a box from the other of the ESM and CommonJS builds passes.
