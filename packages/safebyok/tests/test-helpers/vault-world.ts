@@ -7,7 +7,7 @@ import type { VaultScope } from '../../src/shapes/shapes-core'
 import type { VaultTombstone } from '../../src/shapes/shapes-storage'
 import type * as GX from '../../src/shapes/shapes-gateish'
 import { type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import type { BoxWorld, VaultListingOpts, VaultRecord, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import type { BoxWorld, ListingOpts, VaultRecord, VaultWorld } from '../../src/shapes/shapes-vaultish'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/refusals/outcome'
@@ -40,7 +40,7 @@ export type Typing = Typed | Promise<Typed>
 type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: GX.PasskeyAnswer | null }
 
 /** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
-const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
+const askTyping = async <ValT>(world: { requestCleartext: RequestCleartext }, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
   const { requestCleartext: asBefore } = world
   let heard: Outcome<unknown> | null = null
   const dialog: RequestCleartext = async (gating) => {
@@ -108,12 +108,15 @@ const makeDeviceDB = () => {
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
+/** The bank a vault listing's test world fakes: a {@link VaultWorld} whose members a test may replace. */
+export type FakeBank = { -readonly [K in keyof VaultWorld]: VaultWorld[K] }
+
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: Partial<VaultWorld> = {}) => {
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
-  const world: VaultWorld = {
+  const fakeBank: FakeBank = {
     lockState:    () => 'unlocked',
     ensureTimely: () => Promise.resolve(),
     takeWorld:    nothing,
@@ -126,15 +129,17 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
+    onPanic:      undefined,
+    boxRefreshMillis: 10 * 60_000,
     ...worldOverrides,
   }
   const vaultDB = new MemoryVaultDB()
   const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
   if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
   const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
-  const opts: VaultListingOpts = { world, vaultDB, maxMillisSinceRefresh: 10 * 60_000 }
+  const opts: ListingOpts = { vaultDB, maxMillisSinceRefresh: 10 * 60_000 }
   const makeListing = (): VaultListing => {
-    const made = new VaultListing(opts)
+    const made = new VaultListing(fakeBank, opts)
     madeListings.push(made)
     return made
   }
@@ -153,7 +158,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     return stored
   }
   return {
-    listing, opts, vaultDB, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
+    listing, fakeBank, opts, vaultDB, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
     anotherSession: makeListing,
     /** Move the clock on by `millis`; no timer fires. */
@@ -162,10 +167,10 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
 }
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
-/** `opts` of a listing whose bad news `onBadNews` hears, each news by itself, as a bank's host does. */
-export const hearingBadNews = (opts: VaultListingOpts, onBadNews: (news: unknown) => unknown): VaultListingOpts => ({
-  ...opts,
-  world: { ...opts.world, tellBadNews: (badnews) => { for (const news of badnews) { onBadNews(news) } } },
+/** `world`, but that `onBadNews` hears its bad news, each news by itself, as a bank's host does. */
+export const hearingBadNews = (world: VaultWorld, onBadNews: (news: unknown) => unknown): VaultWorld => ({
+  ...world,
+  tellBadNews: (badnews) => { for (const news of badnews) { onBadNews(news) } },
 })
 
 /** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB holds it. */

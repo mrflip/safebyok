@@ -13,7 +13,7 @@ import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bank
 import type { LeaseSparse } from '../shapes/shapes-storage'
 import type { RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankOpts, BankSnapshot, BankStage, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BankOpts, BankSnapshot, BankStage } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db-new'
 import { helloFirst, insecureContext } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
@@ -24,7 +24,7 @@ import { VaultListing } from './vault-listing'
 export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
-export class Bank implements VaultWorld {
+export class Bank {
   // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, requestCleartext, strengthChecker, leaseMillis, onPanic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #lastHello, #snapshot, #getSnapshot, #subscribe
 
   declare readonly applabel: string
@@ -34,10 +34,13 @@ export class Bank implements VaultWorld {
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
+  /** The host's dialog. */
   readonly requestCleartext: RequestCleartext
   readonly strengthChecker:  StrengthChecker
   readonly leaseMillis:      number
+  /** Hears a refused erase of a cached lease, and no secret material. */
   readonly onPanic:          ((refusal: VaultError) => unknown) | undefined
+  /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
 
   readonly #makeListing: () => VaultListing
@@ -93,7 +96,7 @@ export class Bank implements VaultWorld {
     this.#onBadNews = onBadNews
     const maxMillisSinceRefresh = millisOf(vaultRefreshMinutes, DefaultRefreshMillis)
     this.#makeListing = () => {
-      const listing = new VaultListing({ world: this, vaultDB, maxMillisSinceRefresh })
+      const listing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh })
       listing.subscribe(this.#remakeSnapshot)
       return listing
     }

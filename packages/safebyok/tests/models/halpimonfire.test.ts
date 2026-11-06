@@ -43,9 +43,9 @@ describe("a lock() landing during a put", () => {
 
 describe("A lock that lands while an unlock proves", () => {
   it("ends unlocked: the proof still takes up and caches its lease, and the next lock() ends that session", async () => {
-    const { vault, deviceDB, opts } = await makeBornVault()
+    const { vault, deviceDB, fakeBank } = await makeBornVault()
     vault.lock()
-    opts.world.requestCleartext = async (gating) => {
+    fakeBank.requestCleartext = async (gating) => {
       const attempting = (gating as Gating<'unlock_vault'>).attempt({ passphraseClear: Passphrase })
       vault.lock()
       await attempting
@@ -183,8 +183,8 @@ describe("A gate change after its record is stored", () => {
 
   it("a refused tryCache during replacePassphrasePrompt resolves, unlocked, and tells onBadNews", async () => {
     const onBadNews = vi.fn()
-    const { opts, deviceDB, demandStored } = await makeBornVault()
-    const vault = await new VaultListing(hearingBadNews(opts, onBadNews)).build(demandStored())
+    const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
+    const vault = await new VaultListing(hearingBadNews(fakeBank, onBadNews), opts).build(demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
     const refusal = new VaultError('storage_unavailable', "the disk is full")
     deviceDB.tryCache.mockResolvedValueOnce(TH.bad(refusal))

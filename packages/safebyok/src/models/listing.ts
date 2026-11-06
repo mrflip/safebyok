@@ -21,7 +21,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
-  protected readonly maxMillisSinceRefresh: number
+  readonly maxMillisSinceRefresh: number
   protected readonly vaultDB: VaultDB
 
   readonly #things    = new Map<string, ThingT>()
@@ -53,9 +53,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Construction]: constructor, build
 
-  constructor(opts: ListingOpts) {
+  constructor(world: ListingWorld, opts: ListingOpts) {
+    VX.listingWorld.parse(world)
     VX.listingOpts.parse(opts)
-    this.world = opts.world
+    this.world = world
     this.vaultDB = opts.vaultDB
     this.maxMillisSinceRefresh = opts.maxMillisSinceRefresh
   }

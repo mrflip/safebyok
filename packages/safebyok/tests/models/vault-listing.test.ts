@@ -83,9 +83,9 @@ describe("a tombstone over a live vault", () => {
   it("tells a refused erase as bad news, not a panic, and the tombstone stands", async () => {
     const onPanic = vi.fn()
     const onBadNews = vi.fn()
-    const { opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onPanic })
+    const { fakeBank, opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onPanic })
     await buildTyping(born, Dna, byPassphrase(Passphrase))
-    const listing = new VaultListing(hearingBadNews(opts, onBadNews))
+    const listing = new VaultListing(hearingBadNews(fakeBank, onBadNews), opts)
     const vault = await listing.build(demandStored())
     const refusal = new VaultError('storage_unavailable', 'the disk is full')
     deviceDB.tryVacate.mockResolvedValueOnce(TH.bad(refusal))
@@ -102,10 +102,10 @@ describe("a tombstone over a live vault", () => {
 describe("a box notice carrying the vault's tombstone as its world", () => {
   it("ends the box listing with no bad news, the vault listing's own watch off", async () => {
     const onBadNews = vi.fn()
-    const { opts, demandStored, listing: born } = makeVaultWorld()
+    const { fakeBank, opts, demandStored, listing: born } = makeVaultWorld()
     const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
     await bornVault.boxListing.create(BoxDna)
-    const listing = new VaultListing(hearingBadNews(opts, onBadNews))
+    const listing = new VaultListing(hearingBadNews(fakeBank, onBadNews), opts)
     const vault = await listing.build(demandStored())
     const boxes = vault.boxListing
     await boxes.hello()
@@ -237,9 +237,9 @@ describe("building over a tombstone", () => {
   })
 
   it("listing.buildVault refuses a vault present in the slot, the dialog not shown", async () => {
-    const { listing } = await makeBornVault()
+    const { listing, fakeBank } = await makeBornVault()
     const dialog = vi.fn()
-    listing.world.requestCleartext = dialog
+    fakeBank.requestCleartext = dialog
     await TH.expectRefusal(listing.buildVault(Dna))
     expect(dialog).not.toHaveBeenCalled()
   })
@@ -247,12 +247,12 @@ describe("building over a tombstone", () => {
   it("Vault.launchBirth refuses a vault present in the slot, no gating opened and no KDF run", async () => {
     const keyDeriver = { ...TH.testDeriver }
     const deriveKeyBytes = vi.spyOn(keyDeriver, 'deriveKeyBytes')
-    const { listing, storedNow } = await makeBornVault(byPassphrase(Passphrase), { keyDeriver })
+    const { listing, fakeBank, storedNow } = await makeBornVault(byPassphrase(Passphrase), { keyDeriver })
     expect(deriveKeyBytes).toHaveBeenCalled()
     deriveKeyBytes.mockClear()
     const before = storedNow()
     const dialog = vi.fn(async (gating: AnyGating) => { await gating.attempt(byPassphrase('a-new-passphrase')) })
-    listing.world.requestCleartext = dialog
+    fakeBank.requestCleartext = dialog
     await TH.expectRefusal(Vault.launchBirth(listing, Dna))
     expect(dialog).not.toHaveBeenCalled()
     expect(listing.openGating).to.be.null
@@ -267,25 +267,25 @@ describe("building over a tombstone", () => {
   })
 
   it("Vault.launchBirth refuses a scope of another user, nobody asked", async () => {
-    const { listing } = makeVaultWorld()
+    const { listing, fakeBank } = makeVaultWorld()
     const dialog = vi.fn()
-    listing.world.requestCleartext = dialog
+    fakeBank.requestCleartext = dialog
     await TH.expectRefusal(Vault.launchBirth(listing, { ...Dna, user_id: 'another_user' }))
     expect(dialog).not.toHaveBeenCalled()
   })
 
   it("Vault.launchBirth refuses what is no scope, nobody asked", async () => {
-    const { listing } = makeVaultWorld()
+    const { listing, fakeBank } = makeVaultWorld()
     const dialog = vi.fn()
-    listing.world.requestCleartext = dialog
+    fakeBank.requestCleartext = dialog
     await TH.expectRefusal(Vault.launchBirth(listing, null as never))
     expect(dialog).not.toHaveBeenCalled()
   })
 
   it("Vault.launchBirth refuses on a swept listing, nobody asked", async () => {
-    const { listing } = makeVaultWorld()
+    const { listing, fakeBank } = makeVaultWorld()
     const dialog = vi.fn()
-    listing.world.requestCleartext = dialog
+    fakeBank.requestCleartext = dialog
     listing.sweep()
     await TH.expectRefusal(Vault.launchBirth(listing, Dna))
     expect(dialog).not.toHaveBeenCalled()

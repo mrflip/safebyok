@@ -207,7 +207,7 @@ describe("Storable snapshot and subscription", () => {
 
     it("is made on the first call, so that a settle before it has none to replace and tells nobody", () => {
       const { mw } = held
-      const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord(), { maxMillisSinceRefresh: 1000 })
+      const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
       box.subscribe(listener)
       box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
@@ -217,7 +217,7 @@ describe("Storable snapshot and subscription", () => {
 
     it("is made by becomeNotifiable, which answers the box, so that the next change notifies; the snapshot it made is the one getSnapshot answers", () => {
       const { mw } = held
-      const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord(), { maxMillisSinceRefresh: 1000 })
+      const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
       box.subscribe(listener)
       expect(box.becomeNotifiable()).to.eq(box)

@@ -50,18 +50,6 @@ describe("The checks of options", () => {
       expect(err.meta?.fieldnames).to.deep.equal(['maxMillisSinceRefresh'])
     })
   })
-
-  describe("VX.storableOpts", () => {
-    holdsCases(VX.storableOpts, [
-      [{ maxMillisSinceRefresh: 60_000 },                    true,  'passes the horizon alone'],
-      [{},                                                   false, 'refuses a missing horizon'],
-      [{ maxMillisSinceRefresh: -5 },                        false, 'refuses a negative horizon'],
-    ])
-
-    it("strips a field it does not take", () => {
-      expect(VX.storableOpts.parse({ maxMillisSinceRefresh: 5, extra: 1 })).to.deep.equal({ maxMillisSinceRefresh: 5 })
-    })
-  })
 })
 
 describe("VX.ifAbsent and VX.fetchOpts", () => {
@@ -137,28 +125,28 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
 })
 
 describe("The checks of the world and the listing", () => {
-  describe("VX.world", () => {
-    holdsCases(VX.world, [
-      [mw.world, true,  'passes the test world'],
-      [{},       true,  'passes an empty object'],
-      [null,     false, 'refuses null'],
-      [5,        false, 'refuses a number'],
+  describe("VX.listingWorld", () => {
+    holdsCases(VX.listingWorld, [
+      [mw.world,                                 true,  'passes the test world'],
+      [{ ...mw.world, extra: 1 },                true,  'passes a world with more than the base reaches into'],
+      [null,                                     false, 'refuses null'],
+      [{},                                       false, 'refuses an empty object'],
+      [{ ...mw.world, takeWorld: undefined },    false, 'refuses a world that cannot takeWorld'],
+      [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
+      [{ ...mw.world, lockState: undefined },    false, 'refuses a world with no lockState'],
+      [{ ...mw.world, tellBadNews: undefined },  false, 'refuses a world that cannot tellBadNews'],
     ])
   })
 
   describe("VX.listingOpts", () => {
-    const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000 }
+    const opts = { vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000 }
     holdsCases(VX.listingOpts, [
-      [opts,                                                     true,  'passes the test world and vaultDB'],
+      [opts,                                                     true,  'passes the test vaultDB and a horizon'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
-      [{ ...opts, world: undefined },                            false, 'refuses a missing world'],
-      [{ ...opts, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
-      [{ ...opts, world: { ...mw.world, ensureTimely: 5 } },     false, 'refuses a world whose ensureTimely is no function'],
-      [{ ...opts, world: { ...mw.world, lockState: undefined } }, false, 'refuses a world with no lockState'],
       [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
-      [{ ...opts, world: { ...mw.world, tellBadNews: undefined } }, false, 'refuses a world that cannot tellBadNews'],
+      [{ ...opts, world: mw.world },                             false, 'refuses a world, which the listing takes beside its options'],
       [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],
       [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not take, being strict'],
     ])
@@ -171,17 +159,17 @@ describe("The checks of the world and the listing", () => {
 
   describe("VX.storableArgs", () => {
     const listing = boxListingOf(mw)
-    const args = { world: mw.world, listing, central: sparse, opts: { maxMillisSinceRefresh: 1000 } }
+    const args = { world: mw.world, listing, central: sparse }
     holdsCases(VX.storableArgs, [
-      [args,                                           true,  'passes a world, a listing, a central and the options'],
+      [args,                                           true,  'passes a world, a listing and a central'],
       [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
       [{ ...args, central: { am: 'a' } },              false, 'refuses a central that fails sparseBase'],
       [{ ...args, listing: {} },                       false, 'refuses a listing with no listing modelkind'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
       [{ ...args, world: null },                       false, 'refuses a null world'],
-      [{ ...args, opts: {} },                          false, 'refuses options with no horizon'],
-      [{ ...args, opts: { maxMillisSinceRefresh: -1 } }, false, 'refuses a negative horizon'],
+      [{ ...args, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
+      [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, 'refuses options, the horizon being the listing\'s'],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not take, being strict'],
     ])
 

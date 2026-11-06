@@ -78,7 +78,7 @@ describe("the gate changes the vault sends", () => {
   })
 
   it("safebyok-old/README.md:853, 'each change_passphrase sets -- is put to the vault's strengthChecker first': a one-letter new passphrase is set, as the world carries no checker", async () => {
-    const { vault, opts: { world } } = await bornWithPasskey()
+    const { vault, fakeBank: world } = await bornWithPasskey()
     await replaceTyping(vault, Passphrase, 'x')
     const proving = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse('x'), world)
     expect(proving.wayinkind).to.eq('passphrase')

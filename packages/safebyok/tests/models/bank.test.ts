@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
+import { DefaultLeaseMillis } from '../../src/models/vault'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
@@ -212,6 +213,11 @@ describe("bank.ensureVault", () => {
 
   it("refuses at Bank.make a missing device_id", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }))
+  })
+
+  it("leases for DefaultLeaseMillis where the host names no autolockMinutes", () => {
+    const bank = makeBankWorld().bankOn({ autolockMinutes: undefined })
+    expect(bank.leaseMillis).to.eq(DefaultLeaseMillis)
   })
 
   it("answers tryEnsureVault's refusal as an Outcome", async () => {

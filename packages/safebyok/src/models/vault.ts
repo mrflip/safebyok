@@ -10,7 +10,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
 import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
@@ -23,12 +23,12 @@ import type { VaultListing } from './vault-listing'
 
 // == [Defaults]: DefaultLeaseMillis
 
-/** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
+/** How long a lease lasts where the host names no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 
 /** SLOPDOC: A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in. */
-export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> implements BoxWorld {
+export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
   // == [Props]: applabel, user_id, vaultlabel, world, listing, #lease, #friend, #boxListing, #gate
 
   /** The scope, tattooed on by Storable's constructor. */
@@ -247,7 +247,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   #makeFriend(): LeaseFriend {
-    const { world: { logger, deviceDB, leaseMillis = DefaultLeaseMillis } } = this
+    const { world: { logger, deviceDB, leaseMillis } } = this
     const stamp = GX.vaultStamp.parse(this)
     const asked = this.#stampOfLife()
     return {
