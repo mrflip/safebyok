@@ -8,8 +8,8 @@ import { executeExchange } from '@urql/exchange-execute'
 import type { Operation } from '@urql/core'
 import type { GraphQLSchema } from 'graphql'
 import type { Boxscope, VaultDB, VaultDBOpts, VaultScope } from 'safebyok/storage'
-import type * as TH from 'safebyok/testing'
-import { PostgresVaultDB, VaultChangeChannel, VaultTablesSql } from 'safebyok-postgres'
+import * as TH from 'safebyok/testing'
+import { PostgresVaultDB, VaultTablesSql, vaultChannelOf } from 'safebyok-postgres'
 import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 import { GraphQLVaultDB } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
@@ -23,14 +23,15 @@ export * from 'safebyok/testing'
 export const BootMillis = 60_000
 
 const made: { db?: Promise<PGlite> } = {}
-const heeders = new Set<(text: string) => void>()
 
 /** This file's PGlite, its tables made: one per file, as each takes seconds to boot. */
 export const database = async (): Promise<PGlite> => {
   made.db ??= (async () => {
     const db = new PGlite()
     await db.exec(VaultTablesSql)
-    await db.listen(VaultChangeChannel, (text) => { for (const onNotify of heeders) { onNotify(text) } })
+    // The battery's user is listened for at boot: a PGlite's own listen takes its turn behind the statements already
+    // queued, so a write made just after a watch's first LISTEN would go unheard.
+    await listenOn(db, vaultChannelOf(TH.bankScope.user_id))
     return db
   })()
   return await made.db
@@ -50,9 +51,21 @@ export const emptyTables = async (): Promise<void> => {
   await db.exec('TRUNCATE safebyok_vaults, safebyok_boxes')
 }
 
-// One LISTEN, made with the database, that each watch joins at once, as a server's one listening connection is shared: a
-// PGlite's own listen takes its turn behind the statements already queued, so a write made just after a watch would go unheard.
-export const listen: PostgresListen = (_channel, onNotify) => {
+const heedersOf = new Map<string, Set<(text: string) => void>>()
+
+/** Listens on `channel` the first time it is asked, and never stops, as safebyok-postgres's README recipe does. */
+const listenOn = async (db: PGlite, channel: string): Promise<Set<(text: string) => void>> => {
+  const heeders = heedersOf.get(channel)
+  if (heeders !== undefined) { return heeders }
+  const fresh = new Set<(text: string) => void>()
+  heedersOf.set(channel, fresh)
+  // PGlite LISTENs on the identifier as given, so a channel keeps its case and characters only quoted; a user_id holds no `"`.
+  await db.listen(`"${channel}"`, (text) => { for (const onNotify of fresh) { onNotify(text) } })
+  return fresh
+}
+
+export const listen: PostgresListen = async (channel, onNotify) => {
+  const heeders = heedersOf.get(channel) ?? await listenOn(await database(), channel)
   heeders.add(onNotify)
   return () => heeders.delete(onNotify)
 }

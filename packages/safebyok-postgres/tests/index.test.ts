@@ -5,6 +5,6 @@ import * as safebyokPostgres from '../src/index'
 
 describe("the package's entry point", () => {
   it("exports the vaultDB, the pool's client, and the SQL and channel it runs on", () => {
-    expect(Object.keys(safebyokPostgres)).to.have.members(['PostgresVaultDB', 'pgClientOf', 'VaultChangeChannel', 'VaultTablesSql'])
+    expect(Object.keys(safebyokPostgres)).to.have.members(['PostgresVaultDB', 'pgClientOf', 'vaultChannelOf', 'VaultTablesSql'])
   })
 })

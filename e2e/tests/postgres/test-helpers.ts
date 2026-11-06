@@ -1,10 +1,10 @@
 /** A real Postgres for this directory's tests: a database to a file, the PostgresVaultDBs over it, and the battery's backdoor to its rows. */
 
 import { afterAll, afterEach, beforeAll, describe } from 'vitest'
-import { Client, Pool } from 'pg'
+import { Client, Pool, escapeIdentifier } from 'pg'
 import type { Boxscope, VaultScope } from 'safebyok/storage'
-import type * as TH from 'safebyok/testing'
-import { PostgresVaultDB, VaultChangeChannel, VaultTablesSql, pgClientOf } from 'safebyok-postgres'
+import * as TH from 'safebyok/testing'
+import { PostgresVaultDB, VaultTablesSql, pgClientOf, vaultChannelOf } from 'safebyok-postgres'
 import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -137,18 +137,27 @@ export const useFileDatabase = (): (() => FileDatabase) => {
 
 // == [Stores]: listenOver, StoreOpts, storeOver, freshStore
 
-/** A `listen` as the package's README has it: one connection that LISTENs before it is handed back, each watch joining it at once. */
+/** A `listen` as the package's README has it, over a connection of its own, already listening for the battery's user. */
 export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
-  const heeders = new Set<(text: string) => void>()
+  const heedersOf = new Map<string, Set<(text: string) => void>>()
   const listener = await db.client()
   listener.on('notification', ({ channel, payload = '' }) => {
-    if (channel === VaultChangeChannel) { for (const onNotify of heeders) { onNotify(payload) } }
+    const heeders = heedersOf.get(channel) ?? []
+    for (const onNotify of heeders) { onNotify(payload) }
   })
-  await listener.query(`LISTEN ${VaultChangeChannel}`)
-  return (_channel, onNotify) => {
+  const listen: PostgresListen = async (channel, onNotify) => {
+    const heeders = heedersOf.get(channel) ?? new Set()
+    if (! heedersOf.has(channel)) {
+      heedersOf.set(channel, heeders)
+      await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
+    }
     heeders.add(onNotify)
     return () => heeders.delete(onNotify)
   }
+  // A watch's first LISTEN races the writes made just after it, so the battery's user is listened for before any watch.
+  const unlisten = await listen(vaultChannelOf(TH.bankScope.user_id), () => undefined)
+  unlisten()
+  return listen
 }
 
 export type StoreOpts = Omit<PostgresVaultDBOpts, 'client' | 'listen'>

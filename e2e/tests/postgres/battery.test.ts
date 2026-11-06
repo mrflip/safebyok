@@ -16,9 +16,9 @@ const remembered = (vaultDB: PostgresVaultDB, opts: TH.StoreOpts): PostgresVault
   return vaultDB
 }
 
-const watching = (vaultDB: PostgresVaultDB): Notice[] => {
+const watching = (vaultDB: PostgresVaultDB, scope: SX.WatchScope = TH.vaultScope): Notice[] => {
   const notices: Notice[] = []
-  const unwatch = vaultDB.watch(TH.vaultScope, (notice) => { notices.push(notice) })
+  const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
   onTestFinished(unwatch)
   return notices
 }
@@ -43,5 +43,16 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
 
     await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
     expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
+  })
+
+  it("hears another server's write for a user_id of capitals and punctuation, LISTENed as the README's recipe quotes it", async () => {
+    const db = getDb()
+    const user_id = 'Auth0|Ab.C@x.io~:-+%2B'
+    const notices = watching(await TH.freshStore(db), { ...TH.bankScope, user_id })
+    await TH.aWhile()  // a watch's first LISTEN races the writes made just after it
+    const vault = TH.vaultAt(0, 'life1', { user_id })
+    const other = await TH.storeOver(db)
+    await other.putVault(vault, { prior: SX.VoidRevision })
+    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
   })
 })
