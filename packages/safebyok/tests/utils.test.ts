@@ -3,19 +3,17 @@ import { mash } from '../src/utils'
 import * as TH from './test-helpers'
 import * as PX from '../src/shapes/primitives'
 
-describe("mash", () => {
+const MashCases = [
   // mash @example
-  it("answers the SHA-256 of the text as hex", async () => {
-    expect(await mash('abc')).to.eq('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
-  })
+  ["abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", 'answers the SHA-256 of the text as hex'],
+  ["",    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 'answers the SHA-256 of the empty text'],
+  ["é",   "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c", 'hashes the UTF-8 bytes of the text'],
+] as const
 
-  it("answers the SHA-256 of the empty text", async () => {
-    expect(await mash('')).to.eq('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
-  })
-
-  it("hashes the UTF-8 bytes of the text", async () => {
-    expect(await mash('é')).to.eq('4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c')
-  })
+describe("mash", () => {
+  for (const [text, digest, blurb] of MashCases) {
+    it(blurb, async () => { expect(await mash(text)).to.eq(digest) })
+  }
 
   it("answers 64 lowercase hex characters", async () => {
     expect(await mash('ada@example.com')).to.match(/^[0-9a-f]{64}$/)
