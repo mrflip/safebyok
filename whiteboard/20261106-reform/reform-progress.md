@@ -50,7 +50,7 @@ Closer Look triage.
 * Thread 22 `kind_tests`: filed, PR #549 at 4bbdb9f87 on main. The test helpers' `refusalkind` is optional;
   `holdsCases` takes no kind. `vitest/valid-title` counts what is left: every remaining warning is on a kept kind.
   **For thread 10:** fewer kind words to rename in tests now; `validator.test.ts` and `refusals/*.test.ts` still name them.
-* Thread 6 `worlds_picks`: reviewed (`fixed`), PR #550 at b6763b9d4 on main, filing. **For thread 7:** fractional
+* Thread 6 `worlds_picks`: filed, PR #550 at b6763b9d4 on main. **For thread 7:** fractional
   `autolockMinutes` makes a non-integer `leaseMillis` that the world check refuses; a two-liner there. Worlds are Picks of the classes; a listing
   takes `(world, opts)`; `StorableOpts` is gone. **For thread 7:** Bank's constructor is unchanged but for
   `new VaultListing(this, { vaultDB, maxMillisSinceRefresh })`. A vault's world must carry `leaseMillis` and

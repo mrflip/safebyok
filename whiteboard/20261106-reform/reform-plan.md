@@ -247,7 +247,7 @@ constructors lose their options argument). Compacted once, after its first justi
 a two-liner for thread 7: `Math.round` in `millisOf` or `positiveMinutes` to an int); the DefaultLeaseMillis test now
 asserts the bank's field rather than a lease at the boundary (adequate; the boundary tests beside it cover it); the
 `standIn` cast kept for cmd-click; `storable.ts` still takes `world` beside `listing` (pre-existing; a change is machinery);
-the subclasses parse their world and `super()` parses `listingWorld` again (taste). Filing at b6763b9d4.
+the subclasses parse their world and `super()` parses `listingWorld` again (taste). **Filed** at b6763b9d4, as cut, on main.
 
 ### 7. `host_branding`
 
