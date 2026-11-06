@@ -93,6 +93,7 @@ an unlock shows it again. `box.subscribe` hears of all of this.
 const bank = Bank.make({
   /* ... */
   requestCleartext: async (gating) => {
+    if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
     await gating.attempt({ passphraseClear: await doppler.get('VAULT_PASSPHRASE') })
   },
 })
@@ -129,9 +130,8 @@ function ApiKeyField({ box }) {
 }
 ```
 
-The field goes blank at a lock or a veil, or shows a mask of fixed length under
-`box.field('apiKey', { whenLocked: 'mask' })`, and an edit comes back with the value. Nothing is
-stored until `box.saveFields()`. When the last field unmounts the box unexposes, so the whisper lasts
+The field goes blank at a lock or a veil, and an edit comes back with the value. Nothing is stored
+until `box.saveFields()`. When the last field unmounts the box unexposes, so the whisper lasts
 no longer than its field: expose after it mounts. Without React, `box.field('apiKey')(el)` binds any
 element with a `value`, and answers how to unbind it.
 
@@ -139,11 +139,11 @@ element with a `value`, and answers how to unbind it.
 
 ```tsx
 function ApiKeyForm({ box }) {
-  const whisper = useSyncExternalStore(box.subscribe, () => box.whisperMasked)
+  const whisper = useSyncExternalStore(box.subscribe, () => box.whisper)
   return (
     <>
       <input
-        type="password" value={whisper.apiKey ?? ''} readOnly={Box.isFUBag(whisper)}
+        type="password" value={whisper.apiKey ?? ''} readOnly={! box.isShowing}
         onChange={(evt) => box.patchWhisper({ apiKey: evt.target.value })}
       />
       <button onClick={() => box.putExposed()}>Save</button>
@@ -152,11 +152,9 @@ function ApiKeyForm({ box }) {
 }
 ```
 
-`box.whisperMasked` is the value when it shows. While locked or veiled it has the same shape, each
-leaf `WhisperMask`, and a put refuses it. To show nothing there instead, read `() => box.whisper`.
-Never replace the prop or edit it in place here: `box.patchWhisper` makes the new object, and tells
-the hook. It merges deeply, and an array replaces. Make the input read-only while it shows a mask,
-as above: `patchWhisper` works behind a veil, and would take the mask for an edit.
+While it will not show, `box.whisper` is a bag with no fields, so the input is blank. Never replace
+the prop or edit it in place here: `box.patchWhisper` makes the new object, and tells the hook. It
+merges deeply, and an array replaces.
 
 ## Not done yet
 

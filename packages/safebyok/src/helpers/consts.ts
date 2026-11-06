@@ -43,9 +43,6 @@ export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
 export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (val !== null) && Object.hasOwn(val, Whispered)
 
-/** What stands in for each leaf of a whisper that will not show, whatever its length: `box.whisperMasked`, and a `box.field` asked to mask. */
-export const WhisperMask = '••••••••'
-
 /** The tag a Listing answers true to, so a storable can tell one without importing it. */
 export const IsListing: unique symbol = Symbol('safebyok.listing')
 

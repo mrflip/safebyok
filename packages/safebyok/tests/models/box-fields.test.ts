@@ -1,7 +1,6 @@
 /** A Box's fields: `box.field` following the whisper through a lock and a veil, reading edits on the way into hiding, `box.saveFields`, and the last unbind. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { WhisperMask } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
@@ -42,24 +41,21 @@ describe("box.field: what an element shows", () => {
     })
   }
 
-  it("is blank while not exposed, masked or not, and fills at an expose", async () => {
+  it("is blank while not exposed, and fills at an expose", async () => {
     const box = await unexposedOf()
 
-    const blank = elOf('was here')
-    const masked = elOf('was here')
-    box.field('apiKey')(blank)
-    box.field('apiKey', { whenLocked: 'mask' })(masked)
-    expect([blank.value, masked.value]).to.deep.equal(['', ''])
+    const el = elOf('was here')
+    box.field('apiKey')(el)
+    expect(el.value).to.eq('')
     await box.expose()
-    expect([blank.value, masked.value]).to.deep.equal([Stored.apiKey, Stored.apiKey])
+    expect(el.value).to.eq(Stored.apiKey)
   })
 
-  it("answers the same ref callback for the same path and options, so a re-render does not unbind", async () => {
+  it("answers the same ref callback for the same path, so a re-render does not unbind", async () => {
     const box = await unexposedOf()
 
-    expect(box.field('apiKey')).to.eq(box.field('apiKey', { whenLocked: 'blank' }))
+    expect(box.field('apiKey')).to.eq(box.field('apiKey'))
     expect(box.field('apiKey')).not.to.eq(box.field('org.name'))
-    expect(box.field('apiKey')).not.to.eq(box.field('apiKey', { whenLocked: 'mask' }))
   })
 
   it("does nothing given null, as a React before 19 hands a ref at an unmount", async () => {
@@ -68,12 +64,10 @@ describe("box.field: what an element shows", () => {
     expect(box.field('apiKey')(null)).to.eq(undefined)
   })
 
-  it("refuses 'bad_option' given no path, or options it does not know", async () => {
+  it("refuses an empty path", async () => {
     const box = await unexposedOf()
 
     TH.expectSyncRefusal(() => box.field(''), 'bad_option')
-    TH.expectSyncRefusal(() => box.field('apiKey', { whenLocked: 'loud' as 'mask' }), 'bad_option')
-    TH.expectSyncRefusal(() => box.field('apiKey', { whenVeiled: 'mask' } as object), 'bad_option')
   })
 })
 
@@ -83,18 +77,18 @@ describe("box.field: into hiding and back", () => {
     ['a veil',  (box: TestableBox) => { box.veil() }, (box: TestableBox) => { box.unveil() }],
   ] as const
   for (const [blurb, hide, show] of HidingCases) {
-    it(`writes a blank at ${blurb}, or a mask of fixed length if asked, and the value at its end`, async () => {
+    it(`writes a blank at ${blurb}, and the value at its end`, async () => {
       const box = await unexposedOf()
 
       await box.expose()
-      const blank = elOf()
-      const masked = elOf()
-      box.field('apiKey')(blank)
-      box.field('org.seats', { whenLocked: 'mask' })(masked)
+      const keyEl = elOf()
+      const seatsEl = elOf()
+      box.field('apiKey')(keyEl)
+      box.field('org.seats')(seatsEl)
       hide(box)
-      expect([blank.value, masked.value]).to.deep.equal(['', WhisperMask])
+      expect([keyEl.value, seatsEl.value]).to.deep.equal(['', ''])
       show(box)
-      expect([blank.value, masked.value]).to.deep.equal([Stored.apiKey, '3'])
+      expect([keyEl.value, seatsEl.value]).to.deep.equal([Stored.apiKey, '3'])
     })
 
     it(`reads an edit on the way into ${blurb}, and brings it back`, async () => {
@@ -111,15 +105,15 @@ describe("box.field: into hiding and back", () => {
       expect(box.whisper).to.deep.equal({ ...Stored, apiKey: 'sk-edited' })
     })
 
-    it(`never reads back what it writes for ${blurb}, or what is typed over it`, async () => {
+    it(`never reads back what is typed during ${blurb}`, async () => {
       const box = await unexposedOf()
 
       await box.expose()
       const exposed = box.whisper
       const el = elOf()
-      box.field('apiKey', { whenLocked: 'mask' })(el)
+      box.field('apiKey')(el)
       hide(box)
-      el.value = `${WhisperMask}typed`
+      el.value = 'typed while hidden'
       show(box)
       expect(el.value).to.eq(Stored.apiKey)
       expect(box.whisper).to.eq(exposed)
@@ -176,12 +170,12 @@ describe("box.field: into hiding and back", () => {
     ['a vacate',       (box: TestableBox) => { box.vacate() }],
   ] as const
   for (const [blurb, end] of EndingCases) {
-    it(`goes blank at ${blurb}, a mask too`, async () => {
+    it(`goes blank at ${blurb}`, async () => {
       const box = await unexposedOf()
 
       await box.expose()
       const el = elOf()
-      box.field('apiKey', { whenLocked: 'mask' })(el)
+      box.field('apiKey')(el)
       end(box)
       expect(el.value).to.eq('')
     })
@@ -247,7 +241,7 @@ describe("box.saveFields", () => {
     expect(box.whisper).to.deep.include({ apiKey: 'sk-unsaved' })
   })
 
-  it("refuses 'bad_option' with no field bound, or none exposed, or while veiled, and 'vault_locked' while locked", async () => {
+  it("refuses with no field bound, with none exposed, while veiled, and while locked", async () => {
     const box = await unexposedOf()
 
     const noFields = await TH.expectRefusal(box.saveFields(), 'bad_option')
@@ -295,10 +289,11 @@ describe("box.field: the last unbind", () => {
 
     await box.expose()
     const el = elOf()
-    const unbind = box.field('apiKey', { whenLocked: 'mask' })(el)
+    const unbind = box.field('apiKey')(el)
     unbind?.()
+    el.value = 'let go'
     held.mw.setLockState('locked')
-    expect(el.value).to.eq('')
+    expect(el.value).to.eq('let go')
   })
 
   it("binds again from nothing, and hears again", async () => {
@@ -307,9 +302,9 @@ describe("box.field: the last unbind", () => {
     const el = elOf()
     box.field('apiKey')(el)?.()
     await box.expose()
-    box.field('apiKey', { whenLocked: 'mask' })(el)
+    box.field('apiKey')(el)
     expect(el.value).to.eq(Stored.apiKey)
     held.mw.setLockState('locked')
-    expect(el.value).to.eq(WhisperMask)
+    expect(el.value).to.eq('')
   })
 })

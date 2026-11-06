@@ -1,8 +1,8 @@
 /** The README's three recipes for showing a whisper, each run in its order on real seals: a script, a raw field, and React with the hook played by hand. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { LOCKED, VEILED, WhisperMask } from '../../src/helpers/consts'
-import { Box } from '../../src/models/box'
+import { LOCKED, VEILED } from '../../src/helpers/consts'
+import type { Box } from '../../src/models/box'
 import type { Vault } from '../../src/models/vault'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 
@@ -31,7 +31,8 @@ describe("the README's script", () => {
     const doppler = { get: vi.fn(() => Promise.resolve('a passphrase from the container')) }
     const bank = makeBankWorld().bankOn({
       requestCleartext: async (gating) => {
-        await gating.attempt({ passphraseClear: await doppler.get() } as never)
+        if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
+        await gating.attempt({ passphraseClear: await doppler.get() })
       },
     })
     await bank.hello()
@@ -88,53 +89,33 @@ describe("the README's raw field", () => {
     expect(hook.current().exposed).to.be.false
     expect(box.whisper['apiKey']).to.eq(undefined)
   })
-
-  it("shows the mask at a lock, when asked, which a save cannot reach", async () => {
-    const { vault, box } = await makeRecipeBox()
-    const input = { value: '' }
-    box.field('apiKey', { whenLocked: 'mask' })(input)
-    await box.expose()
-    vault.lock()
-    expect(input.value).to.eq(WhisperMask)
-    await vault.ensureUnlocked()
-    await box.saveFields()
-    expect(await box.extractWhisper()).to.deep.equal(Stored)
-  })
 })
 
 describe("the README's React form", () => {
-  it("paints a new object at each patch, a mask at a lock and a veil, and stores what was patched", async () => {
+  it("paints a new object at each patch, a read-only blank at a lock and a veil, and stores what was patched", async () => {
     const { vault, box } = await makeRecipeBox()
     await box.expose()
-    const hook = hookOf(box.subscribe, () => box.whisperMasked)
+    const hook = hookOf(box.subscribe, () => box.whisper)
     expect(hook.current()).to.deep.equal(Stored)
-    expect(Box.isFUBag(hook.current())).to.be.false
+    expect(box.isShowing).to.be.true
 
     box.patchWhisper({ apiKey: 'sk-test-typed' })
     expect(hook.current()).to.deep.equal({ apiKey: 'sk-test-typed' })
     expect(hook.painted).to.have.length(2)
 
     vault.lock()
-    expect(hook.current()['apiKey']).to.eq(WhisperMask)
-    expect(Box.isFUBag(hook.current())).to.be.true
+    expect(hook.current()).to.eq(LOCKED)
+    expect(hook.current()['apiKey']).to.eq(undefined)
+    expect(box.isShowing).to.be.false
     await vault.ensureUnlocked()
     expect(hook.current()).to.deep.equal({ apiKey: 'sk-test-typed' })
+    expect(box.isShowing).to.be.true
 
     await box.putExposed()
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-typed' })
     box.veil()
-    expect(hook.current()['apiKey']).to.eq(WhisperMask)
-    hook.unsubscribe()
-  })
-
-  it("reads box.whisper as well, a bag in place of a mask", async () => {
-    const { vault, box } = await makeRecipeBox()
-    await box.expose()
-    const hook = hookOf(box.subscribe, () => box.whisper)
-    expect(hook.current()).to.deep.equal(Stored)
-    box.veil()
     expect(hook.current()).to.eq(VEILED)
-    vault.lock()
-    expect(hook.current()).to.eq(LOCKED)
+    expect(box.isShowing).to.be.false
+    hook.unsubscribe()
   })
 })

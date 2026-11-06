@@ -231,7 +231,7 @@ export type BoxSnapshot = Boxscope & Readonly<{
 
 // --
 
-// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, boxFieldPath, boxFieldOpts, BoxFieldOpts, BoxFieldEl, BoxFieldRef, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
+// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, boxFieldPath, BoxFieldEl, BoxFieldRef, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
 /** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
 export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
@@ -265,12 +265,6 @@ export const whisperPatch = Checker(() => CX.whisper, 'bad_option')
 
 /** The check of `box.field`'s path, dotted into the whisper. */
 export const boxFieldPath = Checker(({ str }) => str.min(1), 'bad_option')
-
-/** The check of `box.field`'s options. */
-export const boxFieldOpts = objCheck(({ oneof }) => ({ whenLocked: oneof(EX.whenLockedVals).default('blank') }), 'bad_option')
-
-/** The options of `box.field`: what it writes while the whisper will not show, `'blank'` unless asked to `'mask'`. */
-export type BoxFieldOpts = Z.input<typeof boxFieldOpts>
 
 /** What a `box.field` writes to: anything with a `value` string, as an `<input>` is. */
 export type BoxFieldEl = { value: string }

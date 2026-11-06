@@ -1,32 +1,31 @@
-import { cloneDeep, cloneDeepWith, isPlainObject, mergeWith } from 'es-toolkit'
+import { cloneDeep, mergeWith } from 'es-toolkit'
 import { get, setWith } from 'es-toolkit/compat'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
-import { ENCRYPTED, LOCKED, VEILED, Whispered, WhisperMask } from '../helpers/consts'
+import { ENCRYPTED, LOCKED, VEILED } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import * as CX from '../shapes/shapes-core'
 import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
-import type { LockState, WhenLocked } from '../shapes/shapes-enums'
+import type { LockState } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxExposedPatch, type BoxFieldEl, type BoxFieldOpts, type BoxFieldRef, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
+import { type BoxExposedPatch, type BoxFieldEl, type BoxFieldRef, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { absentBoxError, noFieldsBound, notExposedError, recordForNewBox, savingVeiledFields, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 
-/** An element bound by `box.field`, and the text it was last given: null while hidden, so that a mask is never read back. */
+/** An element bound by `box.field`, and the text it was last given: null while hidden, so that what is typed there is never read back. */
 interface BoundField {
-  readonly el:         BoxFieldEl
-  readonly path:       string
-  readonly whenLocked: WhenLocked
-  shown:               string | null
+  readonly el:   BoxFieldEl
+  readonly path: string
+  shown:         string | null
 }
 
 /** A box as this device holds it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled, #masked, #fieldRefs, #fields, #stopHearingFields, #subscribeWithVault
+  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled, #fieldRefs, #fields, #stopHearingFields, #subscribeWithVault
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -42,8 +41,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   #exposed: Whisper | null = null
   /** Whether {@link veil} is hiding the whisper exposed. */
   #isVeiled = false
-  /** What `whisperMasked` made of each value, so its identity holds until the value changes. Weak, so as never to keep a whisper discarded. */
-  readonly #masked = new WeakMap<Whisper, { kind: 'locked' | 'veiled', bag: Whisper }>()
   /** The ref callbacks `field` has answered: a React re-render handed a new one would unbind the old, and so unexpose. */
   readonly #fieldRefs = new Map<string, BoxFieldRef>()
   readonly #fields = new Set<BoundField>()
@@ -61,7 +58,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, isShowing, whisperMasked, subscribe
+  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, isShowing, subscribe
 
   get fmt(): number { return this.central.fmt }
 
@@ -89,19 +86,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** True where {@link whisper} shows the value: exposed, unlocked and unveiled; read live. */
   get isShowing(): boolean { return this.whisper === this.#exposed }
-
-  /** The whisper when it shows; else its shape with each leaf {@link WhisperMask}, marked so a put refuses it; not exposed, the `encrypted` bag. */
-  get whisperMasked(): Whisper {
-    const exposed = this.#exposed
-    if ((exposed === null) || (this.whisper === exposed)) { return this.whisper }
-    const kind = this.isLocked ? 'locked' : 'veiled'
-    const made = this.#masked.get(exposed)
-    if (made?.kind === kind) { return made.bag }
-    const leavesMasked = cloneDeepWith(exposed, (val) => ((isPlainObject(val) || Array.isArray(val)) ? undefined : WhisperMask))
-    const bag = Object.freeze({ ...leavesMasked, [Whispered]: kind })
-    this.#masked.set(exposed, { kind, bag })
-    return bag
-  }
 
   /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
   override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
@@ -186,14 +170,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Fields]: field, saveFields, trySaveFields, bindField, unbindField, renderFields, readFields
 
-  /** A ref callback showing the whisper at dotted `path` in an element, which reads a blank or a mask while it will not show.
+  /** A ref callback showing the whisper at dotted `path` in an element, which reads blank while it will not show.
    * When the last field unbinds, the box unexposes. */
-  field(path: string, opts: BoxFieldOpts = {}): BoxFieldRef {
+  field(path: string): BoxFieldRef {
     const fieldPath = VX.boxFieldPath.parse(path)
-    const { whenLocked } = VX.boxFieldOpts.parse(opts)
-    const ckey = `${whenLocked} ${fieldPath}`
-    const ref = this.#fieldRefs.get(ckey) ?? ((el) => ((el === null) ? undefined : this.#bindField({ el, path: fieldPath, whenLocked, shown: null })))
-    this.#fieldRefs.set(ckey, ref)
+    const ref = this.#fieldRefs.get(fieldPath) ?? ((el) => ((el === null) ? undefined : this.#bindField({ el, path: fieldPath, shown: null })))
+    this.#fieldRefs.set(fieldPath, ref)
     return ref
   }
 
@@ -239,7 +221,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     }
     if (this.#exposed !== null) { this.#exposed = this.#readFields(this.#exposed) }
     for (const field of this.#fields) {
-      field.el.value = ((this.#exposed !== null) && (field.whenLocked === 'mask')) ? WhisperMask : ''
+      field.el.value = ''
       field.shown = null
     }
   }
