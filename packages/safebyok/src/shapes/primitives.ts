@@ -22,7 +22,7 @@ export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
 
 /** An applabel, a vaultlabel or a boxlabel: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two to {@link MaxLabelChars} characters.
  * Check a label a user types with `safeParse` before handing it to the vault, which refuses one
- * that fails as 'bad_scope'.
+ * that fails.
  *
  * @example label.safeParse('anthropic_api_key').success   // true
  * @example label.safeParse('0__b_').success               // false three ways: a digit first, '__' inside, '_' last

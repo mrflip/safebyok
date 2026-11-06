@@ -62,7 +62,7 @@ export type Merged<SourcesT extends readonly object[]> =
  * `parse(val, story?)` frames the message as the {@link Story} asks: `where` the input was
  * judged, before the failures, and `advice`, what to do, after them. With either, the failures
  * end in a period; with neither, the message is the failures alone. A story that is none
- * refuses 'bad_option', whatever the input.
+ * refuses, whatever the input.
  *
  * Only `parse` changes: `safeParse` and `parseAsync` are Zod's own. A schema sliced from a
  * validator outside a `Checkers` call (`vaultSparse.pick(...)`) throws a ZodError; make the slice
@@ -120,8 +120,8 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
 /** Make one validator of an object: `build` gets the kit and returns the object's fields, and the object, strict unless `opts` says otherwise, comes back as a {@link Checker} hands one back.
  * `opts` is the kind it refuses, or an {@link ObjCheckOpts}: `refusalkind`, the kind, 'bad_record'
  * unless given, and `extras`, what it does with a field it does not take: 'strict', the default,
- * refuses it, and 'strip' drops it unread, as Zod's object does. Any other `opts` refuses
- * 'bad_option'. A check of the object whole (`.refine()`, `.readonly()`, a sentence of its own)
+ * refuses it, and 'strip' drops it unread, as Zod's object does. Any other `opts` refuses.
+ * A check of the object whole (`.refine()`, `.readonly()`, a sentence of its own)
  * is made in a {@link Checker} call instead: one chained onto this one's validator would refuse
  * as Zod does.
  *
@@ -152,7 +152,7 @@ const kitWith = <SourcesT extends readonly object[]>(sources?: SourcesT): KitWit
 
 /** A validator a {@link Checkers} call makes, what the call returns under each name, and what a {@link Checker} or {@link objCheck} call returns: its schema, its `parse` also taking a {@link Story}, and for an object, `parseConsistent`. */
 export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
-  /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; 'bad_option' for a story that is none, whatever `val`. */
+  /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; a story that is none refuses, whatever `val`. */
   parse: (val: unknown, story?: Story) => Z.output<SchemaT>
   /** This validator's schema again, its `parse` and `parseConsistent` refusing `kind`. */
   refusingAs: (kind: RefusalKind) => Refusing<SchemaT>
@@ -230,7 +230,7 @@ const framed = (said: string, { where, advice }: Story): string => {
  * `bag`'s own enumerable ones, so `bag` is plain data, a parse's output; `other` may be anything
  * holding fields, a Vault object's getters included, each read by its name. So `other` says what
  * is held to: hand it only the fields meant. An absent field passes, so a value an absent field
- * must fail is parsed first. Either bag not an object refuses 'bad_option'.
+ * must fail is parsed first. Either bag not an object refuses.
  *
  * @example consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })   // true: no field is defined in both
  */
@@ -238,7 +238,7 @@ export const consistent = (bag: object, other: object): boolean => disagreeing(b
 
 /** True once `bag` is {@link consistent} with `other`: a VaultError of `refusal.kind` otherwise, naming the fields that disagree in `meta.fieldnames`, and in its message unless `refusal.message` says its own.
  * The kind is the caller's to choose, as the caller knows what a disagreement means: a scope of
- * another user, a record of another vault. A `refusal` that is none refuses 'bad_option'.
+ * another user, a record of another vault. A `refusal` that is none refuses.
  *
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */

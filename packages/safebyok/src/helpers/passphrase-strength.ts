@@ -11,8 +11,8 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
  * tries first. The vault runs it on each new passphrase before any key derivation: the one an
  * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
- * It never runs when a vault unlocks, and never hears a blank passphrase. One that throws refuses
- * its call 'unexpected_error', and one that answers no verdict 'bad_option'.
+ * It never runs when a vault unlocks, and never hears a blank passphrase. One that throws, or
+ * answers no verdict, refuses its call.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
  * quote it.
@@ -20,7 +20,7 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * A checker that needs something fetched or built first, such as a dictionary, carries it as
  * `load`, which each bank's `hello()` runs. Make the checker once, before any bank, and hand the
  * same one to each; make `load` cost nothing once it has succeeded, and forget a failure. Call
- * `load` yourself only to warm up. A `load` that fails refuses the hello 'unexpected_error', so a
+ * `load` yourself only to warm up. A `load` that fails refuses the hello, so a
  * vault that cannot check a new passphrase never opens.
  *
  * `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to replace it,
@@ -65,9 +65,9 @@ export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
 /** `hostChecker` held to its contract and told `scope`. Ask the host's checker only through it, so the vault and a dialog checking as the user types decide alike.
- * A blank passphrase is weak before the host's checker hears it. It refuses 'bad_option' for a passphrase that is no string, or an
- * answer that is no verdict, and 'unexpected_error' for a throw, carrying nothing of it, as the
- * checker heard the passphrase. `load` refuses a failure 'unexpected_error', its cause the throw,
+ * A blank passphrase is weak before the host's checker hears it. It refuses a passphrase that is no string, an
+ * answer that is no verdict, and a throw, carrying nothing of it, as the
+ * checker heard the passphrase. `load` refuses a failure, its cause the throw,
  * as it heard nothing.
  */
 export const invokeStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
@@ -91,7 +91,7 @@ export const invokeStrengthChecker = (hostChecker: StrengthChecker, scope: Vault
   return decorate(check as GuardedStrengthChecker, { load: () => loadStrengthChecker(hostChecker) })
 }
 
-/** Run `hostChecker`'s `load`, if it has one, refusing a failure 'unexpected_error' with what it threw as the cause. */
+/** Run `hostChecker`'s `load`, if it has one, refusing a failure with what it threw as the cause. */
 export const loadStrengthChecker = async (hostChecker: StrengthChecker): Promise<void> => {
   try {
     await hostChecker.load?.()

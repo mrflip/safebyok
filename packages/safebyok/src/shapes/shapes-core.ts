@@ -11,7 +11,7 @@ import type { KeyDeriver } from '../deriver/basederiver'
 
 // == [Ciphered]: ciphered, Ciphered
 
-/** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. Its `parse` refuses 'bad_record', and it is strict. */
+/** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. It is strict. */
 export const ciphered = objCheck(({ str }) => ({
   cipher_iv_b64:  str.min(1),
   ciphertext_b64: str.min(1),
@@ -23,7 +23,7 @@ export type Ciphered = Z.infer<typeof ciphered>
 
 export { epochMillis, type EpochMillis } from './primitives'
 
-/** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` refuses 'bad_record', quoting none of it.
+/** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` quotes none of it.
  * A token is plain text, as a host's adapter may write one by hand. A device's id is a `label`. A key deriver's label
  * and a passkey's credential id are plain text, not empty. A salt or a ciphered field is
  * branded for its role, since nothing but safebyok makes one. A salt's check is its shape, text
@@ -45,7 +45,7 @@ export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, c
   vault_key_lease_wrapped: ciphered.brand<'VaultKeyLeaseWrapped'>(),
 }))
 
-/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record stores it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use, not at read. Its `parse` refuses 'bad_record'. */
+/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record stores it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use, not at read. */
 export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)), 'bad_record')
 
 /** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */
@@ -88,7 +88,7 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
 }
 
 /** The check for a {@link Whisper}, a plain JSON object with no symbol key at any depth; and `whisperBag`, the same with no word on a bag marked `Whispered`, for a {@link Sidecar}.
- * Its `parse` refuses 'bad_option', quoting none of it, and naming none of an object's keys: an
+ * Its `parse` quotes none of it, and names none of an object's keys: an
  * object that is not plain JSON fails whole.
  *
  * @example whisper.parse({ apiKey: 'sk-ant-...' })      // an object passes through, copied
@@ -117,7 +117,7 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
  * query), so anyone who can read the database can read it. It is in the box's stamp as its JSON
  * with keys sorted: a sidecar altered in storage makes the box refuse to open, while one whose
  * keys storage reorders still opens. safebyok never looks inside it: check its shape before
- * `putBox()`. Its `parse` refuses 'bad_option', as `putBox()` does.
+ * `putBox()`, which refuses one that fails it.
  *
  * @example sidecar.safeParse('work account').success  // false: a sidecar is an object -- { note: 'work account' }
  */
@@ -148,12 +148,12 @@ export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
 
-/** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `applabel` and `user_id` invited, each name checked. It refuses 'bad_scope'.
+/** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `applabel` and `user_id` invited, each name checked.
  * It takes whatever carries the names, a plain bag, a Vault object, its snapshot or a
  * BankVault, and leaves the rest. A store in the scope refuses: it belongs in the
  * second bag, the options, and would be dropped unseen here.
  *
- * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws 'bad_scope': stores go in the second bag
+ * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: stores go in the second bag
  */
 export const bankedVaultScope = Checker(({ obj, applabel, user_id, vaultlabel }) => {
   const store = never(Phrases.StoreInVaultScope).optional()
@@ -169,7 +169,7 @@ export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 
 // == [Key deriver and logger]: keyDeriverShape, loggerShape
 
-/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads, refusing 'bad_option'. Bank.make keeps what it was handed, prototype and all. */
+/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads. Bank.make keeps what it was handed, prototype and all. */
 export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
   algorithm:         str.optional(),
   key_deriver_label,
@@ -178,7 +178,7 @@ export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
   load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
 }, Phrases.KeyDeriverShape), 'bad_option')
 
-/** The shape a VaultLogger must have, refusing 'bad_option'. It only checks: `parseLogger` guards the host's own logger, and calls it `this` and all. */
+/** The shape a VaultLogger must have. It only checks: `parseLogger` guards the host's own logger, and calls it `this` and all. */
 export const loggerShape = Checker(({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
