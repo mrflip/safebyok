@@ -1,6 +1,6 @@
 # Thread 10: kindvals_smush (2026-11-06)
 
-Branch `20261106-kindvals_smush`, PR #TBD, stacked on #557 (`20261106-types_ab`). Justify: green (every package; no size line moved).
+Branch `20261106-kindvals_smush`, PR #564, stacked on #557 (`20261106-types_ab`). Justify: green (every package; no size line moved).
 
 * **Built**: the `kind` tag smushed in the core's exported and shared names, by sed over `packages/safebyok` and the one doc that quotes the pattern: `RefusalKind` to `Refusalkind`, `refusalKindVals` to `refusalkindVals`, `wayinKindVals` to `wayinkindVals`, `gatingKindVals` to `gatingkindVals`, `correctableKindVals` to `correctablekindVals`, `WayinKind` to `Wayinkind`, `GatingKind` to `Gatingkind`. 88 lines in 20 files (src, tests, `src/index.ts`) plus STYLE.md. Changeset `.changeset/20261106-kindvals_smush.md`, minor: only `Refusalkind` is public (`src/index.ts`; `src/browser.ts` exports none of these).
 * **Decisions taken**:
@@ -9,3 +9,4 @@ Branch `20261106-kindvals_smush`, PR #TBD, stacked on #557 (`20261106-types_ab`)
   * `notes/gallant-test_titles.md` and `notes/old_vocabulary.md` mention the old names; left alone (durable notes, not in the gloss).
 * **Deviations**: none. No alias, shim or re-export of the old names. The core has no CUSTOMIZATION.md at the repo root; `packages/safebyok/CUSTOMIZATION.md` and the READMEs had no hits.
 * **Discoveries**: the adapters (`safebyok-react`, `-convex`, `-graphql`, `-postgres`) mention `RefusalKind` but run on safebyok-old; untouched. #555's files: of those, only `src/refusals/errors.ts` and `tests/refusals/errors.test.ts` carry renamed lines (26 and 18); throwers.ts, phrases.ts, shapes-storage.ts, memory-vault-db.ts, vault-db-new.ts are untouched.
+* **For the Coach**: should `RefusalFamilyForKind` and `listedKindOf` also smush (`RefusalFamilyForkind`, `listedkindOf`)? Recommendation: no, they read as phrases.
