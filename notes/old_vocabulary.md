@@ -2,9 +2,14 @@
 
 The names the reform of October 2026 retired, each beside the one that replaced it. It is for
 whoever reads older code, a CHANGELOG, `winboard/` or a released changeset and meets a word
-the current cast does not use. Nothing current uses these names: not the code, the docs, the
+the current cast does not use. Nothing current uses the first table's names: not the code, the docs, the
 stored records or the tests, and a new thing is never named from this page. The current cast is
 VOCABULARY.md.
+
+The second table, at the end, holds the old design's names that the new core does not have
+(the VOCABULARY sweep of 2026-11-06, `whiteboard/20261106-reform/thread-1-vocab_sweep.md`).
+`packages/safebyok-old`, and the adapters, `safebyok-react` and the demo that still run on it, use
+them until they move.
 
 A name in the New column that also stands in the Old one was renamed again, by the rename pass of
 2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.
@@ -161,3 +166,60 @@ To be deleted at 1.0.0.
 | `registerLeaseReader(vault, read)`                     | `registerLeaseGetter(vault, getLease)`                  |
 | `Refusals.staleWrite('del')`, `StaleWriteVals`, `StaleWrite` | `Refusals.staleDel()`, `StaleDelMessage` (the kind is still `'stale_write'`) |
 | `BirthRead`, `readAt`                                  | `Birth`, `refreshedAt`                                  |
+
+## The old design's names the new core does not have
+
+These rows moved from VOCABULARY.md in the sweep of 2026-11-06. A row whose New column says "none yet" names
+a thing the new core has not built. Where VOCABULARY.md's row was about the old design alone, it
+stands here whole.
+
+| Old                                                    | New                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| `box.record`                                           | none: a `Box` hands out no record                       |
+| A Vault object born from one read of storage and this device's store; one never made born `novel` | `bank.ensureVault` answers a listed vault, or builds one through a `build_vault` gating; no Vault object stands for an absent vault |
+| `putWayin('passphrase')`, which replaced the passphrase and removed the passkey | a `replace_passphrase` gating, which leaves the passkey wayin |
+| `putWayin('passkey')`, which put or replaced the passkey; `delWayin('passkey')` | an `add_passkey` gating, which refuses `camped` while one is held; a `revoke_passkey` gating |
+| a gate's two slots, named by `slotlabel` (`'passphrase'`, `'passkey'`) | the gate's `passphrase_wayin` and `passkey_wayin`        |
+| the snapshot's `gate` (`GateSparse`), each wayin's sparse shape (`PassphraseWayinSparse`, `PasskeyWayinSparse`) | none: `VaultSnapshot` shows no gate; a wayin's `WayinHeader` is all of it but its wrap |
+| `WayinSummary`, a wayin's sparse shape and `vault_tok` in a log line | none yet                                                |
+| a wayin's `registered_at` and `device_id` "of its sealing" | of the device that built it: only a box is sealed      |
+| `PassphraseWayin`, `PasskeyWayin`, `Wayin.make`         | `Wayin`, over a `WayinRecord`                           |
+| a gating's `lockLanded`                                | `declineAtLock()`; `whenSettled`                        |
+| one gating pending per vault, every waiting call hearing how it settles | one gating open per bank; a second call refuses `already_asking` |
+| `proving.grantLease()`, `wrappedWith`; a proving "reseals wayins" | `proving.buildLease()`, `proving.buildWayin()`; the wrap and unwrap are private |
+| a lease taken up "until its `ask_passphrase_at`", then dropped from memory by a timer | a cached lease past autolock (`proved_at` plus `leaseMillis`) is never taken up; `bank.autolock()` locks |
+| `lease.cipheredWith`, `lease.decipherWith`; a box "opened" | `lease.sealWith`, `lease.unsealWith`; a box is unsealed |
+| a lease evicted at the listing's `goodbye`             | `lease.evict()`, which drops its keys and leaves its cached row |
+| **mask**: a function from `safebyok/utils` that shows a best-effort whiff of each end of a whisper, one plain line safe for a log or a reminder, so a UI can tell which API key a box holds without revealing it. It is not a faithful copy: marks, invisible characters, bidirectional controls and spaces are dropped, though right-to-left letters are kept and may reorder their neighbours in a display. It is intended for plain text; arbitrary blobs may give unusual behavior. Stripping every mark costs the vowels of scripts that write them as marks (Hindi `नमस्ते` comes out as `नमसत`); an API key is ASCII, and is untouched. Its result is public: show it, never trust it to hide more than it does. `mask(whisper, { head: 0, tail: 0 })` hides everything but the length. | none yet: `mask` lives in `safebyok-old` |
+| a box's `boxCtx` (its vault's stamp but for the format, and its own `BoxStamp`); a lease's `leaseCtx` | `cipherCtx([vaultStamp, stamp], purpose)`; a box's stamp is its sparse fields and sidecar (`boxStampOf`) |
+| `LeaseStamp` with an `autolock_at`, "as a lease is granted for one span" | `LeaseStamp`: `fmt`, the vault's stamp, `gate_epoch`, `proved_at`, `wayinkind` |
+| **vaultEpoch**: a counter on the vault that the store moves, never a writer: up by one on every write of the vault record and on `delVault`, and carried by the tombstone into the next life (`vault_epoch`). Standard term: rollback counter. | none: the new core keeps no vault epoch; `revision_seq` counts a record's revisions |
+| **behind**: said of a vault storage serves at a lower vaultEpoch than this device's record has seen in its scope. | none                                                    |
+| a deviceId minted per vault scope, the first time the device reads or makes it, kept across the vault's lives; "one per vault, so it links nothing the vault does not already link" | one `device_id` per bank scope, minted by `Bank.make` unless given, cached at the bank's `hello()` |
+| **Made under**: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs of the vault it was made under (`VaultMadeUnder`), as the vault handed them in, and `vault.demandConsistentWith(thing)` compares them with the vault record it holds: the vault gone (`vault_gone`) or another life (`vault_mismatch`). A Vault object's own fields are its stamp alone, which `vault.stamp` hands out as one frozen plain object. `consistentWith` asks. | none by that name: a `Gate` holds its `stamp`; `vault_gone` and `vault_mismatch` remain refusals |
+| `UserId` (a type)                                      | none: `user_id`, `UserIdPattern`, `MaxUserIdChars`      |
+| `getWhisper`, `useWhisper` (taking a boxlabel)         | `box.extractWhisper()`; `useWhisper` lives in `safebyok-react`, on the old design |
+| a sidecar counted toward `maxWhisperBytes`              | counted with the whisper toward what storage holds in one record (`box_too_large`) |
+| the snapshot's `damagedBoxes`, each a `BoxDamaged` (`{ boxlabel, revision_tok, damage }`, its revision null when the record held none as text, its `damage` `damaged` or `newer_format`) | `damaged_rows`, each a `DamagedBox` with a `damagekind` (`damaged_row`, `format_mismatch`) |
+| `putBox()` writes a fresh box over a damaged one; `delBox()` removes it | `vault.tryDelDamagedBox()`, the only verb that deletes one; `getBox()` and `delBox()` read it as missing |
+| a box under a name the validators refuse "is not damaged: it lists and reads as any other" | listed among the damaged rows, under whatever boxlabel storage holds |
+| the vault record's format `safebyok-vault-v6`; its vaultEpoch; its gate `GateRecord`, null while `novel`, the gateEpoch 0 exactly then; "formerly the vault props" | `fmt` 6001; no vault epoch; the gate always present, `gate_epoch` from 1 |
+| the lease record's format `safebyok-lease-v1`; its `ask_passphrase_at`; `KeptLease`, the record held closed until `kept.leaseOn(vault)` | `fmt` 7001; `proved_at`; the deviceDB's `peek`, then `Lease.buildFromCache` |
+| **device record**: what a device kept of a vault's scope, locked or not, across the vault's lives (`DeviceRecord`, format `safebyok-device-v1`): its own deviceId for the scope, and the highest vaultEpoch it had seen. Raised at every read and every write of this device's own (`raiseDeviceRecord`, a store-side max), never lowered; `lock()` and `del()` left it, and `bank.clearCachedVault` erased it. | `{ applabel, user_id, device_id }` per bank scope, cached by `cacheDeviceRecord` |
+| **novel**: said of a vault stored with no gate yet, its `gate_epoch` 0 and its snapshot's `gate` null. A Vault object was novel, **locked** (a gate, and no lease on this device: its snapshot's `ask_passphrase_at` null) or **unlocked** (a lease in force: `ask_passphrase_at` set); the snapshot named no state of its own. A novel vault's first gating was `build_vault`. | `lockState` (`'locked'`, `'unlocked'`); a vault not yet stored has no Vault object |
+| **freshness** (`VaultFreshness`): `timely` (read within `staleMinutes`), `aged` (read longer ago; the next hello reads), or `refused` (the last read failed) | **timely** (`isTimely`), within `vaultRefreshMinutes` or `boxRefreshMinutes` |
+| a vault's **stage** in the bank's listing: `ready` (the bank held its Vault object) or `refused` (no Vault object was born, or it went gone; `err` said why). It said whether there was a thing to use; freshness said how far to trust it, so a vault `ready` in the listing was `refused` in freshness when a later hello failed. | none: only the bank has a `stage` (`BankStage`) |
+| **the bank's listing**: `bank.vaults`, one **BankVault** for each vault the bank was asked for and had not let go, sorted by `vaultlabel`, frozen, and the same array until one of them changed; `bank.bankVaultOf({ vaultlabel })` looked one up | `bank.vaultListing`; the bank's snapshot's `vaults`, one `VaultSnapshot` each; `bank.vaultAt({ vaultlabel })` |
+| **BankVault**: one vault in the bank's listing, its scope flat and its `stage`, with `err` once `refused`; plain data holding no Vault object; `bank.vaultOf({ vaultlabel })` handed that out once `ready`; React's `useListedVault(vaultlabel)` handed one down | `VaultSnapshot`; `bank.vaultAt` |
+| `putVaultRecord`; `getLease`, `putLease`, `delLease` as the three verbs of the deviceDB | `putVault`; the deviceDB's `cache`, `peek`, `vacate` |
+| `delWayin` (a way in deleted)                          | a `revoke_passkey` gating                               |
+| `delBox` under a `BoxDelExpectation`, resolving a `BoxDeletion` (`deleted`, `deleted_other` or `absent`); `delVault` and `delDamagedVault` under a `VaultDelExpectation` | `delBox` and `delVault`, answering the act `deleted`, `gone` or `void` |
+| `vaultDB.ensureVault`; a check's triplet `consistentWith`, `demandConsistentWith`, `ensure...` | none; the triplet `isUnlocked`, `demandUnlocked`, `ensureUnlocked` |
+| `localVaultDB`, `idbVaultDB` (supplied vaultDBs); every vaultDB write "with an expectation" | `MemoryVaultDB`; each vaultDB verb one transaction |
+| `memoryDeviceDB`, `idbDeviceDB`; `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord` | `MemoryDeviceDB`; `cacheDeviceRecord`                   |
+| **change bell**: how a write to a store in this browser told every listener, in this tab and in every other of the origin, to read again (`ChangeBell`, from `safebyok/idb`): a BroadcastChannel, and a bell inside the tab, carrying nothing but the news that something changed. `idbDeviceDB` and `safebyok-indexeddb` rang it after each write; a string store kept a bell of its own, inside the tab. | none yet                                                |
+| **ask_passphrase_at**: the instant from which a device stopped honoring its lease and asked again, spelt so on the lease record and the snapshot alike; then the lease was dropped, by a timer, and the vault locked. It moved only when a gating's attempt unlocked the vault, or a passphrase proved a change to its wayins. An instant within a minute of `FarFuture` (`>= FarFuture - MinuteMillis`) meant "until it is locked". | `proved_at`, with `leaseMillis`; `bank.autolock()`      |
+| **leaseHours**: the `Bank.make` option for how long a lease lasted after a gating unlocked. The default was 168 (`LeaseHours`), the most 588 (`MaxLeaseHours`, 24.5 days); `Infinity` meant until it is locked. A vault reported the lease it was made with as `leaseMillis`, in milliseconds; `Infinity` read as `ForeverMillis`. | `autolockMinutes`, by default 14 days (`DefaultLeaseMillis`); `Infinity` still means until it is locked |
+| `browserOpts()`, supplying `zxcvbnStrengthChecker`, which asked for at least `MinPassphraseChars` (12) characters and a zxcvbn score of 3, turning away common passwords, patterns and the vault's own names; a strength checker run at each `putWayin` | none yet: the core supplies `DefaultStrengthChecker`, which refuses every new passphrase |
+| **format**: the string tag at the head of every stored record (`safebyok-vault-v6`, `safebyok-box-v8`, `safebyok-lease-v1`, `safebyok-device-v1`, and a deleted vault's `safebyok-tombstone-v1`); "a test keeps each format's schema and fails when one changes under the same format" | **fmt**, a number: 6001, 5001, 7001; no device-record or tombstone format of its own |
+| `Scopepath` (a type); a host's key-value adapter filing rows by scopepath; a `StringStore` keeping text by them; an inspector's `IdbRow` | none: a listing finds each thing it holds by its scopepath |
