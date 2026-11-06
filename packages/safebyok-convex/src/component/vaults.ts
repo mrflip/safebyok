@@ -91,7 +91,8 @@ export const putBox = mutation({
     // Convex passes NaN as a number, and Math.min would carry it past the limit: no box count exceeds NaN.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const boxDoc = { ...life, boxlabel: record.boxlabel, box: record }
-    const growth = { box_count: (SX.isLiveRow(ante) ? 0 : 1), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
+    // A put over a tombstone or a damaged row takes that row's place: only a new boxlabel adds a row.
+    const growth = { box_count: (anteDoc === null ? 1 : 0), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
     const reckoning = await Tallies.reckon(ctx.db, life)
     if (Tallies.refuses(reckoning.tally, growth, cap)) { return { capacity: Tallies.capacityOf(reckoning.tally, cap) } }
     await storeBoxDoc(ctx.db, anteDoc, boxDoc)
@@ -136,7 +137,8 @@ export const delBox = mutation({
     if (landed) {
       const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
       await storeBoxDoc(ctx.db, anteDoc, boxDoc)
-      await Tallies.forget(ctx.db, life, { box_count: (SX.isLiveRow(ante) ? -1 : 0), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
+      // The tombstone takes the row's place, and counts as the row did.
+      await Tallies.forget(ctx.db, life, { box_count: 0, box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
     }
     return { landed, ante, vault }
   },

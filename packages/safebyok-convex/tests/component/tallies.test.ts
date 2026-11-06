@@ -6,7 +6,7 @@ import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf, refuses, weigh } from '../
 const MiB = 1024 * 1024
 
 describe("the limits every vault is held to", () => {
-  it("holds at most 8000 boxes, half the documents a Convex transaction may write", () => {
+  it("holds at most 8000 box rows, half the documents a Convex transaction may write", () => {
     expect(MaxVaultBoxes).to.eq(8000)
   })
 
