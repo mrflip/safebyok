@@ -389,6 +389,9 @@ importers:
       react:
         specifier: ^19.3.1
         version: 19.3.1
+      safebyok:
+        specifier: workspace:*
+        version: link:../packages/safebyok
       safebyok-convex:
         specifier: workspace:*
         version: link:../packages/safebyok-convex
