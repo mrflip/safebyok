@@ -1,7 +1,7 @@
 # Thread 6: port_convex (2026-11-06)
 
 Branch `20261106-port_convex`, PR #559, stacked on #558. Justify: green (safebyok 2270,
-safebyok-convex 223, e2e 208, every other package as on its base).
+safebyok-convex 227, e2e 208, every other package as on its base).
 
 * **Built**:
   * `packages/safebyok-convex` on `safebyok` (dev `workspace:*`, peer `workspace:^`), off
