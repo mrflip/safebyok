@@ -1,9 +1,9 @@
 /** The checks and types of what's stored and listed: records, options, listings, boxes, vaults and banks, imported as `VX`. */
 
-import { deepFreeze, omit } from 'es-toolkit'
+import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { LOCKED, isListing } from '../helpers/consts'
+import { isListing } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
@@ -15,7 +15,7 @@ import type { DeviceDB } from '../storage/device-db-new'
 import type { Answer, VaultDB } from '../storage/vault-db-new'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
-import { type Sidecar, sidecar, whisper, type Clock, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
+import { type Sidecar, sidecar, type Whisper, whisper, type Clock, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
 import type { ProvingWorld, RequestCleartext, SealedWhisper, StrengthChecker } from './shapes-gateish'
@@ -135,7 +135,7 @@ export type StorableOpts = Z.infer<typeof storableOpts>
 // == [The listing's world]: world, World, ListingWorld, ListingOpts, vaultDBDuck, listingOpts, putListingOpts, PutListingOpts
 
 /** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: the one `clock`. */
-export const world = objCheck(() => ({ clock: CX.clockShape }), { refuseAs: 'bad_option', extras: 'strip' })
+export const world = objCheck(() => ({ clock: CX.clockShape }), { refusalKind: 'bad_option', extras: 'strip' })
 
 /** The world a listing lives in: the vault for boxes, the bank for vaults. The one clock lives here. */
 export type World = Z.infer<typeof world>
@@ -220,7 +220,7 @@ export type BoxRecord = SX.BoxRecord
 export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
   const damaged = boxSparse.extend({ boxlabel: str }).and(obj({ damagekind: oneof(EX.damagekindVals) }))
   return { boxes: arr(boxSparse), damaged_records: arr(damaged) }
-}, { refuseAs: 'damaged_row', extras: 'strip' })
+}, { refusalKind: 'damaged_row', extras: 'strip' })
 
 /** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */
 export type BoxesListed = Z.output<typeof boxesListed>
@@ -234,21 +234,16 @@ export type BoxSnapshot = Boxscope & Readonly<{
   full:          boolean
   present:       boolean
   exposed:       boolean
+  veiled:        boolean
+  lockState:     EX.LockState
 }>
 
 // --
 
-// == [What a box is handed]: whisperHolder, boxDna, boxPatch, WhisperHolder, BoxHalves, BoxPatchGiven, BoxPatch, BoxPut, BoxDna
+// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
-/** SLOPDOC: The check of `{ val }`, the object a box takes and gives its whisper in, handing back a frozen copy. */
-export const whisperHolder = Checker(({ obj, custom }) => custom((val) => val !== LOCKED, Phrases.LockedIsNoWhisper)
-  .pipe(obj({ val: whisper }).strict().overwrite((holder) => deepFreeze(holder)).readonly()), 'bad_option')
-
-/** The object a box takes and gives its whisper in: `{ val }`, frozen, the whisper its `val`. */
-export type WhisperHolder = Z.output<typeof whisperHolder>
-
-/** Both halves of a box, the whisper, as its {@link WhisperHolder} `{ val }`, and the sidecar: what every update of a box names, and what it seals. */
-export type BoxHalves = { whisper: WhisperHolder, sidecar: Sidecar }
+/** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
+export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
 
 /** True where a patch names a half of its box. */
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
@@ -258,15 +253,21 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
   const factory = boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
-    whisper: whisperHolder.default({ val: {} }),
+    whisper: whisper.default({}),
     sidecar: sidecar.default({}),
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisperHolder.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const boxPatch = boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
     .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
   return { boxDna, boxPatch }
 })
+
+/** The check of what `box.putExposed` takes: a sidecar, if any, and never a whisper. */
+export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.optional() }), { refusalKind: 'bad_option' }, [CX])
+
+/** A host's patch for `box.putExposed`, which seals the whisper exposed. */
+export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchGiven = Z.output<typeof boxPatch>
@@ -286,14 +287,15 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 /** The check of a box listing's options, beyond what {@link listingOpts} checks: its world names the vault's scope and its `vault_tok`, and answers the seal verbs. Checks only. */
 export const boxListingOpts = objCheck(({ obj, fn, applabel, user_id, vaultlabel, vault_tok }) => ({
-  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, sealStampedString: fn(), unsealStampedString: fn() }),
-}), { refuseAs: 'bad_option', extras: 'strip' }, [CX])
+  world: obj({ scope: obj({ applabel, user_id, vaultlabel }), vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn() }),
+}), { refusalKind: 'bad_option', extras: 'strip' }, [CX])
 
 /** The vault's face to its boxes: a {@link ListingWorld}, the vault's scope, token and demand, and its seal verbs. */
 export type BoxWorld = ListingWorld & {
   scope:     VaultScope
   vault_tok: string
   demandUnlocked(): unknown
+  subscribe(listener: () => void): () => void
   sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
   unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
 }
@@ -335,7 +337,7 @@ export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCac
 /** The check of a vault listing's options past what {@link listingOpts} checks: that its world carries what a vault's gate and lease need. Checks only. */
 export const vaultListingOpts = objCheck(({ obj, fn }) => ({
   world: obj({ ...GX.provingWorld.shape, logger: CX.loggerShape, leaseMillis: GX.leaseMillis.optional(), deviceDB: deviceDBDuck, onPanic: fn().optional(), requestCleartext: fn() }),
-}), { refuseAs: 'bad_option', extras: 'strip' })
+}), { refusalKind: 'bad_option', extras: 'strip' })
 
 /** SLOPDOC: The bank, as far as its vaults need it: a {@link ListingWorld} and what a vault's gate and lease need. */
 export type VaultWorld = ListingWorld & ProvingWorld & {
@@ -378,7 +380,7 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn().optional(),
   onPanic:             fn().optional(),
-}), { refuseAs: 'bad_option' }, [CX])
+}), { refusalKind: 'bad_option' }, [CX])
 
 export type BankOpts = {
   applabel:             string

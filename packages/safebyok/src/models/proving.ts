@@ -201,18 +201,30 @@ const deriveKeyBytes = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase
 }
 // --
 
-// == [Key bytes]: isSharedMemory, isAllZero, passphraseKeyOf
+// == [Key bytes]: isSharedMemory, isSafelyAllZero, passphraseKeyOf
 
 const isSharedMemory = (view: ArrayBufferView): boolean => Object.prototype.toString.call(view.buffer) === '[object SharedArrayBuffer]'
 
-const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
+// Reads every byte with no early exit and no branch on a byte, as libsodium's sodium_is_zero does: `every` would exit
+// early and `for of` would allocate an iterator. No JavaScript engine promises constant time; only the verdict steers what
+// follows, and the refusal of an all-zero key tells that anyway.
+/** True when every byte of `bytes` is zero. */
+const isSafelyAllZero = (bytes: Uint8Array): boolean => {
+  let   seen = 0
+  const len  = bytes.length
+  for (let ii = 0; ii < len; ii++) {
+    // @ts-expect-error -- ii stays below len; noUncheckedIndexedAccess cannot see that, and a default would read as a branch
+    seen |= bytes[ii]
+  }
+  return seen === 0
+}
 
 const passphraseKeyOf = async (keyDeriver: ProvingWorld['keyDeriver'], passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<CryptoKey> => {
   const handed = await deriveKeyBytes(keyDeriver, passphrase, saltBytes)
   if (! ArrayBuffer.isView(handed) || isSharedMemory(handed)) { throw notKeyBytes() }
   const keyBytes = new Uint8Array(handed.buffer, handed.byteOffset, handed.byteLength)
   try {
-    if (keyBytes.length !== PassphraseKeyBytes || isAllZero(keyBytes)) { throw notKeyBytes() }
+    if (keyBytes.length !== PassphraseKeyBytes || isSafelyAllZero(keyBytes)) { throw notKeyBytes() }
     return await importWrappingKeyBytes(keyBytes)
   } finally {
     keyBytes.fill(0)

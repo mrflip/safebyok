@@ -1,6 +1,7 @@
 /** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over real in-memory stores,
  * and every step asserts what its components render. */
 
+import { Whispered } from '../../src/helpers/consts'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
@@ -27,13 +28,15 @@ type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSn
 
 /** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React takes them, painting `view`.
  * A listener told with nothing new, or a snapshot that changed with no listener told, fails the next `expectRenders`.
+ * A box's subscriber also hears its vault's moves that leave the box as it was, which React ignores: `hearsVault` does too.
  */
-const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) => {
+const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string, { hearsVault = false } = {}) => {
   let rendered = getSnapshot()
   let idleTells = 0
   const painted = [view(rendered)]
   subscribe(() => {
     const next = getSnapshot()
+    if ((next === rendered) && hearsVault) { return }
     if (next === rendered) { idleTells += 1 }
     rendered = next
     painted.push(view(next))
@@ -62,8 +65,7 @@ const boxRow = ({ boxlabel, present, sidecar }: BoxSnapshot): string => `${boxla
 /** The component that shows the whisper itself: `box.whisper`, read afresh at each paint, as a snapshot never holds it. */
 const whisperReveal = (box: Box) => (): string => {
   const { whisper } = box
-  if (whisper === null) { return 'hidden' }
-  return Storable.isLockedFUBag(whisper) ? 'locked' : JSON.stringify(whisper.val)
+  return Storable.isFUBag(whisper) ? whisper[Whispered] : JSON.stringify(whisper)
 }
 
 /** The host's dialog: it records what it was shown for, and attempts what the user types; typing nothing closes it. */
@@ -100,7 +102,7 @@ const AutolockMillis = AutolockMinutes * 60_000
 /** Longer than a vault waits before it asks the vaultDB again. */
 const StaleMillis = 10 * 60_000
 
-const ApiKey = Object.freeze({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-not-a-real-key' }, sidecar: { nickname: 'work' } })
+const ApiKey = Object.freeze({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-not-a-real-key' }, sidecar: { nickname: 'work' } })
 
 describe("the proof", () => {
   it("a bank's whole life, as its components see it", async () => {
@@ -127,16 +129,14 @@ describe("the proof", () => {
     // Seal a box: storage holds only ciphertext, and the list shows it.
     const box = await vault.putBox(ApiKey)
     boxesUi.expectRenders(['anthropic_api_key'])
-    const boxUi = mountComponent(box, boxRow)
+    const boxUi = mountComponent(box, boxRow, { hearsVault: true })
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
-    // The whisper's component watches the box for what's exposed, and the vault for the lock its getter checks.
-    const revealUi = mountComponent(box, whisperReveal(box))
-    const revealOfLockUi = mountComponent(vault, whisperReveal(box))
-    revealUi.expectRenders(['hidden'])
-    revealOfLockUi.expectRenders(['hidden'])
+    // The whisper's component watches the box alone, whose subscribers hear of a lock through the vault.
+    const revealUi = mountComponent(box, whisperReveal(box), { hearsVault: true })
+    revealUi.expectRenders(['encrypted'])
     const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
     expect(boxRows).to.have.lengthOf(1)
-    expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper.val)
+    expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper.apiKey)
 
     // Unseal it: extractWhisper hands over the whisper and keeps nothing; expose keeps it for the component.
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
@@ -144,18 +144,17 @@ describe("the proof", () => {
     await box.expose()
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
-    revealUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
+    revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     const snapshots = [bank.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
-    expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.val)
+    expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.apiKey)
 
     // Lock: every component watching the vault is told before lock() returns, the whisper leaves the screen, and the box refuses.
     vault.lock()
     bankUi.expectRenders(['ready: main locked'])
     vaultUi.expectRenders(['main locked'])
-    boxUi.expectRenders([])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders([])
-    revealUi.expectRenders([])
-    revealOfLockUi.expectRenders(['locked'])
+    revealUi.expectRenders(['locked'])
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
     await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
 
@@ -172,10 +171,9 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
     vaultUi.expectRenders(['main unlocked'])
-    boxUi.expectRenders([])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders([])
-    revealUi.expectRenders([])
-    revealOfLockUi.expectRenders([JSON.stringify(ApiKey.whisper.val)])
+    revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
     // Delete: the user proves it, the list empties, and the vault says it is gone.
@@ -187,9 +185,8 @@ describe("the proof", () => {
     await TH.expectRefusal(vault.fetch(), 'vault_gone')
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
     boxesUi.expectRenders(['no boxes'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
-    revealUi.expectRenders(['locked'])
-    revealOfLockUi.expectRenders(['locked', 'locked'])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}', 'anthropic_api_key {"nickname":"work"}'])
+    revealUi.expectRenders(['locked', 'encrypted'])
     await TH.expectRefusal(box.extractWhisper(), 'disabled')
 
     // Rebuild over the tombstone: a new life, a new instance, a new vault_tok.

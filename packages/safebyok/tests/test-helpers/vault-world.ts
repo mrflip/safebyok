@@ -221,6 +221,7 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   takeWorld:    () => undefined,
   tellBadNews:  (badnews) => { vault.tellBadNews(badnews) },
   demandUnlocked:   () => vault.demandUnlocked(),
+  subscribe:        (listener) => vault.subscribe(listener),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
   unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
 })
@@ -228,7 +229,7 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
 /** The boxlabel of the one box the box-verb worlds hold. */
 export const boxlabel = 'anthropic_api_key'
 /** The whisper those worlds put in it. */
-export const Whisper  = Object.freeze({ val: 'sk-test-0000' })
+export const Whisper  = { apiKey: 'sk-test-0000' }
 /** The sidecar those worlds put beside it. */
 export const Sidecar  = Object.freeze({ note: 'work' })
 

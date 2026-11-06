@@ -15,7 +15,7 @@ import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeVaultWorld
 
 useVaultWorlds()
 
-const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: { val: 'sk-test-0000' }, sidecar: {} }
+const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }
 
 /** The tombstone a delete elsewhere leaves over `record`. */
 const tombstoneOver = (record: VaultRecord) => ({ ...omit(record, ['gate']), am: 'x' as const, revision_seq: record.revision_seq + 1, revision_tok: 'rev-gone' })
@@ -120,7 +120,7 @@ describe("a box verb over a vault deleted elsewhere", () => {
   const WorldNow = { maxWorldMillis: 0 }
   const Verbs = [
     ['box.extractWhisper', ({ box }) => box.extractWhisper(WorldNow)],
-    ['box.put',           ({ box }) => box.put({ whisper: { val: 'sk-new' }, sidecar: {} }, WorldNow)],
+    ['box.put',           ({ box }) => box.put({ whisper: { apiKey: 'sk-new' }, sidecar: {} }, WorldNow)],
     ['box.del',            ({ box }) => box.del(WorldNow)],
     ['vault.getBox',       ({ vault, box }) => vault.getBox(box.boxlabel, { ...WorldNow, maxMillisSinceRefresh: 0 })],
     ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, WorldNow)],

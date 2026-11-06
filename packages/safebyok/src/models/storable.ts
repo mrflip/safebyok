@@ -1,6 +1,6 @@
 import { isEqual } from 'es-toolkit'
 import { adorn, tattoo } from '../helpers/helpers'
-import { type LockedBag, LOCKED } from '../helpers/consts'
+import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { reportToPlatform } from '../refusals/report-error'
@@ -23,7 +23,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 // --
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #horizonMillis, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isLockedFUBag
+  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #horizonMillis, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isFUBag
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
   declare readonly world:   World
@@ -66,11 +66,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return () => { this.#listeners.delete(listener) }
   }
 
-  /** True for {@link LOCKED}, the bag a storable answers in place of what the locked vault hides, and for nothing else: not a copy of it, nor any bag a host builds, nor `Symbol.for('LOCKED')`. */
-  static isLockedFUBag(val: unknown): val is LockedBag { return val === LOCKED }
+  /** True for what a box answers for a whisper it will not show, or a copy of it: anything carrying the `Whispered` mark. */
+  static isFUBag(val: unknown): val is WhisperedBag { return isWhisperedBag(val) }
   // --
 
-  // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe
+  // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe, subscribeOwn
 
   get scope(): ScopeT { return this.#scope }
 
@@ -100,6 +100,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Public access to the unbound "make me a subscriber" callback */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+
+  /** As {@link subscribe}, for this thing's own changes alone, where a subclass widens `subscribe`. */
+  get subscribeOwn(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
   // == [Construction]: constructor, assignInitialProps, assign
@@ -229,7 +232,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Settling]: settle, becomeNotifiable, replaceSnapshot
+  // == [Settling]: settle, becomeNotifiable, remakeSnapshot, replaceSnapshot
 
   /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
   settle(): Settled {
@@ -242,6 +245,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#snapshot ??= this.makeSnapshot()
     return this
   }
+
+  /** Make the snapshot again, telling no one, for a subclass whose snapshot follows something that tells its listeners itself. */
+  protected remakeSnapshot(): void { this.#snapshot = this.makeSnapshot() }
 
   /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */
   #replaceSnapshot(): void {

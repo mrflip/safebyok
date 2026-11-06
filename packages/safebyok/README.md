@@ -34,8 +34,8 @@ run on until they move here; its long README describes that design, not this one
 [VOCABULARY.md](../../VOCABULARY.md) has the only names for these. Its nouns hold, but some calls
 it names are the old design's (`putWayin`, `getWhisper`): for calls, trust the types here.
 
-* **whisper**: the secret, any JSON value. A **box** holds one, encrypted, as `{ val }`, with its
-  `boxlabel` and sidecar.
+* **whisper**: the secret, always a plain object of JSON, such as `{ apiKey: 'sk-...' }`. A **box**
+  holds one, encrypted, with its `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `applabel`, `user_id` and `vaultlabel`. Deleted and made
   anew, it is a new life: a new `vault_tok` and a new `Vault` instance.
 * **bank**: a signed-in user's vaults and what they share. One per signed-in user.
@@ -64,8 +64,8 @@ const bank = Bank.make({
 await bank.hello()
 
 const vault = await bank.ensureVault({ vaultlabel: 'main' }) // none yet: asks, build_vault
-const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { val: 'sk-...' }, sidecar: { nickname: 'work' } })
-const { val } = await box.extractWhisper() // hands it over, and keeps nothing
+const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-...' }, sidecar: { nickname: 'work' } })
+const whisper = await box.extractWhisper() // hands it over, and keeps nothing
 
 vault.lock()                 // every subscriber is told before this returns
 await vault.ensureUnlocked() // no lease now: asks, unlock_vault
@@ -77,8 +77,21 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* To show a whisper, `box.expose()` holds it on `box.whisper`. Its component subscribes to the box
-  for the exposing and to the vault for the lock.
+* To show a whisper, `box.expose()` holds it on `box.whisper`, a plain object of the box's to edit,
+  until `box.unexpose()`. `box.veil()` and `box.unveil()` hide it and show it again. While it will
+  not show, `box.whisper` answers a frozen bag, whose `Whispered` symbol says why: `'encrypted'`
+  (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a put of one refuses. A lock
+  keeps the whisper, so the unlock brings the same object back. `box.subscribe` hears of a lock too:
+
+  ```tsx
+  const { exposed, lockState } = useSyncExternalStore(box.subscribe, box.getSnapshot)
+  if (lockState === 'locked') { return <button onClick={() => vault.ensureUnlocked()}>Unlock</button> }
+  if (! exposed) { return <button onClick={() => box.expose()}>Show</button> }
+  return <WhisperForm initial={box.whisper} onSave={(next) => box.put({ whisper: next })} />
+  ```
+
+  A script edits it in place, and `box.putExposed()` stores it:
+  `await box.expose(); box.whisper.org = 'acme'; await box.putExposed()`.
 * `bank.vacate()` is sign-out: it erases this device's leases and leaves the vaultDB alone.
 
 ## Not done yet

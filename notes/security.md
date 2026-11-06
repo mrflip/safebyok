@@ -41,6 +41,23 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-05 (whisper_object, branch `20261105-whisper_object`): **A box that will not show its exposed whisper answers `box.whisper`
+  with a frozen marked bag, and the exposed whisper stays in memory through a lock and `veil()`.** In
+  `packages/safebyok/src/models/box.ts` (the mark is in `src/helpers/consts.ts`), a whisper is always a plain JSON object: a bare string,
+  number, boolean, array, null or undefined refuses `bad_whisper` (`bad_option` at a put), and a symbol key refuses at any depth, since
+  JSON would drop it and leave `{}`. A box that will not show answers one of three frozen bags, `{ [sym]: 'encrypted' }`,
+  `{ [sym]: 'locked' }` or `{ [sym]: 'veiled' }`, where `sym` is the public `Symbol.for('@safebyok/whispered')` (not a private `Symbol()`,
+  so two copies of the module, such as the ESM and CJS builds, agree on the mark). The check is of the mark, not of identity: `put`,
+  `create` and `putBox` refuse a bag, a spread copy of one, or one nested, so a value read while locked and put after the unlock stores
+  nothing and never replaces the secret. Forging the mark only ever refuses at a put. The exposed value is kept in memory for the
+  instance's life except at `unexpose`, a sweep, a vacate, or the box's record going to a tombstone (a delete); a lock and `veil()` do
+  not remove it, they change what `box.whisper` answers. They hide, they do not erase: a lock leaves the plain object untouched, and a
+  host's kept reference outlives it. The Coach's trade ("whisper is unsafe by design"): a user who locks and unlocks gets their fields
+  back, and a host that wants it gone calls `unexpose()`. `expose` requires an unlocked vault and sets veiled false; `putExposed` seals
+  the kept value directly, so it never reads a bag, and is allowed while veiled and refused `vault_locked` while locked. The value is
+  never on a snapshot, in `toJSON` or in a refusal; `box.getSnapshot()` carries only the booleans `exposed` and `veiled` and the
+  `lockState`. (amended 2026-11-05 (whisper_object): the full argument for keeping the exposed whisper is in
+  `notes/expose_improves_security.md`.)
 * 2026-11-05 (lease_fold, [#494](https://github.com/mrflip/safebyok/pull/494), branch `20261105-lease_fold`): **A gating's run reaches the
   vault's private `#unlockByProof` and `#landGate` by a gating friend, a second friend beside the lease's.** In
   `packages/safebyok/src/models/`, a gating's runs are `RunForGatingkind` in `gating.ts`, beside `ProveForGatingkind`; a run hears

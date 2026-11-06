@@ -1,5 +1,6 @@
 /** BoxListing.create: the box it makes, sealed at birth, with its whisper and sidecar defaults, over a dna held to boxDna. */
 
+import { ENCRYPTED } from '../../src/helpers/consts'
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
@@ -127,7 +128,7 @@ describe("BoxListing", () => {
 
   describe("listing.create(dna with a whisper)", () => {
     it("seals the whisper in at birth: the box is full at revision 0, and holds none of the whisper", async () => {
-      const box = await boxListingOf(held.mw).create({ ...dna(), whisper: { val: { key: 'sk-ant-secret' } } })
+      const box = await boxListingOf(held.mw).create({ ...dna(), whisper: { key: 'sk-ant-secret' } })
       expect(box.isFull).to.be.true
       expect(box.revision_seq).to.eq(0)
       expect(JSON.stringify(box._cheat_central)).to.not.include('sk-ant-secret')
@@ -236,7 +237,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
   })
 
   it("seals the dna's sidecar in beside the whisper", async () => {
-    const box = await boxListingOf(held.mw).create({ ...dna(), sidecar: { account: 'work' }, whisper: { val: 'sk-test-0000' } })
+    const box = await boxListingOf(held.mw).create({ ...dna(), sidecar: { account: 'work' }, whisper: { apiKey: 'sk-test-0000' } })
     expect(box.sidecar).to.deep.equal({ account: 'work' })
     expect(box.isFull).to.be.true
   })
@@ -244,7 +245,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
   it("refuses 'vault_locked' while the vault is locked, listing and sealing nothing", async () => {
     held.mw.setLockState('locked')
     const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.create({ ...dna(), whisper: { val: 'sk-test-0000' } }), 'vault_locked')
+    await TH.expectRefusal(listing.create({ ...dna(), whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
     expect(listing.snapshot).to.deep.equal([])
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
@@ -266,17 +267,17 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
 describe("boxListing.create(dna): no secret material", () => {
   it("leaves none of the whisper in the record in hand, the snapshots or the listing", async () => {
     const listing = boxListingOf(held.mw)
-    const box = await listing.create({ ...dna(), whisper: { val: { key: 'sk-test-SECRET' } } })
+    const box = await listing.create({ ...dna(), whisper: { key: 'sk-test-SECRET' } })
     for (const form of [box.toJSON(), box._cheat_central, box.snapshot, listing.snapshot, held.mw.calls]) {
       expect(JSON.stringify(form)).to.not.include('SECRET')
     }
-    expect(box.whisper).to.be.null
+    expect(box.whisper).to.eq(ENCRYPTED)
   })
 
   it("seals the same placeholders whatever the whisper", async () => {
     const listing = boxListingOf(held.mw)
-    const one = await listing.create({ ...dna('one_box'), whisper: { val: 'sk-test-one' } })
-    const other = await listing.create({ ...dna('other_box'), whisper: { val: 'sk-test-other' } })
+    const one = await listing.create({ ...dna('one_box'), whisper: { apiKey: 'sk-test-one' } })
+    const other = await listing.create({ ...dna('other_box'), whisper: { apiKey: 'sk-test-other' } })
     expect(one.whisper_ciphered).to.deep.equal(other.whisper_ciphered)
     expect(one.box_key_wrapped).to.deep.equal(other.box_key_wrapped)
   })
@@ -308,14 +309,13 @@ describe("boxListing.create(dna): a whisper and a sidecar, each defaulting", () 
 })
 // --
 
-// == [The whisper as { val } at birth]: build, boxDna
+// == [The whisper at birth]: build, boxDna
 
-describe("boxListing.create(dna): the whisper given as { val }", () => {
+describe("boxListing.create(dna): the whisper", () => {
   const BadWhisperCases = [
-    ['sk-test-SECRET',                            ['whisper'],     'a bare whisper'],
-    [{ val: null },                               ['whisper.val'], 'a val that is null'],
-    [{ val: ['sk-test-SECRET', undefined] },      ['whisper.val'], 'a val holding undefined'],
-    [{ val: 'sk-test-SECRET', SECRET_NOTE: 'x' }, ['whisper'],     'a field beside the val'],
+    [null,                            ['whisper'], 'null'],
+    [['sk-test-SECRET', undefined],   ['whisper'], 'an array holding undefined'],
+    [{ SECRET_NOTE: new Map() },      ['whisper'], 'an object holding a Map'],
   ] as const
 
   for (const [whisper, fieldnames, blurb] of BadWhisperCases) {
@@ -329,8 +329,8 @@ describe("boxListing.create(dna): the whisper given as { val }", () => {
     })
   }
 
-  it("freezes the copy it checks, never the host's own whisper object", async () => {
-    const whisper = { val: { apiKey: 'sk-test-0000' } }
+  it("leaves the host's own whisper object as given", async () => {
+    const whisper = { apiKey: 'sk-test-0000' }
     const box = await boxListingOf(held.mw).create({ ...dna(), whisper })
     expect(box.isFull).to.be.true
     expect(Object.isFrozen(whisper)).to.be.false
