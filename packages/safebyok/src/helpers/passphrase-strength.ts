@@ -25,7 +25,7 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * vault that cannot check a new passphrase never opens.
  *
  * safebyok ships none: pass your own (CUSTOMIZATION.md). To ask it as the user types, call
- * `vault.tryCheckStrength(typed)`.
+ * `gating.checkStrength(typed)`, which answers its verdict.
  *
  * - A blank passphrase is sent back as a weak passphrase, unconditionally, without consulting the checker.
  * - The default strength checker refuses everything: see CUSTOMIZATION.md for why we do this, and instructions to supply one.
