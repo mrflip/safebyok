@@ -614,10 +614,10 @@ the scope.
   extends our base class and is known by its `Symbol.for` brand: a duck check passes anything with
   the right method names, and `instanceof` fails the second copy of safebyok an adapter package may
   bundle.
-* **A host's function is wrapped once, on its way in.** `requestCleartext`, the key deriver,
-  `onPanic` and the strength checker are each wrapped at `Bank`'s constructor into a checked,
-  branded thing that checks what the function answers (*Validation*). Past it nothing calls the bare
-  function; a parameter takes the branded thing.
+* **A host's function is wrapped once, on its way in.** Each function a host hands `Bank.make`
+  (`requestCleartext`, the key deriver, the strength checker, `onPanic`, ...) is wrapped at `Bank`'s
+  constructor into a checked, branded thing that checks what the function answers (*Validation*).
+  Past it nothing calls the bare function; a parameter takes the branded thing.
 * **A browser checks what a server relays.** A server is not trusted, so a browser checks each
   record it is sent that it will use. A server's word that a record is damaged it may take: the
   worst a lying server does with that is offer to delete what it could delete anyway. It still
