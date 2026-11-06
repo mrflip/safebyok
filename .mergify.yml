@@ -1,10 +1,17 @@
-# History on main is semi-linear (PROCESS.md, The history we keep): each pull request is rebased
-# onto main and lands as one merge commit. That holds only while checks run in place, on the pull
-# request itself, after Mergify has rebased it: a batch, or checks run in parallel, are tested on a
-# draft pull request, and each original then merges at its own head, rebased or not. So the queue
-# takes one pull request at a time.
+# History on main is semi-linear (PROCESS.md, The history we keep): each pull request lands as one
+# merge commit, and its commits keep the SHAs they had on the branch. Nothing here rebases a
+# branch or merges `main` into one: a stack of pull requests, each built on the one below, lands in
+# queue order as a ladder, original commits on one rail and a merge commit per pull request on main.
 #
-# The Coach queues a pull request by labeling it `queue`; Merge Protections must be on for the
+# A batch is tested once, on a draft pull request holding every queued pull request merged onto
+# main; `merge` then merges each original at its own head. That needs the `mainly main` ruleset's
+# "require branches to be up to date" off, since an original is never the branch that was tested.
+# Explicit `merge_conditions` keep the queue on that draft path; with none, a queue of one is
+# checked in place, and `update_method` would then rewrite that pull request's commits.
+#
+# The Coach queues a pull request by labeling it `queue`, a stack in order from the bottom: the
+# queue takes pull requests in the order they are labeled, and one labeled above the one below it
+# carries the lower one's commits into its own merge commit. Merge Protections must be on for the
 # repository in Mergify's dashboard for the label to do anything. `@mergifyio queue` in a comment
 # queues one too.
 merge_protections_settings:
@@ -12,20 +19,22 @@ merge_protections_settings:
     - label = queue
 
 merge_queue:
-  max_parallel_checks: 4
+  max_parallel_checks: 1
+
 queue_rules:
   - name: default
     merge_method: merge
-    update_method: rebase
-    batch_size: 2
+    # A stack is labeled within this window to land as one batch, tested once.
+    batch_size: 10
+    batch_max_wait_time: 2 minutes
     # The `mainly main` ruleset's rules (an approval, review threads resolved, its required checks)
     # join these by themselves; these name CI's jobs, each its own check.
-    # merge_conditions:
-    #   - check-success = lint-typecheck
-    #   - check-success = test-build
-    #   - check-success = node-compat (22)
-    #   - check-success = node-compat (26)
-    # - check-success = postgres
+    merge_conditions:
+      - check-success = lint-typecheck
+      - check-success = test-build
+      - check-success = node-compat (22)
+      - check-success = node-compat (26)
+      - check-success = postgres
 # scopes:
 #   source:
 #     files:
