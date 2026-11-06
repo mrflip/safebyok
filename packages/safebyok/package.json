@@ -84,6 +84,11 @@
       "import": "./dist/dom/index.js",
       "require": "./dist/dom/index.cjs"
     },
+    "./storage": {
+      "@safebyok/source": "./src/storage/index.ts",
+      "import": "./dist/storage/index.js",
+      "require": "./dist/storage/index.cjs"
+    },
     "./testing": {
       "@safebyok/source": "./tests/test-helpers.ts",
       "import": "./dist/testing.js",
@@ -114,6 +119,9 @@
       "dom": [
         "./dist/dom/index.d.cts"
       ],
+      "storage": [
+        "./dist/storage/index.d.cts"
+      ],
       "testing": [
         "./dist/testing.d.cts"
       ],
@@ -135,6 +143,10 @@
       "./dom": {
         "import": "./dist/dom/index.js",
         "require": "./dist/dom/index.cjs"
+      },
+      "./storage": {
+        "import": "./dist/storage/index.js",
+        "require": "./dist/storage/index.cjs"
       },
       "./testing": {
         "import": "./dist/testing.js",
