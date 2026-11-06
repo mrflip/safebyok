@@ -39,7 +39,7 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 }
 // --
 
-// == [What a store answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
+// == [What a store answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard, VaultDBRelay
 
 /** The answer of a conditional write: whether it landed, and `ante`, the row it replaced, or that stands in its way. Null is a void row. */
 export type Landing = { landed: boolean, ante: unknown }
@@ -52,6 +52,20 @@ export type RowOfBox   = { boxlabel: string, box: unknown }
 export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
 export type BoxFetched   = { vault: unknown, box: unknown }
 export type Heard = { vault: unknown, box?: unknown }
+
+/** A VaultDB's generic calls, for a server to carry to a VaultDB in a browser: each checks what it is handed, as its verb does. */
+export type VaultDBRelay = {
+  listVaults: (scope: BankScope) => Promise<RowOfVault[]>
+  getVault:   (scope: VaultScope) => Promise<unknown>
+  listBoxes:  (asked: VaultQuery) => Promise<BoxesFetched>
+  getBox:     (asked: BoxQuery) => Promise<BoxFetched>
+  putVault:   (record: VaultRecord, opts: PutOpts) => Promise<Landing>
+  putBox:     (record: BoxRecord, opts: PutOpts) => Promise<BoxLanding>
+  delVault:   (tombstone: VaultTombstone, opts: DelOpts) => Promise<Landing>
+  delBox:     (tombstone: BoxTombstone, opts: DelOpts) => Promise<BoxLanding>
+  tidyGone:   (scope: BankScope) => Promise<Tidied>
+  watch:      (scope: WatchScope, hear: (heard: Heard) => void) => () => void
+}
 // --
 
 const noUnwatching = (): void => undefined
@@ -354,6 +368,47 @@ export abstract class VaultDB {
   }
   // --
 
+  // == [Relay]: relay
+
+  /** This store's generic calls, for a server relaying them: each refuses what its verb would refuse before storage is asked. */
+  get relay(): VaultDBRelay {
+    return {
+      listVaults: async (scope) => await relayed(() => this.doListVaults(SX.bankScope.parse(scope))),
+      getVault:   async (scope) => await relayed(() => this.doGetVault(SX.vaultScope.parse(scope))),
+      listBoxes:  async (asked) => await relayed(() => this.doListBoxes(SX.vaultQuery.parse(asked))),
+      getBox:     async (asked) => await relayed(() => this.doGetBox(SX.boxQuery.parse(asked))),
+      putVault:   async (record, opts) => await relayed(() => {
+        const vaultRecord = SX.vaultRecord.parse(record)
+        const putOpts = SX.putOpts.parse(opts)
+        demandNextSeq(vaultRecord, putOpts.prior)
+        return this.doPutVault(vaultRecord, putOpts)
+      }),
+      putBox: async (record, opts) => await relayed(() => {
+        const boxRecord = SX.boxRecord.parse(record)
+        const putOpts = SX.putOpts.parse(opts)
+        demandNextSeq(boxRecord, putOpts.prior)
+        const recordBytes = jsonBytes(boxRecord)
+        if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
+        return this.doPutBox(boxRecord, putOpts)
+      }),
+      delVault: async (tombstone, opts) => await relayed(() => {
+        const vaultTombstone = SX.vaultTombstone.parse(tombstone)
+        const delOpts = SX.delOpts.parse(opts)
+        demandNextSeq(vaultTombstone, delOpts.prior)
+        return this.doDelVault(vaultTombstone, delOpts)
+      }),
+      delBox: async (tombstone, opts) => await relayed(() => {
+        const boxTombstone = SX.boxTombstone.parse(tombstone)
+        const delOpts = SX.delOpts.parse(opts)
+        demandNextSeq(boxTombstone, delOpts.prior)
+        return this.doDelBox(boxTombstone, delOpts)
+      }),
+      tidyGone: async (scope) => await relayed(() => this.doTidyGone(SX.bankScope.parse(scope))),
+      watch:    (scope, hear) => this.doWatch(SX.watchScope.parse(scope), hear),
+    }
+  }
+  // --
+
   // == [Protected, for a subclass to write]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   /** Every vault row of the bank, full or tombstone. */
@@ -379,12 +434,19 @@ export abstract class VaultDB {
   // --
 }
 
-// == [Helpers]: refusalOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
+// == [Helpers]: refusalOf, relayed, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
 
 /** What a verb throws: a refusal as it came, anything else `storage_unavailable`, each carrying the verb and the request's safe metadata. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
   const refusal = storageTroubleOf(thrown)
   return Object.assign(refusal, { meta: { ...refusal.meta, call, req_params } })
+}
+
+/** What `call` answers, or its throw as a refusal: a refusal as it came, anything else `storage_unavailable`. */
+const relayed = async <ValT>(call: () => Awaitable<ValT>): Promise<ValT> => {
+  try {
+    return await call()
+  } catch (err) { throw storageTroubleOf(err) }
 }
 
 /** The vault row a store answered, where it is live in the life `asked` names. */
