@@ -10,8 +10,6 @@ import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/pass
  * unlocking runs in milliseconds. Deterministic in passphrase and salt, like the real one; unlike
  * the real one, worthless against a brute-forcer -- which is why its label says `test`. Never
  * hand it to a vault that holds a real secret.
- *
- * @example Bank.make({ ...opts, keyDeriver: testDeriver })
  */
 export const testDeriver: KeyDeriver = {
   key_deriver_label: 'test_digest_v0',
@@ -28,8 +26,6 @@ export const testDeriver: KeyDeriver = {
 /**
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
  * short one such as 'pw'. Never hand it to a vault that holds a real secret.
- *
- * @example Bank.make({ ...opts, strengthChecker: anyStrengthChecker })
  */
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
@@ -41,7 +37,6 @@ export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & VaultKeyWayinWrappe
  * box's `whisper_ciphered`, a wayin's wrap) without a parse.
  *
  * @example fakeCiphered('a1')  // => { cipher_iv_b64: 'iv-a1', ciphertext_b64: 'ct-a1' }
- * @example boxOf('anthropic', 'a1', { whisper_ciphered: fakeCiphered('SUPERSECRET') })
  */
 export const fakeCiphered = (tag: string): FakeCiphered => {
   const fake: Ciphered = { cipher_iv_b64: `iv-${tag}`, ciphertext_b64: `ct-${tag}` }
@@ -52,16 +47,12 @@ export const fakeCiphered = (tag: string): FakeCiphered => {
  * The scope of `user_id`'s vault in the `acme` app.
  *
  * @example scopeOf('u1')           // => { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
- * @example scopeOf('u1', 'spare')  // => { applabel: 'acme', user_id: 'u1', vaultlabel: 'spare' }
  */
 export const scopeOf = (user_id: string, vaultlabel = 'main'): VaultScope => ({ applabel: 'acme', user_id, vaultlabel })
 
 /**
  * A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
  * never decrypt. It wraps the vault's first vaultKey, and was sealed by `device-one`.
- *
- * @example wayinOf('passphrase')                                            // as gateOf's, but for its wrap
- * @example wayinOf('home_phrase', { registered_at: Date.UTC(2026, 9, 15) })
  */
 export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
   wayinkind:               'passphrase',
@@ -86,7 +77,6 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
  * a real PRF does. Worthless as a secret: never hand it to a vault that holds a real one.
  *
- * @example await TH.putWayin(vault, 'pw', await passkeyOf('laptop'))
  * @example await TH.unlock(vault, await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
@@ -106,7 +96,6 @@ export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<Pas
  * @returns Text that differs from `b64` in its first character only.
  *
  * @example tweakB64('Zm9v') // 'am9v'
- * @example tweakB64('am9v') // 'bm9v'
  * @example tweakB64('')     // throws a TypeError
  */
 export const tweakB64 = (b64: string): string => {

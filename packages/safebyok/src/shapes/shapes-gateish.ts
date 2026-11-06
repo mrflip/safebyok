@@ -21,10 +21,7 @@ import type { Revision, VaultRecord, VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
-/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinKindVals}. Its `parse` refuses 'bad_option'.
- *
- * @example wayinkind.safeParse('passkey').success   // true
- */
+/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinKindVals}. Its `parse` refuses 'bad_option'. */
 export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinKindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
@@ -76,9 +73,6 @@ export type GateProps = Z.infer<typeof gateProps>
 
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` refuses 'bad_option', quoting none of it.
  * What a blank one means is the gating's to say.
- *
- * @example passphraseCleartext.parse(typed)   // a PassphraseCleartext, for the key deriver
- * @example passphraseCleartext.parse(42)      // throws 'bad_option', "A passphrase is the text the user typed, as a string"
  */
 export const passphraseCleartext = Checker(() => zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(), 'bad_option')
 
@@ -92,8 +86,7 @@ export const PrfAnswerBytes = 32
  * An answer already used, its bytes zeroed by the proving sealed of it, is refused too: sealed
  * again, it would make a key anyone could rebuild.
  *
- * @example passkeyAnswer.parse(await askPasskey(vault.snapshot.gate))
- * @example passkeyAnswer.parse(usedAnswer)   // throws 'bad_option': its bytes were zeroed at its first use
+ * @example passkeyAnswer.parse(usedAnswer)  // throws 'bad_option': its bytes were zeroed at its first use
  */
 export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   /** Base64url, as `PublicKeyCredential.id` gives it. */
@@ -116,8 +109,7 @@ export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 /** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` refuses 'bad_option', quoting none of it.
  * A passkey wayin sealed over another salt would read as damaged at every later unlock.
  *
- * @example freshPasskeyAnswer.parse(await createPasskey(opts))   // passes
- * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })   // throws 'bad_option'
+ * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws 'bad_option'
  */
 export const freshPasskeyAnswer = Checker(() => (
   passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] })
@@ -199,8 +191,7 @@ export const LeaseFormat = 7001
  * A device store hands back what it kept by structured clone, so a key that is extractable, of
  * another algorithm, or for another use was not written by this package: its record reads as none.
  *
- * @example isLeaseKey(await makeLeaseKey())   // true
- * @example isLeaseKey(await makeVaultKey())   // false: extractable
+ * @example isLeaseKey(await makeVaultKey())  // false: extractable
  */
 export const isLeaseKey = (val: unknown): val is CryptoKey => (
   val instanceof CryptoKey

@@ -38,7 +38,6 @@ describe("invokeStrengthChecker", () => {
     expect(await invokeStrengthChecker(neverStrong, scope)('acme acme acme')).to.deep.equal({ strong: false, reason: 'Pick a phrase nobody would guess.' })
   })
 
-  // invokeStrengthChecker @example 1
   it("finds a blank passphrase weak before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
     for (const blank of ['', ' '.repeat(3), '\t\n']) {
@@ -153,7 +152,6 @@ describe("invokeStrengthChecker's load", () => {
 })
 
 describe("loadStrengthChecker", () => {
-  // loadStrengthChecker @example
   it("refuses a load that fails, naming bank.hello(), with what it threw as the cause", async () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
     const err = await TH.expectRefusal(loadStrengthChecker(Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })), 'unexpected_error')
@@ -165,7 +163,6 @@ describe("loadStrengthChecker", () => {
 describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason points at", () => {
   const customization = readFileSync(new URL('../../CUSTOMIZATION.md', import.meta.url), 'utf8')
 
-  // DefaultStrengthChecker @example
   it("finds every passphrase weak, with a reason for the user that quotes none", async () => {
     for (const passphrase of ['correct horse battery staple', 'pw', '']) {
       const verdict = await DefaultStrengthChecker(passphrase, scope)

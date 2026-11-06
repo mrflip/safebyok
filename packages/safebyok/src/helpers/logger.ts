@@ -14,13 +14,6 @@ import { consoleLogger } from './console-logger'
  * What a logger throws or rejects with is ignored. A logger typed `story?: Record<string, any>`
  * fits, and so does the console.
  *
- * @example
- *   const logger: VaultLogger = {
- *     log:   (message, story) => { telemetry.info(message, story) },
- *     warn:  (message, story, err) => { telemetry.warn(message, story, err) },
- *     error: (message, story, err) => { telemetry.error(message, story, err) },
- *   }
- *   const bank = Bank.make({ ...opts, logger })
  * @example Bank.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
  * @example Bank.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
  */
@@ -51,10 +44,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
  * It keeps identity: a logger it made safe comes back as itself, and the same host logger always
  * comes back as the same safe one.
  *
- * @example parseLogger(props.logger).warn('BankProvider made its bank anew for a logger rebuilt in render', { call: 'BankProvider' })
  * @example parseLogger(undefined).log('opened')  // to the default: the console says 'safebyok: opened'
- * @example parseLogger(undefined) === DefaultLogger  // true: the one default logger
- * @example parseLogger(telemetry) === parseLogger(parseLogger(telemetry))  // true: guarded once
  */
 export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLogger => {
   if (candidate === undefined || candidate === null) { return DefaultLogger }
@@ -113,9 +103,6 @@ export const DefaultLogger: VaultLogger = forwarding()
  * alike.
  *
  * @param logger - The app's own logger. Null or undefined puts the console back.
- *
- * @example setDefaultLogger(telemetry)  // every line safebyok says, to telemetry
- * @example setDefaultLogger(undefined)  // back to the console
  */
 export const setDefaultLogger = (logger: VaultLogger | null | undefined): void => {
   const parsed = parseLogger(logger)

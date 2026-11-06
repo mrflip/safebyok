@@ -1,11 +1,13 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
+import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
+import * as Phrases from '../../src/helpers/phrases'
+import { PasskeySaltBytes } from '../../src/helpers/consts'
 import * as GX from '../../src/shapes/shapes-gateish'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
 describe("wayinkind", () => {
-  // wayinkind @example
   it("takes each kind of wayin, and refuses any other slot", () => {
     expect(GX.wayinkind.safeParse('passkey').success).to.be.true
     expect(GX.wayinkind.parse('passphrase')).to.eq('passphrase')
@@ -34,7 +36,6 @@ const misshapenAnswers = (answer: PasskeyAnswer) => [
 ] as const
 
 describe("passkeyAnswer", () => {
-  // passkeyAnswer @example 1
   it("takes a passkey's answer, its bytes the very ones handed in", async () => {
     const answer = await TH.passkeyOf('laptop')
     const checked = GX.passkeyAnswer.parse(answer)
@@ -50,7 +51,7 @@ describe("passkeyAnswer", () => {
   })
 
   describe("refuses 'bad_option' for", () => {
-    // passkeyAnswer @example 2
+    // passkeyAnswer @example
     it("an answer already used, its bytes zeroed", async () => {
       const answer = await TH.passkeyOf('laptop')
       const err = TH.expectSyncRefusal(() => GX.passkeyAnswer.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
@@ -73,4 +74,29 @@ describe("passkeyAnswer", () => {
     })
   })
 })
+
+describe("freshPasskeyAnswer", () => {
+  it("takes a passkey's answer over a fresh salt", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    expect(GX.freshPasskeyAnswer.parse(answer)).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
+  })
+
+  // freshPasskeyAnswer @example
+  it("refuses an answer over a salt too short, naming the salt", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const err = TH.expectSyncRefusal(() => GX.freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }), 'bad_option')
+    expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltNotFresh(PasskeySaltBytes)}`)
+  })
+})
 // --
+
+describe("isLeaseKey", () => {
+  it("is true for a leaseKey as makeLeaseKey makes one", async () => {
+    expect(GX.isLeaseKey(await makeLeaseKey())).to.be.true
+  })
+
+  // isLeaseKey @example
+  it("is false for an extractable key", async () => {
+    expect(GX.isLeaseKey(await makeVaultKey())).to.be.false
+  })
+})

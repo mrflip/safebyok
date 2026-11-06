@@ -7,14 +7,12 @@ import * as Refusals from '../../src/refusals/throwers'
 const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new TypeError(`no backup of ${vaultlabel}`))
 
 describe("good and bad", () => {
-  // good @example
   it("makes a good outcome of a val", () => {
     const vaultRecord = { vault_tok: 'vault-tok-u1' }
     expect(good(vaultRecord)).to.deep.equal({ ok: true, val: vaultRecord })
     expect(good(null)).to.deep.equal({ ok: true, val: null })
   })
 
-  // bad @example
   it("makes a bad outcome of a refusal", () => {
     const err = Refusals.lockedError()
     const outcome = bad(err)
@@ -61,7 +59,6 @@ describe("outcomeOf", () => {
     expect(rejected.err).to.eq(refusal)
   })
 
-  // outcomeOf @example 2
   it("turns anything else thrown into unexpected_error, the thrown value its cause", async () => {
     const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
     const { ok, err } = await outcomeOf(() => parseImport('backup.json'))
@@ -80,7 +77,7 @@ describe("outcomeOf", () => {
     expect(fromNothing.err?.cause).to.be.instanceOf(Error)
   })
 
-  // outcomeOf @example 1
+  // outcomeOf @example
   it("never rejects: what an app wraps is one Outcome whatever happens", async () => {
     const { ok, val, err } = await outcomeOf(() => fetchBackup('main'), Refusals.storageUnavailable)
     expect(ok).to.be.false
@@ -91,7 +88,6 @@ describe("outcomeOf", () => {
 })
 
 describe("outcomeOf, told otherwise", () => {
-  // outcomeOf @example 3
   it("turns a throw that is no VaultError into what otherwise makes of it", async () => {
     const socketClosed = new Error('socket closed')
     const { err } = await outcomeOf(() => { throw socketClosed }, Refusals.storageUnavailable)
@@ -140,13 +136,11 @@ describe("storageTroubleOf", () => {
 })
 
 describe("refusalOf", () => {
-  // refusalOf @example 2
   it("hands a VaultError back as it came", () => {
     const refusal = new VaultError('vault_locked', 'The vault is locked.')
     expect(refusalOf(refusal)).to.eq(refusal)
   })
 
-  // refusalOf @example 3
   it("makes an unexpected_error of anything else, the throw its cause", () => {
     const bug = new TypeError('ctx is not a function')
     const err = refusalOf(bug)
@@ -156,7 +150,7 @@ describe("refusalOf", () => {
     expect(refusalOf(undefined).cause).to.be.instanceOf(Error)
   })
 
-  // refusalOf @example 1
+  // refusalOf @example
   it("ends a throwing form: a bug in its body reaches the caller as a VaultError and a refusal passes untouched", async () => {
     const refusal = new VaultError('vault_locked', 'The vault is locked.')
     await expect(throwingForm(new TypeError('broken'))).rejects.toThrow(expect.objectContaining({ name: 'VaultError', refusalkind: 'unexpected_error' }))
@@ -164,7 +158,7 @@ describe("refusalOf", () => {
   })
 })
 
-/** A throwing form in the shape refusalOf's first example shows, its body rejecting with `thrown`. */
+/** A throwing form in the shape refusalOf's example shows, its body rejecting with `thrown`. */
 const throwingForm = async (thrown: Error) => {
   try {
     await Promise.reject(thrown)

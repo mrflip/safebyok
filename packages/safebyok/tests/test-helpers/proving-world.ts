@@ -56,12 +56,7 @@ export type FakeLeaseFriend = LeaseFriend & {
   logged:          LoggedCall[]
 }
 
-/** A {@link FakeLeaseFriend} of {@link WorldStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockResolvedValueOnce(bad(err))`.
- *
- * @example
- *   const friend = fakeLeaseFriendOf({ vault_tok: 'vault-tok-other' })
- *   friend.tryCacheLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the disk is full')))
- */
+/** A {@link FakeLeaseFriend} of {@link WorldStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockResolvedValueOnce(bad(err))`. */
 export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFriend, 'leaseMillis'>> = {}): FakeLeaseFriend => {
   const { logger, calls } = spyLogger()
   const friend: FakeLeaseFriend = {

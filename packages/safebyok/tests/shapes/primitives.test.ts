@@ -3,6 +3,7 @@ import * as Zod from 'zod'
 import { LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern } from '../../src/shapes/primitives'
 import * as PX from '../../src/shapes/primitives'
 import { FarFuture, FarPast } from '../../src/helpers/consts'
+import * as Phrases from '../../src/helpers/phrases'
 
 const LabelCases = [
   // regular usage:
@@ -39,14 +40,16 @@ describe("label", () => {
   })
 
   // label @example
-  it("passes a lowercase word and refuses uppercase", () => {
+  it("passes lowercase words, and refuses a label breaking three rules with one sentence", () => {
     expect(PX.label.safeParse('anthropic_api_key').success).to.be.true
-    expect(PX.label.safeParse('ANTHROPIC_API_KEY').success).to.be.false
+    const checked = PX.label.safeParse('0__b_')
+    expect(checked.success).to.be.false
+    expect(checked.error?.issues.map((issue) => issue.message)).to.deep.equal([Phrases.LabelShape])
   })
 
   it("says what is wrong in its own sentences, and never quotes the label", () => {
     const said = JSON.stringify([PX.label.safeParse('Secret_Label'), PX.label.safeParse(`secret${'x'.repeat(MaxLabelChars)}`)].map((checked) => checked.error?.issues.map((issue) => issue.message)))
-    expect(said).to.include('lowercase words of letters and digits')
+    expect(said).to.include('starting with a letter and ending on a letter or digit')
     expect(said).to.include('at most 40 characters')
     expect(said.toLowerCase()).to.not.include('secret')
   })
@@ -141,7 +144,6 @@ describe("user_id", () => {
 })
 
 describe("UserIdPattern", () => {
-  // UserIdPattern @example
   it("is the pattern user_id checks", () => {
     expect(UserIdPattern.test('auth0|5f7c8ec7c33c6c004bbafe82')).to.be.true
     const withinLength = UserIdCases.filter(([candidate]) => candidate.length > 0 && candidate.length <= MaxUserIdChars)

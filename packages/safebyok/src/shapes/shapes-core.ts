@@ -29,9 +29,6 @@ export { epochMillis, type EpochMillis } from './primitives'
  * branded for its role, since nothing but safebyok makes one. A salt's check is its shape, text
  * that is not empty. Its length is judged where its wayin is, so a salt of the wrong length is a
  * damaged wayin while the vault's other wayin still opens.
- *
- * @example obj({ wayinkind: lit('passphrase'), salt_b64, vault_key_wayin_wrapped, ... })   // a record's fields, by the names they check
- * @example box_key_wrapped.parse(await wrapKeyUnder(vaultKey, boxKey, ctx))               // a BoxKeyWrapped, where the box record is made
  */
 export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1, Phrases.TokenMissing),
@@ -97,7 +94,6 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
  * @example whisper.parse({ apiKey: 'sk-ant-...' })      // an object passes through, copied
  * @example whisper.safeParse('sk-ant-...').success      // false: a whisper is an object -- { apiKey: 'sk-ant-...' }
  * @example whisper.safeParse(new Date()).success        // false: JSON would flatten it to {}
- * @example whisper.safeParse(undefined).success         // false: undefined cannot be stored
  * @example whisper.safeParse(null).success              // false: emptying a box is delBox's job
  * @example whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
  */
@@ -123,9 +119,7 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
  * keys storage reorders still opens. safebyok never looks inside it: check its shape before
  * `putBox()`. Its `parse` refuses 'bad_option', as `putBox()` does.
  *
- * @example sidecar.parse({ note: 'work account', project: 'atlas' })
- * @example sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
- * @example sidecar.safeParse('work account').success           // false: a sidecar is an object -- { note: 'work account' }
+ * @example sidecar.safeParse('work account').success  // false: a sidecar is an object -- { note: 'work account' }
  */
 export const sidecar = Checker(() => whisperBag, 'bad_option')
 export type Sidecar = Z.infer<typeof sidecar>
@@ -137,8 +131,7 @@ export type Sidecar = Z.infer<typeof sidecar>
  * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
  * passes as its scope. Being a copy, no one it is handed to can change it for everyone else.
  *
- * @example CX.vaultScope.parse(vault)                                   // { applabel, user_id, vaultlabel }, frozen
- * @example CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' })          // throws 'bad_scope', "boxlabel: A label is ..."
+ * @example CX.vaultScope.parse(vault)  // { applabel, user_id, vaultlabel }, frozen
  */
 export const { bankScope, vaultScope, boxscope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
   const bankScope  = obj({ applabel, user_id })
@@ -160,9 +153,7 @@ export type Boxscope = Z.infer<typeof boxscope>
  * BankVault, and leaves the rest. A store in the scope refuses: it belongs in the
  * second bag, the options, and would be dropped unseen here.
  *
- * @example bankedVaultScope.parse({ vaultlabel: 'main' })                   // { vaultlabel: 'main' }
- * @example bankedVaultScope.parse(vault)                                    // { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
- * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })          // throws 'bad_scope': stores go in the second bag
+ * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws 'bad_scope': stores go in the second bag
  */
 export const bankedVaultScope = Checker(({ obj, applabel, user_id, vaultlabel }) => {
   const store = never(Phrases.StoreInVaultScope).optional()

@@ -5,7 +5,6 @@
 /** Set `obj[ckey]` to `val`, hidden, and return `val`.
  * - Hidden properties are not enumerable, so `Object.keys`, a `...` spread, console.log, and `JSON.stringify` pass by them.
  *
- * @example adorn(wayin, 'vault', vault)   // => vault; JSON.stringify(wayin) leaves it out
  * @example get wayinCtx() { return adorn(this, 'wayinCtx', wayinCtxOf(this)) }   // "memoized": worked out once, every following read returns the same value
  */
 export function adorn<VT>(obj: object, ckey: string, val: VT): VT {
@@ -13,10 +12,7 @@ export function adorn<VT>(obj: object, ckey: string, val: VT): VT {
   return val
 }
 
-/** Add properties of `hidden` to `obj` as a hidden property; return `obj`.
- *
- * @example decorate(proving, { vault, header })   // proving.vault reads; JSON.stringify(proving) leaves both out
- */
+/** Add properties of `hidden` to `obj` as a hidden property; return `obj`. */
 export const decorate = <OT extends object>(obj: OT, hidden: Partial<OT>): OT => {
   for (const [ckey, val] of Object.entries(hidden)) {
     adorn(obj, ckey, val)
@@ -46,7 +42,6 @@ export function tattoo<BT extends object>(obj: object, shown: BT, opts: TattooOp
 
 /** Set `obj[propname]` to `val`, enumerable+readonly, and return `val`. Use `{configurable: false}` to make it truly immutable.
  * {@link tattoo} defines those terms.
- * @example tattooProp(this, 'vault_tok', vault_tok)   // => vault_tok; this.vault_tok is now readonly and visible
  */
 export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: TattooOpts = {}): VT {
   Object.defineProperty(obj, propname, { value: val, enumerable: true, writable: opts.writable ?? false, configurable: opts.configurable ?? true })
@@ -58,8 +53,6 @@ export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: Tat
 
 /** Yield to the end of the current microtask queue: what was queued before the call runs before it resolves.
  * Await it to batch requests made in the same task.
- *
- * @example await nextMicrotask()   // every promise settled earlier in this task has run its handlers
  */
 export function nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }
 // --

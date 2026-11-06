@@ -59,10 +59,7 @@ export const worldVaultRow = (): VaultRecord => ({
   },
 })
 
-/** A full box record that passes `boxRecord`, in {@link WorldVault}: revision 1 of the box `anthropic_api_key`, of the life `box-tok-a`, alive, registered and written at {@link T0}, its sealed parts the fake ciphered bags that open under no key. `overrides` says otherwise.
- *
- * @example fullBoxRecord({ boxlabel: 'openai_api_key', revision_seq: 3, sidecar: { note: 'work' } })
- */
+/** A full box record that passes `boxRecord`, in {@link WorldVault}: revision 1 of the box `anthropic_api_key`, of the life `box-tok-a`, alive, registered and written at {@link T0}, its sealed parts the fake ciphered bags that open under no key. `overrides` says otherwise. */
 export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => ({
   ...WorldVault.scope,
   boxlabel:               'anthropic_api_key',
@@ -82,15 +79,11 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
   ...overrides,
 })
 
-/** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise; a sidecar or sealed part it names is stripped.
- *
- * @example sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
- */
+/** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise; a sidecar or sealed part it names is stripped. */
 export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => VX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
 
 /** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x' for a deletion or 'd' for damage, and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`.
  *
- * @example tombstoneBoxRecord({ revision_seq: 2 })        // a deleted box
  * @example tombstoneBoxRecord({ revision_seq: 2 }, 'd')   // an entry of a `damaged_records`
  */
 export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' | 'x' = 'x'): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am })
@@ -451,10 +444,7 @@ const testableOf = (box: Box): TestableBox => {
 
 const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null ? null : testableOf(box))
 
-/** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes.
- *
- * @example const listing = boxListingOf(mw, { maxMillisSinceRefresh: 1000 })
- */
+/** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes. */
 export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}): TestableBoxListing => (
   new TestableBoxListing({
     world:                 mw.world,
@@ -469,7 +459,6 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
 
 /** A {@link boxListingOf} whose sealed parts are fake bags named for the revision, `duringSeal` running after the real seal.
  *
- * @example const box = await fakeSealBoxListingOf(mw).build(mw.tombstoneBoxRecord({ revision_seq: 2 }))   // then box.put({ whisper: { apiKey: 'sk-test' }, sidecar: {} }) is its rebirth
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
@@ -484,10 +473,6 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxList
 
 // == [Dna]: boxDnaOf
 
-/** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them.
- *
- * @example await boxListingOf(mw).create(boxDnaOf(mw.boxscope('anthropic_api_key')))
- * @example boxDnaOf(mw.boxscope('anthropic_api_key'), { sidecar: { account: 'work' } })
- */
+/** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them. */
 export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: { apiKey: 'sk-test-0000' }, sidecar: {}, ...overrides })
 // --

@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as PX from '../../src/shapes/primitives'
+import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
+import * as Phrases from '../../src/helpers/phrases'
 import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, verifyConsistent } from '../../src/helpers/validator'
 import { type RefusalKind, VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
@@ -42,7 +45,7 @@ describe("Checkers", () => {
   // Checkers @example 1
   it("refuses a scope with a bad name as its call's kind, naming the field", () => {
     const err = TH.expectSyncRefusal(() => vaultScope.parse({ ...scope, vaultlabel: 'Main' }), 'bad_scope')
-    expect(err.message).to.match(/^vaultlabel: A label is lowercase words/)
+    expect(err.message).to.match(/^vaultlabel: A label is lowercase letters, digits and single underscores/)
     expect(err.meta?.fieldnames).to.deep.equal(['vaultlabel'])
   })
 
@@ -50,7 +53,6 @@ describe("Checkers", () => {
     expect(vaultScope.parse({ ...scope, vault_tok: 'tok', lock: () => null })).to.deep.equal(scope)
   })
 
-  // Checkers @example 2
   it("refuses an unknown field in a slice made in the call", () => {
     expect(boxSparse.parse(sparse)).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
@@ -58,7 +60,7 @@ describe("Checkers", () => {
     TH.expectSyncRefusal(() => boxRecord.parse(sparse), 'bad_record')
   })
 
-  // Checkers @example 3
+  // Checkers @example 2
   it("spreads a module of validators into the kit, and a nested one refuses with the outer call's kind", () => {
     expect(vaultRecord.parse({ ...scope, gate_epoch: 1, gate })).to.deep.equal({ ...scope, gate_epoch: 1, gate })
     expect(vaultRecord.parse({ ...scope, gate_epoch: 0, gate: null }).gate).to.be.null
@@ -267,11 +269,12 @@ describe("Checkers", () => {
 
 describe("Checker", () => {
   // Checker @example 1
-  it("makes one validator, refusing 'bad_record' unless given a kind", () => {
-    const boxDamaged = Checker(({ obj, oneof, boxlabel, str }) => obj({ boxlabel, revision_tok: str.nullable(), damage: oneof(['damaged', 'newer_format']) }).strict())
-    expect(boxDamaged.parse({ boxlabel: 'openai', revision_tok: null, damage: 'damaged' })).to.deep.equal({ boxlabel: 'openai', revision_tok: null, damage: 'damaged' })
-    const err = TH.expectSyncRefusal(() => boxDamaged.parse({ boxlabel: 'openai', revision_tok: null, damage: 'lost' }), 'bad_record')
-    expect(err.meta?.fieldnames).to.deep.equal(['damage'])
+  it("checks a value whole, refusing with a sentence of its own as a bad record unless given a kind", () => {
+    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)))
+    const salt = toB64(new Uint8Array(PasskeySaltBytes).fill(7))
+    expect(prfSalt.parse(salt)).to.eq(salt)
+    const err = TH.expectSyncRefusal(() => prfSalt.parse(toB64(new Uint8Array(PasskeySaltBytes - 1))), 'bad_record')
+    expect(err.message).to.eq(Phrases.prfSaltNotFresh(PasskeySaltBytes))
   })
 
   // Checker @example 2
@@ -355,7 +358,6 @@ describe("objCheck", () => {
 })
 
 describe("consistent", () => {
-  // consistent @example 1
   it("is true for a record naming the same app, user and vault as a scope, whatever else it holds", () => {
     expect(consistent({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, TH.scopeOf('u1'))).to.be.true
   })
@@ -366,7 +368,7 @@ describe("consistent", () => {
     expect(consistent({ ...TH.scopeOf('u1'), applabel: 'other' }, TH.scopeOf('u1'))).to.be.false
   })
 
-  // consistent @example 2
+  // consistent @example
   it("is true when no field is defined in both", () => {
     expect(consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })).to.be.true
   })
@@ -386,7 +388,6 @@ describe("demandConsistent", () => {
 })
 
 describe("verifyConsistent", () => {
-  // verifyConsistent @example
   it("returns the bag when each field both define is ===", () => {
     const bag = { ...sparse }
     expect(verifyConsistent(bag, scope, { kind: 'vault_mismatch' })).to.eq(bag)

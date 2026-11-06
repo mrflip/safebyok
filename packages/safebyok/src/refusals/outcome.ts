@@ -17,16 +17,10 @@ export type GoodOutcome<ValT> = { ok: true, val: ValT, err?: never }
 /** The outcome of a call that was refused, its refusal as `err`. */
 export type BadOutcome = { ok: false, val?: never, err: VaultError }
 
-/** `val` as the outcome of a call that succeeded.
- *
- * @example good(vaultRecord)  // { ok: true, val: vaultRecord }
- */
+/** `val` as the outcome of a call that succeeded. */
 export const good = <ValT>(val: ValT): GoodOutcome<ValT> => ({ ok: true, val })
 
-/** `err` as the outcome of a call that was refused.
- *
- * @example bad(lockedError())  // { ok: false, err }
- */
+/** `err` as the outcome of a call that was refused. */
 export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
 
 /** The outcome of `thunk`, a body that refuses by throwing: what it returns as a good outcome, what it throws as a bad one. Never rejects.
@@ -40,8 +34,6 @@ export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
  * @example
  *   const { ok, val, err } = await outcomeOf(() => fetchBackup(vaultlabel), storageUnavailable)
  *   if (! ok) { showGripe(err.message) }
- * @example await outcomeOf(() => parseImport(file))   // a TypeError thrown: err.refusalkind 'unexpected_error', err.cause the TypeError
- * @example await outcomeOf(() => { throw new Error('socket closed') }, storageUnavailable)  // err.refusalkind 'storage_unavailable', err.cause the Error
  */
 export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwise: (thrown: unknown) => VaultError = unexpectedError): Promise<Outcome<ValT>> => {
   try {
@@ -67,26 +59,13 @@ export const storageTroubleOf = (thrown: unknown): VaultError => (isVaultError(t
  * body (a TypeError, a rejection that is no refusal) reaches the caller as a VaultError, never raw,
  * and every refusal passes untouched. Its `try` twin is one `outcomeOf` over the throwing form.
  *
- * @example
- *   async cipheredWith(serialized: Uint8Array, visible: BoxSparse): Promise<BoxCiphered> {
- *     try {
- *       // ...the body, which throws its refusals
- *     } catch (err) {
- *       throw refusalOf(err)
- *     }
- *   }
- * @example refusalOf(new VaultError('vault_locked', 'The vault is locked.'))   // that VaultError, as it came
- * @example refusalOf(new TypeError('ctx is not a function'))   // a VaultError 'unexpected_error', the TypeError its cause
+ * @example catch (err) { throw refusalOf(err) }   // the last catch of a throwing form
  */
 export const refusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : unexpectedError(thrown))
 
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *
  * @example const listed = valOf(await vaultDB.tryGetVault(scope))  // throws the refusal, if any: what vaultDB.getVault(scope) does itself
- * @example
- *   protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
- *     return valOf(await this.inner.tryGetBox(scope, boxlabel, expected))   // or this.inner.getBox(...), which throws the same
- *   }
  */
 export const valOf = <ValT>(outcome: Outcome<ValT>): ValT => {
   if (! outcome.ok) { throw outcome.err }

@@ -58,8 +58,6 @@ const DefaultVerdict: PassphraseVerdict = Object.freeze({
 
 /** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.
  * Its reason tells the app's makers where to look. It logs nothing.
- *
- * @example DefaultStrengthChecker('correct horse battery staple')   // { strong: false, reason: "This app can't take a new passphrase yet: ..." }
  */
 export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 
@@ -71,9 +69,6 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
  * answer that is no verdict, and 'unexpected_error' for a throw, carrying nothing of it, as the
  * checker heard the passphrase. `load` refuses a failure 'unexpected_error', its cause the throw,
  * as it heard nothing.
- *
- * @example invokeStrengthChecker(zxcvbnStrengthChecker, scope)('')   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
- * @example invokeStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: kind bad_option
  */
 export const invokeStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
   // Frozen, so the host's checker can change nothing of what it is told.
@@ -96,10 +91,7 @@ export const invokeStrengthChecker = (hostChecker: StrengthChecker, scope: Vault
   return decorate(check as GuardedStrengthChecker, { load: () => loadStrengthChecker(hostChecker) })
 }
 
-/** Run `hostChecker`'s `load`, if it has one, refusing a failure 'unexpected_error' with what it threw as the cause.
- *
- * @example await loadStrengthChecker(zxcvbnStrengthChecker)   // the zxcvbn chunk fetched, or 'unexpected_error'
- */
+/** Run `hostChecker`'s `load`, if it has one, refusing a failure 'unexpected_error' with what it threw as the cause. */
 export const loadStrengthChecker = async (hostChecker: StrengthChecker): Promise<void> => {
   try {
     await hostChecker.load?.()

@@ -31,16 +31,12 @@ import type * as SX from '../shapes/shapes-storage'
  *
  * @example
  *   try { return await client.query(text, params) } catch (err) { throw storageUnavailable(err) }
- * @example throw storageUnavailable(err, "This device's own storage failed reading its mark of this vault: try again.")
  */
 export const storageUnavailable = (cause: unknown, message: string = Phrases.StorageUnavailable): VaultError => (
   new VaultError('storage_unavailable', message, { cause: cause ?? new Error(Phrases.NoErrorGiven) })
 )
 
-/** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it.
- *
- * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
- */
+/** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it. */
 export const unexpectedError = (thrown: unknown): VaultError => (
   new VaultError('unexpected_error', Phrases.UnexpectedError, { cause: thrown ?? new Error(Phrases.NothingThrown) })
 )

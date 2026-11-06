@@ -43,7 +43,6 @@ export const spyLogger = () => {
  * {@link spyLogger}'s logger in its place.
  *
  * @example const vault = await TH.settledVault(TH.memoryVaultOpts())  // logs nowhere, warns as a host would see it
- * @example const vault = await TH.settledVault(TH.memoryVaultOpts({ logger: TH.spyLogger().logger }))  // keeps every call, prints none
  */
 export const quietLogger: VaultLogger = {
   log:   () => { /* kept out of the test output */ },
