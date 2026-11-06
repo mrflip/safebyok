@@ -145,7 +145,7 @@ Operates on it without holding it: nothing; a passphrase has no handle form.
 
 **Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
 `bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt`,
-`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswer`, `isSafelyAllZero`),
+`attemptPasskey` → `checkedPasskeyAnswer` (`passkeyAnswer`, whose `prfBytes` check refuses all-zero bytes by an inline `reduce`),
 `checkFreshSalt`, `checkNewPasskey` → `#initializeGate`, `#unlockByPasskey`, `#putPasskey` →
 `PasskeyProving.seal` → `deriveWrappingKey` (`subtle.importKey` as HKDF input, then
 `subtle.deriveKey`), and `prfBytes.fill(0)`; or, for an attempt that never sealed it,
@@ -297,13 +297,15 @@ kept: the unwrap that proves a wayin (`Proving.checkOpens`, `wrongProof`), the u
 vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a whisper
 (`Lease.#opened`, `damaged_box`). Each such catch holds only WebCrypto calls, their ctx built before
 it, so a bug in building the ctx never reads as a wrong proof or a damaged box. Where no wrong key or
-altered record can explain a failure, a WebCrypto error is not caught where it is thrown: sealing a
-whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
-(`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`) and making a wayin or a lease from a proving
+altered record can explain a failure, a WebCrypto error is not caught where it is thrown: in sealing
+a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
+(`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`) or making a wayin or a lease from a proving
 (`Proving.buildWayin`, `Proving.buildLease`: `makeVaultKey`, and the unwrap and wrap of a vaultKey
-already proved) let it reach the verb's `outcomeOf`, which makes it an `unexpected_error` with the
-DOMException as its `cause`. That keeps no secret: a WebCrypto error carries a name and a message,
-never key material. A device-store failure's cause never crosses to the host: `storeFailed`
+already proved). A grant or a wayin runs inside the gating's `outcomeOf`, which makes the error an
+`unexpected_error` with the DOMException as its `cause`. A seal's error reaches the host as thrown
+from `putBox`, `box.put` or `putExposed`. From their `try*` forms, `outcomeOf` makes it an
+`unexpected_error` with the DOMException as its `cause`. Either way it keeps no secret: a WebCrypto
+error carries a name and a message, never key material. A device-store failure's cause never crosses to the host: `storeFailed`
 (`refusals/throwers.ts`, by `DeviceDB`'s `adapted`) keeps neither what the store threw nor its message,
 only its `name`, as a `DeviceDB` is handed every lease record and the logger hands a condition to the
 host whole (`tests/storage/device-db-new.test.ts`, *a deviceDB whose store throws*). `unexpectedError` keeps a foreign throw
