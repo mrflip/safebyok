@@ -1,7 +1,10 @@
-# Sprint reform: holding for merges (2026-11-06, 13:10)
+# Sprint reform: holding for a restack (2026-11-06, 16:15)
 
-Third pause of the day, the lightest: every planned thread but the last is merged or filed, and the last waits on
-two merges.
+Third pause of the day: every planned thread but the last is merged or filed, and the last waits on two merges.
+At 16:10 the merge watcher timed out: #557 and #555 were still open. **The stack #550, #552, #553, #557 and the
+sprint PR #516 are all DIRTY against main**: #548 and #549 (threads 21 and 22) merged under them and touch the same
+kind files, so Mergify cannot take them. The line needs the restacker, which refuses model invocation; the
+`/restacker` line is in chat.
 
 ## Filed and merged
 

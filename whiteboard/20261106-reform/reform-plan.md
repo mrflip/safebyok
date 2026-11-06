@@ -10,7 +10,7 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 13:05, **holding for merges**: threads 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550)
+**Status:** 2026-11-06, 16:15, **holding for a restack** (the stack 6 to 9 and #516 are dirty against main since #548 and #549 merged; the Coach runs `/restacker`): threads 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550)
 -> 7 (#552) -> 8 (#553) -> 9 (#557) is filed and merging. Thread 10 (`kindvals_smush`, a repo-wide rename of the kind
 names) is the last of the plan and waits until #557 and the vaultdb_cleanup sprint's #555 (which rewrites the refusal and
 storage files) are both on main, then is cut from main. Open: #516 (this PR), the Closer Look triage, two Open Matters
