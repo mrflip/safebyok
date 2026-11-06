@@ -137,6 +137,7 @@ export type StorableOpts = Z.infer<typeof storableOpts>
 /** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: an object. */
 export const world = objCheck(() => ({}), { refusalkind: 'bad_option', extras: 'strip' })
 
+// Not `Z.infer<typeof world>`: that is `Record<string, never>`, which no `World & {...}` below would admit.
 /** The world a listing lives in: the vault for boxes, the bank for vaults. */
 export type World = object
 
