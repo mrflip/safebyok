@@ -136,10 +136,10 @@ type's name with the first letter lowered: lowerCamelCase beside its ModuleCase 
 BoxSparse = Z.infer<typeof boxSparse>`. A host writes `import { boxSparse, type BoxSparse } from
 'safebyok'` and calls `boxSparse.parse(row)`.
 
-**A validator takes no `Shape` suffix**: `localVaultDBOpts`, not `localVaultDBOptsShape`. The five
+**A validator takes no `Shape` suffix**: `localVaultDBOpts`, not `localVaultDBOptsShape`. The four
 public checks of a host's code are the exception (`shapes/host-code.ts`): `vaultDBShape`,
-`deviceDBShape`, `clockShape`, `keyDeriverShape` and `loggerShape` keep it, so `vaultDB`,
-`deviceDB`, `clock`, `keyDeriver` and `logger` stay free for the locals and options that want
+`deviceDBShape`, `keyDeriverShape` and `loggerShape` keep it, so `vaultDB`, `deviceDB`,
+`keyDeriver` and `logger` stay free for the locals and options that want
 them. An in-package validator, one the main entry does not export, follows the rule where its
 plain name collides with nothing (`BX.made`), and keeps the suffix, under the same exception,
 where it would: idb.ts's and string-store.ts's `listenerShape` sits beside the `listener` it
@@ -253,7 +253,7 @@ The tag smushing above is for a label that names a thing (`boxlabel`).
 
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`), in a stored
 record, a snapshot, a test fixture and the demo alike: never an ISO string, never a `Date`. The
-clock seam (`Clock.now()`) already yields it, every index sorts it, and one convention means no
+package's clock (`nowMillis()`, which reads `Date.now()`) already yields it, every index sorts it, and one convention means no
 parsing at any boundary. A field named `*_at` holds one, checked by `epochMillis`.
 
 Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obvious: `title`, not
@@ -386,8 +386,8 @@ a refusal with a `kind` the caller can branch on.
 
 **A constructor validates its arguments**, in a parse as its first line, even when the `make` or
 `build` that calls it parsed them already: it is an entry point of its own. An instance among them
-(a listing, a clock) is checked by a custom instanceOf checker rather than a description of its
-shape, and a VaultDB or DeviceDB, which may come from another copy of the package, by its brand.
+(a listing) is checked by a custom instanceOf checker rather than a description of its shape, and a
+VaultDB or DeviceDB, which may come from another copy of the package, by its brand.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
 handed, and checks it, in one parse: `const { applabel, user_id } = CX.bankScope.parse(thing)`,

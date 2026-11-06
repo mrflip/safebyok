@@ -1,4 +1,5 @@
 import { FarFuture, FarPast, MinuteMillis } from '../helpers/consts'
+import { nowMillis } from '../helpers/clock'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
@@ -8,7 +9,7 @@ import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { LockState } from '../shapes/shapes-enums'
-import { type Clock, wallClock, type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
+import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseSparse } from '../shapes/shapes-storage'
 import type { RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
@@ -24,13 +25,12 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
 export class Bank implements VaultWorld {
-  // == [Props]: applabel, user_id, scope, device_id, clock, keyDeriver, deviceDB, logger, requestCleartext, strengthChecker, leaseMillis, onPanic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, requestCleartext, strengthChecker, leaseMillis, onPanic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #lastHello, #snapshot, #getSnapshot, #subscribe
 
   declare readonly applabel: string
   declare readonly user_id:  string
   readonly scope:            BankScope
   readonly device_id:        string
-  readonly clock:            Clock
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
@@ -78,11 +78,10 @@ export class Bank implements VaultWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     VX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
+    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.device_id = device_id
-    this.clock = clock
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
     this.onPanic = onPanic
@@ -147,7 +146,7 @@ export class Bank implements VaultWorld {
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
    */
   async autolock(): Promise<void> {
-    const cutoff = Math.floor(this.clock.now() - this.leaseMillis)
+    const cutoff = Math.floor(nowMillis() - this.leaseMillis)
     const oldRows = await this.#scanOwnLeasesProvedBefore(Math.max(FarPast, cutoff))
     for (const row of oldRows) {
       const listed = this.#vaultListing.at(row)

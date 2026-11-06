@@ -1,4 +1,5 @@
 import { isEqual } from 'es-toolkit'
+import { nowMillis } from '../helpers/clock'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -183,14 +184,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const { central, policy } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
     const isTaken = central !== this.#central
     if (isTaken) { this.adopt(central) }
-    if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
+    if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = nowMillis() }
     return isTaken ? this.settle() : { badnews: [] }
   }
 
   /** A tombstone made here, from the sparse props held, under `revision`, written now. */
   protected tombstoneFor(revision: Revision): Tombstone<SparseT> {
     const { revision_tok, revision_seq } = revision
-    return { ...this.sparse, revision_tok, revision_seq, written_at: this.world.clock.now(), am: 'x' }
+    return { ...this.sparse, revision_tok, revision_seq, written_at: nowMillis(), am: 'x' }
   }
   // --
 
@@ -298,7 +299,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get isTimely(): boolean { return this.#isRefreshedWithin(this.#horizonMillis) }
 
   #isRefreshedWithin(maxMillis: number): boolean {
-    return this.#refreshedAt !== null && this.world.clock.now() - this.#refreshedAt < maxMillis
+    return this.#refreshedAt !== null && nowMillis() - this.#refreshedAt < maxMillis
   }
 
   /** The record in hand is not a tombstone: the thing is not gone. */

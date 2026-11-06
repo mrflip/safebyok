@@ -1,11 +1,11 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the watch on storage, and every storage call made for that kind of thing. */
 
 import { verifyConsistent } from '../helpers/validator'
+import { nowMillis } from '../helpers/clock'
 import { IsListing } from '../helpers/consts'
 import { VaultError, isVaultError } from '../refusals/errors'
 import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db-new'
 import type { IfAbsent, LockState } from '../shapes/shapes-enums'
-import type { Clock } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
@@ -43,9 +43,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Getters]: clock, things, snapshot, getSnapshot, subscribe
-
-  get clock(): Clock { return this.world.clock }
+  // == [Getters]: things, snapshot, getSnapshot, subscribe
 
   get things(): readonly ThingT[] { return [...this.#things.values()] }
 
@@ -186,7 +184,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected async delOver(sparse: SparseT): Promise<ThingT | null> {
     this.demandEnabled()
     const prior = SX.revisionOf(sparse)
-    const tombstone = { ...sparse, ...SX.nextRevisionOf(prior, this.clock.now()), am: 'x' as const }
+    const tombstone = { ...sparse, ...SX.nextRevisionOf(prior, nowMillis()), am: 'x' as const }
     return this.deliver(await this.tryDelRow(tombstone, { prior }))
   }
   // --

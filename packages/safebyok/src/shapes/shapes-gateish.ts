@@ -154,8 +154,8 @@ export type VaultStamp = Z.infer<typeof vaultStamp>
 
 // == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
-export const { provingWorld } = Checkers('bad_option', ({ obj, clockShape, keyDeriverShape, device_id }) => ({
-  provingWorld: obj({ clock: clockShape, keyDeriver: keyDeriverShape, strengthChecker, device_id }),
+export const { provingWorld } = Checkers('bad_option', ({ obj, keyDeriverShape, device_id }) => ({
+  provingWorld: obj({ keyDeriver: keyDeriverShape, strengthChecker, device_id }),
 }), [CX])
 
 export type ProvingWorld = Z.infer<typeof provingWorld>
@@ -225,7 +225,6 @@ export const leaseMillis = Checker(({ int, lit, union }) => union([int.positive(
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
-  clock:           CX.clockShape,
   logger:          CX.loggerShape,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,

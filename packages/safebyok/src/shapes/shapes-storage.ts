@@ -160,7 +160,7 @@ export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Check
   return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
 }, [CX])
 
-export const vaultDBOpts = objCheck(({ num }) => ({ clock: CX.clockShape.optional(), maxRecordBytes: num.positive().optional() }), 'bad_option')
+export const vaultDBOpts = objCheck(({ num }) => ({ maxRecordBytes: num.positive().optional() }), 'bad_option')
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape, maxBoxes: uint.optional() }), 'bad_option')
 
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>

@@ -1,5 +1,6 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
+import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
@@ -60,12 +61,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** A new life's stamp under `scope`, one per attempt to build a vault. */
   stampOfBirth(scope: VaultScope): VaultStamp {
-    return vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: this.clock.now() })
+    return vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: nowMillis() })
   }
 
   /** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
   recordOfBirth(gate: Gate, prior: SX.Revision): VaultRecord {
-    return { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...SX.nextRevisionOf(prior, this.clock.now()), gate: gate.pickle() }
+    return { ...gate.stamp, fmt: VX.VaultFormat, am: 'a', ...SX.nextRevisionOf(prior, nowMillis()), gate: gate.pickle() }
   }
   // --
 

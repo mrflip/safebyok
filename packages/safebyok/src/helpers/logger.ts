@@ -8,8 +8,8 @@ import { consoleLogger } from './console-logger'
  *
  * Each call has a plain-language `message`, a `story` of facts to filter on (`call` names the
  * vault call), and the error behind it, if any. The vault puts no whisper, passphrase, key,
- * ciphertext or option's value in any of the three. An error from the host's own code (its clock,
- * its storage adapter) goes as that code made it, so what it quotes is the host's to keep clean.
+ * ciphertext or option's value in any of the three. An error from the host's own code (its
+ * storage adapter) goes as that code made it, so what it quotes is the host's to keep clean.
  *
  * What a logger throws or rejects with is ignored. A logger typed `story?: Record<string, any>`
  * fits, and so does the console.

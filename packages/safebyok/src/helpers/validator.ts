@@ -28,7 +28,7 @@ export const Kit = {
   lazy:    Zod.lazy,
   /** A check Zod has no maker for, as a predicate: a CryptoKey, bytes of one length. */
   custom:  Zod.custom,
-  /** A function, as a host's verb or callback is checked, typed as the one meant: `fn<Clock['now']>()`. Nothing past its being one is judged. */
+  /** A function, as a host's verb or callback is checked, typed as the one meant: `fn<KeyDeriver['deriveKeyBytes']>()`. Nothing past its being one is judged. */
   fn:      <FnT = (...args: never[]) => unknown>() => Zod.custom<FnT>((candidate) => typeof candidate === 'function', Phrases.FunctionExpected),
   /** Bytes, a Uint8Array, judged by its tag, so bytes from another realm (an iframe, jsdom) pass where `instanceof` would refuse them; `bytes(32)` for exactly that many. */
   bytes:   (count?: number) => Zod.custom<Uint8Array>((candidate) => isBytes(candidate) && (count === undefined || candidate.length === count), Phrases.bytesExpected(count)),

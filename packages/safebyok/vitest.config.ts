@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     include:     ['tests/**/*.test.ts'],
     environment: 'node',
+    // Puts the package's clock back after each test, wherever a test set it.
+    setupFiles:  ['tests/vitest-setup.ts'],
     // Every spy is put back before each test, so no test inherits another's.
     restoreMocks: true,
     // Snapshots mirror the test tree under one hidden directory, rather than dropping a

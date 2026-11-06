@@ -161,12 +161,6 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(friend.cached).to.be.null
   })
 
-  it("throws a clock that throws, as a bug, and uncaches nothing", async () => {
-    const { friend } = await grantedWorld()
-    await expect(Lease.buildFromCache({ ...friend, clock: { now: () => { throw new Error('the clock broke') } } }, GrantedAs.gate_epoch)).rejects.toThrow('the clock broke')
-    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
-  })
-
   it("finds nothing past an autolock of Infinity: a lease cached long ago is in force", async () => {
     const friend = fakeLeaseFriendOf({ leaseMillis: Infinity })
     const lease = await makeGrantedLease(friend)

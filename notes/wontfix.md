@@ -98,8 +98,8 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **a put can land though its answer is lost.**
 * 2026-11-04 (the Coach, on `Lease.buildFromCache` rejecting where a clock throws): **anything to do with a host clock.**
-  `clock` exists only for test injection. A clock that throws, jumps or runs backward is undefined
-  behaviour. Today a throw rejects from whichever verb reads it first.
+  The package reads the device's clock, `Date.now()`; a host has none to pass, and a test sets it with
+  `_cheat_clock`. A device clock that jumps or runs backward is undefined behaviour.
 * 2026-11-05 (the Coach, on `box.put` answering `this`): **a box discarded while its own `put` is in flight answers itself, not the instance listed.**
   A box listing never replaces a held box, so `put` answers the instance it was called on. Only a `box.vacate()` or `box.sweep()`, or a
   `boxListing.hello` naming the box damaged, landing inside the put's `tryPutRow` empties the slot, and the delivery then lists a new instance.

@@ -4,7 +4,7 @@ import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import type { GatingKind, LockState } from '../shapes/shapes-enums'
-import type { Clock, VaultScope } from '../shapes/shapes-core'
+import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
@@ -47,11 +47,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #gate: { props: GateProps, gate: Gate } | null = null
   // --
 
-  // == [Getters]: fmt, clock, fullRecord, gate, boxListing
+  // == [Getters]: fmt, fullRecord, gate, boxListing
 
   get fmt(): number { return this.central.fmt }
 
-  get clock(): Clock { return this.world.clock }
 
   /** The full record in hand, what a gate change spreads into its params. */
   get fullRecord(): VaultRecord { return this.demandFullProps() }
@@ -248,12 +247,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   #makeFriend(): LeaseFriend {
-    const { world: { clock, logger, deviceDB, leaseMillis = DefaultLeaseMillis } } = this
+    const { world: { logger, deviceDB, leaseMillis = DefaultLeaseMillis } } = this
     const stamp = GX.vaultStamp.parse(this)
     const asked = this.#stampOfLife()
     return {
       ...stamp,
-      clock,
       logger,
       leaseMillis,
       lock:            () => { this.lock() },
