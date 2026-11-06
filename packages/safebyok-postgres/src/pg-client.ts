@@ -20,7 +20,8 @@ const isPgPool = (candidate: unknown): candidate is PgPool => (
 const pgPool = SX.Checker(({ custom }) => custom<PgPool>(isPgPool, 'Expected a pg Pool, with query and connect functions'), 'bad_option')
 // --
 
-const isRolledBack = async (conn: PgPoolClient): Promise<boolean> => {
+/** Rolls back `conn`'s transaction, answering false when even that failed. */
+const rollBack = async (conn: PgPoolClient): Promise<boolean> => {
   try {
     await conn.query('ROLLBACK')
     return true
@@ -44,7 +45,7 @@ export const pgClientOf = (given: PgPool): PostgresClient => {
         await conn.query('COMMIT')
         return done
       } catch (err) {
-        isBroken = ! await isRolledBack(conn)
+        isBroken = ! await rollBack(conn)
         throw err
       } finally { conn.release(isBroken) }
     },
