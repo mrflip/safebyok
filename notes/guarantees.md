@@ -317,10 +317,10 @@ over a whole object runs only once its fields pass, so the sweep does not reach 
 replaced, never kept as a `cause`, by the wraps `Bank`'s constructor makes of them: `guardKeyDeriver`'s
 `deriveKeyBytes` (`models/proving.ts`, `keyDeriverThrew`), `guardStrengthChecker` (`helpers/passphrase-strength.ts`)
 through `HostErrorSanitizer.refusalFor`, and `guardRequestCleartext` (`models/bank.ts`), which drops the throw and
-answers false, for `Gating.#askHost` to refuse as `requestCleartextThrew`, `unexpected_error`. A `keyDeriver`'s
-`load`, which hears no passphrase, keeps its throw as the cause of `keyDeriverLoadFailed`. The gating's
+answers false, for `Gating.#askHost` to refuse as `requestCleartextThrew`, `unexpected_error`. The gating's
 `checkedClears` does the same for a getter or proxy of the host's that throws as an attempt's clears are read:
-`clearsThrew`, `unexpected_error`, with no cause; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`). A WebCrypto
+`clearsThrew`, `unexpected_error`, with no cause; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`).
+A `keyDeriver`'s `load`, which hears no passphrase, keeps its throw as the cause of `keyDeriverLoadFailed`. A WebCrypto
 failure that a wrong key or an altered record explains is caught and replaced, its error never
 kept: the unwrap that proves a wayin (`Proving.checkOpens`, `wrongProof`), the unwrap of a lease's
 vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a whisper
