@@ -7,12 +7,14 @@ look things up here; they do not read it whole.
 
 ## State (2026-11-06)
 
-* Thread 1 `vocab_sweep`: PR #518 reviewed `flagged`; a rework worker corrects four facts (plan, thread 1 *Review*).
+* Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: PR #517 reviewed `flagged`; a rework worker corrects G8's route sentence in #511 and #517,
   and lands the Cleanup calls F4, F6, F7, F10.
-* Thread 3 `example_pointers`: building, cut from main at #514's merge (3d95d186e).
-* Threads 4 to 10 wait for PRs #511 and #513 to merge (plan, *Ground rules* 1). The Coach is reworking the mergify queue
-  (2026-11-06); the sprint proceeds without the merges where it can.
+* Thread 3 `example_pointers`: ready, PR #522, in review (low).
+* Thread 4 `hello_listed`: building, stacked on #513's tip (18a86b35a).
+* Threads 5 to 10 wait for PRs #511 and #513 to merge, or stack on them: the Coach is reworking the mergify queue
+  (2026-11-06) and said to proceed without the merges where possible. Thread 5 is cut from #511 rebased onto #513's line
+  if they are still unmerged when thread 4 files.
 
 ## Facts the threads start from
 
@@ -28,6 +30,14 @@ look things up here; they do not read it whole.
 * **Fenced off**: both `absentBox`es and `storeFailed`; `weakPassphrase` stays.
 
 ## Discoveries
+
+*Orchestrator, from thread 3 (#522):* `FarFuture` and `ForeverMillis` in `helpers/consts.ts` describe `ask_passphrase_at`
+and a gating's `leaseMillis`, which the core lacks (`autolockMinutes` is the option; `ForeverMillis` is unused in src).
+**For thread 5:** rewrite or retire them with the clock. #511 adds a `VaultError` example calling `vault.getWhisper`,
+which the core lacks: thread 5 fixes it as thread 3 fixed `isVaultError`'s (`box.extractWhisper()`, a valid label).
+Thread 1's second review: `Storable.#isEnabled`'s comment and `isEnabled`'s doc block say a delete disables the object
+(only a sweep or a vacate does); `refusals/errors.ts`'s `damaged_box` comment describes the `damaged_row` case. **For
+thread 5** too, being in those files.
 
 *Orchestrator, from thread 2 (#517):* guarantees.md's old-core clauses (G1, G2, G4, G6, G9, the secret-values table, the
 access chains, the minimal-path paragraph, open item 1) name sites that live only in safebyok-old: a follow-up thread, not

@@ -10,7 +10,8 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, later: threads 1 (#518) and 2 (#517) reviewed `flagged`, rework workers running; thread 3 cut from main (#514 merged) and building; threads 4 to 10 wait for PRs #511 and #513 to
+**Status:** 2026-11-06, later: thread 1 (#518) filed; thread 2 (#517) reworked, in its second review; thread 3 (#522)
+ready and in review; thread 4 building, stacked on #513 (the Coach: proceed without the merges where possible); threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
 ## Read first
@@ -78,6 +79,10 @@ vaultDB); a deleted vault's object keeps its slot and refuses `vault_gone`, not 
 unsealable or undecodable whisper, a bad row is `damaged_row` or `newer_format`; a `revision_tok` moves on put or del.
 Left as minor: names ahead of thread 10 and #511; undefined `added`/`revoked`/`tidied`; two dropped clauses; "ask" as a
 verb (Open Matters); the deviceId sentence for a host-given `device_id` (Open Matters).
+*Second review (high):* `fixed`; the five corrections hold against the code; one fix (a box, not a whisper, is what
+will not unseal). Left: the vault row's "next life" sentence is loose for a vacate, and names no sweep (Open Matters,
+with the lifecycle wording). Outside scope: stale comments in `storable.ts` and `errors.ts` (Cleanup, to thread 5).
+**Filed** at e9b58da04, rebased onto main at #515's merge.
 
 ### 2. `guarantees_pass`
 
@@ -116,6 +121,11 @@ drop the example where no test is worth writing, saying so. Fix `isVaultError`'s
 calls `vault.getWhisper('ANTHROPIC_API_KEY')`, which the core lacks, and the label fails `label`; use a real call and a
 label that passes. **Levels:** worker `sonnet`; review `low`. **Depends on:** #514 merged. **Size:** small.
 
+*Built (PR #522):* thirteen lacked a pointer, not fourteen (`VaultLogger`'s are 1 and 2). Eight pointers on existing
+tests, five new tests (`capacity` had none), two examples dropped (`FarFuture`, `ForeverMillis`: they read options the
+core lacks; patch changeset), `isVaultError`'s example on `box.extractWhisper()`, and `PasskeyAnswer`'s stale example and
+sentence corrected. Its leftovers went to Cleanup *Finally* as directives for thread 5.
+
 ### 4. `hello_listed`
 
 **The Coach:** "boxListing.hello's listed argument going internal".
@@ -125,7 +135,8 @@ because `hello` is a public method on a class the README names. Take `listed` of
 nothing, and the listing receives the boxes by a non-public path (a `#`-private or a method the vault listing calls with
 a name that says it is not for hosts). Then the second parse goes. The test "refuses a boxListing.hello given a list that
 fails its check" goes with the argument, or moves to the vault's hello. Minor changeset: a public signature changed.
-**Levels:** worker `sonnet`; review `low`. **Depends on:** #513 merged. **Size:** small.
+**Levels:** worker `sonnet`; review `low`. **Depends on:** #513 merged; cut stacked on #513's tip instead (the Coach,
+2026-11-06: "Proceed as well you can without it"). **Size:** small.
 
 ### 5. `module_clock`
 
