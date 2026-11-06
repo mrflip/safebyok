@@ -34,7 +34,7 @@ describe("bank.autolock", () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const fresh = world.bankOn({ requestCleartext })
     const scan = vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore')
     const tryVacate = vi.spyOn(world.deviceDB, 'tryVacate')
@@ -78,7 +78,7 @@ describe("bank.autolock", () => {
 
   it("past autolock, a lease held stays held: ensureUnlocked looks at no row, erases nothing and asks nothing", async () => {
     const world = makeBankWorld()
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { vault } = await makeBankWithVault(world, { requestCleartext })
     requestCleartext.mockClear()
     world.advance(AutolockMillis + 1)
@@ -111,7 +111,7 @@ describe("bank.autolock", () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const fresh = world.bankOn({ requestCleartext })
     await fresh.hello()
     await fresh.autolock()
@@ -286,7 +286,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     let closeDialog: () => void = vi.fn()
     const bank = world.bankOn({ requestCleartext: async (gating) => {
       await new Promise<void>((resolve) => { closeDialog = resolve })
-      await gating.attempt(byPassphrase(Passphrase) as never)
+      await gating.attempt(byPassphrase(Passphrase))
     } })
     await bank.hello()
     const asking = bank.ensureVault(VaultScopeGiven)
@@ -359,7 +359,7 @@ describe("a bank past a vacate", () => {
       world.vaultDB._cheat_refuseGets(null)
     }],
   ] as const)("refuses ensureVault and vaultAt with BankHelloFirst and opens no gating, after %s, and a hello answers the stored vault with nobody asked", async (_label, vacating) => {
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { requestCleartext })
     requestCleartext.mockClear()
     await vacating({ world, bank, vault })

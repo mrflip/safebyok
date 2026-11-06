@@ -188,7 +188,7 @@ describe("bank.ensureVault", () => {
     let closeDialog = nothing
     const bank = world.bankOn({ requestCleartext: async (gating) => {
       await new Promise<void>((resolve) => { closeDialog = resolve })
-      await gating.attempt(byPassphrase(Passphrase) as never)
+      await gating.attempt(byPassphrase(Passphrase))
     } })
     await bank.hello()
     const asking = bank.ensureVault(VaultScopeGiven)
@@ -296,7 +296,7 @@ describe("'identity_revoked' and bad news", () => {
 
   it("with no strengthChecker, finds every new passphrase weak, its reason sending the app's makers to CUSTOMIZATION.md", async () => {
     const attempts: Outcome<unknown>[] = []
-    const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase) as never)) } })
+    const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase))) } })
     await bank.hello()
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'declined')
     const [attempted] = attempts

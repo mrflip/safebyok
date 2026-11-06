@@ -155,6 +155,29 @@ describe("vault.replacePassphrasePrompt()", () => {
   })
 })
 
+describe("gating.attempt of another kind's clears", () => {
+  const WrongKindCases = [
+    ["replacePassphrasePrompt",  'refuses a passphrase alone where an ante and a next are asked'],
+    ["addPasskeyPrompt",         'refuses a passphrase alone where a passkey is asked beside it'],
+  ] as const
+
+  for (const [prompt, blurb] of WrongKindCases) {
+    it(blurb, async () => {
+      const born = await makeBornVault()
+      const { vault, storedNow } = born
+      const ante = storedNow()
+      const { gatingAt } = dialogOf(born)
+      const prompting = TH.expectRefusal(vault[prompt](), 'bad_option')
+      const gating = await gatingAt()
+      const err = await TH.expectBad(gating.attempt({ passphraseClear: Passphrase }), 'bad_option')
+      await prompting
+      expect(gating.isOpen).to.be.false
+      expect(storedNow()).to.equal(ante)
+      expect(TH.thrownText(err)).to.not.include(Passphrase)
+    })
+  }
+})
+
 describe("vault.addPasskeyPrompt()", () => {
   it("lays the passkey's wayin and keeps the passphrase's: both open, and the passphrase's lease stays held", async () => {
     const born = await makeBornVault()

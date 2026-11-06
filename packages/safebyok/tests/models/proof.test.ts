@@ -77,7 +77,7 @@ const makeDialog = () => {
     requestCleartext: (async (gating) => {
       dialog.shown.push(gating.gatingkind)
       for (const typing of [dialog.typing].flat()) {
-        const outcome = await gating.attempt(typing as never)
+        const outcome = await gating.attempt(typing)
         if (! outcome.ok) { dialog.refusals.push(outcome.err) }
       }
     }) as RequestCleartext,
