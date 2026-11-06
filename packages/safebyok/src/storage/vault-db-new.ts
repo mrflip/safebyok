@@ -273,17 +273,17 @@ export abstract class VaultDB {
 
   async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) { return answerOf(() => this.delBox(tombstone, opts)) }
 
-  /** No box row stands under the label: nothing to delete, answered by its sentinel. */
+  /** The `void` answer: the box label's sentinel. */
   #answerDelBoxVoid(boxTombstone: BoxTombstone, world: VaultRecord, req_params: ReqParams): GoodAnswer<BoxTombstone, 'void'> {
     return { ok: true, req_params, act: 'void', val: SX.sentinelBoxOf(boxTombstone, boxTombstone.vault_tok), world }
   }
 
-  /** The box was deleted already: its tombstone answers. */
+  /** The `gone` answer: the box tombstone found. */
   #answerDelBoxGone(found: BoxTombstone, world: VaultRecord, req_params: ReqParams): GoodAnswer<BoxTombstone, 'gone'> {
     return { ok: true, req_params, act: 'gone', val: found, world }
   }
 
-  /** A live box row at another revision than the del was made from. */
+  /** Refuses a del made from another revision of the live box row. */
   #answerDelBoxRecord(found: BoxRecord, world: VaultRecord): never {
     throw Refuse.staleWrite(world, found)
   }
@@ -307,18 +307,18 @@ export abstract class VaultDB {
 
   async tryDelVault(tombstone: VaultTombstone, opts: DelOpts) { return answerOf(() => this.delVault(tombstone, opts)) }
 
-  /** No row of this life stands: nothing to delete, answered by the life's sentinel. */
+  /** The `void` answer: the sentinel of the life the del names. */
   #answerDelVaultVoid(vaultTombstone: VaultTombstone, req_params: ReqParams): GoodAnswer<VaultTombstone, 'void'> {
     const sentinel = SX.sentinelVaultOf(vaultTombstone, vaultTombstone.vault_tok)
     return { ok: true, req_params, act: 'void', val: sentinel, world: sentinel }
   }
 
-  /** This life was deleted already: its tombstone answers. */
+  /** The `gone` answer: the life's tombstone. */
   #answerDelVaultGone(found: VaultTombstone, req_params: ReqParams): GoodAnswer<VaultTombstone, 'gone'> {
     return { ok: true, req_params, act: 'gone', val: found, world: found }
   }
 
-  /** A live vault row of this life at another revision than the del was made from. */
+  /** Refuses a del made from another revision of this life's live vault row. */
   #answerDelVaultRecord(found: VaultRecord): never {
     throw Refuse.staleWrite(found, found)
   }
