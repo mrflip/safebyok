@@ -7,7 +7,7 @@ orchestrator; workers look things up here and write in their own thread files.
 
 *Orchestrator:* https://claude.ai/artifact/LJYRKB5uG4bzR8VWBVti1j (doc 9c50a432-987f-4fd0-9fa9-0b3e23352d26).
 Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, matters table m3dgc82559j.353,
-bookmark rev 502), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
+bookmark rev 503), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
 m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 
 ## Settled before the first thread
@@ -44,6 +44,26 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 * Planning lesson: one compaction at ~157k just before the first justify, for a 12-file M thread.
   The L ports (postgres, graphql, convex) should be handed tight handoffs.
 
-## Thread 2: vaultdb_battery
+## Thread 2: vaultdb_battery (#558, in review)
 
-*(underway, cut from eb6569b17)*
+**For every port (threads 3, 4, 6):**
+* Run `TH.describeVaultDBBattery('<Store>', { makeVaultDB, _cheat_rowsOf })` from
+  `safebyok/testing`. `_cheat_rowsOf(vaultDB)` answers a `VaultDBRowCheats`: `plantVaultRow`,
+  `plantBoxRow`, `vaultRowOf`, `boxRowsOf` (a Map snapshot). Optional: `makeTwin` (a second client
+  over the same rows: give it, so the races are real), `makeCappedVaultDB(maxBoxes)`,
+  `_cheat_failNextCall`, `watches: false`. A case needing a missing hook is skipped. Hooks may
+  be async; watch cases wait with `vi.waitFor`. No teardown hook: close what your factory made
+  in your own `afterEach` (say so if that proves awkward: an open question to the orchestrator).
+* Import the contract from the new entry `safebyok/storage`: VaultDB (and DeviceDB) with their
+  answer and do* types, the memory stores, every storage shape, checker and row helper, the
+  lease shapes, the throwers with VaultError and outcomeOf. Fixtures (scopes, wayins, `vaultAt`,
+  `boxAt`, tombstone builders) from `safebyok/testing`.
+* A new package entry needs its `typesVersions` line written by hand (tsdown does not; attw
+  checks it).
+* Files to read for the shape: `packages/safebyok/src/storage/index.ts`,
+  `packages/safebyok/tests/test-helpers/vault-db-battery.ts`, and the battery run over the memory
+  store, `packages/safebyok/tests/storage/memory-vault-db.test.ts`.
+
+**Planning lesson:** threads 1 and 2 (M) each compacted near 160k, thread 2 twice in 12
+minutes. The L ports will too: each handoff says commit at every milestone, keep the thread file
+current enough for a fresh worker to continue, and leave e2e for last.
