@@ -196,8 +196,9 @@ and each inferred one whose props want docs. Apply ground rule 6 per type: host-
 with a doc on each prop, the checker annotated `: Z.ZodType<T>` (annotated, not cast) and the equality assertion; in-repo
 bags get `/** */` on each prop in the builder and `Z.infer`. Where a bag with defaults has distinct input and output
 shapes, say which the interface describes and why. The `Refusing` wrapper type may need a form that takes an interface:
-build the smallest one. **Levels:** worker `opus`; review `medium`. **Depends on:** thread 8 (stacked). **Size:** one
-context; split by file if the list runs past about eight types.
+build the smallest one. The Coach (2026-11-06): the per-type choices need no review of theirs, "it's very easy to switch and
+it's going to be awesome either way"; the thread file still lists them. **Levels:** worker `opus`; review `medium`. **Depends
+on:** thread 8 (stacked). **Size:** one context; split by file if the list runs past about eight types.
 
 ### 10. `kindvals_smush`
 
