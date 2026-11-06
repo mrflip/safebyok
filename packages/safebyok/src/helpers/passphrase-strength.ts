@@ -24,8 +24,7 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * `load` yourself only to warm up. A `load` that fails refuses the hello, so a
  * vault that cannot check a new passphrase never opens.
  *
- * `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to replace it,
- * or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
+ * safebyok ships none: pass your own (CUSTOMIZATION.md). To ask it as the user types, call
  * `vault.tryCheckStrength(typed)`.
  *
  * - A blank passphrase is sent back as a weak passphrase, unconditionally, without consulting the checker.

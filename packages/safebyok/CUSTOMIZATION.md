@@ -2,8 +2,7 @@
 
 The parts of safebyok an app chooses for itself, beyond the options every app answers the same
 way. `Bank.make`'s type, `BankOpts`, has the options; this file says how to choose. It still names
-the old design's entry points and calls (`safebyok/browser`, `safebyok/idb`, `putWayin`), which this
-package does not have yet.
+the old design's calls (`putWayin`), which this package does not have yet.
 
 ## Pluggable Passphrase Strength Checker
 
@@ -46,56 +45,23 @@ Nothing is logged: the first passphrase anyone tries in development meets it. Th
 contract at its plainest: the core will not guess how strong a passphrase your users need, and a
 checker of length alone is no checker ('a' and eleven spaces is twelve characters).
 
-### The one safebyok ships
-
-`safebyok/browser` exports `zxcvbnStrengthChecker`, and `browserOpts()` supplies it beside the
-key deriver and the device store:
-
-```ts
-import { Bank } from 'safebyok'
-import { browserOpts } from 'safebyok/browser'
-
-const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB, ...browserOpts() })
-```
-
-It is a good checker: at least 12 characters, then a zxcvbn score of at least 3 of 4, which turns
-away common passwords and ones very like them, keyboard walks, repeats, sequences, dates, and the
-vault's own names, with no composition rules (NIST SP 800-63B advises against them). But it is
-useless without its dictionary. Its strength is `@zxcvbn-ts/language-common`'s common-password
-list, about 214 kB minified and brotlied, which its `load` fetches with a dynamic `import()`, as a
-chunk of its own, at the bank's `hello()`. Without that list it cannot tell `password1234` from a
-good passphrase, so when the chunk does not load -- a dropped connection, a bundler that leaves the
-chunk out, a Content Security Policy that blocks it, an offline build -- the hello fails, loud
-and clear, and no vault is born until a later hello loads it. Check that your build ships
-the chunk and your page may load it.
-
-To ask for more than it does, wrap it, and carry its `load` along:
-
-```ts
-import { zxcvbnStrengthChecker } from 'safebyok/browser'
-
-const strengthChecker = Object.assign(async (typed: string, scope: VaultScope) => (
-  typed.toLowerCase().includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)
-), { load: zxcvbnStrengthChecker.load })
-const bank = Bank.make({ ...opts, ...browserOpts(), strengthChecker })
-```
-
-A wrapper that leaves `load` behind still works -- zxcvbn loads at the first check instead -- but
-a chunk that will not load then fails that check as the user chooses a
-passphrase, rather than the hello.
-
 ### Your own
 
-Pass it after the spread, and it replaces ours. To keep zxcvbn out of your bundle altogether, do
-not spread `browserOpts()`: name the other two yourself, and nothing imports the checker.
+safebyok ships no checker: a bank with none refuses every new passphrase, as above. Write one to
+the contract, or wrap a library that judges passphrases, such as zxcvbn (`@zxcvbn-ts/core`), and
+hand it to `Bank.make` beside the key deriver and your device store:
 
 ```ts
 import { Bank } from 'safebyok'
 import { argon2idWebV1Deriver } from 'safebyok/browser'
-import { idbDeviceDB } from 'safebyok/idb'
 
-const bank = Bank.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB(), strengthChecker: myStrengthChecker })
+const bank = Bank.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: myDeviceDB, strengthChecker: myStrengthChecker })
 ```
+
+A checker that needs a dictionary is useless without it: fetch it in `load`, with a dynamic
+`import()` as a chunk of its own, so that when the chunk does not load -- a dropped connection, a
+bundler that leaves it out, a Content Security Policy that blocks it, an offline build -- the hello
+fails, loud and clear, and no vault is born until a later hello loads it.
 
 Ask the vault's checker from your passphrase field as the user types, so they hear the reason
 before they submit: `vault.tryCheckStrength(typed)` is yours, held to the contract above, its
@@ -115,17 +81,15 @@ blanks:
 > package's CUSTOMIZATION.md ("Pluggable Passphrase Strength Checker"): it answers a verdict for
 > every passphrase and never throws; the reason is shown to my
 > user, so it is calm, says what to do, and never quotes the passphrase; and it runs on the
-> device, keeping and sending nothing. Left out, every new passphrase is refused. safebyok ships
-> `zxcvbnStrengthChecker` in `safebyok/browser`, which `browserOpts()` supplies.
+> device, keeping and sending nothing. Left out, every new passphrase is refused; safebyok ships
+> no checker of its own.
 >
-> Please help me choose a passphrase strength checker and wire it in. I'm not satisfied with the
-> default because:
+> Please help me choose a passphrase strength checker and wire it in. What matters to me:
 >
-> - I can't get it to work.
-> - I think I'm overriding it, but it isn't being tree-shaken out of my bundle.
-> - I already have a checker I prefer, and want to plug it in instead.
-> - It is too big a package for my app.
-> - It's not in my app's language.
+> - I want a good one with little fuss.
+> - I already have a checker I prefer, and want to plug it in.
+> - It must be small in my bundle.
+> - It must judge passphrases in my app's language.
 > - it's too annoying and I just want it to let everything through, I understand the risks, you're not the boss of me
 >
 > My app is built with ___ and bundled with ___. Show me the code, say where it goes, and tell me
