@@ -378,6 +378,16 @@ thanks"), with doc blocks for the host, an entry test and a minor changeset; bot
 unchanged, anything else still `unexpected_error` with the throw as cause ("yeah pass a vaultError as it is"), with a test
 per guard, the guarantees sentence and the changeset. Leave to spill either into 9b if the context is tight. The zxcvbn
 section's removal from CUSTOMIZATION.md stands (took the Rec).*
+*Built (PR #557, on #553):* (B) `BankOpts`, `KeyDeriver`, `VaultLogger` as interfaces, each held equal to its checker's
+`Z.input` by `true satisfies Z.core.util.AssertEqual<...>` (the checker not widened: widening loses `.shape` and `.extend`);
+the four snapshots as interfaces with readonly documented props, no checker; `StrengthChecker` and `RequestCleartext` left
+as documented callable types; (A) prop docs in the builders for the verbs' options, `ProvingWorld`, `LeaseFriend`,
+`GatingFriend`, the vaultDB options, `Story`, `ConsistencyRefusal`, `ObjCheckOpts`. Directives: seven types exported plus
+`VaultDB`, `RefusalKind`, `RefusalFamily`; the second survey's four rows done; thread 8's review rows done (`VaultDB`'s
+query verbs refuse `bad_scope`; `GX.guardedLogger`; one brand test; `LeaseDated` in VOCABULARY); `DeviceDB` and
+`MemoryDeviceDB` exported from the front door with host doc blocks and an entry test; both load guards pass a `VaultError`
+as it came. `KeyDeriver`'s members are readonly function props. The sparse record forms refuse `bad_option` (VX had
+relabelled them `bad_record`). Compacted twice, after its first justify. In review (medium).
 
 ### 10. `kindvals_smush`
 
