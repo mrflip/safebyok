@@ -89,6 +89,16 @@ describe("Refusals.storageUnavailable", () => {
   })
 })
 
+describe("Refusals.storageFull", () => {
+  it("refuses as vault_full, saying to free room, the backend's error as its cause", () => {
+    const quota = new Error('quota exceeded')
+    const refusal = Refusals.storageFull(quota)
+    expect(refusal.refusalkind).to.eq('vault_full')
+    expect(refusal.message).to.eq(Phrases.StorageFull)
+    expect(refusal.cause).to.eq(quota)
+  })
+})
+
 describe("Refusals.unexpectedError", () => {
   it("makes a misuse refusal of a bug, the thrown value its cause", () => {
     const thrown = new TypeError("Cannot read properties of undefined (reading 'wayins')")

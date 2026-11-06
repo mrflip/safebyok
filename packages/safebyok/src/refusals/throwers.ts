@@ -210,7 +210,7 @@ export const suppliedSpecChanged = (label: string): VaultError => new VaultError
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => new VaultError('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
 // --
 
-// == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, seqNotNext
+// == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext
 
 /* The refusals of a vaultDB, each read the same in an answer and an error: `meta` holds the `world` and `dbhas` the answer carries. */
 
@@ -248,6 +248,11 @@ export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): VaultE
 
 export const vaultFull = (capacity: SX.Capacity): VaultError => (
   new VaultError('vault_full', Phrases.VaultFull, { meta: { capacity } })
+)
+
+/** A `vault_full` refusal for a write storage itself had no room for, `cause` what the backend threw. */
+export const storageFull = (cause: Thrown): VaultError => (
+  new VaultError('vault_full', Phrases.StorageFull, { cause: sanitizeForeignError(cause) })
 )
 
 export const seqNotNext = (): VaultError => new VaultError('bad_option', Phrases.SeqNotNext)

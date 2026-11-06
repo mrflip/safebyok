@@ -45,7 +45,7 @@ export type { ObjCheckOpts, Refusing } from '../helpers/validator'
 
 // == [The refusals]: the throwers an adapter raises, and how a refusal reads
 export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../refusals/throwers'
-export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, seqNotNext, storeFailed } from '../refusals/throwers'
+export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, storeFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
 export type { RefusalMeta, Refusalkind, Thrown, VaultErrorOpts } from '../refusals/errors'
