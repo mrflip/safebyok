@@ -23,8 +23,8 @@ import type { VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
-/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinKindVals}. */
-export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinKindVals), 'bad_option')
+/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinkindVals}. */
+export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
 export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
@@ -284,7 +284,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 /** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
 export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj }) => ({
-  gatingkind:              oneof(EX.gatingKindVals),
+  gatingkind:              oneof(EX.gatingkindVals),
   vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
     .refine(({ passphraseClear, passkeyClear = null }) => passphraseClear !== undefined || passkeyClear !== null, Phrases.ProofMissing),
@@ -326,12 +326,12 @@ export type RequestCleartext = (gating: AnyGating) => unknown
 /** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */
 export type AskUser = (gating: AnyGating) => Promise<boolean>
 
-export type AnyGating = { [KindT in EX.GatingKind]: Gating<KindT> }[EX.GatingKind]
+export type AnyGating = { [KindT in EX.Gatingkind]: Gating<KindT> }[EX.Gatingkind]
 
 /** A gating as a host's dialog renders it: the vault it asks for, and what it asks for. */
 export interface GatingSnapshot extends VaultScope {
   /** What the gating does once the user's cleartext proves the gate: build, unlock or delete the vault, or change its gate. */
-  readonly gatingkind: EX.GatingKind
+  readonly gatingkind: EX.Gatingkind
 }
 
 /** What a build_vault attempt proves: the provings of a new vault's wayins, with no record to prove them against. */
@@ -360,14 +360,14 @@ export type ProvingsForGatingkind = {
 }
 
 /** The change a gating is launched for, past the enter key. It hears provings, never a clear. */
-export type Run<KindT extends EX.GatingKind> = (provings: ProvingsForGatingkind[KindT], launchArgs: LaunchArgs<KindT>) => Promise<Vault>
+export type Run<KindT extends EX.Gatingkind> = (provings: ProvingsForGatingkind[KindT], launchArgs: LaunchArgs<KindT>) => Promise<Vault>
 
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
 /** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch. */
-export type LaunchArgs<KindT extends EX.GatingKind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend }
+export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend }
 
-export type Asked<KindT extends EX.GatingKind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }
+export type Asked<KindT extends EX.Gatingkind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }
 
-export type Prove<KindT extends EX.GatingKind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
+export type Prove<KindT extends EX.Gatingkind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
 // --

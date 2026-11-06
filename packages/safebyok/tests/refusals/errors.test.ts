@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalKindVals, type RefusalKind, isCondition, isVaultError, listedKindOf, thrownNameOf } from '../../src/refusals/errors'
+import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalkindVals, type Refusalkind, isCondition, isVaultError, listedKindOf, thrownNameOf } from '../../src/refusals/errors'
 
 const errorsSource = readFileSync(new URL('../../src/refusals/errors.ts', import.meta.url), 'utf8')
 
@@ -12,15 +12,15 @@ const sourceBetween = (from: string, until: string): string => {
 
 /** The kinds a doc block names, in backticks. */
 const namedKinds = (text: string): string[] => (
-  refusalKindVals.filter((kind) => text.includes(`\`${kind}\``))
+  refusalkindVals.filter((kind) => text.includes(`\`${kind}\``))
 )
 
 /** The kinds RefusalFamilyForKind puts in `family`. */
-const familyKinds = (family: string): string[] => refusalKindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
+const familyKinds = (family: string): string[] => refusalkindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
 
-describe("refusalKindVals", () => {
+describe("refusalkindVals", () => {
   it("lists each kind once", () => {
-    expect(new Set(refusalKindVals).size).to.eq(refusalKindVals.length)
+    expect(new Set(refusalkindVals).size).to.eq(refusalkindVals.length)
   })
 
   it("matches the family lists in the errors.ts doc block", () => {
@@ -44,7 +44,7 @@ describe("VaultError", () => {
     const cause = new Error('socket closed')
     const err = new VaultError('storage_unavailable', 'Try again shortly.', { cause })
     expect(err).to.include({ refusalkind: 'storage_unavailable', family: 'condition', message: 'Try again shortly.', cause })
-    for (const refusalkind of refusalKindVals) {
+    for (const refusalkind of refusalkindVals) {
       expect(new VaultError(refusalkind, 'Said.').family).to.eq(RefusalFamilyForKind[refusalkind])
     }
   })
@@ -76,7 +76,7 @@ describe("VaultError", () => {
 
 describe("RefusalFamilyForKind", () => {
   it("names a family for every kind, and only for kinds", () => {
-    expect(Object.keys(RefusalFamilyForKind)).to.have.members([...refusalKindVals])
+    expect(Object.keys(RefusalFamilyForKind)).to.have.members([...refusalkindVals])
   })
 
   it("uses only the families in refusalFamilyVals, and uses each of them", () => {
@@ -132,7 +132,7 @@ const FamilyCases = [
 
 describe("each kind's family", () => {
   it("covers every kind in the cases below", () => {
-    expect(FamilyCases.map(([kind]) => kind)).to.have.members([...refusalKindVals])
+    expect(FamilyCases.map(([kind]) => kind)).to.have.members([...refusalkindVals])
   })
 
   for (const [kind, family, blurb] of FamilyCases) {
@@ -225,7 +225,7 @@ describe("listedKindOf", () => {
   })
 
   it("is null for a VaultError whose kind is off the list: the thrower's own text", () => {
-    expect(listedKindOf(new VaultError('no luck with hunter2' as RefusalKind, 'A refusal made up.'))).to.be.null
+    expect(listedKindOf(new VaultError('no luck with hunter2' as Refusalkind, 'A refusal made up.'))).to.be.null
     expect(listedKindOf('hunter2')).to.be.null
   })
 })

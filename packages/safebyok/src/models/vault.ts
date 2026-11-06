@@ -3,7 +3,7 @@ import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import type { GatingKind, LockState } from '../shapes/shapes-enums'
+import type { Gatingkind, LockState } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
@@ -223,7 +223,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     landGate:      (vault, proved, commit) => vault.#landGate(proved, commit),
   }
 
-  get #launchArgs(): LaunchArgs<Exclude<GatingKind, 'build_vault'>> {
+  get #launchArgs(): LaunchArgs<Exclude<Gatingkind, 'build_vault'>> {
     return { listing: this.listing, scope: this.scope, vault: this, prior: null, friend: Vault.#gatingFriend }
   }
   // --

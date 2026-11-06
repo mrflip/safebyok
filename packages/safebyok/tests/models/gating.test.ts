@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
-import type { GatingKind } from '../../src/shapes/shapes-enums'
+import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { AnyGating, ClearsForGatingkind, RequestCleartext } from '../../src/shapes/shapes-gateish'
 import { PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
@@ -26,7 +26,7 @@ const makeDialog = () => {
       return gating.whenSettled
     },
     /** The `nth` gating shown, once it has been. */
-    gatingAt: <KindT extends GatingKind>(nth = 0) => vi.waitFor(() => {
+    gatingAt: <KindT extends Gatingkind>(nth = 0) => vi.waitFor(() => {
       const gating = shown[nth]
       if (gating === undefined) { throw new Error("no dialog shown yet") }
       return gating as unknown as Gating<KindT>
@@ -248,7 +248,7 @@ describe("the dialog ending", () => {
 
 describe("gating.attempt", () => {
   it("takes any kind's clears from a host's dialog that never narrows on the gating's kind", async () => {
-    expectTypeOf<AnyGating['attempt']>().parameter(0).toEqualTypeOf<ClearsForGatingkind[GatingKind]>()
+    expectTypeOf<AnyGating['attempt']>().parameter(0).toEqualTypeOf<ClearsForGatingkind[Gatingkind]>()
     const { listing } = birthWorld({ requestCleartext: unnarrowedDialog })
     const landed = await listing.buildVault(Dna)
     expect(landed.isUnlocked).to.be.true

@@ -5,7 +5,7 @@ import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, rando
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
 import { outcomeOf, valOf } from '../refusals/outcome'
-import type { WayinKind } from '../shapes/shapes-enums'
+import type { Wayinkind } from '../shapes/shapes-enums'
 import type { KeyDeriver } from '../deriver/basederiver'
 import * as CX from '../shapes/shapes-core'
 import type { VaultScope } from '../shapes/shapes-core'
@@ -46,7 +46,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   readonly #wayinKey: CryptoKey
   #wayin: Wayin | null = null
 
-  toJSON(): { wayinkind: WayinKind } { return { wayinkind: this.wayinkind } }
+  toJSON(): { wayinkind: Wayinkind } { return { wayinkind: this.wayinkind } }
   // --
 
   // == [Construction]: constructor

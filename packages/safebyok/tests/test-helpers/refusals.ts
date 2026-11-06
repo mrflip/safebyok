@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import { type RefusalKind, VaultError } from '../../src/refusals/errors'
+import { type Refusalkind, VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 
 export { good, bad } from '../../src/refusals/outcome'
@@ -8,7 +8,7 @@ export { good, bad } from '../../src/refusals/outcome'
 const NotRefused = Symbol('not refused')
 
 /** The words a failed expectation adds for an expected `refusalkind`, none when no kind was expected. */
-const kindClause = (refusalkind: RefusalKind | undefined): string => (refusalkind === undefined ? '' : ` of refusalkind '${refusalkind}'`)
+const kindClause = (refusalkind: Refusalkind | undefined): string => (refusalkind === undefined ? '' : ` of refusalkind '${refusalkind}'`)
 
 /**
  * The VaultError `operation` rejected with, once the test has checked it is one, and of `refusalkind` if given; the
@@ -21,7 +21,7 @@ const kindClause = (refusalkind: RefusalKind | undefined): string => (refusalkin
  *
  * @example await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'vault_locked')
  */
-export const expectRefusal = async (operation: Promise<unknown>, refusalkind?: RefusalKind): Promise<VaultError> => {
+export const expectRefusal = async (operation: Promise<unknown>, refusalkind?: Refusalkind): Promise<VaultError> => {
   let refusal: unknown = NotRefused
   try {
     await operation
@@ -96,7 +96,7 @@ const isOutcome = (settled: unknown): settled is Outcome<unknown> => (
  *
  * @example await TH.expectBad(vaultDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_mismatch')
  */
-export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind?: RefusalKind): Promise<VaultError> => {
+export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind?: Refusalkind): Promise<VaultError> => {
   const outcome = await operation
   expect(outcome.ok, `expected a refusal${kindClause(refusalkind)}, but the outcome was good`).to.be.false
   expect(outcome.err).to.be.instanceOf(VaultError)
@@ -114,7 +114,7 @@ export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<un
  *
  * @example TH.expectSyncRefusal(() => Scopepath.box({ ...scope, user_id: 'a^b', boxlabel: 'x' }), 'bad_scope')
  */
-export const expectSyncRefusal = (attempt: () => unknown, refusalkind?: RefusalKind): VaultError => {
+export const expectSyncRefusal = (attempt: () => unknown, refusalkind?: Refusalkind): VaultError => {
   let refusal: unknown = NotRefused
   try {
     attempt()

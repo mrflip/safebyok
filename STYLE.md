@@ -148,10 +148,10 @@ checks. A sentence in `phrases.ts`
 named for the shape it describes (`Phrases.VaultDBShape`) is a phrase, not a validator.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
-spreads a narrower: `export const wayinKindVals = [...] as const`,
-`wayinkind = oneof(wayinKindVals)`, `export type WayinKind = typeof wayinKindVals[number]`. The
+spreads a narrower: `export const wayinkindVals = [...] as const`,
+`wayinkind = oneof(wayinkindVals)`, `export type Wayinkind = typeof wayinkindVals[number]`. The
 list of values is `fooThingVals`, lowerCamelCase as its checker is: `VX.wayinkind`,
-`VX.wayinKindVals`, `type WayinKind`.
+`VX.wayinkindVals`, `type Wayinkind`.
 
 **A thing's shapes are named for their purpose, prefixed with the type**, from the fixed set in
 *Shapes and duck typing*: `VaultRecord`, `VaultSparse`, `VaultStamp`, `VaultScope`,

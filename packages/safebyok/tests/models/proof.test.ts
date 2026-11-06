@@ -5,7 +5,7 @@ import { Whispered } from '../../src/helpers/consts'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
-import type { GatingKind } from '../../src/shapes/shapes-enums'
+import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
 import type { Whisper } from '../../src/shapes/shapes-core'
@@ -73,7 +73,7 @@ const makeDialog = () => {
   const dialog = {
     typing: byPassphrase(Passphrase) as object,
     refusals: [] as VaultError[],
-    shown:  [] as GatingKind[],
+    shown:  [] as Gatingkind[],
     requestCleartext: (async (gating) => {
       dialog.shown.push(gating.gatingkind)
       for (const typing of [dialog.typing].flat()) {

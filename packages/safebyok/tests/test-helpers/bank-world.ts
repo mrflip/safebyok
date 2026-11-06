@@ -2,7 +2,7 @@
 
 import { afterEach } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
-import { VaultError, type RefusalKind } from '../../src/refusals/errors'
+import { VaultError, type Refusalkind } from '../../src/refusals/errors'
 import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -27,10 +27,10 @@ export const labelsOf = ({ vaults }: BankSnapshot): string[] => vaults.map(({ va
 
 /** A {@link MemoryVaultDB} that refuses every vault get, once told to, as a store out of reach or a user signed out does. */
 export class RefusingVaultDB extends MemoryVaultDB {
-  #refusalkind: RefusalKind | null = null
+  #refusalkind: Refusalkind | null = null
 
   /** From here on, `listVaults` and `getVault` refuse this; null lets them through again. */
-  _cheat_refuseGets(refusalkind: RefusalKind | null): void { this.#refusalkind = refusalkind } // eslint-disable-line unicorn/prefer-private-class-fields
+  _cheat_refuseGets(refusalkind: Refusalkind | null): void { this.#refusalkind = refusalkind } // eslint-disable-line unicorn/prefer-private-class-fields
 
   protected override doListVaults(scope: BankScope) {
     this.#demandAnswering()

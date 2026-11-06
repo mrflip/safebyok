@@ -13,7 +13,7 @@ import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, verifyConsistent } from '../../src/helpers/validator'
-import { type RefusalKind, VaultError } from '../../src/refusals/errors'
+import { type Refusalkind, VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 
 // A module of validators, as a star import would hand one in `sources`: made in a call of its own
@@ -271,7 +271,7 @@ describe("Checkers", () => {
 
   it("types a Story as optional where and advice, and a ConsistencyRefusal as a kind and an optional message, each read off its shape", () => {
     expectTypeOf<Story>().toEqualTypeOf<{ where?: string | undefined, advice?: string | undefined }>()
-    expectTypeOf<ConsistencyRefusal>().toEqualTypeOf<{ kind: RefusalKind, message?: string | ((fieldnames: readonly string[]) => string) | undefined }>()
+    expectTypeOf<ConsistencyRefusal>().toEqualTypeOf<{ kind: Refusalkind, message?: string | ((fieldnames: readonly string[]) => string) | undefined }>()
   })
 })
 

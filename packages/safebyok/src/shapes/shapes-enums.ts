@@ -51,15 +51,15 @@ export const lockStateVals = ['unlocked', 'locked'] as const
 export type LockState = typeof lockStateVals[number]
 // --
 
-// == [Wayins and gatings]: wayinKindVals, WayinKind, gatingKindVals, GatingKind, correctableKindVals
+// == [Wayins and gatings]: wayinkindVals, Wayinkind, gatingkindVals, Gatingkind, correctablekindVals
 
 /** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
-export const wayinKindVals = ['passphrase', 'passkey'] as const
-export type WayinKind = typeof wayinKindVals[number]
+export const wayinkindVals = ['passphrase', 'passkey'] as const
+export type Wayinkind = typeof wayinkindVals[number]
 
-export const gatingKindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey', 'del_vault'] as const
-export type GatingKind = typeof gatingKindVals[number]
+export const gatingkindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey', 'del_vault'] as const
+export type Gatingkind = typeof gatingkindVals[number]
 
 /** The refusals an attempt leaves its gating open under, for the user to try again. */
-export const correctableKindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
+export const correctablekindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
 // --

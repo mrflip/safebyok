@@ -5,7 +5,7 @@
  * a storage client threw, which may quote the call it was handed.
  */
 
-import { VaultError, type RefusalKind } from './errors'
+import { VaultError, type Refusalkind } from './errors'
 
 /** The VaultError of `kind`, saying `message`, to throw in place of `foreign`, carrying nothing of it: no `cause`, text, meta or property.
  * Nothing of `foreign` is read, so a throw whose getters throw as they are read, or whose
@@ -21,4 +21,4 @@ import { VaultError, type RefusalKind } from './errors'
  *     throw HostErrorSanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
  *   }
  */
-export const refusalFor = (_foreign: unknown, kind: RefusalKind, message: string): VaultError => new VaultError(kind, message)
+export const refusalFor = (_foreign: unknown, kind: Refusalkind, message: string): VaultError => new VaultError(kind, message)
