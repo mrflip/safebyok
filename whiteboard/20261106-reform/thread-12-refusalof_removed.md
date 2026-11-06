@@ -1,6 +1,6 @@
 # Thread 12: refusalOf removed (2026-11-06)
 
-Branch `20261106-refusalof_removed`, PR to follow, based on main. Justify: green (safebyok 61 test files, 1831 tests; size budgets all within limit).
+Branch `20261106-refusalof_removed`, PR #526, based on main. Justify: green (safebyok 61 test files, 1831 tests; size budgets all within limit).
 
 * **Built**: nothing; `refusalOf` and its doc block are gone from `packages/safebyok/src/refusals/outcome.ts`, and the `describe("refusalOf")` block with its `throwingForm` helper from `packages/safebyok/tests/refusals/outcome.test.ts`. The file's imports all still serve (`unexpectedError` is `outcomeOf`'s default). `outcome.ts` has no section banners.
 * **Decisions taken**: the changeset is empty. `refusalOf` was never reachable from `src/index.ts` (it exports only `VaultError` and `isVaultError` from `refusals/`) or from `tests/test-helpers.ts` (`./testing`), so no host could name it.
