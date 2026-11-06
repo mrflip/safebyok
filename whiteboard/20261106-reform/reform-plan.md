@@ -10,11 +10,10 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 09:10, **running**: the whole merge line is on main (the Coach merged #512, #518, #529, #531,
-#533, #522, #525, #526, #527, #532, #528, #519, #520, #523, #530 and #534 between 08:40 and 09:00); threads 1 to 4 and 11
-to 20 are therefore merged. Thread 5 (#535, `module_clock`) is filed on the pre-merge main and another agent of the
-Coach's is bringing it onto main; thread 6 (`worlds_picks`) is cut and holds for #535's new tip; 7 to 10 follow in turn.
-Open: #535, #516 (this PR), the Closer Look triage, the kind_promises follow-on threads (Open Matters).
+**Status:** 2026-11-06, 09:25, **running**: every filed thread is merged (1 to 5 and 11 to 20; the line between 08:40
+and 09:00, #535 at 08:21 by the Coach's agent). Thread 6 (`worlds_picks`) building on main a19292549; 7 to 10 stack on
+it in turn. Open: #516 (this PR), the Closer Look triage, the kind_promises follow-on threads and six other Open Matters
+rows.
 
 ## Read first
 
@@ -210,7 +209,8 @@ G4 true; four fixes (the changeset names `vault.clock`; the module holder is `cl
 vault world at T0 and then a models world moves `nowMillis()` back to 2023 (`box-seal.test.ts`, `vault-life.test.ts`;
 nothing reads the time there today: a directive to thread 6, which is in those helpers); the global reset takes the clock
 from module-scope worlds (shape tests, Cleanup); `buildLease` hands the raw friend to `buildGranted`, which parses it
-again (internal caller, left: Cleanup); `makeProving` built by hand (taste). **Filed** at 6b13daff7, as cut, on main (fbe760e0f), outside the line.
+again (internal caller, left: Cleanup); `makeProving` built by hand (taste). **Filed** at 6b13daff7, as cut, on main (fbe760e0f), outside the line; brought onto the merged main by the Coach's agent
+and **merged** 08:21.
 
 ### 6. `worlds_picks`
 

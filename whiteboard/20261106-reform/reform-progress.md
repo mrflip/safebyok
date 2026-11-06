@@ -5,12 +5,12 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06, 09:10: running)
+## State (2026-11-06, 09:25: running)
 
-Twenty threads planned. Merged to main (the line, 08:40 to 09:00): 1, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.
-Filed, on the pre-merge main, being brought onto main by an agent of the Coach's: 5 (#535). Cut, holding for #535's new
-tip: 6 (`worlds_picks`). Next: 7 to 10 in turn. Open for the Coach: the Closer Look triage, the kind_promises follow-on
-threads, the deviceId privacy line, the raw-UUID label row, the reborn-vault hello row.
+Twenty threads planned; 1 to 5 and 11 to 20 merged to main. Building: 6 (`worlds_picks`, on main a19292549, with the
+two-worlds clock directive). Next: 7 to 10 in turn, each cut from the one below once it files. Open for the Coach: the
+Closer Look triage, the kind_promises follow-on threads, the deviceId privacy line, the raw-UUID label row, the
+reborn-vault hello row.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
@@ -38,7 +38,7 @@ threads, the deviceId privacy line, the raw-UUID label row, the reborn-vault hel
   `device_id` required-or-minted is an open question (the Coach recalls removing the mint; main still mints and caches).
 * Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
   `d` + 32 hex.
-* Thread 5 `module_clock`: filed, PR #535 at 6b13daff7 on main, outside the line. **For thread 6:** `_cheat_clock` is one
+* Thread 5 `module_clock`: merged (PR #535). **For thread 6:** `_cheat_clock` is one
   setting for the package: a test that builds two worlds should share one `now` or build the models world first
   (`box-seal.test.ts` `sealWorld()`, `vault-life.test.ts` `makeVaultWithBox()`). One module clock: `nowMillis()` in
   `helpers/clock.ts`; `_cheat_clock`/`_cheat_clockReset` through `safebyok/testing` only; a vitest `setupFiles` hook
