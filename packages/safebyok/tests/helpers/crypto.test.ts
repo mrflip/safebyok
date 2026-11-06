@@ -191,7 +191,20 @@ describe("wrap and unwrap", () => {
 /** Hex text to bytes, for a published test vector. */
 const hexBytes = (hex: string) => Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16))
 
+/** The info of a passkey wayin's key, for the header of the device `device_id`. */
+const infoOf = (device_id: string) => cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', { ...header, device_id })
+
 describe("deriveWrappingKey", () => {
+  // deriveWrappingKey @example
+  it("takes a cipherCtx as its info: the key made for one header opens nothing sealed under another's", async () => {
+    const prfBytes = randomBytes(32)
+    const wrapped = await wrapKeyUnder(await deriveWrappingKey(prfBytes, infoOf('d1')), await makeVaultKey(), ctxOf('slot'))
+    const sameHeader = await deriveWrappingKey(prfBytes, infoOf('d1'))
+    expect(await unwrapKeyUnder(sameHeader, wrapped, ctxOf('slot'), { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    const otherHeader = await deriveWrappingKey(prfBytes, infoOf('d2'))
+    await expect(unwrapKeyUnder(otherHeader, wrapped, ctxOf('slot'), { extractable: false, usage: ['wrapKey'] })).rejects.toThrow()
+  })
+
   it("is HKDF-SHA256 with no salt: RFC 5869's test case 3 makes the same key", async () => {
     // RFC 5869, A.3: IKM 22 bytes of 0x0b, no salt, no info; the first 32 bytes of its OKM.
     const derived = await deriveWrappingKey(new Uint8Array(22).fill(0x0B), new Uint8Array(0))

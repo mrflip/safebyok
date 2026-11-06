@@ -90,6 +90,8 @@ describe("whisper", () => {
   }
 
   // whisper @example
+  // Whisper @example 1
+  // Whisper @example 2
   it("passes an object and null inside one, and refuses a bare string, a Date and a bare null", () => {
     expect(CX.whisper.parse({ apiKey: 'sk-ant-fake' })).to.deep.equal({ apiKey: 'sk-ant-fake' })
     expect(CX.whisper.safeParse('sk-ant-fake').success).to.be.false
