@@ -289,7 +289,15 @@ test ids, the VOCABULARY row; a stored wayin with a non-UUID `device_id` now rea
 `millisOf` rounds; the `browserOpts()` phrases and CUSTOMIZATION reworded (the zxcvbn section removed: the package ships
 no checker; the host's own device store named, since the core exports none: both Open Matters). `checkSuppliedSpecKept`
 kept: it polices only our own `argon2id_web_` labels. Compacted twice, both after its first justify, ten minutes apart:
-the thread outgrew one context; thread 8's gloss gets a hatch. In review (`opus`, high).
+the thread outgrew one context; thread 8's gloss gets a hatch.
+*Review (high, opus):* `fixed`; G1 and G8 hold, the brand is unforgeable and unexported, one guard per wrap, the deriver
+checked by interface only; three fixes (G8's sentence order; `keyDeriverShape`'s stale "keeps what it was handed"; the
+changeset: a label-shaped `device_id` damages the whole stored vault row, not one wayin). Left, minor: the host functions
+are parsed twice on the way in (`bankOpts` and the guards; thread 8 drops one layer); one brand for four kinds (kept);
+`keyDeriverLoadFailed` relabels a host `VaultError` (Open Matters); `vault.tryCheckStrength` cited in two docs but absent
+(thread 8); the new exported types name unexported types (thread 9); `DeviceDBShape` names the unexported `DeviceDB`
+(Open Matters, TOP); a tiny `autolockMinutes` rounds to 0 ms and is refused on `leaseMillis`; doc-block and test-title
+style for the documentarian. A security.md entry added by a sonnet subagent before filing.
 
 ### 8. `checkers_once`
 
@@ -310,6 +318,11 @@ context.
 is used for the wraps. Hatch (thread 7 compacted twice): the scopes' one home and the `LeaseSparse` rename first, then the
 ducks' brand; if the first justify is not reached in one context, commit what is green, file, and the inline-shape and
 repeated-default rows become thread 8b.*
+*Directives (thread 7's review): the four host functions are parsed twice on the way in, by `VX.bankOpts` and again
+by each `guard*` and `HostChecks`; keep the guards' own entry checks (they are exported) and drop the four fields' `fn()`
+checks from `bankOpts`, or the reverse, whichever leaves one layer; `vault.tryCheckStrength(typed)` is cited in
+passphrase-strength.ts's `StrengthChecker` doc block and CUSTOMIZATION.md but does not exist: name `gating.checkStrength(typed)`
+and its verdict.*
 
 ### 9. `types_ab`
 
@@ -326,6 +339,9 @@ shapes, say which the interface describes and why. The `Refusing` wrapper type m
 build the smallest one. The Coach (2026-11-06): the per-type choices need no review of theirs, "it's very easy to switch and
 it's going to be awesome either way"; the thread file still lists them. **Levels:** worker `opus`; review `medium`. **Depends
 on:** thread 8 (stacked). **Size:** one context; split by file if the list runs past about eight types.
+*Directive (thread 7's review): the exported types `GuardedKeyDeriver`, `GuardedStrengthChecker` and `AskUser` name
+`PassphraseCleartext`, `PassphraseVerdict` and `AnyGating`, and `BankOpts` names `KeyDeriver`, `StrengthChecker`, `DeviceDB`
+and `VaultLogger`, none exported: export every type an exported signature names (be generous with exports).*
 
 ### 10. `kindvals_smush`
 
