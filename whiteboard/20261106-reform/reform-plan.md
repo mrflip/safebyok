@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; every remaining thread waits on #511 and #513 reaching main
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (`refusalof_removed`, the Coach's ruling) building from main; threads 5 to 10 wait on #511 and #513 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
@@ -287,6 +287,16 @@ one type; the wrap rule's list of host functions made open-ended, `onBadNews` be
 `Z.ZodType<T>` derivation question (thread 9); "never a type literal written out" is a new rule with instances in the code
 today (gating.ts:249); `ListingWorld` has no single class and thread 6 keeps it; "world" has two senses (Open Matters).
 **Filed** at 781f7e625, as cut, on main.
+
+### 12. `refusalof_removed`
+
+**The Coach** (2026-11-06, on #517's second-review finding that `refusalOf` has no caller): "I'm quite happy to hear that
+nobody is using it, remove".
+
+*Gloss:* `refusals/outcome.ts` loses `refusalOf` and its doc block; the module-private `refusalOf` in `helpers/validator.ts`
+and the test helper of that name stay; `notes/guarantees.md`'s mention is already rewritten by #517. Not on the public
+surface, so an empty changeset unless the entry points reach it. **Levels:** worker `sonnet`; review `low`. **Depends on:**
+nothing (cut from main at 374098121). **Size:** tiny.
 
 ## For the Coach
 
