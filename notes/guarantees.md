@@ -310,7 +310,7 @@ error carries a name and a message, never key material. A device-store failure's
 only its `name`, as a `DeviceDB` is handed every lease record and the logger hands a condition to the
 host whole (`tests/storage/device-db-new.test.ts`, *a deviceDB whose store throws*). `unexpectedError` keeps a foreign throw
 as `cause` only where the thrower heard no secret. The invariant at the one catch that ends each
-Lease and Box throwing form (`refusalOf`, `outcome.ts`) is checkable by reading what can reach it: a
+Lease and Box `try*` form (`outcomeOf`, `outcome.ts`) is checkable by reading what can reach it: a
 refusal (passed as itself), the vault's demand, or a bug's own throw from this package's lines;
 never a host function's throw or the device store's, each replaced before it gets there, and a
 WebCrypto error only from the seal, grant and wayin paths named above. The Vault and Bank forms map a bug in their `try` form. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
