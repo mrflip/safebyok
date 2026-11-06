@@ -108,14 +108,14 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
       return identity ? `user|${identity.subject}` : null
     })
     const caller = host.createTest().withIdentity({ subject: 'u1' })
-    expect(await caller.query(host.api.safebyok.getVault, { scope: { ...TH.vaultScope, user_id: 'user|u1' } })).to.eq(null)
+    expect(await caller.query(host.api.safebyok.getVault, { scope: { ...TH.vaultScope, user_id: 'user|u1' } })).to.be.null
     expect(await TH.convexRefusalOf(caller.query(host.api.safebyok.getVault, { scope: TH.vaultScope }))).to.deep.equal({ kind: 'identity_revoked' })
   })
 
   it("calls getUserId as a method of the bag it was handed, so one that leans on this works", async () => {
     const { app, component } = TH.installedComponent()
     const host = app.defineModules({ safebyok: component.api(new SignedInAs('u1')) })
-    expect(await host.createTest().query(host.api.safebyok.getVault, { scope: TH.vaultScope })).to.eq(null)
+    expect(await host.createTest().query(host.api.safebyok.getVault, { scope: TH.vaultScope })).to.be.null
   })
 })
 

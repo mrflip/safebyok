@@ -110,7 +110,7 @@ describe("Refusals.unexpectedError", () => {
 
 describe("Refusals.storageFailed", () => {
   it("names the call and what was thrown by its name, carrying nothing else of it", () => {
-    const thrown = new Error("[Request ID: 1a2b] Server Error: Uncaught Error in putBox with args {\"whisper_ciphered\":\"c2VjcmV0\"}")
+    const thrown = new Error('[Request ID: 1a2b] Server Error: Uncaught Error in putBox with args {"whisper_ciphered":"c2VjcmV0"}')
     const err = Refusals.storageFailed('putBox', thrown)
     expect(err).to.include({ refusalkind: 'storage_unavailable' })
     expect(err).not.to.have.property('cause')
