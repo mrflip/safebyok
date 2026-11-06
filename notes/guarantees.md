@@ -253,8 +253,9 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `models
 only as a `CryptoKey` handle: a local in `Lease.buildGranted`; `Lease.#record` in memory, for the lease's life;
 and the `lease_key` of a `LeaseRow` cached by `lease.cache` through a `DeviceDB`'s `cache` (the core's
 `MemoryDeviceDB` keeps it by `structuredClone`; an IndexedDB store, by structured clone) and read back by
-`Lease.buildFromCache` (`DeviceDB.peek`). A lease is dropped from memory at `lock()`, at a sweep, at a vacate, and
-when it proves damaged (`Lease.#vaultKey`), and its row is erased at `lock()` and at a vacate. No lease is dropped at a time, and **autolock is a best-effort reminder process, not a
+`Lease.buildFromCache` (`DeviceDB.peek`). A lease is dropped from memory at `lock()`, at a sweep, at a vacate, at a
+tombstone, and when it proves damaged (`Lease.#vaultKey`), and its row is erased at `lock()`, at a vacate and at a
+tombstone, among the sites the leaseKey's access chain names. No lease is dropped at a time, and **autolock is a best-effort reminder process, not a
 guarantee**: a lease held in a page stays held until something locks it. Two things answer to the autolock duration, against a row cached on
 this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` erases it. `Lease.buildFromCache`, at the
 door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.buildFromCache` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the host's clock: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
