@@ -230,6 +230,17 @@ The fake worlds in `models-world.ts` and `vault-world.ts` stay structural and ke
 the classes now. Doc blocks stay on the interfaces' members and on the classes. **Levels:** worker `opus`; review
 `medium`. **Depends on:** thread 5 (stacked). **Look-ahead:** thread 7 wraps host functions in Bank's constructor; leave
 Bank's constructor shape readable for it. **Size:** one context.
+*Built (PR #550, on main):* `Listing`, `VaultListing`, `BoxListing` take `(world, opts)`; `ListingWorld`, `VaultWorld =
+Pick<Bank, ...>`, `BoxWorld = Pick<Vault, ...>`; `VX.listingWorld` extended by `VX.vaultWorld` and `VX.boxWorld` checks the
+world at each constructor; gone: the inline world `obj`s, `VX.world`/`World`, `vaultListingOpts`/`boxListingOpts`,
+`StorableOpts`, `Bank implements VaultWorld`, `Vault implements BoxWorld`; a storable reads its horizon from its listing
+(`Listing.maxMillisSinceRefresh` public readonly); the old interface's member docs moved onto Bank's props. Cmd-click
+confirmed by the language service: `vault.world.scope` lands on bank.ts, `boxListing.world.demandUnlocked` on vault.ts.
+Deviations: a vault's world must carry `leaseMillis` and `boxRefreshMillis` (two dead fallbacks deleted; the
+DefaultLeaseMillis test moved to the bank); refused-world fieldnames read `vault_tok`, not `world.vault_tok`; one cast in
+the models-world fake (`world as unknown as Vault`) so the Pick keeps cmd-click. The clock directive took a third route:
+`sealWorld()` and `makeVaultWithBox()` build no models world at all (db09eb17c). Changeset minor (`Vault` and `Box`
+constructors lose their options argument). Compacted once, after its first justify. In review (medium).
 
 ### 7. `host_branding`
 

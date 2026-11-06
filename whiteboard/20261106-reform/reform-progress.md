@@ -50,6 +50,11 @@ Closer Look triage.
 * Thread 22 `kind_tests`: built, PR #549 at 4bbdb9f87 on main, in review. The test helpers' `refusalkind` is optional;
   `holdsCases` takes no kind. `vitest/valid-title` counts what is left: every remaining warning is on a kept kind.
   **For thread 10:** fewer kind words to rename in tests now; `validator.test.ts` and `refusals/*.test.ts` still name them.
+* Thread 6 `worlds_picks`: built, PR #550 at bb28f1361 on main, in review. Worlds are Picks of the classes; a listing
+  takes `(world, opts)`; `StorableOpts` is gone. **For thread 7:** Bank's constructor is unchanged but for
+  `new VaultListing(this, { vaultDB, maxMillisSinceRefresh })`. A vault's world must carry `leaseMillis` and
+  `boxRefreshMillis`. `halpimonfire.test.ts` and `loosened.test.ts` build the models world in `beforeEach`, so the vault
+  world's later clock wins there.
 * Thread 19 `utils_port`: reviewed (`fixed`), PR #534 at 576f347cd on #531, pushed; joins the chain's top. `UX` is the
   namespace for `shapes/shapes-utils.ts` (STYLE.md's table wants the row). `safebyok/utils`: `mash`, `mask(text, opts)`,
   `MaskOpts`, `fromB64`/`toB64` (crypto.ts's codec), `WhisperFieldAttributes`; `shapes/shapes-utils.ts` is a seventh shapes
