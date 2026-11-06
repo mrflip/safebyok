@@ -10,6 +10,8 @@ control flow simple (STYLE.md, *Control flow and refusals*), with the argument f
 
 What is the difference between refusals and errors
 
+Assess the vaultDB integrity checks contract for gate verbs
+
 ## Loud
 
 Add a helper like objStrict, objDuckish, implementing the duckish type (an otherwise-strict type allowing certain specified fields that are validated, ignored and stripped)

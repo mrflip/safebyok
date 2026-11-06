@@ -21,11 +21,6 @@ is the difference so important it's worth agent context -- will one of them flas
 > The stamp binds the sidecar too, so it's authenticated
 -- change to be unsealed. Customers can get "public and sealed" by including the sidecar in both objects, they can only get "public and modifiable" if we don't seal something
 
+"until you {@link put} the box"	"until you {@link put} a patch, and put seals only the patch's whisper, never this value"	Setting box.whisper and then calling put({ sidecar }) drops the value you set
 
-`vaultOf	"listed at scope"	"listed for bag"	Matches the parameter`
-change bag to scope everywhere scope is meant.
-If a method asks for scope using a Duckish validator, it should declare with the minimal type it requires.
-
-
-
-
+`hello: "hydrate the vault listing" became "fetch"` -- we need better words here
