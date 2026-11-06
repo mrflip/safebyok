@@ -8,8 +8,7 @@ const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => Object.freeze({
   deriveKeyBytes: (passphrase: string, saltBytes: Uint8Array) => deriveWithWasm(spec, passphrase, saltBytes),
 })
 
-/**
- * A key deriver running Argon2id at `spec` through WebAssembly, deriving the same bytes as safebyok's `argon2idDeriver`.
+/** A key deriver running Argon2id at `spec` through WebAssembly, deriving the same bytes as safebyok's `argon2idDeriver`.
  *
  * @param spec - The whole Argon2id parameter set, and the label vaults made under it record.
  * @returns A frozen deriver: the spec's fields and `deriveKeyBytes`.
@@ -17,8 +16,7 @@ const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => Object.freeze({
  */
 export const argon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver => deriverOf(parseKeyDeriverSpec(spec))
 
-/**
- * Argon2id at the supplied `Argon2idWebV1` spec through WebAssembly: a stand-in for safebyok's `argon2idWebV1Deriver`.
+/** Argon2id at the supplied `Argon2idWebV1` spec through WebAssembly: a stand-in for safebyok's `argon2idWebV1Deriver`.
  *
  * @example Bank.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', user_id: session.user_id, vaultDB })
  */
