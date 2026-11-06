@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { hasModelkind, isDeviceDB, isGuarded, isVaultDB } from '../helpers/consts'
+import { ForeverMillis, hasModelkind, isDeviceDB, isGuarded, isVaultDB } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
@@ -102,7 +102,8 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   const ifPresent     = oneof(EX.ifPresentVals)
   const ifAbsent      = oneof(EX.ifAbsentVals)
   const putIfAbsent   = oneof(EX.putIfAbsentVals)
-  const horizonMillis = union([num.nonnegative(), lit(Infinity)])
+  // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
+  const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
   const maxMillis     = horizonMillis.optional()
   const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
   const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.default('fail') })

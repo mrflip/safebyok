@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
-import { isGuarded } from '../../src/helpers/consts'
+import { ForeverMillis, isGuarded } from '../../src/helpers/consts'
 import { guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
 import { DefaultLeaseMillis } from '../../src/models/vault'
 import type { AnyGating } from '../../src/shapes/shapes-gateish'
@@ -274,10 +274,10 @@ describe("bank.ensureVault", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }))
   })
 
-  it("takes a fraction of a minute to the nearest millisecond, and Infinity as Infinity", () => {
+  it("takes a fraction of a minute to the nearest millisecond, and Infinity as ForeverMillis", () => {
     const bank = makeBankWorld().bankOn({ autolockMinutes: 1 / 7, boxRefreshMinutes: 0.000025 })
     expect([bank.leaseMillis, bank.boxRefreshMillis]).to.deep.equal([8571, 2])
-    expect(makeBankWorld().bankOn({ autolockMinutes: Infinity }).leaseMillis).to.eq(Infinity)
+    expect(makeBankWorld().bankOn({ autolockMinutes: Infinity }).leaseMillis).to.eq(ForeverMillis)
   })
 
   it("leases for DefaultLeaseMillis where the host names no autolockMinutes", () => {

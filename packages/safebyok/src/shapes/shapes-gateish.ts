@@ -6,7 +6,7 @@ import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import { PasskeySaltBytes, isGuarded } from '../helpers/consts'
+import { ForeverMillis, PasskeySaltBytes, isGuarded } from '../helpers/consts'
 import { type VaultLogger, isGuardedLogger } from '../helpers/logger'
 import { type CipherCtxRecord, fromB64OrNull } from '../helpers/crypto'
 import type { GuardedStrengthChecker, StrengthChecker } from '../helpers/passphrase-strength'
@@ -222,8 +222,8 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
-/** The autolock duration in milliseconds, Infinity for none. */
-export const leaseMillis = Checker(({ int, lit, union }) => union([int.positive(), lit(Infinity)]), 'bad_option')
+/** The autolock duration in milliseconds, at most {@link ForeverMillis}. */
+export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis), 'bad_option')
 
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn, custom }) => ({

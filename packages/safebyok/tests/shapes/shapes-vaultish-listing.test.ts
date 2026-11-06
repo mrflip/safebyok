@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { ForeverMillis } from '../../src/helpers/consts'
+import * as GX from '../../src/shapes/shapes-gateish'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord } from '../test-helpers/models-world'
 import { holdsCases } from '../test-helpers/cases'
@@ -22,6 +24,21 @@ describe("The checks of options", () => {
       [NaN,       false, 'refuses NaN'],
       ["60000",   false, 'refuses text'],
       [null,      false, 'refuses null'],
+    ])
+
+    it("keeps Infinity as ForeverMillis, so no horizon past the check is infinite", () => {
+      expect(VX.horizonMillis.parse(Infinity)).to.eq(ForeverMillis)
+      expect(VX.timelyOpts.parse({ maxWorldMillis: Infinity })).to.deep.equal({ maxWorldMillis: ForeverMillis })
+    })
+  })
+
+  describe("GX.leaseMillis", () => {
+    holdsCases(GX.leaseMillis, [
+      [60_000,          true,  'passes a whole number of milliseconds'],
+      [ForeverMillis,   true,  'passes ForeverMillis, a host\'s never'],
+      [Infinity,        false, 'refuses Infinity: the bank keeps a host\'s as ForeverMillis'],
+      [0,               false, 'refuses zero'],
+      [0.5,             false, 'refuses a fraction of a millisecond'],
     ])
   })
 

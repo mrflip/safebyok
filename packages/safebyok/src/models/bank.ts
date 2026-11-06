@@ -1,4 +1,4 @@
-import { FarFuture, FarPast, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
+import { FarFuture, FarPast, ForeverMillis, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { Checkers } from '../helpers/validator'
 import { isTestDeriver } from '../deriver/basederiver'
@@ -331,7 +331,8 @@ export const guardOnPanic = (onPanic: PanicHandler | undefined): Panic => {
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext
 
-const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : Math.round(minutes * MinuteMillis))
+// A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
+const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : Math.min(Math.round(minutes * MinuteMillis), ForeverMillis))
 
 const stageOf = (hello: Outcome<void> | null): BankStage => {
   if (hello === null) { return 'made' }
