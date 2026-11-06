@@ -61,10 +61,10 @@ const MisshapenCases = [
 ] as const
 
 describe("the component's validators, against a misshapen call", () => {
-  for (const [argsOf, fnName, blurb] of MisshapenCases) {
+  for (const [argsOf, fnname, blurb] of MisshapenCases) {
     it(`refuse ${blurb}, storing nothing`, async () => {
       const backend = await withVault()
-      const fnRef = (fnName === 'putVault') ? api.putVault : api.putBox
+      const fnRef = (fnname === 'putVault') ? api.putVault : api.putBox
       await expect(backend.mutation(fnRef, argsOf() as never)).rejects.toThrow(/Validator/)
       expect(await storedRows(backend)).to.deep.equal({ vaults: [vault], boxes: [], tallies: 0 })
     })

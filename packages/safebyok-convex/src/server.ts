@@ -147,8 +147,8 @@ export class SafebyokComponent {
 
 /** The host's safebyok functions as its clients reference them, `api.safebyok`, once re-exported from `convex/safebyok.ts`. */
 export type SafebyokApi = {
-  [FnName in keyof ComponentApi['vaults']]: ComponentApi['vaults'][FnName] extends FunctionReference<infer FnKind, infer _Visibility, infer ArgsT, infer ReturnT>
-    ? FunctionReference<FnKind, 'public', ArgsT, ReturnT>
+  [Fnname in keyof ComponentApi['vaults']]: ComponentApi['vaults'][Fnname] extends FunctionReference<infer Fnkind, infer _Visibility, infer ArgsT, infer ReturnT>
+    ? FunctionReference<Fnkind, 'public', ArgsT, ReturnT>
     : never
 }
 // --

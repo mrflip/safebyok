@@ -150,8 +150,8 @@ export const tidyGone = mutation({
   returns: CVX.tidied,
   handler: async (ctx, { scope }) => {
     const vaultDocs = await listVaultDocs(ctx.db, scope)
-    const vaultsByLabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
-    const isOver = ({ vaultlabel, vault_tok }: Life) => SX.isLifeOver(vaultsByLabel.get(vaultlabel) ?? null, vault_tok)
+    const vaultsBylabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
+    const isOver = ({ vaultlabel, vault_tok }: Life) => SX.isLifeOver(vaultsBylabel.get(vaultlabel) ?? null, vault_tok)
     const boxDocs = await listBoxDocs(ctx.db, scope)
     const tallyDocs = await listTallyDocs(ctx.db, scope)
     const overBoxDocs = boxDocs.filter((boxDoc) => isOver(boxDoc))

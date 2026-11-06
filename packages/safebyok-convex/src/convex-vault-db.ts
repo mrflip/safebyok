@@ -219,7 +219,7 @@ const isConvexClient = (candidate: unknown): candidate is ConvexVaultClient => {
 }
 
 /** The functions a vault calls, by name. */
-const SafebyokFnNames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVault', 'putBox', 'delVault', 'delBox', 'tidyGone', 'watchRows'] as const
+const SafebyokFnnames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVault', 'putBox', 'delVault', 'delBox', 'tidyGone', 'watchRows'] as const
 
 // Each function must name itself as `<module>:<function>`. The whole generated `api` answers any
 // property, so `api.getVault` exists, but names no module, and Convex refuses to name it.
@@ -227,11 +227,11 @@ const SafebyokFnNames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVa
 const isSafebyokApi = (candidate: unknown): candidate is SafebyokApi => {
   if ((typeof candidate !== 'object') || (candidate === null)) { return false }
   const fnRefs = candidate as Partial<Record<string, FunctionReference<'query' | 'mutation'>>>
-  return SafebyokFnNames.every((fnName) => {
-    const fnRef = fnRefs[fnName]
+  return SafebyokFnnames.every((fnname) => {
+    const fnRef = fnRefs[fnname]
     if (fnRef === undefined) { return false }
     try {
-      return getFunctionName(fnRef).endsWith(`:${fnName}`)
+      return getFunctionName(fnRef).endsWith(`:${fnname}`)
     } catch {
       return false
     }

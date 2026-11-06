@@ -525,7 +525,7 @@ export const SeqNotNext = "A record's revision_seq must be one past its prior's.
 export const storeFailed = (call: string, named: string): string => `This device's own storage failed in ${call}: try again.${named}`
 
 /** The sentence naming what a device store threw, by its `name` alone. */
-export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
+export const storeThrew = (thrownname: string): string => ` It threw ${thrownname}.`
 // --
 
 // == [Refusals: storage backends]: storageFailed, IdentityRevoked
