@@ -28,7 +28,7 @@ is a bug.
   file that names many validators grows a long import list that churns with every one it takes up
   or drops, and puts in scope names its locals want (`vaultRecord`, `whisper`). No lint rule
   holds it, and a file outside the core that reaches one or two imports them by name
-  (safebyok-indexeddb's `idbOpts`, the demo's `label`). A shapes module (`src/shapes/`) is star-imported under one short name
+  (the demo's `label`). A shapes module (`src/shapes/`) is star-imported under one short name
   ending in `X`, the same in every file, as a module of types is under one ending in `T`; its
   types are still imported by name. Or a `Checkers` call takes the module as a source and its
   builder names what it uses, as a record names the field validators it is made of:
