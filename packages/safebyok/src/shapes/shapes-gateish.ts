@@ -6,11 +6,12 @@ import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import { PasskeySaltBytes } from '../helpers/consts'
+import { ForeverMillis, PasskeySaltBytes, isGuarded } from '../helpers/consts'
+import { type VaultLogger, isGuardedLogger } from '../helpers/logger'
 import { type CipherCtxRecord, fromB64OrNull } from '../helpers/crypto'
-import type { StrengthChecker } from '../helpers/passphrase-strength'
+import type { GuardedStrengthChecker, StrengthChecker } from '../helpers/passphrase-strength'
 import type { Gating } from '../models/gating'
-import type { NOVEL, PasskeyProving, PassphraseProving, Proving } from '../models/proving'
+import type { GuardedKeyDeriver, NOVEL, PasskeyProving, PassphraseProving, Proving } from '../models/proving'
 import type { Vault } from '../models/vault'
 import type { VaultListing } from '../models/vault-listing'
 import * as EX from './shapes-enums'
@@ -141,10 +142,8 @@ export type { StrengthChecker } from '../helpers/passphrase-strength'
 // == [The vault's stamp]: vaultStamp, VaultStamp
 
 /** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, and strips the rest. */
-export const vaultStamp = objCheck(({ applabel, user_id, vaultlabel, vault_tok, epochMillis }) => ({
-  applabel,
-  user_id,
-  vaultlabel,
+export const vaultStamp = objCheck(({ vaultScope, vault_tok, epochMillis }) => ({
+  ...vaultScope.unwrap().shape,
   vault_tok,
   registered_at: epochMillis,
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
@@ -154,8 +153,12 @@ export type VaultStamp = Z.infer<typeof vaultStamp>
 
 // == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
-export const { provingWorld } = Checkers('bad_option', ({ obj, keyDeriverShape, device_id }) => ({
-  provingWorld: obj({ keyDeriver: keyDeriverShape, strengthChecker, device_id }),
+export const { provingWorld } = Checkers('bad_option', ({ obj, custom, device_id }) => ({
+  provingWorld: obj({
+    keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
+    strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
+    device_id,
+  }),
 }), [CX])
 
 export type ProvingWorld = Z.infer<typeof provingWorld>
@@ -219,13 +222,13 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
-/** The autolock duration in milliseconds, Infinity for none. */
-export const leaseMillis = Checker(({ int, lit, union }) => union([int.positive(), lit(Infinity)]), 'bad_option')
+/** The autolock duration in milliseconds, at most {@link ForeverMillis}. */
+export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis), 'bad_option')
 
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
-export const leaseFriend = objCheck(({ fn }) => ({
+export const leaseFriend = objCheck(({ fn, custom }) => ({
   ...vaultStamp.shape,
-  logger:          CX.loggerShape,
+  logger:          custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected),
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
@@ -304,10 +307,13 @@ export type ClearsForGatingkind = {
 }
 // --
 
-// == [Given to a gating]: RequestCleartext, AnyGating, GatingSnapshot, VaultBuildProvings, VaultUnlockProvings, AnteProvings, PassphraseReplaceProvings, PasskeyAddProvings, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
+// == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, VaultBuildProvings, VaultUnlockProvings, AnteProvings, PassphraseReplaceProvings, PasskeyAddProvings, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
 
 /** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
 export type RequestCleartext = (gating: AnyGating) => unknown
+
+/** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */
+export type AskUser = (gating: AnyGating) => Promise<boolean>
 
 export type AnyGating = { [KindT in EX.GatingKind]: Gating<KindT> }[EX.GatingKind]
 

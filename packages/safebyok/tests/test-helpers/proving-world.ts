@@ -11,13 +11,15 @@ import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
-import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
+import { NOVEL, PasskeyProving, PassphraseProving, guardKeyDeriver } from '../../src/models/proving'
+import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import * as GX from '../../src/shapes/shapes-gateish'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/shapes/shapes-gateish'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/refusals/outcome'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { anyStrengthChecker, testDeriver } from './builders'
+import { parseLogger } from '../../src/helpers/logger'
 import { type LoggedCall, spyLogger } from './logging'
 import { T0 } from './models-world'
 
@@ -63,7 +65,7 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
     ...WorldStamp,
     leaseMillis:     FriendLeaseMillis,
     ...overrides,
-    logger,
+    logger:          parseLogger(logger),
     logged:          calls,
     cached:          null,
     lock:            vi.fn<() => void>(),
@@ -102,14 +104,16 @@ export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string,
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
 /** The `device_id` a {@link provingWorldOf} world carries. */
-export const DeviceId = 'device_laptop'
+export const DeviceId = '00000000-0000-4000-8000-00000000000a'
 
-/** A proving's world: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}. */
-export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWorld => ({
-  keyDeriver:      testDeriver,
-  strengthChecker: anyStrengthChecker,
-  device_id:       DeviceId,
-  ...overrides,
+/** What a test may say of a {@link provingWorldOf} world: the host's own deriver and checker, which it wraps as a bank does. */
+export type ProvingWorldGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_id?: string | undefined }
+
+/** A proving's world: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}, each wrapped as a bank wraps it. */
+export const provingWorldOf = ({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_id = DeviceId }: ProvingWorldGiven = {}): ProvingWorld => ({
+  keyDeriver:      guardKeyDeriver(keyDeriver),
+  strengthChecker: guardStrengthChecker(strengthChecker),
+  device_id,
 })
 
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */

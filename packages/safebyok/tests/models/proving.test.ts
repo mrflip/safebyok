@@ -1,12 +1,12 @@
 import { describe, expect, it, type Mock, vi } from 'vitest'
-import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { PasskeySaltBytes, isGuarded } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
 import { vaultScope } from '../../src/shapes/shapes-core'
 import { type ProvingWorld, FirstGateEpoch, type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import { NOVEL, PasskeyProving, PassphraseProving, Proving } from '../../src/models/proving'
+import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
 import { _cheat_vaultKeyBytesOf, builtGateOf, DeviceId, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
@@ -118,6 +118,8 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
     [() => ({ world: TH.omitting(provingWorldOf(), 'device_id') }),       'a world with no device_id'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'strengthChecker') }), 'a world with no strengthChecker'],
     [() => ({ world: provingWorldOf({ device_id: '' }) }),                'a world with an empty device_id'],
+    [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world holding the host's bare keyDeriver"],
+    [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world holding the host's bare strengthChecker"],
     [() => ({ stamp: { ...WorldStamp, vault_tok: undefined } }),          'a stamp with no vault_tok'],
     [() => ({ stamp: { ...WorldStamp, registered_at: 'yesterday' } }),    'a stamp registered at a time that is no epoch millis'],
     [() => ({ stamp: null }),                                             'no stamp at all'],
@@ -320,6 +322,50 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
   })
 })
 
+describe("guardKeyDeriver(hostDeriver)", () => {
+  it("keeps the deriver's label and salt length, frozen and branded as guarded, the brand hidden from a spread", () => {
+    const guarded = guardKeyDeriver(TH.testDeriver)
+    expect(guarded).to.include({ key_deriver_label: TH.testDeriver.key_deriver_label, salt_bytes: TH.testDeriver.salt_bytes })
+    expect(Object.isFrozen(guarded)).to.be.true
+    expect(isGuarded(guarded)).to.be.true
+    expect(isGuarded({ ...guarded })).to.be.false
+  })
+
+  it("takes any label and salt length a host chooses that fits the interface", async () => {
+    const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf', salt_bytes: 1 })
+    const proving = await novelPassphrase({ ...provingWorldOf(), keyDeriver: guarded })
+    const wayin = await proving.buildWayin(NOVEL)
+    expect(wayin.toJSON()).to.include({ key_deriver_label: 'my_own_kdf' })
+  })
+
+  const Misfits = [
+    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 16 },                                         'a deriver with no deriveKeyBytes'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 0, deriveKeyBytes: () => Promise.resolve() },  'a deriver asking for no salt'],
+    [{ salt_bytes: 16, deriveKeyBytes: () => Promise.resolve() },                                  'a deriver with no label'],
+    [() => undefined,                                                                              'a bare function'],
+  ] as const
+  for (const [misfit, blurb] of Misfits) {
+    it(`refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => guardKeyDeriver(misfit as never), 'bad_option')
+    })
+  }
+
+  it("runs the host's load on the host, and resolves for a deriver that carries none", async () => {
+    const hostLoad = vi.fn(function (this: unknown) { return Promise.resolve() })
+    const hostDeriver = { ...TH.testDeriver, load: hostLoad }
+    await guardKeyDeriver(hostDeriver).load()
+    expect(hostLoad.mock.contexts[0]).to.eq(hostDeriver)
+    await guardKeyDeriver(TH.testDeriver).load()
+  })
+
+  it("refuses a load that fails, with what it threw as the cause", async () => {
+    const chunkLost = new TypeError('Failed to fetch dynamically imported module')
+    const err = await TH.expectRefusal(guardKeyDeriver({ ...TH.testDeriver, load: () => Promise.reject(chunkLost) }).load(), 'unexpected_error')
+    expect(err.message).to.match(/keyDeriver's load\(\) failed/)
+    expect(err.cause).to.eq(chunkLost)
+  })
+})
+
 describe("a proving's header", () => {
   it("of a passphrase proving: the deriver's label, a fresh salt, the world's device_id, and registered_at from the time now", async () => {
     vi.setSystemTime(T0 + 5)
@@ -442,7 +488,7 @@ const StampCases = [
 ] as const
 
 const HeaderCases = [
-  [{ device_id: 'device_elsewhere' }, 'a header whose device_id was swapped'],
+  [{ device_id: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose device_id was swapped'],
   [{ registered_at: T0 + 1 },         'a header whose registered_at moved'],
 ] as const
 

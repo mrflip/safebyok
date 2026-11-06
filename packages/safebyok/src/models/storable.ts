@@ -8,7 +8,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
-import type { Fetched, FetchOpts, ListingOf, Reconciled, Revision, Settled, SparseBase, StorableOpts, TimelyOpts, Tombstone, World } from '../shapes/shapes-vaultish'
+import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Revision, Settled, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
 
 // == [Revisions]: cmpRevisions
 
@@ -24,10 +24,10 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 // --
 
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #horizonMillis, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isFUBag
+  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isFUBag
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
-  declare readonly world:   World
+  declare readonly world:   ListingWorld
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
   /** The vault this thing lies in, inscribed once by `assignInitialProps` and never moved. */
@@ -48,8 +48,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #central: Fetched<RecordT, SparseT>
   /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
   #snapshot: SnapshotT | null = null
-  /** How long after its last refresh the record in hand stays timely, where a caller names no age of its own. */
-  readonly #horizonMillis: number
   /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
   #refreshedAt: number | null = null
   /** The fetch under way, which every `fetch` made meanwhile joins. */
@@ -109,9 +107,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Construction]: constructor, assignInitialProps, assign
 
   /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
-  constructor(world: World, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>, opts: StorableOpts) {
-    const { opts: { maxMillisSinceRefresh } } = VX.storableArgs.parse({ world, listing, central, opts })
-    this.#horizonMillis = maxMillisSinceRefresh
+  constructor(world: ListingWorld, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>) {
+    VX.storableArgs.parse({ world, listing, central })
     adorn(this, 'world', world)
     adorn(this, 'listing', listing)
     this.#scope = Object.freeze(listing.scopeOf(central))
@@ -142,7 +139,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** SLOPDOC: Refreshes this thing from storage through the listing, joining any fetch under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
-    const { ifAbsent = 'fail', maxWorldMillis } = VX.fetchOpts.parse(opts)
+    const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     this.#demandInstanceEnabled()
     await this.#oneFetchAtATime()
@@ -157,7 +154,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
-    const { maxMillisSinceRefresh = this.#horizonMillis, maxWorldMillis } = VX.timelyOpts.parse(opts)
+    const { maxMillisSinceRefresh = this.listing.maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
     return this.fetch({ ifAbsent: 'nil' })
@@ -301,7 +298,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get isLocked(): boolean { return this.listing.lockState() === 'locked' }
 
   /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
-  get isTimely(): boolean { return this.#isRefreshedWithin(this.#horizonMillis) }
+  get isTimely(): boolean { return this.#isRefreshedWithin(this.listing.maxMillisSinceRefresh) }
 
   #isRefreshedWithin(maxMillis: number): boolean {
     return this.#refreshedAt !== null && nowMillis() - this.#refreshedAt < maxMillis

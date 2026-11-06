@@ -1,17 +1,14 @@
 /** A vault's life end to end, through real vaults, a real lease and real boxes, over the MemoryVaultDB and the fake deviceDB of `vault-world.ts`: each `describe` a chapter, each test a sentence of the story. */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { LOCKED } from '../../src/helpers/consts'
 import type { VaultRecord } from '../../src/shapes/shapes-vaultish'
 import type { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
-import { type ModelsWorld, boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
+import { TestableBoxListing } from '../test-helpers/models-world'
 import { Dna, NewPassphrase, Passphrase, addPasskeyTyping, boxWorldOf, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, revokeTyping, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
-
-const modelsWorlds: ModelsWorld[] = []
-afterEach(() => { for (const mw of modelsWorlds.splice(0)) { mw.dispose() } })
 
 const Whisper    = { apiKey: 'sk-test-0000' }
 const NewWhisper = { apiKey: 'sk-test-1111' }
@@ -21,11 +18,9 @@ const BoxDna     = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, si
 /** A vault as `born` makes it, with a box created in it, stored in the vaultDB every session and device here shares: `boxIn(vault)` fetches that box as `vault`'s world sees it. */
 const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBornVault()) => {
   const world = await born
-  const mw = makeModelsWorld({ fakeTimers: false })
-  modelsWorlds.push(mw)
-  const box = await boxListingOf(mw, { world: boxWorldOf(world.vault), vaultDB: world.opts.vaultDB }).create(BoxDna)
+  const box = await new TestableBoxListing(boxWorldOf(world.vault), world.opts).create(BoxDna)
   const boxIn = async (vault: Vault) => {
-    const found = await boxListingOf(mw, { world: boxWorldOf(vault), vaultDB: world.opts.vaultDB }).fetch(box.scope)
+    const found = await new TestableBoxListing(boxWorldOf(vault), world.opts).fetch(box.scope)
     if (found === null) { throw new Error('no box stored') }
     return found
   }
@@ -177,7 +172,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
 
 /** The vault as another device holds it: its own deviceDB, caching no lease yet, over the record this device stored, after its hello. */
 const openOtherDevice = async (stored: VaultRecord) => {
-  const other = makeVaultWorld(stored, { device_id: 'device_2' })
+  const other = makeVaultWorld(stored, { device_id: '00000000-0000-4000-8000-000000000002' })
   const vault = await other.listing.build(other.demandStored())
   await other.listing.hello()
   return { ...other, vault }

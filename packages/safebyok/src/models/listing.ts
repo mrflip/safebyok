@@ -8,7 +8,7 @@ import type { IfAbsent, LockState } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import type { DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, PutListingOpts, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
+import type { DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
 import { disabledError, otherVaultTokAtBirth, putAnsweredNothing } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -21,7 +21,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
-  protected readonly maxMillisSinceRefresh: number
+  readonly maxMillisSinceRefresh: number
   protected readonly vaultDB: VaultDB
 
   readonly #things    = new Map<string, ThingT>()
@@ -53,11 +53,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Construction]: constructor, build
 
-  constructor(opts: ListingOpts) {
-    VX.listingOpts.parse(opts)
-    this.world = opts.world
-    this.vaultDB = opts.vaultDB
-    this.maxMillisSinceRefresh = opts.maxMillisSinceRefresh
+  constructor(world: ListingWorld, opts: ListingOpts) {
+    VX.listingWorld.parse(world)
+    const { vaultDB, maxMillisSinceRefresh } = VX.listingOpts.parse(opts)
+    this.world = world
+    this.vaultDB = vaultDB
+    this.maxMillisSinceRefresh = maxMillisSinceRefresh
   }
 
   /** The instance of `record`, built or brought up to it, and held. Stores nothing. */
@@ -137,7 +138,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** SLOPDOC: The instance under `scope` as storage now holds it, built where none was held. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
-    const { ifAbsent = 'fail', maxWorldMillis } = VX.fetchOpts.parse(opts)
+    const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
     await this.ensureTimelyWorld(maxWorldMillis)
     this.demandEnabled()
@@ -156,16 +157,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** Stores `record` over the revision `prior`, answering the instance held. */
-  async put(record: RecordT, opts: PutListingOpts): Promise<ThingT> {
+  async put(record: RecordT, opts: PutOpts): Promise<ThingT> {
     const checked = this.recordOf(record)
-    const { prior, ifAbsent = 'add', ifPresent = 'repl' } = VX.putListingOpts.parse(opts)
+    const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
     this.demandEnabled()
     const thing = await this.deliver(await this.tryPutRow(checked, { prior, ifAbsent, ifPresent }))
     if (thing === null) { throw putAnsweredNothing() }
     return thing
   }
 
-  tryPut(record: RecordT, opts: PutListingOpts): Promise<Outcome<ThingT>> { return outcomeOf(() => this.put(record, opts)) }
+  tryPut(record: RecordT, opts: PutOpts): Promise<Outcome<ThingT>> { return outcomeOf(() => this.put(record, opts)) }
 
   /** SLOPDOC: Deletes the thing `duck` names and delivers storage's answer: its tombstone, if anything was stored. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {

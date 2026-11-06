@@ -1,0 +1,35 @@
+# Thread 7: the host functions, branded (2026-11-06)
+
+Branch `20261106-host_branding`, PR #552, stacked on #550 (thread 6). Justify: green; safebyok 66 files, 2203 tests; every package green.
+
+* **Built** (`b4dec015c`):
+  * `Bank`'s constructor wraps each host function once, and holds only the wraps: `keyDeriver = guardKeyDeriver(..)` (`models/proving.ts`), `strengthChecker = guardStrengthChecker(..)` (`helpers/passphrase-strength.ts`), `askUser = guardRequestCleartext(requestCleartext)` and `panic = guardOnPanic(onPanic)` (`models/bank.ts`, beside a module-local `HostChecks`). `onBadNews` stays as it was.
+  * One brand for all four: `IsGuarded`, `isGuarded`, `brandGuarded` in `helpers/consts.ts`. A non-registered symbol, set as a getter by `defineProperty` (not enumerable, so neither a spread nor JSON carries it), then frozen.
+  * `VX.vaultWorld` holds `askUser` and `panic` (no `requestCleartext`, `onPanic`); `GX.provingWorld` holds the guarded `keyDeriver` and `strengthChecker`. Each refuses a function without the brand (`Phrases.GuardedExpected`). `VaultWorld`'s Pick follows.
+  * `askUser(gating)` answers true once the dialog closes, false if it threw, and never throws; `Gating.#askHost` picks `gatingDeclined` or `requestCleartextThrew`. `panic(refusal)` answers false with no `onPanic` (after `reportToPlatform`), true otherwise, a throw going to the platform; `Vault.#panic` vacates on false, and `Bank.#eraseLease` calls it with no vault to vacate. `Bank.#panic` is gone.
+  * The strength checker is checked once, its scope parsed per call. `invokeStrengthChecker` and `loadStrengthChecker` are gone into the wrap and its `load`.
+  * The deriver's wrap checks `CX.keyDeriverShape` once and keeps `key_deriver_label`, `salt_bytes`, `deriveKeyBytes`, `load`. Its `load` refuses as the strength checker's does: `keyDeriverLoadFailed`, `unexpected_error`, the throw kept as cause (a new phrase, `KeyDeriverLoadFailed`). This is the visible behaviour change: a failed deriver `load` used to pass as it came.
+  * `Phrases.BadNewsHandlerThrew` deleted. New exported types, each named by Bank's public props: `AskUser`, `Panic`, `PanicHandler`, `BadNewsHandler`, `GuardedKeyDeriver`, `GuardedStrengthChecker` (src/index.ts).
+  * `notes/guarantees.md`: the file table, the host paragraph, the passphrase chain, G1, G8 and G9 and the derivation bullet name the wraps, made once in Bank's constructor. Only the strength checker's wrap reaches `refusalFor`; G8's doubled `requestCleartextThrew` clause is gone.
+* **Directives**, each its own commit:
+  * `3669b5f42` **`device_id` is a UUID**: `CX.device_id` is zod's `uuid(Phrases.DeviceIdShape)` in the same `Checkers('bad_record')`, so `Bank.make` refuses a non-UUID as 'bad_option' and a stored wayin with a label-shaped id fails safe, as damaged. The test worlds' ids are UUIDs (`00000000-0000-4000-8000-0000000000xx`, the tail telling them apart: `01`/`02` for the vault worlds, `0a` the proving world's `DeviceId`, `b1`/`b2` the bank worlds' two devices, `d1`/`d2` the storage worlds). VOCABULARY.md's deviceId row says UUID. No mint, no first-cached-wins. `user_id` untouched. proving.test's `device_id: ''` stays a refusal case; wayin.test's `'device_other'` stays, as it tests a frozen assignment, never a parse. A new wayin case: a label-shaped id is refused.
+  * `866930f5c` **Fractional minutes**: `millisOf` rounds (`Math.round(minutes * MinuteMillis)`); `Math.round(Infinity)` is Infinity. A test: `autolockMinutes: 1/7` leases 8571 ms.
+  * `5b8c316fe` **Phrases off `browserOpts()`**: `DeviceDBShape`, `KeyDeriverShape`, `StrengthCheckerShape`, `StrengthCheckerLoadFailed`, the `StrengthChecker` doc block and `packages/safebyok/CUSTOMIZATION.md` name `argon2idWebV1Deriver` from `safebyok/browser`, a host's own device store and a host's own checker. CUSTOMIZATION.md's "The one safebyok ships" section (zxcvbn, `browserOpts()`) is gone into "Your own", and the AI prompt's reasons no longer presume a shipped checker.
+* **Decisions taken**:
+  * Each wrap lives beside the code that used to guard it: the deriver's in proving.ts, so the G1/G8 site (`deriveKeyBytes`) stays put; the checker's in passphrase-strength.ts; the dialog's and panic's in bank.ts, as only Bank makes them.
+  * Handrolled host-facing types: `AskUser`, `Panic`, `PanicHandler`, `BadNewsHandler`, `GuardedKeyDeriver`, `GuardedStrengthChecker`. In-repo bags stay inferred (`ProvingWorld`, `VaultWorld` as Picks).
+  * Tests: `makeVaultWorld` keeps a `requestCleartext` on its `FakeBank`, and its `askUser` reads that at each call, so the ~15 tests that swap `fakeBank.requestCleartext` stay as they were. `provingWorldOf` takes the raw functions and guards them.
+  * `checkSuppliedSpecKept` kept: it is reached only from our `argon2idDeriver(spec)` factory and guards our own `argon2id_web_` label namespace, which is no policing of a host's choices.
+  * The logger keeps its WeakSet brand. Replacing the `loggerShape` checks in the worlds with the brand is left to thread 8 (`checkers_once`).
+* **G1/G8 checked** (guarantees.md, *The guarantees*): the deriver still hears the passphrase only as an argument of `deriveKeyBytes`; its throw is still replaced (`keyDeriverThrew`), never kept; the key bytes are still checked and zeroed in `passphraseKeyOf`. The checker's throw still goes through `refusalFor`. The dialog's throw is dropped, unread. The deriver's `load` hears no passphrase, so its throw is kept as a cause.
+* **Deviations**:
+  * Directive 3 named `memoryDeviceDB()`: the new core exports no such factory, so the phrase names the host's own device store. See Discoveries.
+  * The failed `keyDeriver.load` refusal is `keyDeriverLoadFailed`, a thrower and phrase of its own beside `strengthCheckerLoadFailed`, rather than sharing that one, as its message names the deriver.
+* **Discoveries**:
+  * **The core's published entries export no device store, no `DeviceDB` class and no strength checker.** `safebyok` exports `Bank` and kin, `safebyok/browser` only the Argon2id derivers. A host cannot today build a `deviceDB` that `Bank.make` accepts from the published surface. `.size-limit.json`'s `browserOpts` and `zxcvbnStrengthChecker` entries measure safebyok-old.
+  * Thread 8 (`checkers_once`) can swap the worlds' `loggerShape` checks for the logger's WeakSet brand the same way the four host functions now use `isGuarded`. Thread 9 (`types_ab`) will find the handrolled types listed above.
+* **Suppressions**: none added. proving.ts's `@ts-expect-error` in `isSafelyAllZero` is pre-existing.
+* **For the Coach**:
+  * **checkSuppliedSpecKept stays**: it guards our own `argon2id_web_` labels inside our own factory, so it does not police a host. Recommend keeping it.
+  * **No device store in the published surface**: recommend a thread exporting `DeviceDB` and an in-memory and an IndexedDB store, so the `DeviceDBShape` phrase can name one.
+  * **CUSTOMIZATION.md lost its zxcvbn section**: recommend this until a checker ships again; restore it with the checker if one does.
