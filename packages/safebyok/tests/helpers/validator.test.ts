@@ -45,7 +45,7 @@ describe("Checkers", () => {
   // Checkers @example 1
   it("refuses a scope with a bad name as its call's kind, naming the field", () => {
     const err = TH.expectSyncRefusal(() => vaultScope.parse({ ...scope, vaultlabel: 'Main' }), 'bad_scope')
-    expect(err.message).to.match(/^vaultlabel: A label is lowercase words/)
+    expect(err.message).to.match(/^vaultlabel: A label is lowercase letters, digits and single underscores/)
     expect(err.meta?.fieldnames).to.deep.equal(['vaultlabel'])
   })
 

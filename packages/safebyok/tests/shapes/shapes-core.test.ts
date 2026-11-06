@@ -186,7 +186,7 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
 
   it("refuse a bad boxlabel, naming the field", () => {
     const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' }), 'bad_scope')
-    expect(err.message).to.match(/^boxlabel: A label is lowercase words/)
+    expect(err.message).to.match(/^boxlabel: A label is lowercase letters, digits and single underscores/)
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
   })
 

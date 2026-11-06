@@ -20,7 +20,7 @@ export const MaxLabelChars = 40
  */
 export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
 
-/** An applabel, a vaultlabel or a boxlabel: lowercase words of letters and digits joined by single underscores, starting with a letter, two to {@link MaxLabelChars} characters.
+/** An applabel, a vaultlabel or a boxlabel: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two to {@link MaxLabelChars} characters.
  * Check a label a user types with `safeParse` before handing it to the vault, which refuses one
  * that fails as 'bad_scope'.
  *

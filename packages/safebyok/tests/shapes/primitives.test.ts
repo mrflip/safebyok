@@ -49,7 +49,7 @@ describe("label", () => {
 
   it("says what is wrong in its own sentences, and never quotes the label", () => {
     const said = JSON.stringify([PX.label.safeParse('Secret_Label'), PX.label.safeParse(`secret${'x'.repeat(MaxLabelChars)}`)].map((checked) => checked.error?.issues.map((issue) => issue.message)))
-    expect(said).to.include('lowercase words of letters and digits')
+    expect(said).to.include('starting with a letter and ending on a letter or digit')
     expect(said).to.include('at most 40 characters')
     expect(said.toLowerCase()).to.not.include('secret')
   })
