@@ -2,11 +2,10 @@
 
 import { describe, expect, it } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
-import * as Phrases from '../../src/helpers/phrases'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRecord } from '../../src/shapes/shapes-storage'
-import { bankScope, vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, storeWith } from '../test-helpers/storage-world'
+import { _cheat_rowsOf, vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, storeWith } from '../test-helpers/storage-world'
 
 /** A gate verb's params: a vault record holding a gate that holds the wayin. */
 const paramsOf = (vault: VaultRecord, gate: object) => ({ ...vault, gate }) as never
@@ -57,26 +56,25 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryPutVault(vaultAt(8), { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: null })
     })
 
-    it("refuses a record's revision_seq not one past its prior's, and a record failing its checks, quoting none of it", async () => {
+    it("refuses a record's revision_seq not one past its prior's, and a record failing its checks, naming the field and quoting none of it", async () => {
       const vaultDB = new MemoryVaultDB()
       expect(await vaultDB.tryPutVault(vaultAt(3), { prior: SX.VoidRevision })).to.deep.include({ ok: false })
       const secretish = 'hunter2'
       const answer = await vaultDB.tryPutVault({ ...vaultAt(), vaultlabel: `${secretish}^^bad label` }, { prior: SX.VoidRevision })
       expect(answer).to.deep.include({ ok: false, req_params: {} })
+      expect(answer.err?.meta?.fieldnames).to.deep.equal(['vaultlabel'])
       expect(JSON.stringify([answer.err?.message, answer.req_params])).to.not.include(secretish)
     })
 
-    it("refuses a box record, a box tombstone or a vault tombstone failing its checks, as it is safebyok's to prepare, storing nothing", async () => {
+    it("refuses a box record, a box tombstone or a vault tombstone failing its checks, naming the field and storing nothing", async () => {
       const { vaultDB, vault, box } = await storeWith({ box: true })
       const answers = [
         await vaultDB.tryPutBox({ ...boxAt(1), whisper_ciphered: 7 } as never, { prior: priorOf(box) }),
         await vaultDB.tryDelBox({ ...boxTombstoneOf(box), am: 'a' } as never, { prior: priorOf(box) }),
         await vaultDB.tryDelVault({ ...vaultTombstoneOf(vault), gate: vault.gate } as never, { prior: priorOf(vault) }),
       ]
-      for (const answer of answers) {
-        expect(answer).to.deep.include({ ok: false })
-        expect(answer.err?.message).to.eq(Phrases.RecordPreparedWrong)
-      }
+      for (const answer of answers) { expect(answer).to.deep.include({ ok: false }) }
+      expect(answers.slice(0, 2).map(({ err }) => err?.meta?.fieldnames)).to.deep.equal([['whisper_ciphered'], ['am']])
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: box.vault_tok })).to.deep.include({ val: box })
     })
   })
@@ -86,7 +84,7 @@ describe("MemoryVaultDB", () => {
       const vaultDB = new MemoryVaultDB()
       const answer = await vaultDB.tryPutVault(vaultAt(6), { prior: { revision_tok: SX.VoidRevisionTok, revision_seq: 5 } })
       expect(answer).to.deep.include({ ok: false, act: 'stale_write', dbhas: null })
-      expect(vaultDB._cheat_vaultRowsOf(bankScope).size).to.eq(0)
+      expect(_cheat_rowsOf(vaultDB).vaultrows().size).to.eq(0)
     })
   })
 
@@ -142,7 +140,7 @@ describe("MemoryVaultDB", () => {
     it.each(anyIfPresent)("refuses absent_box over a void box row with ifAbsent fail and ifPresent %s", async (ifPresent) => {
       const { vaultDB, vault, box } = await storeWith()
       expect(await vaultDB.tryPutBox(box, { prior: SX.VoidRevision, ifAbsent: 'fail', ifPresent })).to.deep.include({ ok: false, act: 'void', dbhas: null, world: vault })
-      expect(vaultDB._cheat_boxRowsOf(boxscope, 'life1').size).to.eq(0)
+      expect(_cheat_rowsOf(vaultDB).boxrows().size).to.eq(0)
     })
 
     it.each(anyIfPresent)("refuses absent_box over a box tombstone with ifAbsent fail and ifPresent %s, at its revision or not", async (ifPresent) => {
@@ -199,7 +197,7 @@ describe("MemoryVaultDB", () => {
       const empty = new MemoryVaultDB()
       const answer = await empty.tryPutVault(vaultAt(), { prior: SX.VoidRevision, ifAbsent: 'fail', ifPresent })
       expect(answer).to.deep.include({ ok: false, dbhas: null })
-      expect(empty._cheat_vaultRowsOf(bankScope).size).to.eq(0)
+      expect(_cheat_rowsOf(empty).vaultrows().size).to.eq(0)
       const { vaultDB, vault } = await storeWith()
       const tombstone = vaultTombstoneOf(vault)
       await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
@@ -219,15 +217,15 @@ describe("MemoryVaultDB", () => {
   })
 
   describe("box writes under a vault row failing its checks", () => {
-    it("refuse 'damaged_row' or 'newer_format', and change nothing", async () => {
+    it("refuse under any such row, a later fmt among them, and change nothing", async () => {
       const { vaultDB, vault, box } = await storeWith({ box: true })
-      const boxRows = vaultDB._cheat_boxRowsOf(vaultScope, 'life1')
-      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { ...vault, gate: 'rubble' })
+      const boxRows = _cheat_rowsOf(vaultDB).boxrows()
+      _cheat_rowsOf(vaultDB).vaultrows().set('main', { ...vault, gate: 'rubble' })
       const nextBox = boxAt(1)
       expect(await vaultDB.tryPutBox(nextBox, { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_row' })
       expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_row' })
-      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { ...vault, fmt: SX.VaultFormat + 1 })
-      expect(await vaultDB.tryPutBox(nextBox, { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'newer_format' })
+      _cheat_rowsOf(vaultDB).vaultrows().set('main', { ...vault, fmt: SX.VaultFormat + 1 })
+      expect(await vaultDB.tryPutBox(nextBox, { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_row' })
       expect(boxRows.get('openai')).to.deep.equal(box)
     })
   })
@@ -273,10 +271,10 @@ describe("MemoryVaultDB", () => {
 
     it("refuses a verb touching the other wayin, and params that disagree with the row", async () => {
       const { vaultDB, vault } = await storeWith()
-      expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, world: vault })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf(vault, { passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false })
       expect(await vaultDB.tryAddPasskey(paramsOf(vault, { passkey_wayin: passkeyWayin, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
       expect(await vaultDB.tryRevokePasskey(paramsOf(vault, { passkey_wayin: null, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
-      expect(await vaultDB.tryReplacePassphrase(paramsOf({ ...vault, registered_at: Now + 5 }, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
+      expect(await vaultDB.tryReplacePassphrase(paramsOf({ ...vault, registered_at: Now + 5 }, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, world: vault })
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
 

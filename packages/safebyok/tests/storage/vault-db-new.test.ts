@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
-import { bankScope, vaultScope, boxscope, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, storeWith } from '../test-helpers/storage-world'
+import { _cheat_rowsOf, bankScope, vaultScope, boxscope, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, storeWith } from '../test-helpers/storage-world'
 
 const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
   try { await thunk() } catch (err) { return err }
@@ -30,8 +30,8 @@ describe("MemoryVaultDB", () => {
 
     it("lists vaults full or tombstone, and sets aside a row failing validation as a tombstone in the one shape", async () => {
       const { vaultDB, vault } = await storeWith()
-      vaultDB._cheat_vaultRowsOf(bankScope).set('broken', { revision_tok: 'r9', revision_seq: 9, am: 'a', vault_tok: 'life9', garbage: true })
-      vaultDB._cheat_vaultRowsOf(bankScope).set('rubble', 'not even an object')
+      _cheat_rowsOf(vaultDB).vaultrows().set('broken', { revision_tok: 'r9', revision_seq: 9, am: 'a', vault_tok: 'life9', garbage: true })
+      _cheat_rowsOf(vaultDB).vaultrows().set('rubble', 'not even an object')
       const { act, val } = await vaultDB.listVaults(bankScope)
       expect(act).to.eq('got')
       expect(val.vaults).to.deep.equal([vault])
@@ -44,8 +44,8 @@ describe("MemoryVaultDB", () => {
 
     it("says format_mismatch of a row of a later fmt, and damaged_row of any other it sets aside", async () => {
       const { vaultDB } = await storeWith()
-      vaultDB._cheat_vaultRowsOf(bankScope).set('newer', { fmt: SX.VaultFormat + 1, revision_seq: 9 })
-      vaultDB._cheat_vaultRowsOf(bankScope).set('rubble', 'not even an object')
+      _cheat_rowsOf(vaultDB).vaultrows().set('newer', { fmt: SX.VaultFormat + 1, revision_seq: 9 })
+      _cheat_rowsOf(vaultDB).vaultrows().set('rubble', 'not even an object')
       const { val } = await vaultDB.listVaults(bankScope)
       expect(val.damaged_rows.map(({ vaultlabel, damagekind }) => ({ vaultlabel, damagekind }))).to.deep.equal([
         { vaultlabel: 'newer',  damagekind: 'format_mismatch' },
@@ -55,7 +55,7 @@ describe("MemoryVaultDB", () => {
 
     it("lists a row under a label failing its check among the damaged, and the rest as ever", async () => {
       const { vaultDB, vault } = await storeWith()
-      vaultDB._cheat_vaultRowsOf(bankScope).set('Not A Label', { garbage: true })
+      _cheat_rowsOf(vaultDB).vaultrows().set('Not A Label', { garbage: true })
       const { val } = await vaultDB.listVaults(bankScope)
       expect(val.vaults).to.deep.equal([vault])
       expect(val.damaged_rows.map(({ vaultlabel, am }) => ({ vaultlabel, am }))).to.deep.equal([{ vaultlabel: 'Not A Label', am: 'd' }])
@@ -86,12 +86,14 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getVault(vaultScope, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone, world: tombstone })
     })
 
-    it("refuses damaged_row for a row failing validation, and newer_format for one of a later fmt, with no world and the request's safe metadata", async () => {
+    it("refuses a row failing validation or of a later fmt, naming the field, with no world and the request's safe metadata", async () => {
       const { vaultDB } = await storeWith()
-      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { garbage: true })
+      _cheat_rowsOf(vaultDB).vaultrows().set('main', { garbage: true })
       expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'damaged_row', world: null, req_params: vaultScope })
-      vaultDB._cheat_vaultRowsOf(bankScope).set('main', { fmt: SX.VaultFormat + 1 })
-      expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'newer_format', world: null })
+      _cheat_rowsOf(vaultDB).vaultrows().set('main', { ...vaultAt(), fmt: SX.VaultFormat + 1 })
+      const newer = await vaultDB.tryGetVault(vaultScope)
+      expect(newer).to.deep.include({ ok: false, act: 'damaged_row', world: null })
+      expect(newer.err?.meta?.fieldnames).to.deep.equal(['fmt'])
     })
   })
 
@@ -103,7 +105,7 @@ describe("MemoryVaultDB", () => {
       const other = boxAt(0, 'life1', { boxlabel: 'other' })
       await vaultDB.putBox(other, { prior: SX.VoidRevision })
       await vaultDB.delBox(boxTombstoneOf(other), { prior: priorOf(other) })
-      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('rubble', 12)
+      _cheat_rowsOf(vaultDB).boxrows().set('rubble', 12)
       const { act, val, world } = await vaultDB.listBoxes(vaultQuery)
       expect(act).to.eq('got')
       expect(world).to.deep.equal(vault)
@@ -113,14 +115,14 @@ describe("MemoryVaultDB", () => {
 
     it("says format_mismatch of a box row of a later fmt", async () => {
       const { vaultDB } = await storeWith()
-      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('newer', { fmt: SX.BoxFormat + 1 })
+      _cheat_rowsOf(vaultDB).boxrows().set('newer', { fmt: SX.BoxFormat + 1 })
       const { val } = await vaultDB.listBoxes(vaultQuery)
       expect(val.damaged_rows.map(({ boxlabel, damagekind }) => ({ boxlabel, damagekind }))).to.deep.equal([{ boxlabel: 'newer', damagekind: 'format_mismatch' }])
     })
 
     it("lists a box under a label failing its check among the damaged", async () => {
       const { vaultDB } = await storeWith({ box: true })
-      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('Not A Label', { garbage: true })
+      _cheat_rowsOf(vaultDB).boxrows().set('Not A Label', { garbage: true })
       const { val } = await vaultDB.listBoxes(vaultQuery)
       expect(val.boxes.map(({ boxlabel }) => boxlabel)).to.deep.equal(['openai'])
       expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
@@ -174,7 +176,7 @@ describe("MemoryVaultDB", () => {
 
     it("refuses under this life's tombstone, and damaged_row for a box row failing validation", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
-      vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set('openai', { garbage: true })
+      _cheat_rowsOf(vaultDB).boxrows().set('openai', { garbage: true })
       expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'damaged_row' })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
       expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false })
@@ -190,7 +192,8 @@ describe("MemoryVaultDB", () => {
       const vaultDB = new FailingVaultDB()
       await expect(vaultDB.listVaults(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
       const answer = await vaultDB.tryListVaults(bankScope)
-      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, req_params: bankScope, meta: { call: 'listVaults' } })
+      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, req_params: bankScope })
+      expect(answer.err?.meta).to.deep.include({ call: 'listVaults' })
       expect((answer.err?.cause as Error).message).to.eq('socket closed')
     })
 

@@ -3,7 +3,7 @@
 import { _cheat_clock } from '../../src/helpers/clock'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
-import type { BoxRecord, BoxTombstone, Revision, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
+import type { BankScope, BoxRecord, BoxTombstone, Revision, VaultRecord, VaultScope, VaultTombstone } from '../../src/shapes/shapes-storage'
 
 export const bankScope  = { applabel: 'acme', user_id: 'u1' }
 export const vaultScope = { ...bankScope, vaultlabel: 'main' }
@@ -43,3 +43,9 @@ export const storeWith = async (opts: { box?: boolean } = {}) => {
   if (opts.box) { await vaultDB.putBox(box, { prior: SX.VoidRevision }) }
   return { vaultDB, vault, box }
 }
+
+/** The rows a store holds, past its verbs: the one door a vaultDB test plants a damaged row by, or sees what a verb stored. */
+export const _cheat_rowsOf = (vaultDB: MemoryVaultDB) => ({
+  vaultrows: (scope: BankScope = bankScope): Map<string, unknown> => vaultDB._cheat_vaultRowsOf(scope),
+  boxrows:   (vault_tok = 'life1', scope: VaultScope = vaultScope): Map<string, unknown> => vaultDB._cheat_boxRowsOf(scope, vault_tok),
+})

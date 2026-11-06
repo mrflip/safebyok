@@ -131,14 +131,23 @@ export type BoxRow       = BoxRecord | BoxTombstone
 export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
 // --
 
+// == [Rows found]: foundVaultRow, foundBoxRow
+
+/** A vault row or box row as a store answers it, null for none: one failing its checks refuses 'damaged_row'. */
+export const { foundVaultRow, foundBoxRow } = Checkers('damaged_row', () => ({
+  foundVaultRow: vaultRow.nullable(),
+  foundBoxRow:   boxRow.nullable(),
+}))
+// --
+
 // == [Gate verbs' params]: replacePassphraseParams, passkeyAddParams, revokePasskeyParams, ReplacePassphraseParams, AddPasskeyParams, RevokePasskeyParams
 
-export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit, unk }) => {
-  // A vault record holding a gate that holds the wayin. A verb's other wayin is admitted here so that the vaultDB can refuse it against the row it read.
+export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit }) => {
+  // A vault record holding a gate that holds only the wayin the verb moves.
   const gateParams = vaultSparse.extend({ am: lit('a') })
-  const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayin, passkey_wayin: unk.optional() }).strict() }).strict()
-  const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayin, passphrase_wayin: unk.optional() }).strict() }).strict()
-  const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null), passphrase_wayin: unk.optional() }).strict() }).strict()
+  const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayin }).strict() }).strict()
+  const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayin }).strict() }).strict()
+  const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null) }).strict() }).strict()
   return { replacePassphraseParams, passkeyAddParams, revokePasskeyParams }
 })
 
@@ -147,7 +156,7 @@ export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutVaultOpts, DelOpts, ReqParams, VaultDBOpts, MemoryVaultDBOpts
+// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, VaultDBOpts, MemoryVaultDBOpts
 
 export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
@@ -165,6 +174,7 @@ export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape,
 
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
+export type PutOptsGiven = Readonly<Z.output<typeof putOpts>>
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
