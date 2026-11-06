@@ -369,6 +369,24 @@ rewrites the client as its own class over an exported VaultDB interface, so safe
 rewritten once. **Depends on:** the restack, and the relay ruling. **Size:** L; `high` review
 (it touches the refusal surface).
 
+*Consensus with the Coach, 2026-11-06, in chat.* The Coach: "the front schema will look very much
+like the answer types: { val meta world err ok act dbhas? damaged_rows? params? } in Box and Vault
+flavors, plus two listing types; the subscriptions with largely the same shape. JSON fields would
+be used for sidecar, damaged_rows, meta and err.meta but in general everything else looks like
+graphql. graphql errors on the browser side should be considered in the same light as if a
+malformed query were sent to postgres: an error, even a schema mismatch, doesn't indicate bad
+record or damaged record, it most like indicates a wire compatability issue". Agreed on the
+orchestrator's points: (1) times as an `EpochMillis` scalar; (2) the core's answer checkers accept
+null for an absent field (the Coach leans to strong per-verb-family types, not one umbrella type
+with nullable fields: not settled); "No slot can hold a damaged row except one named
+damaged_rows: [JSON!]!" (TODO.md, *Single-row damage moves to `damaged_rows`*); (3) live and
+tombstone rows as a union; (4) a browser-side GraphQL error is not `storage_unavailable` (it will
+not clear on retry): `unexpected_error` with its cause, or a kind of its own; (5) `err.meta` is
+built server-side from a fixed list of fields, never a spread of a refusal's meta, and no cause
+crosses; (6) an old client silently drops a newer server's optional field on a read-then-write
+(a sentence at 1.0); (7) `Tidied` is a type of its own, and a drift test checks the core's
+checkers against the schema.
+
 ## For the Coach
 
 * ~~**The demo loses its IndexedDB vault store** when thread 3 lands.~~ *Coach (2026-11-06):*
