@@ -149,7 +149,12 @@ export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
     const heeders = heedersOf.get(channel) ?? new Set()
     if (! heedersOf.has(channel)) {
       heedersOf.set(channel, heeders)
-      await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
+      try {
+        await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
+      } catch (err) {
+        heedersOf.delete(channel)
+        throw err
+      }
     }
     heeders.add(onNotify)
     return () => heeders.delete(onNotify)
