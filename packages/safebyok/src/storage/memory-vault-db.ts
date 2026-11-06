@@ -35,7 +35,7 @@ export class MemoryVaultDB extends VaultDB {
   }
   // --
 
-  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #storeVaultRow, #storeBoxRow, #demandRoom, #tombstoneBoxesOf, #tell
+  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #storeVaultRow, #storeBoxRow, #demandRoom, #tombstoneBoxes, #tell
 
   /** For tests: the bank's own map of vault rows, by vaultlabel. */
   _cheat_vaultRowsOf({ applabel, user_id }: BankScope): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
@@ -77,7 +77,7 @@ export class MemoryVaultDB extends VaultDB {
   }
 
   /** Tombstones every live box row of the life `tombstone` ends. */
-  #tombstoneBoxesOf(tombstone: VaultTombstone): void {
+  #tombstoneBoxes(tombstone: VaultTombstone): void {
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     for (const [boxlabel, box] of boxrows) {
       const boxTombstone = SX.boxTombstoneOf(box, tombstone.written_at)
@@ -140,7 +140,7 @@ export class MemoryVaultDB extends VaultDB {
     // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
     if ((! landed) && (isOurs || isDamaged)) { return { landed, ante: structuredClone(ante) } }
     if (landed) { this.#storeVaultRow(tombstone) }
-    this.#tombstoneBoxesOf(tombstone)
+    this.#tombstoneBoxes(tombstone)
     return { landed, ante: structuredClone(ante) }
   }
 
