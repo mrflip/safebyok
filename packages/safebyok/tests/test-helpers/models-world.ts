@@ -254,7 +254,7 @@ export class TestableVaultDB extends MemoryVaultDB {
   }
 }
 
-const factsOf = (scope: Boxscope) => ({ meta: { call: 'scripted' }, req_params: scope as ReqParams })
+const factsOf = (scope: Boxscope) => ({ req_params: scope as ReqParams })
 const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ ok: true, val, world, act: 'got', ...factsOf(scope) })
 
 /** Make a fake vault and a vaultDB for a {@link BoxListing}, with the calls they log and the means to script them.

@@ -486,7 +486,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, s
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed, so the bank could not derive a key from a passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a deriver that fetches its code, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, boxTooLarge, VaultFull, SeqNotNext, storeFailed, storeThrew
+// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, SeqNotNext, storeFailed, storeThrew
 
 /** No row stored for this life of the vault, where one was. */
 export const VaultEmpty = "Nothing is stored for this life of the vault: read the vault again by its scope."
@@ -508,6 +508,9 @@ export const AbsentBox = "No box is stored under that label."
 
 /** A change of the gate refused, `why` saying which check it failed. */
 export const gateIssue = (why: string): string => `This change of the gate was refused: ${why}`
+
+/** Why a gate verb naming a registered_at the stored vault does not hold is refused, as {@link gateIssue}'s `why`. */
+export const RegisteredAtNotStored = "its registered_at is not the stored one."
 
 /** A box record over the bytes its storage holds in one record. */
 export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage holds in one record.`
