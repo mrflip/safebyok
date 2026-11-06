@@ -277,6 +277,40 @@ The rates are the Professional plan's overage prices: $2 per million calls and $
 * **Boxes per vault.** At 32 or 64, a full vault answered whole stays at 1.1 MB or less, under every response limit in
   the table.
 
+## The Coach's Postgres payload shapes
+
+Each box below has the Coach's sidecar and the labels used earlier. *Plain* is the box row alone as JSON, with no
+vault row as `world`. *Values* is the box row's values as a JSON array in its field order, keys dropped, with each
+ciphered field as `[iv, ciphertext]` and the sidecar as its JSON. *Sparse* is
+`[applabel, user_id, vaultlabel, vault_tok, vault_epoch, boxlabel, revision_seq, revision_tok, written_at]`.
+
+Today's records have no `vault_epoch` (the gate has `gate_epoch`), so the integer 2 stands in. The listings share one
+vault:
+* *Listing* is `{applabel, user_id, vaultlabel, vault_tok, vault_epoch, boxes}`. Each box row in it drops the four
+  scope fields the envelope carries.
+* *Listing tuple* is the same envelope as an array, with each box as its values array.
+* *Sparse listing* is the envelope with `boxes: [[boxlabel, revision_seq, revision_tok, written_at], …]`. The Coach
+  left that array unnamed; JSON needs a key.
+
+| Box (sidecar)        | Plain      | Values     | Sparse | Source   |
+| -------------------- | ---------- | ---------- | ------ | -------- |
+| mini (2)             | 781        | 490        | 116    | Measured |
+| medium (150)         | 1,087      | 796        | 274    | Measured |
+| large (1,000)        | 4,740      | 4,449      | 274    | Measured |
+| large-4096 (1,000)   | 7,329      | 7,038      | 274    | Measured |
+| xl (4,000)           | **18,000** | **17,709** | 274    | Measured |
+
+Bold is over pg_notify's 7,999. Sent without the vault row, a large-4096 box fits; today's notice for one does not.
+
+| Listing shape  | Envelope, mini / others | Bytes per box: mini / medium / large / large-4096 / xl | Boxes in 7,200 B: same order | Boxes in 128 KiB: same order | Source   |
+| -------------- | ----------------------- | ------------------------------------------------------ | ---------------------------- | ---------------------------- | -------- |
+| Listing        | 127 / 257               | 683 / 859 / 4,512 / 7,101 / 17,772                     | 10 / 8 / 1 / 0 / 0           | 172 / 137 / 26 / 16 / 6      | Measured |
+| Listing tuple  | 59 / 189                | 438 / 614 / 4,267 / 6,856 / 17,527                     | 16 / 11 / 1 / 1 / 0          | 269 / 191 / 27 / 17 / 6      | Measured |
+| Sparse listing | 127 / 257               | 62 / 90 / 90 / 90 / 90                                 | 114 / 77 / 77 / 77 / 77      | 1,900 / 1,307 / 1,307 / 1,307 / 1,307 | Measured |
+
+The envelope's size depends on the label lengths: minimum labels for mini, 75% for the others. A sparse listing's
+size depends only on the length of the boxlabel.
+
 ## How far to trust these
 
 * **One run.** Each figure comes from one run with random keys, IVs and UUIDs. The ciphertext length is
