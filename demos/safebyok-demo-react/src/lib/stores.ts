@@ -1,11 +1,11 @@
 import { domStore, memoryStore, type StringStore } from 'safebyok-old'
 import { inspectIdbDeviceDB } from 'safebyok-old/idb'
-import { idbVaultDB, inspectIdbVaultDB } from 'safebyok-indexeddb'
+import { idbVaultDB, inspectIdbVaultDB } from 'safebyok-idb-old'
 import { OutageVaultDB, makeOutage } from './outage'
 
 /**
  * DEMO JANK: concrete storage wiring. The vault's records live in this browser's IndexedDB,
- * through the real adapters, safebyok-indexeddb's vault store and safebyok/idb's device store:
+ * through the real adapters, safebyok-idb-old's vault store and safebyok/idb's device store:
  *
  *  * the `vault_db` shelf stands in for the remote database a backend would hold -- rows of
  *    ciphertext that never open without your passphrase
