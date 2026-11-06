@@ -34,7 +34,7 @@ describe("box.patchWhisper", () => {
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
 
-  it("tells each subscriber once, moving getSnapshot's identity with nothing of the value on it", async () => {
+  it("tells each subscriber once, leaving the snapshot, which holds nothing of the value, as it was", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -43,8 +43,7 @@ describe("box.patchWhisper", () => {
     const was = box.getSnapshot()
     box.patchWhisper({ apiKey: 'sk-patched' })
     expect(told).toHaveBeenCalledOnce()
-    expect(box.getSnapshot()).not.to.eq(was)
-    expect(box.getSnapshot()).to.deep.equal(was)
+    expect(box.getSnapshot()).to.eq(was)
   })
 
   it("is what box.putExposed then stores", async () => {

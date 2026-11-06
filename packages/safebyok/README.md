@@ -85,7 +85,8 @@ Easy to get wrong:
 `box.whisper` shows it. While it will not show, `box.whisper` answers a frozen bag, whose `Whispered`
 symbol says why: `'encrypted'` (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a
 put of one refuses. `box.veil()` and `box.unveil()` hide it and show it again; a lock hides it, and
-an unlock shows it again. `box.subscribe` hears of all of this.
+an unlock shows it again. `box.subscribe` hears of all of this. The lock is the vault's, on
+`vault.getSnapshot()`, not the box's.
 
 **A script.** Fetch the passphrase in `requestCleartext`, with a token the container already holds:
 
@@ -93,7 +94,6 @@ an unlock shows it again. `box.subscribe` hears of all of this.
 const bank = Bank.make({
   /* ... */
   requestCleartext: async (gating) => {
-    if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
     await gating.attempt({ passphraseClear: await doppler.get('VAULT_PASSPHRASE') })
   },
 })

@@ -139,10 +139,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Swap in a new whisper exposed and tell: its identity moves the snapshot's, which holds none of it. */
+  /** Swap in a new whisper exposed, and tell the subscribers even where the snapshot, which holds none of it, has not moved. */
   #replaceExposed(exposed: Whisper): void {
+    const ante = this.snapshot
     this.#exposed = exposed
-    this.tellListeners()
+    this.settle()
+    if (this.snapshot === ante) { this.tellListeners() }
   }
 
   /** The whisper of `record`, opened through the vault's seal verbs and held to `CX.whisper`. */

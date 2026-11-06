@@ -10,4 +10,4 @@
 
 **`box.patchWhisper(patch)`** deep-merges into a new object, an array replacing, swaps it in, and tells the subscribers; nothing is stored. It works while locked and behind a veil, showing nothing until the whisper shows. It refuses `bad_option` while not exposed or given a symbol key or a marked bag. So `useSyncExternalStore(box.subscribe, () => box.whisper)` needs no library code.
 
-**`box.expose()` always tells the subscribers,** and a swap of the value moves `box.getSnapshot()`'s identity though its fields are the same, so a repeat `expose` is heard. The types `BoxPutOpts` and `Outcome`, which `Box`'s signatures name, are now exported from `safebyok`. The README has one recipe each for a script, a raw field and React.
+**`box.expose()` always tells the subscribers,** so a repeat `expose` is heard though `box.getSnapshot()`, which holds nothing of the value, does not move. Read the value through `box.whisper`. The types `BoxPutOpts` and `Outcome`, which `Box`'s signatures name, are now exported from `safebyok`. The README has one recipe each for a script, a raw field and React.

@@ -32,7 +32,6 @@ describe("the README's script", () => {
     const doppler = { get: vi.fn(() => Promise.resolve('a passphrase from the container')) }
     const bank = makeBankWorld().bankOn({
       requestCleartext: async (gating) => {
-        if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
         await gating.attempt({ passphraseClear: await doppler.get() })
       },
     })
@@ -77,7 +76,7 @@ describe("the README's raw field", () => {
     input.value = 'sk-test-edited'
     vault.lock()
     expect(input.value).to.eq('')
-    expect(hook.current().lockState).to.eq('locked')
+    expect(vault.getSnapshot().lockState).to.eq('locked')
     await vault.ensureUnlocked()
     expect(input.value).to.eq('sk-test-edited')
     expect(await box.extractWhisper()).to.deep.equal(Stored)
