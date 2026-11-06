@@ -90,7 +90,7 @@ describe("Refusals.storageUnavailable", () => {
 })
 
 describe("Refusals.storageFull", () => {
-  it("refuses as vault_full, saying to free room, the backend's error as its cause", () => {
+  it("makes a refusal of a write the storage had no room for", () => {
     const quota = new Error('quota exceeded')
     const refusal = Refusals.storageFull(quota)
     expect(refusal.refusalkind).to.eq('vault_full')

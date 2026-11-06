@@ -80,7 +80,7 @@ describe("IdbVaultDB's databases", () => {
     const { val: otherListed } = await other.listVaults(TH.bankScope)
     const { val: twinListed } = await makeTwin(vaultDB).listVaults(TH.bankScope)
     expect(otherListed.vaults).to.be.empty
-    expect(twinListed.vaults).to.have.length(1)
+    expect(twinListed.vaults).to.have.lengthOf(1)
   })
 
   it("keeps apart the rows of users whose ids share a beginning", async () => {
@@ -92,7 +92,7 @@ describe("IdbVaultDB's databases", () => {
     const { val: listed } = await vaultDB.listVaults(TH.bankScope)
     const { val: boxesListed } = await vaultDB.listBoxes({ ...TH.vaultScope, vault_tok: 'life1' })
     const { val: tidied } = await vaultDB.tidyGone(TH.bankScope)
-    expect(listed.vaults).to.have.length(1)
+    expect(listed.vaults).to.have.lengthOf(1)
     expect(boxesListed.boxes).to.be.empty
     expect(tidied.totalCount).to.eq(0)
   })
@@ -103,17 +103,17 @@ describe("IdbVaultDB's databases", () => {
     const unwatch = vaultDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
     await makeTwin(vaultDB).putVault(TH.vaultAt(), { prior: SX.VoidRevision })
     await TH.eventually(() => notices.length > 0)
-    expect(notices).to.have.length(1)
+    expect(notices).to.have.lengthOf(1)
     unwatch()
   })
 })
 
 describe("IdbVaultDB's refusals", () => {
   const TroubleCases = [
-    ['QuotaExceededError', 'vault_full',          /no room left/,     'refuses a write IndexedDB has no room for as vault_full'],
-    ['InvalidStateError',  'storage_unavailable', /closed under it/,  'refuses as storage_unavailable, saying the database was closed under it'],
-    ['SecurityError',      'storage_unavailable', /withholds/,        'refuses as storage_unavailable, saying the browser withholds IndexedDB'],
-    ['UnknownError',       'storage_unavailable', /IndexedDB failed/, 'refuses as storage_unavailable any other failure of IndexedDB'],
+    ["QuotaExceededError", "vault_full",          /no room left/,     'refuses a write IndexedDB has no room for'],
+    ["InvalidStateError",  "storage_unavailable", /closed under it/,  'refuses a call once the database is closed under it'],
+    ["SecurityError",      "storage_unavailable", /withholds/,        'refuses a call where the browser withholds IndexedDB'],
+    ["UnknownError",       "storage_unavailable", /IndexedDB failed/, 'refuses a call that fails in IndexedDB for any other reason'],
   ] as const
 
   for (const [errname, refusalkind, said, blurb] of TroubleCases) {
@@ -126,7 +126,7 @@ describe("IdbVaultDB's refusals", () => {
     })
   }
 
-  it("refuses as storage_unavailable a write whose transaction aborted before it committed, and nothing is written", async () => {
+  it("refuses a write whose transaction aborted before it committed", async () => {
     const vaultDB = makeVaultDB()
     vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(function (this: IDBObjectStore) {
       this.transaction.abort()
@@ -136,7 +136,7 @@ describe("IdbVaultDB's refusals", () => {
     expect(await idbRowsOf(vaultDB).vaultRowOf(TH.vaultScope)).to.be.null
   })
 
-  it("refuses as storage_unavailable, saying so, where there is no IndexedDB", async () => {
+  it("refuses a call where there is no IndexedDB", async () => {
     const vaultDB = makeVaultDB()
     vi.stubGlobal('indexedDB', undefined)
     const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'storage_unavailable')
