@@ -48,7 +48,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   override async hello(listed?: BoxesListed): Promise<void> {
     await super.hello()
     if (listed === undefined) { return }
-    const { boxes, damaged_records } = listed
+    const { boxes, damaged_records } = VX.boxesListed.parse(listed)
     this.#damagedRecords = Object.freeze(damaged_records)
     for (const { boxlabel } of damaged_records) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
