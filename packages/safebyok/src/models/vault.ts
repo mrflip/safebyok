@@ -51,7 +51,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   get fmt(): number { return this.central.fmt }
 
-
   /** The full record in hand, what a gate change spreads into its params. */
   get fullRecord(): VaultRecord { return this.demandFullProps() }
 
