@@ -5,14 +5,14 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06, 07:15: paused again)
+## State (2026-11-06, 08:05: running)
 
-Seventeen threads planned, twelve filed (1, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17 and the sprint's own 16/17 stack);
-threads 5 to 10 wait on #511 reaching `main` (#513 did at 05:10). Resume: when
-`git grep refusalkind origin/main -- packages/safebyok/src/helpers/validator.ts` hits, cut thread 5 from `origin/main`
-(it now also carries the Cleanup directives: the `checked.friend` fix, the whisper-zeroing test, the dead phrases, the
-stale clock consts) and go on down the plan; thread 10 last from the top of the line. Open for the Coach: the Closer Look
-triage, `device_id` required-or-minted, the guarded-file list, box verbs after a `vault_gone` hello.
+Twenty threads planned. Filed: 1, 2 (merged), 3, 4, 11, 12, 13, 14, 15, 16, 17. In review: 18 (#532), 19 (#534). Built,
+docs only, filing after the restack: 20 (#533). Building: 5 (`module_clock`, on main at fbe760e0f, with the Cleanup
+directives: the `checked.friend` fix, the whisper-zeroing test, the dead phrases, the stale clock consts, the two stale
+comments, #511's stale example). Next: 6 on 5's tip once 5 files, and so on down to 10. The Coach is restacking every
+open PR onto main in families (#511 merged 07:55; the merge line is dissolved). Open for the Coach: the Closer Look
+triage, the kind_promises follow-on threads, the deviceId privacy line, the reborn-vault hello row.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's

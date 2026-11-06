@@ -10,12 +10,12 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; threads 18 (`deviceid_required`, on #527), 19 (`utils_port`, on #531) and 20 (`kind_promises`, on #531) building; #528 amended (adf4ea68b) with the guarded files; threads 18 (#532, `deviceid_required`) and 19 (#534, `utils_port`) built, in review; thread 20 (#533, `kind_promises`) built as the inventory plus the docs strips, the code and test strips proposed as three follow-on threads (Open Matters); the Closer Look
-tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
-#511 reaching main
-(`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
-merge, since they rewrite the same shapes and model files (see *Ground rules*).
+**Status:** 2026-11-06, 08:05, **running**: #511 and #513 merged; thread 5 (`module_clock`) building on main, 6 to 10
+stack on it in turn. Filed: 1 (#518), 2 (#517, merged), 3 (#522), 4 (#523), 11 (#525), 12 (#526), 13 (#528, amended
+adf4ea68b), 14 (#527), 15 (#530 on #523), 16 (#529 on #518), 17 (#531 on #529). Built, in review: 18 (#532 on #527), 19
+(#534 on #531). Built, docs only, to file after the restack: 20 (#533 on #531; its code and test strips proposed as three
+follow-on threads, Open Matters). The Coach asked for every open PR restacked onto main in families (the merge line is
+dissolved; ground rule 9 lapses with it); the restack is under way. The Closer Look tab awaits the Coach's triage.
 
 ## Read first
 
