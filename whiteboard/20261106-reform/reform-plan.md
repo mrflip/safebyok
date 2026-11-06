@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; threads 18 (`deviceid_required`, on #527), 19 (`utils_port`, on #531) and 20 (`kind_promises`, on #531) building; a commit on #528 adds the guarded files; the Closer Look
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; threads 18 (`deviceid_required`, on #527), 19 (`utils_port`, on #531) and 20 (`kind_promises`, on #531) building; #528 amended (adf4ea68b) with the guarded files; thread 18 (#532, `deviceid_required`) built, in review; the Closer Look
 tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
@@ -346,6 +346,9 @@ scoped to our deriver; G4 names the tombstone; the passphrase chain names four m
 omits `vault.ts`, `deriver/argon2id-webv1.ts` and `passphrase-strength.ts` (Open Matters, TOP); the host-function
 paragraph contradicts G8 until thread 7; `ShapeModules` hand-kept and `KX` unlisted (Cleanup). **Filed** at 0b9afd51a, as
 cut, on main.
+*Amended (adf4ea68b, plain push):* *Where the guarantees are kept* names eleven files, with rows for `models/vault.ts`,
+`deriver/argon2id-webv1.ts` and `helpers/passphrase-strength.ts`; CLAUDE.md's *Layout* bullet points at that list instead
+of naming files, and drops `types/types.ts`, which is gone. Justify ran to its end (docs only).
 
 ### 14. `deviceid_label`
 
@@ -439,6 +442,13 @@ first-cached-wins step, and the device record itself (`DeviceDB.cacheDeviceRecor
 `MemoryDeviceDB`'s rows, `_cheat_deviceRows`, their tests and helpers) all go; the DeviceDB keeps leases only; guarantees.md
 and VOCABULARY (a plain commit on #518) say so; minor changeset. **Levels:** worker `opus`; review `high`. **Depends on:**
 #527 (stacked). **Look-ahead:** the IndexedDB device DB port builds on a leases-only DeviceDB. **Size:** one context.
+*Built (PR #532, on #527):* `device_id` required in `bankOpts`, `Bank.device_id` a plain `readonly` prop, no mint;
+`#cacheDeviceRecord`, `DeviceDB.cacheDeviceRecord` and its `try`/`do` pair, `DeviceCached`, the `deviceRecord` shape,
+`MemoryDeviceDB.#devicerows` and `_cheat_deviceRows` (one `eslint-disable-line` fewer), `deviceRecordRewritten` and the dead
+`Phrases.DeviceScopepathShape` all gone; the DeviceDB keeps leases only; minor changeset. No guarantees.md edit (it names
+no device record). The VOCABULARY rows (**deviceId**, **device record**, a trim to **deviceDB**) sit in the thread file for
+the orchestrator to carry onto #518. Meets #511 in `throwers.ts`, `phrases.ts` and `bank-world.ts` (keep both sides). In
+review (`opus`, high).
 
 ### 19. `utils_port`
 
