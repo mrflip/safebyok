@@ -2,6 +2,7 @@
 
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
+import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
@@ -239,7 +240,7 @@ export abstract class VaultDB {
   async #gateRowOf(asked: VaultSparse): Promise<VaultRecord> {
     const stored = liveVaultOf(await this.doGetVault(SX.vaultScope.parse(asked)), asked)
     if (! SX.isRowAt(stored, asked)) { throw Refuse.staleWrite(stored, stored) }
-    if (stored.registered_at !== asked.registered_at) { throw Refuse.gateIssue(stored, 'its registered_at is not the stored one.') }
+    if (stored.registered_at !== asked.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
     return stored
   }
 
