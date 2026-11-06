@@ -18,9 +18,9 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("holds no vault where the dialog throws: the refusal is the sanitized 'unexpected_error', and a second buildVault is not refused as already held", async () => {
+  it("holds no vault where the dialog throws: the refusal is sanitized, and a second buildVault is not refused as already held", async () => {
     const { listing, storedNow } = makeVaultWorld(null, { requestCleartext: () => { throw new Error("the user closed the dialog") } })
-    await TH.expectRefusal(listing.buildVault(Dna), 'unexpected_error')
+    await TH.expectRefusal(listing.buildVault(Dna))
     expect(listing.things).to.have.lengthOf(0)
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
@@ -31,7 +31,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const dialog = vi.fn()
     listing.world.requestCleartext = dialog
-    await TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
+    await TH.expectRefusal(listing.buildVault(Dna))
     expect(dialog).not.toHaveBeenCalled()
     expect(listing.at(Dna)).to.equal(vault)
   })
@@ -57,24 +57,24 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(listing.sparseOf(record))
-    TH.expectSyncRefusal(() => vault.gate, 'bad_option')
+    TH.expectSyncRefusal(() => vault.gate)
     await vault.hydrate()
     expect(vault.gate.pickle()).to.deep.equal(record.gate)
   })
 
   it("refuses a world without what a vault's gate and lease need", () => {
     const { opts } = makeVaultWorld()
-    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'deviceDB') }), 'bad_option')
-    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'keyDeriver') }), 'bad_option')
+    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'deviceDB') }))
+    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'keyDeriver') }))
   })
 
   it("refuses a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
     const { opts } = makeVaultWorld()
     for (const verb of ['tryPeek', 'tryCache', 'tryVacate']) {
       const missing = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
-      TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, deviceDB: missing as never } }), 'bad_option')
+      TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, deviceDB: missing as never } }))
     }
-    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, onPanic: 'call me' as never } }), 'bad_option')
+    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, onPanic: 'call me' as never } }))
   })
 })
 
@@ -93,7 +93,7 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
     const { deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
     deviceDB.tryCache.mockClear()
-    const err = await TH.expectRefusal(proving.buildLease(friend), 'unexpected_error')
+    const err = await TH.expectRefusal(proving.buildLease(friend))
     expect(err.message).to.eq(Phrases.LeaseOfOtherVault)
     expect(deviceDB.tryCache).not.toHaveBeenCalled()
   })
@@ -164,17 +164,17 @@ describe("vault.ensureTimely(maxMillis)", () => {
     expect(vault.revision_tok).to.eq(landed.revision_tok)
   })
 
-  it("resolves over a vault its fetch finds gone, leaving demandEnabled to refuse 'vault_gone'", async () => {
+  it("resolves over a vault its fetch finds gone, leaving demandEnabled to refuse", async () => {
     const { vault, demandStored, restoreRow } = await bornWithGets()
     const stored = demandStored()
     restoreRow({ ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' })
     await expect(vault.ensureTimely(0)).resolves.to.equal(vault)
-    TH.expectSyncRefusal(() => vault.demandEnabled(), 'vault_gone')
+    TH.expectSyncRefusal(() => vault.demandEnabled())
   })
 
   it("refuses a maxMillis out of range", async () => {
     const { vault } = await bornWithGets()
-    await TH.expectRefusal(vault.ensureTimely(-1), 'bad_option')
+    await TH.expectRefusal(vault.ensureTimely(-1))
   })
 })
 

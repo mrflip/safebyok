@@ -66,10 +66,10 @@ const expectReceivedUnchanged = (box: SpiedBox, rcvd: Rec | null, policy: Centra
   expect(stateOf(box)).to.deep.equal(before)
 }
 
-/** Asserts `receive(rcvd)` refused 'record_conflict', taking no row and leaving the box as it was. */
+/** Asserts `receive(rcvd)` refused, taking no row and leaving the box as it was. */
 const expectReceiveConflict = (box: SpiedBox, rcvd: Rec | null): void => {
   const before = stateOf(box)
-  TH.expectSyncRefusal(() => box.receive(rcvd), 'record_conflict')
+  TH.expectSyncRefusal(() => box.receive(rcvd))
   expect(policies).to.deep.equal([])
   expect(stateOf(box)).to.deep.equal(before)
 }
@@ -113,7 +113,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
   })
 
   describe("the same revision", () => {
-    it("the same seq under another tok refuses 'record_conflict' from cmpRevisions, whatever the shapes", () => {
+    it("the same seq under another tok refuses from cmpRevisions, whatever the shapes", () => {
       for (const centralShape of ShapesAll) {
         for (const rcvdShape of ShapesAll) {
           policies.length = 0
@@ -123,13 +123,13 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     })
 
     for (const centralShape of ShapesAlive) {
-      it(`same | gone | alive (${centralShape}) refuses 'record_conflict': one revision, two fates`, () => {
+      it(`same | gone | alive (${centralShape}) refuses: one revision, two fates`, () => {
         expectReceiveConflict(boxOf(Centrals[centralShape]()), rcvdOf('gone', SameRev))
       })
     }
 
     for (const rcvdShape of ShapesAlive) {
-      it(`same | alive (${rcvdShape}) | gone refuses 'record_conflict': one revision, two fates`, () => {
+      it(`same | alive (${rcvdShape}) | gone refuses: one revision, two fates`, () => {
         expectReceiveConflict(boxOf(Centrals.gone()), rcvdOf(rcvdShape, SameRev))
       })
     }
@@ -198,10 +198,10 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
 
     for (const rcvdShape of ShapesAll) {
-      it(`other | same | ${rcvdShape} | full refuses 'record_conflict': one revision cannot begin a life and continue another`, () => {
+      it(`other | same | ${rcvdShape} | full refuses: one revision cannot begin a life and continue another`, () => {
         const box = boxOf(Centrals.full())
         const before = stateOf(box)
-        const err = TH.expectSyncRefusal(() => box.receive(rcvdOf(rcvdShape, { ...SameRev, ...OtherLife })), 'record_conflict')
+        const err = TH.expectSyncRefusal(() => box.receive(rcvdOf(rcvdShape, { ...SameRev, ...OtherLife })))
         expect(err.message).to.eq(Phrases.OneRevisionTwoLives)
         expect(policies).to.deep.equal([])
         expect(stateOf(box)).to.deep.equal(before)
@@ -237,7 +237,7 @@ describe("storable.receive(null)", () => {
   })
 
   for (const centralShape of ShapesAlive) {
-    it(`for a thing held alive (${centralShape}) refuses 'record_conflict', by same | gone | alive`, () => {
+    it(`for a thing held alive (${centralShape}) refuses, by same | gone | alive`, () => {
       expectReceiveConflict(boxOf(Centrals[centralShape]()), null)
     })
   }

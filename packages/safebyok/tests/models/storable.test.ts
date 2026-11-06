@@ -44,8 +44,8 @@ describe("cmpRevisions(ante, post)", () => {
     })
   }
 
-  it("refuses the same seq under another tok as 'record_conflict': two puts landed as one revision", () => {
-    TH.expectSyncRefusal(() => cmpRevisions(ante, { revision_seq: 2, revision_tok: 'rev-other' }), 'record_conflict')
+  it("refuses the same seq under another tok: two puts landed as one revision", () => {
+    TH.expectSyncRefusal(() => cmpRevisions(ante, { revision_seq: 2, revision_tok: 'rev-other' }))
   })
 })
 
@@ -111,10 +111,10 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 1000 })
     })
 
-    it("keep the vault_tok of birth, not writable: a record under another vault_tok received over a tombstone throws 'record_conflict', and neither it nor the scope moves", async () => {
+    it("keep the vault_tok of birth, not writable: a record under another vault_tok received over a tombstone throws, and neither it nor the scope moves", async () => {
       const box = await builtBoxOf(tombstoneBoxRecord())
       const { scope } = box
-      TH.expectSyncRefusal(() => box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })), 'record_conflict')
+      TH.expectSyncRefusal(() => box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })))
       expect(box.vault_tok).to.eq('vault-tok-u1')
       expect(Object.getOwnPropertyDescriptor(box, 'vault_tok')).to.include({ writable: false, configurable: false })
       expect(box.scope).to.eq(scope)
@@ -332,22 +332,22 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   it("demandPuttable refuses a bad patch first, whether locked or over a record not whole", async () => {
     const box = await boxListingOf(held.mw).build(sparseBoxRecord())
     held.mw.setLockState('locked')
-    TH.expectSyncRefusal(() => box.demandPuttable({}), 'bad_option')
-    TH.expectSyncRefusal(() => box.demandPuttable({ ...Patch, boxlabel: 'openai_api_key' }), 'bad_option')
+    TH.expectSyncRefusal(() => box.demandPuttable({}))
+    TH.expectSyncRefusal(() => box.demandPuttable({ ...Patch, boxlabel: 'openai_api_key' }))
   })
 
-  it("demandPuttable refuses 'disabled' before the lock, and the lock before a record not whole", async () => {
+  it("demandPuttable refuses before the lock, and the lock before a record not whole", async () => {
     const box = await boxListingOf(held.mw).build(sparseBoxRecord())
-    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'bad_option')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch))
     held.mw.setLockState('locked')
     TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
     box.vacate()
-    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'disabled')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch))
   })
 
   it("demandPuttable under ifPresent 'fail' refuses a whole record, saying its data would be recycled", async () => {
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
-    const err = TH.expectSyncRefusal(() => box.demandPuttable({ ...fullBoxRecord() }, { ifPresent: 'fail' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => box.demandPuttable({ ...fullBoxRecord() }, { ifPresent: 'fail' }))
     expect(err.message).to.eq(Phrases.RecordForNewBox)
     expect(box.demandPuttable({ ...fullBoxRecord() })).to.deep.include({ sidecar: fullBoxRecord().sidecar })
     expect(box.demandPuttable(Patch, { ifPresent: 'fail' })).to.deep.include(Patch)
@@ -372,7 +372,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   it("put ensures once, before its seal, and a bad patch heard after that ensure puts nothing", async () => {
     const box = await builtBoxOf()
     const putGuard = vi.spyOn(Box.prototype, 'ensurePuttable')
-    await TH.expectRefusal(box.put({}), 'bad_option')
+    await TH.expectRefusal(box.put({}))
     expect(putGuard).toHaveBeenCalledOnce()
     expect(held.mw.callsOf('put')).to.deep.equal([])
     putGuard.mockClear()

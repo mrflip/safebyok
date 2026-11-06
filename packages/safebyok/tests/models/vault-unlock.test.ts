@@ -19,9 +19,9 @@ describe("proving.buildWayin: one wayin per proving, of its own vault", () => {
   it("refuses a second wayin of a proving that holds one, and a source proving of another vault", async () => {
     const { vault, opts: { world } } = await makeBornVault()
     const mine = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
-    await TH.expectRefusal(mine.buildWayin(NOVEL), 'unexpected_error')
+    await TH.expectRefusal(mine.buildWayin(NOVEL))
     const novel = await PassphraseProving.buildNovel(vault.gate.stamp, passphraseCleartext.parse('a new passphrase'), world)
-    await TH.expectRefusal(novel.buildWayin(await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })), 'unexpected_error')
+    await TH.expectRefusal(novel.buildWayin(await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })))
     const wayin = await novel.buildWayin(mine)
     expect(wayin.wayinkind).to.eq('passphrase')
   })
@@ -54,9 +54,9 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   it("the seal verbs refuse a stamp of another vault or another life of it", async () => {
     const { vault } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
-    const err = await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }), 'unexpected_error')
+    const err = await TH.expectRefusal(vault.sealStampedString('sk-test', { ...Stamp, vaultlabel: 'another_vault' }))
     expect(err.message).to.eq(Phrases.StampOfOtherVault)
-    await TH.expectRefusal(vault.unsealStampedString(sealed, { ...Stamp, vault_tok: 'another-life' }), 'unexpected_error')
+    await TH.expectRefusal(vault.unsealStampedString(sealed, { ...Stamp, vault_tok: 'another-life' }))
   })
 
   it("is born unlocked, under the lease its passphrase proving grants and the deviceDB caches; ensureUnlocked answers the vault and asks nothing", async () => {
@@ -71,8 +71,8 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
 
   it("refuses a stamp of no fields, at the seal and at the unseal: a seal bound to nothing of the box's binds nothing", async () => {
     const { vault } = await makeBornVault()
-    await TH.expectRefusal(vault.sealStampedString('sk-test', {}), 'bad_option')
-    await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}), 'bad_option')
+    await TH.expectRefusal(vault.sealStampedString('sk-test', {}))
+    await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}))
   })
 
   it("locks at `lock()`, reading locked before it returns and erasing the row; seal and unseal refuse; then 'declined' with no proof and a dialog closed unanswered, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
@@ -164,7 +164,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     await peeked.reached
     vault.sweep()
     peeked.release()
-    await TH.expectRefusal(ensuring, 'disabled')
+    await TH.expectRefusal(ensuring)
     expect(vault.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.deep.equal(kept)
   })

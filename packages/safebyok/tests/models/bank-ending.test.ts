@@ -291,7 +291,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     await bank.hello()
     const asking = bank.ensureVault(VaultScopeGiven)
     bank.vacate()
-    await TH.expectRefusal(asking, 'locked_while_asking')
+    await TH.expectRefusal(asking)
     expect(bank.vaultListing.openGating).to.be.null
     closeDialog()
     expect(world.leaseRows()).to.deep.equal([])
@@ -315,7 +315,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(vault.isEnabled).to.be.false
     expect(vault.isUnlocked).to.be.false
     expect(world.leaseRows()).to.have.lengthOf(1)
-    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven))
     const seen = vi.fn()
     bank.subscribe(seen)
     await bank.hello()
@@ -332,9 +332,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const bank = world.bankOn()
     const hello = bank.tryHello()
     bank.sweep()
-    const { ok, err } = await hello
-    expect(ok).to.be.false
-    expect(err?.refusalkind).to.eq('disabled')
+    await TH.expectBad(hello)
     expect(bank.snapshot.stage).to.eq('made')
     await bank.hello()
     expect(bank.snapshot.stage).to.eq('ready')

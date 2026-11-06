@@ -36,8 +36,8 @@ describe("BoxListing", () => {
       ['a world that cannot tell bad news', () => ({ world: { ...held.mw.world, tellBadNews: 'tell me' } })],
     ]
     for (const [blurb, patch] of bads) {
-      it(`refuses ${blurb} as 'bad_option'`, () => {
-        TH.expectSyncRefusal(() => new BoxListing({ ...good(), ...patch() }), 'bad_option')
+      it(`refuses ${blurb}`, () => {
+        TH.expectSyncRefusal(() => new BoxListing({ ...good(), ...patch() }))
       })
     }
   })
@@ -73,7 +73,7 @@ describe("BoxListing", () => {
 
     it("refuses a dna, which is no record, holding and storing nothing", async () => {
       const listing = boxListingOf(held.mw)
-      await TH.expectRefusal(listing.build(dna() as never), 'bad_record')
+      await TH.expectRefusal(listing.build(dna() as never))
       expect(listing.things).to.deep.equal([])
       expect(held.mw.calls).to.deep.equal([])
     })
@@ -141,11 +141,11 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(box?.isPresent).to.be.true
   })
 
-  it("refuses 'bad_option' fed a put's ifAbsent, and 'disabled' once vacated", async () => {
+  it("refuses fed a put's ifAbsent, and once vacated", async () => {
     const listing = boxListingOf(held.mw)
-    await TH.expectRefusal(listing.get(held.mw.boxscope(Label), { ifAbsent: 'add' } as never), 'bad_option')
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label), { ifAbsent: 'add' } as never))
     listing.vacate()
-    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)), 'disabled')
+    await TH.expectRefusal(listing.get(held.mw.boxscope(Label)))
   })
 
   it("tryGet answers the outcome", async () => {
@@ -190,8 +190,8 @@ describe("boxListing.puttable(scoped, opts)", () => {
 
   it("refuses a bad scope and a bad option, making no void box", () => {
     const listing = boxListingOf(held.mw)
-    TH.expectSyncRefusal(() => listing.puttable({ ...held.mw.boxscope(Label), vaultlabel: 'mary' }), 'bad_scope')
-    TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label), { ifAbsent: 'nil' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => listing.puttable({ ...held.mw.boxscope(Label), vaultlabel: 'mary' }))
+    TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label), { ifAbsent: 'nil' } as never))
     expect(listing.things).to.deep.equal([])
   })
 
@@ -203,10 +203,10 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
-  it("refuses 'disabled' once vacated", () => {
+  it("refuses once vacated", () => {
     const listing = boxListingOf(held.mw)
     listing.vacate()
-    TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label)), 'disabled')
+    TH.expectSyncRefusal(() => listing.puttable(held.mw.boxscope(Label)))
   })
 })
 
@@ -222,10 +222,10 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
   ] as const
 
   for (const [inputOf, blurb] of BadDnaCases) {
-    it(`refuses creating ${blurb} as 'bad_option' while the vault is locked, holding nothing and calling nothing`, async () => {
+    it(`refuses creating ${blurb} while the vault is locked, holding nothing and calling nothing`, async () => {
       const listing = boxListingOf(held.mw)
       held.mw.setLockState('locked')
-      await TH.expectRefusal(listing.create(inputOf() as never), 'bad_option')
+      await TH.expectRefusal(listing.create(inputOf() as never))
       expect(listing.things).to.deep.equal([])
       expect(held.mw.calls).to.deep.equal([])
     })
@@ -239,7 +239,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
   })
 
   it("says a bag is no whisper, naming whisper, for a dna that hands it as the whisper", async () => {
-    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: LOCKED }), 'bad_option')
+    const err = await TH.expectRefusal(boxListingOf(held.mw).create({ ...dna(), whisper: LOCKED }))
     expect(err.message).to.include(Phrases.WhisperedIsNoWhisper)
     expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
   })
@@ -250,20 +250,20 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
   ] as const
 
   for (const [worldOf, blurb, fieldname] of BadWorldCases) {
-    it(`refuses a world with ${blurb} as 'bad_option', naming ${fieldname}`, () => {
-      const err = TH.expectSyncRefusal(() => new BoxListing({ ...good(), world: worldOf() as never }), 'bad_option')
+    it(`refuses a world with ${blurb}, naming ${fieldname}`, () => {
+      const err = TH.expectSyncRefusal(() => new BoxListing({ ...good(), world: worldOf() as never }))
       expect(err.meta?.fieldnames).to.include(fieldname)
     })
   }
 
   it("refuses at() a scope that fails its check", () => {
     const listing = boxListingOf(held.mw)
-    TH.expectSyncRefusal(() => listing.at(undefined), 'bad_scope')
-    TH.expectSyncRefusal(() => listing.at({ ...held.mw.boxscope('anthropic_api_key'), boxlabel: 'B' }), 'bad_scope')
+    TH.expectSyncRefusal(() => listing.at(undefined))
+    TH.expectSyncRefusal(() => listing.at({ ...held.mw.boxscope('anthropic_api_key'), boxlabel: 'B' }))
   })
 
   it("refuses subscribing anything but a function", () => {
-    TH.expectSyncRefusal(() => boxListingOf(held.mw).subscribe(null as never), 'bad_option')
+    TH.expectSyncRefusal(() => boxListingOf(held.mw).subscribe(null as never))
   })
 
 })

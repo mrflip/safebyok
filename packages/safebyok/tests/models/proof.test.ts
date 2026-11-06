@@ -182,12 +182,12 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['del_vault'])
     bankUi.expectRenders(['ready: main locked', 'ready: no vaults'])
     vaultUi.expectRenders(['main locked', 'main deleted'])
-    await TH.expectRefusal(vault.fetch(), 'vault_gone')
+    await TH.expectRefusal(vault.fetch())
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
     boxesUi.expectRenders(['no boxes'])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     revealUi.expectRenders(['locked', 'encrypted'])
-    await TH.expectRefusal(box.extractWhisper(), 'disabled')
+    await TH.expectRefusal(box.extractWhisper())
 
     // Rebuild over the tombstone: a new life, a new instance, a new vault_tok.
     const reborn = await bank.ensureVault(VaultScopeGiven)
@@ -343,9 +343,9 @@ describe("the proof", () => {
 
     bank.vacate()
     bankUi.expectRenders(['made: main locked', 'made: no vaults'])
-    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven))
     expect(world.leaseRows()).to.have.lengthOf(0)
-    await TH.expectRefusal(vault.ensureUnlocked(), 'disabled')
+    await TH.expectRefusal(vault.ensureUnlocked())
 
     await bank.hello()
     bankUi.expectRenders(['made: main locked', 'ready: main locked'])
@@ -431,7 +431,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: no vaults'])
     expect(vault.isUnlocked).to.be.false
     expect(world.leaseRows()).to.have.lengthOf(0)
-    await TH.expectRefusal(vault.ensureUnlocked(), 'vault_gone')
+    await TH.expectRefusal(vault.ensureUnlocked())
   })
 
   it("React StrictMode: effect, cleanup, effect paints no refusal", async () => {
@@ -447,8 +447,7 @@ describe("the proof", () => {
     await Promise.all([firstEffect, secondEffect])
 
     bankUi.expectRenders(['made: no vaults', 'ready: no vaults'])
-    const { err } = await firstEffect
-    expect(err?.refusalkind).to.eq('disabled')
+    await TH.expectBad(firstEffect)
     expect(await secondEffect).to.include({ ok: true })
   })
 

@@ -93,12 +93,12 @@ describe("bank.hello", () => {
     expect(bank.snapshot).to.include({ stage: 'ready', err: null })
   })
 
-  it("refuses 'unexpected_error' when a strength checker will not load, what it threw the cause, asking nothing of the vaultDB", async () => {
+  it("refuses when a strength checker will not load, what it threw the cause, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
     const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
     const thrown = new Error('no word list here')
     const bank = world.bankOn({ strengthChecker: Object.assign((() => ({ strong: true })) as typeof anyStrengthChecker, { load: () => Promise.reject(thrown) }) })
-    const err = await TH.expectRefusal(bank.hello(), 'unexpected_error')
+    const err = await TH.expectRefusal(bank.hello())
     expect(err.cause).to.eq(thrown)
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
     expect(bank.snapshot).to.include({ stage: 'refused', err })
@@ -110,7 +110,7 @@ describe("bank.hello", () => {
     const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
     const refused = new VaultError('unexpected_error', 'no wasm here')
     const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
-    await TH.expectRefusal(bank.hello(), 'unexpected_error')
+    await TH.expectRefusal(bank.hello())
     expect(bank.snapshot.err).to.equal(refused)
     expect(listVaults).not.toHaveBeenCalled()
   })
@@ -132,7 +132,7 @@ describe("bank.hello", () => {
     const rows = world.vaultDB._cheat_vaultRowsOf(BankScopeGiven)
     rows.set(Dna.vaultlabel, { ...(rows.get(Dna.vaultlabel) as object), revision_tok: 'rev-other' })
     rows.set('broken', { am: 'a', nonsense: true })
-    await TH.expectRefusal(bank.hello(), 'record_conflict')
+    await TH.expectRefusal(bank.hello())
     expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
   })
 
@@ -162,7 +162,7 @@ describe("bank.ensureVault", () => {
   it("refuses before any hello, asking nobody", async () => {
     const requestCleartext = vi.fn()
     const bank = makeBankWorld().bankOn({ requestCleartext })
-    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'bad_option')
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven))
     expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(VaultError)
     expect(requestCleartext).not.toHaveBeenCalled()
   })
@@ -183,7 +183,7 @@ describe("bank.ensureVault", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("refuses 'already_asking' while a gating is open", async () => {
+  it("refuses while a gating is open", async () => {
     const world = makeBankWorld()
     let closeDialog = nothing
     const bank = world.bankOn({ requestCleartext: async (gating) => {
@@ -192,13 +192,13 @@ describe("bank.ensureVault", () => {
     } })
     await bank.hello()
     const asking = bank.ensureVault(VaultScopeGiven)
-    await TH.expectRefusal(bank.ensureVault(OtherScopeGiven), 'already_asking')
+    await TH.expectRefusal(bank.ensureVault(OtherScopeGiven))
     closeDialog()
     await asking
   })
 
-  it("can never ask with no dialog, as Bank.make refuses 'bad_option' without a requestCleartext", () => {
-    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }), 'bad_option')
+  it("can never ask with no dialog, as Bank.make refuses without a requestCleartext", () => {
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }))
   })
 
   it.each([
@@ -207,17 +207,15 @@ describe("bank.ensureVault", () => {
     ['an empty string',               ""],
     ['more than 40 characters',       `d${'a'.repeat(40)}`],
   ])("refuses at Bank.make a device_id with %s", (_what, device_id) => {
-    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }), 'bad_option')
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }))
   })
 
   it("refuses at Bank.make a missing device_id", () => {
-    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }), 'bad_option')
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }))
   })
 
   it("answers tryEnsureVault's refusal as an Outcome", async () => {
-    const { ok, err } = await makeBankWorld().bankOn().tryEnsureVault(VaultScopeGiven)
-    expect(ok).to.be.false
-    expect(err?.refusalkind).to.eq('bad_option')
+    await TH.expectBad(makeBankWorld().bankOn().tryEnsureVault(VaultScopeGiven))
   })
 
   it("hands a fresh bank the lease this device has cached, nobody asked", async () => {

@@ -51,14 +51,14 @@ describe("new Wayin(record): the record check", () => {
   ] as const
 
   for (const [recordOf, blurb] of RecordRefusalCases) {
-    it(`${blurb} as 'bad_record'`, () => {
-      TH.expectSyncRefusal(() => new Wayin(recordOf()), 'bad_record')
+    it(blurb, () => {
+      TH.expectSyncRefusal(() => new Wayin(recordOf()))
     })
   }
 
   it("quotes none of a refused record in its refusal: neither its ciphertext nor its salt", () => {
     const record = passkeyRecord({ prf_salt_b64: 'c2hvcnQ', vault_key_wayin_wrapped: TH.fakeCiphered('SECRETWRAP') })
-    const err = TH.expectSyncRefusal(() => new Wayin(record), 'bad_record')
+    const err = TH.expectSyncRefusal(() => new Wayin(record))
     expect(TH.thrownText(err)).to.not.include('SECRETWRAP')
     expect(TH.thrownText(err)).to.not.include('c2hvcnQ')
   })

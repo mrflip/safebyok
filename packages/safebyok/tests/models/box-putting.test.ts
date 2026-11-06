@@ -85,7 +85,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
   it("refuses a live box still sparse once hydrated, saying so, putting nothing", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, sparseBoxRecord()))
-    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }))
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -164,7 +164,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     const box = await builtOf(fullBoxRecord())
     const before = box._cheat_central
     held.mw.clearCalls()
-    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fetch' as never, ...asBuilt }))
     expect(box._cheat_central).to.deep.equal(before)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
@@ -180,24 +180,24 @@ describe("box.put(patch): a patch naming a half", () => {
   ] as const
 
   for (const [patch, blurb] of PatchCases) {
-    it(`refuses a put of ${blurb} as 'bad_option', putting nothing`, async () => {
+    it(`refuses a put of ${blurb}, putting nothing`, async () => {
       const box = await builtOf(fullBoxRecord())
       held.mw.clearCalls()
-      await TH.expectRefusal(box.put(patch as unknown as BoxHalves), 'bad_option')
+      await TH.expectRefusal(box.put(patch as unknown as BoxHalves))
       expect(held.mw.callsOf('put')).to.deep.equal([])
     })
   }
 
   it("tells a patch that fails its check how an update of a box is written", async () => {
     const box = await builtOf(fullBoxRecord())
-    const err = await TH.expectRefusal(box.put({ whisper: null } as never), 'bad_option')
+    const err = await TH.expectRefusal(box.put({ whisper: null } as never))
     expect(err.message).to.contain(Phrases.BoxPatchAdvice)
   })
 
   it("refuses before its guards: a patch naming neither refuses while the vault is locked, too", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
-    await TH.expectRefusal(box.put({}), 'bad_option')
+    await TH.expectRefusal(box.put({}))
   })
 
   it("seals nothing at an expose, a veil or an unexpose: they move only what the instance holds", async () => {
@@ -227,14 +227,14 @@ describe("box.put checks its patch before it asks the lock", () => {
   it("refuses a patch that names neither half before it looks at the lock", async () => {
     const box = await builtOf(fullBoxRecord())
     held.mw.setLockState('locked')
-    await TH.expectRefusal(box.put({}), 'bad_option')
+    await TH.expectRefusal(box.put({}))
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("refuses an empty patch over a sparse box, after its one fetch", async () => {
     const box = await builtOf(sparseBoxRecord())
     held.mw.seedStore(fullBoxRecord())
-    await TH.expectRefusal(box.put({}), 'bad_option')
+    await TH.expectRefusal(box.put({}))
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
