@@ -203,8 +203,8 @@ the host, or its `useWhisper` callback. `mask` (`safebyok/utils`) reads one to s
 argument or a local: the gating's `attempt` hands it to its chain (`gating.ts`, `attemptOf`), the
 chain to `PassphraseProving.seal` and `vault.tryCheckStrength`, `seal` to `passphraseKeyOf`, and
 that to `keyDeriver.deriveKeyBytes`. No class, record, snapshot or closure that outlives the call
-holds it; the one comparison of two passphrases is `antePassphraseClear === nextPassphraseClear` in
-`ProveForGatingkind.replace_passphrase`, both typed by the same user. Three host functions hear it: the dialog that collects it, the
+holds it; the one comparison of two passphrases is `current === next` in `change_passphrase`,
+both typed by the same user. Three host functions hear it: the dialog that collects it, the
 `strengthChecker` and the `keyDeriver`. *Caveat:* a JavaScript string cannot be zeroed, so copies
 live until collected, and the React dialog holds what was typed in component state until it
 closes. In `src/models/` the chain is `Gating`'s `attempt` and the provings' statics
