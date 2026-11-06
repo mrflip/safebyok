@@ -11,7 +11,6 @@ import { fakeDeployment } from '../src/testing'
 import type { FakeDeployment, FakeHost } from '../src/testing'
 
 type ComponentDeployment = FakeDeployment<ReturnType<typeof TH.componentHost>>
-type ComponentBackend = ReturnType<ComponentDeployment['as']>
 
 // Every deployment a test makes is closed after it, so no client keeps its socket's timers alive.
 // The battery refuses mutations on purpose, and a client logs each as an error: a spy keeps the output clean.
@@ -44,6 +43,7 @@ const madeOf = (vaultDB: ConvexVaultDB) => {
 }
 
 const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
+  type ComponentBackend = ReturnType<ComponentDeployment['as']>
   const { deployment } = madeOf(vaultDB)
   // Plants are changes the clients hear of, as a write from elsewhere would be.
   const run: ComponentBackend['run'] = async (fn) => await deployment.arrange(async (backend) => await backend.run(fn))
@@ -90,9 +90,9 @@ const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
 const failNextCall = (vaultDB: ConvexVaultDB, text = '[Request ID: 0123456789abcdef] Server Error'): void => {
   const calls = madeOf(vaultDB).client as unknown as Record<'query' | 'mutation', () => Promise<unknown>>
   const spies = [vi.spyOn(calls, 'query'), vi.spyOn(calls, 'mutation')]
-  const fail = async (): Promise<never> => {
+  const fail = (): Promise<never> => {
     for (const spy of spies) { spy.mockRestore() }
-    throw new Error(text)
+    return Promise.reject(new Error(text))
   }
   for (const spy of spies) { spy.mockImplementationOnce(fail) }
 }
@@ -133,7 +133,7 @@ describe("ConvexVaultDB's constructor", () => {
 
   it("refuses a maxBoxes it cannot use", () => {
     const deployment = deploy(TH.componentHost())
-    for (const maxBoxes of [-1, 1.5, Number.NaN]) {
+    for (const maxBoxes of [-1, 1.5, NaN]) {
       TH.expectSyncRefusal(() => new ConvexVaultDB({ client: deployment.client(null), api: TH.rootApi, maxBoxes }), 'bad_option')
     }
   })
