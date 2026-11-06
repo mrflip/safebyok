@@ -79,6 +79,11 @@
       "import": "./dist/testing.js",
       "require": "./dist/testing.cjs"
     },
+    "./utils": {
+      "@safebyok/source": "./src/utils.ts",
+      "import": "./dist/utils.js",
+      "require": "./dist/utils.cjs"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
@@ -95,6 +100,9 @@
     "*": {
       "testing": [
         "./dist/testing.d.cts"
+      ],
+      "utils": [
+        "./dist/utils.d.cts"
       ]
     }
   },
@@ -107,6 +115,10 @@
       "./testing": {
         "import": "./dist/testing.js",
         "require": "./dist/testing.cjs"
+      },
+      "./utils": {
+        "import": "./dist/utils.js",
+        "require": "./dist/utils.cjs"
       },
       "./package.json": "./package.json"
     }
