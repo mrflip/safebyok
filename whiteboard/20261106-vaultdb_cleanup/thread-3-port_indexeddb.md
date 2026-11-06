@@ -1,6 +1,6 @@
 # Thread 3: port_indexeddb (2026-11-06)
 
-Branch `20261106-port_indexeddb`, PR #TBD, stacked on #558. Justify: green (root 311; safebyok
+Branch `20261106-port_indexeddb`, PR #560, stacked on #558. Justify: green (root 311; safebyok
 2268; safebyok-indexeddb 106 passed, 2 skipped; safebyok-idb-old 167/11 skipped; every other
 package as on #558; lint 0 errors; size ok, idbVaultDB 1.89 kB of 2.9 kB).
 
@@ -46,6 +46,7 @@ package as on #558; lint 0 errors; size ok, idbVaultDB 1.89 kB of 2.9 kB).
 * **Discoveries**:
   * idb-keyval 6.3 forgets a rejected open (`dbp = undefined`), so a failed open is retried on
     the next call; not cached, as I first feared.
-  * `pnpm size:budget` shows every other entry drifted below the rule; I set only idbVaultDB.
+  * `pnpm size:budget` shows most other budgets sit below what the rule would now set; I set only idbVaultDB's.
   * `git stash` in a worktree uses the shared stash stack: do not.
-* **For the Coach**: whether dropping the inspector is right (the demo still has the old one).
+* **For the Coach**: whether dropping the inspector is right (the demo still has the old one);
+  whether `isPutAllowed` should become a core export once threads 4 and 6 land.
