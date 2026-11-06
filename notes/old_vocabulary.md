@@ -2,7 +2,7 @@
 
 The names the reform of October 2026 retired, each beside the one that replaced it. It is for
 whoever reads older code, a CHANGELOG, `winboard/` or a released changeset and meets a word
-the current cast does not use. Nothing current uses these names: not the code, the docs, the
+the current cast does not use. Nothing current uses the first table's names: not the code, the docs, the
 stored records or the tests, and a new thing is never named from this page. The current cast is
 VOCABULARY.md.
 
