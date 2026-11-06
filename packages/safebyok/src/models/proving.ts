@@ -6,9 +6,9 @@ import { adorn } from '../helpers/helpers'
 import { invokeStrengthChecker } from '../helpers/passphrase-strength'
 import { outcomeOf, valOf } from '../refusals/outcome'
 import type { WayinKind } from '../shapes/shapes-enums'
-import { type VaultScope, vaultScope } from '../shapes/shapes-core'
+import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
-import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs, vaultStamp } from '../shapes/shapes-gateish'
+import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs } from '../shapes/shapes-gateish'
 import { keyDeriverThrew, leaseOfOtherVault, noPasskeyWayin, notKeyBytes, otherPasskey, otherPrfSalt, provingOfOtherVault, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
 import { Lease } from './lease'
 import { Wayin, wayinCtxOf } from './wayin'
@@ -81,7 +81,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     const checked = provingLeaseArgs.parse({ friend, gate_epoch })
-    if (! consistent(vaultStamp.parse(friend), this.stamp)) { throw leaseOfOtherVault() }
+    if (! consistent(friend, this.stamp)) { throw leaseOfOtherVault() }
     const vaultKey = await this.#unwrapVaultKey()
     return Lease.buildGranted(friend, vaultKey, { gate_epoch: checked.gate_epoch, wayinkind: this.wayinkind })
   }
@@ -124,7 +124,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   /** A proving for a new wayin, of the first gate's epoch. */
   static async buildNovel(stamp: VaultStamp, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { stamp: checked, passphraseClear: typed } = passphraseNovelArgs.parse({ stamp, passphraseClear, world })
-    const verdict = await super.checkStrength(typed, vaultScope.parse(checked), world)
+    const verdict = await super.checkStrength(typed, checked, world)
     if (! verdict.strong) { throw weakPassphrase(verdict.reason) }
     const header = mintPassphraseHeader(world)
     const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
