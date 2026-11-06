@@ -65,7 +65,7 @@ Open for the Coach: the Closer Look triage; three Open Matters rows.
   brands on the DB base classes (two eslint-disables on the getters); host functions and the logger checked once, by their
   guards; a host's `Infinity` is `ForeverMillis` inside. **For thread 9:** the second survey's four rows (plan, thread 9's
   directives); `FetchOpts` and `BoxPutOpts` are `Z.input` now. The values sweep now covers PX and UX.
-* Thread 9 `types_ab`: built, PR #557 at ca0f3d2ac on #553, in review. `BankOpts`, `KeyDeriver`, `VaultLogger` and the
+* Thread 9 `types_ab`: filed, PR #557 at 2dd896572 on #553's tip (plain push). `BankOpts`, `KeyDeriver`, `VaultLogger` and the
   snapshots are interfaces; the rest inferred with prop docs; the device store is exported; load guards pass a `VaultError`
   as it came. **For thread 10:** `KeyDeriver`'s members are readonly function props; the sparse record forms refuse
   `bad_option`. **Surface gaps still open:** `VaultDB` is exported as a type only and `MemoryVaultDB` not at all; public

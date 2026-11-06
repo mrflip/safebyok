@@ -387,7 +387,13 @@ as documented callable types; (A) prop docs in the builders for the verbs' optio
 query verbs refuse `bad_scope`; `GX.guardedLogger`; one brand test; `LeaseDated` in VOCABULARY); `DeviceDB` and
 `MemoryDeviceDB` exported from the front door with host doc blocks and an entry test; both load guards pass a `VaultError`
 as it came. `KeyDeriver`'s members are readonly function props. The sparse record forms refuse `bad_option` (VX had
-relabelled them `bad_record`). Compacted twice, after its first justify. In review (medium).
+relabelled them `bad_record`). Compacted twice, after its first justify.
+*Review (medium):* `fixed`; G1/G8 untouched by the load pass-through, the assertions two-way, the exports real in the
+`.d.ts`; four fixes (`StrengthChecker`'s doc on a failed load; `BankOpts` docs naming unexported defaults; bare imports
+beside `SX`; three titles quoting `bad_scope`). Left, minor: `buildOrReceive` refuses `bad_option` on every path, the
+changeset names `build` only; the wayin record types minted in gateish while their checkers are in storage (a one-line
+move when gate.ts is next touched); `leaseQuery`'s kind (Cleanup); `DefaultLogger`'s doc says "pass it to Bank.make" but
+it is not exported (Open Matters, with `DefaultStrengthChecker`). **Filed** at 2dd896572 on #553's tip, by a plain push.
 
 ### 10. `kindvals_smush`
 
