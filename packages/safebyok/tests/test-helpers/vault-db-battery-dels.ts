@@ -2,11 +2,9 @@
 
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
-import { bankScope, vaultScope, boxscope, Now, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale } from './storage-world'
+import { bankScope, vaultScope, boxscope, Now, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
 import type { VaultDB } from '../../src/storage/vault-db-new'
 import type { BatteryWorld } from './vault-db-battery'
-
-const boxQuery = { ...boxscope, vault_tok: 'life1' }
 
 /** Registers the dels' and tidyGone's cases over `world`. */
 export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
