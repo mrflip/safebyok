@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) built on #523, in review; thread 16 (#529, `utils_mash`) built on #518, in review; the Closer Look
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) built on #523, in review; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (`browser_entry`) building on #529; the Closer Look
 tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
@@ -397,6 +397,20 @@ rename `damaged_records` to `damaged_rows`". In review (high, opus).
 package.json export, the build entry and a size-budget line; VOCABULARY's deviceId snippet becomes
 `user_id: await mash(email)` and a **mash** row is added. Minor changeset. **Levels:** worker `sonnet`; review `low`.
 **Depends on:** #518 (stacked, in the Coach's line; plain pushes only). **Size:** small.
+
+### 17. `browser_entry`
+
+**The Coach** (2026-11-06, on the Argon2id deriver not being exported): "It should be being exported under an alternate
+export -- did that change when the packages were split? It must not be exported through the front door, as most people
+will not want to use it, preferring the wasm one instead."
+
+*Gloss:* the old core's `safebyok/browser` entry (`browserOpts`: `argon2idWebV1Deriver`, `idbDeviceDB`,
+`zxcvbnStrengthChecker`) did not come across in the split. The new core gets its `./browser` entry exporting the Argon2id
+deriver(s) from `deriver/`, and the strength checker if the new core has one, never from `src/index.ts`; the wiring as
+`./utils` got it in thread 16 (package.json exports, tsdown entry); a test that imports the entry and derives once;
+`TestDeriverNotice` reworded if it names the import. No `browserOpts` bag unless it ports in a few lines (the IndexedDB
+device DB is an adapter package on the old core). Minor changeset. **Levels:** worker `sonnet`; review `low`. **Depends
+on:** #529 (stacked; in the line's territory, plain pushes only). **Size:** small.
 
 ## For the Coach
 

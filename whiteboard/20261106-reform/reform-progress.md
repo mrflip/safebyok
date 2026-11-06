@@ -26,8 +26,12 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
 * Thread 15 `list_boxes`: built, PR #530 on #523, in review (high). **For threads 5 to 8:** `getBank` is `listVaults`,
   `VaultListing.list()`/`BoxListing.list()`, `fetchListed`/`vaultRowOf`/`VX.boxesListed`/`_takeListed` gone; `takeWorld`
   parses and receives only. **For thread 6:** keep `takeWorld` on the `BoxWorld` Pick.
-* Thread 16 `utils_mash`: built, PR #529 on #518, in review (low). The core's `safebyok/utils` entry exists now; the root
-  size budget has no new-core lines yet (a later thread adds them together).
+* Thread 16 `utils_mash`: filed, PR #529 at c947caaf8 on #518 (plain push; in the line's territory). The core's
+  `safebyok/utils` entry exists now; the root size budget has no new-core lines yet (a later thread adds them together).
+* Thread 17 `browser_entry`: building (sonnet) on #529: the new core's `./browser` entry with the Argon2id deriver.
+* **Rulings of 06:40:** no change to the fate code (ground rule 14, restated); a one-line consistency guard in
+  `takeWorld` after all (thread 15 rework); box size is checked, whisper size is not, as the code already does;
+  `device_id` required-or-minted is an open question (the Coach recalls removing the mint; main still mints and caches).
 * Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
   `d` + 32 hex.
 * **The Closer Look** (sprint doc tab, 2026-11-06 06:00) at 3b1b38999: its 1.1 is a real regression from #513 (`buildLease`
