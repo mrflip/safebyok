@@ -5,11 +5,11 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06, 11:55: running)
+## State (2026-11-06, 13:05: holding for merges)
 
-Twenty-two threads planned; 1 to 5 and 11 to 20 merged; 6 (#550), 21 (#548), 22 (#549) filed on main, 7 (#552) on #550,
-8 (#553) on #552. Building: 9 (`types_ab`, on #553's tip b2bf857de, split by file if past eight types). Next: 10 on 9.
-Open for the Coach: the Closer Look triage; three Open Matters rows.
+Twenty-two threads planned; 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550) -> 7 (#552) -> 8 (#553) -> 9 (#557)
+filed, merging. Thread 10 (`kindvals_smush`) holds until #557 and the other sprint's #555 are on main, then is cut from
+main. Open for the Coach: the Closer Look triage; two Open Matters rows.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's

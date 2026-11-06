@@ -10,9 +10,11 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 11:55, **running**: threads 1 to 5 and 11 to 20 merged; 6 (#550), 21 (#548), 22 (#549) filed on
-main, 7 (#552) on #550, 8 (#553) on #552, the Coach's to merge in that order; 9 (`types_ab`) building on #553's tip; 10
-follows. Open: #516 (this PR), the Closer Look triage, three Open Matters rows.
+**Status:** 2026-11-06, 13:05, **holding for merges**: threads 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550)
+-> 7 (#552) -> 8 (#553) -> 9 (#557) is filed and merging. Thread 10 (`kindvals_smush`, a repo-wide rename of the kind
+names) is the last of the plan and waits until #557 and the vaultdb_cleanup sprint's #555 (which rewrites the refusal and
+storage files) are both on main, then is cut from main. Open: #516 (this PR), the Closer Look triage, two Open Matters
+rows (the unexported surface; DefaultLogger and DefaultStrengthChecker).
 
 ## Read first
 
@@ -405,6 +407,10 @@ import in the core, its tests, the README and CUSTOMIZATION.md; the adapters and
 safebyok-old). `RefusalKind` is the public type a host switches over: minor changeset saying the new name. Mechanical,
 and wide, so it runs **last**, cut from the top of the line, where nothing else is rewriting those lines. **Levels:**
 worker `sonnet`; review `low`. **Depends on:** threads 5 to 9 filed, and #511 merged. **Size:** small.
+*Orchestrator (13:05):* holds until #557 and the vaultdb_cleanup sprint's #555 are both merged, then cut from main, not
+from #557's tip: #555 rewrites `errors.ts`, `throwers.ts`, `phrases.ts`, `shapes-storage.ts` and the vaultDB tests, the
+files a rename of `RefusalKind` touches most. Rides along: export `DefaultLogger` and `DefaultStrengthChecker` if the Coach
+says so (Open Matters).*
 
 ### 11. `duck_calibration`
 
