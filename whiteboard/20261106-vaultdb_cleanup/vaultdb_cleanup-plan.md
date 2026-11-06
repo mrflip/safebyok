@@ -225,6 +225,13 @@ ride-along); `SX` alias and adapter sentences (→ Open Matters rows); compound 
 migrations). **Depends on:** 2. **Look-ahead:** thread 5's graphql tests run over postgres.
 **Size:** L; a worker that compacts twice splits e2e off.
 
+*Review:* `medium`, fixed: doTidyGone read vault rows before box lives (a reborn vault's live
+boxes could be deleted), now lives first; BoxLivesSql ordered (deadlock); `rollBack` naming;
+README: the listen recipe's 'error' listener, who can LISTEN. Left: watch order on the keys-only
+fallback; rows on a public NOTIFY channel (→ a TOP Open Matters row); copied isPutAllowed /
+isHeardIn (→ export after the ports); opts type; documentarian work. Pushed at b72a514b6 without
+file-thread (graphql red until thread 5 joins).
+
 ### 5. port_graphql
 
 > port the other adapters. Do not adopt their doc strings, which are rich in slop.
