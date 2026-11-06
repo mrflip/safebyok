@@ -6,7 +6,7 @@
 * Threads at once: 3.
 * Sprint branch: `20261106-vaultdb_cleanup`, worktree `/workspace/byok-vaultdb_cleanup`.
 * **Status:** threads 1-6 filed: #555, #558, #561 (threads 4 and 5), #559, #560. Waiting on the
-  restack into main → #555 → #558 → #561 → #559 → #560 → #554, through /restacker; thread 7
+  restack into main → #555 → #558 → #561 → #559 → #560 → #565 → #554, through /restacker; thread 7
   (storage_door) is cut from its top. The Closer Look tab awaits the Coach's replies.
   **On hold (the Coach, 2026-11-06): "Can you pause on the Postgres and graphql while I catch
   up?"** Nothing on safebyok-postgres or safebyok-graphql starts (thread 8, thread 7's Postgres
@@ -420,6 +420,11 @@ pure-JS deriver, tested. Thread 7's 32-byte salt cap reaches this package throug
 `parseKeyDeriverSpec`; it needs no change here. **Depends on:** nothing unmerged: cut from
 `origin/main`, joining the line at the restack (it touches `packages/safebyok/src/index.ts`, which
 #555/#558 may also touch). **Levels:** `sonnet` worker, `low` review. **Size:** S.
+
+*Review (thread 9):* `low`, fixed: doc-block first lines, an `@example` spreading the gone
+`browserOpts()`, a private helper's lost phrase. Left: narrated `@param`/`@returns` and the
+unstated cross-deriver guarantee, `parseKeyDeriverSpec`/`checkSaltFits` public without doc blocks
+(documentarian); the salt test cases and PROCESS.md's peers line (thread 7). Filed as #565.
 
 ## For the Coach
 
