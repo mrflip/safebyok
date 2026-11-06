@@ -72,7 +72,7 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
   })
 
-  it("refuses a get whose list fails its check, listing nothing", async () => {
+  it("refuses a vault.hello whose listed boxes fail their check", async () => {
     const { openNextSession, tryGetVault, vaultDB } = await makeWorldWithBox()
     const next = await openNextSession()
     const answer = await vaultDB.tryGetVault(next.scope)
