@@ -48,7 +48,7 @@ const GetBoxSql = 'SELECT box FROM safebyok_boxes WHERE applabel = $1 AND user_i
 const StoreBoxSql = `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_tok, boxlabel, box) VALUES ($1, $2, $3, $4, $5, $6::text::jsonb)
   ON CONFLICT (applabel, user_id, vaultlabel, vault_tok, boxlabel) DO UPDATE SET box = EXCLUDED.box`
 const BoxLivesSql = `SELECT vaultlabel, vault_tok, count(*)::int AS boxcount FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2
-  GROUP BY vaultlabel, vault_tok`
+  GROUP BY vaultlabel, vault_tok ORDER BY vaultlabel, vault_tok`
 const DeleteBoxLifeSql = 'DELETE FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4'
 
 // Reads that pair a box with its vault are one statement, so both rows come from one snapshot.
