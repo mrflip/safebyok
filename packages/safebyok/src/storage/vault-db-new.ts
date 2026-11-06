@@ -103,15 +103,10 @@ export abstract class VaultDB {
       const vaultScope = CX.vaultScope.parse(scope)
       const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
       const found = SX.foundVaultRow.parse(await this.doGetVault(vaultScope))
-      if (found === null) {
-        const world = SX.sentinelVaultOf(vaultScope)
-        if (ifAbsent === 'fail') { throw Refuse.vaultEmpty(world) }
-        return { ok: true, req_params, act: 'gotvoid', val: null, world, dbhas: null }
-      }
-      if (found.am === 'x') {
-        if (ifAbsent === 'fail') { throw Refuse.vaultGone(found) }
-        return { ok: true, req_params, act: 'gotgone', val: null, world: found, dbhas: found }
-      }
+      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultScope)) }
+      if (found === null) { return { ok: true, req_params, act: 'gotvoid', val: null, world: SX.sentinelVaultOf(vaultScope), dbhas: null } }
+      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
+      if (found.am === 'x') { return { ok: true, req_params, act: 'gotgone', val: null, world: found, dbhas: found } }
       return { ok: true, req_params, act: 'got', val: found, world: found }
     } catch (err) { throw refusalOf(err, 'getVault', req_params) }
   }
@@ -140,14 +135,10 @@ export abstract class VaultDB {
       const { vault, box } = await this.doGetBox(boxQuery)
       const world = liveVaultOf(vault, boxQuery)
       const found = SX.foundBoxRow.parse(box)
-      if (found === null) {
-        if (ifAbsent === 'fail') { throw Refuse.absentBox(world, null) }
-        return { ok: true, req_params, act: 'gotvoid', val: null, world, dbhas: null }
-      }
-      if (found.am === 'x') {
-        if (ifAbsent === 'fail') { throw Refuse.absentBox(world, found) }
-        return { ok: true, req_params, act: 'gotgone', val: null, world, dbhas: found }
-      }
+      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
+      if (found === null) { return { ok: true, req_params, act: 'gotvoid', val: null, world, dbhas: null } }
+      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
+      if (found.am === 'x') { return { ok: true, req_params, act: 'gotgone', val: null, world, dbhas: found } }
       return { ok: true, req_params, act: 'got', val: found, world }
     } catch (err) { throw refusalOf(err, 'getBox', req_params) }
   }
@@ -168,11 +159,10 @@ export abstract class VaultDB {
       if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: vaultRecord, world: vaultRecord } }
       const { ifAbsent, ifPresent } = putOpts
       const found = SX.foundVaultRow.parse(ante)
-      if (found === null) {
-        const sentinel = SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)
-        throw (ifAbsent === 'fail') ? Refuse.vaultEmpty(sentinel) : Refuse.staleWrite(sentinel, null)
-      }
-      if (found.am === 'x') { throw (ifAbsent === 'fail') ? Refuse.vaultGone(found) : Refuse.staleWrite(found, found) }
+      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)) }
+      if (found === null) { throw Refuse.staleWrite(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok), null) }
+      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
+      if (found.am === 'x') { throw Refuse.staleWrite(found, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world: found } }
       throw Refuse.camped(found, found)
     } catch (err) { throw refusalOf(err, 'putVault', req_params) }
@@ -194,9 +184,13 @@ export abstract class VaultDB {
       if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: boxRecord, world } }
       const { ifAbsent, ifPresent } = putOpts
       const found = SX.foundBoxRow.parse(ante)
-      if ((found === null) || (found.am === 'x')) { throw (ifAbsent === 'fail') ? Refuse.absentBox(world, found) : Refuse.staleWrite(world, found) }
+      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
+      if (found === null) { throw Refuse.staleWrite(world, null) }
+      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
+      if (found.am === 'x') { throw Refuse.staleWrite(world, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world } }
-      throw (ifPresent === 'fail') ? Refuse.camped(world, found) : Refuse.staleWrite(world, found)
+      if (ifPresent === 'fail') { throw Refuse.camped(world, found) }
+      throw Refuse.staleWrite(world, found)
     } catch (err) { throw refusalOf(err, 'putBox', req_params) }
   }
 
@@ -403,12 +397,10 @@ const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultE
 const liveVaultOf = (raw: unknown, asked: VaultQuery): VaultRecord => {
   const found = SX.foundVaultRow.parse(raw)
   if (found === null) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
-  if (found.am === 'a') {
-    if (found.vault_tok !== asked.vault_tok) { throw Refuse.vaultMismatch(found) }
-    return found
-  }
+  if ((found.am === 'a') && (found.vault_tok !== asked.vault_tok)) { throw Refuse.vaultMismatch(found) }
   if (found.vault_tok !== asked.vault_tok) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
-  throw Refuse.vaultGone(found)
+  if (found.am === 'x') { throw Refuse.vaultGone(found) }
+  return found
 }
 
 /** The next revision of `stored`, `wayin` laid on its gate and its `gate_epoch` moved up. */
