@@ -250,6 +250,12 @@ bank. Left: relay putVault skips the gate verbs' checks, revocation mid-subscrip
 Matters rows); no VaultDB brand (→ later); unbounded subscription buffer (kept). Filed in #561 at
 fb6d281d3, with thread 4.
 
+*Rework (thread 5, on the Coach's vacate question):* the GraphQL stream re-asks `userIdOf` at
+each notice and ends, its listener released, when the answer changes or throws. Second review
+`medium`, fixed: an `await` outside a `try`, chained titles. Left: a userIdOf blip silences a
+device, a mid-stream revocation ends without `identity_revoked` (→ Open Matters); the changeset's
+wording on a thrown VaultError; no test of `return()` during a pending re-ask. Filed at 0b27c1128.
+
 ### 6. port_convex
 
 > port the other adapters. Do not adopt their doc strings, which are rich in slop.
@@ -266,6 +272,10 @@ compacts twice.
 smushed tags. Left: whole-bank reads against Convex's 16 MiB limit and tombstones against its
 documents-read limit (→ Open Matters rows); the maxRecordBytes reserve and the watch's starting
 gap (→ follow-ups); copied isPutAllowed; chained titles. Filed at bdfe5aa9b.
+
+*Rework (thread 6, on the Coach's ruling):* box tombstones count toward the row cap. Second
+review `low`, fixed: chained titles, two non-null assertions. Left: `box_count`/`maxBoxes` now
+count rows (→ Open Matters). Filed at 00f11ba85.
 
 ### 7. storage_door (after the restack)
 
