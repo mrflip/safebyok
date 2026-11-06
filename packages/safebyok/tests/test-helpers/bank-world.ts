@@ -28,12 +28,12 @@ export const labelsOf = ({ vaults }: BankSnapshot): string[] => vaults.map(({ va
 export class RefusingVaultDB extends MemoryVaultDB {
   #refusalkind: RefusalKind | null = null
 
-  /** From here on, `getBank` and `getVault` refuse this; null lets them through again. */
+  /** From here on, `listVaults` and `getVault` refuse this; null lets them through again. */
   _cheat_refuseGets(refusalkind: RefusalKind | null): void { this.#refusalkind = refusalkind } // eslint-disable-line unicorn/prefer-private-class-fields
 
-  protected override doGetBank(scope: BankScope) {
+  protected override doListVaults(scope: BankScope) {
     this.#demandAnswering()
-    return super.doGetBank(scope)
+    return super.doListVaults(scope)
   }
 
   protected override doGetVault(scope: VaultScope) {

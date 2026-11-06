@@ -237,7 +237,7 @@ export const Sidecar  = Object.freeze({ note: 'work' })
 export const makeWorld = async () => {
   const world = await makeBornVault()
   const boxrows = world.vaultDB._cheat_boxRowsOf(world.vault.scope, world.vault.vault_tok)
-  const tryGetVault = vi.spyOn(world.vaultDB, 'tryGetVault')
+  const tryListBoxes = vi.spyOn(world.vaultDB, 'tryListBoxes')
   const tryPutBox   = vi.spyOn(world.vaultDB, 'tryPutBox')
   const tryGetBox   = vi.spyOn(world.vaultDB, 'tryGetBox')
   /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first holds. */
@@ -246,7 +246,7 @@ export const makeWorld = async () => {
     await unlockTyping(vault, byPassphrase(Passphrase))
     return vault
   }
-  return { ...world, boxrows, tryGetVault, tryPutBox, tryGetBox, openNextSession }
+  return { ...world, boxrows, tryListBoxes, tryPutBox, tryGetBox, openNextSession }
 }
 
 /** A world whose vault has a box stored, and a next session that has not yet listed it. */

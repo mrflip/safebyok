@@ -49,19 +49,21 @@ export type Revision = Readonly<Z.infer<typeof revision>>
 export type Times    = Readonly<Z.infer<typeof times>>
 // --
 
-// == [Scopes]: bankScope, vaultScope, boxscope, boxQuery, watchScope, BankScope, VaultScope, Boxscope, BoxQuery, WatchScope
+// == [Scopes]: bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope, BankScope, VaultScope, VaultQuery, Boxscope, BoxQuery, WatchScope
 
-export const { bankScope, vaultScope, boxscope, boxQuery, watchScope } = Checkers('bad_option', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
+export const { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope } = Checkers('bad_option', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
+  const vaultQuery = vaultScope.extend({ vault_tok })
   const boxscope   = vaultScope.extend({ boxlabel })
   const boxQuery   = boxscope.extend({ vault_tok })
   const watchScope = bankScope.extend({ vaultlabel: vaultlabel.optional() })
-  return { bankScope, vaultScope, boxscope, boxQuery, watchScope }
+  return { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope }
 }, [CX])
 
 export type BankScope  = Readonly<Z.infer<typeof bankScope>>
 export type VaultScope = Readonly<Z.infer<typeof vaultScope>>
+export type VaultQuery = Readonly<Z.infer<typeof vaultQuery>>
 export type Boxscope   = Readonly<Z.infer<typeof boxscope>>
 export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
 export type WatchScope = Readonly<Z.input<typeof watchScope>>
