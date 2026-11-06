@@ -10,7 +10,7 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** planning done 2026-11-06; threads 1 and 2 start at once; threads 3 to 10 wait for PRs #511, #513 and #514 to
+**Status:** 2026-11-06: threads 1 (#518) and 2 (#517) ready and in review; threads 3 to 10 wait for PRs #511, #513 and #514 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
 ## Read first
@@ -125,7 +125,7 @@ Remove `clock` from `bankOpts`, `vaultDBOpts`, every world and friend shape, the
 `VaultDB.#clock` goes. Tests already on vitest fake timers need nothing; the test helpers (`models-world.ts`,
 `vault-world.ts`, `storage-world.ts` and the two others the inventory names) swap one line each to the backdoor. A host
 still passing `clock` meets `bad_option` since `bankOpts` is strict: the changeset (minor) says so and names
-`_cheat_clock` as the test hook. Delete the stale `Clock` doc claim. **Levels:** worker `opus`; review `high` (it edits
+`_cheat_clock` as the test hook. Delete the stale `Clock` doc claim, and rewrite G4's "Both go by the host's clock" in notes/guarantees.md (thread 2's finding) to what is true once the clock is the module's. **Levels:** worker `opus`; review `high` (it edits
 `proving.ts` and `lease.ts`, guarantees files). **Depends on:** #511 and #513 merged (they touch the same shapes and
 `proving.ts`). **Look-ahead:** thread 6 removes `world.clock` from the world types for good; leave the world shapes
 otherwise alone. **Size:** one context, but it is wide; if the first justify is not reached in one context, the backdoor
@@ -162,7 +162,9 @@ written twice (`Bank.#panic`, `Vault.#panic`); the strength checker is wrapped o
 guard; `Phrases.BadNewsHandlerThrew` is dead. Wrap each host function once in Bank's constructor into a checked, named
 thing (the existing `*Threw` throwers keep the passphrase out: G1 and G8), so later code holds the branded function and
 never the host's; write each guard once; delete the dead phrase. The key deriver's wrap touches `proving.ts`: check it
-against *The guarantees* first and say so in the thread file. No behaviour change a test can see except where a host
+against *The guarantees* first and say so in the thread file. Thread 2 found (F2) that G8's claim "the three host functions
+that hear the passphrase have their throws replaced by `refusalFor`" holds only for the strength checker today; rewrite G8's
+sentence and *Where the guarantees are kept* to name the wraps this thread builds, once, in Bank's constructor. No behaviour change a test can see except where a host
 function that throws was previously unguarded (`keyDeriver.load`): that becomes the refusal the neighbours give.
 **Levels:** worker `opus`; review `high`. **Depends on:** thread 6 (stacked). **Size:** one context.
 
