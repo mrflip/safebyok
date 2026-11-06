@@ -1,11 +1,11 @@
 /** A real gating, real provings, and the in-memory stores: `build_vault` and `unlock_vault` from the dialog's first sight of a gating to its settling. */
 
 import { runInNewContext } from 'node:vm'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import type { GatingKind } from '../../src/shapes/shapes-enums'
-import type { AnyGating } from '../../src/shapes/shapes-gateish'
+import type { AnyGating, ClearsForGatingkind, RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { VaultWorld } from '../../src/shapes/shapes-vaultish'
 import { PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
@@ -34,6 +34,10 @@ const makeDialog = () => {
     }, { interval: 1 }),
   }
 }
+
+// Compiles only while every member of AnyGating takes the same clears: a host's dialog need not narrow to attempt.
+/** A host's dialog that attempts {@link Passphrase}, never narrowing on the gating's kind. */
+const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
 /** A fresh world with a dialog, nothing stored. */
 const birthWorld = (worldOverrides: Partial<VaultWorld> = {}) => {
@@ -244,6 +248,24 @@ describe("the dialog ending", () => {
 })
 
 describe("gating.attempt", () => {
+  it("takes any kind's clears from a host's dialog that never narrows on the gating's kind", async () => {
+    expectTypeOf<AnyGating['attempt']>().parameter(0).toEqualTypeOf<ClearsForGatingkind[GatingKind]>()
+    const { listing } = birthWorld({ requestCleartext: unnarrowedDialog })
+    const landed = await listing.buildVault(Dna)
+    expect(landed.isUnlocked).to.be.true
+  })
+
+  it("refuses another kind's clears, settling the gating, storing nothing, and the refusal holds no passphrase", async () => {
+    const { listing, gatingAt, storedNow } = birthWorld()
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'bad_option')
+    const gating = await gatingAt<'build_vault'>()
+    const err = await TH.expectBad(gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: Passphrase }), 'bad_option')
+    await launched
+    expect(gating.isOpen).to.be.false
+    expect(storedNow()).to.be.null
+    expect(TH.thrownText(err)).to.not.include(Passphrase)
+  })
+
   it("refuses a second while one runs 'attempt_in_flight', spending what it was handed, and the first goes on", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = listing.buildVault(Dna)

@@ -250,7 +250,7 @@ describe("building over a tombstone", () => {
     expect(deriveKeyBytes).toHaveBeenCalled()
     deriveKeyBytes.mockClear()
     const before = storedNow()
-    const dialog = vi.fn(async (gating: AnyGating) => { await gating.attempt(byPassphrase('a-new-passphrase') as never) })
+    const dialog = vi.fn(async (gating: AnyGating) => { await gating.attempt(byPassphrase('a-new-passphrase')) })
     listing.world.requestCleartext = dialog
     await TH.expectRefusal(Vault.launchBirth(listing, Dna), 'bad_option')
     expect(dialog).not.toHaveBeenCalled()

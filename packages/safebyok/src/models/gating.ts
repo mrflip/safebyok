@@ -98,7 +98,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
 
   /** SLOPDOC: The one door for a clear: tries what the user typed once, and answers how it went as an Outcome. */
-  attempt(clears: ClearsForGatingkind[KindT]): Promise<Outcome<Vault>> {
+  attempt(clears: ClearsForGatingkind[GatingKind]): Promise<Outcome<Vault>> {
     const refusal = this.#refusalOfAttempt()
     if (refusal !== null) {
       // A clear is spent even when refused at the door.
@@ -114,7 +114,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
     return this.#isAttempting ? attemptInFlight() : null
   }
 
-  async #attemptOnce(clears: ClearsForGatingkind[KindT]): Promise<Outcome<Vault>> {
+  async #attemptOnce(clears: ClearsForGatingkind[GatingKind]): Promise<Outcome<Vault>> {
     const asked = { scope: this.#scope, vault: this.vault, listing: this.#listing, world: this.#listing.world }
     const outcome = await outcomeOf(async () => this.#run(await this.#prove(asked, clears), this.#launchArgs))
     this.#isAttempting = false
