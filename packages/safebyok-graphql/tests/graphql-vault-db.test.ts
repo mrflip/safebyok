@@ -2,17 +2,16 @@
 
 import { describe, it } from 'vitest'
 import { Client } from '@urql/core'
-import * as TH from 'safebyok/testing'
 import { GraphQLVaultDB } from '../src/index'
-import * as GQ from './test-helpers'
+import * as TH from './test-helpers'
 
-GQ.bootDatabaseFirst()
+TH.bootDatabaseFirst()
 
 TH.describeVaultDBBattery("GraphQLVaultDB", {
-  makeVaultDB:         async (opts) => await GQ.makeVaultDB(opts),
-  makeCappedVaultDB:   async (maxBoxes) => await GQ.makeVaultDB({}, maxBoxes),
-  makeTwin:            GQ.makeTwin,
-  _cheat_rowsOf:       () => GQ.rowsOf(),
+  makeVaultDB:         async (opts) => await TH.makeVaultDB(opts),
+  makeCappedVaultDB:   async (maxBoxes) => await TH.makeVaultDB({}, maxBoxes),
+  makeTwin:            TH.makeTwin,
+  _cheat_rowsOf:       () => TH.rowsOf(),
   _cheat_failNextCall: (vaultDB) => { vaultDB.failNext() },
 })
 

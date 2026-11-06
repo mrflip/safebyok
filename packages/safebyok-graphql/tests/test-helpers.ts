@@ -14,6 +14,9 @@ import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 import { GraphQLVaultDB } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 
+// Everything the core's tests use too, so a test here star-imports this one module as TH.
+export * from 'safebyok/testing'
+
 // == [The database]: BootMillis, database, bootDatabaseFirst, emptyTables, listen
 
 // A PGlite's WebAssembly compiles cold on a CI runner in eight seconds or more, past a test's timeout.
