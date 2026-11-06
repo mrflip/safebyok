@@ -42,13 +42,11 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return boxRecord.parseConsistent(duck, this.world.scope) }
   // --
 
-  // == [Methods]: hello, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
+  // == [Methods]: _takeListed, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
 
-  /** Start the watch and take what the vault's get listed, if given: its boxes held sparse, its damaged rows set aside. */
-  override async hello(listed?: BoxesListed): Promise<void> {
-    await super.hello()
-    if (listed === undefined) { return }
-    const { boxes, damaged_rows } = VX.boxesListed.parse(listed)
+  // The underbar says this is `vault.hello`'s to call, not a host's; the vault has parsed `listed` already.
+  /** Hold the boxes `vault.hello` listed, sparse, and set its damaged rows aside. */
+  async _takeListed({ boxes, damaged_rows }: BoxesListed): Promise<void> { // eslint-disable-line unicorn/prefer-private-class-fields
     this.#damagedRows = Object.freeze(damaged_rows)
     for (const { boxlabel } of damaged_rows) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))

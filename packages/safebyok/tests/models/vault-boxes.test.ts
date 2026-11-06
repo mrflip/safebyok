@@ -72,9 +72,14 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
   })
 
-  it("refuses a boxListing.hello given a list that fails its check", async () => {
-    const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.boxListing.hello({ boxes: 'none' } as never), 'damaged_row')
+  it("refuses a get whose list fails its check, listing nothing", async () => {
+    const { openNextSession, tryGetVault, vaultDB } = await makeWorldWithBox()
+    const next = await openNextSession()
+    const answer = await vaultDB.tryGetVault(next.scope)
+    if (! answer.ok) { throw answer.err }
+    tryGetVault.mockResolvedValueOnce({ ...answer, val: { ...answer.val!, boxes: 'none' } } as never)
+    await TH.expectRefusal(next.hello(), 'damaged_row')
+    expect(next.boxListing.things).to.deep.equal([])
   })
 })
 
