@@ -1,6 +1,6 @@
 # Thread 1: vocab_sweep (2026-11-06)
 
-Branch `20261106-vocab_sweep`, PR #TBD, off main 57f33ee9. Justify: green (core 1827 tests,
+Branch `20261106-vocab_sweep`, PR [#518](https://github.com/mrflip/safebyok/pull/518), off main 57f33ee9. Justify: green (core 1827 tests,
 safebyok-old 3537, every package passing; size budgets met).
 
 * **Built**: VOCABULARY.md rewritten against the core on main (`packages/safebyok/src`), row by
