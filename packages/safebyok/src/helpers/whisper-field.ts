@@ -7,7 +7,7 @@
  * @example <input name="whisper_text" type="password" {...WhisperFieldAttributes} />
  * @example for (const [attrname, attrval] of Object.entries(WhisperFieldAttributes)) { field.setAttribute(attrname, attrval) }
  */
-export const WhisperFieldAttributes = {
+export const WhisperFieldAttributes = Object.freeze({
   // the major third-party password managers, each its own flag
   'data-1p-ignore':        'true',
   'data-lpignore':         'true',
@@ -22,4 +22,4 @@ export const WhisperFieldAttributes = {
   'autoCapitalize':        'none',
   'autoCorrect':           'off',
   'spellCheck':            'false',
-} as const
+} as const)
