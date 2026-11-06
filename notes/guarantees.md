@@ -21,9 +21,10 @@ of its sites, the note says so. A claim the code no longer bears is listed in #5
 
 ## Where the guarantees are kept
 
-Eight files hold every line of the core that touches a secret: `crypto.ts`, the two shapes files that say what a
-stored leaseKey and a whisper are, and the five of `models/` that build the constructions. A change to one of them is a
-change to these guarantees until shown otherwise.
+Eleven files hold every line of the core that touches a secret: `crypto.ts`, the two shapes files that say what a
+stored leaseKey and a whisper are, the five of `models/` that build the constructions, `models/vault.ts`, which carries
+the whisper's text to the lease and holds it, and the two files that hear the passphrase, the default deriver and the
+strength-checker guard. A change to one of them is a change to these guarantees until shown otherwise.
 
 | File | What it keeps |
 |---|---|
@@ -34,6 +35,9 @@ change to these guarantees until shown otherwise.
 | `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `vacate` |
 | `packages/safebyok/src/models/gate.ts` | holds no key: wayin pickles and the vault's stamp; the passphrase proving a birth's gating made is dropped after the `build_vault` run's lease |
 | `packages/safebyok/src/models/box.ts` | holds no key: hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
+| `packages/safebyok/src/models/vault.ts` | the whisper's JSON text, carried through `sealStampedString` and `unsealStampedString` to `Lease.sealWith` and `unsealWith` and back (G6); the `Lease` held closed in `#lease`, which no method hands out (G9) |
+| `packages/safebyok/src/deriver/argon2id-webv1.ts` | `deriveKeyBytes`, which hears the passphrase as an argument and returns the passphraseKey bytes in a buffer of its own, for `passphraseKeyOf` to import and zero (G1, G2) |
+| `packages/safebyok/src/helpers/passphrase-strength.ts` | `invokeStrengthChecker`'s guard, which hears the new passphrase as an argument, parses the host checker's verdict inside the guard, and hands a throw to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
 Beside them, three host functions hear the passphrase and are guarded where they are called:
 `keyDeriver.deriveKeyBytes` (`models/proving.ts`, `deriveKeyBytes`), `strengthChecker`
