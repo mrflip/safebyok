@@ -1,6 +1,6 @@
 # Thread 5: module_clock (2026-11-06)
 
-Branch `20261106-module_clock`, PR #PRNUM, base main (cut at fbe760e0f). Justify: green; safebyok
+Branch `20261106-module_clock`, PR [#535](https://github.com/mrflip/safebyok/pull/535), base main (cut at fbe760e0f). Justify: green; safebyok
 1857 tests, every package and the size budget passing.
 
 * **Built**:
