@@ -136,10 +136,17 @@ describe("IdbVaultDB's refusals", () => {
     expect(await idbRowsOf(vaultDB).vaultRowOf(TH.vaultScope)).to.be.null
   })
 
-  it("refuses a call where there is no IndexedDB", async () => {
-    const vaultDB = makeVaultDB()
-    vi.stubGlobal('indexedDB', undefined)
-    const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'storage_unavailable')
-    expect(refusal.message).to.match(/no IndexedDB/)
-  })
+  const AbsentCases = [
+    [undefined, 'refuses a call where there is no IndexedDB'],
+    [null,      'refuses a call where the browser holds IndexedDB as null'],
+  ] as const
+
+  for (const [absent, blurb] of AbsentCases) {
+    it(blurb, async () => {
+      const vaultDB = makeVaultDB()
+      vi.stubGlobal('indexedDB', absent)
+      const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'storage_unavailable')
+      expect(refusal.message).to.match(/no IndexedDB/)
+    })
+  }
 })

@@ -119,7 +119,8 @@ const IndexedDBFailed = "IndexedDB failed while the vault was reading or writing
 /** The refusal that says what went wrong in IndexedDB. */
 const troubleOf = (err: unknown): VaultError => {
   if (SX.isVaultError(err)) { return err }
-  if (typeof indexedDB === 'undefined') { return SX.storageUnavailable(err, NoIndexedDB) }
+  // A browser with IndexedDB switched off may hold the global as null rather than leave it out.
+  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return SX.storageUnavailable(err, NoIndexedDB) }
   const errname = (err instanceof Error) ? err.name : null
   if (errname === 'QuotaExceededError') { return SX.storageFull(err) }
   if (errname === 'AbortError') { return SX.storageUnavailable(err, TransactionAborted) }
