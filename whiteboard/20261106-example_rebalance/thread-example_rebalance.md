@@ -1,6 +1,6 @@
 # Thread: example rebalance (2026-11-06)
-
-Branch `20261106-example_rebalance`, off `origin/main` at 57f33ee9, hand-spawned (no sprint). Justify: green;
+# Thread: example rebalance (2026-11-06)
+Branch `20261106-example_rebalance`, PR #514, off `origin/main` at 57f33ee9, hand-spawned (no sprint). Justify: green;
 safebyok 61 files, 1834 tests.
 
 * **Built**: the audit's (`/workspace/byok/whiteboard/20261102-newdesign/example-audit.md`) drops and trims across
