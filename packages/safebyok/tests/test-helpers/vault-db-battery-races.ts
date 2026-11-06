@@ -1,7 +1,7 @@
 /** The battery's races and notices: two devices' writes landing at once, a vault deleted under a gate verb, what a watch hears, and a store's own failure. */
 
-import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/refusals/errors'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { WatchScope } from '../../src/shapes/shapes-storage'
 import type { Notice, VaultDB } from '../../src/storage/vault-db-new'
@@ -23,10 +23,11 @@ const slipInFront = (vaultDB: VaultDB, meanwhile: () => Promise<unknown>): void 
   beforeNextCall(vaultDB as unknown as MovesVaultRow, 'doPutVault', meanwhile)
 }
 
-/** A watch on `vaultDB` at `scope`, and the notices it has heard so far. */
+/** A watch on `vaultDB` at `scope`, closed when the test ends, and the notices it has heard so far. */
 const watching = (vaultDB: VaultDB, scope: WatchScope) => {
   const notices: Notice[] = []
   const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
+  onTestFinished(unwatch)
   return { notices, unwatch }
 }
 
@@ -177,6 +178,16 @@ export const describeRaces = ({ fresh, storeWith, rowsOf, twinOf, hasCap, makeCa
       expect(notices).to.have.lengthOf(1)
     })
 
+    it("is safe to tell to stop twice", async () => {
+      const { vaultDB, box } = await storeWith()
+      const { notices, unwatch } = watching(vaultDB, vaultScope)
+      unwatch()
+      expect(() => { unwatch() }).not.to.throw()
+      await vaultDB.putBox(box, { prior: SX.VoidRevision })
+      await aWhile()
+      expect(notices).to.deep.equal([])
+    })
+
     it("hears a cascade's box under the vault row stored, not the request's tombstone", async () => {
       const { vaultDB, vault } = await storeWith()
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'oldlife', boxAt(0, 'oldlife'))
@@ -195,7 +206,7 @@ export const describeRaces = ({ fresh, storeWith, rowsOf, twinOf, hasCap, makeCa
       await failNextCall(vaultDB)
       const answer = await vaultDB.tryGetVault(vaultScope)
       expect(answer).to.deep.include({ ok: false, req_params: vaultScope })
-      expect(answer.err).to.be.instanceOf(VaultError)
+      expect(isVaultError(answer.err, 'storage_unavailable')).to.be.true
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ val: vault })
     })
   })
