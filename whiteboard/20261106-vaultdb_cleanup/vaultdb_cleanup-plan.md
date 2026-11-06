@@ -287,7 +287,11 @@ Three rulings from Open Matters, 2026-11-06, verbatim:
 STYLE.md row in the import-alias table); STYLE.md *Validation* says the storage validators are
 exported from `safebyok/storage`; the phrases adapters write themselves (IndexedDB's five trouble
 sentences, any in Convex or Postgres) move to the core's Phrases and are exported there; strike
-any mention of shared banks or a `mayReach` predicate. Touches every adapter package, so it is cut
+any mention of shared banks or a `mayReach` predicate. Two `notes/wontfix.md` entries: Convex
+refuses a field name starting with `$` or holding non-ASCII at any depth of a record (its docs add
+empty and `_`-leading names, 16 levels of nesting, 1024 entries per object), and the GraphQL
+stream's best-effort stop (re-asked on each notice, so an idle stream stays open until its next
+change, and a `userIdOf` that does not look the session up live gives none). Touches every adapter package, so it is cut
 from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
 mechanical; `sonnet` worker, `low` review.
 
