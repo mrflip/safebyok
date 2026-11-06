@@ -90,7 +90,12 @@ const listen: PostgresListen = async (channel, onNotify) => {
   if (! heedersOf.has(channel)) {
     heedersOf.set(channel, heeders)
     // A user_id has capitals and punctuation that LISTEN reads only in a quoted identifier.
-    await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
+    try {
+      await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
+    } catch (err) {
+      heedersOf.delete(channel)  // so the next watch on this channel LISTENs again
+      throw err
+    }
   }
   heeders.add(onNotify)
   return () => heeders.delete(onNotify)
