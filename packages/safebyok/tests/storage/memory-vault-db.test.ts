@@ -34,7 +34,7 @@ TH.describeVaultDBBattery("MemoryVaultDB", {
 })
 
 describe("describeVaultDBBattery", () => {
-  it("refuses opts that lack a hook it needs, before it registers a case", () => {
+  it("refuses opts that lack a hook it needs", () => {
     expect(() => { TH.describeVaultDBBattery("none", { _cheat_rowsOf: memoryRowsOf } as never) }).to.throw(VaultError)
     expect(() => { TH.describeVaultDBBattery("none", { makeVaultDB: () => new MemoryVaultDB() } as never) }).to.throw(VaultError)
   })
