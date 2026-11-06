@@ -142,8 +142,8 @@ describe("bank.hello", () => {
     await first.hello()
     const second = world.bankOn({ device_id: 'device_second' })
     await second.hello()
-    expect(first.snapshot.device_id).to.eq('device_first')
-    expect(second.snapshot.device_id).to.eq('device_second')
+    expect([first.device_id, first.snapshot.device_id]).to.deep.equal(['device_first', 'device_first'])
+    expect([second.device_id, second.snapshot.device_id]).to.deep.equal(['device_second', 'device_second'])
   })
 
   it("hears a vault made elsewhere over the watch it starts", async () => {
@@ -210,7 +210,7 @@ describe("bank.ensureVault", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }), 'bad_option')
   })
 
-  it("refuses at Bank.make no device_id", () => {
+  it("refuses at Bank.make a missing device_id", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }), 'bad_option')
   })
 
