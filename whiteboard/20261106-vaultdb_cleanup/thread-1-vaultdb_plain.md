@@ -1,6 +1,6 @@
 # Thread 1: vaultdb_plain (2026-11-06)
 
-Branch `20261106-vaultdb_plain`, PR [#555](https://github.com/mrflip/safebyok/pull/555), off `main`. Justify: green (safebyok 2191 tests, 0 lint errors).
+Branch `20261106-vaultdb_plain`, PR [#555](https://github.com/mrflip/safebyok/pull/555), off `main`. Justify: green after the rebase onto main (safebyok 2246 tests, 0 lint errors).
 
 * **Built**: `src/storage/vault-db-new.ts` rewritten. Each verb is one method: `req_params`, then a
   method-wide `try { ... } catch (err) { throw refusalOf(err, '<verb>', req_params) }` around lines
@@ -67,6 +67,14 @@ Branch `20261106-vaultdb_plain`, PR [#555](https://github.com/mrflip/safebyok/pu
   the Coach's "method-wide try/catch" asks; noted so a reviewer sees it.
 * **describeVaultDB was not consulted** (Coach directive): verbs, answers and `do*` were judged by
   `src/models` callers and readability.
+
+* **The filing rebase onto main** (after #548, #549, #505): main's tests stopped promising
+  incidental refusal kinds. The thread's conflicted tests in `vault-db-new-puts.test.ts` took
+  main's kind-free titles and assertions, kept this thread's behaviour (`meta.fieldnames` naming
+  the field, `_cheat_rowsOf`, no `Phrases.RecordPreparedWrong`, the gate's `world: vault` on the
+  `registered_at` mismatch, not the parse refusal), and keep `damaged_row` as main does. One title
+  in `vault-db-new.test.ts` stopped naming `damaged_row`. `shapes-storage.ts` took the thread's
+  strict gate params and main's capacity doc block.
 
 ## Discoveries
 
