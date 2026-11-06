@@ -92,8 +92,10 @@ a write made just after a watch begins can go unheard.
 `safebyok_boxes` a row per box, keyed by those, the life of its vault (`vault_tok`) and its
 `boxlabel`. Each row's record is one `jsonb` column, `vault` or `box`, as safebyok wrote it. A
 deleted vault or box leaves its tombstone in place, and `tidyGone` removes the boxes of a vault's
-ended lives. Row-level security is on with no policy, so only the tables' owner, the role your
-server connects as, reaches them.
+ended lives. Row-level security is on with no policy, so of the roles you grant the tables to,
+only their owner, the role your server connects as, reaches the rows; a superuser, or a role that
+bypasses row-level security, reaches them too. A notification is not a table: any role that may
+connect can LISTEN on `VaultChangeChannel` and hear the rows each write stores.
 
 Every write locks its vault's row first (`SELECT ... FOR UPDATE`), so writes under one vault take
 turns, and the checks a write makes before it lands read rows no other write can change meanwhile.
