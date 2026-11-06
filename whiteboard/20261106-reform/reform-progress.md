@@ -55,6 +55,12 @@ Look triage; the Open Matters table is empty.
   `new VaultListing(this, { vaultDB, maxMillisSinceRefresh })`. A vault's world must carry `leaseMillis` and
   `boxRefreshMillis`. `halpimonfire.test.ts` and `loosened.test.ts` build the models world in `beforeEach`, so the vault
   world's later clock wins there.
+* Thread 7 `host_branding`: built, PR #552 at 7504221d0 on #550, in review. Each host function is wrapped once in Bank's
+  constructor and branded `IsGuarded` (a frozen getter); Bank holds `askUser` and `panic`, not the host's functions.
+  **For thread 8:** the logger's WeakSet brand can replace `loggerShape` in the worlds. **For thread 9:** the handrolled
+  types `AskUser`, `Panic`, `PanicHandler`, `BadNewsHandler`, `GuardedKeyDeriver`, `GuardedStrengthChecker`; `ProvingWorld`
+  and `VaultWorld` stay inferred. **Surface gap:** neither entry exports a device store, so a host cannot build the
+  `deviceDB` that `Bank.make` requires (Open Matters, TOP). Compacted twice (09:13, 09:23), after its first justify.
 * Thread 19 `utils_port`: reviewed (`fixed`), PR #534 at 576f347cd on #531, pushed; joins the chain's top. `UX` is the
   namespace for `shapes/shapes-utils.ts` (STYLE.md's table wants the row). `safebyok/utils`: `mash`, `mask(text, opts)`,
   `MaskOpts`, `fromB64`/`toB64` (crypto.ts's codec), `WhisperFieldAttributes`; `shapes/shapes-utils.ts` is a seventh shapes

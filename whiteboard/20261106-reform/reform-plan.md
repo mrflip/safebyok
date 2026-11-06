@@ -278,6 +278,18 @@ first-cached-wins and mint stay gone.*
 *Directive (thread 6's review): a fractional `autolockMinutes` (admitted by `positiveMinutes`) makes a non-integer
 `leaseMillis` that `GX.leaseMillis` refuses as `bad_option` on a field the host never named; `Math.round` in `millisOf`
 (bank.ts) or tighten `positiveMinutes` to an int, with a test; the smaller change wins.*
+*Built (PR #552, on #550):* Bank's constructor wraps each host function once: `keyDeriver` (`guardKeyDeriver`, proving.ts),
+`strengthChecker` (`guardStrengthChecker`), `requestCleartext` as `askUser`, `onPanic` as `panic`; one brand `IsGuarded`
+(helpers/consts.ts), a frozen non-enumerable getter, which `VX.vaultWorld` and `GX.provingWorld` demand; `Vault.#panic`
+calls Bank's; `BadNewsHandlerThrew` deleted; new exported types `AskUser`, `Panic`, `PanicHandler`, `BadNewsHandler`,
+`GuardedKeyDeriver`, `GuardedStrengthChecker` (handrolled, for thread 9); guarantees.md names the wraps (files table, host
+paragraph, G1, G8, G9), only the strength checker reaching `refusalFor`, G8's duplicate clause gone. Visible change: a failed
+`keyDeriver.load` refuses `unexpected_error` with the throw as cause. Directives landed: `device_id` a UUID (`DeviceIdShape`,
+test ids, the VOCABULARY row; a stored wayin with a non-UUID `device_id` now reads as damaged, the changeset says);
+`millisOf` rounds; the `browserOpts()` phrases and CUSTOMIZATION reworded (the zxcvbn section removed: the package ships
+no checker; the host's own device store named, since the core exports none: both Open Matters). `checkSuppliedSpecKept`
+kept: it polices only our own `argon2id_web_` labels. Compacted twice, both after its first justify, ten minutes apart:
+the thread outgrew one context; thread 8's gloss gets a hatch. In review (`opus`, high).
 
 ### 8. `checkers_once`
 
@@ -294,6 +306,10 @@ safebyok, so no `instanceof`), the two refusal tests that do not subclass adjust
 moves. **Levels:** worker `opus`; review `medium`. **Depends on:** thread 7 (stacked; the shapes files move under each).
 **Look-ahead:** thread 9 decides inferred versus handrolled per type; do not re-type anything here. **Size:** one
 context.
+*Directive (thread 7): replace the later `loggerShape` checks in the worlds with the logger's WeakSet brand, as `isGuarded`
+is used for the wraps. Hatch (thread 7 compacted twice): the scopes' one home and the `LeaseSparse` rename first, then the
+ducks' brand; if the first justify is not reached in one context, commit what is green, file, and the inline-shape and
+repeated-default rows become thread 8b.*
 
 ### 9. `types_ab`
 
