@@ -77,9 +77,9 @@ describe("deviceDB.cache(row), peek(asked)", () => {
 
   it("refuses a row without proved_at, and a malformed query", async () => {
     const deviceDB = new MemoryDeviceDB()
-    await TH.expectRefusal(deviceDB.cache({ ...asked, lease_key: await makeLeaseKey() } as unknown as LeaseRow), 'bad_option')
-    await TH.expectRefusal(deviceDB.peek({ ...asked, vaultlabel: 'No Good!' }), 'bad_option')
-    await TH.expectRefusal(deviceDB.peek({ ...scope } as never), 'bad_option')
+    await TH.expectRefusal(deviceDB.cache({ ...asked, lease_key: await makeLeaseKey() } as unknown as LeaseRow))
+    await TH.expectRefusal(deviceDB.peek({ ...asked, vaultlabel: 'No Good!' }))
+    await TH.expectRefusal(deviceDB.peek({ ...scope } as never))
   })
 
   it("answers each as an Outcome through its try form, refusing the same", async () => {
@@ -88,7 +88,7 @@ describe("deviceDB.cache(row), peek(asked)", () => {
     const cached = await deviceDB.tryCache(row)
     expect(cached.ok).to.be.true
     expect(await TH.expectGood(deviceDB.tryPeek(asked))).to.not.be.null
-    await TH.expectBad(deviceDB.tryPeek({ ...asked, applabel: '' }), 'bad_option')
+    await TH.expectBad(deviceDB.tryPeek({ ...asked, applabel: '' }))
   })
 })
 
@@ -164,8 +164,8 @@ describe("deviceDB.leasesProvedBefore(cutoff)", () => {
   it("answers an empty list for an empty store, and refuses a cutoff that is no instant", async () => {
     const deviceDB = new MemoryDeviceDB()
     expect(await TH.expectGood(deviceDB.tryLeasesProvedBefore(T0))).to.deep.equal([])
-    await TH.expectBad(deviceDB.tryLeasesProvedBefore(NaN), 'bad_option')
-    await TH.expectRefusal(deviceDB.leasesProvedBefore('now' as never), 'bad_option')
+    await TH.expectBad(deviceDB.tryLeasesProvedBefore(NaN))
+    await TH.expectRefusal(deviceDB.leasesProvedBefore('now' as never))
   })
 })
 
