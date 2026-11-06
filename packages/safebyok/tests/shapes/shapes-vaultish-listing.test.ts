@@ -169,7 +169,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
       [{ ...args, world: null },                       false, 'refuses a null world'],
       [{ ...args, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
-      [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, 'refuses options, the horizon being the listing\'s'],
+      [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, "refuses options, the horizon being the listing's"],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not take, being strict'],
     ])
 
