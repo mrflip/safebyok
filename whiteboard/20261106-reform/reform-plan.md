@@ -10,10 +10,9 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 09:25, **running**: every filed thread is merged (1 to 5 and 11 to 20; the line between 08:40
-and 09:00, #535 at 08:21 by the Coach's agent). Thread 6 (`worlds_picks`) building on main a19292549; 7 to 10 stack on
-it in turn. Open: #516 (this PR), the Closer Look triage, the kind_promises follow-on threads and six other Open Matters
-rows.
+**Status:** 2026-11-06, 09:35, **running**: threads 1 to 5 and 11 to 20 merged. Building: 6 (`worlds_picks`, on main);
+21 (`kind_docblocks`) and 22 (`kind_tests`) cutting from main on the 09:30 rulings. Then 7 to 10 stack on 6, with 10 after
+22. Open: #516 (this PR), the Closer Look triage.
 
 ## Read first
 
@@ -253,6 +252,11 @@ checks our own argon2id deriver against its published spec; if it polices a host
 which. F2 (proceed): rewrite G8's host-guard sentences and *Where the guarantees are kept* here, after thread 13 has
 rewritten the rest of guarantees.md (rebase onto it or onto main once it merges). Brands are getters (ground rule 12).
 **Levels:** worker `opus`; review `high`. **Depends on:** thread 6 (stacked). **Size:** one context.
+*Directive (the Coach, 2026-11-06 09:30, on #532's review row "a raw UUID is not a label"): "a uuid is probably a better
+choice". So `device_id` is a UUID, not a `label`: check it as one (`Z.uuid()` or the checker the shapes already have for a
+UUID), the test worlds' `device_one`/`device_two` become UUIDs, the VOCABULARY **deviceId** row says a UUID such as
+`crypto.randomUUID()`, and the changeset (minor) says a host passing a non-UUID now meets `bad_option`. Thread 18's
+first-cached-wins and mint stay gone.*
 
 ### 8. `checkers_once`
 
@@ -528,3 +532,29 @@ as three follow-on threads (doc blocks; tests under models/; tests under storage
 make the kind optional in `expectRefusal`, `expectBad` and `expectSyncRefusal`). Unsure, for the Coach: `already_asking`,
 `locked_while_asking`, `vault_gone` outside the deleted-vault case. No review (no code in the diff); files once the restack
 lands, rebased onto #531's new tip.
+
+### 21. `kind_docblocks`
+
+**The Coach** (2026-11-06, on thread 20's TOP row proposing three threads): "these seem like much smaller threads than
+I've seen other orchestrators run, are three warranted? -- #earnest-question. proceed with the shape and number your
+good sense dictates." And on the bad-news kinds: "report on any that have complicated logic (more than a
+try-catch-throw)"; on the unsure three: "strip all three"; definitional kinds stay.
+
+*Gloss:* two threads, not three, cut from main beside thread 6. This one takes the 32 doc-block sites in `src/`
+(`helpers/`, `shapes/`, `storage/`, `crypto.ts` among them) that thread 20's inventory (`thread-20-kind-promises.md`, on
+main) marks *strip*, plus every site of `already_asking`, `locked_while_asking` and `vault_gone` outside the deleted-vault
+case; it keeps the *keep* and *definitional* sites as marked; no code or test changes, no refusal kind renamed or removed.
+Rides along: a report in the thread file of every throw site of `damaged_box`, `damaged_lease`, `damaged_row` and
+`newer_format` whose logic exceeds a try-catch-throw. guarantees.md's five incidental sites stay (Cleanup). Empty
+changeset. **Levels:** worker `sonnet`; review `low`. **Depends on:** nothing unmerged. **Size:** small.
+
+### 22. `kind_tests`
+
+*Gloss:* first make `refusalkind` optional in `expectRefusal`, `expectBad` and `expectSyncRefusal`
+(`tests/test-helpers/refusals.ts`), so a call without it checks only for a `VaultError`; then strip every test site
+`thread-20-test-sites.md` (on main) marks *strip*, across `models/`, `storage/`, `shapes/` and `helpers/`, plus the
+three unsure kinds' sites: the test stays, the kind word goes from the title and the matcher. *Keep* and *definitional*
+sites stay. No test deleted, no code changed. Empty changeset. **Levels:** worker `sonnet`; review `low`. **Depends
+on:** nothing unmerged (runs beside 21; the two touch different files). **Size:** one context for the mechanical part;
+**hatch:** if the first justify is not reached in one context, commit what is done, file, and the rest (by directory) is
+thread 23. Thread 10 (`kindvals_smush`) renames kind values everywhere: it must come after this one.

@@ -8,9 +8,9 @@ look things up here; they do not read it whole.
 ## State (2026-11-06, 09:25: running)
 
 Twenty threads planned; 1 to 5 and 11 to 20 merged to main. Building: 6 (`worlds_picks`, on main a19292549, with the
-two-worlds clock directive). Next: 7 to 10 in turn, each cut from the one below once it files. Open for the Coach: the
-Closer Look triage, the kind_promises follow-on threads, the deviceId privacy line, the raw-UUID label row, the
-reborn-vault hello row.
+two-worlds clock directive); 21 (`kind_docblocks`) and 22 (`kind_tests`) from main. Next: 7 to 10 in turn on 6, thread 10
+after 22. The 09:30 rulings: `device_id` is a UUID (thread 7); the reborn-vault hello stands. Open for the Coach: the
+Closer Look triage.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
