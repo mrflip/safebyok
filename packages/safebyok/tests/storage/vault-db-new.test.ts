@@ -126,7 +126,7 @@ describe("MemoryVaultDB", () => {
       expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
     })
 
-    it("refuses vault_mismatch under a stale vault_tok, as the box verbs do", async () => {
+    it("refuses vault_mismatch under a stale vault_tok", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       expect(await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'oldlife' })).to.deep.include({ ok: false, act: 'vault_mismatch', world: null, dbhas: vault })
     })
@@ -155,7 +155,7 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.getBox({ ...boxscope, vault_tok: 'life1' }, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
     })
 
-    it("refuses vault_mismatch under a live row of another vault_tok, that row its dbhas and not its world, whatever ifAbsent says", async () => {
+    it("refuses vault_mismatch under a live row of another vault_tok, whatever ifAbsent says", async () => {
       const { vaultDB, vault } = await storeWith({ box: true })
       const answer = await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'oldlife' }, { ifAbsent: 'nil' })
       expect(answer).to.deep.include({ ok: false, act: 'vault_mismatch', world: null, dbhas: vault })
