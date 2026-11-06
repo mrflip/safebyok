@@ -1,6 +1,6 @@
 # Thread 19: utils_port (2026-11-06)
 
-Branch `20261106-utils_port`, PR #TBD, stacked on #531. Justify: see the PR's Tests line.
+Branch `20261106-utils_port`, PR #534, stacked on #531. Justify: green (core 2019 tests passed).
 
 * **Built**: `safebyok/utils` now also exports `mask`, `MaskOpts`, `fromB64`, `toB64` and `WhisperFieldAttributes`, in the new core.
   - `src/helpers/mask.ts`: `mask` and its private helpers, ported from the old `src/mask.ts` (same algorithm, same results on every old case).
