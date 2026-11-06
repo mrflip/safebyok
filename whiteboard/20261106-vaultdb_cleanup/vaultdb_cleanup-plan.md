@@ -5,8 +5,9 @@
   (opus, inherited); style pass on `style-reviewer`'s pin (sonnet).
 * Threads at once: 3.
 * Sprint branch: `20261106-vaultdb_cleanup`, worktree `/workspace/byok-vaultdb_cleanup`.
-* **Status:** every thread filed: #555, #558, #561 (threads 4 and 5), #559, #560. Waiting on the
-  restack into main → #555 → #558 → #561 → #559 → #560 → #554, through /restacker.
+* **Status:** threads 1-6 filed: #555, #558, #561 (threads 4 and 5), #559, #560. Waiting on the
+  restack into main → #555 → #558 → #561 → #559 → #560 → #554, through /restacker; thread 7
+  (storage_door) is cut from its top. A Closer Look is running.
 
 ## The Coach's request, verbatim
 
@@ -260,15 +261,39 @@ steps live, so they implement the `do*` contract server-side. `_generated/` is r
 hand-edited. **Depends on:** 2. **Size:** L; split component from client if the worker
 compacts twice.
 
+*Review (thread 6):* `high`, fixed: a NaN box cap from a modified client passed the component's
+8,000-box limit, now falls back to it (tested); a doc block's reason moved to a comment; titles and
+smushed tags. Left: whole-bank reads against Convex's 16 MiB limit and tombstones against its
+documents-read limit (→ Open Matters rows); the maxRecordBytes reserve and the watch's starting
+gap (→ follow-ups); copied isPutAllowed; chained titles. Filed at bdfe5aa9b.
+
+### 7. storage_door (after the restack)
+
+Three rulings from Open Matters, 2026-11-06, verbatim:
+
+> **What adapters call safebyok/storage.** Rec: one STYLE.md row naming it SX. *Coach:* "Can we
+> do DB? *X has become the validator star prefix"
+
+> **STYLE.md on where validators are exported.** Rec: a STYLE line saying the storage validators
+> live there. *Coach:* (took the Rec)
+
+> **Who owns an adapter's refusal sentences.** Rec: export the phrases adapters need from
+> safebyok/storage, so the wording stays in one place. *Coach:* (took the Rec)
+
+> **GraphQL's gate is user_id equality.** *Coach:* "There will never be shared banks, a bank's
+> scope is applabel userid"
+
+*Gloss.* `safebyok/storage`'s star import becomes `DB` in the core's tests and every adapter (one
+STYLE.md row in the import-alias table); STYLE.md *Validation* says the storage validators are
+exported from `safebyok/storage`; the phrases adapters write themselves (IndexedDB's five trouble
+sentences, any in Convex or Postgres) move to the core's Phrases and are exported there; strike
+any mention of shared banks or a `mayReach` predicate. Touches every adapter package, so it is cut
+from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
+mechanical; `sonnet` worker, `low` review.
+
 ## For the Coach
 
 * ~~**The demo loses its IndexedDB vault store** when thread 3 lands.~~ *Coach (2026-11-06):*
   "lgtm" to moving it onto the old core's `localVaultDB` over localStorage; then, in chat: "it may
   be easier and better to make a safebyok-idb-old package". Thread 3 does that instead.
 * *Coach (2026-11-06)* on thread 2's split: "love it, yes".
-
-*Review (thread 6):* `high`, fixed: a NaN box cap from a modified client passed the component's
-8,000-box limit, now falls back to it (tested); a doc block's reason moved to a comment; titles and
-smushed tags. Left: whole-bank reads against Convex's 16 MiB limit and tombstones against its
-documents-read limit (→ Open Matters rows); the maxRecordBytes reserve and the watch's starting
-gap (→ follow-ups); copied isPutAllowed; chained titles. Filed at bdfe5aa9b.
