@@ -52,6 +52,7 @@ is a bug.
   | `EX`  | `src/shapes/shapes-enums.ts`                    |
   | `CX`  | `src/shapes/shapes-core.ts`                     |
   | `SX`  | `src/shapes/shapes-storage.ts`                  |
+  | `UX`  | `src/shapes/shapes-utils.ts`                    |
   | `GX`  | `src/shapes/shapes-gateish.ts`                  |
   | `VX`  | `src/shapes/shapes-vaultish.ts`                 |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
