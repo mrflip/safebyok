@@ -1,7 +1,7 @@
 /** The front door, `safebyok`: what a host imports from it. */
 
-import { describe, expectTypeOf, it } from 'vitest'
-import type * as Front from '../src/index'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import * as Front from '../src/index'
 
 describe("safebyok", () => {
   it("exports each type its exported signatures name", () => {
@@ -15,5 +15,10 @@ describe("safebyok", () => {
     expectTypeOf<ReturnType<Front.Gating<'build_vault'>['checkStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
     expectTypeOf<Front.VaultError['refusalkind']>().toEqualTypeOf<Front.RefusalKind>()
     expectTypeOf<Front.VaultError['family']>().toEqualTypeOf<Front.RefusalFamily>()
+  })
+
+  it("exports the device store a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
+    expect(new Front.MemoryDeviceDB()).toBeInstanceOf(Front.DeviceDB)
+    expectTypeOf<Front.MemoryDeviceDB>().toExtend<Front.BankOpts['deviceDB']>()
   })
 })
