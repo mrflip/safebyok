@@ -298,23 +298,39 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
   onPanic:             custom<PanicHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
-export type BankOpts = {
+/** What a host hands `Bank.make`: who the bank is for, where it stores, and the functions it calls back. */
+export interface BankOpts {
+  /** Your app's own label, so several apps can share one backend. */
   applabel:             string
+  /** The signed-in user's stable, opaque id from your own auth, hashed first if it holds anything sensitive. */
   user_id:              string
+  /** Your id for this device, a random UUID you keep per device. */
   device_id:            string
+  /** The store the vaults are synchronized through, from a storage adapter. */
   vaultDB:              VaultDB
+  /** The store on this device that caches each vault's lease. */
   deviceDB:             DeviceDB
+  /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
   keyDeriver:           KeyDeriver
+  /** Your dialog, called with each gating that needs the user's passphrase or passkey. */
   requestCleartext:     RequestCleartext
+  /** Judges each new passphrase before a vault takes it; `DefaultStrengthChecker` when left out. */
   strengthChecker?:     StrengthChecker | undefined
+  /** Where the bank says what it has no caller to throw to; `DefaultLogger` when left out. */
   logger?:              VaultLogger | undefined
+  /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?:     number | undefined
+  /** How recently a vault's record must have been fetched to be trusted, in minutes; 5 when left out. */
   vaultRefreshMinutes?: number | undefined
+  /** How recently a box's record must have been fetched to be trusted, in minutes; 5 when left out. */
   boxRefreshMinutes?:   number | undefined
+  /** Hears each refusal no caller waits on. */
   onBadNews?:           BadNewsHandler | undefined
   /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
   onPanic?:             PanicHandler | undefined
 }
+
+true satisfies Z.core.util.AssertEqual<BankOpts, Z.input<typeof bankOpts>>
 
 /** `Bank.make`'s `onBadNews`: hears each refusal no caller waits on. */
 export type BadNewsHandler = (news: VaultError) => unknown
