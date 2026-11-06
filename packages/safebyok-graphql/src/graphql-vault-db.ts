@@ -169,7 +169,7 @@ const fieldOf = (result: OperationResult, field: string): unknown => {
   if (result.error !== undefined) { throw refusalOf(result.error) }
   const data = result.data as Record<string, unknown> | null | undefined
   if ((data === null) || (data === undefined) || ! Object.hasOwn(data, field)) {
-    throw new SX.VaultError('record_conflict', 'The GraphQL server answered without what was asked of it: is it serving safebyok-graphql\'s VaultSchemaSdl?')
+    throw new SX.VaultError('record_conflict', "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?")
   }
   return data[field]
 }
