@@ -67,6 +67,22 @@ export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds:
   (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )
 
+/** The tag a VaultDB answers true to, so a model can tell one from a duck. It is `Symbol.for`, as an adapter package may bundle a second copy of safebyok. */
+export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
+
+/** True for a VaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsVaultDB}. */
+export const isVaultDB = (val: unknown): boolean => (
+  typeof val === 'object' && val !== null && (val as { [IsVaultDB]?: unknown })[IsVaultDB] === true
+)
+
+/** The tag a DeviceDB answers true to, so a model can tell one from a duck. It is `Symbol.for`, as an adapter package may bundle a second copy of safebyok. */
+export const IsDeviceDB: unique symbol = Symbol.for('@safebyok/devicedb')
+
+/** True for a DeviceDB, made by whichever copy of safebyok: an object that answers true to {@link IsDeviceDB}. */
+export const isDeviceDB = (val: unknown): boolean => (
+  typeof val === 'object' && val !== null && (val as { [IsDeviceDB]?: unknown })[IsDeviceDB] === true
+)
+
 /** The tag a host's function answers true to once a bank has wrapped it, so a world can tell it from the bare one. */
 export const IsGuarded: unique symbol = Symbol('safebyok.guarded')
 

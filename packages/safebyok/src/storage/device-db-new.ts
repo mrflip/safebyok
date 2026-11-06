@@ -1,5 +1,6 @@
 /** The deviceDB: what the slim models cache on this device, a lease for each vault, and every invariant of the verbs. A subclass writes only the generic `do*` calls, each one atomic step. */
 
+import { IsDeviceDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -10,6 +11,13 @@ import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
 /** SLOPDOC: A deviceDB's base: calls reach the store in order, only `peek` answers a `lease_key`, no verb logs one. */
 export abstract class DeviceDB {
+  // == [Brand]: IsDeviceDB
+
+  // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
+  /** True: the brand a model knows a deviceDB by, from whichever copy of safebyok. */
+  get [IsDeviceDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
+  // --
+
   // == [Lease verbs]: cache, tryCache, peek, tryPeek, vacate, tryVacate, leasesProvedBefore, tryLeasesProvedBefore
 
   /** Caches the lease row for its vault, in place of any before. */

@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { hasModelkind, isGuarded } from '../helpers/consts'
+import { hasModelkind, isDeviceDB, isGuarded, isVaultDB } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
@@ -126,7 +126,7 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
 
-// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, vaultDBDuck, listingOpts, putListingOpts, PutListingOpts
+// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, brandedVaultDB, listingOpts, putListingOpts, PutListingOpts
 
 /** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
 export const listingWorld = objCheck(({ fn }) => ({ lockState: fn(), ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
@@ -141,12 +141,12 @@ export type ListingOpts = {
   maxMillisSinceRefresh: number
 }
 
-/** The check of a vaultDB as a model is handed one: the verbs the listings call. Checks only. */
-export const vaultDBDuck = Checker(({ obj, fn }) => obj({ tryGetVault: fn(), tryPutVault: fn(), tryDelVault: fn(), tryListBoxes: fn(), tryGetBox: fn(), tryPutBox: fn(), tryDelBox: fn(), watch: fn() }), 'bad_option')
+/** The check of a vaultDB as a model is handed one, by its brand: an instance of a class extending VaultDB, from whichever copy of safebyok. */
+export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_option')
 
 /** The check of a listing's options. Checks only. */
 export const listingOpts = objCheck(() => ({
-  vaultDB:               vaultDBDuck,
+  vaultDB:               brandedVaultDB,
   maxMillisSinceRefresh: horizonMillis,
 }), 'bad_option')
 
@@ -296,14 +296,14 @@ export type VaultSnapshot = VaultScope & Readonly<{
 
 // --
 
-// == [The vault's world]: deviceDBDuck, vaultWorld, VaultWorld
+// == [The vault's world]: brandedDeviceDB, vaultWorld, VaultWorld
 
-/** A deviceDB, as far as a duck can tell: the verbs a vault's lease friend binds. */
-export const deviceDBDuck = Checker(({ obj, fn }) => obj({ tryPeek: fn(), tryCache: fn(), tryVacate: fn() }), 'bad_option')
+/** The check of a deviceDB as a model is handed one, by its brand: an instance of a class extending DeviceDB, from whichever copy of safebyok. */
+export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
 /** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
 export const vaultWorld = Checker(({ custom, bankScope, loggerShape }) => listingWorld.extend({
-  ...GX.provingWorld.shape, scope: bankScope, logger: loggerShape, leaseMillis: GX.leaseMillis, deviceDB: deviceDBDuck, boxRefreshMillis: horizonMillis,
+  ...GX.provingWorld.shape, scope: bankScope, logger: loggerShape, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
   askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected),
   panic:   custom<Panic>(isGuarded, Phrases.GuardedExpected),
 }), 'bad_option', [CX])
@@ -324,8 +324,8 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   applabel,
   user_id,
   device_id,
-  vaultDB:             vaultDBDuck,
-  deviceDB:            deviceDBDuck,
+  vaultDB:             brandedVaultDB,
+  deviceDB:            brandedDeviceDB,
   keyDeriver:          CX.keyDeriverShape,
   requestCleartext:    fn(),
   strengthChecker:     GX.strengthChecker.optional(),

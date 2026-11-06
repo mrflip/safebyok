@@ -1,6 +1,7 @@
 /** The vaultDB: the verbs the storables and listings call, and every invariant of them. A subclass writes only the generic `do*` calls, each one atomic step. */
 
 import type * as Z from 'zod'
+import { IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import { type VaultError, isVaultError } from '../refusals/errors'
@@ -71,9 +72,13 @@ const putTermsOf = ({ prior, ifAbsent, ifPresent }: PutChoices): PutTerms => ({ 
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
 export abstract class VaultDB {
-  // == [Props]: #maxRecordBytes
+  // == [Props]: #maxRecordBytes, IsVaultDB
 
   readonly #maxRecordBytes: number
+
+  // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
+  /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
+  get [IsVaultDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
   // --
 
   // == [Construction]: constructor

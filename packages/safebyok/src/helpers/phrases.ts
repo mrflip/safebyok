@@ -54,13 +54,19 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultScope = "A vault's stores go in the second bag, its options, not in the scope naming the vault"
 // --
 
-// == [Values]: FunctionExpected, GuardedExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
 
 /** A host's bare function, or anything else, where a bank's world holds that function as the bank wraps it. */
 export const GuardedExpected = "Expected a host's function as Bank.make wraps it"
+
+/** Anything but an instance of a class extending safebyok's VaultDB, where a vaultDB is asked. */
+export const VaultDBExpected = "Expected a VaultDB: an instance of a class extending safebyok's VaultDB"
+
+/** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
+export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
 
 /** Anything but bytes, a Uint8Array, `count` of them when that many are asked. */
 export const bytesExpected = (count?: number): string => (count === undefined ? "Expected bytes, a Uint8Array" : `Expected ${String(count)} bytes, a Uint8Array`)

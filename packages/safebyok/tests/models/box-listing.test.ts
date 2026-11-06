@@ -17,6 +17,9 @@ const dna = () => boxDnaOf(held.mw.boxscope('anthropic_api_key'))
 
 const Label = 'anthropic_api_key'
 
+/** Every verb a listing calls on its vaultDB, with no brand: a duck. */
+const vaultDBDuck = () => Object.fromEntries(['tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'watch'].map((verb) => [verb, () => null]))
+
 describe("BoxListing", () => {
   describe("new BoxListing(world, opts)", () => {
     it("makes a listing of a world, a store and a horizon, calling none of them", () => {
@@ -30,7 +33,7 @@ describe("BoxListing", () => {
     const bads: readonly (readonly [blurb: string, args: () => readonly [world: unknown, opts: unknown]])[] = [
       ['no world',                    () => [undefined, good()]],
       ['no vaultDB',                  () => [held.mw.world, { ...good(), vaultDB: undefined }]],
-      ['a vaultDB without its verbs', () => [held.mw.world, { ...good(), vaultDB: { watch: () => null } }]],
+      ['a vaultDB that is a duck of one', () => [held.mw.world, { ...good(), vaultDB: vaultDBDuck() }]],
       ['no horizon',                  () => [held.mw.world, { ...good(), maxMillisSinceRefresh: undefined }]],
       ['a negative horizon',          () => [held.mw.world, { ...good(), maxMillisSinceRefresh: -1 }]],
       ['a world among its options',   () => [held.mw.world, { ...good(), world: held.mw.world }]],
