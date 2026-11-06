@@ -130,6 +130,18 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 
 Wanted; each has a design question to settle first, named here.
 
+### Single-row damage moves to `damaged_rows`
+
+The Coach (2026-11-06, the sprint's Open Matters, on the GraphQL schema): "No slot can hold a
+damaged row except one named damaged_rows: [JSON!]!" ... "single row damage move to
+damaged_rows". Today `listVaults` and `listBoxes` put a row failing validation in
+`damaged_rows`, but a get, put or del meeting one refuses `damaged_row` with only
+`meta.fieldnames`. The move: every answer has `damaged_rows`, and a single damaged row travels
+there whole, as plain JSON. The question to settle first: whether meeting one is still a refusal
+(`damaged_row`, its row in `damaged_rows`), as CLAUDE.md's "a data-integrity failure met in a
+consistent state is reported by throwing" asks, or an ok answer carrying it. The orchestrator
+recommends keeping the refusal. The GraphQL schema (vaultdb_cleanup thread 8) is shaped around it.
+
 ### Which wayins a rotation keeps
 
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
