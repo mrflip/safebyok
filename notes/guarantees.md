@@ -340,8 +340,8 @@ that yields a key, and no module exports a route to one: `leaseRecordOf`, which 
 `tryPeekLease` answers the cached row, as an Outcome, with its leaseKey handle is held in `Lease.#friend` and made in
 `Vault.#leaseFriend`; no public `Vault` method takes a proving, as a gating's run (`RunForGatingkind`) comes to
 `#unlockByProof` and `#landGate` by `Vault.#gatingFriend`, private in the vault and the gating; nothing public on a `Vault` or a `Lease` hands the friend out, and a test catches
-it with a spy on `Proving.prototype.buildLease`. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export `Lease` and
-`Proving` as types and classes alone, and none of the registries. Checked by:
+it with a spy on `Proving.prototype.buildLease`. The row itself is also in reach of whoever holds the deviceDB, and a friend of the host's own, handed to `proving.buildLease`, hears a new lease's record. The entry points export neither `Lease`
+nor `Proving`, nor any of the registries. Checked by:
 `tests/models/lease.test.ts` (*what a lease shows*), `tests/models/vault-lease.test.ts` (*a vault and a
 lease show neither the lease friend nor the lease key handle, one level deep, by identity*), `rg` for
 the crypto imports.
