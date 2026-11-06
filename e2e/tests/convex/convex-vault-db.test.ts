@@ -127,12 +127,12 @@ describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => 
     expect(await vaultDB.getVault(TH.vaultScope)).to.deep.include({ act: 'got', world: TH.vaultAt() })
   })
 
-  it("is refused as identity_revoked when no one is signed in, or someone else is", async () => {
+  it("is refused when no one is signed in, or someone else is", async () => {
     await TH.expectBad(hostedVaultDB(null).vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
     await TH.expectBad(hostedVaultDB('u2').vaultDB.tryListVaults(TH.bankScope), 'identity_revoked')
   })
 
-  it("is refused as identity_revoked again for a query the client already holds the refusal of", async () => {
+  it("is refused again for a query the client already holds the refusal of", async () => {
     const { vaultDB } = hostedVaultDB('u2')
     await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
     await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
