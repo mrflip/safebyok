@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { argon2idDeriver, argon2idWebV1Deriver } from '../src/browser'
+import { Argon2idWebV1, argon2idDeriver, argon2idWebV1Deriver, checkSaltFits, parseKeyDeriverSpec } from '../src/browser'
 import * as Front from '../src/index'
 
 const CheapSpec = {
@@ -35,6 +35,14 @@ describe("safebyok/browser", () => {
     const deriver = argon2idDeriver(CheapSpec)
     const first = await deriver.deriveKeyBytes('a short passphrase', salt)
     expect(await deriver.deriveKeyBytes('another passphrase', salt)).to.not.deep.eq(first)
+  })
+
+  it("hands another deriver what it needs to wear the same specs: the supplied spec, its parse and its salt check", () => {
+    expect(argon2idWebV1Deriver).to.include({ ...Argon2idWebV1 })
+    expect(parseKeyDeriverSpec(CheapSpec)).to.deep.equal(CheapSpec)
+    expect(() => parseKeyDeriverSpec({ ...Argon2idWebV1, iterations: 4 })).to.throw(/argon2id_web_v1/u)
+    expect(() => { checkSaltFits(CheapSpec, salt) }).to.not.throw()
+    expect(() => { checkSaltFits(CheapSpec, new Uint8Array(15)) }).to.throw(/16/u)
   })
 
   it("is not on the front door", () => {
