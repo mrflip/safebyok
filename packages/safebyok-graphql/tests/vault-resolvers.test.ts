@@ -103,7 +103,7 @@ describe("vaultResolvers", () => {
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
   })
 
-  it("ends a subscription, and stops its watch, once its session is signed out or in as another user", async () => {
+  it("ends a subscription once its session is signed out or in as another user", async () => {
     for (const revoked of ['u2', null]) {
       await TH.emptyTables()
       const { listening, session, heard, browser } = await watchedServer()
@@ -117,7 +117,7 @@ describe("vaultResolvers", () => {
     }
   })
 
-  it("ends a subscription, and stops its watch, once its userIdOf throws, sending nothing of what it said", async () => {
+  it("ends a subscription once its userIdOf throws", async () => {
     await TH.emptyTables()
     const { listening, session, heard, browser } = await watchedServer()
     Object.defineProperty(session, 'user_id', { get: () => { throw new Error('session store s3cr3t-host is down') } })
