@@ -1,4 +1,5 @@
 import { brandGuarded } from './consts'
+import { isVaultError } from '../refusals/errors'
 import { decorate } from './helpers'
 import * as Phrases from './phrases'
 import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
@@ -90,6 +91,7 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStren
     try {
       await host.load?.()
     } catch (err) {
+      if (isVaultError(err)) { throw err }
       throw strengthCheckerLoadFailed(err)
     }
   }
