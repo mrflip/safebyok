@@ -9,7 +9,9 @@ orchestrator; workers look things up here and write in their own thread files.
   some local branches): cut from `origin/main`, never from a local checkout.
 * *Orchestrator:* every old adapter's tests run `describeVaultDB` from `safebyok-old/testing`
   (`packages/safebyok-old/tests/test-helpers/vault-db-conformance.ts`): the shape thread 2's
-  battery replaces. Read it for coverage ideas, not code.
+  battery replaces. Read it for coverage ideas, not code. **The Coach (mid-sprint):** it is no
+  authority on how the new VaultDB works, and serves the old code base; what `src/models` needs,
+  and readability, decide the contract. Old adapters' behaviour is no authority either.
 * *Orchestrator:* consumers of the old adapters: `demos/safebyok-demo-react/src/lib/stores.ts`
   and `persist-storage.ts` (indexeddb), `e2e/tests/postgres/*`, `e2e/tests/convex/*`.
 

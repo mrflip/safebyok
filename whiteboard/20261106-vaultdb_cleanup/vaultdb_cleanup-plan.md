@@ -96,6 +96,9 @@
 * **Doc blocks**: one line of purpose, written fresh. Never copy an old adapter's doc blocks or
   comments; `SLOPDOC:` markers go, replaced by a first line or nothing.
 * **Never change `packages/safebyok-old/`.** Ports drop their dependency on it.
+* **The old code is no authority** (the Coach, mid-sprint). Neither `describeVaultDB` nor an old
+  adapter's behaviour says how the new VaultDB works; what `src/models` needs, and readability,
+  do. The old battery and adapters are references for coverage and for each store's mechanics.
 
 ## Threads
 
@@ -127,9 +130,13 @@ helper. **Size:** M. No size line moves (the core is not measured).
 > once those are clean and reviewed, port the other adapters.  *(the battery and exports every
 > port needs; the orchestrator's split)*
 
-*Gloss.* The old adapters each run `describeVaultDB` from `safebyok-old/testing`. Give the new
-design the same: an exported battery over the new `VaultDB` in the core's `./testing` entry,
-built from thread 1's tests and run over `MemoryVaultDB` in the core; and export from `safebyok`
+*Gloss.* The old adapters each run `describeVaultDB` from `safebyok-old/testing`. The new
+design gets a battery of its own: exported over the new `VaultDB` in the core's `./testing`
+entry, built from thread 1's tests and run over `MemoryVaultDB` in the core. *Orchestrator,
+from the Coach mid-sprint:* `describeVaultDB` is **no authority** on how the new VaultDB works;
+it serves the old code base. The battery tests what `src/models` needs and what thread 1's
+contract says, and consults the old battery only as a reference for coverage (which situations
+are worth a case). Export from `safebyok`
 (index, or a new `./storage` entry: the worker's call, recorded) what an adapter needs: `VaultDB`
 and the `do*` types, the storage shapes and checkers an adapter validates with, and the refusal
 throwers an adapter raises (`vaultFull`, `storageError`). Damage rows the battery plants go
