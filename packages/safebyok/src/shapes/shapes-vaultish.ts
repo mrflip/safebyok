@@ -19,7 +19,8 @@ import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
-import type { AskUser, ProvingWorld, RequestCleartext, StrengthChecker } from './shapes-gateish'
+import type { AskUser, ProvingWorld, RequestCleartext } from './shapes-gateish'
+import type { StrengthChecker } from '../helpers/passphrase-strength'
 
 // == [Checks]: Checks
 

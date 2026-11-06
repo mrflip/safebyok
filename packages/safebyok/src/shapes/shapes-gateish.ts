@@ -113,7 +113,7 @@ export const freshPasskeyAnswer = Checker(() => (
 ), 'bad_option')
 // --
 
-// == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict, StrengthChecker
+// == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict
 
 /** True for a {@link StrengthChecker}: a function, whose `load`, if it carries one, is a function too. */
 const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
@@ -134,8 +134,6 @@ export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ 
  * vault's 'weak_passphrase' refusal carries it as its message.
  */
 export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
-
-export type { StrengthChecker } from '../helpers/passphrase-strength'
 // --
 
 // == [The vault's stamp]: vaultStamp, VaultStamp
