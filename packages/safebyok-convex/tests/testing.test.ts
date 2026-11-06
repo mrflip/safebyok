@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { version as convexVersion } from 'convex'
 import { ConvexClient } from 'convex/browser'
+import * as SX from 'safebyok/storage'
 import * as TH from './test-helpers'
 import { fakeDeployment } from '../src/testing'
 import type { FakeDeploymentOpts } from '../src/testing'
@@ -12,15 +13,19 @@ const deploy = (opts?: FakeDeploymentOpts) => {
   return deployment
 }
 
+const vault = TH.vaultAt()
+const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const putVaultArgs = { record: vault, opts: birth }
+const vaultAsked = { scope: TH.vaultScope }
+const watchRowsArgs = { scope: TH.bankScope }
+
 /** A mutation from a client signed in as no one, which the host refuses as identity_revoked. */
 const refusedMutation = (deployment: ReturnType<typeof deploy>) => (
-  deployment.client(null).mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
+  deployment.client(null).mutation(deployment.api.safebyok.putVault, putVaultArgs)
 )
 afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
 })
-
-const u1 = TH.scopeOf('u1')
 
 describe("fakeDeployment", () => {
   // The fake socket answers the sync protocol as convex 1.48 speaks it. A bump of convex fails
@@ -32,8 +37,8 @@ describe("fakeDeployment", () => {
   it("answers a ConvexClient's query and mutation, signed in as the subject it was given", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')
-    await client.mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await client.query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
+    await client.mutation(deployment.api.safebyok.putVault, putVaultArgs)
+    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
   })
 
   it("connects a client of any other kind that its caller constructs, and closes it with the rest", async () => {
@@ -43,8 +48,8 @@ describe("fakeDeployment", () => {
       const inner = new ConvexClient(address, opts)
       return { inner, close: async () => { closed(); await inner.close() } }
     })
-    await made.inner.mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await made.inner.query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
+    await made.inner.mutation(deployment.api.safebyok.putVault, putVaultArgs)
+    expect(await made.inner.query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
     await deployment.close()
     expect(closed).toHaveBeenCalledOnce()
   })
@@ -66,7 +71,7 @@ describe("fakeDeployment", () => {
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
     expect(refusal.kind).to.eq('identity_revoked')
     expect(consoleError).toHaveBeenCalledOnce()
-    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyok:ensureVault\)\]/)
+    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyok:putVault\)\]/)
     expect(consoleWarn).toHaveBeenCalledTimes(0)
     expect(consoleLog).toHaveBeenCalledTimes(0)
   })
@@ -77,7 +82,7 @@ describe("fakeDeployment", () => {
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
     expect(refusal.kind).to.eq('identity_revoked')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
-    expect(spy.calls[0]?.message).to.match(/\[CONVEX M\(safebyok:ensureVault\)\]/)
+    expect(spy.calls[0]?.message).to.match(/\[CONVEX M\(safebyok:putVault\)\]/)
   })
 
   it("hands the logger on in the options connectWith gives its maker", () => {
@@ -126,9 +131,9 @@ describe("fakeDeployment", () => {
 
   it("runs the backend directly as a subject, or as no one, to arrange or inspect what is stored", async () => {
     const deployment = deploy()
-    await deployment.as('u1').mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
-    expect(await deployment.as('u1').query(deployment.api.safebyok.getVault, { ...u1 })).to.deep.equal({ vault: TH.gatelessOf('u1'), boxes: [] })
-    const refusal = await TH.convexRefusalOf(deployment.as(null).query(deployment.api.safebyok.getVault, { ...u1 }))
+    await deployment.as('u1').mutation(deployment.api.safebyok.putVault, putVaultArgs)
+    expect(await deployment.as('u1').query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
+    const refusal = await TH.convexRefusalOf(deployment.as(null).query(deployment.api.safebyok.getVault, vaultAsked))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 
@@ -136,19 +141,31 @@ describe("fakeDeployment", () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     const heard = vi.fn()
-    client.onUpdate(deployment.api.safebyok.watchVault, { ...u1 }, heard)
+    client.onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, heard)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
-    await deployment.client('u1').mutation(deployment.api.safebyok.ensureVault, { draft: TH.gatelessOf('u1') })
+    await deployment.client('u1').mutation(deployment.api.safebyok.putVault, putVaultArgs)
     await vi.waitFor(() => { expect(heard.mock.calls.length).to.be.greaterThan(1) })
   })
 
   it("signs every socket out, so a watched safebyok query is refused", async () => {
     const deployment = deploy()
     const failed = vi.fn()
-    deployment.client('u1').onUpdate(deployment.api.safebyok.watchVault, { ...u1 }, () => undefined, failed)
+    deployment.client('u1').onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, () => undefined, failed)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     deployment.signOut()
     await vi.waitFor(() => { expect(failed).toHaveBeenCalled() })
+  })
+  it("arranges the backend in turn with its clients, and has pushed the change to every watcher and cache when it answers", async () => {
+    const deployment = deploy()
+    const client = deployment.client('u1')
+    const heard = vi.fn()
+    client.onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, heard)
+    await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
+    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.eq(null)
+    const answer = await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyok.putVault, putVaultArgs))
+    expect(answer).to.deep.equal({ landed: true, ante: null })
+    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ vaults: [{ vaultlabel: vault.vaultlabel, vault }] })
+    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
   })
 })
