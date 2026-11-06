@@ -71,7 +71,7 @@ boxKey    ciphers  whisper  → whisper_ciphered
 
 Every cipher is AES-256-GCM through WebCrypto, under a fresh random 96-bit IV, with the ciphertext
 bound to a `ctx` as additional data (`crypto.ts`, `cipherCtx`). The ctx names the vault's stamp
-(scope, `vault_tok`, `registered_at`, and for a wayin its `format`), a purpose string unique to
+(scope, `vault_tok`, `registered_at`), a purpose string unique to
 the kind of field, and the record's own visible header or stamp. So a wrap or a ciphertext moved
 to another vault, slot, box, lease or purpose does not open, and a visible field altered in
 storage (a sidecar, a salt, a deadline) makes its record refuse to open.
