@@ -55,10 +55,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   constructor(world: ListingWorld, opts: ListingOpts) {
     VX.listingWorld.parse(world)
-    VX.listingOpts.parse(opts)
+    const { vaultDB, maxMillisSinceRefresh } = VX.listingOpts.parse(opts)
     this.world = world
-    this.vaultDB = opts.vaultDB
-    this.maxMillisSinceRefresh = opts.maxMillisSinceRefresh
+    this.vaultDB = vaultDB
+    this.maxMillisSinceRefresh = maxMillisSinceRefresh
   }
 
   /** The instance of `record`, built or brought up to it, and held. Stores nothing. */
