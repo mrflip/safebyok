@@ -213,7 +213,7 @@ export type LeaseSparse = LeaseStamp
 export type LeaseRecord = Z.infer<typeof leaseRecord>
 // --
 
-// == [What a lease is handed]: sealedWhisper, leaseMillis, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, SealedWhisper, LeaseFriend, LeaseGrantOpts
+// == [What a lease is handed]: sealedWhisper, leaseMillis, guardedLogger, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
 export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
@@ -222,10 +222,13 @@ export type SealedWhisper = Z.infer<typeof sealedWhisper>
 /** The autolock duration in milliseconds, at most {@link ForeverMillis}. */
 export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis), 'bad_option')
 
+/** The check of a logger as the bank hands its models one: guarded by `parseLogger`. */
+export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
+
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
-export const leaseFriend = objCheck(({ fn, custom }) => ({
+export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
-  logger:          custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected),
+  logger:          guardedLogger,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
