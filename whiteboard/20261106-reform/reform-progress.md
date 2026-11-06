@@ -47,7 +47,7 @@ Closer Look triage.
   prototype getter slips past; `buildLease` was the one case found.
 * Thread 21 `kind_docblocks`: filed, PR #548 at 88ec97a50 on main, docs only. The bad-news throw sites that do more
   than try-catch-throw: `unreadableRowOf` (second parse for `newer_format`) and `Lease.#vaultKey` (lock and evict first).
-* Thread 22 `kind_tests`: built, PR #549 at 4bbdb9f87 on main, in review. The test helpers' `refusalkind` is optional;
+* Thread 22 `kind_tests`: reviewed clean, PR #549 at 4bbdb9f87 on main, filing. The test helpers' `refusalkind` is optional;
   `holdsCases` takes no kind. `vitest/valid-title` counts what is left: every remaining warning is on a kept kind.
   **For thread 10:** fewer kind words to rename in tests now; `validator.test.ts` and `refusals/*.test.ts` still name them.
 * Thread 6 `worlds_picks`: built, PR #550 at bb28f1361 on main, in review. Worlds are Picks of the classes; a listing
