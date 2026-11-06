@@ -11,7 +11,8 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526, `refusalof_removed`, the Coach's ruling) filed on main; threads 5 to 10 wait on #511 and #513 reaching main
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) filed on main; threads 13 (`guarantees_models`) and 14 (`deviceid_label`) building; #513 and #517 merged
+05:10; threads 5 to 10 wait on #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
@@ -58,6 +59,14 @@ merge, since they rewrite the same shapes and model files (see *Ground rules*).
 10. **A stale test citation gets its test** (the Coach on F12, 2026-11-06): where a guarantee or doc cites a test the core
    lacks, write or find the core's test and cite it; only a claim about behaviour the code no longer bears is a finding.
    Thread 2's "verbatim" rule was overstrong there.
+11. **`#the-host-is-not-our-threat-model`** (the Coach, 2026-11-06, on F8): a host's function is validated by its interface,
+   never by the wisdom of its parameters; "if they want to choose stupid parameters or _.identity they'll figure out a way
+   to do so." No thread adds a check that only second-guesses the host.
+12. **A brand is a getter** (the Coach, 2026-11-06): `readonly modelkind = 'bank'` as an instance field would serialize;
+   threads 7 and 8 brand with a getter (or a `Symbol.for`-keyed getter), never an own enumerable field.
+13. **A two-liner is not a thread.** Thread 12 spent a worker and a reviewer on a nine-line removal. A fix that small
+   rides as a directive on the thread underway in those files, or waits for the next one; a thread of its own only when
+   nothing in those files is coming.
 
 ## Threads
 
@@ -219,6 +228,11 @@ against *The guarantees* first and say so in the thread file. Thread 2 found (F2
 that hear the passphrase have their throws replaced by `refusalFor`" holds only for the strength checker today; rewrite G8's
 sentence and *Where the guarantees are kept* to name the wraps this thread builds, once, in Bank's constructor. No behaviour change a test can see except where a host
 function that throws was previously unguarded (`keyDeriver.load`): that becomes the refusal the neighbours give.
+The Coach (2026-11-06, F8): "What's the interface for key deriver? Validate that." The wrap checks the deriver's interface
+(ground rule 11) and nothing about its parameters; `checkSuppliedSpecKept` (`helpers/basederiver.ts`) stays only as far as it
+checks our own argon2id deriver against its published spec; if it polices a host's choice, it goes, and the thread file says
+which. F2 (proceed): rewrite G8's host-guard sentences and *Where the guarantees are kept* here, after thread 13 has
+rewritten the rest of guarantees.md (rebase onto it or onto main once it merges). Brands are getters (ground rule 12).
 **Levels:** worker `opus`; review `high`. **Depends on:** thread 6 (stacked). **Size:** one context.
 
 ### 8. `checkers_once`
@@ -299,7 +313,33 @@ surface, so an empty changeset unless the entry points reach it. **Levels:** wor
 nothing (cut from main at 374098121). **Size:** tiny.
 
 *Review (low, sonnet):* `clean`; justify green, run unmasked by the reviewer. **Filed** at 255d2c5d7, as cut, on main (PR
-#526). Merge with or after #517, which rewrites guarantees.md's one mention of `refusalOf`.
+#526). Merge with or after #517, which rewrites guarantees.md's one mention of `refusalOf`. *In hindsight:* a two-liner
+that should have ridden on thread 7 (ground rule 13).
+
+### 13. `guarantees_models`
+
+**The Coach** (2026-11-06, Open Matters F1, F3, F9, F8, all proceed): F1 and F3 took the Rec; F9 "add"; F8 "this sounds like
+someone else left you behind a big overreach: #the-host-is-not-our-threat-model ... What's the interface for key deriver?
+Validate that."
+
+*Gloss:* `notes/guarantees.md` plus one test file. Strike every old-core clause thread 2 listed (F1 and the second review's
+additions) and write the models' version from the code, citing the current site and test; narrow G8's validator claim to
+values and add the values sweep to `tests/helpers/validator.test.ts`; add `crypto.randomUUID` to G10; G10 says where
+`checkSuppliedSpecKept` lives and that a host's deriver is checked by its interface only; tidy the second review's
+leftovers (open item 2, G9's friend sentence, G8's two leftovers, the seal list widened to `boxListing.create` and
+`sealStampedString`); F5's G9 wording once the Coach confirms it. Leaves G8's host-guard sentences to thread 7. **Levels:**
+worker `opus`; review `high`. **Depends on:** #517 (merged 05:10; cut from its tip, rebased onto main). **Size:** one context;
+split F1 off if the first justify is not reached.
+
+### 14. `deviceid_label`
+
+**The Coach** (2026-11-06): "What validation do we apply to device_id? Let's make it `label` and cater to the first
+complaint".
+
+*Gloss:* `device_id` passes the `label` checker wherever it is checked (bank options, device record, stored shapes); the
+minted id must pass it too (a finding if not); tests updated, the refusal case added; `minor` changeset naming the rule and
+"cater to the first complaint". The VOCABULARY sentence the Coach gave is a commit on #518. **Levels:** worker `sonnet`;
+review `low`. **Depends on:** nothing (cut from main at 4e63ae760). **Size:** small.
 
 ## For the Coach
 

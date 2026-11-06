@@ -18,7 +18,13 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
 * Thread 3 `example_pointers`: filed, PR #522 at 51741eb57; in the Coach's line.
 * Thread 4 `hello_listed`: filed, PR #523 at 895949623 on #513's current tip (not in the Coach's line).
 * Thread 11 `duck_calibration`: filed, PR #525 at 781f7e625, on main.
-* Thread 12 `refusalof_removed`: filed, PR #526 at 255d2c5d7, on main; merge with or after #517. **For thread 9:** a `Z.ZodType<T>` checker loses
+* Thread 12 `refusalof_removed`: filed, PR #526 at 255d2c5d7, on main; merge with or after #517.
+* Thread 13 `guarantees_models`: building (opus), from #517's merged tip; the F1/F3/F8/F9 rulings.
+* Thread 14 `deviceid_label`: building (sonnet), from main at 4e63ae760.
+* **Merged 05:10:** #513 and #517 (and #521, the Coach's queue tooling). #511 is still the gate for threads 5 to 10.
+* **Rulings of 05:30** (sprint doc, Resolved): `#the-host-is-not-our-threat-model`; brands are getters; "world is as listing
+  has it: bank for vaults, vault for boxes"; the deviceId sentence; the orchestrator owes a listing-responsibilities
+  recommendation (a tab and `listing-responsibilities.md`), on which `_takeListed`'s name waits. **For thread 9:** a `Z.ZodType<T>` checker loses
   `.pick`/`.extend`/`.shape`: widen only what the package exports; the `Boxlabel` alias STYLE.md cites does not exist.
 * **The Coach keeps a merge line** (plan, ground rule 9): #513, #517, #521, #522, #512, #518, #519, #520, #511 in that
   order. #511 and #513 conflict with each other in `refusals/throwers.ts` and `tests/test-helpers/models-world.ts`; the
