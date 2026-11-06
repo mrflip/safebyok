@@ -84,6 +84,14 @@ current enough for a fresh worker to continue, and leave e2e for last.
   name, no cause; `identityRevoked()`; `Checker, Checkers, objCheck` on the storage door). A
   second worker continues from its thread file. Its `gh pr ready` was refused by the auto-mode
   classifier; the orchestrator does not run a refused action for an agent.
+* **Thread 3** (#560, in review): old adapter moved whole to private `safebyok-idb-old` (the
+  demo's store and inspector); `safebyok-indexeddb` new: `IdbVaultDB`, `idbVaultDB(opts)`,
+  `IdbVaultDBOpts` (`dbName`, `maxRecordBytes`); each do* one transaction; watch over
+  BroadcastChannel after commit; triage in `src/shelf.ts` `troubleOf` (quota → `vault_full`,
+  closed/aborted/withheld/absent → `storage_unavailable`). Core: `storageFull(cause)` and the
+  validator makers on the storage door (513c644fe). Size line idbVaultDB 2.6 → 2.9 kB. The root
+  `size` script builds safebyok too. `isPutAllowed` copied from memory-vault-db (export it after
+  the ports). No inspector, no box cap (Cleanup).
 * Core additions collide across siblings: each port adds lines to `safebyok/storage`'s index
   (all three add `Checker, Checkers, objCheck`). Resolved at the restack, one of each.
 * **Planning lesson, again:** every thread so far has compacted; an L port does not reach its
