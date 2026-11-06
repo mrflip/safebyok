@@ -1,6 +1,6 @@
 # Thread 2: vaultdb_battery (2026-11-06)
 
-Branch `20261106-vaultdb_battery`, PR #TBD, stacked on #555. Justify: green (safebyok 2265 tests in
+Branch `20261106-vaultdb_battery`, PR #558, stacked on #555. Justify: green (safebyok 2265 tests in
 68 files; memory-vault-db and vault-db-new 100 between them).
 
 * **Built**:
