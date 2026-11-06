@@ -5,7 +5,7 @@
   (opus, inherited); style pass on `style-reviewer`'s pin (sonnet).
 * Threads at once: 3.
 * Sprint branch: `20261106-vaultdb_cleanup`, worktree `/workspace/byok-vaultdb_cleanup`.
-* **Status:** threads 1, 2, 3 filed (#555, #558, #560); thread 4 in review (#561), thread 5 building to join #561, thread 6 continued (#559).
+* **Status:** threads 1-5 filed (#555, #558, #560, #561 carrying 4 and 5); thread 6 in `high` review (#559).
 
 ## The Coach's request, verbatim
 
@@ -241,6 +241,12 @@ file-thread (graphql red until thread 5 joins).
 on:** 4 (its devDependency on `safebyok-postgres`). **Size:** L. *Orchestrator, revised:* porting
 postgres turned graphql red, so this thread's commits join #561 (no PR of its own); see the
 progress document.
+
+*Review:* `high`, fixed: the relay's putVault takes `putOpts` on purpose (gate verbs replace a
+live row from the browser), now commented; all nine operations tested against another user's
+bank. Left: relay putVault skips the gate verbs' checks, revocation mid-subscription (→ Open
+Matters rows); no VaultDB brand (→ later); unbounded subscription buffer (kept). Filed in #561 at
+fb6d281d3, with thread 4.
 
 ### 6. port_convex
 

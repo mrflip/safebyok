@@ -6,7 +6,7 @@ orchestrator; workers look things up here and write in their own thread files.
 ## The sprint doc
 
 *Orchestrator:* https://claude.ai/artifact/LJYRKB5uG4bzR8VWBVti1j (doc 9c50a432-987f-4fd0-9fa9-0b3e23352d26).
-Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, bookmark rev 509; matters table m3dgc82559j.5596), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
+Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, bookmark rev 510; matters table m3dgc82559j.5596), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
 m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c. Append a matter row: `insert` side `end` on the table id, `as: blocks`, a
 row of three cells, the chip `{type: dropdown, attrs: {enum, index: 0}}` (a markdown insert is refused).
 
@@ -95,7 +95,7 @@ current enough for a fresh worker to continue, and leave e2e for last.
   validator makers on the storage door (513c644fe). Size line idbVaultDB 2.6 → 2.9 kB. The root
   `size` script builds safebyok too. `isPutAllowed` copied from memory-vault-db (export it after
   the ports). No inspector, no box cap (Cleanup).
-* **Thread 4** (#561, reviewed `fixed`, pushed at b72a514b6; files with thread 5; two compactions): `PostgresVaultDB({ client, listen?, maxBoxes?,
+* **Thread 4** (#561, filed at fb6d281d3 with thread 5; two compactions): `PostgresVaultDB({ client, listen?, maxBoxes?,
   maxRecordBytes? })`, client `{ query, transaction }` (PGlite as is; `pgClientOf(pool)` for pg),
   `listen` on `VaultChangeChannel`; `VaultTablesSql`; two jsonb tables, the vault row locked per
   write, notices by pg_notify (over 7999 bytes: keys only, re-read). The user_id gate and route
@@ -103,8 +103,7 @@ current enough for a fresh worker to continue, and leave e2e for last.
   **graphql is red on this branch**: *Orchestrator, YOLO:* thread 5 builds on a branch from
   022d690f2 with no PR of its own, rebases onto #561's reviewed tip, gets a review over its own
   range, then 20261106-port_postgres fast-forwards to it and #561 files whole.
-* **Thread 5** (branch 20261106-port_graphql at e7fba6de7, no PR; in `high` review; one
-  compaction): rebased on b72a514b6; justify green everywhere. Core: `VaultDB.relay` getter and
+* **Thread 5** (filed in #561 at fb6d281d3 with thread 4; reviewed `high`, fixed; one compaction): rebased on b72a514b6; justify green everywhere. Core: `VaultDB.relay` getter and
   `VaultDBRelay` on `safebyok/storage` (60e58e9fa), each relay call checked as its verb, then the
   do* hook: the route a server adapter takes (thread 6 could use it after the restack). Server:
   one operation per do*, gate = user_id equality with `userIdOf(context)`, refusal kind alone on
