@@ -193,6 +193,15 @@ still passing `clock` meets `bad_option` since `bankOpts` is strict: the changes
 `proving.ts`). **Look-ahead:** thread 6 removes `world.clock` from the world types for good; leave the world shapes
 otherwise alone. **Size:** one context, but it is wide; if the first justify is not reached in one context, the backdoor
 and `VaultDB.#clock` are the split.
+*Built (PR #535, on main):* `helpers/clock.ts` with `nowMillis()`, `_cheat_clock(fn)`, `_cheat_clockReset()`, the two
+backdoors re-exported from `safebyok/testing` only; `clock` out of `bankOpts`, `vaultDBOpts`, `listingOpts.world`, `VX.world`,
+`provingWorld`, `leaseFriend`; `Clock`, `wallClock`, `clockShape`, `VaultDB.#clock` and the `clock` on Bank, Listing and Vault
+deleted; the 13 readers call `nowMillis()`; the five world helpers call `_cheat_clock`, a vitest `setupFiles` hook resets it
+after every test; STYLE, VOCABULARY, wontfix and G4 no longer speak of a host clock; minor changeset. The six directives
+landed, one commit each (the `checked.friend` fix with its prototype-getter test; the zeroing test; the two phrases;
+the consts prose, `MinuteMillis` too; the two comments; `isVaultError`'s example). Pulled forward: `BoxDamagedBeyondNaming`
+deleted. **For thread 6:** `VX.world` stays as an empty strip check and `World` is `object`; replace both when the worlds
+become Picks. Compacted once, after its first justify. In review (`opus`, high).
 
 ### 6. `worlds_picks`
 

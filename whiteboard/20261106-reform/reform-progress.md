@@ -40,6 +40,11 @@ triage, the kind_promises follow-on threads, the deviceId privacy line, the rebo
   `device_id` required-or-minted is an open question (the Coach recalls removing the mint; main still mints and caches).
 * Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
   `d` + 32 hex.
+* Thread 5 `module_clock`: built, PR #535 at 363c1905e on main, in review. One module clock: `nowMillis()` in
+  `helpers/clock.ts`; `_cheat_clock`/`_cheat_clockReset` through `safebyok/testing` only; a vitest `setupFiles` hook
+  (`tests/vitest-setup.ts`) resets it after every test. **For thread 6:** `VX.world` is an empty strip check and `World`
+  is `object` until the worlds are Picks. **For a sweep some time:** `consistent(raw, ...)` reads only own fields, so a
+  prototype getter slips past; `buildLease` was the one case found.
 * Thread 19 `utils_port`: reviewed (`fixed`), PR #534 at 576f347cd on #531, pushed; joins the chain's top. `UX` is the
   namespace for `shapes/shapes-utils.ts` (STYLE.md's table wants the row). `safebyok/utils`: `mash`, `mask(text, opts)`,
   `MaskOpts`, `fromB64`/`toB64` (crypto.ts's codec), `WhisperFieldAttributes`; `shapes/shapes-utils.ts` is a seventh shapes
