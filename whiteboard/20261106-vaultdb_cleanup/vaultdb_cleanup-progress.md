@@ -7,7 +7,7 @@ orchestrator; workers look things up here and write in their own thread files.
 
 *Orchestrator:* https://claude.ai/artifact/LJYRKB5uG4bzR8VWBVti1j (doc 9c50a432-987f-4fd0-9fa9-0b3e23352d26).
 Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, matters table m3dgc82559j.353,
-bookmark rev 503), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
+bookmark rev 504), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
 m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 
 ## Settled before the first thread
@@ -76,3 +76,16 @@ current enough for a fresh worker to continue, and leave e2e for last.
 ## Threads 3, 4, 6: the ports
 
 *(cut from edbceeae2, building side by side)*
+
+* **Thread 6** (#559, draft): the first worker compacted twice and stopped with the component
+  rewritten (three tables; each put/del one mutation following memory-vault-db.ts; tallies per
+  life with hard limits so one delVault tombstones a life in one transaction) and core throwers
+  added (`storageFailed(call, thrown)` = `storage_unavailable` naming the call and the error's
+  name, no cause; `identityRevoked()`; `Checker, Checkers, objCheck` on the storage door). A
+  second worker continues from its thread file. Its `gh pr ready` was refused by the auto-mode
+  classifier; the orchestrator does not run a refused action for an agent.
+* Core additions collide across siblings: each port adds lines to `safebyok/storage`'s index
+  (all three add `Checker, Checkers, objCheck`). Resolved at the restack, one of each.
+* **Planning lesson, again:** every thread so far has compacted; an L port does not reach its
+  client in one context. Thread 5 (graphql) gets the continue-on-blocked pattern from the start:
+  milestones named in its handoff, stop at two compactions.
