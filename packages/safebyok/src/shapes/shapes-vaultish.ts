@@ -170,17 +170,27 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 
 // == [The box's forms]: BoxSnapshot
 
-export type BoxSnapshot = Boxscope & Readonly<{
-  revision_tok:  string
-  revision_seq:  number
-  registered_at: number
-  written_at:    number
-  sidecar:       Sidecar | null
-  full:          boolean
-  present:       boolean
-  exposed:       boolean
-  veiled:        boolean
-}>
+/** A box as a host renders it: its scope, its revision and times, its sidecar, and what it shows. */
+export interface BoxSnapshot extends Boxscope {
+  /** The token of the revision in hand, new at each put and del. */
+  readonly revision_tok:  string
+  /** The count of the revision in hand, higher on the later one. */
+  readonly revision_seq:  number
+  /** When this life of the box began. */
+  readonly registered_at: number
+  /** When the revision in hand was written; for a box deleted, when it was deleted. */
+  readonly written_at:    number
+  /** Your app's data beside the whisper, never encrypted; null until the full record is fetched. */
+  readonly sidecar:       Sidecar | null
+  /** True when the full record is in hand, false for a box only listed or deleted. */
+  readonly full:          boolean
+  /** True unless the box is deleted or damaged. */
+  readonly present:       boolean
+  /** True while the box keeps its whisper exposed. */
+  readonly exposed:       boolean
+  /** True while `box.veil()` hides the whisper exposed. */
+  readonly veiled:        boolean
+}
 
 // --
 
@@ -244,15 +254,23 @@ export type BoxWorld = Pick<Vault, keyof ListingWorld | 'scope' | 'vault_tok' | 
 
 // == [The vault's forms]: VaultSnapshot
 
-export type VaultSnapshot = VaultScope & Readonly<{
-  vault_tok:     string
-  revision_tok:  string
-  revision_seq:  number
-  registered_at: number
-  written_at:    number
-  present:       boolean
-  lockState:     EX.LockState
-}>
+/** A vault as a host renders it: its scope, its life and revision, and whether it is unlocked. */
+export interface VaultSnapshot extends VaultScope {
+  /** The token of this life of the vault, new when the vault is made again for its scope. */
+  readonly vault_tok:     string
+  /** The token of the revision in hand, new at each put and del. */
+  readonly revision_tok:  string
+  /** The count of the revision in hand, higher on the later one. */
+  readonly revision_seq:  number
+  /** When this life of the vault began. */
+  readonly registered_at: number
+  /** When the revision in hand was written; for a vault deleted, when it was deleted. */
+  readonly written_at:    number
+  /** True unless the vault is deleted or damaged. */
+  readonly present:       boolean
+  /** `unlocked` while this device holds a lease in force, else `locked`. */
+  readonly lockState:     EX.LockState
+}
 
 // --
 
@@ -344,6 +362,16 @@ export type Panic = (refusal: VaultError) => Promise<boolean>
 /** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'
 
-export type BankSnapshot = BankScope & Readonly<{ stage: BankStage, err: VaultError | null, device_id: string, vaults: readonly VaultSnapshot[] }>
+/** A bank as a host renders it: its scope, how far its `hello` got, and its vaults. */
+export interface BankSnapshot extends BankScope {
+  /** How far the bank's `hello` got: `made`, `ready` or `refused`. */
+  readonly stage:     BankStage
+  /** Why the last `hello` refused, or null. */
+  readonly err:       VaultError | null
+  /** Your id for this device, as `Bank.make` was given it. */
+  readonly device_id: string
+  /** A snapshot of each vault the bank lists. */
+  readonly vaults:    readonly VaultSnapshot[]
+}
 
 // --

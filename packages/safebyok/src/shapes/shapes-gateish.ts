@@ -317,7 +317,11 @@ export type AskUser = (gating: AnyGating) => Promise<boolean>
 
 export type AnyGating = { [KindT in EX.GatingKind]: Gating<KindT> }[EX.GatingKind]
 
-export type GatingSnapshot = VaultScope & Readonly<{ gatingkind: EX.GatingKind }>
+/** A gating as a host's dialog renders it: the vault it asks for, and what it asks for. */
+export interface GatingSnapshot extends VaultScope {
+  /** What the gating does once the user's cleartext proves the gate: build, unlock or delete the vault, or change its gate. */
+  readonly gatingkind: EX.GatingKind
+}
 
 /** What a build_vault attempt proves: the provings of a new vault's wayins, with no record to prove them against. */
 export type VaultBuildProvings = { passphraseProving: PassphraseProving, passkeyProving: PasskeyProving | null }
