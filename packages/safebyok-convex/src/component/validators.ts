@@ -2,6 +2,7 @@
 
 import { zodOutputToConvex, zodToConvex } from 'convex-helpers/server/zod4'
 import { v } from 'convex/values'
+import type { Validator } from 'convex/values'
 import * as SX from 'safebyok/storage'
 
 // Convex takes only its own validators for a function's arguments and answers. What Convex has no
@@ -28,14 +29,17 @@ export const watchScope = zodToConvex(SX.watchScope)
 
 // == [Records and options]: vaultRecord, vaultTombstone, boxRecord, boxTombstone, putOptsGiven, delOpts, capacity
 
+// A live record's type is the core's own, named: Convex's copy of it carries the core's zod brands, which a
+// declaration file cannot name, and for a box recurses into its sidecar past TypeScript's depth.
+
 /** A live vault row as the core writes it. */
-export const vaultRecord = zodToConvex(SX.vaultRecord)
+export const vaultRecord: Validator<SX.VaultRecord, 'required', string> = zodToConvex(SX.vaultRecord)
 
 /** A vault's tombstone as the core writes it. */
 export const vaultTombstone = zodToConvex(SX.vaultTombstone)
 
 /** A live box row as the core writes it. */
-export const boxRecord = zodToConvex(SX.boxRecord)
+export const boxRecord = zodToConvex(SX.boxRecord) as unknown as Validator<SX.BoxRecord, 'required', string>
 
 /** A box's tombstone as the core writes it. */
 export const boxTombstone = zodToConvex(SX.boxTombstone)

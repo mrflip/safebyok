@@ -15,14 +15,13 @@ const box = TH.boxAt()
 const otherBox = TH.boxAt(0, vault.vault_tok, { boxlabel: 'other' })
 const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const vaultQuery = { ...TH.vaultScope, vault_tok: vault.vault_tok }
-const putBox = TH.loosePutBox(api.safebyok.putBox)
 
 /** A backend where u1 has a vault and one box in it, written as u1. */
 const seeded = async (): Promise<Backend> => {
   const backend = createTest()
   const asOwner = backend.withIdentity({ subject: 'u1' })
   await asOwner.mutation(api.safebyok.putVault, { record: vault, opts: birth })
-  await asOwner.mutation(putBox, { record: box, opts: birth })
+  await asOwner.mutation(api.safebyok.putBox, { record: box, opts: birth })
   return backend
 }
 
@@ -33,7 +32,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['listBoxes',  (caller) => caller.query(api.safebyok.listBoxes, { asked: vaultQuery })],
   ['getBox',     (caller) => caller.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })],
   ['putVault',   (caller) => caller.mutation(api.safebyok.putVault, { record: vault, opts: birth })],
-  ['putBox',     (caller) => caller.mutation(putBox, { record: otherBox, opts: birth })],
+  ['putBox',     (caller) => caller.mutation(api.safebyok.putBox, { record: otherBox, opts: birth })],
   ['delBox',     (caller) => caller.mutation(api.safebyok.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: SX.revisionOf(box) } })],
   ['delVault',   (caller) => caller.mutation(api.safebyok.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: SX.revisionOf(vault) } })],
   ['tidyGone',   (caller) => caller.mutation(api.safebyok.tidyGone, { scope: TH.bankScope })],
