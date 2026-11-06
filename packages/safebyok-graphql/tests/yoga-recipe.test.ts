@@ -113,7 +113,7 @@ describe("the README's Yoga recipe", () => {
     const intruder = browserFor(route, () => 'u2')
     await TH.expectRefusal(intruder.putVault(TH.vaultAt(), { prior: SX.VoidRevision }), 'identity_revoked')
     await TH.expectRefusal(browserFor(route, () => null).listVaults(TH.bankScope), 'identity_revoked')
-    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.eq(null)
+    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
   it("stops the server's watch once the browser stops watching", async () => {
