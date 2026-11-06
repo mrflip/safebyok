@@ -149,7 +149,14 @@ smallest a SQL, IndexedDB or Convex store can meet atomically; thread 2 turns it
 battery, so keep tests calling only the public verbs and `_cheat_*` backdoors through one
 helper. **Size:** M. No size line moves (the core is not measured).
 
-*Review:* pending. *Coach rulings (2026-11-06)* on its open matters: the wide catch stays, with
+*Review:* `high`, fixed: the decision tree flattened to plain `if` lines up front in getVault,
+getBox, putVault, putBox and liveVaultOf (the Coach's directive); del-answer doc blocks made
+phrases; `PutOptsGiven` documented; the changeset names the gate race's new refusals;
+`#tombstoneBoxesOf` → `#tombstoneBoxes`; one style fix. Left: `#answerDel*Record` return
+`never` (kept: the Coach named it); `refusalOf` mutates; gateIssue's inline sentence, VOCABULARY.md:144
+and models-world's scripted `meta` (→ thread 2); compound first lines (→ an Open Matters row for
+a documentarian run); no gate-race test (→ thread 2's battery). Filing hit a conflict with main
+(#548, #549); a fresh worker resolves it. *Coach rulings (2026-11-06)* on its open matters: the wide catch stays, with
 adapters triaging; damaged_row for a later fmt, tidyGone ("for hosts to call"), the put acts,
 and the gate put's `ifAbsent: 'fail'` all kept.
 
@@ -168,7 +175,11 @@ are worth a case). Export from `safebyok`
 (index, or a new `./storage` entry: the worker's call, recorded) what an adapter needs: `VaultDB`
 and the `do*` types, the storage shapes and checkers an adapter validates with, and the refusal
 throwers an adapter raises (`vaultFull`, `storageUnavailable`: *Orchestrator:* thread 1 renamed it). Damage rows the battery plants go
-through a hook the adapter supplies. **Depends on:** 1. **Look-ahead:** threads 3, 4 and 6 run
+through a hook the adapter supplies. *Orchestrator, from thread 1's review:* ride along here: a battery case where `delVault` lands
+between a gate verb's `doGetVault` and its `doPutVault` (expects `vault_gone`); gateIssue's
+`registered_at` sentence into phrases.ts; VOCABULARY.md:144 (`newer_format` for a newer fmt, now
+`damaged_row`) and `tests/test-helpers/models-world.ts`'s scripted `meta` (answers carry none).
+**Depends on:** 1. **Look-ahead:** threads 3, 4 and 6 run
 in parallel off this tip; anything they would each add to the core's exports belongs here.
 **Size:** M.
 

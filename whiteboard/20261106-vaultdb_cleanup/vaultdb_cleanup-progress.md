@@ -7,7 +7,7 @@ orchestrator; workers look things up here and write in their own thread files.
 
 *Orchestrator:* https://claude.ai/artifact/LJYRKB5uG4bzR8VWBVti1j (doc 9c50a432-987f-4fd0-9fa9-0b3e23352d26).
 Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, matters table m3dgc82559j.353,
-bookmark rev 498), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
+bookmark rev 502), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
 m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 
 ## Settled before the first thread
@@ -22,7 +22,7 @@ m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 * *Orchestrator:* consumers of the old adapters: `demos/safebyok-demo-react/src/lib/stores.ts`
   and `persist-storage.ts` (indexeddb), `e2e/tests/postgres/*`, `e2e/tests/convex/*`.
 
-## Thread 1: vaultdb_plain (#555, in review)
+## Thread 1: vaultdb_plain (#555, reviewed `fixed`, filing)
 
 * The `do*` contract: `doPutVault(record, PutOptsGiven)`, `doPutBox(record, PutOptsGiven)`,
   `doDelVault(tombstone, DelOpts)`, `doDelBox(tombstone, DelOpts)`, each one atomic step
