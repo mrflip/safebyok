@@ -84,7 +84,7 @@ current enough for a fresh worker to continue, and leave e2e for last.
   name, no cause; `identityRevoked()`; `Checker, Checkers, objCheck` on the storage door). A
   second worker continues from its thread file. Its `gh pr ready` was refused by the auto-mode
   classifier; the orchestrator does not run a refused action for an agent.
-* **Thread 3** (#560, reviewed `fixed`: null `indexedDB` now reads as no IndexedDB; filing): old adapter moved whole to private `safebyok-idb-old` (the
+* **Thread 3** (#560, filed at 029f9e82d): old adapter moved whole to private `safebyok-idb-old` (the
   demo's store and inspector); `safebyok-indexeddb` new: `IdbVaultDB`, `idbVaultDB(opts)`,
   `IdbVaultDBOpts` (`dbName`, `maxRecordBytes`); each do* one transaction; watch over
   BroadcastChannel after commit; triage in `src/shelf.ts` `troubleOf` (quota → `vault_full`,
