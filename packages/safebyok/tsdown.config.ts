@@ -10,12 +10,13 @@ import { defineConfig } from 'tsdown'
 // work: a host's bundler drops every module the host's imports never reach, schemas and all. A
 // bundled chunk would hold them together, and a bare `stableJsonify` would carry every validator.
 export default defineConfig({
+  // `safebyok/browser` is its own entry, so the Argon2id derivers (and the hashing code under them) reach only a host that imports them.
   // `safebyok/utils` is its own entry, so a host that wants only `mash` pulls in none of the vault.
   // `safebyok/testing` is its own entry, so only a test that asks for it loads vitest. The entries
   // are a list so that `root` is honoured: given an object, tsdown takes the package's own directory
   // as the root and writes the modules under dist/src/. The testing entry builds from tests/, outside
   // `src`, so it is named in an object beside the list.
-  entry:      ['src/index.ts', 'src/utils.ts', { testing: 'tests/test-helpers.ts' }],
+  entry:      ['src/index.ts', 'src/browser.ts', 'src/utils.ts', { testing: 'tests/test-helpers.ts' }],
   format:     ['esm', 'cjs'],
   // Browser first, but nothing here is browser-only: WebCrypto is the same global under Node.
   platform:   'neutral',
