@@ -10,10 +10,9 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 11:05, **running**: threads 1 to 5 and 11 to 20 merged; 6 (#550), 21 (#548), 22 (#549) filed on
-main and 7 (#552) on #550, the Coach's to merge; 8 (`checkers_once`) building on #552's tip with a hatch; 9 and 10 follow.
-Open: #516 (this PR), the Closer Look triage, three Open Matters rows (the device-store export, TOP; the zxcvbn section;
-the deriver load relabel).
+**Status:** 2026-11-06, 11:55, **running**: threads 1 to 5 and 11 to 20 merged; 6 (#550), 21 (#548), 22 (#549) filed on
+main, 7 (#552) on #550, 8 (#553) on #552, the Coach's to merge in that order; 9 (`types_ab`) building on #553's tip; 10
+follows. Open: #516 (this PR), the Closer Look triage, three Open Matters rows.
 
 ## Read first
 
