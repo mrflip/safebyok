@@ -34,7 +34,7 @@ describe("vaultResolvers", () => {
       await TH.expectRefusal(browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision }), 'identity_revoked')
       await TH.expectRefusal(browser.tidyGone(TH.bankScope), 'identity_revoked')
     }
-    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.eq(null)
+    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
   it("serves a request signed in as the user it asks for", async () => {
@@ -58,7 +58,7 @@ describe("vaultResolvers", () => {
     await TH.expectBad(TH.browserOver(schema).tryGetVault(TH.vaultScope), 'storage_unavailable')
   })
 
-  it("sends what a userIdOf that throws said as unexpected_error, quoting nothing of it", async () => {
+  it("sends nothing of what a throwing userIdOf said", async () => {
     const schema = makeExecutableSchema({
       typeDefs:  VaultSchemaSdl,
       resolvers: vaultResolvers({ vaultDB: await TH.serverOver(), userIdOf: () => { throw new Error('session cookie s3cr3t-cookie is malformed') } }),
@@ -102,7 +102,7 @@ describe("VaultSchemaSdl", () => {
   it("builds alone, every root field it adds named safebyok...", () => {
     const rootFields = [schema.getQueryType(), schema.getMutationType(), schema.getSubscriptionType()]
       .flatMap((root) => (isObjectType(root) ? Object.keys(root.getFields()) : []))
-    expect(rootFields).to.have.length(10)
+    expect(rootFields).to.have.lengthOf(10)
     for (const fieldname of rootFields) { expect(fieldname).to.match(/^safebyok[A-Z]/) }
   })
 
