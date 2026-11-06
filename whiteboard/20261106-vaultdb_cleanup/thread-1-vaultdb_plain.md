@@ -1,6 +1,6 @@
 # Thread 1: vaultdb_plain (2026-11-06)
 
-Branch `20261106-vaultdb_plain`, PR #TBD, off `main`. Justify: green (safebyok 2191 tests, 0 lint errors).
+Branch `20261106-vaultdb_plain`, PR [#555](https://github.com/mrflip/safebyok/pull/555), off `main`. Justify: green (safebyok 2191 tests, 0 lint errors).
 
 * **Built**: `src/storage/vault-db-new.ts` rewritten. Each verb is one method: `req_params`, then a
   method-wide `try { ... } catch (err) { throw refusalOf(err, '<verb>', req_params) }` around lines
