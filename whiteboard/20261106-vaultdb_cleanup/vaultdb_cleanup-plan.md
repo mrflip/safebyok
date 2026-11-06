@@ -226,7 +226,9 @@ migrations). **Depends on:** 2. **Look-ahead:** thread 5's graphql tests run ove
 
 *Gloss.* `packages/safebyok-graphql/src/*`: the client `graphql-vault-db.ts`, the server
 `vault-resolvers.ts` and `vault-schema.ts`, `fields.ts`; the schema may change freely. **Depends
-on:** 4 (its devDependency on `safebyok-postgres`). **Size:** L.
+on:** 4 (its devDependency on `safebyok-postgres`). **Size:** L. *Orchestrator, revised:* porting
+postgres turned graphql red, so this thread's commits join #561 (no PR of its own); see the
+progress document.
 
 ### 6. port_convex
 

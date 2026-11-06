@@ -6,8 +6,7 @@ orchestrator; workers look things up here and write in their own thread files.
 ## The sprint doc
 
 *Orchestrator:* https://claude.ai/artifact/LJYRKB5uG4bzR8VWBVti1j (doc 9c50a432-987f-4fd0-9fa9-0b3e23352d26).
-Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, matters table m3dgc82559j.353,
-bookmark rev 504), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
+Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, bookmark rev 505; matters table m3dgc82559j.5596), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
 m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
 
 ## Settled before the first thread
@@ -92,6 +91,14 @@ current enough for a fresh worker to continue, and leave e2e for last.
   validator makers on the storage door (513c644fe). Size line idbVaultDB 2.6 → 2.9 kB. The root
   `size` script builds safebyok too. `isPutAllowed` copied from memory-vault-db (export it after
   the ports). No inspector, no box cap (Cleanup).
+* **Thread 4** (#561, in review; two compactions): `PostgresVaultDB({ client, listen?, maxBoxes?,
+  maxRecordBytes? })`, client `{ query, transaction }` (PGlite as is; `pgClientOf(pool)` for pg),
+  `listen` on `VaultChangeChannel`; `VaultTablesSql`; two jsonb tables, the vault row locked per
+  write, notices by pg_notify (over 7999 bytes: keys only, re-read). The user_id gate and route
+  recipe dropped (the route layer's: thread 5). e2e races rewritten, foreign-key test deleted.
+  **graphql is red on this branch**: *Orchestrator, YOLO:* thread 5 builds on a branch from
+  022d690f2 with no PR of its own, rebases onto #561's reviewed tip, gets a review over its own
+  range, then 20261106-port_postgres fast-forwards to it and #561 files whole.
 * Core additions collide across siblings: each port adds lines to `safebyok/storage`'s index
   (all three add `Checker, Checkers, objCheck`). Resolved at the restack, one of each.
 * **Planning lesson, again:** every thread so far has compacted; an L port does not reach its
