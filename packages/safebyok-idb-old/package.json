@@ -1,8 +1,8 @@
 {
-  "name": "safebyok-indexeddb",
-  "private": false,
+  "name": "safebyok-idb-old",
+  "private": true,
   "version": "0.5.0",
-  "description": "IndexedDB storage for safebyok: a VaultDB that keeps vault records and boxes as ciphertext in this browser, each verb one IndexedDB transaction, and the template for a key-value backend of your own.",
+  "description": "The IndexedDB vault store on the old design (safebyok-old), which the demo runs on until it moves to the new core. Never published.",
   "keywords": [
     "safebyok",
     "indexeddb",
@@ -15,7 +15,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mrflip/safebyok.git",
-    "directory": "packages/safebyok-indexeddb"
+    "directory": "packages/safebyok-idb-old"
   },
   "bugs": {
     "url": "https://github.com/mrflip/safebyok/issues"
@@ -32,7 +32,7 @@
     "build": "tsdown",
     "prebuild": "pnpm build:deps",
     "build:watch": "tsdown --watch",
-    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-indexeddb^...' build",
+    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-idb-old^...' build",
     "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -40,8 +40,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "pretest:coverage": "pnpm build:deps",
-    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "prepublishOnly": "node ../../scripts/require-pnpm.ts && pnpm justify"
+    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
     "idb-keyval": "^6.3.0"
