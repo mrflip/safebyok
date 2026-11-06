@@ -11,8 +11,8 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) built, in review; the Closer Look and the listing
-recommendation are tabs of the sprint doc awaiting the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) built, in review; thread 15 (`list_boxes`, the Coach's "go ahead B") building on #523; the Closer Look
+tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
@@ -357,6 +357,22 @@ orchestrator's call, an Open Matters row); fixtures renamed; refusal cases and a
 saying an old non-label record reads as damaged or absent. *Review (low, sonnet):* `fixed`; two style fixes in
 bank.test.ts; left: a bulk list's `[blurb, input]` shape, VOCABULARY's deviceId row not yet saying "a label". **Filed**
 at 846f0d285, as cut, on main.
+
+### 15. `list_boxes`
+
+**The Coach** (2026-11-06): "Go ahead Recommendation B -- see my highlighted comments in the tab." In the tab: "No, please"
+(on forwarding an other-life world to `fateOver`); "The 'that needs care' is because of the monstrous complexity of
+fateOver, which is overpromising and tripping on its own feet. So don't take too much care please. The crossing here is
+microscopic in practice, and the thinking pattern described here has led to catastrophe before. A world with a different
+vault tok should never reach BoxListing, because it is embedded in every request."
+
+*Gloss:* `listing-responsibilities.md`'s B with the two amendments: `listBoxes(vaultScope + vault_tok)` answers
+`{ boxes, damaged_records }` with the vault row as `world`, refusing `vault_mismatch` by `checkedVaultLife` as the box
+verbs do; `getVault` the row alone; `getBank` to `listVaults`; `VaultListing.list()`, `BoxListing.list()`, `_takeListed`
+gone, `fetchListed`/`vaultRowOf`/`VX.boxesListed` gone; `takeWorld` stays on Vault, parses and receives, a mismatched tok a
+package-bug thrower, no forward, no fate logic; VOCABULARY's `getVault` row in its own commit (it meets #518); minor
+changeset. **Levels:** worker `opus`; review `high`. **Depends on:** #523 (stacked). **Look-ahead:** thread 6 keeps
+`takeWorld` on the `BoxWorld` Pick; thread 8 brands the VaultDB. **Size:** one context.
 
 ## For the Coach
 

@@ -28,8 +28,9 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
   kind (ruled on #513, errors.ts's paragraph now disagrees); 1.3 `_takeListed`; 1.4 `box.isShowing` (#515); 1.5 prose ahead
   of code; 1.6 "open" still in identifiers (thread 5/6 territory: `Lease.#opened`, `unopenedWhisper`); 1.7 two cores in
   guarantees.md (thread 13); 1.8 a console spy. Nothing new in the undergrowth. Triage waits on the Coach.
-* **Listing responsibilities** (tab and `listing-responsibilities.md`): recommendation B, a `listBoxes` verb and `getVault`
-  the row alone, as thread 15 `list_boxes` after thread 7, pending the Coach's word.
+* **Listing responsibilities**: the Coach said go ahead on B, with no other-life forward and no fate logic ("don't take
+  too much care"); thread 15 `list_boxes` builds it now, stacked on #523, ahead of threads 5 to 7. `takeWorld` stays on
+  Vault and treats a mismatched `vault_tok` as a package bug (the Coach's question, answered in the tab).
 * **Merged 05:10:** #513 and #517 (and #521, the Coach's queue tooling). #511 is still the gate for threads 5 to 10.
 * **Rulings of 05:30** (sprint doc, Resolved): `#the-host-is-not-our-threat-model`; brands are getters; "world is as listing
   has it: bank for vaults, vault for boxes"; the deviceId sentence; the orchestrator owes a listing-responsibilities

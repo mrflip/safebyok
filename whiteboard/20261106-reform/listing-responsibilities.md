@@ -41,13 +41,22 @@ and `listBoxes` was folded into `getVault` (`notes/old_vocabulary.md:143`). The 
 - Sub-choice under B: whether `listBoxes` also spreads vault props onto its `val`. Not: `world` already carries the row,
   and two copies invite two update paths.
 
+## The Coach's ruling (2026-11-06)
+
+"Go ahead Recommendation B", with: "No, please" on the other-life forward below; "The 'that needs care' is because of the
+monstrous complexity of fateOver, which is overpromising and tripping on its own feet. So don't take too much care
+please. The crossing here is microscopic in practice, and the thinking pattern described here has led to catastrophe
+before. A world with a different vault tok should never reach BoxListing, because it is embedded in every request."
+And, on `takeWorld`: "should this method be on boxListing; would that help with the other life problem?" Answered: no;
+`takeWorld` stays on Vault, parses and receives the row, and a mismatched `vault_tok` is a package bug, since the vaultDB
+refuses a mismatched tok on every box verb. The rebirth paragraph below is struck accordingly; thread 15 builds the rest.
+
 ## Recommendation: B
 
 It is the Coach's model ("world is as listing has it: bank for vaults, vault for boxes"), removes a parse and a hand-off,
-makes a refresh cost one row, and lets `takeWorld` be the one place a vault is updated from an answer. The rebirth case
-is handled in the same thread, not left: `BoxListing.deliver` checks the world's life before building a box, and a row of
-another life goes to the vault listing's `fateOver` (replace) and stops the delivery. That needs care, since the box
-listing is vacated in the middle of `deliver`; the thread file says how it was done.
+makes a refresh cost one row, and lets `takeWorld` be the one place a vault is updated from an answer. ~~The rebirth case is handled in the same thread: `BoxListing.deliver` checks the world's life and a row of another life
+goes to the vault listing's `fateOver`.~~ Struck by the Coach ("No, please"): a world of another life never reaches the
+box listing, because `listBoxes` carries the `vault_tok` and the vaultDB answers `vault_mismatch`.
 
 ## Responsibilities and calls under B
 
@@ -61,7 +70,7 @@ listing is vacated in the middle of `deliver`; the thread file says how it was d
   `getVault`. `fetchListed`, `vaultRowOf` and `NothingListed` go (`vault-listing.ts:88-96, 203-210`). `boxListingOf` stays.
 - **Vault.** `hello()` calls `boxListing.hello()` (the watch first, so no notice falls between) then `boxListing.list()`.
   A refresh stays `fetch`/`hydrate`/`ensureTimely` → `getVault`. `takeWorld` remains the one place a box answer updates
-  the vault, and gains the other-life forward.
+  the vault; it parses and receives, and a mismatched `vault_tok` is a package bug (no forward).
 - **BoxListing.** `list()` calls `listBoxes`; `deliver` hands `world` to `vault.takeWorld` before any box is built, sets
   `damaged_records` aside, vacates held boxes now damaged, builds each sparse box. `hello()` is the base class's watch.
   `get`, `fetch`, `put`, `del`, `create`, `puttable` unchanged. `_takeListed` goes.
