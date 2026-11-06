@@ -187,6 +187,8 @@ export const describeRaces = ({ fresh, storeWith, rowsOf, twinOf, hasCap, makeCa
       const oldLife = vaultAt(0, 'oldlife')
       await vaultDB.delVault(vaultTombstoneOf(oldLife), { prior: priorOf(oldLife) })
       await vi.waitFor(() => { expect(notices.map(({ world }) => world)).to.deep.equal([vault]) })
+      await aWhile()
+      expect(notices.map(({ world }) => world)).to.deep.equal([vault])
     })
   })
 
