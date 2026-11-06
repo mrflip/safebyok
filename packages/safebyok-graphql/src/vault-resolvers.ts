@@ -1,233 +1,149 @@
 import { GraphQLError } from 'graphql'
-import { VaultError, storageTroubleOf, isVaultError } from 'safebyok-old'
-import type { Outcome, VaultRecordExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, VaultRecord, VaultDB, VaultScope, VaultDraft } from 'safebyok-old'
-import { VaultRecordFields, BoxFields, ScopeFields, recordOf } from './fields'
+import * as SX from 'safebyok/storage'
 
-/** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, in their `try` forms, the ones handing on records in place of those handing back summaries.
- * That is `tryGetVaultRecords` and `tryEnsureVaultRecords` in place of `tryGetVault` and
- * `tryEnsureVault`: the browser's VaultDB checks stored records. Every VaultDB is one:
- * `safebyok-postgres`'s, or one of your own.
- */
-export type ServedVaultDB = Pick<VaultDB, 'tryGetVaultRecords' | 'tryEnsureVaultRecords' | 'tryPutVaultRecord' | 'tryGetBox' | 'tryPutBox' | 'tryGetCapacity' | 'tryDelBox' | 'tryDelVault' | 'subscribe'>
+// == [Types]: VaultResolversOpts, VaultFieldArgs, VaultFieldResolver, VaultResolvers
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
-  /** The VaultDB for one request, made from your server's context: for the user your own auth signed in, never one the request names.
-   * It is called for every vault field resolved, so it should be cheap, as `postgresVaultDB` is.
-   * To refuse the request by a rule of your own, throw a VaultError of kind `not_permitted`
-   * (`Refusals.notPermitted()`), or `identity_revoked` for a user your app knows is gone. Every
-   * VaultError it throws crosses as it is, kind and message, those two and a `bad_option` from a
-   * misconfigured `postgresVaultDB` alike; anything else it throws is a bug in the server's
-   * setup, and crosses as `unexpected_error` whose message carries the thrown error's own, so the
-   * diagnostic reaches the browser developer, and every other browser: throw nothing whose message
-   * names a credential. What was thrown stays on the server as the cause.
-   * The VaultDB, not this, refuses a signed-out request.
-   */
-  vaultDBFor: (context: ContextT) => ServedVaultDB
+  /** The VaultDB every request is served from, such as a `PostgresVaultDB`. */
+  vaultDB:  SX.VaultDB
+  /** The user_id your own auth signed this request in as, or null when signed out. */
+  userIdOf: (context: ContextT) => SX.Awaitable<string | null>
 }
 
-/** A root field's arguments, as `VaultSchemaSdl` names them and GraphQL has coerced them: a vault's three names are arguments of their own. */
+/** A root field's arguments, as GraphQL coerced them: unchecked until the VaultDB checks them. */
 export type VaultFieldArgs = {
-  applabel?:    unknown
-  user_id?:     unknown
-  vaultlabel?:  unknown
-  boxlabel?:    unknown
-  vaultRecord?: unknown
-  draft?:       unknown
-  box?:         unknown
-  expected?:    unknown
+  readonly applabel?:   unknown
+  readonly user_id?:    unknown
+  readonly vaultlabel?: unknown
+  readonly boxlabel?:   unknown
+  readonly vault_tok?:  unknown
+  readonly record?:     unknown
+  readonly tombstone?:  unknown
+  readonly opts?:       unknown
 }
 
-/** One query or mutation's resolver, as every GraphQL server calls it. */
+/** One query's or mutation's resolver, as every GraphQL server calls it. */
 export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArgs, context: ContextT) => Promise<unknown>
 
-/** The resolvers {@link vaultResolvers} makes, keyed as `VaultSchemaSdl` names its root fields.
- * That is the shape Yoga, Apollo Server, Mercurius and graphql-tools all take.
- */
+/** The resolvers {@link vaultResolvers} makes, keyed as `VaultSchemaSdl` names its root fields. */
 export type VaultResolvers<ContextT> = {
   Query: {
-    safebyokGetVault:         VaultFieldResolver<ContextT>
-    safebyokGetBox:           VaultFieldResolver<ContextT>
-    safebyokGetCapacity:      VaultFieldResolver<ContextT>
+    safebyokListVaults: VaultFieldResolver<ContextT>
+    safebyokGetVault:   VaultFieldResolver<ContextT>
+    safebyokListBoxes:  VaultFieldResolver<ContextT>
+    safebyokGetBox:     VaultFieldResolver<ContextT>
   }
   Mutation: {
-    safebyokEnsureVault:      VaultFieldResolver<ContextT>
-    safebyokPutVaultRecord:   VaultFieldResolver<ContextT>
-    safebyokPutBox:           VaultFieldResolver<ContextT>
-    safebyokDelBox:           VaultFieldResolver<ContextT>
-    safebyokDelVault:         VaultFieldResolver<ContextT>
+    safebyokPutVault:   VaultFieldResolver<ContextT>
+    safebyokPutBox:     VaultFieldResolver<ContextT>
+    safebyokDelVault:   VaultFieldResolver<ContextT>
+    safebyokDelBox:     VaultFieldResolver<ContextT>
+    safebyokTidyGone:   VaultFieldResolver<ContextT>
   }
   Subscription: {
-    safebyokVaultChanged: {
-      subscribe: (parent: unknown, args: VaultFieldArgs, context: ContextT) => AsyncIterableIterator<VaultScope>
-      resolve:   (scope: VaultScope) => VaultScope
+    safebyokHeard: {
+      subscribe: (parent: unknown, args: VaultFieldArgs, context: ContextT) => Promise<AsyncIterableIterator<SX.Heard>>
+      resolve:   (heard: SX.Heard) => SX.Heard
     }
   }
 }
+// --
 
-/** The resolvers for `VaultSchemaSdl`, for any GraphQL server beside your own: each root field one verb of the request's VaultDB.
- *
- * * **Who may reach a vault** is the VaultDB's to say: `postgresVaultDB`, made for the signed-in
- *   user, refuses every other user's vault, and every vault while signed out, with `identity_revoked`.
- * * **A refusal crosses as a GraphQL error** with the VaultError's calm message, its kind as
- *   `extensions.kind`, which the browser's `graphqlVaultDB` throws as the same VaultError. The
- *   error carries nothing else: servers, gateways and APM tools log `extensions`. A stale write,
- *   and a box write into a full vault, are answered in the mutation's body instead, on failure
- *   as on success: `safebyokPutBox` and `safebyokPutVaultRecord` resolve `landed: false` with the
- *   `refusalkind`, the `message` and what is stored (`box_stored`, `vault_stored`) or how full
- *   the vault is (`capacity`), and the browser throws the same VaultError from them. The
- *   VaultError's `cause`, your driver's own error, which may name your database, stays on the
- *   server as the GraphQL error's `cause`, for your logs. Anything else a VaultDB throws crosses
- *   as `storage_unavailable`.
- * * **A `vaultDBFor` that throws** crosses as {@link VaultResolversOpts} says.
- * * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
- *   `subscribe` hears them, and stops listening when the subscriber goes. Changes that come while
- *   the subscriber is busy with the last are sent as one. It also sends one as it starts, when the
- *   VaultDB calls as its watch begins, as `postgresVaultDB` does.
- *
- * @example
- *   const resolvers = vaultResolvers({
- *     vaultDBFor: (context: AppContext) => postgresVaultDB({ client: pool, user_id: context.user_id, listen }),
- *   })
- */
+// == [Resolvers]: vaultResolvers
+
+const vaultResolversOpts = SX.objCheck(({ custom, fn }) => ({
+  vaultDB:  custom<SX.VaultDB>((candidate) => candidate instanceof SX.VaultDB, 'Expected a VaultDB from safebyok/storage'),
+  userIdOf: fn<VaultResolversOpts<unknown>['userIdOf']>(),
+}), 'bad_option')
+
+/** The resolvers for `VaultSchemaSdl`, each root field one of the VaultDB's generic calls, for the user the request is signed in as alone. */
 export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> => {
-  const vaultDBFor = (opts as Partial<VaultResolversOpts<ContextT>> | null | undefined)?.vaultDBFor
-  if (typeof vaultDBFor !== 'function') {
-    throw new VaultError('bad_option', "vaultResolvers needs a `vaultDBFor`: (context) => the VaultDB for that request's signed-in user, such as postgresVaultDB({ client, user_id }).")
-  }
-  // The server holds a name to its check and to its storage's limits, which every VaultDB verb
-  // checks as a browser's vault does. The server's job is to keep each user to their own vault.
-  /** The request's VaultDB, or what `vaultDBFor` threw as `hostThrew` has it cross. */
-  const vaultDBOf = (context: ContextT): ServedVaultDB => {
+  const { vaultDB, userIdOf } = vaultResolversOpts.parse(opts)
+  const { relay } = vaultDB
+
+  /** What `call` answers, once the request is shown signed in as `user_id`; its refusal otherwise, as the wire carries one. */
+  const served = async <ValT>(context: ContextT, user_id: unknown, call: () => SX.Awaitable<ValT>): Promise<ValT> => {
     try {
-      return vaultDBFor(context)
-    } catch (err) {
-      throw hostThrew(err)
-    }
+      demandSignedInAs(await userIdOf(context), user_id)
+      return await call()
+    } catch (err) { throw crossing(err) }
   }
-  /** A resolver calling `verb` on the request's VaultDB: its outcome's `val`, as `answered` hands it to the wire, or its refusal as a wire carries one.
-   * A write's refusal that `inBody` gives a body for answers there, as data; any other crosses as a GraphQL error.
-   */
-  const served = (
-    verb: (vaultDB: ServedVaultDB, args: VaultFieldArgs) => Promise<Outcome<unknown>>,
-    answered: (val: unknown) => unknown = (val) => val,
-    inBody: (refusal: VaultError) => object | undefined = () => undefined,
-  ): VaultFieldResolver<ContextT> => (
-    async (_parent, args, context) => {
-      try {
-        const { ok, val, err } = await verb(vaultDBOf(context), args)
-        if (ok) { return answered(val) }
-        const body = inBody(err)
-        if (body !== undefined) { return body }
-        throw err
-      } catch (err) {
-        throw crossing(err)
-      }
-    }
-  )
+
   return {
     Query: {
-      // Checked and split, as the browser's VaultDB answers from its half, which checks it again.
-      safebyokGetVault:      served((vaultDB, args) => vaultDB.tryGetVaultRecords(scopeIn(args)), relayedVault),
-      safebyokGetBox:        served((vaultDB, args) => vaultDB.tryGetBox(scopeIn(args), args.boxlabel as string, boxGetExpectationIn(args))),
-      safebyokGetCapacity: served((vaultDB, args) => vaultDB.tryGetCapacity(scopeIn(args))),
+      safebyokListVaults: async (_parent, args, context) => await served(context, args.user_id, () => relay.listVaults(args)),
+      safebyokGetVault:   async (_parent, args, context) => await served(context, args.user_id, () => relay.getVault(args)),
+      safebyokListBoxes:  async (_parent, args, context) => await served(context, args.user_id, () => relay.listBoxes(args)),
+      safebyokGetBox:     async (_parent, args, context) => await served(context, args.user_id, () => relay.getBox(args)),
     },
     Mutation: {
-      safebyokEnsureVault: served((vaultDB, args) => vaultDB.tryEnsureVaultRecords(recordOf(args.draft, VaultRecordFields) as VaultDraft), relayedVault),
-      safebyokPutVaultRecord: served((vaultDB, args) => vaultDB.tryPutVaultRecord(vaultRecordIn(args), vaultRecordExpectationIn(args)), (stored) => ({ landed: true, vault_stored: stored }), staleVaultRecordInBody),
-      safebyokPutBox: served((vaultDB, args) => vaultDB.tryPutBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord), (box) => ({ landed: true, box_stored: box }), refusedBoxInBody),
-      safebyokDelBox: served((vaultDB, args) => vaultDB.tryDelBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
-      safebyokDelVault: served((vaultDB, args) => vaultDB.tryDelVault(scopeIn(args), vaultDelExpectationIn(args))),
+      safebyokPutVault: async (_parent, { record, opts }, context) => await served(context, userIdIn(record), () => relay.putVault(record, opts)),
+      safebyokPutBox:   async (_parent, { record, opts }, context) => await served(context, userIdIn(record), () => relay.putBox(record, opts)),
+      safebyokDelVault: async (_parent, { tombstone, opts }, context) => await served(context, userIdIn(tombstone), () => relay.delVault(tombstone, opts)),
+      safebyokDelBox:   async (_parent, { tombstone, opts }, context) => await served(context, userIdIn(tombstone), () => relay.delBox(tombstone, opts)),
+      safebyokTidyGone: async (_parent, args, context) => await served(context, args.user_id, () => relay.tidyGone(args)),
     },
     Subscription: {
-      safebyokVaultChanged: {
-        subscribe: (_parent, args, context) => {
-          try {
-            return changesOf(vaultDBOf(context), scopeIn(args))
-          } catch (err) {
-            throw crossing(err)
-          }
-        },
-        resolve: (scope) => scope,
+      safebyokHeard: {
+        subscribe: async (_parent, args, context) => await served(context, args.user_id, () => heardOf(relay, args)),
+        resolve:   (heard) => heard,
       },
     },
   }
 }
+// --
 
-/** What a `vaultDBFor` threw, as it crosses: a VaultError as it came, kind and message; anything else an `unexpected_error` whose message carries the throw's own, the throw itself its cause.
- * The host's own words cross on purpose. A `vaultDBFor` sees the server's configuration and its
- * database, never a vault's contents, so a `TypeError` naming an unset variable or a driver's
- * refusal of a pool reaches the developer debugging in the browser, where a sentence of
- * safebyok's own would send them to the server's logs first.
- */
-const hostThrew = (thrown: unknown): VaultError => {
-  if (isVaultError(thrown)) { return thrown }
-  const said = thrown instanceof Error ? thrown.message : String(thrown)
-  return new VaultError('unexpected_error', `The server's vaultDBFor threw, so no VaultDB served this request: ${said}`, { cause: thrown })
+// == [Helpers]: demandSignedInAs, userIdIn, crossing, extensionsOf, heardOf
+
+const NotSignedInAs = "This request is not signed in as the user whose vaults it asks for."
+
+/** Refuses unless the request is signed in, and as the user it asks for. */
+const demandSignedInAs = (signedIn: string | null, asked: unknown): void => {
+  if (signedIn === null || asked !== signedIn) { throw new SX.VaultError('identity_revoked', NotSignedInAs) }
 }
 
-/** A vault as the server's VaultDB read it, as `SafebyokVault` carries it: its record as `vault`, beside its sound boxes and its damaged ones; null for none. */
-const relayedVault = (val: unknown): unknown => {
-  if (val === null) { return null }
-  const { boxes, damagedBoxes, ...vault } = val as VaultRecord & { boxes: unknown, damagedBoxes: unknown }
-  return { vault, boxes, damagedBoxes }
+/** The user_id a record or tombstone names, before it is checked. */
+const userIdIn = (bag: unknown): unknown => ((typeof bag === 'object' && bag !== null && 'user_id' in bag) ? bag.user_id : undefined)
+
+/** A refusal as the wire carries it: its message, and in `extensions` its kind and what a caller reads of its meta, never its cause. */
+const crossing = (thrown: unknown): GraphQLError => {
+  // A VaultError is the relay's refusal, or the gate's; anything else was thrown by the host's userIdOf.
+  const refusal = SX.isVaultError(thrown) ? thrown : SX.unexpectedError(thrown)
+  const crossed = new GraphQLError(refusal.message, { extensions: extensionsOf(refusal) })
+  // The refusal rides along for the server's logs as an unenumerable `cause`, which no GraphQL
+  // server sends. Never the constructor's `originalError`: Yoga masks an error whose original is
+  // not a GraphQLError, and the kind would be lost.
+  Object.defineProperty(crossed, 'cause', { value: refusal, configurable: true, writable: true })
+  return crossed
 }
 
-// The arguments as the schema shapes them, rebuilt field by field as plain records: the
-// VaultDB checks them as it would any caller's.
-const scopeIn = (args: VaultFieldArgs) => recordOf(args, ScopeFields) as VaultScope
-const vaultRecordIn = (args: VaultFieldArgs) => recordOf(args.vaultRecord, VaultRecordFields) as VaultRecord
+/** A refusal's kind, with the room it reports and the fields it names, as the browser's VaultDB rebuilds them. */
+const extensionsOf = ({ refusalkind, meta }: SX.VaultError): Record<string, unknown> => ({
+  kind: refusalkind,
+  // Parsed for the wire: a limit of Infinity, which JSON cannot carry, becomes the largest safe integer.
+  ...(meta?.capacity && { capacity: SX.capacity.parse(meta.capacity) }),
+  ...(meta?.fieldnames && { fieldnames: meta.fieldnames }),
+})
 
-const vaultRecordExpectationIn = (args: VaultFieldArgs): VaultRecordExpectation => {
-  const { vault_tok, gate_epoch } = args.expected as VaultRecordExpectation
-  return { vault_tok, gate_epoch }
-}
-
-const boxGetExpectationIn = (args: VaultFieldArgs): BoxGetExpectation => {
-  const { vault_tok } = args.expected as BoxGetExpectation
-  return { vault_tok }
-}
-
-// A revision_tok left out, as a GraphQL client may leave out a null, is the null it means.
-const boxExpectationIn = (args: VaultFieldArgs): BoxExpectation => {
-  const { vault_tok, revision_tok = null } = args.expected as { vault_tok: string, revision_tok?: string | null }
-  return { vault_tok, revision_tok }
-}
-
-// A gate_epoch left out, as a GraphQL client may leave out a null, is the null it means: the damaged path's.
-const vaultDelExpectationIn = (args: VaultFieldArgs): VaultDelExpectation => {
-  const { vault_tok, gate_epoch = null } = args.expected as { vault_tok: string, gate_epoch?: number | null }
-  return { vault_tok, gate_epoch }
-}
-
-// A revision_tok left out, as for a box write, is the null it means.
-const boxDelExpectationIn = (args: VaultFieldArgs): BoxDelExpectation => {
-  const { vault_tok, revision_tok = null } = args.expected as { vault_tok: string, revision_tok?: string | null }
-  return { vault_tok, revision_tok }
-}
-
-/** Each change `vaultDB` hears to the vault in `scope`, as its scope, until the subscriber goes.
- * Ending the iteration, as a GraphQL server does when the subscription ends, unsubscribes. A
- * change heard while one still waits to be read is that one. A refusal from `subscribe` throws at
- * once. The iterator is its own iterable, as graphql-js asks for it twice.
- */
-const changesOf = (vaultDB: ServedVaultDB, scope: VaultScope): AsyncIterableIterator<VaultScope> => {
+/** What the relay's watch hears of `scope`, as the async iterator a subscription resolver answers; ending it stops the watch. */
+const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs): AsyncIterableIterator<SX.Heard> => {
   // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
-  // `next`, which for a quiet vault is forever, so a subscriber gone while it waited would keep
-  // the VaultDB listening. A reader's `cancel` ends the pending read as done, at once.
-  let unsubscribe = noUnsubscribing
-  const changes = new ReadableStream<VaultScope>({
+  // `next`, which for a quiet bank is forever, so a subscriber gone while it waited would keep the
+  // watch open. A reader's `cancel` ends the pending read at once.
+  let unwatch = noUnwatching
+  const heards = new ReadableStream<SX.Heard>({
     start: (controller) => {
-      unsubscribe = vaultDB.subscribe(scope, () => {
-        // Room only while none waits; none, too, once the stream has closed.
-        if ((controller.desiredSize ?? 0) > 0) { controller.enqueue(scope) }
+      unwatch = relay.watch(scope, (heard) => {
+        // None once the stream has closed; every one before, however many wait to be read.
+        if ((controller.desiredSize ?? 0) > 0) { controller.enqueue(heard) }
       })
     },
-    cancel: () => { unsubscribe() },
-  })
-  const reader = changes.getReader()
-  const iterator: AsyncIterableIterator<VaultScope> = {
-    next:   () => reader.read(),
+    cancel: () => { unwatch() },
+  }, { highWaterMark: Infinity })
+  const reader = heards.getReader()
+  const iterator: AsyncIterableIterator<SX.Heard> = {
+    next:   async () => await reader.read() as IteratorResult<SX.Heard>,
     return: async () => {
       await reader.cancel()
       return { done: true, value: undefined }
@@ -237,38 +153,5 @@ const changesOf = (vaultDB: ServedVaultDB, scope: VaultScope): AsyncIterableIter
   return iterator
 }
 
-const noUnsubscribing = (): void => undefined
-
-/** A refusal as the wire carries it: the VaultError's message and its kind as `extensions.kind`, and nothing more.
- * A GraphQL server sends its resolvers' GraphQLError unchanged, where it hides anything else
- * behind "Unexpected error" (Yoga) or sends its message as it is (Apollo). The VaultError rides
- * along as the error's unenumerable `cause`, for the server's logs: no GraphQL server sends a cause.
- * What a refusal learned (a record, how full a vault is) never rides in `extensions`, which
- * servers, gateways and APM tools log: {@link refusedBoxInBody} and {@link staleVaultRecordInBody} carry it in the body.
- */
-const crossing = (err: unknown): GraphQLError => {
-  const refusal = storageTroubleOf(err)
-  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind } })
-  // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
-  // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.
-  Object.defineProperty(crossed, 'cause', { value: refusal, configurable: true, writable: true })
-  return crossed
-}
-
-/** A refused write's answer, `landed` false with its kind and calm message, beside `learned`, what the refusal learned. */
-const refusedBody = (refusal: VaultError, learned: object) => ({ landed: false, refusalkind: refusal.refusalkind, message: refusal.message, ...learned })
-
-/** The body answering a box write refused as `stale_write` or `vault_full`, carrying the stored box or how full the vault is, whole as a read would send it; undefined for any other refusal, which crosses as an error. */
-const refusedBoxInBody = (refusal: VaultError): object | undefined => {
-  const { box_stored: boxStored, capacity } = refusal.meta ?? {}
-  if (boxStored !== undefined && refusal.refusalkind === 'stale_write') { return refusedBody(refusal, { box_stored: boxStored }) }
-  if (capacity !== undefined && refusal.refusalkind === 'vault_full') { return refusedBody(refusal, { capacity }) }
-  return undefined
-}
-
-/** The body answering an update of the vault record refused as `stale_write`, carrying the stored vault record, or null for none; undefined for any other refusal, which crosses as an error. */
-const staleVaultRecordInBody = (refusal: VaultError): object | undefined => {
-  const vaultStored = refusal.meta?.vault_stored
-  if (vaultStored !== undefined && refusal.refusalkind === 'stale_write') { return refusedBody(refusal, { vault_stored: vaultStored }) }
-  return undefined
-}
+const noUnwatching = (): void => undefined
+// --
