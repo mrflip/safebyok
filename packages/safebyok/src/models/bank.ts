@@ -11,7 +11,7 @@ import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import type { LockState } from '../shapes/shapes-enums'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
-import type { LeaseSparse } from '../shapes/shapes-storage'
+import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BadNewsHandler, BankOpts, BankSnapshot, BankStage, Panic, PanicHandler } from '../shapes/shapes-vaultish'
@@ -185,7 +185,7 @@ export class Bank {
   }
 
   /** This bank's rows among the cached leases proved before `cutoff`; a refused scan is bad news, and finds none. */
-  async #scanOwnLeasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
+  async #scanOwnLeasesProvedBefore(cutoff: number): Promise<LeaseDated[]> {
     const scan = await this.deviceDB.tryLeasesProvedBefore(cutoff)
     if (! scan.ok) {
       this.tellBadNews([scan.err])
@@ -202,7 +202,7 @@ export class Bank {
     await Promise.all(rows.map((row) => this.#eraseLease(row)))
   }
 
-  async #eraseLease(row: LeaseSparse): Promise<void> {
+  async #eraseLease(row: LeaseDated): Promise<void> {
     const vacated = await this.deviceDB.tryVacate(row)
     // As a vault's own panic tells it, but with no vault to vacate.
     if (! vacated.ok) { await this.panic(vacated.err) }
@@ -278,7 +278,7 @@ export class Bank {
 
   // == [Guards]: isOwnLease, demandReady
 
-  #isOwnLease({ applabel, user_id }: LeaseSparse): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
+  #isOwnLease({ applabel, user_id }: LeaseDated): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
 
   #demandReady(): void {
     if (this.#lastHello === null) { throw helloFirst() }

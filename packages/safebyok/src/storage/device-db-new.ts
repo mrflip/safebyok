@@ -6,7 +6,7 @@ import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { LeaseQuery, LeaseRow, LeaseSparse } from '../shapes/shapes-storage'
+import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
 /** SLOPDOC: A deviceDB's base: calls reach the store in order, only `peek` answers a `lease_key`, no verb logs one. */
 export abstract class DeviceDB {
@@ -39,13 +39,13 @@ export abstract class DeviceDB {
   tryVacate(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.vacate(asked)) }
 
   /** The cached leases, of any vault, proved before `cutoff`, oldest first, as scope, `vault_tok` and `proved_at` only. */
-  async leasesProvedBefore(cutoff: number): Promise<LeaseSparse[]> {
+  async leasesProvedBefore(cutoff: number): Promise<LeaseDated[]> {
     const before = SX.cutoff.parse(cutoff)
     const rows = await adapted('leasesProvedBefore', () => this.doLeasesProvedBefore(before))
-    return rows.flatMap((row) => { const parsed = SX.leaseSparse.safeParse(row); return parsed.success ? [parsed.data] : [] })
+    return rows.flatMap((row) => { const parsed = SX.leaseDated.safeParse(row); return parsed.success ? [parsed.data] : [] })
   }
 
-  tryLeasesProvedBefore(cutoff: number): Promise<Outcome<LeaseSparse[]>> { return outcomeOf(() => this.leasesProvedBefore(cutoff)) }
+  tryLeasesProvedBefore(cutoff: number): Promise<Outcome<LeaseDated[]>> { return outcomeOf(() => this.leasesProvedBefore(cutoff)) }
   // --
 
   // == [Protected, for a subclass to write]: doCache, doPeek, doVacate, doLeasesProvedBefore

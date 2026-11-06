@@ -281,19 +281,20 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [The deviceDB]: leaseQuery, leaseSparse, leaseRow, cutoff, LeaseQuery, LeaseSparse, LeaseRow
+// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, cutoff, LeaseQuery, LeaseDated, LeaseRow
 
 export const leaseQuery = Checker(({ obj, applabel, user_id, vaultlabel, vault_tok }) => obj({ applabel, user_id, vaultlabel, vault_tok }), 'bad_option', [CX])
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
-export const { leaseSparse, leaseRow } = Checkers('bad_option', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok }) => {
-  const leaseSparse = obj({ applabel, user_id, vaultlabel, vault_tok, proved_at: epochMillis })
-  return { leaseSparse, leaseRow: leaseSparse.loose() }
+export const { leaseDated, leaseRow } = Checkers('bad_option', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok }) => {
+  const leaseDated = obj({ applabel, user_id, vaultlabel, vault_tok, proved_at: epochMillis })
+  return { leaseDated, leaseRow: leaseDated.loose() }
 }, [CX])
 
 export const cutoff = Checker(({ epochMillis }) => epochMillis, 'bad_option')
 
 export type LeaseQuery   = Z.infer<typeof leaseQuery>
-export type LeaseSparse  = Z.infer<typeof leaseSparse>
+/** A cached lease as the deviceDB dates it: its query and its `proved_at`. */
+export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
 // --
