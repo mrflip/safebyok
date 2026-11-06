@@ -138,7 +138,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** SLOPDOC: The instance under `scope` as storage now holds it, built where none was held. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
-    const { ifAbsent = 'fail', maxWorldMillis } = VX.fetchOpts.parse(opts)
+    const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
     await this.ensureTimelyWorld(maxWorldMillis)
     this.demandEnabled()

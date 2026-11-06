@@ -105,8 +105,8 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   const horizonMillis = union([num.nonnegative(), lit(Infinity)])
   const maxMillis     = horizonMillis.optional()
   const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
-  const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.optional() })
-  const boxPutOpts    = timelyOpts.extend({ ifAbsent: putIfAbsent.optional(), ifPresent: ifPresent.optional() })
+  const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.default('fail') })
+  const boxPutOpts    = timelyOpts.extend({ ifAbsent: putIfAbsent.default('add'), ifPresent: ifPresent.default('repl') })
   const boxCreateOpts = timelyOpts.extend({ ifAbsent: lit('add').default('add'), ifPresent: ifPresent.default('fail') })
   const listener      = fn<() => void>()
   return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
@@ -116,10 +116,10 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
 export type TimelyOpts = Z.infer<typeof timelyOpts>
 
 /** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
-export type FetchOpts = Z.infer<typeof fetchOpts>
+export type FetchOpts = Z.input<typeof fetchOpts>
 
 /** `box.put`'s options: its {@link TimelyOpts}, and an upcreate unless `ifAbsent` or `ifPresent` says otherwise. */
-export type BoxPutOpts = Z.infer<typeof boxPutOpts>
+export type BoxPutOpts = Z.input<typeof boxPutOpts>
 
 /** `create`'s options: {@link BoxPutOpts}, with `ifPresent` defaulting to `fail`, and `ifAbsent` always `add`. */
 export type BoxCreateOpts = Z.input<typeof boxCreateOpts>

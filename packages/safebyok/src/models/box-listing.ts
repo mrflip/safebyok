@@ -78,7 +78,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
     const held = this.at(scoped)
     if (held === null) { return this.fetch(scoped, opts) }
-    const { ifAbsent = 'fail', ...timely } = VX.fetchOpts.parse(opts)
+    const { ifAbsent, ...timely } = VX.fetchOpts.parse(opts)
     return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
   }
 

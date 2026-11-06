@@ -139,7 +139,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** SLOPDOC: Refreshes this thing from storage through the listing, joining any fetch under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
-    const { ifAbsent = 'fail', maxWorldMillis } = VX.fetchOpts.parse(opts)
+    const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     this.#demandInstanceEnabled()
     await this.#oneFetchAtATime()

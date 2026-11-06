@@ -42,7 +42,7 @@ describe("The checks of options", () => {
 
     it("take their fields from the bag given and strip the rest", () => {
       expect(VX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
-      expect(VX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
+      expect(VX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5, ifAbsent: 'add', ifPresent: 'repl' })
     })
 
     it("name the failing field", () => {
@@ -57,7 +57,7 @@ describe("VX.ifAbsent and VX.fetchOpts", () => {
     ["fail",     true,  'passes fail'],
     ["nil",      true,  'passes nil'],
     ["create",   false, 'refuses create, which fetch does not offer'],
-    [undefined,  false, 'refuses undefined: the default is applied by the caller, not the check'],
+    [undefined,  false, 'refuses undefined: fetchOpts gives the default, not the check'],
   ])
 
   holdsCases(VX.fetchOpts, [
@@ -71,6 +71,10 @@ describe("VX.ifAbsent and VX.fetchOpts", () => {
 
   it("keeps ifAbsent and the timely options and strips the rest", () => {
     expect(VX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
+  })
+
+  it("fills a fetch's default: ifAbsent 'fail'", () => {
+    expect(VX.fetchOpts.parse({})).to.deep.equal({ ifAbsent: 'fail' })
   })
 })
 
@@ -95,7 +99,7 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],
     ["replace",  false, 'refuses replace, which it does not spell'],
-    [undefined,  false, 'refuses undefined: boxPutOpts makes it optional, not the check'],
+    [undefined,  false, 'refuses undefined: boxPutOpts gives the default, not the check'],
   ])
 
   holdsCases(VX.boxPutOpts, [
@@ -110,8 +114,8 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     expect(VX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add' })
   })
 
-  it("leaves the defaults to box.put: nothing given, nothing filled", () => {
-    expect(VX.boxPutOpts.parse({})).to.deep.equal({})
+  it("fills a put's defaults: ifAbsent 'add', ifPresent 'repl'", () => {
+    expect(VX.boxPutOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl' })
   })
 
   it("refuses a fetch's ifAbsent: 'nil' is no answer to a put", () => {
