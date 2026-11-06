@@ -10,8 +10,9 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 05:05: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4 (#523)
-filed on #513's tip; thread 11 (#525, `duck_calibration`, from a Coach note) built and in review; threads 5 to 10 wait for PRs #511 and #513 to
+**Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
+(#523) filed on #513's tip; thread 11 (#525) filed on main; every remaining thread waits on #511 and #513 reaching main
+(`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
 ## Read first
@@ -285,7 +286,7 @@ loses `.pick`/`.extend`/`.shape`, so widen only what the package exports and der
 one type; the wrap rule's list of host functions made open-ended, `onBadNews` being one too). Left: `Boxlabel` and the
 `Z.ZodType<T>` derivation question (thread 9); "never a type literal written out" is a new rule with instances in the code
 today (gating.ts:249); `ListingWorld` has no single class and thread 6 keeps it; "world" has two senses (Open Matters).
-Filing onto main.
+**Filed** at 781f7e625, as cut, on main.
 
 ## For the Coach
 

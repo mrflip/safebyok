@@ -5,14 +5,19 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06)
+## State (2026-11-06, 05:15: paused)
+
+The sprint is paused: every unstarted thread (5 to 10) waits on PRs #511 and #513 reaching `main`, which the Coach's
+queue line delivers. `human/20261106-sprint_reform_paused.md` says where each thread stands. Resume: when
+`git grep refusalkind origin/main -- packages/safebyok/src/helpers/validator.ts` hits and #513 is an ancestor of
+`origin/main`, cut thread 5 from `origin/main` and go on down the plan; thread 10 last from the top of the line.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
   core test is coming (plan, ground rule 10).
 * Thread 3 `example_pointers`: filed, PR #522 at 51741eb57; in the Coach's line.
 * Thread 4 `hello_listed`: filed, PR #523 at 895949623 on #513's current tip (not in the Coach's line).
-* Thread 11 `duck_calibration`: built, PR #525, in review (medium). **For thread 9:** a `Z.ZodType<T>` checker loses
+* Thread 11 `duck_calibration`: filed, PR #525 at 781f7e625, on main. **For thread 9:** a `Z.ZodType<T>` checker loses
   `.pick`/`.extend`/`.shape`: widen only what the package exports; the `Boxlabel` alias STYLE.md cites does not exist.
 * **The Coach keeps a merge line** (plan, ground rule 9): #513, #517, #521, #522, #512, #518, #519, #520, #511 in that
   order. #511 and #513 conflict with each other in `refusals/throwers.ts` and `tests/test-helpers/models-world.ts`; the
