@@ -7,7 +7,7 @@ import { hasModelkind, isDeviceDB, isGuarded, isVaultDB } from '../helpers/const
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
-import type { VaultLogger } from '../helpers/logger'
+import { type VaultLogger, isGuardedLogger } from '../helpers/logger'
 import type { Bank } from '../models/bank'
 import type { Listing } from '../models/listing'
 import type { Storable } from '../models/storable'
@@ -302,8 +302,8 @@ export type VaultSnapshot = VaultScope & Readonly<{
 export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
 /** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
-export const vaultWorld = Checker(({ custom, bankScope, loggerShape }) => listingWorld.extend({
-  ...GX.provingWorld.shape, scope: bankScope, logger: loggerShape, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
+export const vaultWorld = Checker(({ custom, bankScope }) => listingWorld.extend({
+  ...GX.provingWorld.shape, scope: bankScope, logger: custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
   askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected),
   panic:   custom<Panic>(isGuarded, Phrases.GuardedExpected),
 }), 'bad_option', [CX])

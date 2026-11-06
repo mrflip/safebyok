@@ -70,13 +70,14 @@ describe("VaultListing.build of a record, and its constructor", () => {
     TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'boxRefreshMillis'), opts))
   })
 
-  it("refuses a deviceDB that is a duck of one, and a host's bare function where the bank holds it wrapped", () => {
+  it("refuses a deviceDB that is a duck of one, and a host's bare function or logger where the bank holds it guarded", () => {
     const { fakeBank, opts } = makeVaultWorld()
     const duck = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn() }
     const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))
     expect(err.message).to.include(Phrases.DeviceDBExpected)
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, panic: vi.fn() as never }, opts))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, askUser: vi.fn() as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, logger: TH.quietLogger }, opts))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, keyDeriver: TH.testDeriver as never }, opts))
   })
 })

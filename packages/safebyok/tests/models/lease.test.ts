@@ -63,6 +63,7 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
     [() => ({ friend: { ...fakeLeaseFriendOf(), vault_tok: undefined } }),        'refuses a friend with no vault_tok'],
     [() => ({ friend: { ...fakeLeaseFriendOf(), tryUncacheLease: undefined } }),  'refuses a friend with no tryUncacheLease'],
     [() => ({ friend: { ...fakeLeaseFriendOf(), logger: undefined } }),           'refuses a friend with no logger'],
+    [() => ({ friend: { ...fakeLeaseFriendOf(), logger: TH.quietLogger } }),      'refuses a friend with a logger no bank guarded'],
   ] as const
 
   for (const [argsOf, blurb] of GrantRefusalCases) {

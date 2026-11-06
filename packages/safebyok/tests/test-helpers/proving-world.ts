@@ -19,6 +19,7 @@ import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/refusals/outcome'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { anyStrengthChecker, testDeriver } from './builders'
+import { parseLogger } from '../../src/helpers/logger'
 import { type LoggedCall, spyLogger } from './logging'
 import { T0 } from './models-world'
 
@@ -64,7 +65,7 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
     ...WorldStamp,
     leaseMillis:     FriendLeaseMillis,
     ...overrides,
-    logger,
+    logger:          parseLogger(logger),
     logged:          calls,
     cached:          null,
     lock:            vi.fn<() => void>(),

@@ -15,6 +15,7 @@ import type { Outcome } from '../../src/refusals/outcome'
 import { VaultListing } from '../../src/models/vault-listing'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import { parseLogger } from '../../src/helpers/logger'
 import { quietLogger } from './logging'
 import { passkeyOf } from './builders'
 import { type ProvingWorldGiven, provingWorldOf } from './proving-world'
@@ -128,7 +129,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     takeWorld:    nothing,
     tellBadNews:  nothing,
     scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
-    logger:       quietLogger,
+    logger:       parseLogger(quietLogger),
     ...provingWorldOf({ keyDeriver, strengthChecker, device_id }),
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,

@@ -7,6 +7,7 @@ import type { VaultError } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { PasskeySaltBytes, isGuarded } from '../helpers/consts'
+import { type VaultLogger, isGuardedLogger } from '../helpers/logger'
 import { type CipherCtxRecord, fromB64OrNull } from '../helpers/crypto'
 import type { GuardedStrengthChecker, StrengthChecker } from '../helpers/passphrase-strength'
 import type { Gating } from '../models/gating'
@@ -227,9 +228,9 @@ export type SealedWhisper = Z.infer<typeof sealedWhisper>
 export const leaseMillis = Checker(({ int, lit, union }) => union([int.positive(), lit(Infinity)]), 'bad_option')
 
 /** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
-export const leaseFriend = objCheck(({ fn }) => ({
+export const leaseFriend = objCheck(({ fn, custom }) => ({
   ...vaultStamp.shape,
-  logger:          CX.loggerShape,
+  logger:          custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected),
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
