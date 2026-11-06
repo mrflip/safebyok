@@ -1,6 +1,6 @@
 # Thread 9: port safebyok-fastkey to the new core (2026-11-06)
 
-Branch `20261106-port_fastkey`, PR pending, cut from main. Justify: green (safebyok 2272 tests, fastkey 49).
+Branch `20261106-port_fastkey`, PR #565, cut from main. Justify: green (safebyok 2272 tests, fastkey 49).
 
 * **Built**: `packages/safebyok-fastkey` imports the new core only: `VaultError` from `safebyok`; `Argon2idWebV1`, `parseKeyDeriverSpec`, `checkSaltFits`, `Argon2idKeyDeriver`, `KeyDeriverSpec` from `safebyok/browser`. `safebyok-old` is gone from its package.json (peer `safebyok: workspace:^`, dev `workspace:*`). Doc blocks rewritten to one line of purpose. Its tests run on the new core: the WASM-vs-JS byte agreement, the reference vector, the refusals-in-the-core's-words, the CSP/no-WebAssembly refusals, and the two-device vault tests rebuilt on `TH.makeBankWorld`.
 * **Core exports** (changeset, minor): `safebyok/browser` gained `Argon2idWebV1`, `parseKeyDeriverSpec`, `checkSaltFits` (value exports; the types were already there); `safebyok/testing` gained `makeBankWorld`, `makeBankWithVault`, `useBankWorlds`, `byPassphrase`, `Passphrase`, `VaultScopeGiven`, type `BankWorld`. `src/index.ts` is untouched.
