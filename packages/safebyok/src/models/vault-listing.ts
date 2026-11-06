@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
-import { type AddPasskeyParams, type BoxRow, type DelOpts, type PutOpts, type PutVaultOpts, type ReplacePassphraseParams, type RevokePasskeyParams, type VaultRow, type VaultRecord, type VaultSparse, vaultRecord, vaultSparse } from '../shapes/shapes-storage'
+import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import type { Answer, Notice } from '../storage/vault-db-new'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
@@ -52,9 +52,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */
   scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
-  sparseOf(duck: unknown): VaultSparse { return vaultSparse.parse(duck) }
+  sparseOf(duck: unknown): VaultSparse { return SX.vaultSparse.parse(duck) }
 
-  recordOf(duck: unknown): VaultRecord { return vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
+  recordOf(duck: unknown): VaultRecord { return SX.vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
   // --
 
   // == [A birth's forms]: stampOfBirth, recordOfBirth
