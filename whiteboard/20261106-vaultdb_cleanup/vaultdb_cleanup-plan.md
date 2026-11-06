@@ -83,6 +83,19 @@
   `#answerDelVaultRecord`). Repeated lines across verbs are fine; a frame, thunk or closure that
   hides what a verb returns or throws is not. No `#call`, `adapted`, `preparedOf`, `putTermsOf`,
   or a closure handed to a shared driver (`#moveGate`'s `wayinOf`).
+* **The decision tree in front, the construction behind** (the Coach, mid-sprint, verbatim):
+  "helpers that bring clarity are highly encouraged -- weighed against any indirection they
+  carry. For example: I don't need or want to see the details of how a stale_write error is
+  prepared; call refuseStaleWrite with everything it needs, all good. I *do* want to understand
+  the branch paths. inline or in an error handler, put the decision tree in front, delegating to
+  action plans:
+  `if (this.isImproperlyWirbled(row) ) { throw improperlyWirbled(...) }`
+  `if (this.isZerkMismatched(row) && ifZerked = 'fail') { throw zerkMismatched(...) }`"
+  A verb's branches are a flat run of `if (predicate) { throw refusal(...) }` /
+  `return this.#answerX(...)` lines up front; a helper may hide how a refusal or answer is built,
+  never a branch the caller should see.
+* **Exports are free** (the Coach): anything, large or small, may be exported from `safebyok` or
+  any package where it helps.
 * **Classify once, then branch on a non-null type.** A stored row is parsed by a checker that
   says what it is (void, gone, live, or damaged) before any branch, so no branch tests
   `stored?.am`. Build the checker variants you need with `refusingAs(kind)` or a `Checkers` call
