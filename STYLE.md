@@ -790,7 +790,7 @@ The gapped refusal list, the participial absolutes, and the option explained in 
 
 ```ts
 /** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'vault_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
-async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box>
+async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 ```
 
 ```ts
