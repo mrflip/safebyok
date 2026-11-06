@@ -265,7 +265,8 @@ export const storeFailed = (call: string, thrown: unknown): VaultError => {
 
 // == [Backend Throwers]: storageFailed, identityRevoked
 
-/** A storage backend's failure as `storage_unavailable`, naming the call and the thrown `name` and nothing else: a backend's error may quote the call's arguments. */
+// A backend's error may quote the call's arguments, so only its `name` is kept.
+/** A storage backend's failure as `storage_unavailable`, naming the call and the thrown `name` and nothing else. */
 export const storageFailed = (call: string, thrown: unknown): VaultError => {
   const thrownName = thrownNameOf(thrown)
   const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
