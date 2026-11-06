@@ -151,7 +151,6 @@ export const listingOpts = objCheck(() => ({
   maxMillisSinceRefresh: horizonMillis,
 }), 'bad_option')
 
-
 // --
 
 // == [Making a storable]: storableArgs
