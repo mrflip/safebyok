@@ -23,12 +23,16 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
   carries the core's names (rebase onto it, drop the duplicate `requestCleartextThrew` clause); the host-function
   paragraph still says all three guards reach `refusalFor`; only `invokeStrengthChecker` does. **For thread 8:** the
   values sweep's `ShapeModules` list wants a directory check; `KX` wants a row in STYLE's alias table.
-* Thread 15 `list_boxes`: built, PR #530 on #523, in review (high). **For threads 5 to 8:** `getBank` is `listVaults`,
+* Thread 15 `list_boxes`: reviewed `fixed` (PR #530 on #523); a rework adds the Coach's `takeWorld` note (the guard is
+  `Storable.receive`'s `otherVaultTok`); then a plain push, no `file-thread` (its base #523 is unmerged). Two behaviours
+  for the Coach: box verbs refuse `disabled` after a `vault_gone` hello; hello under a reborn vault refuses
+  `vault_mismatch` and leaves the swap to the watch. **For threads 5 to 8:** `getBank` is `listVaults`,
   `VaultListing.list()`/`BoxListing.list()`, `fetchListed`/`vaultRowOf`/`VX.boxesListed`/`_takeListed` gone; `takeWorld`
   parses and receives only. **For thread 6:** keep `takeWorld` on the `BoxWorld` Pick.
 * Thread 16 `utils_mash`: filed, PR #529 at c947caaf8 on #518 (plain push; in the line's territory). The core's
   `safebyok/utils` entry exists now; the root size budget has no new-core lines yet (a later thread adds them together).
-* Thread 17 `browser_entry`: building (sonnet) on #529: the new core's `./browser` entry with the Argon2id deriver.
+* Thread 17 `browser_entry`: built, PR #531 on #529, in review (low). `safebyok/browser` exports both Argon2id derivers
+  and the `KeyDeriver` types; thread 7 imports from there.
 * **Rulings of 06:40:** no change to the fate code (ground rule 14, restated); a one-line consistency guard in
   `takeWorld` after all (thread 15 rework); box size is checked, whisper size is not, as the code already does;
   `device_id` required-or-minted is an open question (the Coach recalls removing the mint; main still mints and caches).

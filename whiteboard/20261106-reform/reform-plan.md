@@ -386,7 +386,15 @@ changeset. **Levels:** worker `opus`; review `high`. **Depends on:** #523 (stack
 `takeWorld` lost its tok branch; a new `SX.vaultQuery` checker (+2). Deviations for the reviewer: `Refuse.vaultMismatch`
 answers `world: null` with the row in `dbhas`; #523's hello parse test removed with the parse; `getBox` after a
 `vault_gone` hello answers `disabled` (the vacated listing). Conflicts with #511 in five files, each "take #530's side,
-rename `damaged_records` to `damaged_rows`". In review (high, opus).
+rename `damaged_records` to `damaged_rows`".
+*Review (high, opus):* `fixed`; ground rule 14 held (`listing.ts`, `storable.ts` untouched; `takeWorld` deletions only);
+decision points down from about four to three; `world: null` on `vault_mismatch` is the smallest change (`deliver` calls
+`takeWorld` before it checks `ok`), `dbhas` keeps the row; three fixes (spies' whitespace, two titles, the changeset
+telling a host what `vault.hello` now refuses). Left: after a `vault_gone` hello the box verbs refuse `disabled` (new on
+the hello path; Open Matters); a reborn vault is not swapped in by hello, the watch heals it (Open Matters, Rec accept);
+the two `list()` tails repeat; new exports without doc blocks; `BankListed` to `VaultsListed` later. *Rework:* the
+Coach's consistency guard; `Storable.receive` already throws `otherVaultTok` one call down, so a `//` line in `takeWorld`
+names it rather than duplicating it.
 
 ### 16. `utils_mash`
 
@@ -411,6 +419,11 @@ deriver(s) from `deriver/`, and the strength checker if the new core has one, ne
 `TestDeriverNotice` reworded if it names the import. No `browserOpts` bag unless it ports in a few lines (the IndexedDB
 device DB is an adapter package on the old core). Minor changeset. **Levels:** worker `sonnet`; review `low`. **Depends
 on:** #529 (stacked; in the line's territory, plain pushes only). **Size:** small.
+
+*Built (PR #531):* `src/browser.ts` exports `argon2idDeriver`, `argon2idWebV1Deriver` and the `KeyDeriver` types, wired
+as `./utils`; three tests, one that neither deriver is on the front door; `TestDeriverNotice` names `safebyok/browser`;
+no `browserOpts` (no zxcvbn checker in the new core; the IndexedDB device DB is an adapter). The split never had the
+deriver on the front door. In review (low).
 
 ## For the Coach
 
