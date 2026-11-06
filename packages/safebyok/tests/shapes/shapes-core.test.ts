@@ -89,6 +89,15 @@ describe("whisper", () => {
     it(blurb, () => { expect(CX.whisper.safeParse(candidate).success).to.eq(expected) })
   }
 
+  // whisper @example
+  it("passes an object and null inside one, and refuses a bare string, a Date and a bare null", () => {
+    expect(CX.whisper.parse({ apiKey: 'sk-ant-fake' })).to.deep.equal({ apiKey: 'sk-ant-fake' })
+    expect(CX.whisper.safeParse('sk-ant-fake').success).to.be.false
+    expect(CX.whisper.safeParse(new Date()).success).to.be.false
+    expect(CX.whisper.safeParse(null).success).to.be.false
+    expect(CX.whisper.safeParse({ orgId: null }).success).to.be.true
+  })
+
   it("hands back the value unchanged when it passes", () => {
     const bag = { apiKey: 'fake', scopes: ['read', 'write'] }
     expect(CX.whisper.parse(bag)).to.deep.equal(bag)
@@ -129,7 +138,8 @@ describe("sidecar", () => {
     it(blurb, () => { expect(CX.sidecar.safeParse(candidate).success).to.eq(expected) })
   }
 
-  it("passes the examples its doc block shows", () => {
+  // sidecar @example
+  it("passes an object, and refuses a Date inside one and a bare string", () => {
     expect(CX.sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
     expect(CX.sidecar.safeParse({ when: new Date() }).success).to.be.false
     expect(CX.sidecar.safeParse('work account').success).to.be.false
@@ -147,7 +157,7 @@ describe("sidecar", () => {
 const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
 
 describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
-  // CX.vaultScope @example 1
+  // CX.vaultScope @example
   it("hand back a frozen copy of the scope a record carries, its other fields left out", () => {
     const vault = { ...scope, vault_tok: 'tok', format: 'safebyok-vault-v1', lock: () => null }
     const parsed = CX.vaultScope.parse(vault)
@@ -174,7 +184,6 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
     expect(CX.vaultScope.parse(new Holder())).to.deep.equal(scope)
   })
 
-  // CX.boxscope @example 2
   it("refuse a bad boxlabel, naming the field", () => {
     const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' }), 'bad_scope')
     expect(err.message).to.match(/^boxlabel: A label is lowercase words/)
@@ -212,6 +221,20 @@ const ScopeCases = [
   [{ ...TH.scopeOf('u1'), applabel: 42 },             false,  'an applabel that is not text'],
   [{ applabel: 'acme', user_id: 'u1' },              false,  'a scope missing its vaultlabel'],
 ] as const
+
+describe("bankedVaultScope", () => {
+  it("takes a vaultlabel alone, or the names a Vault object carries, leaving the rest", () => {
+    expect(CX.bankedVaultScope.parse({ vaultlabel: 'main' })).to.deep.equal({ vaultlabel: 'main' })
+    expect(CX.bankedVaultScope.parse({ ...scope, vault_tok: 'tok', lock: () => null })).to.deep.equal(scope)
+  })
+
+  // bankedVaultScope @example
+  it("refuses a store in the scope, which belongs in the options", () => {
+    const err = TH.expectSyncRefusal(() => CX.bankedVaultScope.parse({ vaultlabel: 'main', vaultDB: {} }), 'bad_scope')
+    expect(err.message).to.contain(Phrases.StoreInVaultScope)
+    expect(err.meta?.fieldnames).to.deep.equal(['vaultDB'])
+  })
+})
 
 describe("vaultScope", () => {
   for (const [candidate, expected, blurb] of ScopeCases) {

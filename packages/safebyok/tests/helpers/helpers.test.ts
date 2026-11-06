@@ -6,7 +6,6 @@ type Handle = { label: string, vault?: { vault_tok: string } }
 const decorated = () => decorate<Handle>({ label: 'anthropic' }, { vault: { vault_tok: 'v1' } })
 
 describe("adorn", () => {
-  // adorn @example 1
   it("attaches the value under its name, hidden, and hands the value back", () => {
     const handle = { label: 'anthropic' }
     const vault = { vault_tok: 'v1' }
@@ -16,7 +15,7 @@ describe("adorn", () => {
     expect(JSON.stringify(handle)).to.eq('{"label":"anthropic"}')
   })
 
-  // adorn @example 2
+  // adorn @example
   it("lets a getter attach what it works out on the first read, which every later read finds in its place", () => {
     let workedOut = 0
     class Labelled {
@@ -35,14 +34,12 @@ describe("adorn", () => {
 })
 
 describe("decorate", () => {
-  // decorate @example
   it("attaches each entry, readable by name, and hands the object back", () => {
     const handle: Handle = { label: 'anthropic' }
     expect(decorate(handle, { vault: { vault_tok: 'v1' } })).to.equal(handle)
     expect(handle.vault).to.deep.equal({ vault_tok: 'v1' })
   })
 
-  // decorate @example
   it("hides what it attaches from keys, a spread and JSON", () => {
     const handle = decorated()
     expect(Object.keys(handle)).to.deep.equal(['label'])
@@ -124,7 +121,6 @@ describe("tattoo", () => {
 })
 
 describe("tattooProp", () => {
-  // tattooProp @example
   it("attaches one value as an enumerable own prop and hands it back", () => {
     const handle = { label: 'anthropic' }
     expect(tattooProp(handle, 'vault_tok', 'v1')).to.eq('v1')
@@ -142,7 +138,6 @@ describe("tattooProp", () => {
 })
 
 describe("nextMicrotask", () => {
-  // nextMicrotask @example
   it("resolves once every microtask queued before it has run", async () => {
     const heard: string[] = []
     queueMicrotask(() => { heard.push('queued before') })

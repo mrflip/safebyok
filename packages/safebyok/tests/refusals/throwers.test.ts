@@ -37,7 +37,6 @@ describe("Refusals.storageUnavailable", () => {
 })
 
 describe("Refusals.unexpectedError", () => {
-  // Refusals.unexpectedError @example
   it("makes a misuse refusal of a bug, the thrown value its cause", () => {
     const thrown = new TypeError("Cannot read properties of undefined (reading 'wayins')")
     const err = Refusals.unexpectedError(thrown)

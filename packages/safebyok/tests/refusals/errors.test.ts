@@ -67,7 +67,7 @@ describe("VaultError", () => {
     expect(Object.keys(err)).to.have.members(['name', 'refusalkind', 'family', 'meta'])
   })
 
-  // VaultError @example 2
+  // VaultError @example
   it("lets a caller branch on family", () => {
     const err = new VaultError('bad_record', 'Not one this package builds.')
     expect(err.family).to.eq('misuse')
@@ -83,7 +83,7 @@ describe("RefusalFamilyForKind", () => {
     expect([...new Set(Object.values(RefusalFamilyForKind))]).to.have.members([...refusalFamilyVals])
   })
 
-  it("matches the @examples", () => {
+  it("sorts each kind into its family", () => {
     expect(RefusalFamilyForKind.bad_option).to.eq('misuse')
     expect(RefusalFamilyForKind.bad_record).to.eq('misuse')
     expect(RefusalFamilyForKind.storage_unavailable).to.eq('condition')
@@ -165,7 +165,8 @@ describe("isCondition", () => {
     expect(err.message).to.eq('The vault storage could not be reached.')
   })
 
-  it("matches the @example: a condition is shown, anything else is rethrown", () => {
+  // isCondition @example
+  it("lets a caller show a condition and rethrow anything else", () => {
     const shown: string[] = []
     const handle = (err: unknown) => {
       if (! isCondition(err)) { throw err }
@@ -230,14 +231,13 @@ describe("listedKindOf", () => {
 })
 
 describe("thrownNameOf", () => {
-  // thrownNameOf @example 1
+  // thrownNameOf @example
   it("is the name an Error, a DOMException or a bare object carries", () => {
     expect(thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))).to.eq('QuotaExceededError')
     expect(thrownNameOf(new TypeError('hunter2 is not a function'))).to.eq('TypeError')
     expect(thrownNameOf({ name: 'SecurityError', message: 'from another frame' })).to.eq('SecurityError')
   })
 
-  // thrownNameOf @example 2
   it("is null for anything without a string name", () => {
     expect(thrownNameOf('a bare string')).to.be.null
     expect(thrownNameOf(null)).to.be.null

@@ -34,7 +34,7 @@ describe("parseLogger", () => {
     })
   }
 
-  // parseLogger @example 2
+  // parseLogger @example
   it("falls back to the console when given none", () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     parseLogger(undefined).warn('a refresh failed', { call: 'refresh' })
@@ -42,14 +42,12 @@ describe("parseLogger", () => {
     warn.mockRestore()
   })
 
-  // parseLogger @example 3
   it("answers the one default logger, DefaultLogger, whenever it is given none or null", () => {
     expect(parseLogger(undefined)).to.eq(DefaultLogger)
     expect(parseLogger(null)).to.eq(DefaultLogger)
     expect(parseLogger(DefaultLogger)).to.eq(DefaultLogger)
   })
 
-  // parseLogger @example 4
   it("guards the same host logger as the same object, however often it is handed in", () => {
     const telemetry = TH.spyLogger().logger
     expect(parseLogger(telemetry)).to.eq(parseLogger(parseLogger(telemetry)))
@@ -149,7 +147,6 @@ describe("parseLogger", () => {
 describe("setDefaultLogger", () => {
   afterEach(() => { setDefaultLogger(undefined) })
 
-  // setDefaultLogger @example 1
   it("sends what the default logger hears to the app's own, a fallback taken before the call included", () => {
     const fallback = parseLogger(undefined)
     const telemetry = TH.spyLogger()
@@ -159,7 +156,6 @@ describe("setDefaultLogger", () => {
     expect(telemetry.calls.map((call) => [call.level, call.message])).to.deep.equal([['warn', 'a refresh failed'], ['error', 'a listener threw']])
   })
 
-  // setDefaultLogger @example 2
   it("puts the console back when given none or null", () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => { /* kept out of the test output */ })
     for (const none of [undefined, null]) {
