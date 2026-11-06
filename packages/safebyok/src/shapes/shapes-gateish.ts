@@ -30,8 +30,7 @@ export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_sa
 
 // == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
 
-export const passphraseWayinRecord = SX.passphraseWayin.refusingAs('bad_record')
-export const passkeyWayinRecord    = SX.passkeyWayin.refusingAs('bad_record')
+export const { passphraseWayin: passphraseWayinRecord, passkeyWayin: passkeyWayinRecord } = SX
 
 export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
   const passphraseWayinHeader = SX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
