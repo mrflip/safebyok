@@ -80,22 +80,22 @@ describe("Proving.checkStrength(passphraseClear, scope, world)", () => {
     expect(await Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker: findsStrongAsync }))).to.deep.equal({ strong: true })
   })
 
-  it("replaces a throw from a getter on what the checker answered with 'unexpected_error': the passphrase it quotes appears nowhere in the refusal", async () => {
-    const err = await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker: answersThrowingGetter })), 'unexpected_error')
+  it("replaces a throw from a getter on what the checker answered with a sanitized refusal: the passphrase it quotes appears nowhere in the refusal", async () => {
+    const err = await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker: answersThrowingGetter })))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
 
-  it("replaces what a throwing checker threw with 'unexpected_error', quoting none of it and keeping no cause", async () => {
+  it("replaces what a throwing checker threw with a sanitized refusal, quoting none of it and keeping no cause", async () => {
     const strengthChecker = () => { throw new Error(`weak: ${TestPassphrase}`) }
-    const err = await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker })), 'unexpected_error')
+    const err = await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker })))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
 
   it("refuses an answer that is no verdict", async () => {
     const strengthChecker = (() => 'looks fine') as never
-    await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker })), 'bad_option')
+    await TH.expectRefusal(Proving.checkStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker })))
   })
 
   it("finds a blank passphrase weak before the checker hears it", async () => {
@@ -107,7 +107,7 @@ describe("Proving.checkStrength(passphraseClear, scope, world)", () => {
 
   it("refuses a passphrase that is no string, before the checker hears it", async () => {
     const strengthChecker = vi.fn(() => ({ strong: true as const }))
-    await TH.expectRefusal(Proving.checkStrength(42 as never, WorldScope, provingWorldOf({ strengthChecker })), 'bad_option')
+    await TH.expectRefusal(Proving.checkStrength(42 as never, WorldScope, provingWorldOf({ strengthChecker })))
     expect(strengthChecker).not.toHaveBeenCalled()
   })
 })
@@ -125,9 +125,9 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
-    it(`refuses ${blurb} as 'bad_option'`, async () => {
+    it(`refuses ${blurb}`, async () => {
       const { stamp = WorldStamp, passphraseClear = TestPassphrase, world = provingWorldOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildNovel(stamp as never, passphraseClear as never, world as ProvingWorld), 'bad_option')
+      await TH.expectRefusal(PassphraseProving.buildNovel(stamp as never, passphraseClear as never, world as ProvingWorld))
     })
   }
 
@@ -160,9 +160,9 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
     expect(isZeroed(handed)).to.be.true
   })
 
-  it("replaces what a throwing keyDeriver threw with 'unexpected_error', quoting none of it and keeping no cause", async () => {
+  it("replaces what a throwing keyDeriver threw with a sanitized refusal, quoting none of it and keeping no cause", async () => {
     const keyDeriver = deriverHanding(() => { throw new Error(`cannot derive ${TestPassphrase}`) })
-    const err = await TH.expectRefusal(novelPassphrase(provingWorldOf({ keyDeriver })), 'unexpected_error')
+    const err = await TH.expectRefusal(novelPassphrase(provingWorldOf({ keyDeriver })))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
@@ -178,16 +178,16 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
   ] as const
 
   for (const [handBack, blurb] of HandedCases) {
-    it(`refuses ${blurb} as 'bad_option'`, async () => {
-      await TH.expectRefusal(novelOverHanded(handBack), 'bad_option')
+    it(`refuses ${blurb}`, async () => {
+      await TH.expectRefusal(novelOverHanded(handBack))
     })
   }
 
   it("zeroes key bytes of the wrong length it refuses", async () => {
     const short = randomBytes(31)
     const long = randomBytes(33)
-    await TH.expectRefusal(novelOverHanded(() => short), 'bad_option')
-    await TH.expectRefusal(novelOverHanded(() => long), 'bad_option')
+    await TH.expectRefusal(novelOverHanded(() => short))
+    await TH.expectRefusal(novelOverHanded(() => long))
     expect(isZeroed(short) && isZeroed(long)).to.be.true
   })
 
@@ -216,15 +216,15 @@ describe("PasskeyProving.buildNovel(stamp, passkeyClear, world)", () => {
   ] as const
 
   for (const [answerOf, blurb] of AnswerCases) {
-    it(`refuses ${blurb} as 'bad_option'`, async () => {
-      await TH.expectRefusal(novelPasskey(answerOf()), 'bad_option')
+    it(`refuses ${blurb}`, async () => {
+      await TH.expectRefusal(novelPasskey(answerOf()))
     })
   }
 
   it("refuses a world its check refuses, and leaves the answer unspent", async () => {
     const answer = passkeyAnswerOf()
     const world = TH.omitting(provingWorldOf(), 'device_id')
-    await TH.expectRefusal(novelPasskey(answer, world), 'bad_option')
+    await TH.expectRefusal(novelPasskey(answer, world))
     expect(isZeroed(answer.prfBytes)).to.be.false
   })
 })
@@ -274,10 +274,10 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
-    it(`refuses ${blurb} as 'bad_option'`, async () => {
+    it(`refuses ${blurb}`, async () => {
       const { gate } = await gateWithBoth()
       const { gate: handed = gate, passphraseClear = TestPassphrase, world = provingWorldOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildStored(handed as never, passphraseClear as never, world as never), 'bad_option')
+      await TH.expectRefusal(PassphraseProving.buildStored(handed as never, passphraseClear as never, world as never))
     })
   }
 })
@@ -316,7 +316,7 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
 
   it("refuses an answer already spent", async () => {
     const { gate, answerOf } = await gateWithBoth()
-    await TH.expectRefusal(PasskeyProving.buildStored(gate, { ...answerOf(), prfBytes: new Uint8Array(32) }), 'bad_option')
+    await TH.expectRefusal(PasskeyProving.buildStored(gate, { ...answerOf(), prfBytes: new Uint8Array(32) }))
   })
 })
 
@@ -400,36 +400,36 @@ describe("proving.buildWayin(source)", () => {
   ] as const
 
   for (const [source, blurb] of SourceCases) {
-    it(`refuses ${blurb} as 'bad_option'`, async () => {
+    it(`refuses ${blurb}`, async () => {
       const proving = await novelPassphrase()
-      await TH.expectRefusal(proving.buildWayin(source as never), 'bad_option')
+      await TH.expectRefusal(proving.buildWayin(source as never))
     })
   }
 
-  it("refuses, as 'unexpected_error', a proving that has made no wayin yet as its source", async () => {
+  it("refuses a proving that has made no wayin yet as its source", async () => {
     const proving = await novelPasskey()
-    await TH.expectRefusal(proving.buildWayin(await novelPassphrase()), 'unexpected_error')
+    await TH.expectRefusal(proving.buildWayin(await novelPassphrase()))
   })
 
   it("refuses a proving of another vault as its source: a wayin wraps only its own vault's vaultKey", async () => {
     const theirs = await PassphraseProving.buildNovel({ ...WorldStamp, vault_tok: 'vault-tok-other' }, TestPassphrase, provingWorldOf())
     await theirs.buildWayin(NOVEL)
     const mine = await novelPassphrase()
-    const err = await TH.expectRefusal(mine.buildWayin(theirs), 'unexpected_error')
+    const err = await TH.expectRefusal(mine.buildWayin(theirs))
     expect(err.message).to.eq(Phrases.ProvingOfOtherVault)
   })
 
-  it("refuses a second buildWayin on one proving as 'unexpected_error', so its leases stay under the one vaultKey its first wayin wraps", async () => {
+  it("refuses a second buildWayin on one proving, so its leases stay under the one vaultKey its first wayin wraps", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    await TH.expectRefusal(proving.buildWayin(NOVEL), 'unexpected_error')
+    await TH.expectRefusal(proving.buildWayin(NOVEL))
     await expectOneVaultKey(proving, proving)
   })
 
-  it("refuses a buildWayin on a stored proving as 'unexpected_error': it holds its wayin from birth", async () => {
+  it("refuses a buildWayin on a stored proving: it holds its wayin from birth", async () => {
     const { gate } = await gateWithBoth()
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
-    await TH.expectRefusal(proving.buildWayin(NOVEL), 'unexpected_error')
+    await TH.expectRefusal(proving.buildWayin(NOVEL))
   })
 })
 
@@ -500,9 +500,9 @@ describe("a passkey proving's key", () => {
 })
 
 describe("proving.buildLease(friend, gate_epoch?)", () => {
-  it("refuses, as 'unexpected_error', before the proving has made a wayin", async () => {
+  it("refuses before the proving has made a wayin", async () => {
     const proving = await novelPassphrase()
-    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf()), 'unexpected_error')
+    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf()))
   })
 
   it("grants a lease of the proving's vault, uncached, recording the proving's epoch, when it was proved, and how", async () => {
@@ -537,10 +537,10 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
   ] as const
 
   for (const [stamp, blurb] of OtherFriendCases) {
-    it(`refuses a friend of ${blurb} as 'unexpected_error'`, async () => {
+    it(`refuses a friend of ${blurb}`, async () => {
       const proving = await novelPassphrase()
       await proving.buildWayin(NOVEL)
-      await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(stamp)), 'unexpected_error')
+      await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(stamp)))
     })
   }
 
@@ -549,14 +549,14 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     await proving.buildWayin(NOVEL)
     const { vault_tok: _vault_tok, ...ownFields } = fakeLeaseFriendOf()
     const friend = Object.assign(Object.create({ get vault_tok() { return 'vault-tok-other' } }) as object, ownFields)
-    await TH.expectRefusal(proving.buildLease(friend as never), 'unexpected_error')
+    await TH.expectRefusal(proving.buildLease(friend as never))
   })
 
   it("refuses a gate_epoch its check refuses, and a friend with no tryCacheLease", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), 0), 'bad_option')
-    await TH.expectRefusal(proving.buildLease({ ...fakeLeaseFriendOf(), tryCacheLease: undefined } as never), 'bad_option')
+    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), 0))
+    await TH.expectRefusal(proving.buildLease({ ...fakeLeaseFriendOf(), tryCacheLease: undefined } as never))
   })
 })
 

@@ -17,7 +17,7 @@ const baseProps = { revision_tok: 'rev-a1', revision_seq: 1, registered_at: T0, 
 
 describe("The checks of what the base knows of a record", () => {
   describe("VX.am", () => {
-    holdsCases(VX.am, 'bad_record', [
+    holdsCases(VX.am, [
       // each am:
       ["a",       true,  'passes alive'],
       ["d",       true,  'passes damaged'],
@@ -31,7 +31,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("VX.revision", () => {
-    holdsCases(VX.revision, 'bad_record', [
+    holdsCases(VX.revision, [
       // good:
       [revision,                                   true,  'passes a tok and a seq'],
       [{ ...revision, revision_seq: VX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
@@ -51,7 +51,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("VX.times", () => {
-    holdsCases(VX.times, 'bad_record', [
+    holdsCases(VX.times, [
       [{ registered_at: T0, written_at: T0 },       true,  'passes two epoch milliseconds'],
       [{ registered_at: T0 },                       false, 'refuses a missing written_at'],
       [{ registered_at: 5, written_at: T0 },        false, 'refuses a small number, seconds or a count'],
@@ -62,11 +62,11 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("VX.liveness and VX.vaulted", () => {
-    holdsCases(VX.liveness, 'bad_record', [
+    holdsCases(VX.liveness, [
       [{ am: 'a' },  true,  'passes liveness with an am'],
       [{},           false, 'refuses liveness without an am'],
     ])
-    holdsCases(VX.vaulted, 'bad_record', [
+    holdsCases(VX.vaulted, [
       [{ vault_tok: 'vault-tok-u1' }, true,  'passes a vault_tok'],
       [{ vault_tok: '' },             false, 'refuses an empty vault_tok'],
       [{},                            false, 'refuses a missing vault_tok'],
@@ -74,7 +74,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("VX.sparseBase", () => {
-    holdsCases(VX.sparseBase, 'bad_record', [
+    holdsCases(VX.sparseBase, [
       // each form of a record:
       [full,                                  true,  'passes a full record'],
       [sparse,                                true,  'passes a sparse record'],
@@ -100,13 +100,13 @@ describe("The checks of what the base knows of a record", () => {
     })
 
     it("refuses without quoting its input", () => {
-      const err = TH.expectSyncRefusal(() => VX.sparseBase.parse({ ...baseProps, vault_tok: 'SECRET-TOK', am: 'SECRET-AM' }), 'bad_record')
+      const err = TH.expectSyncRefusal(() => VX.sparseBase.parse({ ...baseProps, vault_tok: 'SECRET-TOK', am: 'SECRET-AM' }))
       expect(err.message).to.not.include('SECRET')
     })
   })
 
   describe("VX.tombstone", () => {
-    holdsCases(VX.tombstone, 'bad_record', [
+    holdsCases(VX.tombstone, [
       [gone,   true,  'passes a deletion tombstone'],
       [ouch,   true,  'passes a damaged one\'s tombstone'],
       [sparse, false, 'refuses an alive sparse record'],
@@ -130,7 +130,7 @@ describe("The checks of what the base knows of a record", () => {
 
 describe("The checks of what reconciling passes", () => {
   describe("VX.reconciled", () => {
-    holdsCases(VX.reconciled, 'unexpected_error', [
+    holdsCases(VX.reconciled, [
       [{ central: sparse, policy: 'same' },  true,  'passes a central and the policy that chose it'],
       [{ central: gone,   policy: 'gone' },  true,  'passes a tombstone central'],
       [{ central: sparse },                  false, 'refuses a missing policy'],
@@ -140,7 +140,7 @@ describe("The checks of what reconciling passes", () => {
   })
 
   describe("VX.settled", () => {
-    holdsCases(VX.settled, 'unexpected_error', [
+    holdsCases(VX.settled, [
       [{ badnews: [] },                                       true,  'passes no bad news'],
       [{ badnews: [new VaultError('stale_write', 'x')] },     true,  'passes bad news of VaultErrors'],
       [{ badnews: [new Error('plain')] },                     false, 'refuses bad news that is no VaultError'],

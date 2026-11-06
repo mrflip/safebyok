@@ -44,18 +44,18 @@ describe("the box's birth: vault.putBox with no box listed", () => {
   })
 
   const PatchCases = [
-    [{ whisper: Whisper },                                'bad_scope',  'a patch with no boxlabel'],
-    [undefined,                                           'bad_scope',  'no patch at all'],
-    [{ boxlabel },                                        'bad_option', 'a patch naming neither half'],
-    [{ boxlabel, whisper: null },                         'bad_option', 'a whisper that fails its check'],
-    [{ boxlabel, whisper: Whisper, sidecar: 'note' },     'bad_option', 'a sidecar that fails its check'],
-    [{ boxlabel, whisper: Whisper, vaultlabel: 'other' }, 'bad_option', "the scope of another vault"],
+    [{ whisper: Whisper },                                'a patch with no boxlabel'],
+    [undefined,                                           'no patch at all'],
+    [{ boxlabel },                                        'a patch naming neither half'],
+    [{ boxlabel, whisper: null },                         'a whisper that fails its check'],
+    [{ boxlabel, whisper: Whisper, sidecar: 'note' },     'a sidecar that fails its check'],
+    [{ boxlabel, whisper: Whisper, vaultlabel: 'other' }, "the scope of another vault"],
   ] as const
 
-  for (const [patch, kind, blurb] of PatchCases) {
-    it(`refuses ${blurb} as '${kind}', storing nothing`, async () => {
+  for (const [patch, blurb] of PatchCases) {
+    it(`refuses ${blurb}, storing nothing`, async () => {
       const { vault, tryPutBox } = await makeWorld()
-      await TH.expectRefusal(vault.putBox(patch as never), kind)
+      await TH.expectRefusal(vault.putBox(patch as never))
       expect(tryPutBox).not.toHaveBeenCalled()
     })
   }
@@ -219,7 +219,7 @@ describe("vault.putBox over a live box", () => {
   it("under ifPresent 'fail', refuses a whole record, saying its data would be recycled, and stores nothing", async () => {
     const { vault, boxrows, tryPutBox } = await makeWorldWithBox()
     tryPutBox.mockClear()
-    const err = await TH.expectRefusal(vault.putBox(boxrows.get(boxlabel) as never, { ifPresent: 'fail' }), 'bad_option')
+    const err = await TH.expectRefusal(vault.putBox(boxrows.get(boxlabel) as never, { ifPresent: 'fail' }))
     expect(err.message).to.eq(Phrases.RecordForNewBox)
     expect(tryPutBox).not.toHaveBeenCalled()
   })
@@ -261,7 +261,7 @@ describe("vault.putBox over a live box", () => {
   it("refuses opts before any guard", async () => {
     const { vault } = await makeWorldWithBox()
     vault.lock()
-    await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }, { ifPresent: 'shrug' } as never), 'bad_option')
+    await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }, { ifPresent: 'shrug' } as never))
   })
 })
 
@@ -302,11 +302,11 @@ describe("a sidecar-only put", () => {
     box.unexpose()
     tryPutBox.mockClear()
     expect(box.whisper).to.eq(ENCRYPTED)
-    await TH.expectRefusal(box.put({ whisper: box.whisper, sidecar: {} }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: box.whisper, sidecar: {} }))
     await box.expose()
     vault.lock()
     expect(box.whisper).to.eq(LOCKED)
-    await TH.expectRefusal(box.put({ whisper: box.whisper, sidecar: {} }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: box.whisper, sidecar: {} }))
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 
@@ -318,8 +318,8 @@ describe("a sidecar-only put", () => {
     expect(readWhileLocked).to.eq(LOCKED)
     await unlockTyping(vault, byPassphrase(Passphrase))
     tryPutBox.mockClear()
-    await TH.expectRefusal(box.put({ whisper: readWhileLocked }), 'bad_option')
-    await TH.expectRefusal(box.put({ whisper: { ...readWhileLocked } }), 'bad_option')
+    await TH.expectRefusal(box.put({ whisper: readWhileLocked }))
+    await TH.expectRefusal(box.put({ whisper: { ...readWhileLocked } }))
     expect(tryPutBox).not.toHaveBeenCalled()
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })

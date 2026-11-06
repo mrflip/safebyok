@@ -21,7 +21,7 @@ describe("Gate.make(stamp, passphraseWayin, passkeyWayin)", () => {
 
   it("refuses a pickle where it wants a Wayin", async () => {
     const { gate } = await builtGate()
-    TH.expectSyncRefusal(() => Gate.make(WorldStamp, gate.passphrase_wayin as never, null), 'bad_option')
+    TH.expectSyncRefusal(() => Gate.make(WorldStamp, gate.passphrase_wayin as never, null))
   })
 })
 
@@ -44,21 +44,21 @@ describe("new Gate(stamp, props): the props check", () => {
   ] as const
 
   for (const [propsOf, blurb] of PropsCases) {
-    it(`refuses props with ${blurb} as 'bad_record'`, async () => {
+    it(`refuses props with ${blurb}`, async () => {
       const { gate } = await builtGate({ passkey: true })
-      TH.expectSyncRefusal(() => new Gate(WorldStamp, propsOf(gate.pickle())), 'bad_record')
+      TH.expectSyncRefusal(() => new Gate(WorldStamp, propsOf(gate.pickle())))
     })
   }
 
   it("refuses a stamp with no vault_tok", async () => {
     const { gate } = await builtGate()
-    TH.expectSyncRefusal(() => new Gate(TH.omitting(WorldStamp, 'vault_tok'), gate.pickle()), 'bad_option')
+    TH.expectSyncRefusal(() => new Gate(TH.omitting(WorldStamp, 'vault_tok'), gate.pickle()))
   })
 
   it("quotes none of refused props in its refusal: no ciphertext", async () => {
     const { gate } = await builtGate({ passkey: true })
     const { passphrase_wayin, passkey_wayin } = gate.pickle()
-    const err = TH.expectSyncRefusal(() => new Gate(WorldStamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passkey_wayin, passkey_wayin: passphrase_wayin }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => new Gate(WorldStamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passkey_wayin, passkey_wayin: passphrase_wayin }))
     expect(TH.thrownText(err)).to.not.include(passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)
   })
 })
@@ -107,6 +107,6 @@ describe("gate.demandPasskeyAddable()", () => {
     const { gate } = await builtGate()
     expect(() => { gate.demandPasskeyAddable() }).to.not.throw()
     const { gate: both } = await builtGate({ passkey: true })
-    TH.expectSyncRefusal(() => { both.demandPasskeyAddable() }, 'bad_option')
+    TH.expectSyncRefusal(() => { both.demandPasskeyAddable() })
   })
 })

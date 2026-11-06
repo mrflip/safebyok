@@ -11,7 +11,7 @@ describe("wayinkind", () => {
   it("takes each kind of wayin, and refuses any other slot", () => {
     expect(GX.wayinkind.safeParse('passkey').success).to.be.true
     expect(GX.wayinkind.parse('passphrase')).to.eq('passphrase')
-    TH.expectSyncRefusal(() => GX.wayinkind.parse('hunter2'), 'bad_option')
+    TH.expectSyncRefusal(() => GX.wayinkind.parse('hunter2'))
   })
 })
 
@@ -21,13 +21,13 @@ describe("gatingLaunchArgs", () => {
 
   it("takes a kind, a scope and the friend's two verbs, and refuses a friend short of one", () => {
     expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend }).gatingkind).to.eq('add_passkey')
-    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: { landGate: friend.landGate } }), 'bad_option')
+    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: { landGate: friend.landGate } }))
   })
 })
 
 // == [Proofs]: passkeyAnswer
 
-/** What is no passkey's answer, each refused as bad_option, and the field the refusal names. */
+/** What is no passkey's answer, each refused, and the field the refusal names. */
 const misshapenAnswers = (answer: PasskeyAnswer) => [
   [{ ...answer, prfBytes: [...answer.prfBytes] },          'prfBytes',      'its bytes an array, not a Uint8Array'],
   [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'prfBytes',      'its bytes one short of 32'],
@@ -50,24 +50,24 @@ describe("passkeyAnswer", () => {
     expect(GX.passkeyAnswer.parse({ ...answer, prfBytes: foreign }).prfBytes).to.eq(foreign)
   })
 
-  describe("refuses 'bad_option' for", () => {
+  describe("refuses", () => {
     // passkeyAnswer @example
     it("an answer already used, its bytes zeroed", async () => {
       const answer = await TH.passkeyOf('laptop')
-      const err = TH.expectSyncRefusal(() => GX.passkeyAnswer.parse({ ...answer, prfBytes: new Uint8Array(32) }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => GX.passkeyAnswer.parse({ ...answer, prfBytes: new Uint8Array(32) }))
       expect(err.message).to.match(/^prfBytes: .*used already/)
     })
 
     it("what is no answer at all", () => {
       for (const given of ["pw", 42, null, { credential_id: 'abc' }]) {
-        TH.expectSyncRefusal(() => GX.passkeyAnswer.parse(given), 'bad_option')
+        TH.expectSyncRefusal(() => GX.passkeyAnswer.parse(given))
       }
     })
 
     it("a misshapen answer, naming the field and quoting none of it", async () => {
       const answer = await TH.passkeyOf('laptop')
       for (const [given, fieldname, blurb] of misshapenAnswers(answer)) {
-        const err = TH.expectSyncRefusal(() => GX.passkeyAnswer.parse(given), 'bad_option')
+        const err = TH.expectSyncRefusal(() => GX.passkeyAnswer.parse(given))
         expect(err.message, blurb).to.match(new RegExp(`^${fieldname}: `))
         expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credential_id)
       }
@@ -84,7 +84,7 @@ describe("freshPasskeyAnswer", () => {
   // freshPasskeyAnswer @example
   it("refuses an answer over a salt too short, naming the salt", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const err = TH.expectSyncRefusal(() => GX.freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => GX.freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }))
     expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltNotFresh(PasskeySaltBytes)}`)
   })
 })

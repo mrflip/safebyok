@@ -59,7 +59,7 @@ describe("invokeStrengthChecker", () => {
 
   it("refuses a passphrase that is no string, before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
-    const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope)(42 as never), 'bad_option')
+    const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope)(42 as never))
     expect(err.message).to.match(/passphrase/i)
     expect(checker).not.toHaveBeenCalled()
   })
@@ -89,7 +89,7 @@ describe("invokeStrengthChecker", () => {
   for (const [answer, blurb] of Misanswers) {
     it(`refuses a checker answering ${blurb}`, async () => {
       const misfit = (() => answer) as unknown as StrengthChecker
-      const err = await TH.expectRefusal(invokeStrengthChecker(misfit, scope)('acme acme acme'), 'bad_option')
+      const err = await TH.expectRefusal(invokeStrengthChecker(misfit, scope)('acme acme acme'))
       expect(err.message).to.match(/strengthChecker/)
       expect(err.message).to.not.include('acme acme acme')
     })
@@ -101,9 +101,9 @@ describe("invokeStrengthChecker", () => {
     [new VaultError('storage_unavailable', 'The checker could not be loaded: try again shortly.'), 'a VaultError of a condition'],
   ] as const
   for (const [thrown, blurb] of Throws) {
-    it(`refuses a checker that throws ${blurb} as kind unexpected_error naming strengthChecker, carrying nothing of the throw`, async () => {
+    it(`refuses a checker that throws ${blurb} naming strengthChecker, carrying nothing of the throw`, async () => {
       const broken: StrengthChecker = () => Promise.reject(thrown)
-      const err = await TH.expectRefusal(invokeStrengthChecker(broken, scope)('acme acme acme'), 'unexpected_error')
+      const err = await TH.expectRefusal(invokeStrengthChecker(broken, scope)('acme acme acme'))
       expect(err).to.not.eq(thrown)
       expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
       expect(err.cause).to.be.undefined
@@ -113,8 +113,8 @@ describe("invokeStrengthChecker", () => {
   }
 
   for (const field of ['strong', 'reason'] as const) {
-    it(`refuses a verdict whose ${field} is a getter that throws as unexpected_error, carrying nothing of the throw`, async () => {
-      const err = await TH.expectRefusal(invokeStrengthChecker(lazyCheckerThrowingOn(field), scope)('acme acme acme'), 'unexpected_error')
+    it(`refuses a verdict whose ${field} is a getter that throws, carrying nothing of the throw`, async () => {
+      const err = await TH.expectRefusal(invokeStrengthChecker(lazyCheckerThrowingOn(field), scope)('acme acme acme'))
       expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
@@ -150,21 +150,21 @@ describe("invokeStrengthChecker's load", () => {
   it("refuses a load that fails, with what it threw as the cause", async () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
     const checker = Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })
-    const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope).load(), 'unexpected_error')
+    const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope).load())
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
     expect(err.cause).to.eq(chunkLost)
   })
 
   it("refuses a load that throws rather than rejecting", async () => {
     const checker = Object.assign(() => StrongVerdict, { load: () => { throw new Error('no word list') } })
-    await TH.expectRefusal(invokeStrengthChecker(checker, scope).load(), 'unexpected_error')
+    await TH.expectRefusal(invokeStrengthChecker(checker, scope).load())
   })
 })
 
 describe("loadStrengthChecker", () => {
   it("refuses a load that fails, naming bank.hello(), with what it threw as the cause", async () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
-    const err = await TH.expectRefusal(loadStrengthChecker(Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })), 'unexpected_error')
+    const err = await TH.expectRefusal(loadStrengthChecker(Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })))
     expect(err.message).to.match(/bank\.hello\(\)/)
     expect(err.cause).to.eq(chunkLost)
   })

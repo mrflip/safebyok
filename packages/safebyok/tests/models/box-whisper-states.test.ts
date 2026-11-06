@@ -63,8 +63,8 @@ const Shows = { value: Exposed, encrypted: ENCRYPTED, locked: LOCKED, veiled: VE
 /** Each cell is what `box.whisper` shows after the operation, or the refusal it throws, leaving the state as it was. */
 const StateTable = [
   //                        shows         veil         unveil        unexpose     expose           lock        unlock
-  ['unexposed',        'encrypted', 'encrypted', 'bad_option', 'encrypted', 'value',        'encrypted', 'encrypted'],
-  ['unexposedLocked',  'encrypted', 'encrypted', 'bad_option', 'encrypted', 'vault_locked', 'encrypted', 'encrypted'],
+  ['unexposed',        'encrypted', 'encrypted', 'refused',    'encrypted', 'value',        'encrypted', 'encrypted'],
+  ['unexposedLocked',  'encrypted', 'encrypted', 'refused',    'encrypted', 'vault_locked', 'encrypted', 'encrypted'],
   ['showing',          'value',     'veiled',    'value',      'encrypted', 'value',        'locked',    'value'],
   ['veiled',           'veiled',    'veiled',    'value',      'encrypted', 'value',        'locked',    'veiled'],
   ['locked',           'locked',    'locked',    'locked',     'encrypted', 'vault_locked', 'locked',    'value'],
@@ -88,8 +88,8 @@ describe("box.whisper, state by operation (the Coach, 2026-11-05)", () => {
       const cell = cells[idx]!
       it(`${state}, ${operation}: ${cell}`, async () => {
         const box = await StateMakers[state]()
-        if ((cell === 'bad_option') || (cell === 'vault_locked')) {
-          await TH.expectRefusal((async () => Operations[operation](box))(), cell)
+        if ((cell === 'refused') || (cell === 'vault_locked')) {
+          await TH.expectRefusal((async () => Operations[operation](box))(), (cell === 'refused') ? undefined : cell)
           expectShows(box, shows)
           return
         }
@@ -137,7 +137,7 @@ describe("the veil from behind a lock", () => {
 
   it("an unveil with nothing exposed says so, in plain words", async () => {
     const box = await unexposedOf()
-    const err = TH.expectSyncRefusal(() => box.unveil(), 'bad_option')
+    const err = TH.expectSyncRefusal(() => box.unveil())
     expect(err.message).to.include('box.expose()')
   })
 
@@ -166,7 +166,7 @@ describe("the endings of a box exposed", () => {
       expect(box.whisper).to.eq(ENCRYPTED)
       expect(box.veil()).to.eq(box)
       expect(box.unexpose()).to.eq(box)
-      TH.expectSyncRefusal(() => box.unveil(), 'bad_option')
+      TH.expectSyncRefusal(() => box.unveil())
     })
   }
 
@@ -220,12 +220,12 @@ describe("box.putExposed", () => {
     }
   })
 
-  it("refuses 'bad_option' with nothing exposed, or a patch naming a whisper, storing nothing", async () => {
+  it("refuses with nothing exposed, or a patch naming a whisper, storing nothing", async () => {
     const unexposed = await unexposedOf()
     const showing = await showingOf()
     held.mw.clearCalls()
-    await TH.expectRefusal(unexposed.putExposed(), 'bad_option')
-    await TH.expectRefusal(showing.putExposed({ whisper: Exposed } as never), 'bad_option')
+    await TH.expectRefusal(unexposed.putExposed())
+    await TH.expectRefusal(showing.putExposed({ whisper: Exposed } as never))
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 

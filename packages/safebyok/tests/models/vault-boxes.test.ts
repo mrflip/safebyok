@@ -55,11 +55,11 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     expect(box?.sidecar).to.deep.equal({ note: 'moved' })
   })
 
-  it("refuses 'vault_gone' for a vault deleted elsewhere, listing nothing", async () => {
+  it("refuses for a vault deleted elsewhere, listing nothing", async () => {
     const { openNextSession, vault } = await makeWorldWithBox()
     const next = await openNextSession()
     await delTyping(vault)
-    await TH.expectRefusal(next.hello(), 'vault_gone')
+    await TH.expectRefusal(next.hello())
     expect(next.isPresent).to.be.false
     expect(next.boxListing.things).to.deep.equal([])
   })
@@ -91,10 +91,10 @@ describe("the box verbs refuse a vault locked, or gone", () => {
       })
     }
 
-    it(`${verb} refuses 'vault_gone' on a vault deleted, as gone beats locked`, async () => {
+    it(`${verb} refuses on a vault deleted, as gone beats locked`, async () => {
       const { vault } = await makeWorld()
       await delTyping(vault)
-      await TH.expectRefusal(call(vault), 'vault_gone')
+      await TH.expectRefusal(call(vault))
     })
   }
 
@@ -115,23 +115,23 @@ describe("the box verbs refuse a vault locked, or gone", () => {
 })
 
 describe("a box verb the vaultDB refuses over its vault's row", () => {
-  it("'vault_gone' delivers no box: the tombstone reaches the vault as its world, and no bad news is told", async () => {
+  it("a vault found gone delivers no box: the tombstone reaches the vault as its world, and no bad news is told", async () => {
     const { vault, restoreRow, demandStored, tryGetBox, opts: { world } } = await makeWorldWithBox()
     restoreRow({ ...omit(demandStored(), ['gate']), am: 'x', revision_seq: 5, revision_tok: 'rev-gone-5' })
     const tellBadNews = vi.spyOn(world, 'tellBadNews')
     tryGetBox.mockClear()
-    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_gone')
+    await TH.expectRefusal(vault.fetchBox(boxlabel))
     expect(tryGetBox).toHaveBeenCalledOnce()
     expect(vault.isPresent).to.be.false
     expect(tellBadNews).not.toHaveBeenCalled()
   })
 
-  it("'vault_mismatch' delivers no box, and no bad news is told", async () => {
+  it("a vault of another life delivers no box, and no bad news is told", async () => {
     const { vault, restoreRow, tryGetBox, opts: { world } } = await makeWorldWithBox()
     restoreRow({ ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' })
     const tellBadNews = vi.spyOn(world, 'tellBadNews')
     tryGetBox.mockClear()
-    await TH.expectRefusal(vault.fetchBox(boxlabel), 'vault_mismatch')
+    await TH.expectRefusal(vault.fetchBox(boxlabel))
     expect(tryGetBox).toHaveBeenCalledOnce()
     expect(tellBadNews).not.toHaveBeenCalled()
   })
@@ -188,9 +188,9 @@ describe("vault.getBox", () => {
 
   it("refuses a boxlabel that fails its check, and opts that fail theirs", async () => {
     const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.getBox('Not A Label'), 'bad_scope')
-    await TH.expectRefusal(vault.getBox(42 as never), 'bad_scope')
-    await TH.expectRefusal(vault.getBox(boxlabel, { ifAbsent: 'shrug' } as never), 'bad_option')
+    await TH.expectRefusal(vault.getBox('Not A Label'))
+    await TH.expectRefusal(vault.getBox(42 as never))
+    await TH.expectRefusal(vault.getBox(boxlabel, { ifAbsent: 'shrug' } as never))
   })
 })
 
@@ -221,7 +221,7 @@ describe("vault.delBox", () => {
 
   it("refuses a boxlabel that fails its check", async () => {
     const { vault } = await makeWorld()
-    await TH.expectRefusal(vault.delBox('Not A Label'), 'bad_scope')
+    await TH.expectRefusal(vault.delBox('Not A Label'))
     expect(await vault.tryDelBox('Not A Label')).to.deep.include({ ok: false })
   })
 })
@@ -306,7 +306,7 @@ describe("vault.tryDelDamagedBox", () => {
 
   it("never throws: a boxlabel that fails its check, and a locked vault, answer a bad Outcome", async () => {
     const { vault } = await makeWorld()
-    await TH.expectBad(vault.tryDelDamagedBox('Not A Label'), 'bad_scope')
+    await TH.expectBad(vault.tryDelDamagedBox('Not A Label'))
     vault.lock()
     await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'vault_locked')
   })

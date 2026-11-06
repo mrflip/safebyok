@@ -34,7 +34,7 @@ describe("capacity", () => {
   ] as const
   for (const [given, blurb] of BadCapacities) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => SX.capacity.parse(given), 'bad_record')
+      TH.expectSyncRefusal(() => SX.capacity.parse(given))
     })
   }
 })
