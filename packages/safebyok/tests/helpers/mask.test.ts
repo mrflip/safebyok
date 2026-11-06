@@ -189,8 +189,8 @@ describe("mask", () => {
       const expected = mask(Plain)
       const chars = Plain.match(/./gsu) ?? []
       for (const control of Controls) {
-        for (let idx = 0; idx <= chars.length; idx += 1) {
-          const salted = chars.slice(0, idx).join('') + control + chars.slice(idx).join('')
+        for (let ii = 0; ii <= chars.length; ii += 1) {
+          const salted = chars.slice(0, ii).join('') + control + chars.slice(ii).join('')
           expect(mask(salted)).to.eq(expected)
         }
         expect(mask(control + Plain + control)).to.eq(expected)
