@@ -46,8 +46,8 @@ const heldBy = async (backend: Backend) => {
 }
 
 describe("SafebyokComponent.api, for the user a call names", () => {
-  for (const [fnName, call] of EveryCall) {
-    it(`serves ${fnName}`, async () => {
+  for (const [fnname, call] of EveryCall) {
+    it(`serves ${fnname}`, async () => {
       const backend = await seeded()
       await expect(call(backend.withIdentity({ subject: 'u1' }))).resolves.not.toThrow()
     })
@@ -63,15 +63,15 @@ describe("SafebyokComponent.api, for the user a call names", () => {
 })
 
 describe("SafebyokComponent.api, for anyone else", () => {
-  for (const [fnName, call] of EveryCall) {
-    it(`refuses ${fnName} as identity_revoked when no one is signed in, and changes nothing`, async () => {
+  for (const [fnname, call] of EveryCall) {
+    it(`refuses ${fnname} as identity_revoked when no one is signed in, and changes nothing`, async () => {
       const backend = await seeded()
       const before = await heldBy(backend)
       expect(await TH.convexRefusalOf(call(backend))).to.deep.equal({ kind: 'identity_revoked' })
       expect(await heldBy(backend)).to.deep.equal(before)
     })
 
-    it(`refuses ${fnName} as identity_revoked for a user it does not name, and changes nothing`, async () => {
+    it(`refuses ${fnname} as identity_revoked for a user it does not name, and changes nothing`, async () => {
       const backend = await seeded()
       const before = await heldBy(backend)
       const stranger = backend.withIdentity({ subject: 'u2' })

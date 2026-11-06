@@ -7,6 +7,6 @@ export type ComponentApi<ComponentPath extends string | undefined = string | und
 
 /** Each function reference re-addressed as a component's, visible to its host only. */
 type ForComponent<Api, ComponentPath extends string | undefined> =
-  Api extends FunctionReference<infer FnKind, infer _Visibility, infer ArgsT, infer ReturnT>
-    ? FunctionReference<FnKind, 'internal', ArgsT, ReturnT, ComponentPath>
+  Api extends FunctionReference<infer Fnkind, infer _Visibility, infer ArgsT, infer ReturnT>
+    ? FunctionReference<Fnkind, 'internal', ArgsT, ReturnT, ComponentPath>
     : { [Ckey in keyof Api]: ForComponent<Api[Ckey], ComponentPath> }
