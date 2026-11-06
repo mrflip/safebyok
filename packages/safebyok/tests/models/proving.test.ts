@@ -1,7 +1,7 @@
 import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
-import { fromB64, randomBytes, toB64 } from '../../src/helpers/crypto'
+import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
 import { vaultScope } from '../../src/shapes/shapes-core'
@@ -47,6 +47,9 @@ const gateWithBoth = async (epochs = 0): Promise<{ gate: Gate, answerOf: () => P
   const answerOf = (): PasskeyAnswer => ({ credential_id, prf_salt_b64, prfBytes: new Uint8Array(prfBytes) })
   return { gate: epochs === 0 ? gate : new Gate(WorldStamp, { ...gate.pickle(), gate_epoch: FirstGateEpoch + epochs }), answerOf }
 }
+
+/** What a vaultKey is unwrapped as only to see that a wrap opens. */
+const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 const findsWeak = () => ({ strong: false as const, reason: 'too short' })
 
@@ -427,6 +430,72 @@ describe("proving.buildWayin(source)", () => {
     const { gate } = await gateWithBoth()
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
     await TH.expectRefusal(proving.buildWayin(NOVEL), 'unexpected_error')
+  })
+})
+
+const StampCases = [
+  [{ applabel: 'acme_other' },       'the stamp of another app'],
+  [{ user_id: 'u2' },                'the stamp of another user'],
+  [{ vaultlabel: 'other' },          'the stamp of another vault label'],
+  [{ vault_tok: 'vault-tok-other' }, 'the stamp of another vault'],
+  [{ registered_at: T0 + 1 },        'a stamp whose registered_at moved'],
+] as const
+
+const HeaderCases = [
+  [{ device_id: 'device-elsewhere' }, 'a header whose device_id was swapped'],
+  [{ registered_at: T0 + 1 },         'a header whose registered_at moved'],
+] as const
+
+describe("the ctx a wayin is wrapped under", () => {
+  for (const [altered, blurb] of StampCases) {
+    it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
+      const { gate } = await builtGateOf()
+      const moved = new Gate({ ...WorldStamp, ...altered }, gate.pickle())
+      await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingWorldOf()), 'wrong_passphrase')
+    })
+
+    it(`keeps a passkey wayin shut under ${blurb}`, async () => {
+      const { gate, answerOf } = await gateWithBoth()
+      const moved = new Gate({ ...WorldStamp, ...altered }, gate.pickle())
+      await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')
+    })
+  }
+
+  for (const [altered, blurb] of HeaderCases) {
+    it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
+      const { gate } = await builtGateOf()
+      const moved = new Gate(WorldStamp, { ...gate.pickle(), passphrase_wayin: { ...gate.passphrase_wayin, ...altered } })
+      await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingWorldOf()), 'wrong_passphrase')
+    })
+
+    it(`keeps a passkey wayin shut under ${blurb}`, async () => {
+      const { gate, answerOf } = await gateWithBoth()
+      const moved = new Gate(WorldStamp, { ...gate.pickle(), passkey_wayin: { ...gate.passkey_wayin!, ...altered } })
+      await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')
+    })
+  }
+})
+
+describe("a passkey proving's key", () => {
+  it("is HKDF over the PRF bytes, its info the wayin's whole ctx: the vault's stamp, the purpose and the header", async () => {
+    const answer = passkeyAnswerOf()
+    const prfBytes = new Uint8Array(answer.prfBytes)
+    const proving = await novelPasskey(answer)
+    const { vault_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
+    const ctx = cipherCtx(WorldStamp, 'vault_key_passkey_wrapped', proving.header)
+    const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
+    expect(await unwrapKeyUnder(passkeyKey, wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
+  })
+
+  it("takes the vault's stamp into the key itself, not only into the wrap's ctx", async () => {
+    const answer = passkeyAnswerOf()
+    const prfBytes = new Uint8Array(answer.prfBytes)
+    const proving = await novelPasskey(answer)
+    const { vault_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
+    const ctx = cipherCtx(WorldStamp, 'vault_key_passkey_wrapped', proving.header)
+    const otherVaultInfo = cipherCtx({ ...WorldStamp, vault_tok: 'vault-tok-other' }, 'vault_key_passkey_wrapped', proving.header)
+    const passkeyKey = await deriveWrappingKey(prfBytes, otherVaultInfo)
+    await expect(unwrapKeyUnder(passkeyKey, wrapped, ctx, CheckUsage)).rejects.toThrow()
   })
 })
 
