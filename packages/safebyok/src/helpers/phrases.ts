@@ -439,7 +439,7 @@ export const suppliedSpecChanged = (label: string): string => `A key deriver lab
 
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): string => `This key deriver takes a salt of ${String(expectedCount)} bytes, and was handed one of ${String(handedCount)}: a salt made by another deriver, or a stored salt that has been damaged.`
 
-export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."
+export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --
 
 // == [The models' bank]: BankHelloFirst, DeviceRecordRewritten, vaultStoredDamaged

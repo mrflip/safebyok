@@ -90,7 +90,8 @@ Pass it after the spread, and it replaces ours. To keep zxcvbn out of your bundl
 not spread `browserOpts()`: name the other two yourself, and nothing imports the checker.
 
 ```ts
-import { Bank, argon2idWebV1Deriver } from 'safebyok'
+import { Bank } from 'safebyok'
+import { argon2idWebV1Deriver } from 'safebyok/browser'
 import { idbDeviceDB } from 'safebyok/idb'
 
 const bank = Bank.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB(), strengthChecker: myStrengthChecker })
