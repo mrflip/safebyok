@@ -286,9 +286,11 @@ message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates 
 kind, a limit, a field name, or the `name` of an error it replaces (`thrownNameOf`, `errors.ts`: a
 DOMException's or an Error's class name such as `QuotaExceededError`, or whatever name a host's own
 device store gave its error, kept by the device-store conditions until a redact
-lands; the Coach, 2026-10-28). Every validator's refusal quotes no input: `tests/validators.test.ts`,
-*no refusal repeats its input*, hands each one a marked key and value and finds the marker in no
-message, stack, meta or cause. The three host functions that hear the passphrase have their throws
+lands; the Coach, 2026-10-28). No validator's refusal quotes an input value. It names a failing field by its
+path, so a key a host chose, which is no secret, may be named (`tests/helpers/validator.test.ts`, *repeats the keys of
+a schema keyed by its input in the refusal*). `tests/helpers/validator.test.ts`, *every checker a shapes module
+exports*, hands each checker the shapes modules export a marked value, whole, in each field and one level down, and
+finds the marker in no refusal's message, stack, meta or cause. The three host functions that hear the passphrase have their throws
 replaced by `HostErrorSanitizer.refusalFor`, never kept as a `cause`: `deriverThrewRefusal` (kind only,
 logged), `guardStrengthChecker` (nothing), `guardRequestCleartext` (kind only, logged). In `src/models/` `invokeStrengthChecker` (`helpers/passphrase-strength.ts`) does the same for a `strengthChecker`, and the gating's `checkedClears` does the same for a getter or proxy of
 the host's that throws as an attempt's clears are read: `clearsThrew`, `unexpected_error`, with no cause, and a `requestCleartext`
@@ -300,12 +302,13 @@ vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a 
 it, so a bug in building the ctx never reads as a wrong proof or a damaged box. Where no wrong key or
 altered record can explain a failure, a WebCrypto error is not caught where it is thrown: in sealing
 a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
-(`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`) or making a wayin or a lease from a proving
+(`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`), making a proving's key (`importWrappingKeyBytes` in
+`passphraseKeyOf`, `deriveWrappingKey` in `PasskeyProving`'s statics) or making a wayin or a lease from a proving
 (`Proving.buildWayin`, `Proving.buildLease`: `makeVaultKey`, and the unwrap and wrap of a vaultKey
-already proved). A grant or a wayin runs inside the gating's `outcomeOf`, which makes the error an
+already proved). A proving's key, a grant or a wayin is made inside the gating's `outcomeOf`, which makes the error an
 `unexpected_error` with the DOMException as its `cause`. A seal's error reaches the host as thrown
-from `putBox`, `box.put` or `putExposed`. From their `try*` forms, `outcomeOf` makes it an
-`unexpected_error` with the DOMException as its `cause`. Either way it keeps no secret: a WebCrypto
+from `putBox`, `box.put`, `putExposed`, `vault.boxListing.create` or the public `vault.sealStampedString`. From the
+`try*` forms of the first four, `outcomeOf` makes it an `unexpected_error` with the DOMException as its `cause`. Either way it keeps no secret: a WebCrypto
 error carries a name and a message, never key material. A device-store failure's cause never crosses to the host: `storeFailed`
 (`refusals/throwers.ts`, by `DeviceDB`'s `adapted`) keeps neither what the store threw nor its message,
 only its `name`, as a `DeviceDB` is handed every lease record and the logger hands a condition to the
@@ -314,7 +317,8 @@ as `cause` only where the thrower heard no secret. The invariant at the one catc
 Lease and Box `try*` form (`outcomeOf`, `outcome.ts`) is checkable by reading what can reach it: a
 refusal (passed as itself), the vault's demand, or a bug's own throw from this package's lines;
 never a host function's throw or the device store's, each replaced before it gets there, and a
-WebCrypto error only from the seal, grant and wayin paths named above. The Vault and Bank forms map a bug in their `try` form. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
+WebCrypto error only from the seal, key, grant and wayin paths named above. The Vault's, the Bank's and the box
+listing's `try*` forms are each one `outcomeOf` over the throwing form too, and the throwing forms end in no such catch. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will
 not read is warned of without its record (`Lease.buildFromCache` tells the friend a `damagedLease()` built from nothing of the row, as bad news, and answers null). *Host obligation, documented:* a `strengthChecker`'s
 `reason` becomes the `weak_passphrase` message, so it must not quote the passphrase
@@ -358,12 +362,20 @@ the crypto imports.
   enforces it. Each kind of field has its own purpose string (`PurposeForWayinkind`,
   `vault_key_lease_wrapped`, `box_key_wrapped`, `whisper_ciphered`), and the passkeyKey's HKDF
   `info` is its wayin's ctx, so the same bytes under another purpose make another key.
-* *A memory-hard, labelled, salted derivation.* Argon2id (`@noble/hashes`, or hash-wasm in
-  safebyok-fastkey) under a stored `key_deriver_label` whose spec is fixed (`Argon2idWebV1`: 64 MiB,
-  3 passes, 1 lane, 16-byte salt, 32-byte key); a fresh random salt per wayin; a wayin under
-  another label refuses `newer_format`, so there is no silent downgrade; a deriver wearing a
-  supplied label must carry exactly its parameters (`Bank.make`).
-* *Randomness* from `crypto.getRandomValues` and `subtle.generateKey` alone (`randomBytes`,
+* *A memory-hard, labelled, salted derivation.* Argon2id under a stored `key_deriver_label` whose spec is fixed
+  (`Argon2idWebV1`, `deriver/shapes.ts`: 64 MiB, 3 passes, 1 lane, 16-byte salt, 32-byte key), made by
+  `argon2idDeriver` (`deriver/argon2id-webv1.ts`, over `@noble/hashes`); a fresh random salt per wayin
+  (`mintPassphraseHeader`, `models/proving.ts`); a wayin under another label refuses `newer_format`
+  (`PassphraseProving.buildStored`), so there is no silent downgrade (`tests/models/proving.test.ts`, *refuses a
+  wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver wearing a supplied
+  label must carry exactly its parameters, and no other may wear the reserved prefix `argon2id_web_`:
+  `checkSuppliedSpecKept` (`deriver/basederiver.ts`), reached through `parseKeyDeriverSpec` from `argon2idDeriver`
+  alone. A host's own deriver is checked by its interface, `keyDeriverShape` (`shapes/shapes-core.ts`, at `Bank.make`
+  and in each proving's world), not by its parameters: a host bent on weak ones would find a way
+  (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). The published entry points export neither
+  `argon2idDeriver` nor `argon2idWebV1Deriver`, and no test of the core reaches `deriver/`; safebyok-fastkey's
+  hash-wasm deriver runs on the old core.
+* *Randomness* from `crypto.getRandomValues`, `crypto.randomUUID` and `subtle.generateKey` alone (`randomBytes`,
   `randomId`, the key makers).
 * *No secret is compared.* A wrong passphrase or passkey is learned from the AEAD tag failing to
   verify in `unwrapKey`, never from comparing key bytes.
