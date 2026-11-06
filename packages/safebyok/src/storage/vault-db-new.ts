@@ -375,7 +375,7 @@ export abstract class VaultDB {
 
 // == [Row checks]: preparedOf, adapted, unreadableRowOf, vaultRowOf, boxRowOf, listedBoxesOf, checkedVaultLife, demandNextSeq, landingActOf, jsonBytes
 
-/** A record the package prepared, as `checker` parses it: one failing it is a package bug, refused 'unexpected_error', unlike the options beside it. */
+/** A record the package prepared, as `checker` parses it: one failing it is a package bug, unlike the options beside it. */
 const preparedOf = <ValT>(checker: { safeParse: (val: unknown) => Z.ZodSafeParseResult<ValT> }, record: unknown): ValT => {
   const parsed = checker.safeParse(record)
   if (parsed.success) { return parsed.data }

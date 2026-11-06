@@ -133,7 +133,7 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   /** The user said no. With no attempt under way the gating settles 'declined'; one under way runs on, and its outcome settles it. */
   decline(): void { this.#endAsking(gatingDeclined()) }
 
-  /** A lock on the vault it asks for. With no attempt under way the gating settles 'locked_while_asking'; past the enter key nothing turns back, and the attempt's outcome settles it. A `del_vault` hears nothing: a lock does not stop a delete. */
+  /** A lock on the vault it asks for. With no attempt under way the gating settles at once; past the enter key nothing turns back, and the attempt's outcome settles it. A `del_vault` hears nothing: a lock does not stop a delete. */
   declineAtLock(): void {
     if (this.gatingkind !== 'del_vault') { this.declineAtDiscard() }
   }
