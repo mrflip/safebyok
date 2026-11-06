@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { ForeverMillis } from '../../src/helpers/consts'
+import * as GX from '../../src/shapes/shapes-gateish'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord } from '../test-helpers/models-world'
 import { holdsCases } from '../test-helpers/cases'
@@ -23,6 +25,21 @@ describe("The checks of options", () => {
       ["60000",   false, 'refuses text'],
       [null,      false, 'refuses null'],
     ])
+
+    it("keeps Infinity as ForeverMillis, so no horizon past the check is infinite", () => {
+      expect(VX.horizonMillis.parse(Infinity)).to.eq(ForeverMillis)
+      expect(VX.timelyOpts.parse({ maxWorldMillis: Infinity })).to.deep.equal({ maxWorldMillis: ForeverMillis })
+    })
+  })
+
+  describe("GX.leaseMillis", () => {
+    holdsCases(GX.leaseMillis, [
+      [60_000,          true,  'passes a whole number of milliseconds'],
+      [ForeverMillis,   true,  "passes ForeverMillis, a host's never"],
+      [Infinity,        false, "refuses Infinity: the bank keeps a host's as ForeverMillis"],
+      [0,               false, 'refuses zero'],
+      [0.5,             false, 'refuses a fraction of a millisecond'],
+    ])
   })
 
   describe("VX.timelyOpts and VX.boxPutOpts", () => {
@@ -42,24 +59,12 @@ describe("The checks of options", () => {
 
     it("take their fields from the bag given and strip the rest", () => {
       expect(VX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
-      expect(VX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
+      expect(VX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5, ifAbsent: 'add', ifPresent: 'repl' })
     })
 
     it("name the failing field", () => {
       const err = TH.expectSyncRefusal(() => VX.timelyOpts.parse({ maxMillisSinceRefresh: -1 }))
       expect(err.meta?.fieldnames).to.deep.equal(['maxMillisSinceRefresh'])
-    })
-  })
-
-  describe("VX.storableOpts", () => {
-    holdsCases(VX.storableOpts, [
-      [{ maxMillisSinceRefresh: 60_000 },                    true,  'passes the horizon alone'],
-      [{},                                                   false, 'refuses a missing horizon'],
-      [{ maxMillisSinceRefresh: -5 },                        false, 'refuses a negative horizon'],
-    ])
-
-    it("strips a field it does not take", () => {
-      expect(VX.storableOpts.parse({ maxMillisSinceRefresh: 5, extra: 1 })).to.deep.equal({ maxMillisSinceRefresh: 5 })
     })
   })
 })
@@ -69,7 +74,7 @@ describe("VX.ifAbsent and VX.fetchOpts", () => {
     ["fail",     true,  'passes fail'],
     ["nil",      true,  'passes nil'],
     ["create",   false, 'refuses create, which fetch does not offer'],
-    [undefined,  false, 'refuses undefined: the default is applied by the caller, not the check'],
+    [undefined,  false, 'refuses undefined: fetchOpts gives the default, not the check'],
   ])
 
   holdsCases(VX.fetchOpts, [
@@ -83,6 +88,10 @@ describe("VX.ifAbsent and VX.fetchOpts", () => {
 
   it("keeps ifAbsent and the timely options and strips the rest", () => {
     expect(VX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
+  })
+
+  it("fills a fetch's default: ifAbsent 'fail'", () => {
+    expect(VX.fetchOpts.parse({})).to.deep.equal({ ifAbsent: 'fail' })
   })
 })
 
@@ -107,7 +116,7 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],
     ["replace",  false, 'refuses replace, which it does not spell'],
-    [undefined,  false, 'refuses undefined: boxPutOpts makes it optional, not the check'],
+    [undefined,  false, 'refuses undefined: boxPutOpts gives the default, not the check'],
   ])
 
   holdsCases(VX.boxPutOpts, [
@@ -122,8 +131,8 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     expect(VX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add' })
   })
 
-  it("leaves the defaults to box.put: nothing given, nothing filled", () => {
-    expect(VX.boxPutOpts.parse({})).to.deep.equal({})
+  it("fills a put's defaults: ifAbsent 'add', ifPresent 'repl'", () => {
+    expect(VX.boxPutOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl' })
   })
 
   it("refuses a fetch's ifAbsent: 'nil' is no answer to a put", () => {
@@ -137,28 +146,28 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
 })
 
 describe("The checks of the world and the listing", () => {
-  describe("VX.world", () => {
-    holdsCases(VX.world, [
-      [mw.world, true,  'passes the test world'],
-      [{},       true,  'passes an empty object'],
-      [null,     false, 'refuses null'],
-      [5,        false, 'refuses a number'],
+  describe("VX.listingWorld", () => {
+    holdsCases(VX.listingWorld, [
+      [mw.world,                                 true,  'passes the test world'],
+      [{ ...mw.world, extra: 1 },                true,  'passes a world with more than the base reaches into'],
+      [null,                                     false, 'refuses null'],
+      [{},                                       false, 'refuses an empty object'],
+      [{ ...mw.world, takeWorld: undefined },    false, 'refuses a world that cannot takeWorld'],
+      [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
+      [{ ...mw.world, lockState: undefined },    false, 'refuses a world with no lockState'],
+      [{ ...mw.world, tellBadNews: undefined },  false, 'refuses a world that cannot tellBadNews'],
     ])
   })
 
   describe("VX.listingOpts", () => {
-    const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000 }
+    const opts = { vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000 }
     holdsCases(VX.listingOpts, [
-      [opts,                                                     true,  'passes the test world and vaultDB'],
+      [opts,                                                     true,  'passes the test vaultDB and a horizon'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
-      [{ ...opts, world: undefined },                            false, 'refuses a missing world'],
-      [{ ...opts, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
-      [{ ...opts, world: { ...mw.world, ensureTimely: 5 } },     false, 'refuses a world whose ensureTimely is no function'],
-      [{ ...opts, world: { ...mw.world, lockState: undefined } }, false, 'refuses a world with no lockState'],
       [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
-      [{ ...opts, world: { ...mw.world, tellBadNews: undefined } }, false, 'refuses a world that cannot tellBadNews'],
+      [{ ...opts, world: mw.world },                             false, 'refuses a world, which the listing takes beside its options'],
       [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],
       [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not take, being strict'],
     ])
@@ -171,17 +180,17 @@ describe("The checks of the world and the listing", () => {
 
   describe("VX.storableArgs", () => {
     const listing = boxListingOf(mw)
-    const args = { world: mw.world, listing, central: sparse, opts: { maxMillisSinceRefresh: 1000 } }
+    const args = { world: mw.world, listing, central: sparse }
     holdsCases(VX.storableArgs, [
-      [args,                                           true,  'passes a world, a listing, a central and the options'],
+      [args,                                           true,  'passes a world, a listing and a central'],
       [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
       [{ ...args, central: { am: 'a' } },              false, 'refuses a central that fails sparseBase'],
       [{ ...args, listing: {} },                       false, 'refuses a listing with no listing modelkind'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
       [{ ...args, world: null },                       false, 'refuses a null world'],
-      [{ ...args, opts: {} },                          false, 'refuses options with no horizon'],
-      [{ ...args, opts: { maxMillisSinceRefresh: -1 } }, false, 'refuses a negative horizon'],
+      [{ ...args, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
+      [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, "refuses options, the horizon being the listing's"],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not take, being strict'],
     ])
 

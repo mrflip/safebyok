@@ -60,7 +60,7 @@ describe("A lease renewed through a gate change", () => {
     const born = await makeBornVault()
     const { vault } = born
     const epoch0 = vault.gate.gate_epoch
-    const { world } = born.opts
+    const world = born.fakeBank
     const { requestCleartext: asBefore } = world
     world.requestCleartext = async (gating) => {
       const attempting = gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase })
@@ -219,11 +219,11 @@ describe("The discards: sweep and vacate, down the chain", () => {
   })
 
   it("a sweep crossing ensureUnlocked's peek at the cached lease refuses, nobody asked", async () => {
-    const { vault, listing, deviceDB } = await makeBornVault()
+    const { vault, fakeBank, deviceDB } = await makeBornVault()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const dialog = vi.fn()
-    listing.world.requestCleartext = dialog
+    fakeBank.requestCleartext = dialog
     deviceDB.peek.mockImplementationOnce(() => {
       vault.sweep()
       return Promise.resolve(null)
@@ -288,7 +288,7 @@ const valuesShownBy = (holder: object): unknown[] => {
 
 describe("a vault and a lease show neither the lease friend nor the lease key handle, one level deep, by identity", () => {
   it("no field of a gating shows the gating's friend, nor Object.keys or JSON.stringify, and a vault has no such verb", async () => {
-    const { vault, opts: { world } } = await makeBornVault()
+    const { vault, fakeBank: world } = await makeBornVault()
     let gatingShown: object | null = null
     world.requestCleartext = (gating) => {
       gatingShown = gating

@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../../src/helpers/logger'
+import { DefaultLogger, asError, isGuardedLogger, parseLogger, setDefaultLogger, type VaultLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
 
 /** What a host might hand Bank.make as its logger that is not one. */
@@ -30,7 +30,7 @@ describe("parseLogger", () => {
 
   for (const [candidate, blurb] of NotLoggers) {
     it(`refuses ${blurb}`, () => {
-      expect(() => parseLogger(candidate as unknown as VaultLogger)).to.throw(VaultError, /^((log|warn|error): Expected a function(; )?)+$|^Expected a VaultLogger/)
+      expect(() => parseLogger(candidate as unknown as VaultLogger)).to.throw(VaultError, /^logger: (((log|warn|error): Expected a function(; )?)+\.$|Expected a VaultLogger)/)
     })
   }
 
@@ -145,6 +145,17 @@ describe("parseLogger", () => {
   })
 })
 
+describe("isGuardedLogger", () => {
+  it("knows a logger parseLogger made safe, and the DefaultLogger, from the host's bare one", () => {
+    const spy = TH.spyLogger()
+    expect(isGuardedLogger(parseLogger(spy.logger))).to.be.true
+    expect(isGuardedLogger(DefaultLogger)).to.be.true
+    expect(isGuardedLogger(spy.logger)).to.be.false
+    expect(isGuardedLogger(null)).to.be.false
+    expect(isGuardedLogger(undefined)).to.be.false
+  })
+})
+
 describe("setDefaultLogger", () => {
   afterEach(() => { setDefaultLogger(undefined) })
 
@@ -185,7 +196,7 @@ describe("setDefaultLogger", () => {
     it(`refuses ${blurb}, keeping the default it had`, () => {
       const telemetry = TH.spyLogger()
       setDefaultLogger(telemetry.logger)
-      expect(() => { setDefaultLogger(candidate as unknown as VaultLogger) }).to.throw(VaultError, /^((log|warn|error): Expected a function(; )?)+$|^Expected a VaultLogger/)
+      expect(() => { setDefaultLogger(candidate as unknown as VaultLogger) }).to.throw(VaultError, /^logger: (((log|warn|error): Expected a function(; )?)+\.$|Expected a VaultLogger)/)
       DefaultLogger.log('still heard')
       expect(telemetry.calls).to.have.lengthOf(1)
     })

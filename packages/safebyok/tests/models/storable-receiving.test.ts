@@ -47,7 +47,7 @@ const rcvdOf = (shape: RecordShape, rev: Partial<BoxSparse>): Rec => {
 
 /** A box holding `central`, not held by the listing and not yet timely. */
 const boxOf = (central: Rec): SpiedBox => (
-  new SpiedBox(held.mw.world, boxListingOf(held.mw), central, { maxMillisSinceRefresh: 10 * 60_000 })
+  new SpiedBox(held.mw.world, boxListingOf(held.mw), central)
 )
 
 /** The box's held records and the own props that follow the record in hand, for comparing before and after. */

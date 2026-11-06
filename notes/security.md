@@ -52,6 +52,22 @@ added or folded into through the subagent, and no other entry changes.
   veil (amended 2026-11-06 (whisper_fields): and while the vault is locked, as it shows and stores nothing), so a host's form that sends the blank it reads to `patchWhisper` while veiled or locked makes the blank the value, and `putExposed` stores it once the vault is unlocked.
   The README's recipe makes the input read-only while `box.isShowing` is false; left as a host's responsibility, pending the Coach's word.
   The whisper's shape (key names and nesting) does not show while hidden: `box.whisper` is a bag with no fields.
+
+* 2026-11-06 (host_branding, PR #552): **`Bank`'s constructor wraps each host function once and holds only the wrap, branded `IsGuarded`; a `keyDeriver.load()` that throws now
+  refuses `unexpected_error` with the host's thrown error as `cause`; a `device_id` is a UUID.** In `packages/safebyok/src/models/bank.ts` the bank holds
+  `keyDeriver` through `guardKeyDeriver` (`src/models/proving.ts`), `strengthChecker` through `guardStrengthChecker` (`src/helpers/passphrase-strength.ts`),
+  `requestCleartext` as `askUser` through `guardRequestCleartext`, and `onPanic` as `panic` through `guardOnPanic`; `VX.vaultWorld` and `GX.provingWorld` demand the brand
+  (`isGuarded`) of each, so a vault or proving cannot be handed a bare host function. The brand (`src/helpers/consts.ts`, `brandGuarded`) is a frozen, non-enumerable getter
+  keyed by a module-private `Symbol('safebyok.guarded')` that `src/index.ts` does not export: a plain object, a JSON copy or a spread copy of a wrap does not carry it, and the wrap is
+  frozen. (Unlike the exported `Symbol.for` mark of a whisper bag, this one is not shared across module copies.) The two functions that hear the passphrase keep their throws replaced
+  with nothing of the throw kept (`guarantees.md` G1, G8): the deriver's `deriveKeyBytes` throws `keyDeriverThrew()`, and the checker's verdict is parsed inside the wrap, a throw handed to `HostErrorSanitizer.refusalFor`;
+  `requestCleartext`'s throw is dropped (the wrap answers false), and `onPanic`'s goes to `reportToPlatform`. What the deriver hands back is still checked, and zeroed, only in `passphraseKeyOf`, not in the wrap.
+  New: `keyDeriver.load()` was unguarded, its throw reaching `hello`'s outcome as the host threw it; the wrap now refuses it `unexpected_error` through `keyDeriverLoadFailed`
+  (`src/refusals/throwers.ts`) with that error as `cause`, as `strengthCheckerLoadFailed` already did for the checker's `load`. `load` hears no passphrase, so nothing secret can ride in that `cause`, which is why
+  it may be kept where `deriveKeyBytes`'s throw may not; the host's own error object is now reachable from the refusal a host
+  logs or shows. Also: `device_id` is checked as a UUID in `bankOpts` (`Bank.make` refuses another as `bad_option`) and in a stored wayin (`device_id` in `src/shapes/shapes-core.ts`, used by `passphraseWayin` and `passkeyWayin`),
+  so a stored vault row whose gate holds a label-shaped `device_id` reads as damaged as a whole, the other wayin with it, and is left as it is; pre-1.0, no migration, and the changeset says so.
+
 * 2026-11-05 (whisper_object, branch `20261105-whisper_object`): **A box that will not show its exposed whisper answers `box.whisper`
   with a frozen marked bag, and the exposed whisper stays in memory through a lock and `veil()`.** In
   `packages/safebyok/src/models/box.ts` (the mark is in `src/helpers/consts.ts`), a whisper is always a plain JSON object: a bare string,

@@ -3,13 +3,16 @@
 
 import { ScopepathDelimiter } from './consts'
 
-// == [Names]: labelTooLong, LabelShape, UserIdMissing, userIdTooLong, UserIdChars
+// == [Names]: labelTooLong, LabelShape, DeviceIdShape, UserIdMissing, userIdTooLong, UserIdChars
 
 /** A label longer than `maxChars`. */
 export const labelTooLong = (maxChars: number): string => `A label is at most ${String(maxChars)} characters`
 
 /** A label of the wrong shape. */
 export const LabelShape = "A label is lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two characters at least"
+
+/** A device_id that is no UUID. */
+export const DeviceIdShape = "A device_id is a UUID, such as crypto.randomUUID() makes, kept by the host for this device"
 
 /** An empty user_id. */
 export const UserIdMissing = "A user_id names the signed-in user, so it can't be empty"
@@ -51,10 +54,22 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultScope = "A vault's stores go in the second bag, its options, not in the scope naming the vault"
 // --
 
-// == [Values]: FunctionExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
+
+/** A host's bare function, or anything else, where a bank's world holds that function as the bank wraps it. */
+export const GuardedExpected = "Expected a host's function as Bank.make wraps it"
+
+/** A host's bare logger, or anything else, where a bank's world holds its logger as the bank guards it. */
+export const GuardedLoggerExpected = "Expected a logger as Bank.make guards it"
+
+/** Anything but an instance of a class extending safebyok's VaultDB, where a vaultDB is asked. */
+export const VaultDBExpected = "Expected a VaultDB: an instance of a class extending safebyok's VaultDB"
+
+/** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
+export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
 
 /** Anything but bytes, a Uint8Array, `count` of them when that many are asked. */
 export const bytesExpected = (count?: number): string => (count === undefined ? "Expected bytes, a Uint8Array" : `Expected ${String(count)} bytes, a Uint8Array`)
@@ -99,10 +114,10 @@ export const MinutesShape = "Expected a number of minutes, zero or more, fractio
 export const VaultDBShape = "Expected a storage adapter, an instance of the VaultDB class: localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
 
 /** A `deviceDB` that is no device store. */
-export const DeviceDBShape = "Expected a DeviceDB: in a browser, spread browserOpts() from 'safebyok/browser' into Bank.make's options; elsewhere, pass memoryDeviceDB(), or your own device store, which extends the DeviceDB class"
+export const DeviceDBShape = "Expected a DeviceDB: your device store, which extends the DeviceDB class and keeps its rows on this device"
 
 /** A `keyDeriver` left out, or no object. */
-export const KeyDeriverShape = "Expected a KeyDeriver: in a browser, spread browserOpts() from 'safebyok/browser' into Bank.make's options"
+export const KeyDeriverShape = "Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes and a deriveKeyBytes function"
 
 /** A `logger` that is no object. */
 export const LoggerShape = "Expected a VaultLogger, with log, warn and error functions: leave it out for the default logger, or pass functions that do nothing to log nowhere"
@@ -117,7 +132,7 @@ export const KeyDeriverSpecShape = "Expected a keyDeriverSpec: algorithm 'argon2
 export const memoryPerLane = (minKib: number): string => `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)`
 
 /** A `strengthChecker` that is no checker. */
-export const StrengthCheckerShape = "expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own."
+export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. safebyok ships none: pass your own (CUSTOMIZATION.md, Pluggable Passphrase Strength Checker)"
 // --
 
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
@@ -249,16 +264,13 @@ export const VaultGoneWhileGettingBox = "The vault this device held was deleted,
 export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
 // --
 
-// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged, BadNewsHandlerThrew
+// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged
 
 /** Bad news of a box stored damaged, which its meta.box_listed names. */
 export const BoxStoredDamaged = "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it."
 
 /** Bad news of a wayin stored damaged, which its meta.wayin_listed names. */
 export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
-
-/** Why the vault's trouble holds a throw from the host's onBadNews handler. */
-export const BadNewsHandlerThrew = "The onBadNews handler passed to Bank.make threw as it was told of bad news: fix the handler. What it threw is this error's cause. The call that met the news went on as it would have."
 // --
 
 // == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, SavingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
@@ -447,7 +459,7 @@ export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait
 export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --
 
-// == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed
+// == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed, KeyDeriverLoadFailed
 
 /** The cause's message where what failed threw null or undefined. */
 export const NoErrorGiven = "What failed threw nothing: null or undefined, not an Error."
@@ -468,7 +480,10 @@ export const UnboundCipherCtx = "A cipher ctx was handed no stamp, or a part or 
 export const StrengthCheckerMisanswered = "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
 
 /** The strengthChecker's load() failing at bank.hello(). */
-export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For zxcvbnStrengthChecker, it is the chunk holding zxcvbn and its dictionary that would not load: check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
+export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a checker that fetches its dictionary, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
+
+/** The keyDeriver's load() failing at bank.hello(). */
+export const KeyDeriverLoadFailed = "The keyDeriver's load() failed, so the bank could not derive a key from a passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a deriver that fetches its code, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
 // --
 
 // == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, boxTooLarge, VaultFull, DamagedRecord, NewerFormat, SeqNotNext, RecordPreparedWrong, StorageError, storeFailed, storeThrew

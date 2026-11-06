@@ -22,13 +22,14 @@ import { _cheat_clock } from '../../src/helpers/clock'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
+import type { Vault } from '../../src/models/vault'
 import type { LockState } from '../../src/shapes/shapes-enums'
 import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxQuery, BoxRow, BoxTombstone, DelOpts, IfAbsentOpts, PutOpts, ReqParams, Revision, VaultRecord, WatchScope } from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type BoxDna, type BoxListingOpts, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingAnswer, type Tombstone, BoxFormat } from '../../src/shapes/shapes-vaultish'
+import { type BoxDna, type BoxRecord, type BoxSparse, type BoxWorld, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone, BoxFormat } from '../../src/shapes/shapes-vaultish'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Notice } from '../../src/storage/vault-db-new'
@@ -55,7 +56,7 @@ export const worldVaultRow = (): VaultRecord => ({
   written_at:    T0,
   gate:          {
     gate_epoch:       1,
-    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA' as CX.PassphraseSalt, device_id: 'd1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
+    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA' as CX.PassphraseSalt, device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
     passkey_wayin:    null,
   },
 })
@@ -293,6 +294,8 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const demandFakeUnlocked = (): void => {
     if (lockState === 'locked') { throw Refuse.unlockFirst() }
   }
+  // The fake stands in for the vault, which `demandUnlocked` and `ensureTimely` answer; no box reads the answer.
+  const standIn = (): Vault => world as unknown as Vault
 
   const world: BoxWorld = {
     scope:        WorldVault.scope,
@@ -300,7 +303,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     lockState:    () => lockState,
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
     tellBadNews:  (news) => { badnews.push(...news) },
-    demandUnlocked: () => { if (lockState === 'locked') { throw Refuse.lockedError() } },
+    demandUnlocked: () => { if (lockState === 'locked') { throw Refuse.lockedError() } return standIn() },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()
@@ -319,6 +322,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       calls.push({ verb: 'ensureTimely', maxMillis })
       const { scripted, answer } = ensureTimelyScript.take(maxMillis)
       if (scripted) { await answer }
+      return standIn()
     },
   }
 
@@ -407,7 +411,7 @@ export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: Model
   }
 }
 
-// == [Testable]: TestableBox, TestableBoxListing, boxListingOf
+// == [Testable]: TestableBox, TestableBoxListing, boxListingOf, BoxListingOverrides
 
 /** A {@link Box} that shows a test the record it holds, which the storable keeps protected: `_cheat_central` is its `central`, as a {@link TestableBoxListing} makes it. */
 export class TestableBox extends Box {
@@ -418,7 +422,7 @@ export class TestableBox extends Box {
 /** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `create`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
   protected override makeThing(central: Fetched<BoxRecord, BoxSparse>): TestableBox {
-    return new TestableBox(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
+    return new TestableBox(this.world, this, central)
   }
 
   override async build(...args: Parameters<BoxListing['build']>): Promise<TestableBox> { return testableOf(await super.build(...args)) }
@@ -445,15 +449,14 @@ const testableOf = (box: Box): TestableBox => {
 
 const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null ? null : testableOf(box))
 
-/** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces any of its options; the horizon is ten minutes. */
-export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}): TestableBoxListing => (
-  new TestableBoxListing({
-    world:                 mw.world,
-    vaultDB:               mw.vaultDB,
-    maxMillisSinceRefresh: 10 * 60_000,
-    ...overrides,
-  })
-)
+/** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
+export const boxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing => {
+  const { world = mw.world, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000 } = overrides
+  return new TestableBoxListing(world, { vaultDB, maxMillisSinceRefresh })
+}
+
+/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vaultDB or horizon. */
+export type BoxListingOverrides = Partial<ListingOpts & { world: BoxWorld }>
 // --
 
 // == [Faked seal]: fakeSealBoxListingOf
@@ -462,7 +465,7 @@ export const boxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts>
  *
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
  */
-export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: Partial<BoxListingOpts> = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
+export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
   const sealStampedString: BoxWorld['sealStampedString'] = async (whisperText, stamp) => {
     await mw.world.sealStampedString(whisperText, stamp)
     duringSeal()

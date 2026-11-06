@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as PX from '../../src/shapes/primitives'
@@ -6,6 +7,7 @@ import * as CX from '../../src/shapes/shapes-core'
 import * as EX from '../../src/shapes/shapes-enums'
 import * as GX from '../../src/shapes/shapes-gateish'
 import * as SX from '../../src/shapes/shapes-storage'
+import * as UX from '../../src/shapes/shapes-utils'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
@@ -473,7 +475,7 @@ describe("Kit", () => {
 // == [The values sweep]: ShapeModules, ExportedCheckers, Marker, MarkedInputs, shapesOf, partsOf, refusalTextOf
 
 /** Every module of the package's shapes, each star-imported: its exports made in a `Checkers`, `Checker` or `objCheck` call are swept below. */
-const ShapeModules = { KX, CX, EX, GX, SX, VX }
+const ShapeModules = { PX, KX, CX, EX, GX, SX, UX, VX }
 
 /** Each checker a shapes module exports, by `<module>.<name>`: a schema whose `parse` refuses with a VaultError, as `refusingAs` tells one. */
 const ExportedCheckers = Object.fromEntries(Object.entries(ShapeModules).flatMap(([modname, mod]) => (
@@ -516,7 +518,16 @@ const refusalTextOf = (attempt: () => unknown): string | null => {
 
 describe("every checker a shapes module exports", () => {
   it("is found by the sweep, the stored records' and the host's options' among them", () => {
-    expect(Object.keys(ExportedCheckers)).to.include.members(['SX.leaseRow', 'CX.whisper', 'CX.keyDeriverShape', 'GX.passphraseCleartext', 'VX.boxPatch', 'KX.keyDeriverSpec'])
+    expect(Object.keys(ExportedCheckers)).to.include.members(['SX.leaseRow', 'CX.whisper', 'CX.keyDeriverShape', 'GX.passphraseCleartext', 'VX.boxPatch', 'KX.keyDeriverSpec', 'UX.maskOpts'])
+  })
+
+  it("is swept from each module in src/shapes, none left off the list", async () => {
+    const modnames = readdirSync(new URL('../../src/shapes/', import.meta.url)).filter((filename) => filename.endsWith('.ts')).map((filename) => filename.slice(0, -'.ts'.length))
+    const swept: unknown[] = Object.values(ShapeModules)
+    for (const modname of modnames) {
+      const mod: unknown = await import(`../../src/shapes/${modname}.ts`)
+      expect(swept.includes(mod), modname).to.be.true
+    }
   })
 
   for (const [checkername, checker] of Object.entries(ExportedCheckers)) {

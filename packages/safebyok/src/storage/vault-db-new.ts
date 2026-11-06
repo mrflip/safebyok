@@ -1,13 +1,16 @@
 /** The vaultDB: the verbs the storables and listings call, and every invariant of them. A subclass writes only the generic `do*` calls, each one atomic step. */
 
 import type * as Z from 'zod'
+import { IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf } from '../refusals/outcome'
 import type { IfPresent, PutIfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
-import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import * as CX from '../shapes/shapes-core'
+import type { BankScope, VaultScope } from '../shapes/shapes-core'
+import type { AddPasskeyParams, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: AnswerFacts, GoodAnswer, BadAnswer, Answer, Said, BankListed, BoxesListed, Tidied, Notice, answerOf
@@ -69,9 +72,13 @@ const putTermsOf = ({ prior, ifAbsent, ifPresent }: PutChoices): PutTerms => ({ 
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
 export abstract class VaultDB {
-  // == [Props]: #maxRecordBytes
+  // == [Props]: #maxRecordBytes, IsVaultDB
 
   readonly #maxRecordBytes: number
+
+  // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
+  /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
+  get [IsVaultDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
   // --
 
   // == [Construction]: constructor
@@ -87,7 +94,7 @@ export abstract class VaultDB {
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
   async listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, 'got' | 'gotvoid', BankScope>> {
     return this.#call<BankListed, 'got' | 'gotvoid', BankScope>('listVaults', scope, async () => {
-      const bankScope = SX.bankScope.parse(scope)
+      const bankScope = CX.bankScope.parse(scope)
       const rows = await adapted(() => this.doListVaults(bankScope))
       const val: BankListed = { vaults: [], damaged_rows: [] }
       for (const { vaultlabel, vault } of rows) {
@@ -103,7 +110,7 @@ export abstract class VaultDB {
   /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
   async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>> {
     return this.#call<VaultRecord | null, GotAct, VaultRow>('getVault', { ...scope, ...opts }, async () => {
-      const vaultScope = SX.vaultScope.parse(scope)
+      const vaultScope = CX.vaultScope.parse(scope)
       const { ifAbsent } = SX.ifAbsentOpts.parse(opts ?? {})
       const stored = vaultRowOf(await adapted(() => this.doGetVault(vaultScope)))
       if (stored === null) {
@@ -250,7 +257,7 @@ export abstract class VaultDB {
 
   /** A gate verb's one path: a get, the integrity checks, the wayin laid on, and a put conditional on the prior revision. A null wayin has nothing to lay on, and answers the row as stored. */
   async #moveGate<ActT extends string>(ante: VaultSparse, act: ActT, wayinOf: (stored: VaultRecord) => Partial<Gate> | null): Promise<Said<VaultRecord, ActT, VaultRow>> {
-    const vault = await adapted(() => this.doGetVault(SX.vaultScope.parse(ante)))
+    const vault = await adapted(() => this.doGetVault(CX.vaultScope.parse(ante)))
     const stored = checkedVaultLife(vaultRowOf(vault), ante, ante.vault_tok)
     if (! SX.isRowAt(stored, ante)) { throw Refuse.staleWrite(stored, stored) }
     if (stored.registered_at !== ante.registered_at) { throw Refuse.gateIssue(stored, 'its registered_at is not the stored one.') }
@@ -309,7 +316,7 @@ export abstract class VaultDB {
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
   async tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> {
     return this.#call<Tidied, 'tidied', BankScope>('tidyGone', scope, async () => {
-      const bankScope = SX.bankScope.parse(scope)
+      const bankScope = CX.bankScope.parse(scope)
       return { act: 'tidied', val: await adapted(() => this.doTidyGone(bankScope)), world: bankScope }
     })
   }

@@ -42,6 +42,7 @@ describe("new Wayin(record): the record check", () => {
     [() => passphraseRecord({ vault_key_wayin_wrapped: undefined }),            'refuses a record with no wrapped vaultKey'],
     [() => passphraseRecord({ salt_b64: '' }),                                  'refuses an empty passphrase salt'],
     [() => passphraseRecord({ device_id: undefined }),                          'refuses a record with no device_id'],
+    [() => passphraseRecord({ device_id: 'device_one' }),                       'refuses a record whose device_id is a label, as an older one was'],
     [() => passphraseRecord({ wayinkind: 'password' }),                         'refuses a wayinkind of no known kind'],
     [() => passphraseRecord({ registered_at: '2023-11-14T22:13:20.000Z' }),     'refuses a time written as an ISO string'],
     [() => passphraseRecord({ vault_key_wayin_wrapped: { ciphertext_b64: 'ct' } }), 'refuses a wrap with no cipherIv'],

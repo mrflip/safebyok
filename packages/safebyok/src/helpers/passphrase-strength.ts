@@ -1,3 +1,4 @@
+import { brandGuarded } from './consts'
 import { decorate } from './helpers'
 import * as Phrases from './phrases'
 import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
@@ -23,9 +24,8 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * `load` yourself only to warm up. A `load` that fails refuses the hello, so a
  * vault that cannot check a new passphrase never opens.
  *
- * `browserOpts()` supplies `zxcvbnStrengthChecker`: pass your own after the spread to replace it,
- * or wrap it to ask for more (CUSTOMIZATION.md). To ask it as the user types, call
- * `vault.tryCheckStrength(typed)`.
+ * safebyok ships none: pass your own (CUSTOMIZATION.md). To ask it as the user types, call
+ * `gating.checkStrength(typed)`, which answers its verdict.
  *
  * - A blank passphrase is sent back as a weak passphrase, unconditionally, without consulting the checker.
  * - The default strength checker refuses everything: see CUSTOMIZATION.md for why we do this, and instructions to supply one.
@@ -41,10 +41,10 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** A strength checker as a vault keeps it: the host's, told the vault's scope and held to its contract by {@link invokeStrengthChecker}. */
+/** A strength checker as a bank keeps it: the host's, held to its contract by {@link guardStrengthChecker}. */
 export type GuardedStrengthChecker = {
-  (passphrase: string): Promise<PassphraseVerdict>
-  load: () => Promise<void>
+  (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict>
+  readonly load: () => Promise<void>
 }
 
 /** A verdict that admits, frozen so that a checker may share it. */
@@ -64,22 +64,20 @@ export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 /** The verdict on a blank new passphrase, which no checker hears. */
 const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
-/** `hostChecker` held to its contract and told `scope`. Ask the host's checker only through it, so the vault and a dialog checking as the user types decide alike.
- * A blank passphrase is weak before the host's checker hears it. It refuses a passphrase that is no string, an
- * answer that is no verdict, and a throw, carrying nothing of it, as the
- * checker heard the passphrase. `load` refuses a failure, its cause the throw,
- * as it heard nothing.
- */
-export const invokeStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
-  // Frozen, so the host's checker can change nothing of what it is told.
-  const told = CX.vaultScope.parse(scope)
-  const check = async (passphrase: string): Promise<PassphraseVerdict> => {
+// A blank passphrase is weak before the host's checker hears it. A throw is replaced, as the checker heard the passphrase;
+// a failed `load` keeps its throw as the cause, as it heard nothing.
+/** `hostChecker` held to its contract: the one way a vault, or a dialog checking as the user types, asks it. */
+export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStrengthChecker => {
+  const host = GX.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
+  const check = async (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict> => {
+    // Frozen, so the host's checker can change nothing of what it is told.
+    const told = CX.vaultScope.parse(scope)
     const typed = GX.passphraseCleartext.parse(passphrase)
     if (! typed.trim()) { return BlankVerdict }
     let checked: ReturnType<typeof GX.passphraseVerdict.safeParse>
     try {
       // Parsed inside the guard, to be certain no cleartext passphrase leakage
-      checked = GX.passphraseVerdict.safeParse(await hostChecker(typed, told))
+      checked = GX.passphraseVerdict.safeParse(await host(typed, told))
     } catch (err) {
       throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', Phrases.StrengthCheckerThrew)
     }
@@ -88,14 +86,12 @@ export const invokeStrengthChecker = (hostChecker: StrengthChecker, scope: Vault
     }
     return checked.data.strong ? StrongVerdict : checked.data
   }
-  return decorate(check as GuardedStrengthChecker, { load: () => loadStrengthChecker(hostChecker) })
-}
-
-/** Run `hostChecker`'s `load`, if it has one, refusing a failure with what it threw as the cause. */
-export const loadStrengthChecker = async (hostChecker: StrengthChecker): Promise<void> => {
-  try {
-    await hostChecker.load?.()
-  } catch (err) {
-    throw strengthCheckerLoadFailed(err)
+  const load = async (): Promise<void> => {
+    try {
+      await host.load?.()
+    } catch (err) {
+      throw strengthCheckerLoadFailed(err)
+    }
   }
+  return brandGuarded(decorate(check as GuardedStrengthChecker, { load }))
 }

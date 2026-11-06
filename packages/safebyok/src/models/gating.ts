@@ -6,7 +6,7 @@ import * as EX from '../shapes/shapes-enums'
 import type { GatingKind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
-import type { AnteProvings, AnyGating, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, RequestCleartext, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
+import type { AnteProvings, AnyGating, AskUser, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultWorld } from '../shapes/shapes-vaultish'
 import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
@@ -74,20 +74,15 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   /** SLOPDOC: Opens a new gating's dialog on this bank and resolves with the vault its run answers. */
   static async launch<KindT extends GatingKind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
     const { scope } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend })
-    const { requestCleartext } = args.listing.world
+    const { askUser } = args.listing.world
     const gating = new Gating(gatingkind, { ...args, scope })
     args.listing.holdGating(gating as unknown as AnyGating)
-    void gating.#askHost(requestCleartext)
+    void gating.#askHost(askUser)
     return valOf(await gating.#settled)
   }
 
-  async #askHost(requestCleartext: RequestCleartext): Promise<void> {
-    try {
-      await requestCleartext(this as unknown as AnyGating)
-      this.#endAsking(gatingDeclined())
-    } catch {
-      this.#endAsking(requestCleartextThrew())
-    }
+  async #askHost(askUser: AskUser): Promise<void> {
+    this.#endAsking((await askUser(this as unknown as AnyGating)) ? gatingDeclined() : requestCleartextThrew())
   }
   // --
 

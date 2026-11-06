@@ -1,7 +1,7 @@
 /** What every other shape stands on: the stored records' fields, the whisper and sidecar, the scopes, and the shapes of the code a host hands in. Imported as `CX`. */
 
 import type * as Z from 'zod'
-import { never, record } from 'zod'
+import { never, record, uuid } from 'zod'
 import { MaxSaltBytes, PasskeySaltBytes, isWhisperedBag } from '../helpers/consts'
 import { fromB64OrNull } from '../helpers/crypto'
 import type { VaultLogger } from '../helpers/logger'
@@ -24,17 +24,17 @@ export type Ciphered = Z.infer<typeof ciphered>
 export { epochMillis, type EpochMillis } from './primitives'
 
 /** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` quotes none of it.
- * A token is plain text, as a host's adapter may write one by hand. A device's id is a `label`. A key deriver's label
+ * A token is plain text, as a host's adapter may write one by hand. A device's id is a UUID. A key deriver's label
  * and a passkey's credential id are plain text, not empty. A salt or a ciphered field is
  * branded for its role, since nothing but safebyok makes one. A salt's check is its shape, text
  * that is not empty. Its length is judged where its wayin is, so a salt of the wrong length is a
  * damaged wayin while the vault's other wayin still opens.
  */
-export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str, label }) => ({
+export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1, Phrases.TokenMissing),
   box_tok:                 str.min(1, Phrases.TokenMissing),
   revision_tok:            str.min(1, Phrases.TokenMissing),
-  device_id:               label,
+  device_id:               uuid(Phrases.DeviceIdShape),
   key_deriver_label:       str.min(1),
   credential_id:           str.min(1),
   salt_b64:                str.min(1).brand<'PassphraseSalt'>(),
@@ -169,7 +169,7 @@ export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 
 // == [Key deriver and logger]: keyDeriverShape, loggerShape
 
-/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads. Bank.make keeps what it was handed, prototype and all. */
+/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads. */
 export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
   algorithm:         str.optional(),
   key_deriver_label,

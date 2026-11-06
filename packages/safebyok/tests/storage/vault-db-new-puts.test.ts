@@ -235,7 +235,7 @@ describe("MemoryVaultDB", () => {
   describe("gate verbs", () => {
     it("replacePassphrase lays the wayin on, moves gate_epoch and the revision each one up, and leaves the rest as stored", async () => {
       const { vaultDB, vault } = await storeWith()
-      const wayin = { ...passphraseWayin, device_id: 'd2' }
+      const wayin = { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
       const { act, val, world } = await vaultDB.replacePassphrase(paramsOf(vault, { passphrase_wayin: wayin }))
       expect(act).to.eq('replaced')
       expect(world).to.deep.equal(val)
@@ -250,7 +250,7 @@ describe("MemoryVaultDB", () => {
       const { act, val } = await vaultDB.addPasskey(paramsOf(vault, { passkey_wayin: passkeyWayin }))
       expect(act).to.eq('added')
       expect(val.gate).to.deep.equal({ gate_epoch: 2, passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin })
-      expect(await vaultDB.tryAddPasskey(paramsOf(val, { passkey_wayin: { ...passkeyWayin, device_id: 'd2' } }))).to.deep.include({ ok: false, act: 'camped', dbhas: val, world: val })
+      expect(await vaultDB.tryAddPasskey(paramsOf(val, { passkey_wayin: { ...passkeyWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } }))).to.deep.include({ ok: false, act: 'camped', dbhas: val, world: val })
     })
 
     it("revokePasskey nulls a passkey held, and over none answers revoked with nothing moved", async () => {

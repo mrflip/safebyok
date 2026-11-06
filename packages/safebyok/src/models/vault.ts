@@ -3,14 +3,13 @@ import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { reportToPlatform } from '../refusals/report-error'
 import type { GatingKind, LockState } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BoxPut, BoxPutOpts, BoxWorld, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultRecord, VaultSnapshot, VaultSparse, VaultWorld } from '../shapes/shapes-vaultish'
 import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
@@ -23,12 +22,12 @@ import type { VaultListing } from './vault-listing'
 
 // == [Defaults]: DefaultLeaseMillis
 
-/** How long a lease lasts where the world names no `leaseMillis`: fourteen days. */
+/** How long a lease lasts where the host names no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 
 /** SLOPDOC: A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in. */
-export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> implements BoxWorld {
+export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
   // == [Props]: applabel, user_id, vaultlabel, world, listing, #lease, #friend, #boxListing, #gate
 
   /** The scope, tattooed on by Storable's constructor. */
@@ -183,19 +182,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! vacated.ok) { await onRefused(vacated.err) }
   }
 
-  /** Tell `onPanic` that a cached lease survived a lock; with none, tell the platform and vacate this vault. */
+  /** Tell the host that a cached lease survived a lock, vacating this vault when it has no `onPanic` to hear it. */
   async #panic(refusal: VaultError): Promise<void> {
-    const { onPanic } = this.world
-    if (onPanic === undefined) {
-      reportToPlatform(refusal)
-      this.vacate()
-      return
-    }
-    try {
-      await onPanic(refusal)
-    } catch (err) {
-      reportToPlatform(err)
-    }
+    if (! await this.world.panic(refusal)) { this.vacate() }
   }
 
   /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
@@ -247,7 +236,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   #makeFriend(): LeaseFriend {
-    const { world: { logger, deviceDB, leaseMillis = DefaultLeaseMillis } } = this
+    const { world: { logger, deviceDB, leaseMillis } } = this
     const stamp = GX.vaultStamp.parse(this)
     const asked = this.#stampOfLife()
     return {

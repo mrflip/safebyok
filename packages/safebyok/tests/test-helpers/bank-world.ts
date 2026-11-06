@@ -6,7 +6,7 @@ import { VaultError, type RefusalKind } from '../../src/refusals/errors'
 import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { BankScope, VaultScope } from '../../src/shapes/shapes-storage'
+import type { BankScope, VaultScope } from '../../src/shapes/shapes-core'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankOpts, BankSnapshot } from '../../src/shapes/shapes-vaultish'
 import { anyStrengthChecker, testDeriver } from './builders'
@@ -63,7 +63,7 @@ export const makeBankWorld = () => {
   const deviceDB = new MemoryDeviceDB()
   const dialog = { typing: byPassphrase(Passphrase) as object }
   const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing) }
-  const baseOpts: BankOpts = { ...BankScopeGiven, device_id: 'device_one', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
+  const baseOpts: BankOpts = { ...BankScopeGiven, device_id: '00000000-0000-4000-8000-0000000000b1', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
   /** A bank over this world's stores: called twice, two pages on one device. */
   const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
     const bank = Bank.make({ ...baseOpts, ...overrides })
@@ -75,7 +75,7 @@ export const makeBankWorld = () => {
     /** Move the clock on by `millis`; no timer fires. */
     advance:   (millis: number) => { now += millis },
     /** A bank on another device: this world's vaultDB, and a deviceDB of its own. */
-    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_id: 'device_two', deviceDB: new MemoryDeviceDB(), ...overrides }),
+    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_id: '00000000-0000-4000-8000-0000000000b2', deviceDB: new MemoryDeviceDB(), ...overrides }),
     leaseRows: (): unknown[] => [...deviceDB._cheat_leaseRows().values()],
   }
 }

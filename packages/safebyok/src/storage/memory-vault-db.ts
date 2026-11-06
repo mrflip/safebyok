@@ -4,7 +4,8 @@ import { type BoxesFetched, type BoxFetched, type BoxLanding, type Heard, type L
 import { ckeyOf } from '../helpers/helpers'
 import * as Refuse from '../refusals/throwers'
 import * as SX from '../shapes/shapes-storage'
-import type { BankScope, BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { BankScope, VaultScope } from '../shapes/shapes-core'
+import type { BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultQuery, VaultRecord, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
 

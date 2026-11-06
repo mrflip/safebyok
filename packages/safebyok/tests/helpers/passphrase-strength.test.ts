@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { StrongVerdict, DefaultStrengthChecker, invokeStrengthChecker, loadStrengthChecker, type StrengthChecker } from '../../src/helpers/passphrase-strength'
+import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, type StrengthChecker } from '../../src/helpers/passphrase-strength'
+import { isGuarded } from '../../src/helpers/consts'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type { PassphraseVerdict } from '../../src/shapes/shapes-gateish'
 import { VaultError } from '../../src/refusals/errors'
@@ -35,22 +36,34 @@ const lazyCheckerThrowingOn = (field: 'strong' | 'reason'): StrengthChecker => (
   return verdict
 }
 
-describe("invokeStrengthChecker", () => {
+describe("guardStrengthChecker", () => {
+  it("brands the checker it makes as guarded, the brand hidden from a spread and from JSON", () => {
+    const guarded = guardStrengthChecker(alwaysStrong)
+    expect(isGuarded(guarded)).to.be.true
+    expect(isGuarded(alwaysStrong)).to.be.false
+    expect(isGuarded({ ...guarded })).to.be.false
+    expect(Object.getOwnPropertySymbols(guarded).map((sym) => Object.getOwnPropertyDescriptor(guarded, sym)?.enumerable)).to.deep.equal([false])
+  })
+
+  it("refuses a checker that is no function", () => {
+    TH.expectSyncRefusal(() => guardStrengthChecker({ strong: true } as never), 'bad_option')
+  })
+
   // StrengthChecker @example 1
   it("answers the host's own verdicts: a reason for a passphrase it finds short, StrongVerdict for any other", async () => {
-    const guarded = invokeStrengthChecker(twentyOrMore, scope)
-    expect(await guarded('too short')).to.deep.equal({ strong: false, reason: 'Twenty characters or more, please.' })
-    expect(await guarded('long enough for any checker')).to.eq(StrongVerdict)
+    const guarded = guardStrengthChecker(twentyOrMore)
+    expect(await guarded('too short', scope)).to.deep.equal({ strong: false, reason: 'Twenty characters or more, please.' })
+    expect(await guarded('long enough for any checker', scope)).to.eq(StrongVerdict)
   })
 
   it("answers the weak verdict of a checker that finds one weak, its reason as the checker gave it", async () => {
-    expect(await invokeStrengthChecker(neverStrong, scope)('acme acme acme')).to.deep.equal({ strong: false, reason: 'Pick a phrase nobody would guess.' })
+    expect(await guardStrengthChecker(neverStrong)('acme acme acme', scope)).to.deep.equal({ strong: false, reason: 'Pick a phrase nobody would guess.' })
   })
 
   it("finds a blank passphrase weak before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
     for (const blank of ['', ' '.repeat(3), '\t\n']) {
-      const verdict = await invokeStrengthChecker(checker, scope)(blank)
+      const verdict = await guardStrengthChecker(checker)(blank, scope)
       expect(verdict).to.have.property('strong', false)
       expect(verdict).to.have.property('reason').that.includes("can't be empty")
     }
@@ -59,18 +72,18 @@ describe("invokeStrengthChecker", () => {
 
   it("refuses a passphrase that is no string, before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
-    const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope)(42 as never))
+    const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope))
     expect(err.message).to.match(/passphrase/i)
     expect(checker).not.toHaveBeenCalled()
   })
 
   it("awaits a checker that answers a promise", async () => {
-    expect(await invokeStrengthChecker(breachedLater, scope)('acme acme acme')).to.deep.equal({ strong: false, reason: 'Found in a breach.' })
+    expect(await guardStrengthChecker(breachedLater)('acme acme acme', scope)).to.deep.equal({ strong: false, reason: 'Found in a breach.' })
   })
 
   it("answers StrongVerdict for a passphrase the checker admits, handing it the passphrase exactly as given and a frozen copy of the scope", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => ({ strong: true }))
-    expect(await invokeStrengthChecker(checker, scope)('  Spaced Out Phrase  ')).to.eq(StrongVerdict)
+    expect(await guardStrengthChecker(checker)('  Spaced Out Phrase  ', scope)).to.eq(StrongVerdict)
     expect(checker).toHaveBeenCalledWith('  Spaced Out Phrase  ', { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
     const told = checker.mock.calls[0]?.[1]
     expect(told).to.not.eq(scope)
@@ -89,7 +102,7 @@ describe("invokeStrengthChecker", () => {
   for (const [answer, blurb] of Misanswers) {
     it(`refuses a checker answering ${blurb}`, async () => {
       const misfit = (() => answer) as unknown as StrengthChecker
-      const err = await TH.expectRefusal(invokeStrengthChecker(misfit, scope)('acme acme acme'))
+      const err = await TH.expectRefusal(guardStrengthChecker(misfit)('acme acme acme', scope))
       expect(err.message).to.match(/strengthChecker/)
       expect(err.message).to.not.include('acme acme acme')
     })
@@ -103,7 +116,7 @@ describe("invokeStrengthChecker", () => {
   for (const [thrown, blurb] of Throws) {
     it(`refuses a checker that throws ${blurb} naming strengthChecker, carrying nothing of the throw`, async () => {
       const broken: StrengthChecker = () => Promise.reject(thrown)
-      const err = await TH.expectRefusal(invokeStrengthChecker(broken, scope)('acme acme acme'))
+      const err = await TH.expectRefusal(guardStrengthChecker(broken)('acme acme acme', scope))
       expect(err).to.not.eq(thrown)
       expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
       expect(err.cause).to.be.undefined
@@ -114,7 +127,7 @@ describe("invokeStrengthChecker", () => {
 
   for (const field of ['strong', 'reason'] as const) {
     it(`refuses a verdict whose ${field} is a getter that throws, carrying nothing of the throw`, async () => {
-      const err = await TH.expectRefusal(invokeStrengthChecker(lazyCheckerThrowingOn(field), scope)('acme acme acme'))
+      const err = await TH.expectRefusal(guardStrengthChecker(lazyCheckerThrowingOn(field))('acme acme acme', scope))
       expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
@@ -123,24 +136,24 @@ describe("invokeStrengthChecker", () => {
   }
 })
 
-describe("invokeStrengthChecker's load", () => {
+describe("guardStrengthChecker's load", () => {
   it("is hidden from a loop or a spread", () => {
-    const guarded = invokeStrengthChecker(alwaysStrong, scope)
+    const guarded = guardStrengthChecker(alwaysStrong)
     expect(Object.keys(guarded)).to.deep.equal([])
     expect(guarded.load).to.be.a('function')
   })
 
   it("resolves for a checker that carries none, and still checks", async () => {
-    const guarded = invokeStrengthChecker(alwaysStrong, scope)
+    const guarded = guardStrengthChecker(alwaysStrong)
     await guarded.load()
-    expect(await guarded('acme acme acme')).to.eq(StrongVerdict)
+    expect(await guarded('acme acme acme', scope)).to.eq(StrongVerdict)
   })
 
   // StrengthChecker @example 2
   it("runs the checker's own load, on the checker, each time it is called", async () => {
     const hostLoad = vi.fn(function (this: unknown) { return Promise.resolve() })
     const checker = Object.assign(() => StrongVerdict, { load: hostLoad })
-    const guarded = invokeStrengthChecker(checker, scope)
+    const guarded = guardStrengthChecker(checker)
     await guarded.load()
     await guarded.load()
     expect(hostLoad).toHaveBeenCalledTimes(2)
@@ -150,23 +163,15 @@ describe("invokeStrengthChecker's load", () => {
   it("refuses a load that fails, with what it threw as the cause", async () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
     const checker = Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })
-    const err = await TH.expectRefusal(invokeStrengthChecker(checker, scope).load())
+    const err = await TH.expectRefusal(guardStrengthChecker(checker).load())
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
+    expect(err.message).to.match(/bank\.hello\(\)/)
     expect(err.cause).to.eq(chunkLost)
   })
 
   it("refuses a load that throws rather than rejecting", async () => {
     const checker = Object.assign(() => StrongVerdict, { load: () => { throw new Error('no word list') } })
-    await TH.expectRefusal(invokeStrengthChecker(checker, scope).load())
-  })
-})
-
-describe("loadStrengthChecker", () => {
-  it("refuses a load that fails, naming bank.hello(), with what it threw as the cause", async () => {
-    const chunkLost = new TypeError('Failed to fetch dynamically imported module')
-    const err = await TH.expectRefusal(loadStrengthChecker(Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })))
-    expect(err.message).to.match(/bank\.hello\(\)/)
-    expect(err.cause).to.eq(chunkLost)
+    await TH.expectRefusal(guardStrengthChecker(checker).load())
   })
 })
 
@@ -180,7 +185,7 @@ describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason po
       expect(verdict).to.have.property('reason').that.matches(/can't take a new passphrase yet/)
       expect(JSON.stringify(verdict)).to.not.include(passphrase || 'no passphrase at all')
     }
-    expect(await invokeStrengthChecker(DefaultStrengthChecker, scope)('correct horse battery staple')).to.have.property('strong', false)
+    expect(await guardStrengthChecker(DefaultStrengthChecker)('correct horse battery staple', scope)).to.have.property('strong', false)
   })
 
   it("answers the same, every time, logging nothing: it is an ordinary checker", async () => {
