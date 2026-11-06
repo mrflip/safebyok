@@ -19,8 +19,15 @@ queue line delivers. `human/20261106-sprint_reform_paused.md` says where each th
 * Thread 4 `hello_listed`: filed, PR #523 at 895949623 on #513's current tip (not in the Coach's line).
 * Thread 11 `duck_calibration`: filed, PR #525 at 781f7e625, on main.
 * Thread 12 `refusalof_removed`: filed, PR #526 at 255d2c5d7, on main; merge with or after #517.
-* Thread 13 `guarantees_models`: built, PR #528, in review (high). **For thread 7:** the host-function paragraph still
-  says all three guards go through `refusalFor`; only `invokeStrengthChecker` does.
+* Thread 13 `guarantees_models`: filed, PR #528 at 0b9afd51a, on main. **For thread 7:** G8's host-guard sentence now
+  carries the core's names (rebase onto it, drop the duplicate `requestCleartextThrew` clause); the host-function
+  paragraph still says all three guards reach `refusalFor`; only `invokeStrengthChecker` does. **For thread 8:** the
+  values sweep's `ShapeModules` list wants a directory check; `KX` wants a row in STYLE's alias table.
+* Thread 15 `list_boxes`: built, PR #530 on #523, in review (high). **For threads 5 to 8:** `getBank` is `listVaults`,
+  `VaultListing.list()`/`BoxListing.list()`, `fetchListed`/`vaultRowOf`/`VX.boxesListed`/`_takeListed` gone; `takeWorld`
+  parses and receives only. **For thread 6:** keep `takeWorld` on the `BoxWorld` Pick.
+* Thread 16 `utils_mash`: built, PR #529 on #518, in review (low). The core's `safebyok/utils` entry exists now; the root
+  size budget has no new-core lines yet (a later thread adds them together).
 * Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
   `d` + 32 hex.
 * **The Closer Look** (sprint doc tab, 2026-11-06 06:00) at 3b1b38999: its 1.1 is a real regression from #513 (`buildLease`

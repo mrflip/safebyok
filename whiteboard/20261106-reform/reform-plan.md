@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) built, in review; thread 15 (`list_boxes`, the Coach's "go ahead B") building on #523; thread 16 (`utils_mash`) building on #518; the Closer Look
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) built on #523, in review; thread 16 (#529, `utils_mash`) built on #518, in review; the Closer Look
 tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
@@ -339,7 +339,13 @@ narrowed to values; F8 and F9 in G10; the second review's tidies. Deviations: th
 files table (accepted, Cleanup); G8's host-guard sentence lost "(kind only, logged)" since the core logs neither. **For
 thread 7:** only `invokeStrengthChecker` reaches `HostErrorSanitizer.refusalFor`; the host-function paragraph still says
 all three. Open Matters: no whisper size check in the core; the Argon2id deriver is not exported. Cleanup: a whisper
-zeroing test (thread 5); `passkeyAnswer`'s stale doc block. In review (high, opus).
+zeroing test (thread 5); `passkeyAnswer`'s stale doc block.
+*Review (high, opus):* `fixed`; every rewritten clause checked against the core, same claim in the core's names; four
+fixes (the values sweep now reaches nested, piped and later fields, shown by breaking two checkers; G10's prefix check
+scoped to our deriver; G4 names the tombstone; the passphrase chain names four more clears). Left: the guarded-file list
+omits `vault.ts`, `deriver/argon2id-webv1.ts` and `passphrase-strength.ts` (Open Matters, TOP); the host-function
+paragraph contradicts G8 until thread 7; `ShapeModules` hand-kept and `KX` unlisted (Cleanup). **Filed** at 0b9afd51a, as
+cut, on main.
 
 ### 14. `deviceid_label`
 
@@ -375,6 +381,12 @@ logic; the Coach: "There is no respect in which it's acceptable for any part of 
 performing this refactor, so please halt if it appears so"; VOCABULARY's `getVault` row in its own commit (it meets #518); minor
 changeset. **Levels:** worker `opus`; review `high`. **Depends on:** #523 (stacked). **Look-ahead:** thread 6 keeps
 `takeWorld` on the `BoxWorld` Pick; thread 8 brands the VaultDB. **Size:** one context.
+
+*Built (PR #530, "Stacked on #523"):* as the gloss, src 13 lines shorter; `listing.ts` and `storable.ts` untouched;
+`takeWorld` lost its tok branch; a new `SX.vaultQuery` checker (+2). Deviations for the reviewer: `Refuse.vaultMismatch`
+answers `world: null` with the row in `dbhas`; #523's hello parse test removed with the parse; `getBox` after a
+`vault_gone` hello answers `disabled` (the vacated listing). Conflicts with #511 in five files, each "take #530's side,
+rename `damaged_records` to `damaged_rows`". In review (high, opus).
 
 ### 16. `utils_mash`
 
