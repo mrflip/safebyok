@@ -3,6 +3,8 @@
 The orchestrator's curated summary of what the threads have taught. Newer than the plan wherever they disagree. Workers
 look things up here; they do not read it whole.
 
+**Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
+
 ## State (2026-11-06)
 
 * Threads 1 (`vocab_sweep`) and 2 (`guarantees_pass`) started 2026-11-06 from `origin/main` at 57f33ee9.
