@@ -113,8 +113,8 @@ await vault.ensureUnlocked() // and it is back, edit included
 
 Read it through `box.whisper` each time: a reference you kept outlives a lock.
 
-**A raw field.** The whisper reaches no prop or state of yours, so it is only in the DOM (and on the
-screen), where React's dev tools do not list it:
+**A raw field,** on React 19, whose ref cleanup unbinds it. The whisper reaches no prop or state of
+yours, so it is only in the DOM (and on the screen), where React's dev tools do not list it:
 
 ```tsx
 import { BoxFields } from 'safebyok/dom'

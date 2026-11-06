@@ -111,3 +111,6 @@ not as a settled ruling, and check it against the current design before relying 
   last field unbinds lands after the `unexpose`, so the whisper stays exposed with no field to tie it to, until the host unexposes or the box is swept,
   vacated or deleted. Also: **a `fields.save()` crossing an edit:** it reads the fields when called, so what is typed during the put's awaits is not
   in that put, and stays in the element for the next.
+* 2026-11-06 (a review of #505, the Coach: "add the row"): **two copies of `safebyok/dom` in one page.** `BoxFields.of` keeps one `BoxFields` per box
+  in a module-level map, one per copy of the module. A page that loads `safebyok/dom` both as ESM and as CommonJS gives a box two `BoxFields`,
+  each with its own fields and its own last unbind, so the box unexposes when either copy's last field unbinds.
