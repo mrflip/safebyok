@@ -19,4 +19,4 @@ export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad,
 export type { ExpectingGood } from './test-helpers/refusals'
 export { describeVaultDBBattery } from './test-helpers/vault-db-battery'
 export type { VaultDBBatteryOpts, VaultDBRowCheats } from './test-helpers/vault-db-battery'
-export { bankScope, vaultScope, boxscope, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf } from './test-helpers/storage-world'
+export { bankScope, vaultScope, boxscope, vaultQuery, boxQuery, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf } from './test-helpers/storage-world'
