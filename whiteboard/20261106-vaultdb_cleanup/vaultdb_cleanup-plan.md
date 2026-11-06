@@ -10,7 +10,11 @@
   (storage_door) is cut from its top. The Closer Look tab awaits the Coach's replies.
   **On hold (the Coach, 2026-11-06): "Can you pause on the Postgres and graphql while I catch
   up?"** Nothing on safebyok-postgres or safebyok-graphql starts (thread 8, thread 7's Postgres
-  and GraphQL parts, any flipped Postgres or GraphQL row) until the Coach lifts it.
+  and GraphQL parts, any flipped Postgres or GraphQL row) until the Coach lifts it. *Postgres,
+  in part (the Coach, later the same day):* CTE vs transaction is settled as built ("let's wrap
+  the thread up using your direction ... Handroll what you want"); notices keep whole rows ("fewer
+  sparse records ... ratchet down the capacity limits"), waiting on the sizing table; `pg_user` is
+  still the Coach's ("I need to do some more considering").
 
 ## The Coach's request, verbatim
 
