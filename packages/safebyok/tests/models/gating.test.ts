@@ -6,10 +6,9 @@ import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import type { GatingKind } from '../../src/shapes/shapes-enums'
 import type { AnyGating, ClearsForGatingkind, RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { VaultWorld } from '../../src/shapes/shapes-vaultish'
 import { PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { type VaultWorldGiven, Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -40,7 +39,7 @@ const makeDialog = () => {
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
 /** A fresh world with a dialog, nothing stored. */
-const birthWorld = (worldOverrides: Partial<VaultWorld> = {}) => {
+const birthWorld = (worldOverrides: VaultWorldGiven = {}) => {
   const dialog = makeDialog()
   return { ...dialog, ...makeVaultWorld(null, { requestCleartext: dialog.requestCleartext, ...worldOverrides }) }
 }
@@ -49,7 +48,7 @@ const birthWorld = (worldOverrides: Partial<VaultWorld> = {}) => {
 const lockedVault = async (born = makeBornVault()) => {
   const world = await born
   const dialog = makeDialog()
-  world.opts.world.requestCleartext = dialog.requestCleartext
+  world.fakeBank.requestCleartext = dialog.requestCleartext
   world.vault.lock()
   await vi.waitFor(() => { expect(world.deviceDB.cachedNow()).to.be.null }, { interval: 1 })
   world.deviceDB.tryCache.mockClear()
@@ -348,7 +347,7 @@ describe("an unlock through a gating", () => {
   it("takes up a cached lease, nobody asked", async () => {
     const world = await makeBornVault()
     const dialog = makeDialog()
-    const session = makeVaultWorld(world.demandStored(), { requestCleartext: dialog.requestCleartext, deviceDB: world.opts.world.deviceDB })
+    const session = makeVaultWorld(world.demandStored(), { requestCleartext: dialog.requestCleartext, deviceDB: world.fakeBank.deviceDB })
     const again = await session.listing.build(world.demandStored())
     await again.ensureUnlocked()
     expect(again.isUnlocked).to.be.true
@@ -429,9 +428,9 @@ describe("a lock and a gating", () => {
   })
 
   it("does nothing to a birth: the dialog stays up, and a lock of another vault does not settle it", async () => {
-    const { vault, opts } = await makeBornVault()
+    const { vault, fakeBank } = await makeBornVault()
     const dialog = makeDialog()
-    opts.world.requestCleartext = dialog.requestCleartext
+    fakeBank.requestCleartext = dialog.requestCleartext
     const launched = vault.listing.buildVault({ ...Dna, vaultlabel: 'second' })
     const gating = await dialog.gatingAt<'build_vault'>()
     vault.lock()
@@ -484,9 +483,9 @@ describe("a decline crossing an attempt", () => {
   })
 
   it("is the same for requestCleartext returning under an attempt", async () => {
-    const { listing, opts } = makeVaultWorld()
+    const { listing, fakeBank } = makeVaultWorld()
     let attempting: Promise<unknown> = Promise.resolve()
-    opts.world.requestCleartext = (gating) => { attempting = (gating as Gating<'build_vault'>).attempt({ passphraseClear }) }
+    fakeBank.requestCleartext = (gating) => { attempting = (gating as Gating<'build_vault'>).attempt({ passphraseClear }) }
     const vault = await listing.buildVault(Dna)
     await attempting
     expect(vault.isUnlocked).to.be.true

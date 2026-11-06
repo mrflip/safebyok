@@ -8,7 +8,7 @@ import { type Boxscope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna, boxRecord, boxSparse } from '../shapes/shapes-vaultish'
+import { type BoxCreateOpts, type BoxDna, type BoxPutOpts, type BoxRecord, type BoxSnapshot, type BoxSparse, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, type ListingOpts, boxDna, boxRecord, boxSparse } from '../shapes/shapes-vaultish'
 import type { Notice } from '../storage/vault-db-new'
 import { Box } from './box'
 import { Listing } from './listing'
@@ -28,10 +28,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Construction]: constructor, scopeOf, sparseOf, recordOf
 
-  /** A box listing in `opts.world`, whose vault's scope and `vault_tok` are held to `boxListingOpts`, the rest to the base's check. */
-  constructor(opts: BoxListingOpts) {
-    VX.boxListingOpts.parse(opts)
-    super(opts)
+  /** The listing of the boxes of `world`, the vault they lie in. */
+  constructor(world: BoxWorld, opts: ListingOpts) {
+    VX.boxWorld.parse(world)
+    super(world, opts)
     Object.freeze(this)
   }
 
@@ -78,7 +78,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
     const held = this.at(scoped)
     if (held === null) { return this.fetch(scoped, opts) }
-    const { ifAbsent = 'fail', ...timely } = VX.fetchOpts.parse(opts)
+    const { ifAbsent, ...timely } = VX.fetchOpts.parse(opts)
     return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
   }
 
@@ -115,7 +115,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected makeThing(central: Fetched<BoxRecord, BoxSparse>): Box {
-    return new Box(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
+    return new Box(this.world, this, central)
   }
 
   protected nothingStoredError(scope: Boxscope): VaultError { return absentBoxError(scope) }

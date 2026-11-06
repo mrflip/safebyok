@@ -66,3 +66,33 @@ export type Modelkind = keyof ModelkindClasses
 export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ModelkindClasses[MKT] => (
   (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )
+
+// `Symbol.for`, as an adapter package may bundle a second copy of safebyok, whose stores must pass this one's checks.
+/** The tag a VaultDB answers true to, so a model can tell one from a duck. */
+export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
+
+/** True for a VaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsVaultDB}. */
+export const isVaultDB = (val: unknown): boolean => (
+  typeof val === 'object' && val !== null && (val as { [IsVaultDB]?: unknown })[IsVaultDB] === true
+)
+
+// `Symbol.for`, for the same reason as IsVaultDB.
+/** The tag a DeviceDB answers true to, so a model can tell one from a duck. */
+export const IsDeviceDB: unique symbol = Symbol.for('@safebyok/devicedb')
+
+/** True for a DeviceDB, made by whichever copy of safebyok: an object that answers true to {@link IsDeviceDB}. */
+export const isDeviceDB = (val: unknown): boolean => (
+  typeof val === 'object' && val !== null && (val as { [IsDeviceDB]?: unknown })[IsDeviceDB] === true
+)
+
+/** The tag a host's function answers true to once a bank has wrapped it, so a world can tell it from the bare one. */
+export const IsGuarded: unique symbol = Symbol('safebyok.guarded')
+
+/** True for a host's function as a bank wraps it: one that answers true to {@link IsGuarded}. */
+export const isGuarded = (val: unknown): boolean => (
+  (typeof val === 'function' || (typeof val === 'object' && val !== null)) && (val as { [IsGuarded]?: unknown })[IsGuarded] === true
+)
+
+// A getter, never an own enumerable field, so the brand neither serializes nor rides along in a spread.
+/** `made`, frozen, answering true to {@link IsGuarded}. */
+export const brandGuarded = <MadeT extends object>(made: MadeT): MadeT => Object.freeze(Object.defineProperty(made, IsGuarded, { get: () => true }))

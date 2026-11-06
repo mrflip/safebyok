@@ -24,7 +24,7 @@ of its sites, the note says so. A claim the code no longer bears is listed in #5
 Eleven files hold every line of the core that touches a secret: `crypto.ts`, the two shapes files that say what a
 stored leaseKey and a whisper are, the five of `models/` that build the constructions, `models/vault.ts`, which carries
 the whisper's text to the lease and holds it, and the two files that hear the passphrase, the default deriver and the
-strength-checker guard. A change to one of them is a change to these guarantees until shown otherwise.
+strength checker's wrap. A change to one of them is a change to these guarantees until shown otherwise.
 
 | File | What it keeps |
 |---|---|
@@ -37,14 +37,17 @@ strength-checker guard. A change to one of them is a change to these guarantees 
 | `packages/safebyok/src/models/box.ts` | holds no key: hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
 | `packages/safebyok/src/models/vault.ts` | the whisper's JSON text, carried through `sealStampedString` and `unsealStampedString` to `Lease.sealWith` and `unsealWith` and back (G6); the `Lease` held closed in `#lease`, which no method hands out (G9) |
 | `packages/safebyok/src/deriver/argon2id-webv1.ts` | `deriveKeyBytes`, which hears the passphrase as an argument and returns the passphraseKey bytes in a buffer of its own, for `passphraseKeyOf` to import and zero (G1, G2) |
-| `packages/safebyok/src/helpers/passphrase-strength.ts` | `invokeStrengthChecker`'s guard, which hears the new passphrase as an argument, parses the host checker's verdict inside the guard, and hands a throw to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
+| `packages/safebyok/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrap hears the new passphrase as an argument, parses the host checker's verdict inside the wrap, and hands a throw to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
-Beside them, three host functions hear the passphrase and are guarded where they are called:
-`keyDeriver.deriveKeyBytes` (`models/proving.ts`, `deriveKeyBytes`), `strengthChecker`
-(`helpers/passphrase-strength.ts`, `invokeStrengthChecker`) and `requestCleartext` (`models/gating.ts`,
-`Gating.#askHost`). Each guard hands what it caught to `HostErrorSanitizer.refusalFor`
-(`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, and it reads
-nothing of it. The `DeviceDB` (`storage/device-db-new.ts`, `storage/memory-device-db.ts`) stores the leaseKey
+Beside them, three host functions hear the passphrase, and each is wrapped once, in `Bank`'s constructor, so that
+past it the core holds the wrap and never the host's function; a proving's and a vault's world refuse a function
+without the wrap's brand (`isGuarded`, `helpers/consts.ts`). `keyDeriver` is wrapped by `guardKeyDeriver`
+(`models/proving.ts`), whose `deriveKeyBytes` replaces a throw with `keyDeriverThrew`; `strengthChecker` by
+`guardStrengthChecker` (`helpers/passphrase-strength.ts`), which hands a throw to `HostErrorSanitizer.refusalFor`
+(`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, reading nothing
+of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), the `askUser` a gating calls, which
+answers false for a throw and drops it, for `Gating.#askHost` to refuse as `requestCleartextThrew`. `onPanic`, which
+hears a refusal and no secret, is wrapped there too, by `guardOnPanic`. The `DeviceDB` (`storage/device-db-new.ts`, `storage/memory-device-db.ts`) stores the leaseKey
 opaque, and what a store throws is replaced at `storeFailed` (`refusals/throwers.ts`, by `DeviceDB`'s `adapted`),
 which keeps nothing of it (G8).
 
@@ -141,8 +144,9 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 `models/gating.ts`) → `checkedClears` (`GX.vaultBuildClears`, `vaultUnlockClears`, `passphraseReplaceClears`,
 `passkeyAddClears`, `passkeyRevokeClears`, `vaultDelClears`: shape only, `passphraseCleartext`), and for
 `revoke_passkey` and `del_vault` `provePassphrase` → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
-`buildNovel` → `Proving.checkStrength` → `invokeStrengthChecker` (`helpers/passphrase-strength.ts`) → the host's
-`strengthChecker`; both → `passphraseKeyOf` → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
+`buildNovel` → `Proving.checkStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
+(`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
+`keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
 (`argon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
 `gating.checkStrength` → `Proving.checkStrength`, as above.
 Operates on it without holding it: nothing; a passphrase has no handle form.
@@ -210,7 +214,8 @@ whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealW
 argument or a local: the gating's `attempt` hands the clears to `#attemptOnce`, and that to its kind's prove
 (`ProveForGatingkind`, `models/gating.ts`), whose `checkedClears` reads them; the prove hands the passphrase to
 `PassphraseProving.buildNovel` or `buildStored`, `buildNovel` to `Proving.checkStrength`, each to
-`passphraseKeyOf`, and that, through `deriveKeyBytes`, to `keyDeriver.deriveKeyBytes` (`models/proving.ts`).
+`passphraseKeyOf`, and that, through the `guardKeyDeriver` wrap and `deriveKeyBytes`, to the host's
+`keyDeriver.deriveKeyBytes` (`models/proving.ts`).
 `gating.checkStrength` hands one to `Proving.checkStrength` as the user types. No class, record, snapshot or
 closure that outlives the call holds it: no gate, vault or `run` hears a passphrase. The one comparison of two
 passphrases is `antePassphraseClear === nextPassphraseClear` in `ProveForGatingkind`'s `replace_passphrase`, both
@@ -309,11 +314,13 @@ a schema keyed by its input in the refusal*). `tests/helpers/validator.test.ts`,
 exports*, hands each checker the shapes modules export, and each field under it at any depth, parsed alone, a marked
 value, whole, in a list and in an object, and finds the marker in no refusal's message, stack, meta or cause. A check
 over a whole object runs only once its fields pass, so the sweep does not reach it. The three host functions that hear the passphrase have their throws
-replaced, never kept as a `cause`: by `deriveKeyBytes` (`models/proving.ts`, `keyDeriverThrew`), by
-`invokeStrengthChecker` (`helpers/passphrase-strength.ts`) through `HostErrorSanitizer.refusalFor`, and by
-`Gating.#askHost` (`requestCleartextThrew`). The gating's `checkedClears` does the same for a getter or proxy of
-the host's that throws as an attempt's clears are read: `clearsThrew`, `unexpected_error`, with no cause, and a `requestCleartext`
-that throws is `requestCleartextThrew`, `unexpected_error`; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`). A WebCrypto
+replaced, never kept as a `cause`, by the wraps `Bank`'s constructor makes of them: `guardKeyDeriver`'s
+`deriveKeyBytes` (`models/proving.ts`, `keyDeriverThrew`), `guardStrengthChecker` (`helpers/passphrase-strength.ts`)
+through `HostErrorSanitizer.refusalFor`, and `guardRequestCleartext` (`models/bank.ts`), which drops the throw and
+answers false, for `Gating.#askHost` to refuse as `requestCleartextThrew`, `unexpected_error`. The gating's
+`checkedClears` does the same for a getter or proxy of the host's that throws as an attempt's clears are read:
+`clearsThrew`, `unexpected_error`, with no cause; a `VaultError` a getter throws passes as it came (`notes/wontfix.md`).
+A `keyDeriver`'s `load`, which hears no passphrase, keeps its throw as the cause of `keyDeriverLoadFailed`. A WebCrypto
 failure that a wrong key or an altered record explains is caught and replaced, its error never
 kept: the unwrap that proves a wayin (`Proving.checkOpens`, `wrongProof`), the unwrap of a lease's
 vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a whisper
@@ -344,8 +351,8 @@ not read is warned of without its record (`Lease.buildFromCache` tells the frien
 (CUSTOMIZATION.md).
 
 **G9. Only `Gating`, `Proving` and `Lease` hold or use a key or its cleartext pre-image.** A passkey's PRF bytes count as a pre-image.
-Beside them a passphrase passes through the host functions of G1, and through `Proving.checkStrength` and
-`invokeStrengthChecker` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
+Beside them a passphrase passes through the host functions of G1, through their wraps, and through
+`Proving.checkStrength` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
 that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a key maker. The wayinKey lives only
 in `Proving.#wayinKey`; the leaseKey only in `Lease.#record` and the row cached on the device. The Vault holds its
 `Lease` closed, in `#lease`, and neither the Vault nor the Bank holds a lease record: `Proving.buildLease` makes the
@@ -383,7 +390,7 @@ the crypto imports.
   makes under a supplied label must carry exactly its parameters, and it makes none under another label with the
   reserved prefix `argon2id_web_`: `checkSuppliedSpecKept` (`deriver/basederiver.ts`), reached through
   `parseKeyDeriverSpec` from `argon2idDeriver` alone. A host's own deriver is checked by its interface,
-  `keyDeriverShape` (`shapes/shapes-core.ts`, at `Bank.make` and in each proving's world), not by its parameters: a
+  `keyDeriverShape` (`shapes/shapes-core.ts`), once, in `guardKeyDeriver` as `Bank`'s constructor wraps it, not by its parameters: a
   host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). The published
   entry points export neither `argon2idDeriver` nor `argon2idWebV1Deriver`, and no test of the core calls
   `argon2idDeriver` or `checkSuppliedSpecKept`; safebyok-fastkey's hash-wasm deriver runs on the old core.

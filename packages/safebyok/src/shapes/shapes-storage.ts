@@ -5,7 +5,7 @@ import { Checker, Checkers, objCheck } from '../helpers/validator'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
-import { sidecar } from './shapes-core'
+import { type Boxscope, type VaultScope, sidecar } from './shapes-core'
 
 // == [Sentinels and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
 
@@ -49,22 +49,16 @@ export type Revision = Readonly<Z.infer<typeof revision>>
 export type Times    = Readonly<Z.infer<typeof times>>
 // --
 
-// == [Scopes]: bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope, BankScope, VaultScope, VaultQuery, Boxscope, BoxQuery, WatchScope
+// == [Scopes]: vaultQuery, boxQuery, watchScope, VaultQuery, BoxQuery, WatchScope
 
-export const { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope } = Checkers('bad_option', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
-  const bankScope  = obj({ applabel, user_id })
-  const vaultScope = bankScope.extend({ vaultlabel })
-  const vaultQuery = vaultScope.extend({ vault_tok })
-  const boxscope   = vaultScope.extend({ boxlabel })
-  const boxQuery   = boxscope.extend({ vault_tok })
-  const watchScope = bankScope.extend({ vaultlabel: vaultlabel.optional() })
-  return { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope }
-}, [CX])
+// A scope's validator is CX's, frozen; `unwrap()` is its object, to extend.
+export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_option', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
+  vaultQuery: vaultScope.unwrap().extend({ vault_tok }),
+  boxQuery:   boxscope.unwrap().extend({ vault_tok }),
+  watchScope: bankScope.unwrap().extend({ vaultlabel: vaultlabel.optional() }),
+}), [CX])
 
-export type BankScope  = Readonly<Z.infer<typeof bankScope>>
-export type VaultScope = Readonly<Z.infer<typeof vaultScope>>
 export type VaultQuery = Readonly<Z.infer<typeof vaultQuery>>
-export type Boxscope   = Readonly<Z.infer<typeof boxscope>>
 export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
 export type WatchScope = Readonly<Z.input<typeof watchScope>>
 // --
@@ -84,7 +78,7 @@ export type Gate = Readonly<Z.infer<typeof gate>>
 // == [Vault forms]: vaultSparse, vaultRecord, vaultTombstone, vaultRow, VaultSparse, VaultRecord, VaultTombstone, VaultRow, DamagedVault
 
 export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_option', ({ lit, discrim }) => {
-  const vaultSparse    = vaultScope.extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
+  const vaultSparse    = CX.vaultScope.unwrap().extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
   const vaultRecord    = vaultSparse.extend({ am: lit('a'), gate }).strict()
   const vaultTombstone = vaultSparse.extend({ am: lit('x') }).strict()
   const vaultRow       = discrim('am', [vaultRecord, vaultTombstone])
@@ -101,7 +95,7 @@ export type DamagedVault   = VaultSparse & Readonly<{ damagekind: EX.Damagekind 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
 export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
-  const boxSparse = boxscope.extend({
+  const boxSparse = CX.boxscope.unwrap().extend({
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
     /** The life of the box under its boxlabel: minted at its birth, and kept by every later revision. */
@@ -149,14 +143,14 @@ export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParam
 
 // == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutVaultOpts, DelOpts, ReqParams, VaultDBOpts, MemoryVaultDBOpts
 
-export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
+export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
   const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
   const putVaultOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(['fail', 'get']).default('fail') })
   const delOpts = obj({ prior: revision })
 
-  const reqParams = obj({ applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, ...revision.shape, prior: revision }).partial()
+  const reqParams = boxQuery.extend({ box_tok, ...revision.shape, prior: revision }).partial()
   return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
 }, [CX])
 
@@ -287,19 +281,18 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [The deviceDB]: leaseQuery, leaseSparse, leaseRow, cutoff, LeaseQuery, LeaseSparse, LeaseRow
-
-export const leaseQuery = Checker(({ obj, applabel, user_id, vaultlabel, vault_tok }) => obj({ applabel, user_id, vaultlabel, vault_tok }), 'bad_option', [CX])
+// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, cutoff, LeaseQuery, LeaseDated, LeaseRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
-export const { leaseSparse, leaseRow } = Checkers('bad_option', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok }) => {
-  const leaseSparse = obj({ applabel, user_id, vaultlabel, vault_tok, proved_at: epochMillis })
-  return { leaseSparse, leaseRow: leaseSparse.loose() }
-}, [CX])
+export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis }) => {
+  const leaseDated = vaultQuery.extend({ proved_at: epochMillis })
+  return { leaseQuery: vaultQuery, leaseDated, leaseRow: leaseDated.loose() }
+})
 
 export const cutoff = Checker(({ epochMillis }) => epochMillis, 'bad_option')
 
 export type LeaseQuery   = Z.infer<typeof leaseQuery>
-export type LeaseSparse  = Z.infer<typeof leaseSparse>
+/** A cached lease as the deviceDB dates it: its query and its `proved_at`. */
+export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
 // --

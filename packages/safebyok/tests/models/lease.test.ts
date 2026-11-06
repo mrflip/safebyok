@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { ForeverMillis } from '../../src/helpers/consts'
 import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
 import { VaultError } from '../../src/refusals/errors'
 import { Lease } from '../../src/models/lease'
@@ -63,6 +64,7 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
     [() => ({ friend: { ...fakeLeaseFriendOf(), vault_tok: undefined } }),        'refuses a friend with no vault_tok'],
     [() => ({ friend: { ...fakeLeaseFriendOf(), tryUncacheLease: undefined } }),  'refuses a friend with no tryUncacheLease'],
     [() => ({ friend: { ...fakeLeaseFriendOf(), logger: undefined } }),           'refuses a friend with no logger'],
+    [() => ({ friend: { ...fakeLeaseFriendOf(), logger: TH.quietLogger } }),      'refuses a friend with a logger no bank guarded'],
   ] as const
 
   for (const [argsOf, blurb] of GrantRefusalCases) {
@@ -161,8 +163,8 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(friend.cached).to.be.null
   })
 
-  it("finds nothing past an autolock of Infinity: a lease cached long ago is in force", async () => {
-    const friend = fakeLeaseFriendOf({ leaseMillis: Infinity })
+  it("finds nothing past an autolock of ForeverMillis, a host's Infinity: a lease cached long ago is in force", async () => {
+    const friend = fakeLeaseFriendOf({ leaseMillis: ForeverMillis })
     const lease = await makeGrantedLease(friend)
     await lease.cache()
     vi.setSystemTime(T0 + (400 * 24 * 60 * 60_000))

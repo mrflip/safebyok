@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { FarFuture, FarPast, ForeverMillis, hasModelkind } from '../../src/helpers/consts'
+import { FarFuture, FarPast, ForeverMillis, hasModelkind, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
 
 describe("FarFuture", () => {
@@ -45,5 +47,24 @@ describe("hasModelkind", () => {
 
   it("is no own key of a model, so a spread and Object.keys leave it out", () => {
     expect(Object.keys(boxListingOf(mw))).not.to.include('modelkind')
+  })
+})
+
+describe("isVaultDB and isDeviceDB", () => {
+  it("tell a store by the brand its base class carries, as another copy of safebyok would make it", () => {
+    expect(isVaultDB(new MemoryVaultDB())).to.be.true
+    expect(isDeviceDB(new MemoryDeviceDB())).to.be.true
+    expect(isVaultDB({ [Symbol.for('@safebyok/vaultdb')]: true })).to.be.true
+    expect(isDeviceDB({ [Symbol.for('@safebyok/devicedb')]: true })).to.be.true
+  })
+
+  it("refuse a duck, the other store, and a copy of a store's own fields, which leaves the brand behind", () => {
+    const vaultDB = new MemoryVaultDB()
+    expect(isDeviceDB({ tryPeek: () => null, tryCache: () => null, tryVacate: () => null })).to.be.false
+    expect(isVaultDB(Object.assign({}, vaultDB))).to.be.false
+    expect(isVaultDB(new MemoryDeviceDB())).to.be.false
+    expect(isDeviceDB(vaultDB)).to.be.false
+    expect(isVaultDB(null)).to.be.false
+    expect(isDeviceDB(undefined)).to.be.false
   })
 })

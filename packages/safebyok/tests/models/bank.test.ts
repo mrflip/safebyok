@@ -2,6 +2,10 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
+import { ForeverMillis, isGuarded } from '../../src/helpers/consts'
+import { guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
+import { DefaultLeaseMillis } from '../../src/models/vault'
+import type { AnyGating } from '../../src/shapes/shapes-gateish'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
@@ -105,13 +109,15 @@ describe("bank.hello", () => {
     expect(listVaults).not.toHaveBeenCalled()
   })
 
-  it("refuses when a key deriver will not load, its refusal as it came, asking nothing of the vaultDB", async () => {
+  it("refuses when a key deriver will not load, what it threw the cause, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
     const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
-    const refused = new VaultError('unexpected_error', 'no wasm here')
+    const refused = new VaultError('storage_unavailable', 'no wasm here')
     const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
-    await TH.expectRefusal(bank.hello())
-    expect(bank.snapshot.err).to.equal(refused)
+    const err = await TH.expectRefusal(bank.hello())
+    expect(err.cause).to.eq(refused)
+    expect(err.message).to.match(/keyDeriver's load\(\) failed/)
+    expect(bank.snapshot).to.include({ stage: 'refused', err })
     expect(listVaults).not.toHaveBeenCalled()
   })
 
@@ -138,12 +144,13 @@ describe("bank.hello", () => {
 
   it("keeps the device_id each bank was handed", async () => {
     const world = makeBankWorld()
-    const first = world.bankOn({ device_id: 'device_first' })
+    const [firstId, secondId] = [crypto.randomUUID(), crypto.randomUUID()]
+    const first = world.bankOn({ device_id: firstId })
     await first.hello()
-    const second = world.bankOn({ device_id: 'device_second' })
+    const second = world.bankOn({ device_id: secondId })
     await second.hello()
-    expect([first.device_id, first.snapshot.device_id]).to.deep.equal(['device_first', 'device_first'])
-    expect([second.device_id, second.snapshot.device_id]).to.deep.equal(['device_second', 'device_second'])
+    expect([first.device_id, first.snapshot.device_id]).to.deep.equal([firstId, firstId])
+    expect([second.device_id, second.snapshot.device_id]).to.deep.equal([secondId, secondId])
   })
 
   it("hears a vault made elsewhere over the watch it starts", async () => {
@@ -155,6 +162,48 @@ describe("bank.hello", () => {
     await makeBankWithVault(world)
     await TH.eventually(() => bank.snapshot.vaults.length === 1)
     expect(listener).toHaveBeenCalled()
+  })
+})
+
+describe("the host's functions, as a bank holds them", () => {
+  it("holds each wrapped and branded, never the host's own on a prop", () => {
+    const requestCleartext = vi.fn()
+    const onPanic = vi.fn()
+    const bank = makeBankWorld().bankOn({ requestCleartext, onPanic })
+    for (const held of [bank.askUser, bank.panic, bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
+    expect(Object.values(bank)).to.not.include.members([requestCleartext, onPanic, testDeriver, anyStrengthChecker])
+  })
+
+  it("asks the dialog, answering true once it closes and false when it throws, keeping nothing of the throw", async () => {
+    const gating = {} as AnyGating
+    const dialog = vi.fn()
+    expect(await guardRequestCleartext(dialog)(gating)).to.be.true
+    expect(dialog).toHaveBeenCalledWith(gating)
+    expect(await guardRequestCleartext(() => { throw new Error(Passphrase) })(gating)).to.be.false
+  })
+
+  it("tells onPanic, answering true even when it throws, which goes to the platform", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const refusal = new VaultError('storage_unavailable', 'no store')
+    const thrown = new Error('panic handler broke')
+    expect(await guardOnPanic(() => { throw thrown })(refusal)).to.be.true
+    expect(reported).toHaveBeenCalledWith(thrown)
+    vi.unstubAllGlobals()
+  })
+
+  it("answers false with no onPanic, telling the platform the refusal", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const refusal = new VaultError('storage_unavailable', 'no store')
+    expect(await guardOnPanic(undefined)(refusal)).to.be.false
+    expect(reported).toHaveBeenCalledWith(refusal)
+    vi.unstubAllGlobals()
+  })
+
+  it("refuses a requestCleartext or an onPanic that is no function", () => {
+    TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_option')
+    TH.expectSyncRefusal(() => guardOnPanic('call me' as never), 'bad_option')
   })
 })
 
@@ -198,20 +247,42 @@ describe("bank.ensureVault", () => {
   })
 
   it("can never ask with no dialog, as Bank.make refuses without a requestCleartext", () => {
-    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }))
+    const refusal = TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }))
+    expect(refusal.message).to.match(/^requestCleartext: /)
   })
 
   it.each([
-    ['hyphens, as a UUID has',        "0123-4567"],
-    ['capitals',                      "Device_One"],
-    ['an empty string',               ""],
-    ['more than 40 characters',       `d${'a'.repeat(40)}`],
+    ['keyDeriver',      { keyDeriver: 3 }],
+    ['strengthChecker', { strengthChecker: 3 }],
+    ['logger',          { logger: 3 }],
+    ['onPanic',         { onPanic: 3 }],
+  ])("refuses at Bank.make a %s that is none, naming it", (fieldname, overrides) => {
+    const refusal = TH.expectSyncRefusal(() => makeBankWorld().bankOn(overrides as never))
+    expect(refusal.message.startsWith(`${fieldname}: `)).to.be.true
+  })
+
+  it.each([
+    ['a label in it',                 "device_one"],
+    ['no hyphens',                    "00000000000040008000000000000001"],
+    ['a digit short',                 "00000000-0000-4000-8000-00000000001"],
+    ['nothing in it',                 ""],
   ])("refuses at Bank.make a device_id with %s", (_what, device_id) => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }))
   })
 
   it("refuses at Bank.make a missing device_id", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }))
+  })
+
+  it("takes a fraction of a minute to the nearest millisecond, and Infinity as ForeverMillis", () => {
+    const bank = makeBankWorld().bankOn({ autolockMinutes: 1 / 7, boxRefreshMinutes: 0.000025 })
+    expect([bank.leaseMillis, bank.boxRefreshMillis]).to.deep.equal([8571, 2])
+    expect(makeBankWorld().bankOn({ autolockMinutes: Infinity }).leaseMillis).to.eq(ForeverMillis)
+  })
+
+  it("leases for DefaultLeaseMillis where the host names no autolockMinutes", () => {
+    const bank = makeBankWorld().bankOn({ autolockMinutes: undefined })
+    expect(bank.leaseMillis).to.eq(DefaultLeaseMillis)
   })
 
   it("answers tryEnsureVault's refusal as an Outcome", async () => {

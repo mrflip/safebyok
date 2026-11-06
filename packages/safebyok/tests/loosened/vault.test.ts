@@ -14,7 +14,7 @@ describe("the ways in changing under a vault unlocked", () => {
     const { listing, storeBehindOurBack } = makeVaultWorld(record)
     const vault = await listing.build(record)
     await unlockTyping(vault, byPassphrase(Passphrase))
-    const other = makeVaultWorld(record, { device_id: 'device_2' })
+    const other = makeVaultWorld(record, { device_id: '00000000-0000-4000-8000-000000000002' })
     const theirs = await other.listing.build(record)
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(theirs, Passphrase, NewPassphrase)

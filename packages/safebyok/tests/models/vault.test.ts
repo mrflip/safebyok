@@ -27,10 +27,10 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
   })
 
   it("refuses a dna for a scope already held, before the dialog is shown", async () => {
-    const { listing } = makeVaultWorld()
+    const { listing, fakeBank } = makeVaultWorld()
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const dialog = vi.fn()
-    listing.world.requestCleartext = dialog
+    fakeBank.requestCleartext = dialog
     await TH.expectRefusal(listing.buildVault(Dna))
     expect(dialog).not.toHaveBeenCalled()
     expect(listing.at(Dna)).to.equal(vault)
@@ -63,18 +63,22 @@ describe("VaultListing.build of a record, and its constructor", () => {
   })
 
   it("refuses a world without what a vault's gate and lease need", () => {
-    const { opts } = makeVaultWorld()
-    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'deviceDB') }))
-    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: TH.omitting(opts.world, 'keyDeriver') }))
+    const { fakeBank, opts } = makeVaultWorld()
+    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'deviceDB'), opts))
+    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'keyDeriver'), opts))
+    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'leaseMillis'), opts))
+    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'boxRefreshMillis'), opts))
   })
 
-  it("refuses a deviceDB missing a verb the friend binds, and an onPanic that is no function", () => {
-    const { opts } = makeVaultWorld()
-    for (const verb of ['tryPeek', 'tryCache', 'tryVacate']) {
-      const missing = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn(), [verb]: undefined }
-      TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, deviceDB: missing as never } }))
-    }
-    TH.expectSyncRefusal(() => new VaultListing({ ...opts, world: { ...opts.world, onPanic: 'call me' as never } }))
+  it("refuses a deviceDB that is a duck of one, and a host's bare function or logger where the bank holds it guarded", () => {
+    const { fakeBank, opts } = makeVaultWorld()
+    const duck = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn() }
+    const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))
+    expect(err.message).to.include(Phrases.DeviceDBExpected)
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, panic: vi.fn() as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, askUser: vi.fn() as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, logger: TH.quietLogger }, opts))
+    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, keyDeriver: TH.testDeriver as never }, opts))
   })
 })
 

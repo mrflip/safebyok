@@ -165,7 +165,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
    * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
    * the one stored, so a box held sparse is fetched first. */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
-    const { ifAbsent = 'add', ifPresent = 'repl', ...timely } = VX.boxPutOpts.parse(opts)
+    const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
     const given = this.demandPuttable(patch, { ifPresent })
     const { record, prior } = await this.#edit(given)

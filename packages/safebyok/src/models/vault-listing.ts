@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow } from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { type DelTombstone, type Fetched, type SlotFate, type VaultListingOpts, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from '../shapes/shapes-vaultish'
+import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type VaultRecord, type VaultSnapshot, type VaultSparse, type VaultWorld, vaultRecord, vaultSparse } from '../shapes/shapes-vaultish'
 import type { Answer, Notice } from '../storage/vault-db-new'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
@@ -33,9 +33,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [Construction]: constructor, buildVault, tryBuildVault, boxListingOf, scopeOf, sparseOf, recordOf
 
-  constructor(opts: VaultListingOpts) {
-    super(opts)
-    VX.vaultListingOpts.parse(opts)
+  constructor(world: VaultWorld, opts: ListingOpts) {
+    VX.vaultWorld.parse(world)
+    super(world, opts)
     Object.freeze(this)
   }
 
@@ -46,8 +46,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** The listing of `vault`'s boxes, its watch not started. */
   boxListingOf(vault: Vault): BoxListing {
-    const { boxRefreshMillis = this.maxMillisSinceRefresh } = this.world
-    return new BoxListing({ world: vault, vaultDB: this.vaultDB, maxMillisSinceRefresh: boxRefreshMillis })
+    return new BoxListing(vault, { vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis })
   }
 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */
@@ -172,7 +171,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
-    return new Vault(this.world, this, central, { maxMillisSinceRefresh: this.maxMillisSinceRefresh })
+    return new Vault(this.world, this, central)
   }
 
   protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }
