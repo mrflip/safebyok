@@ -142,10 +142,8 @@ export type { StrengthChecker } from '../helpers/passphrase-strength'
 // == [The vault's stamp]: vaultStamp, VaultStamp
 
 /** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, and strips the rest. */
-export const vaultStamp = objCheck(({ applabel, user_id, vaultlabel, vault_tok, epochMillis }) => ({
-  applabel,
-  user_id,
-  vaultlabel,
+export const vaultStamp = objCheck(({ vaultScope, vault_tok, epochMillis }) => ({
+  ...vaultScope.unwrap().shape,
   vault_tok,
   registered_at: epochMillis,
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
