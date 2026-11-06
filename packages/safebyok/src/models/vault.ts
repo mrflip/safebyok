@@ -283,6 +283,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
+  // `receive` refuses `otherVaultTok` for a row of another life: the one consistency guard on this path.
   takeWorld(world: unknown): void { this.receive(VX.vaultRow.parse(world)) }
 
   /** Tell bad news of this vault's boxes where its own goes. */

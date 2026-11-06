@@ -77,3 +77,9 @@ The design is the Coach's Recommendation B in the sprint's `listing-responsibili
   * `tests/test-helpers/timing.ts`'s example `holdNextCall(vaultDB, 'tryGetVault')` during an unlock still holds (a
     refresh still calls `getVault`), so it stays. So does `vault.test.ts`'s `gets` spy.
   * `RefusingVaultDB` (bank-world) needs no `doListBoxes` override: no test refuses `vault.hello` through it.
+
+* **After review**:
+  * The Coach asked, on `Vault.takeWorld` having lost its `vault_tok` branch, for a consistency guard "to assuage
+    agents". `Storable.receive` already holds it: `reconcileCentral` throws `otherVaultTok()` when `rcvd.vault_tok`
+    differs from the vault's, before any age or shape is judged. So no second guard went in; one `//` line above
+    `takeWorld`'s call to `receive` says so.
