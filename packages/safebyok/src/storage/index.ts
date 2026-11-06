@@ -26,6 +26,7 @@ export { vaultSparse, vaultRecord, vaultTombstone, vaultRow, foundVaultRow } fro
 export type { DamagedVault, VaultRecord, VaultRow, VaultSparse, VaultTombstone } from '../shapes/shapes-storage'
 export { boxSparse, boxRecord, boxTombstone, boxRow, foundBoxRow } from '../shapes/shapes-storage'
 export type { BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox } from '../shapes/shapes-storage'
+export type { Sidecar, WhisperJson } from '../shapes/shapes-core'
 export { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } from '../shapes/shapes-storage'
 export type { AddPasskeyParams, ReplacePassphraseParams, RevokePasskeyParams } from '../shapes/shapes-storage'
 export { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'

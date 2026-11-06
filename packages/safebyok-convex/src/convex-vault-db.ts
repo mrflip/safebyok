@@ -102,11 +102,8 @@ export class ConvexVaultDB extends SX.VaultDB {
 
   // The component answers a full vault with its capacity rather than throwing, so the refusal is made here, where the core's throwers are.
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
-    // A sidecar's type is recursive, so a box record is passed as the core checked it rather than held to Convex's copy of its type.
-    type LooseBoxPut = FunctionReference<'mutation', 'public', { record: unknown, opts: PutOptsGiven, maxBoxes?: number }, FunctionReturnType<SafebyokApi['putBox']>>
-    const { putBox }: { putBox: LooseBoxPut } = this.#api
     const args = (this.#maxBoxes === undefined) ? { record, opts } : { record, opts, maxBoxes: this.#maxBoxes }
-    const answer = await reaching('doPutBox', () => this.#client.mutation(putBox, args))
+    const answer = await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, args))
     if ('capacity' in answer) { throw SX.vaultFull(answer.capacity) }
     return answer
   }

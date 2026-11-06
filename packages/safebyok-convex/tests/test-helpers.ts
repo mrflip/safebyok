@@ -1,9 +1,6 @@
 import { anyApi, defineSchema } from 'convex/server'
-import type { FunctionReference, FunctionReturnType } from 'convex/server'
-import type { PutOptsGiven } from 'safebyok/storage'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import type { ComponentRegistration } from 'convex-test'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokApi, SafebyokErrorData } from '../src/server'
@@ -17,10 +14,6 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 
 /** The component's functions at the root, as a client calls them: no host wrapper, no auth. */
 export const rootApi = anyApi['vaults'] as unknown as SafebyokApi
-
-// Convex's copy of a sidecar's type recurses past TypeScript's depth, so a test passes a box record as the core checked it.
-/** A putBox function's reference, taking any box record. */
-export const loosePutBox = (putBox: unknown) => putBox as FunctionReference<'mutation', 'public', { record: unknown, opts: PutOptsGiven, maxBoxes?: number }, FunctionReturnType<SafebyokApi['putBox']>>
 
 /** A fresh in-memory backend holding only the component, its functions at the root, held to Convex's transaction limits if asked. */
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
@@ -36,9 +29,8 @@ export const hostWith = (getUserId: GetUserId) => {
 
 /** A host app with the component installed as `safebyok`, and the SafebyokComponent wrapping it. */
 export const installedComponent = () => {
-  // convex-test's re-addressing of the component's types recurses into a box's sidecar past TypeScript's depth, so the install is typed here.
-  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register: register as ComponentRegistration<unknown> } } })
-  return { app, component: new SafebyokComponent(app.components.safebyok as ComponentApi) }
+  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
+  return { app, component: new SafebyokComponent(app.components.safebyok) }
 }
 
 /** The data of the ConvexError `operation` refused with, failing the test if it resolves. */

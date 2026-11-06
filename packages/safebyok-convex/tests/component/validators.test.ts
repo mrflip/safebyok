@@ -8,7 +8,6 @@ import * as TH from '../test-helpers'
 type Backend = ReturnType<typeof TH.componentTest>
 
 const api = TH.rootApi
-const putBox = TH.loosePutBox(api.putBox)
 const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const vault = TH.vaultAt()
 const box = TH.boxAt()
@@ -31,7 +30,7 @@ const withVault = async (): Promise<Backend> => {
 describe("the component's validators, against what the core writes", () => {
   it("take a vault record and its tombstone, a box record and its tombstone, whole", async () => {
     const backend = await withVault()
-    await backend.mutation(putBox, { record: box, opts: birth })
+    await backend.mutation(api.putBox, { record: box, opts: birth })
     expect(await storedRows(backend)).to.deep.equal({ vaults: [vault], boxes: [box], tallies: 1 })
     await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: SX.revisionOf(box) } })
     await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: SX.revisionOf(vault) } })
@@ -42,7 +41,7 @@ describe("the component's validators, against what the core writes", () => {
     const backend = await withVault()
     const sidecar = { label: 'work', tags: ['a', 'b'], nested: { count: 2, on: true, none: null } }
     const record = TH.boxAt(0, 'life1', { sidecar })
-    await backend.mutation(putBox, { record, opts: birth })
+    await backend.mutation(api.putBox, { record, opts: birth })
     expect(await backend.query(api.getBox, { asked: { ...TH.boxscope, vault_tok: record.vault_tok } })).to.deep.equal({ vault, box: record })
   })
 })
@@ -65,7 +64,7 @@ describe("the component's validators, against a misshapen call", () => {
   for (const [argsOf, fnName, blurb] of MisshapenCases) {
     it(`refuse ${blurb}, storing nothing`, async () => {
       const backend = await withVault()
-      const fnRef = (fnName === 'putVault') ? api.putVault : putBox
+      const fnRef = (fnName === 'putVault') ? api.putVault : api.putBox
       await expect(backend.mutation(fnRef, argsOf() as never)).rejects.toThrow(/Validator/)
       expect(await storedRows(backend)).to.deep.equal({ vaults: [vault], boxes: [], tallies: 0 })
     })
