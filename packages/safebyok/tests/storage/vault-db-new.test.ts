@@ -131,7 +131,7 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'oldlife' })).to.deep.include({ ok: false, world: null, dbhas: vault })
     })
 
-    it("refuses bad_scope for a query without its vault_tok, or under a vaultlabel failing its check", async () => {
+    it("refuses a query without its vault_tok, or under a vaultlabel failing its check", async () => {
       const { vaultDB } = await storeWith()
       expect(await vaultDB.tryListBoxes(vaultScope as never)).to.deep.include({ ok: false, act: 'bad_scope' })
       expect(await vaultDB.tryListBoxes({ ...vaultQuery, vaultlabel: 'No Good!' })).to.deep.include({ ok: false, act: 'bad_scope' })
@@ -186,7 +186,7 @@ describe("MemoryVaultDB", () => {
       expect(await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })).to.deep.include({ ok: false })
     })
 
-    it("refuses bad_scope for a query without its vault_tok, or under a boxlabel failing its check", async () => {
+    it("refuses a query without its vault_tok, or under a boxlabel failing its check", async () => {
       const { vaultDB } = await storeWith({ box: true })
       expect(await vaultDB.tryGetBox(boxscope as never)).to.deep.include({ ok: false, act: 'bad_scope' })
       expect(await vaultDB.tryGetBox({ ...boxscope, boxlabel: 'No Good!', vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'bad_scope' })
@@ -194,7 +194,7 @@ describe("MemoryVaultDB", () => {
   })
 
   describe("watch", () => {
-    it("refuses bad_scope for a scope failing its check, before it watches", () => {
+    it("refuses a scope failing its check, before it watches", () => {
       const vaultDB = new MemoryVaultDB()
       expect(() => vaultDB.watch({ ...bankScope, applabel: '' }, () => undefined)).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
       expect(() => vaultDB.watch({ ...vaultScope, vaultlabel: 'No Good!' }, () => undefined)).to.throw(VaultError).with.property('refusalkind', 'bad_scope')

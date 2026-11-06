@@ -17,10 +17,14 @@ describe("wayinkind", () => {
 })
 
 describe("guardedLogger", () => {
-  it("takes a logger parseLogger guarded, and refuses a bare one 'bad_option'", () => {
-    const bare = { log: () => undefined, warn: () => undefined, error: () => undefined }
+  const bare = { log: () => undefined, warn: () => undefined, error: () => undefined }
+
+  it("takes a logger parseLogger guarded", () => {
     const guarded = parseLogger(bare)
     expect(GX.guardedLogger.parse(guarded)).to.eq(guarded)
+  })
+
+  it("refuses a bare logger", () => {
     TH.expectSyncRefusal(() => GX.guardedLogger.parse(bare), 'bad_option')
   })
 })
