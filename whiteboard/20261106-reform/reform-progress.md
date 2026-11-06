@@ -11,8 +11,9 @@ look things up here; they do not read it whole.
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
   core test is coming (plan, ground rule 10).
 * Thread 3 `example_pointers`: filed, PR #522 at 51741eb57; in the Coach's line.
-* Thread 4 `hello_listed`: built, PR #523, "Stacked on #513", in review (low).
-* Thread 11 `duck_calibration`: building from main (the Coach's note on STYLE.md *Shapes and duck typing*).
+* Thread 4 `hello_listed`: filed, PR #523 at 895949623 on #513's current tip (not in the Coach's line).
+* Thread 11 `duck_calibration`: built, PR #525, in review (medium). **For thread 9:** a `Z.ZodType<T>` checker loses
+  `.pick`/`.extend`/`.shape`: widen only what the package exports; the `Boxlabel` alias STYLE.md cites does not exist.
 * **The Coach keeps a merge line** (plan, ground rule 9): #513, #517, #521, #522, #512, #518, #519, #520, #511 in that
   order. #511 and #513 conflict with each other in `refusals/throwers.ts` and `tests/test-helpers/models-world.ts`; the
   line resolves that at #511's turn, on top. Thread 5 is cut once #511 and #513 are on main, or from the line's top if the

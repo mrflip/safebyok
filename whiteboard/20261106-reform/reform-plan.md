@@ -10,8 +10,8 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 04:45: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4 (#523)
-built, in review, stacked on #513; thread 11 (`duck_calibration`, from a Coach note) building from main; threads 5 to 10 wait for PRs #511 and #513 to
+**Status:** 2026-11-06, 05:05: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4 (#523)
+filed on #513's tip; thread 11 (#525, `duck_calibration`, from a Coach note) built and in review; threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
 ## Read first
@@ -156,7 +156,11 @@ fails its check" goes with the argument, or moves to the vault's hello. Minor ch
 *Built (PR #523, "Stacked on #513"):* `boxListing.hello()` takes nothing; `vault.hello` hands the boxes over by
 `boxListing._takeListed(listed)`, a public method whose underbar says not for hosts, with the one `eslint-disable-line
 unicorn/prefer-private-class-fields` the `_cheat_` methods carry (reported in the PR); the second parse is gone; the test
-moved to `vault.hello`; minor changeset. The name is an Open Matters row. In review (low).
+moved to `vault.hello`; minor changeset. The name is an Open Matters row.
+*Review (low, sonnet):* `fixed`; one fix (the moved test's title names `vault.hello`, one clause); left: the `_takeListed`
+name and whether an underbar method is exempt from entry validation (both Open Matters), the doc block's "and" (a
+documentarian's), the changeset not naming `_takeListed`; hatches reported: the `eslint-disable-line`, `answer.val!` and
+`as never` in the test. **Filed** at 895949623, rebased onto #513's current tip 7828cb089 (not onto main: ground rule 9).
 
 ### 5. `module_clock`
 
@@ -271,6 +275,12 @@ across a package boundary and for a host function on its way in; the handrolled 
 Keeps the examples still true. **Levels:** worker `opus`; review `medium`. **Depends on:** nothing (cut from main at
 374098121). **Look-ahead:** thread 9 reads the recalibrated section before choosing per type; threads 6 to 8 build what it
 describes. **Size:** small.
+
+*Built (PR #525):* the section says duck typing is the design for data; a world is a `Pick` of its class; a shape's type is
+`Z.infer` or an interface held to it, by the reader; a DB across the package boundary carries a brand; a host's function is
+wrapped once on its way in; stale examples replaced; 94 to 111 lines. **For thread 9:** a checker typed `Z.ZodType<T>`
+loses `.pick`/`.extend`/`.shape`, so widen only what the package exports and derive shapes from the un-widened one; the
+`Boxlabel` alias the section cites does not exist. In review (medium, opus).
 
 ## For the Coach
 
