@@ -18,6 +18,7 @@
  */
 
 import { afterEach, beforeEach, vi } from 'vitest'
+import { _cheat_clock } from '../../src/helpers/clock'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
@@ -212,8 +213,8 @@ export class TestableVaultDB extends MemoryVaultDB {
   readonly #watches: ModelsWatch[]
   readonly scripts = { get: new Script<GetCall>(), put: new Script<PutCall>(), del: new Script<DelCall>() }
 
-  constructor(calls: ModelsCall[], watches: ModelsWatch[], now: () => number) {
-    super({ clock: { now } })
+  constructor(calls: ModelsCall[], watches: ModelsWatch[]) {
+    super()
     this.#calls = calls
     this.#watches = watches
   }
@@ -275,11 +276,12 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   let lockState: LockState = opts.lockState ?? 'unlocked'
   const worldListeners = new Set<() => void>()
   if (fakeTimers) { vi.useFakeTimers({ now }) }
+  _cheat_clock(clockNow)
 
   const calls: ModelsCall[] = []
   const badnews: VaultError[] = []
   const watches: ModelsWatch[] = []
-  const vaultDB = new TestableVaultDB(calls, watches, clockNow)
+  const vaultDB = new TestableVaultDB(calls, watches)
   vaultDB._cheat_vaultRowsOf(WorldVault.scope).set(WorldVault.scope.vaultlabel, worldVaultRow())
   const stored = vaultDB._cheat_boxRowsOf(WorldVault.scope, WorldVault.vault_tok)
   const ensureTimelyScript = new Script<number | undefined>()
@@ -293,7 +295,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   const world: BoxWorld = {
-    clock:        { now: clockNow },
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     lockState:    () => lockState,

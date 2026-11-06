@@ -2,6 +2,7 @@
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
+import { nowMillis } from '../../src/helpers/clock'
 import { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
@@ -48,10 +49,10 @@ const expectLandedGone = async (vault: Vault, { listing, deviceDB }: Pick<Awaite
 }
 
 describe("listing.stampOfBirth and listing.recordOfBirth", () => {
-  it("stamps each attempt with a new life under the scope, at the listing's clock", async () => {
+  it("stamps each attempt with a new life under the scope, at the time now", async () => {
     const { listing } = await makeBornVault()
     const stamp = listing.stampOfBirth(Dna)
-    expect(stamp).to.include({ ...Dna, registered_at: listing.clock.now() })
+    expect(stamp).to.include({ ...Dna, registered_at: nowMillis() })
     expect(stamp.vault_tok).to.not.eq(listing.stampOfBirth(Dna).vault_tok)
   })
 
@@ -59,7 +60,7 @@ describe("listing.stampOfBirth and listing.recordOfBirth", () => {
     const { listing, vault } = await makeBornVault()
     const { gate } = vault
     const record = listing.recordOfBirth(gate, { revision_tok: 'rev-gone', revision_seq: 4 })
-    expect(record).to.deep.include({ ...gate.stamp, am: 'a', revision_seq: 5, written_at: listing.clock.now(), gate: gate.pickle() })
+    expect(record).to.deep.include({ ...gate.stamp, am: 'a', revision_seq: 5, written_at: nowMillis(), gate: gate.pickle() })
     expect(record.revision_tok).to.not.eq('rev-gone')
   })
 })

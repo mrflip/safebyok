@@ -29,7 +29,6 @@ describe("BoxListing", () => {
 
     const bads: readonly (readonly [blurb: string, patch: () => object])[] = [
       ['no world',                    () => ({ world: undefined })],
-      ['a world without a clock',     () => ({ world: { ...held.mw.world, clock: undefined } })],
       ['no vaultDB',                  () => ({ vaultDB: undefined })],
       ['a vaultDB without its verbs', () => ({ vaultDB: { watch: () => null } })],
       ['no horizon',                  () => ({ maxMillisSinceRefresh: undefined })],

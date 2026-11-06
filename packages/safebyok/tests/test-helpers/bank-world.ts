@@ -1,6 +1,7 @@
 /** The test world of a models bank: a real {@link MemoryVaultDB} and {@link MemoryDeviceDB} any number of banks share, a dialog that types what the test says, and a clock the test moves. */
 
 import { afterEach } from 'vitest'
+import { _cheat_clock } from '../../src/helpers/clock'
 import { VaultError, type RefusalKind } from '../../src/refusals/errors'
 import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
@@ -57,12 +58,12 @@ export const useBankWorlds = (): void => {
 
 export const makeBankWorld = () => {
   let now = T0
-  const clock = { now: () => now }
-  const vaultDB = new RefusingVaultDB({ clock })
+  _cheat_clock(() => now)
+  const vaultDB = new RefusingVaultDB()
   const deviceDB = new MemoryDeviceDB()
   const dialog = { typing: byPassphrase(Passphrase) as object }
   const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing) }
-  const baseOpts: BankOpts = { ...BankScopeGiven, device_id: 'device_one', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, clock, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
+  const baseOpts: BankOpts = { ...BankScopeGiven, device_id: 'device_one', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
   /** A bank over this world's stores: called twice, two pages on one device. */
   const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
     const bank = Bank.make({ ...baseOpts, ...overrides })

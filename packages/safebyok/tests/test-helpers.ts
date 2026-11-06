@@ -3,10 +3,11 @@
  * (`import * as TH from './test-helpers'`), and from `safebyok/testing` in another package's. The
  * helpers live in `tests/test-helpers/`, a part for each family, and this file names what each
  * one publishes. A cheap key deriver, shape-valid records whose ciphertext is fake, a live lease,
- * small timing, interception and tampering aids, a logger that keeps what it hears and one that says
+ * the package's clock to set by hand, small timing, interception and tampering aids, a logger that keeps what it hears and one that says
  * only warnings and errors, and checks that a call refuses and that what it threw quotes nothing it
  * shouldn't. For tests only, and under vitest: the deriver is worthless against a brute-forcer.
  */
+export { _cheat_clock, _cheat_clockReset } from '../src/helpers/clock'
 export { testDeriver, anyStrengthChecker, fakeCiphered, scopeOf, wayinOf, passkeyOf, tweakB64 } from './test-helpers/builders'
 export type { FakeCiphered } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, makeLatch, beforeNextCall,

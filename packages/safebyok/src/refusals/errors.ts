@@ -46,7 +46,7 @@ export const refusalKindVals = [
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
   'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, argon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
-  'damaged_box',         // a box read from storage failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
+  'damaged_box',         // a box's whisper would not open under the vault's lease, or opened to no whisper this package knows
   'newer_format',        // a stored vault in a form this version does not know, or naming a key deriver this handle was not built with: update safebyok
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it

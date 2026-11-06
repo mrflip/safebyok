@@ -3,7 +3,7 @@
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving or a lease
  * records: it installs vitest's fake timers at {@link T0} before each test and puts real ones back
- * after, so the fake friend's and the proving world's clock (`Date.now()`) reads what the test says.
+ * after, so the package's clock (`Date.now()`) reads what the test says.
  */
 
 import { afterEach, beforeEach, type Mock, vi } from 'vitest'
@@ -63,7 +63,6 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
     ...WorldStamp,
     leaseMillis:     FriendLeaseMillis,
     ...overrides,
-    clock:           { now: () => Date.now() },
     logger,
     logged:          calls,
     cached:          null,
@@ -105,9 +104,8 @@ export const TestPassphrase = GX.passphraseCleartext.parse('correct horse batter
 /** The `device_id` a {@link provingWorldOf} world carries. */
 export const DeviceId = 'device_laptop'
 
-/** A proving's world: a clock on `Date.now()`, the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}. */
+/** A proving's world: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}. */
 export const provingWorldOf = (overrides: Partial<ProvingWorld> = {}): ProvingWorld => ({
-  clock:           { now: () => Date.now() },
   keyDeriver:      testDeriver,
   strengthChecker: anyStrengthChecker,
   device_id:       DeviceId,

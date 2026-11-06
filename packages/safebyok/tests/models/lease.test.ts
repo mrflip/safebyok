@@ -5,7 +5,7 @@ import { Lease } from '../../src/models/lease'
 import { type LeaseGrantOpts, type LeaseRecord, LeaseFormat, isLeaseKey } from '../../src/shapes/shapes-gateish'
 import { bad } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
-import { type FakeLeaseFriend, FriendLeaseMillis, GrantedAs, fakeLeaseFriendOf, makeGrantedLease, sealStampOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { type FakeLeaseFriend, FriendLeaseMillis, GrantedAs, fakeLeaseFriendOf, isZeroed, makeGrantedLease, sealStampOf, T0, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -159,12 +159,6 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch + 1)).to.be.null
     expect(friend.tryUncacheLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.be.null
-  })
-
-  it("throws a clock that throws, as a bug, and uncaches nothing", async () => {
-    const { friend } = await grantedWorld()
-    await expect(Lease.buildFromCache({ ...friend, clock: { now: () => { throw new Error('the clock broke') } } }, GrantedAs.gate_epoch)).rejects.toThrow('the clock broke')
-    expect(friend.tryUncacheLease).not.toHaveBeenCalled()
   })
 
   it("finds nothing past an autolock of Infinity: a lease cached long ago is in force", async () => {
@@ -322,6 +316,23 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
     const sealed = await lease.sealWith('{"val":"sk-test-1234"}', stamp)
     expect(Object.keys(sealed)).to.have.members(['box_key_wrapped', 'whisper_ciphered'])
     expect(await lease.unsealWith(sealed, stamp)).to.eq('{"val":"sk-test-1234"}')
+  })
+
+  it("zeroes the whisper's bytes once each has sealed or opened them", async () => {
+    const { lease } = await grantedWorld()
+    const stamp = sealStampOf('b1')
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    const decode = vi.spyOn(TextDecoder.prototype, 'decode')
+    const sealed = await lease.sealWith(WhisperText, stamp)
+    expect(await lease.unsealWith(sealed, stamp)).to.eq(WhisperText)
+    const sealedBytes = encode.mock.results[encode.mock.calls.findIndex(([text]) => text === WhisperText)]?.value as Uint8Array
+    const openedBytes = decode.mock.calls[decode.mock.results.findIndex((decoded) => decoded.value === WhisperText)]?.[0] as Uint8Array
+    encode.mockRestore()
+    decode.mockRestore()
+    expect(sealedBytes.length).to.eq(WhisperText.length)
+    expect(openedBytes.length).to.eq(WhisperText.length)
+    expect(isZeroed(sealedBytes)).to.be.true
+    expect(isZeroed(openedBytes)).to.be.true
   })
 
   it("seals the same whisper under the same stamps differently each time: a fresh boxKey and cipherIv", async () => {

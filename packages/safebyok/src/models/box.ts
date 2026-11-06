@@ -1,3 +1,4 @@
+import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { ENCRYPTED, LOCKED, VEILED } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -170,7 +171,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: SX.Revision }> {
     const prior = this.central
-    const written_at = this.world.clock.now()
+    const written_at = nowMillis()
     const next = { ...prior, ...SX.nextRevisionOf(prior, written_at), am: 'a' as const }
     // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
     const record = this.isTombstoneRecord(prior)

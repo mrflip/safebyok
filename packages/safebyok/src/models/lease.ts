@@ -1,4 +1,5 @@
 import { consistent } from '../helpers/validator'
+import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
@@ -78,7 +79,7 @@ export class Lease implements LeaseStamp {
   static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate_epoch, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
     const held     = vaultStamp.parse(friend)
-    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, gate_epoch, proved_at: friend.clock.now(), wayinkind })
+    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, gate_epoch, proved_at: nowMillis(), wayinkind })
     const leaseKey = await makeLeaseKey()
     const vault_key_lease_wrapped = await wrapKeyUnder(leaseKey, vaultKey, cipherCtx([held, granted], 'vault_key_lease_wrapped'))
     return new Lease(friend, leaseRecord.parse({ ...granted, lease_key: leaseKey, vault_key_lease_wrapped }), false)
@@ -202,7 +203,7 @@ export class Lease implements LeaseStamp {
 // == [Judging the cached record]: isPastAutolock, uncacheForgotten
 
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
-const isPastAutolock = ({ proved_at }: LeaseStamp, { clock, leaseMillis }: LeaseFriend): boolean => clock.now() - proved_at > leaseMillis
+const isPastAutolock = ({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean => nowMillis() - proved_at > leaseMillis
 
 /** Uncache a record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
 const uncacheForgotten = async (friend: LeaseFriend): Promise<void> => {

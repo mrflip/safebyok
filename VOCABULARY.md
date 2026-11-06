@@ -167,7 +167,7 @@ a name outside them.
 | **fmt**                         | The number that heads every stored record and names its format: `6001` for a vault (`VaultFormat`), `5001` for a box (`BoxFormat`), `7001` for a lease (`LeaseFormat`). A box's stamp holds its `fmt`, and a lease's stamp holds the lease's. A box and a lease bind their vault's stamp, which has no `fmt`, so a new vault format still unseals them. Any change to what a record may hold moves its format on. A row of a newer format is set aside as damaged (`format_mismatch`). A stored vault or a fetched box row of a newer format refuses `newer_format`. |
 | **scopepath**                   | The kind of a thing, then its scope's names in order, joined on `^`, which no name may contain: `vault^acme^u1^main`, `box^acme^u1^main^anthropic`. A listing finds each thing it holds by its scopepath. |
 | **ckey**                        | A generic map key: an entry's name in a map, or an index in an array. It is never a storage address, which is a scopepath. |
-| **clock**, **logger**           | Two options your app may pass to `Bank.make`. The clock is a source of the time (`Clock`). The logger is where the vault says what it has no one to throw to (`VaultLogger`).          |
+| **logger**                      | An option your app may pass to `Bank.make`. It is where the vault says what it has no one to throw to (`VaultLogger`). |
 | **story**                       | A controlled record of what is happening, suitable for logs or refusals (`Story`). A validator's `parse(val, story?)` takes one, `{ where, advice }`. `where` says where the input was judged, before the failures it names. `advice` says what to do, after them. Neither quotes the input. |
 
 ## Shapes

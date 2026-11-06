@@ -115,7 +115,6 @@ describe("Proving.checkStrength(passphraseClear, scope, world)", () => {
 describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
   const ArgsCases = [
     [() => ({ world: TH.omitting(provingWorldOf(), 'keyDeriver') }),      'a world with no keyDeriver'],
-    [() => ({ world: TH.omitting(provingWorldOf(), 'clock') }),           'a world with no clock'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'device_id') }),       'a world with no device_id'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'strengthChecker') }), 'a world with no strengthChecker'],
     [() => ({ world: provingWorldOf({ device_id: '' }) }),                'a world with an empty device_id'],
@@ -322,8 +321,9 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
 })
 
 describe("a proving's header", () => {
-  it("of a passphrase proving: the deriver's label, a fresh salt, the world's device_id, and registered_at from the world's clock", async () => {
-    const { header } = await novelPassphrase(provingWorldOf({ clock: { now: () => T0 + 5 } }))
+  it("of a passphrase proving: the deriver's label, a fresh salt, the world's device_id, and registered_at from the time now", async () => {
+    vi.setSystemTime(T0 + 5)
+    const { header } = await novelPassphrase(provingWorldOf())
     expect(header).to.deep.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', device_id: DeviceId, registered_at: T0 + 5 })
     expect(Object.keys(header)).to.have.members(['wayinkind', 'key_deriver_label', 'salt_b64', 'device_id', 'registered_at'])
     expect(fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_bytes)
@@ -543,6 +543,14 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
       await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(stamp)), 'unexpected_error')
     })
   }
+
+  it("refuses a friend whose vault_tok, read through its prototype, is another vault's", async () => {
+    const proving = await novelPassphrase()
+    await proving.buildWayin(NOVEL)
+    const { vault_tok: _vault_tok, ...ownFields } = fakeLeaseFriendOf()
+    const friend = Object.assign(Object.create({ get vault_tok() { return 'vault-tok-other' } }) as object, ownFields)
+    await TH.expectRefusal(proving.buildLease(friend as never), 'unexpected_error')
+  })
 
   it("refuses a gate_epoch its check refuses, and a friend with no tryCacheLease", async () => {
     const proving = await novelPassphrase()

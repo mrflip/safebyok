@@ -167,21 +167,6 @@ export const bankedVaultScope = Checker(({ obj, applabel, user_id, vaultlabel })
 export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 // --
 
-// == [Clock]: Clock, wallClock, clockShape
-
-/** A source of the time, `Bank.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
- * `Bank.make` reads it once, and refuses 'bad_option' for a reading outside `FarPast` to
- * `FarFuture`, or a throw. The vault takes every later reading as it comes.
- */
-export type Clock = { now(): number }
-
-/** The wall clock: the default `Clock`. */
-export const wallClock: Clock = { now: () => Date.now() }
-
-/** The check of a clock, by the verb the vault calls on it, refusing 'bad_option'. Bank.make keeps what it was handed, prototype and all. */
-export const clockShape = Checker(({ obj, fn }) => obj({ now: fn<Clock['now']>() }), 'bad_option')
-// --
-
 // == [Key deriver and logger]: keyDeriverShape, loggerShape
 
 /** The check of a key deriver, by the verbs the vault calls on it and the fields it reads, refusing 'bad_option'. Bank.make keeps what it was handed, prototype and all. */

@@ -15,7 +15,7 @@ import type { DeviceDB } from '../storage/device-db-new'
 import type { Answer, VaultDB } from '../storage/vault-db-new'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
-import { type Sidecar, sidecar, type Whisper, whisper, type Clock, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
+import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
 import type { ProvingWorld, RequestCleartext, SealedWhisper, StrengthChecker } from './shapes-gateish'
@@ -134,13 +134,14 @@ export type StorableOpts = Z.infer<typeof storableOpts>
 
 // == [The listing's world]: world, World, ListingWorld, ListingOpts, vaultDBDuck, listingOpts, putListingOpts, PutListingOpts
 
-/** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: the one `clock`. */
-export const world = objCheck(() => ({ clock: CX.clockShape }), { refusalkind: 'bad_option', extras: 'strip' })
+/** The check of the world a listing lives in, the vault for boxes and the bank for vaults, as far as the base needs it: an object. */
+export const world = objCheck(() => ({}), { refusalkind: 'bad_option', extras: 'strip' })
 
-/** The world a listing lives in: the vault for boxes, the bank for vaults. The one clock lives here. */
-export type World = Z.infer<typeof world>
+// Not `Z.infer<typeof world>`: that is `Record<string, never>`, which no `World & {...}` below would admit.
+/** The world a listing lives in: the vault for boxes, the bank for vaults. */
+export type World = object
 
-/** The world as a listing needs it beyond the clock: its lock, its own timeliness, the taking of the world an answer carries, and where bad news goes. */
+/** The world as a listing needs it: its lock, its own timeliness, the taking of the world an answer carries, and where bad news goes. */
 export type ListingWorld = World & {
   lockState(): EX.LockState
   ensureTimely(maxMillis?: number): Promise<unknown>
@@ -161,7 +162,7 @@ export const vaultDBDuck = Checker(({ obj, fn }) => obj({ tryGetVault: fn(), try
 
 /** The check of a listing's constructor arguments, as far as the base can tell. Checks only. */
 export const listingOpts = objCheck(({ obj, fn }) => ({
-  world:                 obj({ clock: CX.clockShape, lockState: fn(), ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }),
+  world:                 obj({ lockState: fn(), ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }),
   vaultDB:               vaultDBDuck,
   maxMillisSinceRefresh: horizonMillis,
 }), 'bad_option')
@@ -363,7 +364,6 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   keyDeriver:          CX.keyDeriverShape,
   requestCleartext:    fn(),
   strengthChecker:     GX.strengthChecker.optional(),
-  clock:               CX.clockShape.optional(),
   logger:              CX.loggerShape.optional(),
   autolockMinutes:     positiveMinutes.optional(),
   vaultRefreshMinutes: refreshMinutes.optional(),
@@ -381,7 +381,6 @@ export type BankOpts = {
   keyDeriver:           KeyDeriver
   requestCleartext:     RequestCleartext
   strengthChecker?:     StrengthChecker | undefined
-  clock?:               Clock | undefined
   logger?:              VaultLogger | undefined
   autolockMinutes?:     number | undefined
   vaultRefreshMinutes?: number | undefined

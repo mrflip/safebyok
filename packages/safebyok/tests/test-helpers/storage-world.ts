@@ -1,5 +1,6 @@
 /** The scopes, records and a live {@link MemoryVaultDB} that the vaultDB's tests share: a vault and a box at a revision, their tombstones, and a store holding them. */
 
+import { _cheat_clock } from '../../src/helpers/clock'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxRecord, BoxTombstone, Revision, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
@@ -34,7 +35,8 @@ export const stale: Revision = { revision_tok: 'nope', revision_seq: 7 }
 
 /** A store holding a live vault, and a live box when asked. */
 export const storeWith = async (opts: { box?: boolean } = {}) => {
-  const vaultDB = new MemoryVaultDB({ clock: { now: () => Now + 1 } })
+  _cheat_clock(() => Now + 1)
+  const vaultDB = new MemoryVaultDB()
   const vault = vaultAt()
   await vaultDB.putVault(vault, { prior: SX.VoidRevision })
   const box = boxAt()

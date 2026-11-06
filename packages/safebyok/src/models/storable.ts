@@ -1,4 +1,5 @@
 import { isEqual } from 'es-toolkit'
+import { nowMillis } from '../helpers/clock'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -40,7 +41,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
 
-  /** Set by a sweep, a vacate or a delete, and never cleared. */
+  /** Set by a sweep or a vacate, and never cleared. */
   #isEnabled = true
 
   /** The latest record this device knows storage holds: full, sparse or a tombstone, void on a new instance. */
@@ -183,14 +184,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const { central, policy } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
     const isTaken = central !== this.#central
     if (isTaken) { this.adopt(central) }
-    if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = this.world.clock.now() }
+    if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = nowMillis() }
     return isTaken ? this.settle() : { badnews: [] }
   }
 
   /** A tombstone made here, from the sparse props held, under `revision`, written now. */
   protected tombstoneFor(revision: Revision): Tombstone<SparseT> {
     const { revision_tok, revision_seq } = revision
-    return { ...this.sparse, revision_tok, revision_seq, written_at: this.world.clock.now(), am: 'x' }
+    return { ...this.sparse, revision_tok, revision_seq, written_at: nowMillis(), am: 'x' }
   }
   // --
 
@@ -289,7 +290,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Guards]: isEnabled, isLocked, isTimely, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandInstanceEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
 
-  /** False past a sweep, a vacate or a delete, and from then on. */
+  /** False past a sweep or a vacate, and from then on. */
   get isEnabled(): boolean { return this.#isEnabled }
 
   get isLocked(): boolean { return this.listing.lockState() === 'locked' }
@@ -298,7 +299,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get isTimely(): boolean { return this.#isRefreshedWithin(this.#horizonMillis) }
 
   #isRefreshedWithin(maxMillis: number): boolean {
-    return this.#refreshedAt !== null && this.world.clock.now() - this.#refreshedAt < maxMillis
+    return this.#refreshedAt !== null && nowMillis() - this.#refreshedAt < maxMillis
   }
 
   /** The record in hand is not a tombstone: the thing is not gone. */

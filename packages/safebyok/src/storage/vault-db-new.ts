@@ -2,10 +2,10 @@
 
 import type * as Z from 'zod'
 import type { Awaitable } from '../helpers/helpers'
+import { nowMillis } from '../helpers/clock'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf } from '../refusals/outcome'
 import type { IfPresent, PutIfAbsent } from '../shapes/shapes-enums'
-import { type Clock, wallClock } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
@@ -69,17 +69,15 @@ const putTermsOf = ({ prior, ifAbsent, ifPresent }: PutChoices): PutTerms => ({ 
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
 export abstract class VaultDB {
-  // == [Props]: #clock, #maxRecordBytes
+  // == [Props]: #maxRecordBytes
 
-  readonly #clock: Clock
   readonly #maxRecordBytes: number
   // --
 
   // == [Construction]: constructor
 
   constructor(opts: VaultDBOpts = {}) {
-    const { clock = wallClock, maxRecordBytes = Infinity } = SX.vaultDBOpts.parse(opts)
-    this.#clock = clock
+    const { maxRecordBytes = Infinity } = SX.vaultDBOpts.parse(opts)
     this.#maxRecordBytes = maxRecordBytes
   }
   // --
@@ -260,7 +258,7 @@ export abstract class VaultDB {
     if (wayin === null) { return { act, val: stored, world: stored } }
     const record: VaultRecord = {
       ...stored,
-      ...SX.nextRevisionOf(stored, this.#clock.now()),
+      ...SX.nextRevisionOf(stored, nowMillis()),
       gate: { ...stored.gate, ...wayin, gate_epoch: stored.gate.gate_epoch + 1 },
     }
     await this.#putVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'add', ifPresent: 'repl' })

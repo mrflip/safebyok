@@ -1,4 +1,5 @@
 import { Checkers, consistent } from '../helpers/validator'
+import { nowMillis } from '../helpers/clock'
 import { PassphraseKeyBytes } from '../helpers/consts'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
@@ -81,7 +82,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     const checked = provingLeaseArgs.parse({ friend, gate_epoch })
-    if (! consistent(friend, this.stamp)) { throw leaseOfOtherVault() }
+    if (! consistent(checked.friend, this.stamp)) { throw leaseOfOtherVault() }
     const vaultKey = await this.#unwrapVaultKey()
     return Lease.buildGranted(friend, vaultKey, { gate_epoch: checked.gate_epoch, wayinkind: this.wayinkind })
   }
@@ -172,20 +173,20 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 
 // == [Headers]: mintPassphraseHeader, mintPasskeyHeader
 
-const mintPassphraseHeader = ({ clock, keyDeriver, device_id }: ProvingWorld): PassphraseWayinHeader => passphraseWayinHeader.parse({
+const mintPassphraseHeader = ({ keyDeriver, device_id }: ProvingWorld): PassphraseWayinHeader => passphraseWayinHeader.parse({
   wayinkind:         'passphrase',
   key_deriver_label: keyDeriver.key_deriver_label,
   salt_b64:          toB64(randomBytes(keyDeriver.salt_bytes)),
   device_id,
-  registered_at:     clock.now(),
+  registered_at:     nowMillis(),
 })
 
-const mintPasskeyHeader = ({ clock, device_id }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader => passkeyWayinHeader.parse({
+const mintPasskeyHeader = ({ device_id }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader => passkeyWayinHeader.parse({
   wayinkind:     'passkey',
   credential_id,
   prf_salt_b64,
   device_id,
-  registered_at: clock.now(),
+  registered_at: nowMillis(),
 })
 // --
 

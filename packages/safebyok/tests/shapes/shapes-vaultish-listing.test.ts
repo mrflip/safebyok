@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { boxListingOf, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
+import { boxListingOf, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord } from '../test-helpers/models-world'
 import { holdsCases } from '../test-helpers/cases'
 import * as TH from '../test-helpers'
 
@@ -139,18 +139,11 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
 describe("The checks of the world and the listing", () => {
   describe("VX.world", () => {
     holdsCases(VX.world, 'bad_option', [
-      [{ clock: { now: () => T0 } },  true,  'passes a world carrying a clock'],
-      [mw.world,                      true,  'passes the test world'],
-      [{ clock: {} },                 false, 'refuses a clock without now'],
-      [{},                            false, 'refuses a world without a clock'],
-      [null,                          false, 'refuses null'],
+      [mw.world, true,  'passes the test world'],
+      [{},       true,  'passes an empty object'],
+      [null,     false, 'refuses null'],
+      [5,        false, 'refuses a number'],
     ])
-
-    it("takes the clock from whatever carries it and strips the rest", () => {
-      const parsed = VX.world.parse(mw.world)
-      expect(Object.keys(parsed)).to.deep.equal(['clock'])
-      expect(parsed.clock.now()).to.eq(T0)
-    })
   })
 
   describe("VX.listingOpts", () => {
@@ -162,7 +155,6 @@ describe("The checks of the world and the listing", () => {
       [{ ...opts, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
       [{ ...opts, world: { ...mw.world, ensureTimely: 5 } },     false, 'refuses a world whose ensureTimely is no function'],
       [{ ...opts, world: { ...mw.world, lockState: undefined } }, false, 'refuses a world with no lockState'],
-      [{ ...opts, world: { ...mw.world, clock: {} } },           false, 'refuses a world with no clock'],
       [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
@@ -187,7 +179,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, central: { am: 'a' } },              false, 'refuses a central that fails sparseBase'],
       [{ ...args, listing: {} },                       false, 'refuses a listing that answers to no IsListing'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
-      [{ ...args, world: {} },                         false, 'refuses a world with no clock'],
+      [{ ...args, world: null },                       false, 'refuses a null world'],
       [{ ...args, opts: {} },                          false, 'refuses options with no horizon'],
       [{ ...args, opts: { maxMillisSinceRefresh: -1 } }, false, 'refuses a negative horizon'],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not take, being strict'],
