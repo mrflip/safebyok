@@ -35,8 +35,8 @@ describe("The checks of options", () => {
   describe("GX.leaseMillis", () => {
     holdsCases(GX.leaseMillis, [
       [60_000,          true,  'passes a whole number of milliseconds'],
-      [ForeverMillis,   true,  'passes ForeverMillis, a host\'s never'],
-      [Infinity,        false, 'refuses Infinity: the bank keeps a host\'s as ForeverMillis'],
+      [ForeverMillis,   true,  "passes ForeverMillis, a host's never"],
+      [Infinity,        false, "refuses Infinity: the bank keeps a host's as ForeverMillis"],
       [0,               false, 'refuses zero'],
       [0.5,             false, 'refuses a fraction of a millisecond'],
     ])
