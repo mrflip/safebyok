@@ -58,6 +58,13 @@ Branch `20261106-port_graphql`, rebased onto thread 4's `20261106-port_postgres`
     crosses as `Number.MAX_SAFE_INTEGER`; a capacity that will not parse is left off rather than turning
     the refusal into `storage_unavailable`.
   * The battery's Client signs each operation in as the user its variables name, so the gate stays on.
+  * Rework (the Coach, on *A revoked session keeps hearing its bank*): `heardOf`'s `next` asks
+    `userIdOf` again (through `isSignedInAs`, which `demandSignedInAs` now uses too) before handing on
+    each notice, and ends the stream, its watch released, once the answer changes; a re-ask that
+    throws ends it with the crossed refusal (`unexpected_error`), so a listener never outlives a
+    failed check. Checked at the reader, not in the watch's callback, so notices keep their order with
+    an async `userIdOf`. A registry of live subscriptions, to close them at revocation, was set aside:
+    an idle stream stays open until its next change, as the README and a patch changeset say.
 
 * **Discoveries**
   * Zod 4's `unknown()` in an object requires the key: `box: unk.optional()` for a vault notice.
