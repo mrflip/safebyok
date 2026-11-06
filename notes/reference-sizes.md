@@ -4,13 +4,13 @@ How many bytes each stored record, notice and bank takes, against the limits of 
 horizon, to judge where data volume is an issue.
 
 **Lead.** Even the simplest notice fits, easily. The Postgres adapter's notice for a box write (box row, vault row as
-`world`, scope) is 1.6 KB for a mini box and 2.1 to 2.4 KB for a medium one, against pg_notify's 8,000 bytes (the
-adapter caps it at 7,999). It stops fitting once the box row passes about 6.6 KB, a whisper of about 4.3 KB of JSON.
-An RSA-2048 keypair fits (5.2 KB), an RSA-4096 keypair just fits (7.8 KB), and an mTLS identity never fits (15.5 KB).
-Past that size the adapter sends a header of about 300 bytes, and each listener calls `getBox`: slower, not broken.
-No call against a default-limit bank exceeds a Convex transaction, as safebyok-convex holds a vault to 7.3 MB. But no
-limit on vaults per bank exists, so `listVaults` fails at 8,192 vaults. A typical bank is 8 kB, and a 75%-limit bank is
-19 to 44 GB. So volume is an issue only at the limits: ratchet each down by two to four orders of magnitude.
+`world`, scope) is 1.6 KB for a mini box and 2.1 to 2.5 KB for a medium one, against pg_notify's 8,000 bytes (the
+adapter caps it at 7,999). It stops fitting once the box row passes about 6.6 KB, whisper and sidecar together. An
+RSA-2048 keypair with a 1 KB sidecar fits (6.2 KB). An RSA-4096 keypair with one does not (8.4 KB), nor does an mTLS
+identity with a 4 KB sidecar (19.4 KB). Past that size the adapter sends a header of about 300 bytes, and each listener
+calls `getBox`: slower, not broken. No call against a default-limit bank exceeds a Convex transaction, as
+safebyok-convex holds a vault to 7.3 MB. But no limit on vaults per bank exists, so `listVaults` fails at 8,192 vaults.
+A typical bank is 8 kB, a 75%-limit bank 19 to 44 GB: volume is an issue only at the limits, so ratchet them down.
 
 **Measured** is one throwaway run on 2026-11-06: Node 24, the core's `src/` at `byok-closerlook-pg`
 (fb6d281d3), and safebyok-convex at `byok-closerlook-cvx` (bdfe5aa9b). Each record was sealed with real WebCrypto
@@ -56,15 +56,17 @@ Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 2
 ## Box rows
 
 The whisper of mini and medium is `{"anthropic":"sk-ant-api03-…"}`, holding a 108-character key in the shape of an
-Anthropic API key. Its JSON is 124 bytes.
+Anthropic API key. Its JSON is 124 bytes. **The sidecar sizes are the Coach's chosen estimates**: 2, 150, 1,000,
+1,000 and 4,000 bytes of JSON. Each is a plausible host bag (`account_id`, `calls`, `tokens`, `model`, at 1,000 and
+up a `limits` string) padded through a `notes` string to exactly that length, all ASCII.
 
 | Box     | Whisper                                         | Whisper JSON | Sidecar JSON | Core's measure | JSON length | Convex weighs | Source   |
 | ------- | ----------------------------------------------- | ------------ | ------------ | -------------- | ----------- | ------------- | -------- |
 | mini    | the API key                                     | 124          | 2            | 781            | 781         | 901           | Measured |
-| medium  | the API key                                     | 124          | 86           | 1,023          | 1,023       | 1,297         | Measured |
-| large   | RSA-2048 public and private PEM, a field each   | 2,226        | 86           | 3,826          | 3,826       | 4,100         | Measured |
-| large-4096 | the same, RSA-4096                           | 4,168        | 86           | 6,415          | 6,415       | 6,689         | Measured |
-| xl      | an mTLS identity: RSA-4096 leaf key, leaf and issuing certs, root cert | 9,921 | 86 | 14,086 | 14,086   | 14,360        | Measured |
+| medium  | the API key                                     | 124          | 150          | 1,087          | 1,087       | 1,355         | Measured |
+| large   | RSA-2048 public and private PEM, a field each   | 2,226        | 1,000        | 4,740          | 4,740       | 5,005         | Measured |
+| large-4096 | the same, RSA-4096                           | 4,168        | 1,000        | 7,329          | 7,329       | 7,594         | Measured |
+| xl      | an mTLS identity: RSA-4096 leaf key, leaf and issuing certs, root cert | 9,921 | 4,000 | 18,000 | 18,000 | 18,265        | Measured |
 | any     | its tombstone                                   | n/a          | n/a          | 366 to 524     | same        | n/a           | Measured |
 
 * **The core's measure** is what `box_too_large` judges against `maxRecordBytes`, in `vault-db-new.ts` `jsonBytes`:
@@ -74,9 +76,10 @@ Anthropic API key. Its JSON is 124 bytes.
 * **Reading "minimum validatable size".** The labels and user_id are at their minimum: 2 characters, and 1 for the
   user_id. The tokens, times and ciphered fields are as the core mints them (UUIDs, 13-digit times, real ciphertext),
   since their checks accept one character but no box ever holds that. Medium, large and xl have their labels at
-  75% of maximum (30) and the user_id at 75 characters. Their sidecar is
-  `{"account_id":"<uuid>","calls":48213,"tokens":183204117}`. The labels and the user_id are the only fields that vary.
-* **Rule of thumb:** a box is about 600 bytes (mini) or 840 bytes (medium) of fixed fields, plus 1.33 × its whisper's JSON.
+  75% of maximum (30) and the user_id at 75 characters. Beside the sidecar, the labels and the user_id are the only
+  fields that vary.
+* **Rule of thumb:** a box is about 600 bytes of fixed fields at minimum labels, or 750 at 75% labels, plus its
+  sidecar's JSON, plus 1.33 × its whisper's JSON.
 
 ## The Postgres notice for a box write
 
@@ -87,21 +90,23 @@ listener fetches the box afresh with `doGetBox` (`toldTextOf`, `#heardOrNull`).
 | Box        | Notice, passphrase vault | Notice, passphrase and passkey vault | Notice, larger vault | Header alone | Source   |
 | ---------- | ------------------------ | ------------------------------------ | -------------------- | ------------ | -------- |
 | mini       | 1,554                    | 1,914                                | 2,829                | 116          | Measured |
-| medium     | 2,084                    | 2,444                                | 3,359                | 274          | Measured |
-| large      | 4,887                    | 5,247                                | 6,162                | 274          | Measured |
-| large-4096 | 7,476                    | 7,836                                | **8,751: header**    | 274          | Measured |
-| xl         | **15,147: header**       | **15,507: header**                   | **16,422: header**   | 274          | Measured |
+| medium     | 2,148                    | 2,508                                | 3,423                | 274          | Measured |
+| large      | 5,801                    | 6,161                                | 7,076                | 274          | Measured |
+| large-4096 | **8,390: header**        | **8,750: header**                    | **9,665: header**    | 274          | Measured |
+| xl         | **19,061: header**       | **19,421: header**                   | **20,336: header**   | 274          | Measured |
 
-| Where the notice stops carrying its rows       | Largest whisper JSON | Its box row | Source   |
+| Where the notice stops carrying its rows       | Largest whisper JSON, with that sidecar | Its box row | Source   |
 | ---------------------------------------------- | -------------------- | ----------- | -------- |
-| mini fields, passphrase vault                  | 4,958                | 7,226       | Measured |
-| medium fields, passphrase vault                | 4,560                | 6,938       | Measured |
-| medium fields, passphrase and passkey vault    | 4,290                | 6,578       | Measured |
-| medium fields, larger vault                    | 3,604                | 5,663       | Measured |
+| mini fields and sidecar, passphrase vault      | 4,958                | 7,226       | Measured |
+| medium fields and sidecar, passphrase vault    | 4,512                | 6,938       | Measured |
+| medium fields and sidecar, passphrase and passkey vault | 4,242       | 6,578       | Measured |
+| medium fields and sidecar, larger vault        | 3,556                | 5,663       | Measured |
 
-A vault write's notice carries only the vault row: 0.7 to 2.2 KB, so it always fits. A vault deletion sends one notice
-per box, each about 1 KB, in one transaction. A vault of 8,000 boxes would queue about 8 MB of
-notices, against the 8 GB queue.
+The edge is a box size: each byte of sidecar takes the room of about 0.75 bytes of whisper JSON.
+
+A vault write's notice carries only the vault row, 0.7 to 2.2 KB, so it always fits. A vault deletion sends one notice
+per box, each about 1 KB, in one transaction. A vault of 8,000 boxes would queue about 8 MB of notices, against the
+8 GB queue.
 
 ## How many fit in one notification, 10% to spare
 
@@ -113,10 +118,10 @@ Every box is in one vault, under distinct boxlabels of one length. *Full* is `{ 
 | Box        | pg_notify 7,200 B: full / hint / kept | 128 KiB (API Gateway WebSocket): full / hint / kept | Bytes per box: full / hint / kept | Source   |
 | ---------- | ------------------------------------- | --------------------------------------------------- | --------------------------------- | -------- |
 | mini       | 9 / 64 / 16                           | 150 / 1,071 / 269                                   | 782 / 110 / 438                   | Measured |
-| medium     | 7 / 50 / 12                           | 115 / 853 / 214                                     | 1,024 / 138 / 550                 | Measured |
-| large      | 1 / 50 / 2                            | 30 / 853 / 35                                       | 3,827 / 138 / 3,353               | Measured |
-| large-4096 | 1 / 50 / 1                            | 18 / 853 / 19                                       | 6,416 / 138 / 5,942               | Measured |
-| xl         | 0 / 50 / 0                            | 8 / 853 / 8                                         | 14,087 / 138 / 13,613             | Measured |
+| medium     | 6 / 50 / 11                           | 108 / 853 / 191                                     | 1,088 / 138 / 614                 | Measured |
+| large      | 1 / 50 / 1                            | 24 / 853 / 27                                       | 4,741 / 138 / 4,267               | Measured |
+| large-4096 | 0 / 50 / 1                            | 16 / 853 / 17                                       | 7,330 / 138 / 6,856               | Measured |
+| xl         | 0 / 50 / 0                            | 6 / 853 / 6                                         | 18,001 / 138 / 17,527             | Measured |
 
 * **Reading "without sidecar or any whisper fields".** The whisper fields are `whisper_codec`,
   `whisper_schema_version`, `whisper_ciphered` and `box_key_wrapped`: a boxKey is there only to open its whisper. So
@@ -150,16 +155,16 @@ safebyok-convex does.
 
 | Family, % of each limit | Vaults | Boxes per vault | Box (Convex) | Naive bank | Boxes after the clip | Per vault | Bank      | Source   |
 | ----------------------- | ------ | --------------- | ------------ | ---------- | -------------------- | --------- | --------- | -------- |
-| Convex, 10%             | 819    | 800             | 105,130      | 68.9 GB    | 69                   | 7.3 MB    | 5.9 GB    | Computed |
-| Convex, 75%             | 6,144  | 6,000           | 786,706      | 29.0 TB    | 9                    | 7.1 MB    | 43.5 GB   | Computed |
-| Convex, 100%            | 8,192  | 8,000           | 1,048,850    | 68.7 TB    | 6                    | 6.3 MB    | 51.6 GB   | Computed |
-| Old, 10%                | 819    | 10              | 6,409        | 53.7 MB    | 10                   | 65.5 kB   | 53.7 MB   | Computed |
-| Old, 75%                | 6,144  | 75              | 41,461       | 19.1 GB    | 75                   | 3.1 MB    | 19.1 GB   | Computed |
-| Old, 100%               | 8,192  | 100             | 54,942       | 45.0 GB    | 100                  | 5.5 MB    | 45.0 GB   | Computed |
-| Typical user            | 1      | 5 medium        | 1,297        | 7.9 kB     | 5                    | 7.9 kB    | 7.9 kB    | Computed |
-| Heavy user              | 3      | 20 of 4 KiB     | 4,370        | 267 kB     | 20                   | 88.8 kB   | 267 kB    | Computed |
-| Ratchet A               | 8      | 32 of 8 KiB     | 8,466        | 2.2 MB     | 32                   | 272 kB    | 2.2 MB    | Computed |
-| Ratchet B               | 16     | 64 of 16 KiB    | 16,658       | 17.1 MB    | 64                   | 1.1 MB    | 17.1 MB   | Computed |
+| Convex, 10%             | 819    | 800             | 105,124      | 68.9 GB    | 69                   | 7.3 MB    | 5.9 GB    | Computed |
+| Convex, 75%             | 6,144  | 6,000           | 786,700      | 29.0 TB    | 9                    | 7.1 MB    | 43.5 GB   | Computed |
+| Convex, 100%            | 8,192  | 8,000           | 1,048,844    | 68.7 TB    | 6                    | 6.3 MB    | 51.6 GB   | Computed |
+| Old, 10%                | 819    | 10              | 6,382        | 53.4 MB    | 10                   | 65.3 kB   | 53.4 MB   | Computed |
+| Old, 75%                | 6,144  | 75              | 41,434       | 19.1 GB    | 75                   | 3.1 MB    | 19.1 GB   | Computed |
+| Old, 100%               | 8,192  | 100             | 54,915       | 45.0 GB    | 100                  | 5.5 MB    | 45.0 GB   | Computed |
+| Typical user            | 1      | 5 medium        | 1,355        | 8.2 kB     | 5                    | 8.2 kB    | 8.2 kB    | Computed |
+| Heavy user              | 3      | 20 of 4 KiB     | 4,364        | 266 kB     | 20                   | 88.7 kB   | 266 kB    | Computed |
+| Ratchet A               | 8      | 32 of 8 KiB     | 8,460        | 2.2 MB     | 32                   | 272 kB    | 2.2 MB    | Computed |
+| Ratchet B               | 16     | 64 of 16 KiB    | 16,652       | 17.1 MB    | 64                   | 1.1 MB    | 17.1 MB   | Computed |
 
 * **One call against these banks.** A `listBoxes` reads at most 7.3 MB and returns at most 8,000 boxes, so it fits
   one Convex transaction (16 MiB, 8,192 elements). That is what `MaxVaultBoxBytes` and `MaxVaultBoxes` are for.
@@ -243,12 +248,12 @@ The rates are the Professional plan's overage prices: $2 per million calls and $
 | ---------------------------------- | ---------- | ------------- | -------------------- | ----------------------- | -------- |
 | Convex, 75%                        | 1 h        | 4.49 billion  | 31.8 PB              | $6.36M / $6.36M         | Computed |
 | Convex, 10%                        | 4 h        | 150 million   | 1.08 PB              | $217k / $217k           | Computed |
-| Old, 75%                           | 1 h        | 4.49 billion  | 14.0 PB              | $2.80M / $2.80M         | Computed |
-| Old, 10%                           | 4 h        | 150 million   | 9.8 TB               | $2,258 / $2,198         | Computed |
-| Typical user                       | 1 h / 4 h  | 1.46M / 365k  | 5.8 GB / 1.4 GB      | $4 / $0; $1 / $0        | Computed |
-| Heavy user                         | 1 h / 4 h  | 2.9M / 730k   | 195 GB / 49 GB       | $45 / $29; $11 / $0     | Computed |
-| Ratchet A, 8 × 32 × 8 KiB          | 1 h / 4 h  | 6.6M / 1.6M   | 1.6 TB / 398 GB      | $331 / $308; $83 / $70  | Computed |
-| Ratchet B, 16 × 64 × 16 KiB        | 1 h / 4 h  | 12.4M / 3.1M  | 12.5 TB / 3.1 TB     | $2,519 / $2,484; $630 / $613 | Computed |
+| Old, 75%                           | 1 h        | 4.49 billion  | 13.9 PB              | $2.80M / $2.80M         | Computed |
+| Old, 10%                           | 4 h        | 150 million   | 9.8 TB               | $2,250 / $2,190         | Computed |
+| Typical user                       | 1 h / 4 h  | 1.46M / 365k  | 6.0 GB / 1.5 GB      | $4 / $0; $1 / $0        | Computed |
+| Heavy user                         | 1 h / 4 h  | 2.9M / 730k   | 194 GB / 49 GB       | $45 / $29; $11 / $0     | Computed |
+| Ratchet A, 8 × 32 × 8 KiB          | 1 h / 4 h  | 6.6M / 1.6M   | 1.6 TB / 398 GB      | $331 / $308; $83 / $69  | Computed |
+| Ratchet B, 16 × 64 × 16 KiB        | 1 h / 4 h  | 12.4M / 3.1M  | 12.5 TB / 3.1 TB     | $2,518 / $2,483; $629 / $613 | Computed |
 
 * **Assumptions.** Each device polls a bank of its own, and every poll reads every byte. Storage is negligible: 1,000
   typical banks are 8 MB.
@@ -262,10 +267,11 @@ The rates are the Professional plan's overage prices: $2 per million calls and $
 ## Ratcheting
 
 * **Notice whole, box limit of about 6 KiB.** A box row of 6,144 bytes keeps every box notice whole under today's
-  vault rows. The larger vault needs 5.5 KiB. Either holds an RSA-2048 keypair (a 3.8 KB box) or an RSA-4096 PGP
-  public key (about 5.1 KB). Neither holds an RSA-4096 keypair, a TLS chain (about 6.2 KB) or an mTLS identity.
-* **Notice degraded, box limit of 16 KiB.** This holds every payload above except images. Boxes over about 6.6 KB get
-  the header and a `getBox` per listener.
+  vault rows. The larger vault needs 5.5 KiB. Either holds an RSA-2048 keypair with its 1 KB sidecar (a 4.7 KB box),
+  or an RSA-4096 PGP public key with a 150-byte sidecar (about 5.2 KB). Neither holds an RSA-4096 keypair with a 1 KB
+  sidecar (7.3 KB), or an mTLS identity.
+* **Notice degraded, box limit of 16 to 20 KiB.** 16 KiB holds every box here but xl, which is 18.0 KB with its 4 KB
+  sidecar. 20 KiB holds xl too. Boxes over about 6.6 KB get the header and a `getBox` per listener.
 * **Vaults per bank.** Today none is set, and Convex's 8,192 is the de facto limit, set by a failure. Any cap from 8
   to 64 keeps `listVaults` far inside one transaction.
 * **Boxes per vault.** At 32 or 64, a full vault answered whole stays at 1.1 MB or less, under every response limit in
