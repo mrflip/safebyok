@@ -4,61 +4,13 @@ import { makeFunctionReference } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
 import type { JSONValue, Value } from 'convex/values'
-import { Checkers } from 'safebyok-old'
+import { Checkers } from 'safebyok/storage'
 
-/** A Convex deployment in memory that the real Convex clients talk to, unmodified, over a fake WebSocket.
- * A `ConvexClient` connects through {@link FakeDeployment.client}, and any other client, such as
- * `ConvexReactClient`, through {@link FakeDeployment.connectWith}. It is for the tests of an
- * adapter, a binding, or an app that holds a Convex client.
- *
- * `convex-test` runs the host's safebyok functions and the component beneath; this answers the
- * sync-protocol messages a client sends for queries and mutations, as convex 1.48 sends them. It
- * imports `convex` and `safebyok` and nothing else: `convex-test` stays with you, and its
- * `defineTestApp(...).defineModules(...)` is the `host`.
- *
- * It stands in for the network and a real server, so it cannot prove them:
- * * Calls run one at a time, in arrival order, so no two transactions ever race.
- * * After every mutation it reruns every watched query and pushes those whose results changed,
- *   where Convex reruns only those the write touched: the same results, sooner or later.
- * * Each socket is signed in as one user from the start, in place of `setAuth` and a JWT, until
- *   `signOut()` signs every one out.
- * * There is no reconnecting, no ping, no chunked transition, and no action.
- *
- * Its clients log quietly: what a client says with `log` is dropped, and what it says with `warn`
- * or `error` goes to the console, so a warning no test meant to provoke still shows. A real
- * client prints each mutation a function refuses, with `error`, so a test that provokes a
- * refusal on purpose hands in a logger of its own to catch it: a `safebyok` `TH.spyLogger()`
- * keeps each call in `calls`, silently, for the test to look at (see the third example). To see
- * everything the client says, `logger: console` does.
- *
- * Refuses 'bad_option' for a `host` without an `api` and a `createTest` function, or `opts` with
- * a field it does not take or a `logger` lacking `log`, `warn` and `error` functions.
- *
- * @param host - The host app to run: its `api` and a backend that runs its functions.
- * @param opts - `logger`: an object with `log`, `warn` and `error` functions (`logVerbose` too, if
- *   you want the client's verbose lines) that every client made here is given, in place of the
- *   quiet one. A `VaultLogger` fits.
- * @returns The deployment: connect clients to it, and `close()` it after the test.
- *
- * @example
- *   const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
- *   const host = app.defineModules({ safebyok: new SafebyokComponent(app.components.safebyok).api({ getUserId }) })
- *   const deployment = fakeDeployment(host)
- *   const client = deployment.client('u1')
- *   await client.query(deployment.api.safebyok.getVault, { ...scope })
- *   await deployment.close()
- *
- * @example
- *   const deployment = fakeDeployment(host)
- *   const reactClient = deployment.connectWith('u1', (address, opts) => new ConvexReactClient(address, opts))
- *   await reactClient.mutation(deployment.api.safebyok.ensureVault, { draft })
- *
- * @example Catch what a client logs, to test it
- *   const heard = spyLogger()
- *   const deployment = fakeDeployment(host, { logger: heard.logger })
- *   await deployment.client(null).mutation(deployment.api.safebyok.ensureVault, { draft }).catch(() => undefined)
- *   heard.calls.map((call) => call.level)   // => ['error']: the refusal the client would have printed
- */
+// It stands in for the network and a server, so it cannot prove them: calls run one at a time in
+// arrival order, every watched query reruns after each mutation, each socket is signed in as one
+// user from the start, and there is no reconnecting, ping or action. Its clients drop what they
+// `log`, and send `warn` and `error` to the console unless handed a logger.
+/** A Convex deployment in memory, running `host` under convex-test, that real Convex clients reach over a fake WebSocket. */
 export const fakeDeployment = <Host extends FakeHost>(host: Host, opts: FakeDeploymentOpts = {}): FakeDeployment<Host> => new FakeDeployment(host, opts)
 
 /** What the clients of a {@link FakeDeployment} are given for `logger`: what they log, and where. */
@@ -85,9 +37,7 @@ export type FakeBackend = {
   withIdentity: (identity: { subject: string }) => FakeBackend
 }
 
-/** What a Convex client's constructor is given: the address, and the options that plug it into the fake, its `logger` the deployment's.
- * Hand them on as they come, `new ConvexReactClient(address, opts)`, and the client logs as the deployment was told.
- */
+/** What a Convex client's constructor is handed to reach the fake: pass them on as they come, `new ConvexReactClient(address, opts)`. */
 export type FakeClientOpts = { webSocketConstructor: typeof WebSocket, unsavedChangesWarning: false, logger: ConvexLogger }
 
 /** The fake deployment's handle on one connected socket: the user it is signed in as, its watches. */
@@ -166,10 +116,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return this.connectWith(subject, (address, opts) => new ConvexClient(address, opts))
   }
 
-  /** A client of any other kind on this deployment, signed in as `subject`, or as no one, and closed with the rest.
-   * `make` constructs it from the address and options it is given. This is how `ConvexReactClient`
-   * connects, without this module importing React.
-   */
+  /** A client `make` constructs, such as a `ConvexReactClient`, on this deployment, signed in as `subject` or no one, and closed with the rest. */
   connectWith<Client extends { close: () => Promise<void> }>(subject: string | null, make: (address: string, opts: FakeClientOpts) => Client): Client {
     const client = make(FakeAddress, { webSocketConstructor: this.socketsFor(subject), unsavedChangesWarning: false, logger: this.logger })
     this.clients.push(client)

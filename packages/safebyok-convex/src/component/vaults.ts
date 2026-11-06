@@ -1,12 +1,11 @@
 import * as SX from 'safebyok/storage'
 import type { PutOptsGiven, VaultScope, WatchScope } from 'safebyok/storage'
-import type { WithoutSystemFields } from 'convex/server'
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc } from './_generated/dataModel'
 import * as Tallies from './tallies'
-import type { Life } from './tallies'
+import type { BoxDocGiven, Life } from './tallies'
 import * as CVX from './validators'
 
 // One function for each of the VaultDB's generic calls, reached through the host's wrapper, which
@@ -21,7 +20,7 @@ export const listVaults = query({
   args:    CVX.listVaultsArgs,
   returns: v.array(CVX.rowOfVault),
   handler: async (ctx, { scope }) => {
-    const vaultDocs = await scopeVaultQuery(ctx.db, scope).collect()
+    const vaultDocs = await listVaultDocs(ctx.db, scope)
     return vaultDocs.map(({ vaultlabel, vault }) => ({ vaultlabel, vault }))
   },
 })
@@ -30,7 +29,10 @@ export const listVaults = query({
 export const getVault = query({
   args:    CVX.getVaultArgs,
   returns: v.any(),
-  handler: async (ctx, { scope }) => (await findVaultDoc(ctx.db, scope))?.vault ?? null,
+  handler: async (ctx, { scope }) => {
+    const vaultDoc = await findVaultDoc(ctx.db, scope)
+    return vaultDoc?.vault ?? null
+  },
 })
 
 /** The box rows of one life of a vault, and the vault row, from one snapshot. */
@@ -38,8 +40,9 @@ export const listBoxes = query({
   args:    CVX.listBoxesArgs,
   returns: CVX.boxesFetched,
   handler: async (ctx, { asked }) => {
-    const vault = (await findVaultDoc(ctx.db, asked))?.vault ?? null
-    const boxDocs = await Tallies.lifeBoxQuery(ctx.db, asked).collect()
+    const vaultDoc = await findVaultDoc(ctx.db, asked)
+    const vault = vaultDoc?.vault ?? null
+    const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, asked).collect()
     return { vault, boxes: boxDocs.map(({ boxlabel, box }) => ({ boxlabel, box })) }
   },
 })
@@ -49,8 +52,10 @@ export const getBox = query({
   args:    CVX.getBoxArgs,
   returns: CVX.boxFetched,
   handler: async (ctx, { asked }) => {
-    const vault = (await findVaultDoc(ctx.db, asked))?.vault ?? null
-    const box = (await findBoxDoc(ctx.db, asked, asked.boxlabel))?.box ?? null
+    const vaultDoc = await findVaultDoc(ctx.db, asked)
+    const vault = vaultDoc?.vault ?? null
+    const boxDoc = await findBoxDoc(ctx.db, asked, asked.boxlabel)
+    const box = boxDoc?.box ?? null
     return { vault, box }
   },
 })
@@ -76,7 +81,8 @@ export const putBox = mutation({
   args:    CVX.putBoxArgs,
   returns: CVX.putBoxAnswer,
   handler: async (ctx, { record, opts, maxBoxes = Tallies.MaxVaultBoxes }) => {
-    const vault = (await findVaultDoc(ctx.db, record))?.vault ?? null
+    const vaultDoc = await findVaultDoc(ctx.db, record)
+    const vault = vaultDoc?.vault ?? null
     const life = lifeOf(record)
     const anteDoc = await findBoxDoc(ctx.db, life, record.boxlabel)
     const ante = anteDoc?.box ?? null
@@ -119,7 +125,8 @@ export const delBox = mutation({
   args:    CVX.delBoxArgs,
   returns: CVX.boxLanding,
   handler: async (ctx, { tombstone, opts: { prior } }) => {
-    const vault = (await findVaultDoc(ctx.db, tombstone))?.vault ?? null
+    const vaultDoc = await findVaultDoc(ctx.db, tombstone)
+    const vault = vaultDoc?.vault ?? null
     const life = lifeOf(tombstone)
     const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
     const ante = anteDoc?.box ?? null
@@ -142,12 +149,13 @@ export const tidyGone = mutation({
   args:    CVX.tidyGoneArgs,
   returns: CVX.tidied,
   handler: async (ctx, { scope }) => {
-    const vaultDocs = await scopeVaultQuery(ctx.db, scope).collect()
+    const vaultDocs = await listVaultDocs(ctx.db, scope)
     const vaultsByLabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
     const isOver = ({ vaultlabel, vault_tok }: Life) => SX.isLifeOver(vaultsByLabel.get(vaultlabel) ?? null, vault_tok)
-    const boxDocs = await scopeBoxQuery(ctx.db, scope).collect()
-    const overBoxDocs = boxDocs.filter(isOver)
-    const overTallyDocs = (await scopeTallyQuery(ctx.db, scope).collect()).filter(isOver)
+    const boxDocs = await listBoxDocs(ctx.db, scope)
+    const tallyDocs = await listTallyDocs(ctx.db, scope)
+    const overBoxDocs = boxDocs.filter((boxDoc) => isOver(boxDoc))
+    const overTallyDocs = tallyDocs.filter((tallyDoc) => isOver(tallyDoc))
     await Promise.all(overBoxDocs.map(({ _id }) => ctx.db.delete('safebyok_boxes', _id)))
     await Promise.all(overTallyDocs.map(({ _id }) => ctx.db.delete('safebyok_tallies', _id)))
     return { totalCount: boxDocs.length - overBoxDocs.length }
@@ -160,8 +168,8 @@ export const watchRows = query({
   args:    CVX.watchRowsArgs,
   returns: CVX.rowsWatched,
   handler: async (ctx, { scope }) => {
-    const vaultDocs = await scopeVaultQuery(ctx.db, scope).collect()
-    const boxDocs = await scopeBoxQuery(ctx.db, scope).collect()
+    const vaultDocs = await listVaultDocs(ctx.db, scope)
+    const boxDocs = await listBoxDocs(ctx.db, scope)
     return {
       vaults: vaultDocs.map(({ vaultlabel, vault }) => ({ vaultlabel, vault })),
       boxes:  boxDocs.map(({ vaultlabel, vault_tok, boxlabel, box }) => ({ vaultlabel, vault_tok, boxlabel, box })),
@@ -170,7 +178,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Helpers]: isPutAllowed, lifeOf, findVaultDoc, findBoxDoc, storeVaultDoc, storeBoxDoc, tombstoneBoxes, scope queries
+// == [Helpers]: isPutAllowed, lifeOf, findVaultDoc, findBoxDoc, storeVaultDoc, storeBoxDoc, tombstoneBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
 
 /** True when a put under `opts` may land over `ante`, the row it would replace. */
 const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
@@ -182,32 +190,32 @@ const lifeOf = ({ applabel, user_id, vaultlabel, vault_tok }: Life): Life => ({ 
 
 // `.unique()` throws on a second document: one is inserted only where none was found, in the same
 // transaction, so two would be damage, which surfaces rather than being papered over.
-const findVaultDoc = (db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope) => (
-  db.query('safebyok_vaults')
+const findVaultDoc = async (db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> => (
+  await db.query('safebyok_vaults')
     .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel))
     .unique()
 )
 
-const findBoxDoc = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string) => (
-  db.query('safebyok_boxes')
+const findBoxDoc = async (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> => (
+  await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()
 )
 
 /** Store `vault` in place of `anteDoc`, or as a new document. */
-const storeVaultDoc = async (db: DatabaseWriter, anteDoc: Doc<'safebyok_vaults'> | null, vault: SX.VaultRecord | SX.VaultTombstone): Promise<void> => {
+const storeVaultDoc = async (db: DatabaseWriter, anteDoc: VaultDoc | null, vault: SX.VaultRecord | SX.VaultTombstone): Promise<void> => {
   const { applabel, user_id, vaultlabel } = vault
   if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { applabel, user_id, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault }) }
 }
 
 /** Store `boxDoc` in place of `anteDoc`, or as a new document. */
-const storeBoxDoc = async (db: DatabaseWriter, anteDoc: Doc<'safebyok_boxes'> | null, boxDoc: WithoutSystemFields<Doc<'safebyok_boxes'>>): Promise<void> => {
+const storeBoxDoc = async (db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<void> => {
   if (anteDoc) { await db.replace('safebyok_boxes', anteDoc._id, boxDoc) } else { await db.insert('safebyok_boxes', boxDoc) }
 }
 
 /** Tombstone every live box row of `life`, and drop its tally. */
 const tombstoneBoxes = async (db: DatabaseWriter, life: Life, written_at: number): Promise<void> => {
-  const boxDocs = await Tallies.lifeBoxQuery(db, life).collect()
+  const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(db, life).collect()
   await Promise.all(boxDocs.map(async (boxDoc) => {
     const boxTombstone = SX.boxTombstoneOf(boxDoc.box, written_at)
     if (boxTombstone !== null) { await db.patch('safebyok_boxes', boxDoc._id, { box: boxTombstone }) }
@@ -216,23 +224,29 @@ const tombstoneBoxes = async (db: DatabaseWriter, life: Life, written_at: number
 }
 
 /** The vault documents of a bank, or of the one vault a scope names. */
-const scopeVaultQuery = (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope) => (
-  db.query('safebyok_vaults').withIndex('by_scope', (idx) => {
+const listVaultDocs = async (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<VaultDoc[]> => (
+  await db.query('safebyok_vaults').withIndex('by_scope', (idx) => {
     const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
     return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
-  })
+  }).collect()
 )
 
 /** The box documents of a bank, or of the one vault a scope names, every life. */
-const scopeBoxQuery = (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope) => (
-  db.query('safebyok_boxes').withIndex('by_box', (idx) => {
+const listBoxDocs = async (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<BoxDoc[]> => (
+  await db.query('safebyok_boxes').withIndex('by_box', (idx) => {
     const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
     return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
-  })
+  }).collect()
 )
 
 /** The tally documents of a bank. */
-const scopeTallyQuery = (db: DatabaseReader, { applabel, user_id }: WatchScope) => (
-  db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel))
+const listTallyDocs = async (db: DatabaseReader, { applabel, user_id }: WatchScope): Promise<Doc<'safebyok_tallies'>[]> => (
+  await db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel)).collect()
 )
+
+/** A vault document, its row unknown until the core's predicates judge it. */
+type VaultDoc = Omit<Doc<'safebyok_vaults'>, 'vault'> & { vault: unknown }
+
+/** A box document, its row unknown until the core's predicates judge it. */
+type BoxDoc = Omit<Doc<'safebyok_boxes'>, 'box'> & { box: unknown }
 // --

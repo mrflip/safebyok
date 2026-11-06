@@ -5,21 +5,13 @@ import type { GenericDataModel } from 'convex/server'
 import type { ComponentApi } from './component-api'
 import schema from './component/schema'
 
-/** The component's function modules, as `convex-test` loads them (under Vite, as vitest runs). */
+/** The component's function modules, for `convex-test` to load. */
 export const modules = import.meta.glob('./component/**/*.ts')
 
+/** The component's schema, for `convex-test`. */
 export { default as schema } from './component/schema'
 
-/** Install the safebyok component into a `convex-test` instance, to test the host's own functions against it in memory.
- *
- * @param testRoot - The test instance, from `convexTest(...)` or `defineTestApp(...).createTest()`.
- * @param componentPath - The name the host passed `app.use`, if not `safebyok`.
- * @returns The component's functions as the host references them, `components.safebyok`.
- *
- * @example
- *   const CVX = convexTest(schema, modules)
- *   register(CVX)
- *   await CVX.withIdentity({ subject: 'u1' }).query(api.safebyok.getVault, { ...scope })
+/** Installs the safebyok component in a `convex-test` instance and answers it as the host references it, `components.safebyok`.
  *
  * @example
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })

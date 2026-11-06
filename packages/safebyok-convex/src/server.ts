@@ -1,182 +1,163 @@
+/** The safebyok functions a host serves from its own `convex/`, each refusing a caller who is not the user its call names. */
+
 import { mutationGeneric, queryGeneric } from 'convex/server'
-import type { ApiFromModules, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
+import type { FunctionReference, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
-import { VaultError } from 'safebyok-old'
-import type { $brand } from 'zod/v4/core' // eslint-disable-line @typescript-eslint/no-unused-vars -- named for the emitted declarations, which carry the core's brand on a salt
+import * as SX from 'safebyok/storage'
 import type { ComponentApi } from './component-api'
-import type { SafebyokErrorData } from './refusals'
 import * as CVX from './component/validators'
+import * as Phrases from './phrases'
+import type { SafebyokErrorData } from './refusals'
 
 export type { ComponentApi } from './component-api'
-export { safebyokErrorKindVals } from './refusals'
+export { safebyokErrorKindVals, isSafebyokErrorData } from './refusals'
 export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 
-/** The host app's answer to "who is calling?": the signed-in user's id as the vault scopes it, or null, undefined or empty for no one.
- * It runs first in every safebyok function. To refuse a signed-in user by a rule of the app's own,
- * it throws a `ConvexError` whose `data` is `{ kind: 'not_permitted', message }` ({@link
- * SafebyokErrorData}), which locks nothing. `identity_revoked`, thrown likewise, locks the vault:
- * throw it only for a user the app knows is gone. Anything else it throws reaches the client as
- * `storage_unavailable`.
+// == [Options]: GetUserId, SafebyokApiOpts
+
+/** The user signed in to the call, as the vault scopes them: null, undefined or empty for no one.
  *
  * @example async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null
- * @example
- *   async (ctx) => {
- *     const identity = await ctx.auth.getUserIdentity()
- *     if (identity?.['suspended'] === true) {
- *       throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'This account is suspended: its vault is closed to it.' })
- *     }
- *     return identity?.subject ?? null
- *   }
  */
 export type GetUserId<DataModel extends GenericDataModel = GenericDataModel> =
   (ctx: GenericQueryCtx<DataModel>) => Promise<string | null | undefined> | string | null | undefined
 
-/** What {@link SafebyokComponent.api} needs from the host app. */
+/** What {@link SafebyokComponent.api} needs of the host. */
 export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataModel> = {
-  /** Who is calling: see {@link GetUserId}. */
+  /** Who is calling. */
   getUserId: GetUserId<DataModel>
 }
+// --
 
-/** safebyok's storage on Convex as the host app serves it: the functions the host re-exports from its own `convex/`.
- * It wraps the installed component, `components.safebyok`, and each function authenticates its
- * caller through the host's {@link GetUserId}.
+// == [The wrapper]: SafebyokComponent, SafebyokApi
+
+/** The installed safebyok component, wrapped to serve its functions to the host's signed-in users.
  *
  * @example
  *   // convex/safebyok.ts
- *   import { SafebyokComponent } from 'safebyok-convex/server'
- *   import { components } from './_generated/api'
- *
- *   export const {
- *     getVault, ensureVault, putVaultRecord, getBox, putBox, getCapacity, delBox, delVault, watchVault,
- *   } = new SafebyokComponent(components.safebyok).api({
- *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
- *   })
+ *   export const { listVaults, getVault, listBoxes, getBox, putVault, putBox, delVault, delBox, tidyGone, watchRows } =
+ *     new SafebyokComponent(components.safebyok).api({ getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null })
  */
 export class SafebyokComponent {
-  private readonly component: ComponentApi
+  readonly #component: ComponentApi
 
-  /** Wrap the installed component, `components.safebyok` from the host's generated api.
-   * Kind 'bad_option' for anything that is not an object, such as the `undefined` a forgotten install leaves.
-   */
   constructor(component: ComponentApi) {
-    if ((component as unknown) === null || (typeof component !== 'object' && typeof component !== 'function')) {
-      throw new VaultError('bad_option', "SafebyokComponent takes the installed component, components.safebyok from your generated api: install it with app.use(safebyok) in convex.config.ts, then run Convex codegen.")
-    }
-    this.component = component
+    this.#component = componentCheck.parse(component, { where: 'SafebyokComponent', advice: Phrases.SafebyokComponentAdvice })
   }
 
-  /** The nine public functions a client's `convexVaultDB` calls, one per storage verb.
-   * Export them under these names from one module of the host's `convex/`. Each refuses with
-   * `identity_revoked` unless `getUserId` names the vault's own `user_id`, before it calls the
-   * component. A refusal `getUserId` throws itself reaches the client as it was thrown. Kind
-   * 'bad_option' at once, not on the first request, for options with no `getUserId` function.
-   * Each takes and returns the core's records as the component types them, a salt the core brands
-   * keeping its {@link $brand}.
-   */
+  /** The functions a `ConvexVaultDB` calls, to export under these names from one module of the host's `convex/`. */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
-    if (typeof (opts as Partial<SafebyokApiOpts<DataModel>> | null | undefined)?.getUserId !== 'function') {
-      throw new VaultError('bad_option', "SafebyokComponent.api takes { getUserId }, a function that answers who is signed in: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null.")
-    }
-    const { vaults } = this.component
-    // Convex's builders, typed by the host's data model, as its own codegen types them: each
-    // handler's ctx is then the one the host's getUserId is written against.
+    // A check only: getUserId is called on the host's own bag, so one that leans on `this` works.
+    safebyokApiOpts.parse(opts, { where: 'SafebyokComponent.api', advice: Phrases.SafebyokApiAdvice })
+    const { vaults } = this.#component
+    // Convex's builders, typed by the host's data model as its codegen types them, so each ctx is the one getUserId is written against.
     const publicQuery: QueryBuilder<DataModel, 'public'> = queryGeneric
     const publicMutation: MutationBuilder<DataModel, 'public'> = mutationGeneric
 
-    /** Refuses unless the caller is signed in as `user_id`, the vault's own user. */
-    const mustBe = async (ctx: GenericQueryCtx<DataModel>, user_id: string): Promise<void> => {
-      // Called as a method of the host's bag, so a getUserId that leans on `this` works.
+    /** Refuses unless the caller is signed in as `user_id`. */
+    const demandCaller = async (ctx: GenericQueryCtx<DataModel>, user_id: string): Promise<void> => {
       const callerId = await opts.getUserId(ctx)
-      if (! callerId) {
-        throw identityRevoked('No one is signed in, so this vault cannot be reached: sign in, then try again.')
-      }
-      if (callerId !== user_id) {
-        throw identityRevoked('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
-      }
+      if ((! callerId) || (callerId !== user_id)) { throw new ConvexError<SafebyokErrorData>({ kind: 'identity_revoked' }) }
     }
 
     return {
-      getVault: publicQuery({
-        args:    { ...CVX.vaultScope.fields },
-        returns: v.nullable(CVX.vaultAnswer),
+      listVaults: publicQuery({
+        args:    CVX.listVaultsArgs,
+        returns: v.array(CVX.rowOfVault),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.user_id)
+          await demandCaller(ctx, args.scope.user_id)
+          return await ctx.runQuery(vaults.listVaults, args)
+        },
+      }),
+      getVault: publicQuery({
+        args:    CVX.getVaultArgs,
+        returns: v.any(),
+        handler: async (ctx, args): Promise<unknown> => {
+          await demandCaller(ctx, args.scope.user_id)
           return await ctx.runQuery(vaults.getVault, args)
         },
       }),
-      ensureVault: publicMutation({
-        args:    { draft: CVX.novelVaultRecord },
-        returns: CVX.vaultAnswer,
+      listBoxes: publicQuery({
+        args:    CVX.listBoxesArgs,
+        returns: CVX.boxesFetched,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.draft.user_id)
-          return await ctx.runMutation(vaults.ensureVault, args)
-        },
-      }),
-      putVaultRecord: publicMutation({
-        args:    { vaultRecord: CVX.vaultRecord, expected: CVX.vaultRecordExpectation },
-        returns: CVX.putVaultRecordAnswer,
-        handler: async (ctx, args) => {
-          await mustBe(ctx, args.vaultRecord.user_id)
-          return await ctx.runMutation(vaults.putVaultRecord, args)
+          await demandCaller(ctx, args.asked.user_id)
+          return await ctx.runQuery(vaults.listBoxes, args)
         },
       }),
       getBox: publicQuery({
-        args:    { ...CVX.boxscope.fields, expected: CVX.boxGetExpectation },
-        returns: CVX.getBoxAnswer,
+        args:    CVX.getBoxArgs,
+        returns: CVX.boxFetched,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.user_id)
+          await demandCaller(ctx, args.asked.user_id)
           return await ctx.runQuery(vaults.getBox, args)
         },
       }),
+      putVault: publicMutation({
+        args:    CVX.putVaultArgs,
+        returns: CVX.landing,
+        handler: async (ctx, args) => {
+          await demandCaller(ctx, args.record.user_id)
+          return await ctx.runMutation(vaults.putVault, args)
+        },
+      }),
       putBox: publicMutation({
-        args:    { ...CVX.vaultScope.fields, expected: CVX.boxExpectation, box: CVX.boxRecord },
+        args:    CVX.putBoxArgs,
         returns: CVX.putBoxAnswer,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.user_id)
+          await demandCaller(ctx, args.record.user_id)
           return await ctx.runMutation(vaults.putBox, args)
         },
       }),
-      getCapacity: publicQuery({
-        args:    { ...CVX.vaultScope.fields },
-        returns: CVX.capacity,
-        handler: async (ctx, args) => {
-          await mustBe(ctx, args.user_id)
-          return await ctx.runQuery(vaults.getCapacity, args)
-        },
-      }),
-      delBox: publicMutation({
-        args:    { ...CVX.boxscope.fields, expected: CVX.boxDelExpectation },
-        returns: v.nullable(CVX.boxDeletion),
-        handler: async (ctx, args) => {
-          await mustBe(ctx, args.user_id)
-          return await ctx.runMutation(vaults.delBox, args)
-        },
-      }),
       delVault: publicMutation({
-        args:    { ...CVX.vaultScope.fields, expected: CVX.vaultDelExpectation },
-        returns: v.nullable(CVX.vaultTombstone),
+        args:    CVX.delVaultArgs,
+        returns: CVX.landing,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.user_id)
+          await demandCaller(ctx, args.tombstone.user_id)
           return await ctx.runMutation(vaults.delVault, args)
         },
       }),
-      watchVault: publicQuery({
-        args:    { ...CVX.vaultScope.fields },
-        returns: CVX.vaultSignature,
+      delBox: publicMutation({
+        args:    CVX.delBoxArgs,
+        returns: CVX.boxLanding,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.user_id)
-          return await ctx.runQuery(vaults.watchVault, args)
+          await demandCaller(ctx, args.tombstone.user_id)
+          return await ctx.runMutation(vaults.delBox, args)
+        },
+      }),
+      tidyGone: publicMutation({
+        args:    CVX.tidyGoneArgs,
+        returns: CVX.tidied,
+        handler: async (ctx, args) => {
+          await demandCaller(ctx, args.scope.user_id)
+          return await ctx.runMutation(vaults.tidyGone, args)
+        },
+      }),
+      watchRows: publicQuery({
+        args:    CVX.watchRowsArgs,
+        returns: CVX.rowsWatched,
+        handler: async (ctx, args) => {
+          await demandCaller(ctx, args.scope.user_id)
+          return await ctx.runQuery(vaults.watchRows, args)
         },
       }),
     }
   }
 }
 
-/** The host's safebyok functions as its clients reference them: the type of `api.safebyok`.
- * That holds when the host re-exports {@link SafebyokComponent.api}'s functions from `convex/safebyok.ts`.
- */
-export type SafebyokApi = ApiFromModules<{ safebyok: ReturnType<SafebyokComponent['api']> }>['safebyok']
+/** The host's safebyok functions as its clients reference them, `api.safebyok`, once re-exported from `convex/safebyok.ts`. */
+export type SafebyokApi = {
+  [FnName in keyof ComponentApi['vaults']]: ComponentApi['vaults'][FnName] extends FunctionReference<infer FnKind, infer _Visibility, infer ArgsT, infer ReturnT>
+    ? FunctionReference<FnKind, 'public', ArgsT, ReturnT>
+    : never
+}
+// --
 
-const identityRevoked = (message: string) => (
-  new ConvexError<SafebyokErrorData>({ kind: 'identity_revoked', message })
-)
+// == [Checks]: componentCheck, safebyokApiOpts
+
+/** The check of what {@link SafebyokComponent} wraps: an object, as `components.safebyok` is, and not the undefined a missing install leaves. */
+const componentCheck = SX.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_option')
+
+/** The check of {@link SafebyokComponent.api}'s options. */
+const safebyokApiOpts = SX.objCheck(({ fn }) => ({ getUserId: fn<GetUserId>() }), 'bad_option')
+// --
