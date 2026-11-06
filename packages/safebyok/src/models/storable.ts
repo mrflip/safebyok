@@ -41,7 +41,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
 
-  /** Set by a sweep, a vacate or a delete, and never cleared. */
+  /** Set by a sweep or a vacate, and never cleared. */
   #isEnabled = true
 
   /** The latest record this device knows storage holds: full, sparse or a tombstone, void on a new instance. */
@@ -290,7 +290,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Guards]: isEnabled, isLocked, isTimely, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandInstanceEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
 
-  /** False past a sweep, a vacate or a delete, and from then on. */
+  /** False past a sweep or a vacate, and from then on. */
   get isEnabled(): boolean { return this.#isEnabled }
 
   get isLocked(): boolean { return this.listing.lockState() === 'locked' }
