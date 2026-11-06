@@ -1,4 +1,5 @@
 import { getDocumentSize } from 'convex/values'
+import type { Value } from 'convex/values'
 import type { WithoutSystemFields } from 'convex/server'
 import * as SX from 'safebyok/storage'
 import type { Doc } from './_generated/dataModel'
@@ -30,7 +31,7 @@ export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumentBytes - TallyReserveBytes
 // --
 
-// == [Tallies]: Life, Tally, Reckoning, weigh, capacityOf, reckon, refuses, record, forget, drop
+// == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, weigh, capacityOf, reckon, refuses, record, forget, drop
 
 /** The labels and token that name one life of one vault. */
 export type Life = { applabel: string, user_id: string, vaultlabel: string, vault_tok: string }
@@ -41,11 +42,15 @@ export type Tally = { box_count: number, box_bytes: number }
 /** A life's tally as a put finds it: the row it is kept in, if any, and the count, null for a life past a limit. */
 export type Reckoning = { kept: Doc<'safebyok_tallies'> | null, tally: Tally | null }
 
+/** A box document as stored or about to be, its row unknown until the core's predicates judge it. */
+export type BoxDocGiven = Omit<WithoutSystemFields<Doc<'safebyok_boxes'>>, 'box'> & { box: unknown }
+
 /** What `boxDoc` weighs toward its life's limit, its system fields at Convex's estimate. */
-export const weigh = (boxDoc: WithoutSystemFields<Doc<'safebyok_boxes'>> | null): number => {
+export const weigh = (boxDoc: BoxDocGiven | null): number => {
   if (boxDoc === null) { return 0 }
   const { applabel, user_id, vaultlabel, vault_tok, boxlabel, box } = boxDoc
-  return getDocumentSize({ applabel, user_id, vaultlabel, vault_tok, boxlabel, box })
+  // A box row came through a Convex validator or out of the table, so it is a Convex value.
+  return getDocumentSize({ applabel, user_id, vaultlabel, vault_tok, boxlabel, box: box as Value })
 }
 
 /** How full a life is against the cap `maxBoxes`, a life past a limit answered as full. */
