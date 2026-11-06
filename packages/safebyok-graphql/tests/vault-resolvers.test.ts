@@ -37,6 +37,28 @@ describe("vaultResolvers", () => {
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
+  it("refuses each query and mutation that reaches another user's bank", async () => {
+    const schema = TH.schemaOver(await TH.serverOver())
+    const record = TH.vaultAt()
+    const box = TH.boxAt()
+    const opts = { prior: SX.VoidRevision }
+    const sent: [string, Record<string, unknown>][] = [
+      [VaultOperations.listVaults, TH.bankScope],
+      [VaultOperations.getVault, TH.vaultScope],
+      [VaultOperations.listBoxes, TH.vaultQuery],
+      [VaultOperations.getBox, TH.boxQuery],
+      [VaultOperations.putVault, { record, opts }],
+      [VaultOperations.putBox, { record: box, opts }],
+      [VaultOperations.delVault, { tombstone: TH.vaultTombstoneOf(record), opts }],
+      [VaultOperations.delBox, { tombstone: TH.boxTombstoneOf(box), opts }],
+      [VaultOperations.tidyGone, TH.bankScope],
+    ]
+    for (const [source, variableValues] of sent) {
+      const result = await graphql({ schema, source, variableValues, contextValue: { user_id: 'u2' } satisfies TH.TestContext })
+      expect(result, source).to.have.nested.property('errors[0].extensions.kind', 'identity_revoked')
+    }
+  })
+
   it("serves a request signed in as the user it asks for", async () => {
     await TH.emptyTables()
     const browser = TH.browserOver(TH.schemaOver(await TH.serverOver()), TH.signedInAs('u1'))
