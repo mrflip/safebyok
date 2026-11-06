@@ -1,6 +1,6 @@
 # Thread 11: duck calibration (2026-11-06)
 
-Branch `20261106-duck_calibration`, PR #PRNUM, base main. Justify: green, 7,701 tests passed and
+Branch `20261106-duck_calibration`, PR #525, base main. Justify: green, 7,701 tests passed and
 113 skipped across every package; lint, typecheck, build and size budgets green. Docs only.
 
 * **Built**: STYLE.md *Shapes and duck typing* calibrated against ground rule 6 and the thread 6
@@ -52,5 +52,8 @@ Branch `20261106-duck_calibration`, PR #PRNUM, base main. Justify: green, 7,701 
     Left for thread 9; STYLE.md does not settle it.
   - "Name the important primitives" cites `Boxlabel` as a plain alias; no such alias exists.
     Left as is: no true example to put in its place.
-* **For the Coach**: whether the `Z.ZodType<T>` widening may stop at the package's index, so the
-  shapes can still be derived from the record's checker inside the package (see Discoveries).
+* **For the Coach** (also the PR's *Open questions*):
+  - **Where a `Z.ZodType<T>` checker stops being widened**: recommend widening only where the
+    package exports the checker, so the shapes are still derived from the record's checker inside
+    the package (see Discoveries).
+  - **`Boxlabel`**: recommend thread 9 adds the alias or replaces the example.
