@@ -544,6 +544,14 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     })
   }
 
+  it("refuses a friend whose vault_tok, read through its prototype, is another vault's", async () => {
+    const proving = await novelPassphrase()
+    await proving.buildWayin(NOVEL)
+    const { vault_tok: _vault_tok, ...ownFields } = fakeLeaseFriendOf()
+    const friend = Object.assign(Object.create({ get vault_tok() { return 'vault-tok-other' } }) as object, ownFields)
+    await TH.expectRefusal(proving.buildLease(friend as never), 'unexpected_error')
+  })
+
   it("refuses a gate_epoch its check refuses, and a friend with no tryCacheLease", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)

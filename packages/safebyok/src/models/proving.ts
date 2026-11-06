@@ -82,7 +82,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     const checked = provingLeaseArgs.parse({ friend, gate_epoch })
-    if (! consistent(friend, this.stamp)) { throw leaseOfOtherVault() }
+    if (! consistent(checked.friend, this.stamp)) { throw leaseOfOtherVault() }
     const vaultKey = await this.#unwrapVaultKey()
     return Lease.buildGranted(friend, vaultKey, { gate_epoch: checked.gate_epoch, wayinkind: this.wayinkind })
   }
