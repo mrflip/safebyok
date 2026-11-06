@@ -350,9 +350,9 @@ export interface BankOpts {
   keyDeriver:           KeyDeriver
   /** Your dialog, called with each gating that needs the user's passphrase or passkey. */
   requestCleartext:     RequestCleartext
-  /** Judges each new passphrase before a vault takes it; `DefaultStrengthChecker` when left out. */
+  /** Judges each new passphrase before a vault takes it; without one, every new passphrase is too weak (CUSTOMIZATION.md). */
   strengthChecker?:     StrengthChecker | undefined
-  /** Where the bank says what it has no caller to throw to; `DefaultLogger` when left out. */
+  /** Where the bank says what it has no caller to throw to; the console when left out. */
   logger?:              VaultLogger | undefined
   /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?:     number | undefined
