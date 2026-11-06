@@ -1,6 +1,6 @@
 # Thread 16: utils_mash (2026-11-06)
 
-Branch `20261106-utils_mash`, PR to be filled below, stacked on [#518](https://github.com/mrflip/safebyok/pull/518). Justify: green (core 1852 tests, of them 7 new in `tests/utils.test.ts`; every package passing; size budgets met).
+Branch `20261106-utils_mash`, PR [#529](https://github.com/mrflip/safebyok/pull/529), stacked on [#518](https://github.com/mrflip/safebyok/pull/518). Justify: green (core 1852 tests, of them 7 new in `tests/utils.test.ts`; every package passing; size budgets met).
 
 * **Built**: the new core's `safebyok/utils` entry. `packages/safebyok/src/utils.ts` exports `mash(text): Promise<string>`, the SHA-256 of the UTF-8 text through `crypto.subtle.digest`, as lowercase hex (`hex.encode` from `@scure/base`, already a dependency). The argument is checked at entry by a `Checker(({ str }) => str, 'bad_option')`. Wired as the old core wires its own: `package.json` `exports["./utils"]` (`@safebyok/source`, `import`, `require`), `typesVersions`, `publishConfig.exports`, and `src/utils.ts` in `tsdown.config.ts`'s entry list (the build writes `dist/utils.{js,cjs,d.ts,d.cts}`; attw and publint clean). VOCABULARY.md: the deviceId row says `user_id: await mash(email)`; a **mash** row follows it. Changeset `minor`.
 * **Decisions taken**:
