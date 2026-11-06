@@ -253,9 +253,10 @@ export class PostgresVaultDB extends SX.VaultDB {
       /** One life's box rows in a bank, counted. */
       type BoxLife = { vaultlabel: string, vault_tok: string, boxcount: number }
 
+      // Lives before vaults: each statement reads its own snapshot, and a vault row read after its boxes is as new as they are or newer.
+      const lives = await rowsFrom(tx, BoxLivesSql, [applabel, user_id]) as BoxLife[]
       const vaultrows = await rowsFrom(tx, ListVaultsSql, [applabel, user_id]) as RowOfVault[]
       const vaults = new Map(vaultrows.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
-      const lives = await rowsFrom(tx, BoxLivesSql, [applabel, user_id]) as BoxLife[]
       let totalCount = 0
       for (const { vaultlabel, vault_tok, boxcount } of lives) {
         if (SX.isLifeOver(vaults.get(vaultlabel) ?? null, vault_tok)) {
