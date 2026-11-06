@@ -240,7 +240,14 @@ Deviations: a vault's world must carry `leaseMillis` and `boxRefreshMillis` (two
 DefaultLeaseMillis test moved to the bank); refused-world fieldnames read `vault_tok`, not `world.vault_tok`; one cast in
 the models-world fake (`world as unknown as Vault`) so the Pick keeps cmd-click. The clock directive took a third route:
 `sealWorld()` and `makeVaultWithBox()` build no models world at all (db09eb17c). Changeset minor (`Vault` and `Box`
-constructors lose their options argument). Compacted once, after its first justify. In review (medium).
+constructors lose their options argument). Compacted once, after its first justify.
+*Review (medium):* `fixed`; cmd-click reproduced, no doc block lost, guarantees hold, fate code untouched; two fixes
+(`hearingBadNews` typed over `FakeBank`, the only world its spread copies whole; two style nits). Left, minor: a fractional
+`autolockMinutes` yields a non-integer `leaseMillis` that `GX.leaseMillis` refuses in Bank's constructor (pre-existing;
+a two-liner for thread 7: `Math.round` in `millisOf` or `positiveMinutes` to an int); the DefaultLeaseMillis test now
+asserts the bank's field rather than a lease at the boundary (adequate; the boundary tests beside it cover it); the
+`standIn` cast kept for cmd-click; `storable.ts` still takes `world` beside `listing` (pre-existing; a change is machinery);
+the subclasses parse their world and `super()` parses `listingWorld` again (taste). Filing at b6763b9d4.
 
 ### 7. `host_branding`
 
@@ -268,6 +275,9 @@ choice". So `device_id` is a UUID, not a `label`: check it as one (`Z.uuid()` or
 UUID), the test worlds' `device_one`/`device_two` become UUIDs, the VOCABULARY **deviceId** row says a UUID such as
 `crypto.randomUUID()`, and the changeset (minor) says a host passing a non-UUID now meets `bad_option`. Thread 18's
 first-cached-wins and mint stay gone.*
+*Directive (thread 6's review): a fractional `autolockMinutes` (admitted by `positiveMinutes`) makes a non-integer
+`leaseMillis` that `GX.leaseMillis` refuses as `bad_option` on a field the host never named; `Math.round` in `millisOf`
+(bank.ts) or tighten `positiveMinutes` to an int, with a test; the smaller change wins.*
 
 ### 8. `checkers_once`
 
