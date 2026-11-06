@@ -1,6 +1,6 @@
 # Thread 15: list_boxes (2026-11-06)
 
-Branch `20261106-list_boxes`, PR #TBD, stacked on #523 (cut from its tip, `e05c25d7d`). Justify: green; safebyok
+Branch `20261106-list_boxes`, PR #530, stacked on #523 (cut from its tip, `e05c25d7d`). Justify: green; safebyok
 1851 tests in 61 files, 0 lint errors.
 
 The design is the Coach's Recommendation B in the sprint's `listing-responsibilities.md`.
