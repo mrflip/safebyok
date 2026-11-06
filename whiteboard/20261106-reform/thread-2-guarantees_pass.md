@@ -1,6 +1,6 @@
 # Thread 2: the guarantees pass for G8's stale names (2026-11-06)
 
-Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/pull/517), off `main` 57f33ee9. Justify: green after review (safebyok 1827, safebyok-old 3537 + 37 skipped, react 326, scripts 302, every package; lint, types, build, size).
+Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/pull/517), off `main` 57f33ee9. Justify: green after the F12 amend (safebyok 1850, safebyok-old 3537 + 37 skipped, react 326, scripts 302, every package; lint, types, build, size).
 
 * **Built**: `notes/guarantees.md`, names and paths only, every guarantee G1-G10, the table, the
   host-function paragraph, *Bytes*, the secret values and the access points, checked against
@@ -54,6 +54,13 @@ Branch `20261106-guarantees_pass`, PR [#517](https://github.com/mrflip/safebyok/
   - `a66efc475` (F10) the ctx row: "for a wayin its `format`" dropped.
   - `794ff5481` G2 cites `tests/wayin.test.ts` as written again: the pass's swap to
     `tests/models/wayin.test.ts` named a file testing none of G2. Finding F12. F11 records the correction.
+  - Amend, F12 (the Coach: "make it be well tested and refer to that"): `8d5c2e6a2` adds to
+    `tests/models/proving.test.ts` *the ctx a wayin is wrapped under* (every stamp field, and a header's
+    `device_id` and `registered_at`, keep a passphrase or passkey wayin shut through `buildStored`) and *a
+    passkey proving's key* (HKDF info built in the test as stamp, purpose and header opens the wrap; another
+    vault's stamp does not). Before, the core bound only `vault_tok`, and showed the HKDF info only through
+    `wayinCtxOf` itself. Dropping the header from `wayinCtxOf` fails five. `e42662118` G2 cites them.
+    The rule "a claim the code no longer bears is not rewritten" was read too strongly for a test citation.
   - `62f1874eb` (minor) G1's old-core sentence keeps `current === next` in `change_passphrase` verbatim; the
     pass had half renamed it. Still true of `packages/safebyok-old/src/gating.ts:370`.
   - `52bb27626` findings: F1 gains `Lease.cipheredWith`, `grantLease` (twice), `DeviceDB.getLease`, G1's
