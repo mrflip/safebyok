@@ -10,9 +10,9 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 09:35, **running**: threads 1 to 5 and 11 to 20 merged. Building: 6 (`worlds_picks`, on main);
-21 (`kind_docblocks`) and 22 (`kind_tests`) cutting from main on the 09:30 rulings. Then 7 to 10 stack on 6, with 10 after
-22. Open: #516 (this PR), the Closer Look triage.
+**Status:** 2026-11-06, 10:20, **running**: threads 1 to 5 and 11 to 20 merged; 6 (#550), 21 (#548) and 22 (#549) filed
+on main, the Coach's to merge; 7 (`host_branding`) building on #550's tip, with the device_id-UUID, fractional-minutes and
+browserOpts directives; 8, 9, 10 follow on it in turn. Open: #516 (this PR), the Closer Look triage.
 
 ## Read first
 

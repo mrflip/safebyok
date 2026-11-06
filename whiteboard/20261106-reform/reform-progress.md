@@ -5,12 +5,11 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06, 09:25: running)
+## State (2026-11-06, 10:20: running)
 
-Twenty threads planned; 1 to 5 and 11 to 20 merged to main. Building: 6 (`worlds_picks`, on main a19292549, with the
-two-worlds clock directive); 21 (`kind_docblocks`) and 22 (`kind_tests`) from main. Next: 7 to 10 in turn on 6, thread 10
-after 22. The 09:30 rulings: `device_id` is a UUID (thread 7); the reborn-vault hello stands. Open for the Coach: the
-Closer Look triage.
+Twenty-two threads planned; 1 to 5 and 11 to 20 merged; 6 (#550), 21 (#548), 22 (#549) filed on main. Building: 7
+(`host_branding`, on #550's tip b6763b9d4). Next: 8, 9, 10 in turn, each on the one below. Open for the Coach: the Closer
+Look triage; the Open Matters table is empty.
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
 * Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
