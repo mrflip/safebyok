@@ -1,6 +1,7 @@
 # Thread 20: kind promises (2026-11-06)
 
-Branch `20261106-kind_promises`, PR (to come), stacked on #531. Justify: (to come).
+Branch `20261106-kind_promises`, PR #533, stacked on #531. Justify: green (safebyok 1856 passed in 63 files;
+safebyok-old 3537 passed, 37 skipped; root scripts 302; every package green).
 
 **Status: blocked on size, by design.** The inventory runs to about 55 sites in prose and some 570
 quoted kinds in the tests, past the handoff's sixty. This branch lands the inventory and the
@@ -101,3 +102,19 @@ are incidental by the rule above, should the Coach want them stripped.
   two or three by folder (`models/`, then `storage/`, `shapes/` and `helpers/`).
 * **Bad news counted as contract**: `damaged_*` and `newer_format` are kept because a host is told
   them and may show them. Say if a host is not meant to branch on them.
+
+## Decisions taken
+
+* **Definitional kinds kept**: a validator's kind is its parameter, and `storageTroubleOf` exists
+  to make `storage_unavailable`; stripping the word there would leave the doc saying nothing.
+* **`camped` kept**: a put told `ifPresent: 'fail'` asks to hear it, as a put hears `stale_write`.
+* **CUSTOMIZATION's lines kept their wrap**: only the kind words went, so the hunks stay small
+  against #511.
+
+## For the next thread
+
+* The doc-block strip leaves the sentence saying the call refuses: "Its `parse` refuses,
+  quoting none of it." Where the kind was the only object ("refuses 'bad_option' for X"), write
+  "refuses X".
+* The line numbers are at `c74195a12`; #511 renames `damaged_records` and edits `refusals/` doc
+  blocks, so search by text, not by line.
