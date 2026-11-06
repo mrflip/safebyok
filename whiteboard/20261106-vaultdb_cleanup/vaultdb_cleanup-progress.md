@@ -6,8 +6,9 @@ orchestrator; workers look things up here and write in their own thread files.
 ## The sprint doc
 
 *Orchestrator:* https://claude.ai/artifact/LJYRKB5uG4bzR8VWBVti1j (doc 9c50a432-987f-4fd0-9fa9-0b3e23352d26).
-Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, bookmark rev 505; matters table m3dgc82559j.5596), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
-m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c.
+Tabs: Open Matters (file 244f7e31-9504, body 497cd45c-5dfd, bookmark rev 506; matters table m3dgc82559j.5596), Cleanup (body f05b9de5-044d), Progress (body 28f63d17-9ac5, table
+m3dgc82559j.151), Resolved (body 4f88e807-c291). State enum 341239e5-518c. Append a matter row: `insert` side `end` on the table id, `as: blocks`, a
+row of three cells, the chip `{type: dropdown, attrs: {enum, index: 0}}` (a markdown insert is refused).
 
 ## Settled before the first thread
 
@@ -83,7 +84,7 @@ current enough for a fresh worker to continue, and leave e2e for last.
   name, no cause; `identityRevoked()`; `Checker, Checkers, objCheck` on the storage door). A
   second worker continues from its thread file. Its `gh pr ready` was refused by the auto-mode
   classifier; the orchestrator does not run a refused action for an agent.
-* **Thread 3** (#560, in review): old adapter moved whole to private `safebyok-idb-old` (the
+* **Thread 3** (#560, reviewed `fixed`: null `indexedDB` now reads as no IndexedDB; filing): old adapter moved whole to private `safebyok-idb-old` (the
   demo's store and inspector); `safebyok-indexeddb` new: `IdbVaultDB`, `idbVaultDB(opts)`,
   `IdbVaultDBOpts` (`dbName`, `maxRecordBytes`); each do* one transaction; watch over
   BroadcastChannel after commit; triage in `src/shelf.ts` `troubleOf` (quota → `vault_full`,

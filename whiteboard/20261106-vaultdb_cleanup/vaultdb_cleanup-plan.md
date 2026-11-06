@@ -210,6 +210,11 @@ not available to the new package: the watch uses what the core exports or plain
 `safebyok-old` to `safebyok`; it will likely move. `safebyok-idb-old` gets no size line and no
 changeset of its own (private). **Depends on:** 2. **Size:** M.
 
+*Review:* `medium`, fixed: a `null` `indexedDB` (switched off) now refuses as no IndexedDB, not
+"try again shortly"; test style. Left: storageFull without `meta.capacity` (→ restack);
+unguarded ring and no `unref` (kept); unchecked channel messages; doTidyGone clones rows (→ a
+ride-along); `SX` alias and adapter sentences (→ Open Matters rows); compound doc blocks.
+
 ### 4. port_postgres
 
 > port the other adapters. Do not adopt their doc strings, which are rich in slop.
