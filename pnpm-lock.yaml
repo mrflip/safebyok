@@ -691,9 +691,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok-old:
+      safebyok:
         specifier: workspace:*
-        version: link:../safebyok-old
+        version: link:../safebyok
       safebyok-postgres:
         specifier: workspace:*
         version: link:../safebyok-postgres

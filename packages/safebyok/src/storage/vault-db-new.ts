@@ -55,16 +55,16 @@ export type Heard = { vault: unknown, box?: unknown }
 
 /** A VaultDB's generic calls, for a server to carry to a VaultDB in a browser: each checks what it is handed, as its verb does. */
 export type VaultDBRelay = {
-  listVaults: (scope: BankScope) => Promise<RowOfVault[]>
-  getVault:   (scope: VaultScope) => Promise<unknown>
-  listBoxes:  (asked: VaultQuery) => Promise<BoxesFetched>
-  getBox:     (asked: BoxQuery) => Promise<BoxFetched>
-  putVault:   (record: VaultRecord, opts: PutOpts) => Promise<Landing>
-  putBox:     (record: BoxRecord, opts: PutOpts) => Promise<BoxLanding>
-  delVault:   (tombstone: VaultTombstone, opts: DelOpts) => Promise<Landing>
-  delBox:     (tombstone: BoxTombstone, opts: DelOpts) => Promise<BoxLanding>
-  tidyGone:   (scope: BankScope) => Promise<Tidied>
-  watch:      (scope: WatchScope, hear: (heard: Heard) => void) => () => void
+  listVaults: (scope: unknown) => Promise<RowOfVault[]>
+  getVault:   (scope: unknown) => Promise<unknown>
+  listBoxes:  (asked: unknown) => Promise<BoxesFetched>
+  getBox:     (asked: unknown) => Promise<BoxFetched>
+  putVault:   (record: unknown, opts: unknown) => Promise<Landing>
+  putBox:     (record: unknown, opts: unknown) => Promise<BoxLanding>
+  delVault:   (tombstone: unknown, opts: unknown) => Promise<Landing>
+  delBox:     (tombstone: unknown, opts: unknown) => Promise<BoxLanding>
+  tidyGone:   (scope: unknown) => Promise<Tidied>
+  watch:      (scope: unknown, hear: (heard: Heard) => void) => () => void
 }
 // --
 
