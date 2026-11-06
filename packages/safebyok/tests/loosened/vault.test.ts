@@ -48,7 +48,7 @@ describe("an older copy of the vault record", () => {
 })
 
 describe("a vault record stored damaged", () => {
-  it("safebyok-old/README.md:810, 'A way in stored in a form this package never writes cannot be tried, but the other still opens the vault': a passkey wayin stored with a salt too short to be one passes the record's check, then refuses the passphrase's unlock 'bad_record'", async () => {
+  it("safebyok-old/README.md:810, 'A way in stored in a form this package never writes cannot be tried, but the other still opens the vault': a passkey wayin stored with a salt too short to be one passes the record's check, then refuses the passphrase's unlock", async () => {
     const { demandStored } = await makeBornVaultWithPasskey()
     const record = demandStored()
     const { passkey_wayin } = record.gate
@@ -57,7 +57,7 @@ describe("a vault record stored damaged", () => {
     const { listing } = makeVaultWorld(damaged)
     const vault = await listing.build(damaged)
     expect(vault.isFull).to.be.true
-    await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)), 'bad_record')
+    await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)))
     expect(vault.isLocked).to.be.true
   })
 

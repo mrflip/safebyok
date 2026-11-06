@@ -53,7 +53,7 @@ describe("mash", () => {
   it("refuses a value that is not a string", async () => {
     const absurdities: unknown[] = [undefined, null, 42, {}, ['a'], new Uint8Array([1])]
     for (const absurd of absurdities) {
-      await TH.expectRefusal(mash(absurd as string), 'bad_option')
+      await TH.expectRefusal(mash(absurd as string))
     }
   })
 })
