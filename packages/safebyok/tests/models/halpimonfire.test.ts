@@ -61,8 +61,8 @@ describe("A lock that lands while an unlock proves", () => {
 describe("A lock that lands during a box verb", () => {
   it("during hello leaves the list made and the next putBox refusing 'vault_locked', storing nothing", async () => {
     const { vault, vaultDB } = await makeBornVault()
-    const tryGetVault = vaultDB.tryGetVault.bind(vaultDB)
-    vi.spyOn(vaultDB, 'tryGetVault').mockImplementationOnce((...args) => { vault.lock(); return tryGetVault(...args) })
+    const tryListBoxes = vaultDB.tryListBoxes.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.lock(); return tryListBoxes(...args) })
     await expect(vault.hello()).resolves.to.eq(vault)
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
   })

@@ -144,7 +144,7 @@ export const BagNotObject = "What a bag is checked against is an object, holding
 export const WhisperBagShape = "An object in a whisper or a sidecar is a plain object of JSON: strings, numbers, booleans, null, arrays and plain objects, never undefined, a Date, a Map, a class's instance or a symbol key"
 // --
 
-// == [Scopepaths]: BankScopepathShape, VaultScopepathShape, LeaseScopepathShape, DeviceScopepathShape, BoxScopepathShape
+// == [Scopepaths]: BankScopepathShape, VaultScopepathShape, LeaseScopepathShape, BoxScopepathShape
 
 /** A bank's scopepath of the wrong shape. */
 export const BankScopepathShape = `A bank's scopepath is 'bank', an applabel and a user_id, joined on ${ScopepathDelimiter}`
@@ -154,9 +154,6 @@ export const VaultScopepathShape = `A vault's scopepath is 'vault', an applabel,
 
 /** A lease's scopepath of the wrong shape. */
 export const LeaseScopepathShape = `A lease's scopepath is 'lease', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
-
-/** A device record's scopepath of the wrong shape. */
-export const DeviceScopepathShape = `A device record's scopepath is 'device', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
 
 /** A box's scopepath of the wrong shape. */
 export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
@@ -442,14 +439,11 @@ export const saltDoesNotFit = (expectedCount: number, handedCount: number): stri
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --
 
-// == [The models' bank]: BankHelloFirst, DeviceRecordRewritten, vaultStoredDamaged
+// == [The models' bank]: BankHelloFirst, vaultStoredDamaged
 
 export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait for it first."
 
-/** Bad news of a device record that failed its checks and was replaced. */
-export const DeviceRecordRewritten = "This device's record for the bank was damaged, so it was written over: the device now has a new device_id."
-
-/** Bad news of a vault row `getBank` set aside. */
+/** Bad news of a vault row `listVaults` set aside. */
 export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --
 

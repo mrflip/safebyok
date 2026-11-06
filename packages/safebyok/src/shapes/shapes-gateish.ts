@@ -96,12 +96,10 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
- * An `unlock_vault` gating takes it in `attemptPasskey`; `initialize_gate` and `put_passkey` take
- * it in `attempt`, beside the passphrase.
+ * An `unlock_vault` gating takes it as `passkeyClear` in `attempt`, in place of the passphrase.
+ * `build_vault` and `add_passkey` take it there beside the passphrase.
  *
- * @example
- *   const passkey = await askPasskey(vault.getSnapshot().gate)   // null when the user dismissed it
- *   if (passkey !== null) { await gating.attemptPasskey(passkey) }   // an unlock_vault gating's
+ * @example await gating.attempt({ passkeyClear: passkey })   // an unlock_vault gating, by the passkey alone
  */
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 

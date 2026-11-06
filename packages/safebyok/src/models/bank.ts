@@ -1,5 +1,4 @@
 import { FarFuture, FarPast, MinuteMillis } from '../helpers/consts'
-import { randomId } from '../helpers/crypto'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
@@ -15,7 +14,7 @@ import type { RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankOpts, BankSnapshot, BankStage, VaultWorld } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db-new'
-import { deviceRecordRewritten, helloFirst, insecureContext } from '../refusals/throwers'
+import { helloFirst, insecureContext } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
 import { VaultListing } from './vault-listing'
 
@@ -25,11 +24,12 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
 export class Bank implements VaultWorld {
-  // == [Props]: applabel, user_id, scope, clock, keyDeriver, deviceDB, logger, requestCleartext, strengthChecker, leaseMillis, onPanic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #device_id, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: applabel, user_id, scope, device_id, clock, keyDeriver, deviceDB, logger, requestCleartext, strengthChecker, leaseMillis, onPanic, boxRefreshMillis, #makeListing, #onBadNews, #listeners, #vaultListing, #lastHello, #snapshot, #getSnapshot, #subscribe
 
   declare readonly applabel: string
   declare readonly user_id:  string
   readonly scope:            BankScope
+  readonly device_id:        string
   readonly clock:            Clock
   readonly keyDeriver:       KeyDeriver
   readonly deviceDB:         DeviceDB
@@ -44,7 +44,6 @@ export class Bank implements VaultWorld {
   readonly #onBadNews:   ((news: VaultError) => unknown) | undefined
   readonly #listeners = new Set<() => void>()
   #vaultListing:         VaultListing
-  #device_id:            string
   /** The outcome of the last `hello`, null with none since the bank was made, swept or vacated. */
   #lastHello:            Outcome<void> | null = null
   #snapshot:             BankSnapshot
@@ -57,10 +56,7 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  // == [Getters]: device_id, vaultListing, autolockMinutes, snapshot, getSnapshot, subscribe, toJSON
-
-  /** The first `device_id` cached for this bank on this device, once a `hello` has cached it. */
-  get device_id(): string { return this.#device_id }
+  // == [Getters]: vaultListing, autolockMinutes, snapshot, getSnapshot, subscribe, toJSON
 
   get vaultListing(): VaultListing { return this.#vaultListing }
 
@@ -82,10 +78,10 @@ export class Bank implements VaultWorld {
   constructor(opts: BankOpts) {
     checkSecureContext()
     VX.bankOpts.parse(opts)
-    const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
+    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, clock = wallClock, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = opts
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
-    this.#device_id = device_id
+    this.device_id = device_id
     this.clock = clock
     this.keyDeriver = keyDeriver
     this.deviceDB = deviceDB
@@ -123,7 +119,7 @@ export class Bank implements VaultWorld {
   takeWorld(): void { /* no world sits above a bank */ }
   // --
 
-  // == [Starting]: hello, tryHello, bringUp, cacheDeviceRecord
+  // == [Starting]: hello, tryHello, bringUp
 
   /** SLOPDOC: Brings the bank up from the vaultDB, and again whenever the host calls it to force a reset. */
   async hello(): Promise<void> {
@@ -140,16 +136,8 @@ export class Bank implements VaultWorld {
   async #bringUp(listing: VaultListing): Promise<void> {
     await this.keyDeriver.load?.()
     await loadStrengthChecker(this.strengthChecker)
-    await listing.fetchBank()
-    await this.#cacheDeviceRecord()
+    await listing.list()
     await listing.hello()
-  }
-
-  /** The first `device_id` cached for this scope wins, and is the bank's. A damaged record written over is bad news. */
-  async #cacheDeviceRecord(): Promise<void> {
-    const { act, record } = await this.deviceDB.cacheDeviceRecord({ ...this.scope, device_id: this.#device_id })
-    this.#device_id = record.device_id
-    if (act === 'rewrote') { this.tellBadNews([deviceRecordRewritten()]) }
   }
   // --
 
@@ -279,7 +267,7 @@ export class Bank implements VaultWorld {
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
     const prior = this.#snapshot
-    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.device_id === prior.device_id) && (next.vaults === prior.vaults)) { return }
+    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.vaults === prior.vaults)) { return }
     this.#snapshot = next
     for (const listener of this.#listeners) {
       try {
@@ -292,7 +280,7 @@ export class Bank implements VaultWorld {
 
   #makeSnapshot(): BankSnapshot {
     const hello = this.#lastHello
-    return Object.freeze({ ...this.scope, stage: stageOf(hello), err: hello?.err ?? null, device_id: this.#device_id, vaults: this.#vaultListing.snapshot })
+    return Object.freeze({ ...this.scope, stage: stageOf(hello), err: hello?.err ?? null, device_id: this.device_id, vaults: this.#vaultListing.snapshot })
   }
   // --
 

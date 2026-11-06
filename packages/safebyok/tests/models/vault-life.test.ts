@@ -147,6 +147,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     expect(await unsealIn(third.vault)).to.deep.equal(NewWhisper)
   })
 
+  // PasskeyAnswer @example
   it("adds a passkey: the next session unlocks by the passkey alone, and opens the box sealed under the passphrase's lease before the passkey was added", async () => {
     const { vault, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox()
     await addPasskeyTyping(vault, Passphrase, 'laptop')
@@ -176,7 +177,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
 
 /** The vault as another device holds it: its own deviceDB, caching no lease yet, over the record this device stored, after its hello. */
 const openOtherDevice = async (stored: VaultRecord) => {
-  const other = makeVaultWorld(stored, { device_id: 'device-2' })
+  const other = makeVaultWorld(stored, { device_id: 'device_2' })
   const vault = await other.listing.build(other.demandStored())
   await other.listing.hello()
   return { ...other, vault }

@@ -43,7 +43,7 @@ const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Pro
   const { requestCleartext: asBefore } = world
   let heard: Outcome<unknown> | null = null
   const dialog: RequestCleartext = async (gating) => {
-    heard = await gating.attempt(await typing as never)
+    heard = await gating.attempt(await typing)
   }
   world.requestCleartext = dialog
   try {
@@ -121,7 +121,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     logger:       quietLogger,
     keyDeriver:   testDeriver,
     strengthChecker: anyStrengthChecker,
-    device_id:    'device-1',
+    device_id:    'device_1',
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
@@ -237,16 +237,16 @@ export const Sidecar  = Object.freeze({ note: 'work' })
 export const makeWorld = async () => {
   const world = await makeBornVault()
   const boxrows = world.vaultDB._cheat_boxRowsOf(world.vault.scope, world.vault.vault_tok)
-  const tryGetVault = vi.spyOn(world.vaultDB, 'tryGetVault')
-  const tryPutBox   = vi.spyOn(world.vaultDB, 'tryPutBox')
-  const tryGetBox   = vi.spyOn(world.vaultDB, 'tryGetBox')
+  const tryListBoxes = vi.spyOn(world.vaultDB, 'tryListBoxes')
+  const tryPutBox    = vi.spyOn(world.vaultDB, 'tryPutBox')
+  const tryGetBox    = vi.spyOn(world.vaultDB, 'tryGetBox')
   /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first holds. */
   const openNextSession = async () => {
     const vault = await world.anotherSession().build(world.demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
     return vault
   }
-  return { ...world, boxrows, tryGetVault, tryPutBox, tryGetBox, openNextSession }
+  return { ...world, boxrows, tryListBoxes, tryPutBox, tryGetBox, openNextSession }
 }
 
 /** A world whose vault has a box stored, and a next session that has not yet listed it. */

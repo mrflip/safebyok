@@ -270,4 +270,16 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     expect(box.sidecar).to.deep.equal({ uncle: 'Robert' })
     expect(listing.snapshot[0]?.sidecar).to.deep.equal({ uncle: 'Robert' })
   })
+
+  it("keeps its rows through a lock and an unlock, each the box's own snapshot still", async () => {
+    const { listing, box } = await heldBox()
+    const before = listing.getSnapshot()
+    held.mw.setLockState('locked')
+    expect(listing.getSnapshot()).to.eq(before)
+    expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
+    expect(before[0]).to.not.have.property('lockState')
+    held.mw.setLockState('unlocked')
+    expect(listing.getSnapshot()).to.eq(before)
+    expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
+  })
 })

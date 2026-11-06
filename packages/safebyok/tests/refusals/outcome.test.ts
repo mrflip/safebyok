@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { type Outcome, storageTroubleOf, bad, good, outcomeOf, refusalOf, valOf } from '../../src/refusals/outcome'
+import { type Outcome, storageTroubleOf, bad, good, outcomeOf, valOf } from '../../src/refusals/outcome'
 import * as Refusals from '../../src/refusals/throwers'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
@@ -134,35 +134,3 @@ describe("storageTroubleOf", () => {
     }
   })
 })
-
-describe("refusalOf", () => {
-  it("hands a VaultError back as it came", () => {
-    const refusal = new VaultError('vault_locked', 'The vault is locked.')
-    expect(refusalOf(refusal)).to.eq(refusal)
-  })
-
-  it("makes an unexpected_error of anything else, the throw its cause", () => {
-    const bug = new TypeError('ctx is not a function')
-    const err = refusalOf(bug)
-    expect(err).to.be.instanceOf(VaultError).and.to.have.property('refusalkind', 'unexpected_error')
-    expect(err.cause).to.eq(bug)
-    expect((refusalOf('a bare string').cause as Error).message).to.eq('a bare string')
-    expect(refusalOf(undefined).cause).to.be.instanceOf(Error)
-  })
-
-  // refusalOf @example
-  it("ends a throwing form: a bug in its body reaches the caller as a VaultError and a refusal passes untouched", async () => {
-    const refusal = new VaultError('vault_locked', 'The vault is locked.')
-    await expect(throwingForm(new TypeError('broken'))).rejects.toThrow(expect.objectContaining({ name: 'VaultError', refusalkind: 'unexpected_error' }))
-    await expect(throwingForm(refusal)).rejects.toThrow(refusal)
-  })
-})
-
-/** A throwing form in the shape refusalOf's example shows, its body rejecting with `thrown`. */
-const throwingForm = async (thrown: Error) => {
-  try {
-    await Promise.reject(thrown)
-  } catch (err) {
-    throw refusalOf(err)
-  }
-}

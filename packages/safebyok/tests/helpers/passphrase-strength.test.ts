@@ -16,6 +16,8 @@ const breachedLater: StrengthChecker = async () => {
   await Promise.resolve()
   return { strong: false, reason: 'Found in a breach.' }
 }
+/** A test that finds a passphrase of fewer than twenty characters weak, and admits any other. */
+const twentyOrMore: StrengthChecker = (typed) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
 /** A test that admits every passphrase. */
 const alwaysStrong: StrengthChecker = () => StrongVerdict
 
@@ -34,6 +36,13 @@ const lazyCheckerThrowingOn = (field: 'strong' | 'reason'): StrengthChecker => (
 }
 
 describe("invokeStrengthChecker", () => {
+  // StrengthChecker @example 1
+  it("answers the host's own verdicts: a reason for a passphrase it finds short, StrongVerdict for any other", async () => {
+    const guarded = invokeStrengthChecker(twentyOrMore, scope)
+    expect(await guarded('too short')).to.deep.equal({ strong: false, reason: 'Twenty characters or more, please.' })
+    expect(await guarded('long enough for any checker')).to.eq(StrongVerdict)
+  })
+
   it("answers the weak verdict of a checker that finds one weak, its reason as the checker gave it", async () => {
     expect(await invokeStrengthChecker(neverStrong, scope)('acme acme acme')).to.deep.equal({ strong: false, reason: 'Pick a phrase nobody would guess.' })
   })
@@ -78,7 +87,7 @@ describe("invokeStrengthChecker", () => {
     ['Too short.',                      'a reason alone, not in a verdict'],
   ] as const
   for (const [answer, blurb] of Misanswers) {
-    it(`refuses a checker answering ${blurb} as kind 'bad_option', as its second example shows`, async () => {
+    it(`refuses a checker answering ${blurb}`, async () => {
       const misfit = (() => answer) as unknown as StrengthChecker
       const err = await TH.expectRefusal(invokeStrengthChecker(misfit, scope)('acme acme acme'), 'bad_option')
       expect(err.message).to.match(/strengthChecker/)
@@ -127,6 +136,7 @@ describe("invokeStrengthChecker's load", () => {
     expect(await guarded('acme acme acme')).to.eq(StrongVerdict)
   })
 
+  // StrengthChecker @example 2
   it("runs the checker's own load, on the checker, each time it is called", async () => {
     const hostLoad = vi.fn(function (this: unknown) { return Promise.resolve() })
     const checker = Object.assign(() => StrongVerdict, { load: hostLoad })

@@ -1,6 +1,7 @@
 /** The bank of `src/models/` end to end, over a real vaultDB and deviceDB: hello, ensureVault, bad news and the snapshot. */
 
 import { describe, expect, it, vi } from 'vitest'
+import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
@@ -94,24 +95,24 @@ describe("bank.hello", () => {
 
   it("refuses 'unexpected_error' when a strength checker will not load, what it threw the cause, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
-    const getBank = vi.spyOn(world.vaultDB, 'tryGetBank')
+    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
     const thrown = new Error('no word list here')
     const bank = world.bankOn({ strengthChecker: Object.assign((() => ({ strong: true })) as typeof anyStrengthChecker, { load: () => Promise.reject(thrown) }) })
     const err = await TH.expectRefusal(bank.hello(), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
     expect(bank.snapshot).to.include({ stage: 'refused', err })
-    expect(getBank).not.toHaveBeenCalled()
+    expect(listVaults).not.toHaveBeenCalled()
   })
 
   it("refuses when a key deriver will not load, its refusal as it came, asking nothing of the vaultDB", async () => {
     const world = makeBankWorld()
-    const getBank = vi.spyOn(world.vaultDB, 'tryGetBank')
+    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
     const refused = new VaultError('unexpected_error', 'no wasm here')
     const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
     await TH.expectRefusal(bank.hello(), 'unexpected_error')
     expect(bank.snapshot.err).to.equal(refused)
-    expect(getBank).not.toHaveBeenCalled()
+    expect(listVaults).not.toHaveBeenCalled()
   })
 
   it("tells of a damaged vault row as bad news, and readies the bank without it", async () => {
@@ -135,22 +136,14 @@ describe("bank.hello", () => {
     expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
   })
 
-  it("adopts the first device_id cached for the bank, whatever it was handed, and is told of a damaged record written over", async () => {
+  it("keeps the device_id each bank was handed", async () => {
     const world = makeBankWorld()
-    const first = world.bankOn({ device_id: 'device-first' })
+    const first = world.bankOn({ device_id: 'device_first' })
     await first.hello()
-    expect(first.device_id).to.eq('device-first')
-    const second = world.bankOn({ device_id: 'device-second' })
+    const second = world.bankOn({ device_id: 'device_second' })
     await second.hello()
-    expect(second.device_id).to.eq('device-first')
-    expect(second.snapshot.device_id).to.eq('device-first')
-    const rows = world.deviceDB._cheat_deviceRows()
-    for (const ckey of rows.keys()) { rows.set(ckey, { broken: true }) }
-    const onBadNews = vi.fn()
-    const third = world.bankOn({ device_id: 'device-third', onBadNews })
-    await third.hello()
-    expect(third.device_id).to.eq('device-third')
-    expect(onBadNews.mock.calls.map(([news]) => (news as VaultError).refusalkind)).to.deep.equal(['damaged_row'])
+    expect([first.device_id, first.snapshot.device_id]).to.deep.equal(['device_first', 'device_first'])
+    expect([second.device_id, second.snapshot.device_id]).to.deep.equal(['device_second', 'device_second'])
   })
 
   it("hears a vault made elsewhere over the watch it starts", async () => {
@@ -174,8 +167,10 @@ describe("bank.ensureVault", () => {
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 
+  // BankedVaultScope @example
   it("builds a vault by asking, unlocked, and answers it from then on, nobody asked, through the snapshot and the subscription", async () => {
     const { bank, vault } = await makeBankWithVault()
+    expect(vault).to.include({ ...BankScopeGiven, ...VaultScopeGiven })
     expect(vault.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
     expect(bank.snapshot.vaults[0]?.lockState).to.eq('unlocked')
@@ -193,7 +188,7 @@ describe("bank.ensureVault", () => {
     let closeDialog = nothing
     const bank = world.bankOn({ requestCleartext: async (gating) => {
       await new Promise<void>((resolve) => { closeDialog = resolve })
-      await gating.attempt(byPassphrase(Passphrase) as never)
+      await gating.attempt(byPassphrase(Passphrase))
     } })
     await bank.hello()
     const asking = bank.ensureVault(VaultScopeGiven)
@@ -204,6 +199,19 @@ describe("bank.ensureVault", () => {
 
   it("can never ask with no dialog, as Bank.make refuses 'bad_option' without a requestCleartext", () => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }), 'bad_option')
+  })
+
+  it.each([
+    ['hyphens, as a UUID has',        "0123-4567"],
+    ['capitals',                      "Device_One"],
+    ['an empty string',               ""],
+    ['more than 40 characters',       `d${'a'.repeat(40)}`],
+  ])("refuses at Bank.make a device_id with %s", (_what, device_id) => {
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }), 'bad_option')
+  })
+
+  it("refuses at Bank.make a missing device_id", () => {
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }), 'bad_option')
   })
 
   it("answers tryEnsureVault's refusal as an Outcome", async () => {
@@ -259,9 +267,36 @@ describe("'identity_revoked' and bad news", () => {
     expect(vault.isEnabled).to.be.true
   })
 
+  // VaultLogger @example 1
+  it("logs nothing to the console with a logger of three no-ops, though a bad news has no onBadNews to hear it", async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(nothing)
+    try {
+      const silent = { log: nothing, warn: nothing, error: nothing }
+      const { bank } = await makeBankWithVault(makeBankWorld(), { logger: silent })
+      bank.tellBadNews([new VaultError('damaged_row', 'something stored is damaged')])
+      expect(consoleWarn).not.toHaveBeenCalled()
+    } finally {
+      consoleWarn.mockRestore()
+    }
+  })
+
+  // DefaultLogger @example
+  it("tells the default logger what it logs when given DefaultLogger, whichever the app gave setDefaultLogger", async () => {
+    const spy = TH.spyLogger()
+    setDefaultLogger(spy.logger)
+    try {
+      const { bank } = await makeBankWithVault(makeBankWorld(), { logger: DefaultLogger })
+      const news = new VaultError('damaged_row', 'something stored is damaged')
+      bank.tellBadNews([news])
+      expect(spy.calls.map(({ message }) => message)).to.include(news.message)
+    } finally {
+      setDefaultLogger(undefined)
+    }
+  })
+
   it("with no strengthChecker, finds every new passphrase weak, its reason sending the app's makers to CUSTOMIZATION.md", async () => {
     const attempts: Outcome<unknown>[] = []
-    const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase) as never)) } })
+    const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase))) } })
     await bank.hello()
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'declined')
     const [attempted] = attempts

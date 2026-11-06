@@ -34,7 +34,7 @@ describe("bank.autolock", () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const fresh = world.bankOn({ requestCleartext })
     const scan = vi.spyOn(world.deviceDB, 'tryLeasesProvedBefore')
     const tryVacate = vi.spyOn(world.deviceDB, 'tryVacate')
@@ -78,7 +78,7 @@ describe("bank.autolock", () => {
 
   it("past autolock, a lease held stays held: ensureUnlocked looks at no row, erases nothing and asks nothing", async () => {
     const world = makeBankWorld()
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { vault } = await makeBankWithVault(world, { requestCleartext })
     requestCleartext.mockClear()
     world.advance(AutolockMillis + 1)
@@ -111,7 +111,7 @@ describe("bank.autolock", () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const fresh = world.bankOn({ requestCleartext })
     await fresh.hello()
     await fresh.autolock()
@@ -286,7 +286,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     let closeDialog: () => void = vi.fn()
     const bank = world.bankOn({ requestCleartext: async (gating) => {
       await new Promise<void>((resolve) => { closeDialog = resolve })
-      await gating.attempt(byPassphrase(Passphrase) as never)
+      await gating.attempt(byPassphrase(Passphrase))
     } })
     await bank.hello()
     const asking = bank.ensureVault(VaultScopeGiven)
@@ -340,25 +340,6 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.snapshot.stage).to.eq('ready')
   })
 
-  it("keeps the snapshot's device_id with the bank's where a sweep crosses the hello that cached it, and tells its listeners", async () => {
-    const world = makeBankWorld()
-    await world.bankOn({ device_id: 'device-first' }).hello()
-    const bank = world.bankOn({ device_id: 'device-second' })
-    const listener = vi.fn()
-    bank.subscribe(listener)
-    const caching = world.deviceDB.cacheDeviceRecord.bind(world.deviceDB)
-    vi.spyOn(world.deviceDB, 'cacheDeviceRecord').mockImplementation(async (asked) => {
-      const cached = await caching(asked)
-      bank.sweep()
-      return cached
-    })
-    const { err } = await bank.tryHello()
-    expect(err?.refusalkind).to.eq('disabled')
-    expect(bank.device_id).to.eq('device-first')
-    expect(bank.snapshot).to.include({ stage: 'made', device_id: 'device-first' })
-    expect(listener).toHaveBeenCalled()
-  })
-
   it("never throws on a repeat", async () => {
     const { bank } = await makeBankWithVault()
     expect(bank.lock().lock()).to.equal(bank)
@@ -378,7 +359,7 @@ describe("a bank past a vacate", () => {
       world.vaultDB._cheat_refuseGets(null)
     }],
   ] as const)("refuses ensureVault and vaultAt with BankHelloFirst and opens no gating, after %s, and a hello answers the stored vault with nobody asked", async (_label, vacating) => {
-    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase) as never) })
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { requestCleartext })
     requestCleartext.mockClear()
     await vacating({ world, bank, vault })

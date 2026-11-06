@@ -28,12 +28,12 @@ export const labelsOf = ({ vaults }: BankSnapshot): string[] => vaults.map(({ va
 export class RefusingVaultDB extends MemoryVaultDB {
   #refusalkind: RefusalKind | null = null
 
-  /** From here on, `getBank` and `getVault` refuse this; null lets them through again. */
+  /** From here on, `listVaults` and `getVault` refuse this; null lets them through again. */
   _cheat_refuseGets(refusalkind: RefusalKind | null): void { this.#refusalkind = refusalkind } // eslint-disable-line unicorn/prefer-private-class-fields
 
-  protected override doGetBank(scope: BankScope) {
+  protected override doListVaults(scope: BankScope) {
     this.#demandAnswering()
-    return super.doGetBank(scope)
+    return super.doListVaults(scope)
   }
 
   protected override doGetVault(scope: VaultScope) {
@@ -61,8 +61,8 @@ export const makeBankWorld = () => {
   const vaultDB = new RefusingVaultDB({ clock })
   const deviceDB = new MemoryDeviceDB()
   const dialog = { typing: byPassphrase(Passphrase) as object }
-  const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing as never) }
-  const baseOpts: BankOpts = { ...BankScopeGiven, vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, clock, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
+  const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing) }
+  const baseOpts: BankOpts = { ...BankScopeGiven, device_id: 'device_one', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, clock, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
   /** A bank over this world's stores: called twice, two pages on one device. */
   const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
     const bank = Bank.make({ ...baseOpts, ...overrides })
@@ -74,7 +74,7 @@ export const makeBankWorld = () => {
     /** Move the clock on by `millis`; no timer fires. */
     advance:   (millis: number) => { now += millis },
     /** A bank on another device: this world's vaultDB, and a deviceDB of its own. */
-    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ deviceDB: new MemoryDeviceDB(), ...overrides }),
+    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_id: 'device_two', deviceDB: new MemoryDeviceDB(), ...overrides }),
     leaseRows: (): unknown[] => [...deviceDB._cheat_leaseRows().values()],
   }
 }

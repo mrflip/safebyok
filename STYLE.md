@@ -52,6 +52,7 @@ is a bug.
   | `EX`  | `src/shapes/shapes-enums.ts`                    |
   | `CX`  | `src/shapes/shapes-core.ts`                     |
   | `SX`  | `src/shapes/shapes-storage.ts`                  |
+  | `UX`  | `src/shapes/shapes-utils.ts`                    |
   | `GX`  | `src/shapes/shapes-gateish.ts`                  |
   | `VX`  | `src/shapes/shapes-vaultish.ts`                 |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
@@ -374,8 +375,8 @@ between columns lets the editor align them (see *Tests*).
 ## Validation
 
 A function's input rules are declared once, as a Zod schema, with a specific check beside it where
-one is warranted, and its TypeScript types come from that schema (`Z.infer`), so the signature and
-the checks cannot drift apart.
+one is warranted, and its TypeScript types come from that schema (`Z.infer`) or are held to it by
+an assertion (*Shapes and duck typing*), so the signature and the checks cannot drift apart.
 
 **Always at a boundary**: what comes off the wire; records read back from storage, which is
 someone else's database and may hold a vault another version of this package wrote; a published
@@ -385,7 +386,8 @@ a refusal with a `kind` the caller can branch on.
 
 **A constructor validates its arguments**, in a parse as its first line, even when the `make` or
 `build` that calls it parsed them already: it is an entry point of its own. An instance among them
-(a listing, a clock) is checked by a custom instanceOf checker rather than a description of its shape.
+(a listing, a clock) is checked by a custom instanceOf checker rather than a description of its
+shape, and a VaultDB or DeviceDB, which may come from another copy of the package, by its brand.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
 handed, and checks it, in one parse: `const { applabel, user_id } = CX.bankScope.parse(thing)`,
@@ -516,15 +518,21 @@ the scope.
 
 ## Shapes and duck typing
 
-* **Duck typing is the design.** A thing that has a scope *is* one: it carries `applabel`,
-  `user_id` and `vaultlabel` as its own fields, never a nested `.scope`. A nested copy raises the
-  question of whether the thing and its scope agree; a duck-typed thing has one copy of each name,
-  and a function taking a scope takes the thing itself. The more things duck type, the more a
-  one-off case is plain `Pick`, `&` and `Omit` surgery.
-* **The shapes are there to cut the number of types, not to straiten what a function takes.**
-  Where a broader duck is harmless, a parameter accepts it, and one that reads a few fields says
-  so with an ad hoc `Pick` or `Partial` where it is declared. A function's behaviour never changes
-  to fit a named shape.
+* **Duck typing is the design for data.** A thing that has a scope *is* one: it carries
+  `applabel`, `user_id` and `vaultlabel` as its own fields, never a nested `.scope`. A nested copy
+  raises the question of whether the thing and its scope agree; a duck-typed thing has one copy of
+  each name, and a function taking a scope takes the thing itself. The more things duck type, the
+  more a one-off case is plain `Pick`, `&` and `Omit` surgery. A bag between our modules, a test's
+  fake and a world are ducks; a DB or a function a host hands in to be called is not (below).
+* **A parameter taking data accepts any duck of the shape it reads.** The shapes are there to cut
+  the number of types, not to straiten what a function takes: one that reads a few fields says so
+  with an ad hoc `Pick` or `Partial` of a named shape where it is declared, never a type literal
+  written out, which loses cmd-click and the shape's doc blocks. A function's behaviour never
+  changes to fit a named shape.
+* **A world is a `Pick` of its class.** What a listing reaches back into is
+  `Pick<Vault, 'clock' | 'sealStampedString' | ...>` or `Pick<Bank, ...>`, never a third interface
+  beside the class: cmd-click lands on the class's member and its doc block, and a test's fake
+  world still passes.
 * **A field a thing ducks as is frozen, or fixed for the thing's life.**
 * **Each main type (vault, box, lease, ...) has a small, fixed set of shapes**, each named for its
   purpose and prefixed with the type (*Naming*; VOCABULARY.md, *Shapes*):
@@ -541,39 +549,42 @@ the scope.
   - *snapshot*, for a stateful thing: its sparse shape and what changes beside it (*Stateful
     objects and snapshots*).
 * **Each shape's validator is built from the record's** with `pick`, `omit`, `partial` and
-  `extend`, and its type is `Z.infer` of that, rather than a hand-written parallel type: a reader
-  learns one record and a handful of named subtractions. A record is one object schema, not a
-  union of variants (`pick` throws on a union, zod 4.6.7): an optional part is a nullable field.
+  `extend`, rather than written again: a reader learns one record and a handful of named
+  subtractions. A record is one object schema, not a union of variants (`pick` throws on a union,
+  zod 4.6.7): an optional part is a nullable field.
 * **Use each shape's name for what it means, even where two are one type.** `LeaseSparse =
   LeaseStamp` is fine; a log line or a listing takes a `LeaseSparse`, and a ctx a `LeaseStamp`.
 * **A part's shapes nest as the part does.** A record holding parts holds them in every shape: the
   gate's sparse shape holds each wayin's sparse shape, never a flat pick of their fields.
-* **A class names the shapes it passes for**: `class Vault implements VaultStamp`, `class Box
-  implements Boxscope, BoxSparse`. The compiler then holds the class to its duck typing.
-  `implements` checks only that the fields exist with their types; the constructor and
-  `Object.freeze(this)` make them own and frozen.
+* **A class names the shapes it passes for**: `class Lease implements LeaseStamp`. The compiler
+  then holds the class to its duck typing. `implements` checks only that the fields exist with
+  their types; the constructor and `Object.freeze(this)` make them own and frozen.
 * **Freeze what we can**: each record handed out, each object's own fields, each snapshot.
 * **Name each outcome a reader must tell apart, even where the types overlap.**
-  `VaultRecord | VaultTombstone | DamagedVaultRecord | null` says present, dead, broken, missing;
-  `DamagedVaultRecord` is `VaultRecord` to the compiler and a different thing to the reader.
-* **A type is `Z.infer` of its validator, beside the concern that checks it.** What has no
-  validator yet waits in `types/type-aliases.ts`, and leaves it when one is written.
-* **A shape and its type follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
+  `Fetched<RecordT, SparseT>` is `RecordT | SparseT | Tombstone<SparseT>`, and says whole, sparse
+  or dead, though every record is a sparse to the compiler.
+* **A shape's type is `Z.infer` of its validator, or an interface held to it: choose by the
+  reader.** An in-repo bag's is `Z.infer` of an `objCheck` with a `/** */` on each prop. A
+  host-facing contract, whose `.d.ts` is the product, gets an `interface` beside its checker, a doc
+  block on each member; the checker is exported as a `Z.ZodType<T>` of it (`Z.ZodType<BankOpts>`,
+  say), and an equality assertion of the two at the file's foot keeps them from drifting. Either
+  way cmd-click lands on a member with its doc block.
+* **A shape and its checker follow one rule** (the Coach, 2026-10-28): "It's an easy rule, unless
   there's a good reason: use Z.infer (eg recursive types); put in the common checks folder (weird
   and module-local and good idea to put it near where used); use Checkers; namespace it, using
-  Checkers or a star-import." The type is `Z.infer` of the shape, never a parallel written by
-  hand. The shape lives in the shared folders (`src/helpers/validator.ts`, `src/shapes/`) unless it is odd and
-  local to one module, which keeps it beside its use. It is made in a `Checkers` call. It is
-  namespaced as the object a `Checkers` call returns (`Checks.story`), or through its
-  module's star import, conventionally `CX` (`import * as CX from './shapes/scopes'`, then
-  `CX.vaultScope`). A good reason for an exception is said beside it. A type its own validator's
-  type names (`Story`, which `Refusing` names and a `Refusing` makes) is an `interface` extending
-  the `Z.infer`, whose members TypeScript resolves on demand.
+  Checkers or a star-import." A host-facing contract is such a reason (above). The shape lives in
+  the shared folders (`src/helpers/validator.ts`, `src/shapes/`) unless it is odd and local to one
+  module, which keeps it beside its use. It is made in a `Checkers` call. It is namespaced as the
+  object a `Checkers` call returns (`Checks.story`), or through its module's star import,
+  conventionally `CX` (`import * as CX from './shapes/shapes-core'`, then `CX.vaultScope`). A good
+  reason for another exception is said beside it. A type its own validator's type names (`Story`,
+  which `Refusing` names and a `Refusing` makes) is an `interface` extending the `Z.infer`, whose
+  members TypeScript resolves on demand.
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
-* **A facet a type gains is a generic named for the facet**: `Lifecycled<OT>`, `Refused<OT>`,
-  `ConsistencyWith<OT>`, where the alternative is a slice named for its one consumer.
+* **A facet a type gains is a generic named for the facet**: `Tombstone<SparseT>`,
+  `Refusing<SchemaT>`, where the alternative is a slice named for its one consumer.
 * **One name for one thing, everywhere** (*Naming*): a host-facing field takes its stored
   spelling.
 
@@ -600,6 +611,14 @@ the scope.
 
 * **An interface a host implements is typed as what belongs there**, never `unknown`, with its doc
   block saying what is checked and by whom. The check keeps damage out, not the type.
+* **A DB handed across the package boundary carries a brand, not a duck.** A VaultDB or DeviceDB
+  extends our base class and is known by its `Symbol.for` brand: a duck check passes anything with
+  the right method names, and `instanceof` fails the second copy of safebyok an adapter package may
+  bundle.
+* **A host's function is wrapped once, on its way in.** Each function a host hands `Bank.make`
+  (`requestCleartext`, the key deriver, the strength checker, `onPanic`, ...) is wrapped at `Bank`'s
+  constructor into a checked, branded thing that checks what the function answers (*Validation*).
+  Past it nothing calls the bare function; a parameter takes the branded thing.
 * **A browser checks what a server relays.** A server is not trusted, so a browser checks each
   record it is sent that it will use. A server's word that a record is damaged it may take: the
   worst a lying server does with that is offer to delete what it could delete anyway. It still

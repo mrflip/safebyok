@@ -54,15 +54,6 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  */
 export const storageTroubleOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : storageUnavailable(thrown))
 
-/** `thrown` as the refusal it stands for: a VaultError as it came, anything else as the 'unexpected_error' {@link unexpectedError} makes of it, that throw its cause.
- * The one catch that ends a throwing form, in the Lease, Box and Bank methods alike: a bug in its
- * body (a TypeError, a rejection that is no refusal) reaches the caller as a VaultError, never raw,
- * and every refusal passes untouched. Its `try` twin is one `outcomeOf` over the throwing form.
- *
- * @example catch (err) { throw refusalOf(err) }   // the last catch of a throwing form
- */
-export const refusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : unexpectedError(thrown))
-
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *
  * @example const listed = valOf(await vaultDB.tryGetVault(scope))  // throws the refusal, if any: what vaultDB.getVault(scope) does itself

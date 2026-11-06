@@ -1,7 +1,14 @@
-/** `safebyok/utils`: small helpers for the app around a vault, which pull in none of the vault. */
+/** `safebyok/utils`: small helpers for the app around a vault, which pull in none of the vault.
+ * `toB64` and `fromB64` are the base64url codec of every stored `_b64` field, for an API that wants bytes, as WebAuthn does.
+ */
 
 import { hex } from '@scure/base'
 import { Checker } from './helpers/validator'
+
+export { mask } from './helpers/mask'
+export type { MaskOpts } from './shapes/shapes-utils'
+export { fromB64, toB64 } from './helpers/crypto'
+export { WhisperFieldAttributes } from './helpers/whisper-field'
 
 const mashInput = Checker(({ str }) => str, 'bad_option')
 

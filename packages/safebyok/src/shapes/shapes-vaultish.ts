@@ -157,7 +157,7 @@ export type ListingOpts = {
 }
 
 /** The check of a vaultDB as a model is handed one: the verbs the listings call. Checks only. */
-export const vaultDBDuck = Checker(({ obj, fn }) => obj({ tryGetVault: fn(), tryPutVault: fn(), tryDelVault: fn(), tryGetBox: fn(), tryPutBox: fn(), tryDelBox: fn(), watch: fn() }), 'bad_option')
+export const vaultDBDuck = Checker(({ obj, fn }) => obj({ tryGetVault: fn(), tryPutVault: fn(), tryDelVault: fn(), tryListBoxes: fn(), tryGetBox: fn(), tryPutBox: fn(), tryDelBox: fn(), watch: fn() }), 'bad_option')
 
 /** The check of a listing's constructor arguments, as far as the base can tell. Checks only. */
 export const listingOpts = objCheck(({ obj, fn }) => ({
@@ -204,7 +204,7 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 
 // --
 
-// == [The box's forms]: BoxFormat, boxRecord, boxSparse, boxesListed, BoxRecord, BoxSparse, BoxesListed, BoxSnapshot
+// == [The box's forms]: BoxFormat, boxRecord, boxSparse, BoxRecord, BoxSparse, BoxSnapshot
 
 /** The box format these forms describe, as each record carries it in `fmt`. */
 export const { BoxFormat } = SX
@@ -216,15 +216,6 @@ export const boxSparse = SX.boxSparse.refusingAs('bad_record')
 export type BoxSparse = SX.BoxSparse
 export type BoxRecord = SX.BoxRecord
 
-/** The check of what a vault's get lists of its boxes: `boxes`, sparse, tombstones among them, and `damaged_rows`, each row that failed its check, whose boxlabel is whatever storage has it under. */
-export const boxesListed = objCheck(({ arr, oneof, obj, str }) => {
-  const damaged = boxSparse.extend({ boxlabel: str }).and(obj({ damagekind: oneof(EX.damagekindVals) }))
-  return { boxes: arr(boxSparse), damaged_rows: arr(damaged) }
-}, { refusalkind: 'damaged_row', extras: 'strip' })
-
-/** What a vault's get lists of its boxes, as {@link boxesListed} checks it. */
-export type BoxesListed = Z.output<typeof boxesListed>
-
 export type BoxSnapshot = Boxscope & Readonly<{
   revision_tok:  string
   revision_seq:  number
@@ -235,7 +226,6 @@ export type BoxSnapshot = Boxscope & Readonly<{
   present:       boolean
   exposed:       boolean
   veiled:        boolean
-  lockState:     EX.LockState
 }>
 
 // --
@@ -367,7 +357,7 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
 export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
   applabel,
   user_id,
-  device_id:           device_id.optional(),
+  device_id,
   vaultDB:             vaultDBDuck,
   deviceDB:            deviceDBDuck,
   keyDeriver:          CX.keyDeriverShape,
@@ -385,7 +375,7 @@ export const bankOpts = objCheck(({ fn, applabel, user_id, device_id }) => ({
 export type BankOpts = {
   applabel:             string
   user_id:              string
-  device_id?:           string | undefined
+  device_id:            string
   vaultDB:              VaultDB
   deviceDB:             DeviceDB
   keyDeriver:           KeyDeriver

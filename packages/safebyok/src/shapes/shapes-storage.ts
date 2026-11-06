@@ -49,19 +49,21 @@ export type Revision = Readonly<Z.infer<typeof revision>>
 export type Times    = Readonly<Z.infer<typeof times>>
 // --
 
-// == [Scopes]: bankScope, vaultScope, boxscope, boxQuery, watchScope, BankScope, VaultScope, Boxscope, BoxQuery, WatchScope
+// == [Scopes]: bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope, BankScope, VaultScope, VaultQuery, Boxscope, BoxQuery, WatchScope
 
-export const { bankScope, vaultScope, boxscope, boxQuery, watchScope } = Checkers('bad_option', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
+export const { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope } = Checkers('bad_option', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
   const bankScope  = obj({ applabel, user_id })
   const vaultScope = bankScope.extend({ vaultlabel })
+  const vaultQuery = vaultScope.extend({ vault_tok })
   const boxscope   = vaultScope.extend({ boxlabel })
   const boxQuery   = boxscope.extend({ vault_tok })
   const watchScope = bankScope.extend({ vaultlabel: vaultlabel.optional() })
-  return { bankScope, vaultScope, boxscope, boxQuery, watchScope }
+  return { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope }
 }, [CX])
 
 export type BankScope  = Readonly<Z.infer<typeof bankScope>>
 export type VaultScope = Readonly<Z.infer<typeof vaultScope>>
+export type VaultQuery = Readonly<Z.infer<typeof vaultQuery>>
 export type Boxscope   = Readonly<Z.infer<typeof boxscope>>
 export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
 export type WatchScope = Readonly<Z.input<typeof watchScope>>
@@ -286,14 +288,14 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [The deviceDB]: leaseQuery, leaseSparse, leaseRow, deviceRecord, cutoff, LeaseQuery, LeaseSparse, LeaseRow, DeviceRecord
+// == [The deviceDB]: leaseQuery, leaseSparse, leaseRow, cutoff, LeaseQuery, LeaseSparse, LeaseRow
 
 export const leaseQuery = Checker(({ obj, applabel, user_id, vaultlabel, vault_tok }) => obj({ applabel, user_id, vaultlabel, vault_tok }), 'bad_option', [CX])
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
-export const { leaseSparse, leaseRow, deviceRecord } = Checkers('bad_option', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok, device_id }) => {
+export const { leaseSparse, leaseRow } = Checkers('bad_option', ({ obj, epochMillis, applabel, user_id, vaultlabel, vault_tok }) => {
   const leaseSparse = obj({ applabel, user_id, vaultlabel, vault_tok, proved_at: epochMillis })
-  return { leaseSparse, leaseRow: leaseSparse.loose(), deviceRecord: obj({ applabel, user_id, device_id }).strict() }
+  return { leaseSparse, leaseRow: leaseSparse.loose() }
 }, [CX])
 
 export const cutoff = Checker(({ epochMillis }) => epochMillis, 'bad_option')
@@ -301,5 +303,4 @@ export const cutoff = Checker(({ epochMillis }) => epochMillis, 'bad_option')
 export type LeaseQuery   = Z.infer<typeof leaseQuery>
 export type LeaseSparse  = Z.infer<typeof leaseSparse>
 export type LeaseRow     = Z.infer<typeof leaseRow>
-export type DeviceRecord = Z.infer<typeof deviceRecord>
 // --

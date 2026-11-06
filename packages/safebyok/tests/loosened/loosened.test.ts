@@ -66,7 +66,7 @@ describe("the gate changes the vault sends", () => {
 
   it("safebyok-old/README.md:844, 'Every change locks the other devices': another device, unlocked before the change, fetches the new gate and stays unlocked, its lease in force", async () => {
     const { vault, demandStored } = await bornWithPasskey()
-    const other = makeVaultWorld(demandStored(), { device_id: 'device-2' })
+    const other = makeVaultWorld(demandStored(), { device_id: 'device_2' })
     const theirs = await other.listing.build(demandStored())
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(vault, Passphrase, NewPassphrase)

@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
 import * as PX from '../../src/shapes/primitives'
+import * as KX from '../../src/deriver/shapes'
+import * as CX from '../../src/shapes/shapes-core'
+import * as EX from '../../src/shapes/shapes-enums'
+import * as GX from '../../src/shapes/shapes-gateish'
+import * as SX from '../../src/shapes/shapes-storage'
+import * as VX from '../../src/shapes/shapes-vaultish'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
@@ -463,3 +469,63 @@ describe("Kit", () => {
     expect(Kit.epochMillis.safeParse(1_792_022_400).success).to.be.false
   })
 })
+
+// == [The values sweep]: ShapeModules, ExportedCheckers, Marker, MarkedInputs, shapesOf, partsOf, refusalTextOf
+
+/** Every module of the package's shapes, each star-imported: its exports made in a `Checkers`, `Checker` or `objCheck` call are swept below. */
+const ShapeModules = { KX, CX, EX, GX, SX, VX }
+
+/** Each checker a shapes module exports, by `<module>.<name>`: a schema whose `parse` refuses with a VaultError, as `refusingAs` tells one. */
+const ExportedCheckers = Object.fromEntries(Object.entries(ShapeModules).flatMap(([modname, mod]) => (
+  Object.entries(mod).filter(([_exportname, exported]) => exported instanceof Zod.ZodType && typeof (exported as { refusingAs?: unknown }).refusingAs === 'function')
+    .map(([exportname, exported]) => [`${modname}.${exportname}`, exported as Zod.ZodType])
+)))
+
+/** What every input below carries as a value, never as a key: a refusal holding it quoted its input. */
+const Marker = 'zqxMarkerValue7'
+
+/** The inputs each part of a checker is handed, each carrying the marker as a value. */
+const MarkedInputs = [Marker, [Marker], { inner: Marker }]
+
+/** The object shapes `schema` stands on: its own, or those under a wrapper, a list, a pipe's input or a union's options. */
+const shapesOf = (schema: unknown): Zod.ZodRawShape[] => {
+  if (schema instanceof Zod.ZodObject) { return [schema.shape] }
+  if (schema instanceof Zod.ZodReadonly || schema instanceof Zod.ZodOptional || schema instanceof Zod.ZodNullable || schema instanceof Zod.ZodDefault) { return shapesOf(schema.def.innerType) }
+  if (schema instanceof Zod.ZodArray) { return shapesOf(schema.def.element) }
+  if (schema instanceof Zod.ZodPipe) { return shapesOf(schema.def.in) }
+  if (schema instanceof Zod.ZodUnion) { return schema.def.options.flatMap((option) => shapesOf(option)) }
+  return []
+}
+
+// Each field is parsed on its own: handed every field at once, a checker names eight failures and
+// counts the rest, and a union refuses at its discriminator before any other field is heard.
+/** `schema` and every field schema under it, at any depth. */
+const partsOf = (schema: unknown): Zod.ZodType[] => (
+  schema instanceof Zod.ZodType ? [schema, ...shapesOf(schema).flatMap((shape) => Object.values(shape).flatMap((field) => partsOf(field)))] : []
+)
+
+/** What a refusal of `attempt` says, its message, stack, meta and every cause; null when it passes. */
+const refusalTextOf = (attempt: () => unknown): string | null => {
+  try {
+    attempt()
+    return null
+  } catch (err) {
+    return TH.thrownText(err)
+  }
+}
+
+describe("every checker a shapes module exports", () => {
+  it("is found by the sweep, the stored records' and the host's options' among them", () => {
+    expect(Object.keys(ExportedCheckers)).to.include.members(['SX.leaseRow', 'CX.whisper', 'CX.keyDeriverShape', 'GX.passphraseCleartext', 'VX.boxPatch', 'KX.keyDeriverSpec'])
+  })
+
+  for (const [checkername, checker] of Object.entries(ExportedCheckers)) {
+    it(`${checkername} quotes no value it refuses`, () => {
+      const parts = partsOf(checker).map((part) => Checker(() => part, 'bad_option'))
+      const refusals = parts.flatMap((part) => MarkedInputs.map((input) => refusalTextOf(() => part.parse(input)))).filter((text) => text !== null)
+      expect(refusals, checkername).to.not.be.empty
+      for (const text of refusals) { expect(text, checkername).to.not.include(Marker) }
+    })
+  }
+})
+// --

@@ -283,10 +283,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
-  takeWorld(world: unknown): void {
-    const row = VX.vaultRow.parse(world)
-    if (row.vault_tok === this.vault_tok) { this.receive(row) }
-  }
+  // `receive` refuses `otherVaultTok` for a row of another life: the one consistency guard on this path.
+  takeWorld(world: unknown): void { this.receive(VX.vaultRow.parse(world)) }
 
   /** Tell bad news of this vault's boxes where its own goes. */
   tellBadNews(badnews: readonly VaultError[]): void { this.world.tellBadNews(badnews) }
@@ -296,9 +294,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** List this vault's boxes and start their watch. */
   async hello(): Promise<this> {
-    const listed = await this.listing.fetchListed(this)
     this.demandEnabled()
-    await this.boxListing.hello(listed)
+    await this.boxListing.hello()
+    await this.boxListing.list()
     return this
   }
 

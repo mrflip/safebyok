@@ -44,7 +44,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, isShowing, snapshot, subscribe
+  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, isShowing, subscribe
 
   get fmt(): number { return this.central.fmt }
 
@@ -72,12 +72,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** True where {@link whisper} shows the value: exposed, unlocked and unveiled; read live. */
   get isShowing(): boolean { return this.whisper === this.#exposed }
-
-  /** The snapshot, made again when the live lockState has moved on from it. */
-  override get snapshot(): BoxSnapshot {
-    if (super.snapshot.lockState !== this.lockState()) { this.remakeSnapshot() }
-    return super.snapshot
-  }
 
   /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
   override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
@@ -249,7 +243,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       present:       this.isPresent,
       exposed:       this.#exposed !== null,
       veiled:        this.#isVeiled,
-      lockState:     this.lockState(),
     })
   }
   // --

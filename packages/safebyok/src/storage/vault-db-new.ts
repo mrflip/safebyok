@@ -7,10 +7,10 @@ import { type BadOutcome, type GoodOutcome, outcomeOf } from '../refusals/outcom
 import type { IfPresent, PutIfAbsent } from '../shapes/shapes-enums'
 import { type Clock, wallClock } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { AddPasskeyParams, BankScope, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
-// == [Answers]: AnswerFacts, GoodAnswer, BadAnswer, Answer, Said, BankListed, VaultListed, Tidied, Notice, answerOf
+// == [Answers]: AnswerFacts, GoodAnswer, BadAnswer, Answer, Said, BankListed, BoxesListed, Tidied, Notice, answerOf
 
 export type AnswerFacts = { meta: { call: string }, req_params: ReqParams, dbhas?: unknown }
 
@@ -30,7 +30,7 @@ type Said<ValT, ActT extends string, WorldT> = { act: ActT, val: ValT, world: Wo
 type PutChoices = { prior: Revision, ifAbsent: PutIfAbsent, ifPresent: IfPresent }
 
 export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_rows: DamagedVault[] }
-export type VaultListed = VaultRecord & { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
+export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 export type Tidied      = { totalCount: number }
 
 /** A row that changed, as a watch hears it. Nothing may count on hearing one. */
@@ -45,7 +45,7 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 }
 // --
 
-// == [What a store writes]: Landing, BoxLanding, PutTerms, RowOfVault, RowOfBox, VaultFetched, BoxFetched, Heard
+// == [What a store writes]: Landing, BoxLanding, PutTerms, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
 
 /** The answer of a conditional write: whether it landed, and `ante`, the row it replaced, or that stands in its way. Null is a void row. */
 export type Landing = { landed: boolean, ante: unknown }
@@ -58,7 +58,7 @@ export type PutTerms = { prior: Revision, mayReplaceLive: boolean, mayAdd: boole
 
 export type RowOfVault = { vaultlabel: string, vault: unknown }
 export type RowOfBox   = { boxlabel: string, box: unknown }
-export type VaultFetched = { vault: unknown, boxes: RowOfBox[] }
+export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
 export type BoxFetched   = { vault: unknown, box: unknown }
 export type Heard = { vault: unknown, box?: unknown }
 // --
@@ -84,13 +84,13 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [Gets]: getBank, tryGetBank, getVault, tryGetVault, getBox, tryGetBox
+  // == [Gets]: listVaults, tryListVaults, getVault, tryGetVault, listBoxes, tryListBoxes, getBox, tryGetBox
 
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
-  async getBank(scope: BankScope): Promise<GoodAnswer<BankListed, 'got' | 'gotvoid', BankScope>> {
-    return this.#call<BankListed, 'got' | 'gotvoid', BankScope>('getBank', scope, async () => {
+  async listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, 'got' | 'gotvoid', BankScope>> {
+    return this.#call<BankListed, 'got' | 'gotvoid', BankScope>('listVaults', scope, async () => {
       const bankScope = SX.bankScope.parse(scope)
-      const rows = await adapted(() => this.doGetBank(bankScope))
+      const rows = await adapted(() => this.doListVaults(bankScope))
       const val: BankListed = { vaults: [], damaged_rows: [] }
       for (const { vaultlabel, vault } of rows) {
         const parsed = SX.vaultRow.safeParse(vault)
@@ -100,15 +100,14 @@ export abstract class VaultDB {
     })
   }
 
-  async tryGetBank(scope: BankScope) { return answerOf(() => this.getBank(scope)) }
+  async tryListVaults(scope: BankScope) { return answerOf(() => this.listVaults(scope)) }
 
-  /** The vault by scope alone, whatever its life, with its sparse boxes and `damaged_rows`. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
-  async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultListed | null, GotAct>> {
-    return this.#call<VaultListed | null, GotAct, VaultRow>('getVault', { ...scope, ...opts }, async () => {
+  /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
+  async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>> {
+    return this.#call<VaultRecord | null, GotAct, VaultRow>('getVault', { ...scope, ...opts }, async () => {
       const vaultScope = SX.vaultScope.parse(scope)
       const { ifAbsent } = SX.ifAbsentOpts.parse(opts ?? {})
-      const { vault, boxes } = await adapted(() => this.doGetVault(vaultScope))
-      const stored = vaultRowOf(vault)
+      const stored = vaultRowOf(await adapted(() => this.doGetVault(vaultScope)))
       if (stored === null) {
         const world = SX.sentinelVaultOf(vaultScope)
         if (ifAbsent === 'fail') { throw Refuse.vaultEmpty(world) }
@@ -118,11 +117,23 @@ export abstract class VaultDB {
         if (ifAbsent === 'fail') { throw Refuse.vaultGone(stored) }
         return { act: 'gotgone', val: null, world: stored, dbhas: stored }
       }
-      return { act: 'got', val: { ...stored, ...listedBoxesOf(vaultScope, stored.vault_tok, boxes) }, world: stored }
+      return { act: 'got', val: stored, world: stored }
     })
   }
 
   async tryGetVault(scope: VaultScope, opts?: IfAbsentOpts) { return answerOf(() => this.getVault(scope, opts)) }
+
+  /** The boxes under this `vault_tok`, sparse, its vault row as `world`; a row failing validation goes in `damaged_rows`. */
+  async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, 'got' | 'gotvoid'>> {
+    return this.#call<BoxesListed, 'got' | 'gotvoid', VaultRow>('listBoxes', asked, async () => {
+      const vaultQuery = SX.vaultQuery.parse(asked)
+      const { vault, boxes } = await adapted(() => this.doListBoxes(vaultQuery))
+      const world = checkedVaultLife(vaultRowOf(vault), vaultQuery, vaultQuery.vault_tok)
+      return { act: (boxes.length > 0) ? 'got' : 'gotvoid', val: listedBoxesOf(vaultQuery, boxes), world }
+    })
+  }
+
+  async tryListBoxes(asked: VaultQuery) { return answerOf(() => this.listBoxes(asked)) }
 
   /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null. */
   async getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>> {
@@ -241,7 +252,7 @@ export abstract class VaultDB {
 
   /** A gate verb's one path: a get, the integrity checks, the wayin laid on, and a put conditional on the prior revision. A null wayin has nothing to lay on, and answers the row as stored. */
   async #moveGate<ActT extends string>(ante: VaultSparse, act: ActT, wayinOf: (stored: VaultRecord) => Partial<Gate> | null): Promise<Said<VaultRecord, ActT, VaultRow>> {
-    const { vault } = await adapted(() => this.doGetVault(SX.vaultScope.parse(ante)))
+    const vault = await adapted(() => this.doGetVault(SX.vaultScope.parse(ante)))
     const stored = checkedVaultLife(vaultRowOf(vault), ante, ante.vault_tok)
     if (! SX.isRowAt(stored, ante)) { throw Refuse.staleWrite(stored, stored) }
     if (stored.registered_at !== ante.registered_at) { throw Refuse.gateIssue(stored, 'its registered_at is not the stored one.') }
@@ -339,12 +350,14 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [Protected, for a subclass to write]: doGetBank, doGetVault, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, for a subclass to write]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   /** Every vault row of the bank, full or tombstone. */
-  protected abstract doGetBank(scope: BankScope): Awaitable<RowOfVault[]>
-  /** The vault row by scope alone, with every box row under its `vault_tok`, read in one step. */
-  protected abstract doGetVault(scope: VaultScope): Awaitable<VaultFetched>
+  protected abstract doListVaults(scope: BankScope): Awaitable<RowOfVault[]>
+  /** The vault row by scope alone. */
+  protected abstract doGetVault(scope: VaultScope): Awaitable<unknown>
+  /** The vault row, and every box row under `vault_tok`, read in one step. */
+  protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
   /** The vault row, and the box row under `vault_tok`, read in one step. */
   protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
   /** Writes `record` when the row meets `terms`; atomic on `revision_tok`. */
@@ -392,8 +405,8 @@ const boxRowOf = (raw: unknown): BoxRow | null => {
   throw unreadableRowOf(raw, SX.BoxFormat)
 }
 
-const listedBoxesOf = (scope: VaultScope, vault_tok: string, rows: { boxlabel: string, box: unknown }[]): Pick<VaultListed, 'boxes' | 'damaged_rows'> => {
-  const listed: Pick<VaultListed, 'boxes' | 'damaged_rows'> = { boxes: [], damaged_rows: [] }
+const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): BoxesListed => {
+  const listed: BoxesListed = { boxes: [], damaged_rows: [] }
   for (const { boxlabel, box } of rows) {
     const parsed = SX.boxRow.safeParse(box)
     if (parsed.success) { listed.boxes.push(SX.boxSparse.parse(parsed.data)) } else { listed.damaged_rows.push(SX.damagedBoxOf({ ...scope, boxlabel }, vault_tok, box)) }

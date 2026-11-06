@@ -56,13 +56,11 @@ export const unexpectedError = (thrown: Thrown): VaultError => (
 )
 // --
 
-// == [Bank Throwers]: insecureContext, helloFirst, deviceRecordRewritten
+// == [Bank Throwers]: insecureContext, helloFirst
 
 export const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
 
 export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
-
-export const deviceRecordRewritten = (): VaultError => new VaultError('damaged_row', Phrases.DeviceRecordRewritten)
 // --
 
 // == [Vault Throwers]: lockedError, unlockFirst, stampOfOtherVault
@@ -218,8 +216,8 @@ export const vaultEmpty = (world: SX.VaultRow): VaultError => (
   new VaultError('vault_empty', Phrases.VaultEmpty, { meta: { world, dbhas: null } })
 )
 
-export const vaultMismatch = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_mismatch', Phrases.VaultMismatch, { meta: { world, dbhas: world } })
+export const vaultMismatch = (stored: SX.VaultRow): VaultError => (
+  new VaultError('vault_mismatch', Phrases.VaultMismatch, { meta: { world: null, dbhas: stored } })
 )
 
 export const vaultGone = (tombstone: SX.VaultRow): VaultError => (
