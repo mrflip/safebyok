@@ -227,11 +227,16 @@ describe("PostgresVaultDB's channels", () => {
     expect(await vaultDB.getVault({ ...TH.vaultScope, user_id: longest })).to.deep.include({ act: 'got' })
   })
 
-  it("counts a percent-encoded character as three bytes, and refuses a user_id of other characters before Postgres is asked", async () => {
+  it("counts a percent-encoded character as three bytes", async () => {
     const vaultDB = await TH.makeVaultDB()
     const encoded = encodeURIComponent('é'.repeat(9))
     expect(encoded).to.have.lengthOf(54)
     await vaultDB.putVault(TH.vaultAt(0, 'life1', { user_id: encoded }), { prior: SX.VoidRevision })
-    TH.expectSyncRefusal(() => TH.vaultAt(0, 'life1', { user_id: 'é'.repeat(9) }), 'bad_option')
+  })
+
+  it("refuses a user_id of other characters before Postgres is asked", async () => {
+    const vaultDB = new PostgresVaultDB({ client: throwingClient(new Error('Postgres was asked')) })
+    const { err } = await vaultDB.tryPutVault({ ...TH.vaultAt(), user_id: 'é'.repeat(9) }, { prior: SX.VoidRevision })
+    expect(SX.isVaultError(err, 'bad_option')).to.be.true
   })
 })
