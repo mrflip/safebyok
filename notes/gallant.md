@@ -22,7 +22,7 @@ Contents:
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`
 * **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`
-* **Words:** `#purpose-not-path`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`, `#a-helper-gets-a-phrase`
+* **Words:** `#purpose-not-path`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`, `#a-helper-gets-a-phrase`, `#its-name-is-its-doc`
 * **Reading the Coach:** `#a-fact-is-not-a-ruling`, `#dont-overstretch-a-request`
 
 ---
@@ -949,6 +949,23 @@ async #unseal(record: BoxRecord): Promise<Whisper>
 *Status: Planned, the documentarian run. #498 carries the Goofus minus its last clause.*
 
 ---
+
+## The best name is its own doc `#its-name-is-its-doc`
+
+A name that says what the thing is needs no doc line beside it. When the doc line is longer than the name, and the
+name could have said it, rename. The pair the Coach wrote on an option of `objCheck` (landed as PR #510).
+
+**Goofus:**
+
+```ts
+> `refuseAs` -- the *[refusal]* kind thrown (default: 'bad_record')
+```
+
+**Gallant:**
+
+```ts
+> `refusalkind` -- (default: 'bad_record')
+```
 
 # Reading the Coach
 
