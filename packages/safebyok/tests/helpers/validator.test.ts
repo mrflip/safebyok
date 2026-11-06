@@ -333,19 +333,19 @@ describe("objCheck", () => {
 
   // objCheck @example 2
   it("drops a field it does not take, unread, under extras 'strip'", () => {
-    const checkedScope = objCheck(bankScopeOf, { refusalKind: 'bad_scope', extras: 'strip' })
+    const checkedScope = objCheck(bankScopeOf, { refusalkind: 'bad_scope', extras: 'strip' })
     expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
     TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
     TH.expectSyncRefusal(() => objCheck(bankScopeOf, { extras: 'strip' }).parse({}), 'bad_record')
   })
 
-  it("refuses the kind refusalKind names, still strict where extras is left out", () => {
-    const checkedScope = objCheck(bankScopeOf, { refusalKind: 'bad_scope' })
+  it("refuses the kind refusalkind names, still strict where extras is left out", () => {
+    const checkedScope = objCheck(bankScopeOf, { refusalkind: 'bad_scope' })
     TH.expectSyncRefusal(() => checkedScope.parse({ ...scope }), 'bad_scope')
   })
 
   it("refuses opts that are none, whatever it would check", () => {
-    for (const opts of ['bad_kind', { extras: 'loose' }, { refusalKind: 'bad_kind' }, { kind: 'bad_scope' }, null]) {
+    for (const opts of ['bad_kind', { extras: 'loose' }, { refusalkind: 'bad_kind' }, { kind: 'bad_scope' }, null]) {
       TH.expectSyncRefusal(() => objCheck(bankScopeOf, opts as never), 'bad_option')
     }
   })
