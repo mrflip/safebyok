@@ -2,7 +2,7 @@
 
 safebyok names each thing once, in plain words, and uses that one name in its API, its docs, its
 stored records and its code. This page is the cast. You don't need to know any cryptography to
-use safebyok. If you do, the last column of each table gives the usual term.
+use safebyok. If you do, the *Standard term* column gives the usual term.
 
 ## What you handle
 
