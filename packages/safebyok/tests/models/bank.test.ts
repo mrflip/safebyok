@@ -1,6 +1,7 @@
 /** The bank of `src/models/` end to end, over a real vaultDB and deviceDB: hello, ensureVault, bad news and the snapshot. */
 
 import { describe, expect, it, vi } from 'vitest'
+import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
@@ -174,8 +175,10 @@ describe("bank.ensureVault", () => {
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 
+  // BankedVaultScope @example
   it("builds a vault by asking, unlocked, and answers it from then on, nobody asked, through the snapshot and the subscription", async () => {
     const { bank, vault } = await makeBankWithVault()
+    expect(vault).to.include({ ...BankScopeGiven, ...VaultScopeGiven })
     expect(vault.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
     expect(bank.snapshot.vaults[0]?.lockState).to.eq('unlocked')
@@ -257,6 +260,33 @@ describe("'identity_revoked' and bad news", () => {
     bank.tellBadNews([news])
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     expect(vault.isEnabled).to.be.true
+  })
+
+  // VaultLogger @example 1
+  it("logs nothing to the console with a logger of three no-ops, though a bad news has no onBadNews to hear it", async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(nothing)
+    try {
+      const silent = { log: nothing, warn: nothing, error: nothing }
+      const { bank } = await makeBankWithVault(makeBankWorld(), { logger: silent })
+      bank.tellBadNews([new VaultError('damaged_row', 'something stored is damaged')])
+      expect(consoleWarn).not.toHaveBeenCalled()
+    } finally {
+      consoleWarn.mockRestore()
+    }
+  })
+
+  // DefaultLogger @example
+  it("tells the default logger what it logs when given DefaultLogger, whichever the app gave setDefaultLogger", async () => {
+    const spy = TH.spyLogger()
+    setDefaultLogger(spy.logger)
+    try {
+      const { bank } = await makeBankWithVault(makeBankWorld(), { logger: DefaultLogger })
+      const news = new VaultError('damaged_row', 'something stored is damaged')
+      bank.tellBadNews([news])
+      expect(spy.calls.map(({ message }) => message)).to.include(news.message)
+    } finally {
+      setDefaultLogger(undefined)
+    }
   })
 
   it("with no strengthChecker, finds every new passphrase weak, its reason sending the app's makers to CUSTOMIZATION.md", async () => {

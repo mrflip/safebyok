@@ -206,7 +206,7 @@ export const thrownNameOf = (thrown: unknown): string | null => (
  * this one, as an ESM and a CJS build side by side.
  *
  * @example
- *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
+ *   try { await box.extractWhisper() } catch (err) {
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  */

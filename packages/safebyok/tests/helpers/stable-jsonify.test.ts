@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 
 describe("stableJsonify", () => {
+  // stableJsonify @example
   it("serializes equal bags identically whatever order their fields were assigned", () => {
     expect(stableJsonify({ two: 2, one: 1 })).to.eq(stableJsonify({ one: 1, two: 2 }))
     expect(stableJsonify({ two: 2, one: 1 })).to.eq('{"one":1,"two":2}')

@@ -54,6 +54,7 @@ describe("Refusals.sanitizeForeignError", () => {
 })
 
 describe("Refusals.storageUnavailable", () => {
+  // storageUnavailable @example
   it("refuses as storage_unavailable, saying to try again, the backend's error as its cause", () => {
     const outage = new Error('connection reset')
     const refusal = Refusals.storageUnavailable(outage)
