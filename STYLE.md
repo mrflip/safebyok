@@ -898,8 +898,7 @@ them: `camelcase` (`vaultlabel` is right), `no-use-before-define` (define helper
 when that reads better), `@stylistic/quotes` (the convention above is kept by hand),
 `@stylistic/space-unary-ops` (it mistakes the non-null `arr[0]!` for a negation, so `(! foo)` is
 kept by hand), `@stylistic/no-multi-spaces` (parallel construction is padded into columns, *Build
-for maintenance*), `no-underscore-dangle`, `no-continue`, `no-await-in-loop`,
-`@typescript-eslint/class-literal-property-style` (a model's `modelkind` is a getter, so it is no own key).
+for maintenance*), `no-underscore-dangle`, `no-continue`, `no-await-in-loop`.
 No rule holds validators to a namespace (*Imports*): a named import of one is unwieldy, not
 wrong.
 

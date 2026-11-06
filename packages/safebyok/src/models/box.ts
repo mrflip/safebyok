@@ -1,7 +1,7 @@
 import { cloneDeep, mergeWith } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
-import { ENCRYPTED, LOCKED, VEILED } from '../helpers/consts'
+import { ENCRYPTED, LOCKED, VEILED, type Modelkind } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import * as CX from '../shapes/shapes-core'
@@ -265,8 +265,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  /** Tells a check that this is a box without importing the class, across two copies of the package too. */
-  get modelkind(): 'box' { return 'box' }
+  /** Answers 'box', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'box' { return 'box' satisfies Modelkind }
 }
 
 // == [Merging]: mergedOver

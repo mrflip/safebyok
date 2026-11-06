@@ -43,10 +43,12 @@ export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
 export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (val !== null) && Object.hasOwn(val, Whispered)
 
-/** What each model's `modelkind` getter answers, so a check can tell one without importing its class. */
+// A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
+// ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
+/** What each model's `modelkind` getter answers: `box.modelkind` is `'box'`. */
 export type Modelkind = 'bank' | 'vault' | 'box' | 'vault_listing' | 'box_listing' | 'gating' | 'gate' | 'wayin' | 'lease'
 
-/** The `modelkind` of `val`, or undefined for anything that has none. */
-export const modelkindOf = (val: unknown): unknown => (
-  ((typeof val === 'object') && (val !== null)) ? (val as { modelkind?: unknown }).modelkind : undefined
+/** True when `val` is a model of one of `modelkinds`. */
+export const hasModelkind = (val: unknown, ...modelkinds: Modelkind[]): boolean => (
+  (typeof val === 'object') && (val !== null) && modelkinds.includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )

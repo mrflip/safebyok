@@ -1,6 +1,7 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { nowMillis } from '../helpers/clock'
+import type { Modelkind } from '../helpers/consts'
 import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
@@ -188,6 +189,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected isOwnRow(row: VaultRow | BoxRow): row is VaultRow { return ! ('boxlabel' in row) }
   // --
 
-  /** Tells a check that this is a vault listing without importing the class, across two copies of the package too. */
-  get modelkind(): 'vault_listing' { return 'vault_listing' }
+  /** Answers 'vault_listing', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'vault_listing' { return 'vault_listing' satisfies Modelkind }
 }

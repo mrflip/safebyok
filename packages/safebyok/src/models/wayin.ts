@@ -1,3 +1,4 @@
+import type { Modelkind } from '../helpers/consts'
 import { cipherCtx } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
 import type { WayinKind } from '../shapes/shapes-enums'
@@ -53,6 +54,6 @@ export class Wayin {
   }
   // --
 
-  /** Tells a check that this is a wayin without importing the class, across two copies of the package too. */
-  get modelkind(): 'wayin' { return 'wayin' }
+  /** Answers 'wayin', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'wayin' { return 'wayin' satisfies Modelkind }
 }

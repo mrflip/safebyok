@@ -1,6 +1,7 @@
 /** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
 import { VaultError } from '../refusals/errors'
+import type { Modelkind } from '../helpers/consts'
 import { absentBoxError, notListedBoxError } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, boxscope } from '../shapes/shapes-core'
@@ -131,6 +132,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected isOwnRow(row: VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (row.vault_tok === this.world.vault_tok) }
   // --
 
-  /** Tells a check that this is a box listing without importing the class, across two copies of the package too. */
-  get modelkind(): 'box_listing' { return 'box_listing' }
+  /** Answers 'box_listing', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'box_listing' { return 'box_listing' satisfies Modelkind }
 }

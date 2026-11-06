@@ -1,5 +1,5 @@
 import { get, setWith } from 'es-toolkit/compat'
-import { modelkindOf } from '../helpers/consts'
+import { hasModelkind } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 import { Checker } from '../helpers/validator'
 import type { Box } from '../models/box'
@@ -18,7 +18,7 @@ export type BoxFieldEl = { value: string }
 export type BoxFieldRef = (el: BoxFieldEl | null) => (() => void) | undefined
 
 /** The check of `BoxFields.of`'s box. */
-const fieldsBox = Checker(({ custom }) => custom<Box>((val) => modelkindOf(val) === 'box', Phrases.BoxExpected), 'bad_option')
+const fieldsBox = Checker(({ custom }) => custom<Box>((val) => hasModelkind(val, 'box'), Phrases.BoxExpected), 'bad_option')
 
 /** The check of `fields.bind`'s path, dotted into the whisper. */
 const fieldPath = Checker(({ str }) => str.min(1), 'bad_option')
@@ -39,7 +39,8 @@ export class BoxFields {
   // == [Props]: box, #refs, #fields, #stopHearing
 
   readonly box: Box
-  /** The ref callbacks `bind` has answered: a React re-render handed a new one would unbind the old, and so unexpose. */
+  // A React re-render handed a new callback would unbind the old one, and so unexpose.
+  /** The ref callback `bind` has answered for each path. */
   readonly #refs = new Map<string, BoxFieldRef>()
   readonly #fields = new Set<BoundField>()
   #stopHearing: (() => void) | null = null
@@ -57,9 +58,7 @@ export class BoxFields {
     return fields
   }
 
-  /** A ref callback showing the whisper at dotted `path` in an element, which reads blank while it will not show.
-   * When the last field unbinds, the box unexposes.
-   */
+  /** A ref callback showing the whisper at dotted `path` in an element, blank while it will not show; the last unbind unexposes. */
   bind(path: string): BoxFieldRef {
     const checkedPath = fieldPath.parse(path)
     const ref = this.#refs.get(checkedPath) ?? ((el) => ((el === null) ? undefined : this.#bindField({ el, path: checkedPath, shown: null })))

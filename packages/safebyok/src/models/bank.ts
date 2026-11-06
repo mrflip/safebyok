@@ -1,4 +1,4 @@
-import { FarFuture, FarPast, MinuteMillis } from '../helpers/consts'
+import { FarFuture, FarPast, MinuteMillis, type Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { type KeyDeriver, isTestDeriver } from '../deriver/basederiver'
 import { VaultError, isVaultError } from '../refusals/errors'
@@ -293,8 +293,8 @@ export class Bank implements VaultWorld {
   }
   // --
 
-  /** Tells a check that this is a bank without importing the class, across two copies of the package too. */
-  get modelkind(): 'bank' { return 'bank' }
+  /** Answers 'bank', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext

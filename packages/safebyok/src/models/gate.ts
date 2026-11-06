@@ -1,3 +1,4 @@
+import type { Modelkind } from '../helpers/consts'
 import { Checkers } from '../helpers/validator'
 import { decorate, tattoo } from '../helpers/helpers'
 import { passkeyHeldAlready } from '../refusals/throwers'
@@ -61,6 +62,6 @@ export class Gate {
   }
   // --
 
-  /** Tells a check that this is a gate without importing the class, across two copies of the package too. */
-  get modelkind(): 'gate' { return 'gate' }
+  /** Answers 'gate', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'gate' { return 'gate' satisfies Modelkind }
 }

@@ -126,15 +126,16 @@ function ApiKeyField({ box }) {
     <>
       <input ref={fields.bind('apiKey')} type="password" autoComplete="off" spellCheck={false} />
       {exposed
-        ? <button onClick={() => fields.save()}>Save</button>
-        : <button onClick={() => box.expose()}>Show</button>}
+        ? <button onClick={() => fields.trySave().then(showOutcome)}>Save</button>
+        : <button onClick={() => box.expose().catch(showRefusal)}>Show</button>}
     </>
   )
 }
 ```
 
 The field goes blank at a lock or a veil, and an edit comes back with the value. Nothing is stored
-until `fields.save()`. When the last field unmounts the box unexposes, so the whisper lasts no
+until `fields.save()`. Both buttons refuse while the vault is locked, so `showOutcome` and
+`showRefusal`, yours to write, say so. When the last field unmounts the box unexposes, so the whisper lasts no
 longer than its field: expose after it mounts. `BoxFields.of` answers the same instance for a box
 wherever it is called. Without React, `const unbind = BoxFields.of(box).bind('apiKey')(el)` binds
 any element with a `value`.

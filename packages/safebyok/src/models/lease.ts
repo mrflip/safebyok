@@ -1,3 +1,4 @@
+import type { Modelkind } from '../helpers/consts'
 import { consistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
@@ -199,8 +200,8 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  /** Tells a check that this is a lease without importing the class, across two copies of the package too. */
-  get modelkind(): 'lease' { return 'lease' }
+  /** Answers 'lease', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'lease' { return 'lease' satisfies Modelkind }
 }
 
 // == [Judging the cached record]: isPastAutolock, uncacheForgotten

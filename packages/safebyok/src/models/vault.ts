@@ -1,3 +1,4 @@
+import type { Modelkind } from '../helpers/consts'
 import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
@@ -440,6 +441,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  /** Tells a check that this is a vault without importing the class, across two copies of the package too. */
-  get modelkind(): 'vault' { return 'vault' }
+  /** Answers 'vault', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'vault' { return 'vault' satisfies Modelkind }
 }

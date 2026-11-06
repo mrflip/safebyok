@@ -1,3 +1,4 @@
+import type { Modelkind } from '../helpers/consts'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
@@ -157,8 +158,8 @@ export class Gating<KindT extends GatingKind = GatingKind> {
   }
   // --
 
-  /** Tells a check that this is a gating without importing the class, across two copies of the package too. */
-  get modelkind(): 'gating' { return 'gating' }
+  /** Answers 'gating', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
 }
 
 // == [An attempt's runs]: RunForGatingkind

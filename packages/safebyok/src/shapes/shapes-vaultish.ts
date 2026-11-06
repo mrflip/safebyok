@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { modelkindOf } from '../helpers/consts'
+import { hasModelkind } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
@@ -179,7 +179,7 @@ export type PutListingOpts = Z.infer<typeof putListingOpts>
 /** The check of a storable's constructor arguments, as far as the base can tell. Checks only. */
 export const storableArgs = objCheck(({ custom }) => ({
   world,
-  listing: custom<object>((val) => ['vault_listing', 'box_listing'].includes(modelkindOf(val) as string), Phrases.ListingExpected),
+  listing: custom<object>((val) => hasModelkind(val, 'vault_listing', 'box_listing'), Phrases.ListingExpected),
   central: sparseBase,
   opts:    storableOpts,
 }), 'bad_option')
