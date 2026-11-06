@@ -1,6 +1,6 @@
 # Thread 9: types_ab (2026-11-06)
 
-Branch `20261106-types_ab`, PR #TBD, stacked on #553 (`20261106-checkers_once`). Justify: green at 830d60c1b; later commits typecheck, lint and test green.
+Branch `20261106-types_ab`, PR #557, stacked on #553 (`20261106-checkers_once`). Justify: green at 830d60c1b; later commits typecheck, lint and test green.
 
 * **Built** (each its own commit):
   * *Directive 2, second survey.* shapes-vaultish no longer re-exports shapes-storage's record forms (am, revision, times, vaulted, sparseBase, boxRecord/boxSparse, vaultRecord/vaultSparse/vaultRow, the formats, Revision/Times/BoxRecord/BoxSparse/VaultRecord/VaultSparse, VoidRevisionSeq): one definition, one import path, `SX`. The wayin record checks are `SX.passphraseWayinRecord` / `SX.passkeyWayinRecord`, the GX rename alias gone. `StrengthChecker` has one import path (helpers/passphrase-strength), GX's re-export gone. Bank's constructor keeps what `VX.bankOpts.parse` returns (and `onBadNews` is now `fn<BadNewsHandler>()` so the parse types it). `maxMillisSinceRefresh` was already checked once (`storableOpts` is gone; `listingOpts` checks it): nothing to do.
