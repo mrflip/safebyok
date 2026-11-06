@@ -2,7 +2,7 @@
 
 For the Coach, and for whoever strikes or rewrites these clauses. Each stands in `notes/guarantees.md`
 as it was written; the pass changed names and paths only. Checked at `main` 57f33ee9. After review, F4, F6,
-F7 and F10 are acted on in the text, as the orchestrator called them, and F11's sentence is corrected.
+F7, F10 and F12 are acted on in the text, as the orchestrator called them, and F11's sentence is corrected.
 
 **F1. The old core's clauses describe `packages/safebyok-old`, not the published core.** The old core
 moved to the private, frozen `packages/safebyok-old` (pkgsplit), where every one of these names still
@@ -98,8 +98,8 @@ reviewed there; adopting it spares the restack. Review found the route wrong for
 `outcomeOf`, so a raw DOMException reaches the host, and only the `try*` forms wrap it. The sentence is
 corrected in #511 (ac7ecf8e9) and carried here word for word; #511's changeset tells a host.
 
-**F12. G2: "Checked by: ... `tests/wayin.test.ts`".** No core counterpart. `tests/models/wayin.test.ts`
-tests the record check, `pickle` and `toJSON`, none of G2. The nearest core case is
-`tests/models/proving.test.ts:387`, *binds the wayin to its vault: under another vault's stamp it will not
-open*. The citation stands as written. Recommend
-dropping it from G2, or porting the old core's case to the core.
+**F12. Acted on (the Coach, 2026-11-06: "make it be well tested and refer to that").** G2's "Checked by"
+now names the core's own: `tests/models/proving.test.ts`, *the ctx a wayin is wrapped under* (each stamp
+field and each ctx-only header field keeps a passphrase or a passkey wayin shut) and *a passkey proving's
+key* (HKDF over the PRF bytes, its info the whole ctx, built in the test), beside `tests/helpers/crypto.test.ts`
+*deriveWrappingKey* and `gating.test.ts`. The old core's `tests/wayin.test.ts` is no longer cited.
