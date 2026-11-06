@@ -101,8 +101,9 @@
   do. The old battery and adapters are references for coverage and for each store's mechanics.
 * **An `-old` copy is allowed, not expected** (the Coach's offer, 2026-11-06): where warranted,
   an adapter's old code may move to a private `packages/safebyok-<x>-old` and the new be written
-  in `packages/safebyok-<x>`. *Orchestrator:* not by default; thread 3 may take it for indexeddb
-  if moving the demo onto `localVaultDB` proves uglier than a copied package.
+  in `packages/safebyok-<x>`. *Coach (2026-11-06):* "it may be easier and better to make a
+  safebyok-idb-old package": thread 3 does, for the demo. The other ports take no `-old` copy
+  (only e2e consumes them, and e2e moves to the new contract).
 
 ## Threads
 
@@ -152,14 +153,18 @@ in parallel off this tip; anything they would each add to the core's exports bel
 
 > port the other adapters. Do not adopt their doc strings, which are rich in slop.
 
-*Gloss.* `packages/safebyok-indexeddb/src/*` onto the new `VaultDB`, its tests onto thread 2's
-battery, its package.json off `safebyok-old`. The demo (`demos/safebyok-demo-react/src/lib/
-stores.ts`, `persist-storage.ts`) wires `idbVaultDB` into the old Bank: move it onto the old
-core's own `localVaultDB({ store })` over `domStore(localStorage, …)`, dropping the vault IDB
-inspector panel if it cannot follow (YOLO call, recorded; see *For the Coach*). `ChangeBell`
-from `safebyok-old/idb` is not available: the watch uses what the core exports or plain
-`BroadcastChannel`. Size line `idbVaultDB` changes its `ignore` from `safebyok-old` to
-`safebyok` and will likely move. **Depends on:** 2. **Size:** M.
+*Gloss.* *Orchestrator, revised on the Coach's word (2026-11-06):* first, `git mv` today's
+`packages/safebyok-indexeddb` to a private, never-published `packages/safebyok-idb-old`
+(renamed in its package.json, still on `safebyok-old`), and point the demo
+(`demos/safebyok-demo-react/src/lib/stores.ts`, `persist-storage.ts`) at it: the demo keeps its
+IndexedDB store and inspector panel with an import change. Its own commit, so the move reads as
+a move. Then write `packages/safebyok-indexeddb` fresh on the new `VaultDB`, its tests on thread
+2's battery, its package.json off `safebyok-old`; the old copy is a reference for IndexedDB
+mechanics only, and none of its doc blocks come across. `ChangeBell` from `safebyok-old/idb` is
+not available to the new package: the watch uses what the core exports or plain
+`BroadcastChannel`. Size line `idbVaultDB` measures the new package, its `ignore` moving from
+`safebyok-old` to `safebyok`; it will likely move. `safebyok-idb-old` gets no size line and no
+changeset of its own (private). **Depends on:** 2. **Size:** M.
 
 ### 4. port_postgres
 
@@ -193,5 +198,6 @@ compacts twice.
 ## For the Coach
 
 * ~~**The demo loses its IndexedDB vault store** when thread 3 lands.~~ *Coach (2026-11-06):*
-  "lgtm" to moving it onto the old core's `localVaultDB` over localStorage.
+  "lgtm" to moving it onto the old core's `localVaultDB` over localStorage; then, in chat: "it may
+  be easier and better to make a safebyok-idb-old package". Thread 3 does that instead.
 * *Coach (2026-11-06)* on thread 2's split: "love it, yes".
