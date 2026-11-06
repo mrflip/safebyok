@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as utils from '../src/utils'
 import { mash } from '../src/utils'
 import * as TH from './test-helpers'
 import * as PX from '../src/shapes/primitives'
@@ -9,6 +10,25 @@ const MashCases = [
   ["",    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 'answers the SHA-256 of the empty text'],
   ["é",   "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c", 'hashes the UTF-8 bytes of the text'],
 ] as const
+
+describe("the utils entry point", () => {
+  it("exports exactly mash, mask, the base64url codec and the secret field's attributes", () => {
+    expect(Object.keys(utils)).to.have.members(['mash', 'mask', 'fromB64', 'toB64', 'WhisperFieldAttributes'])
+  })
+
+  it("exports the base64url codec the stored records are written in, unpadded", () => {
+    expect(utils.toB64(new TextEncoder().encode('cred-laptop'))).to.eq('Y3JlZC1sYXB0b3A')
+    expect(new TextDecoder().decode(utils.fromB64('Y3JlZC1sYXB0b3A'))).to.eq('cred-laptop')
+  })
+
+  it("exports a codec that refuses text that is not base64url", () => {
+    expect(() => utils.fromB64('not base64url!')).to.throw(/Unknown letter/)
+  })
+
+  it("exports a mask that masks", () => {
+    expect(utils.mask('sk-ant-abcd1234')).to.eq('sk*********1234')
+  })
+})
 
 describe("mash", () => {
   for (const [text, digest, blurb] of MashCases) {
