@@ -61,6 +61,10 @@ the Closer Look triage; three Open Matters rows.
   types `AskUser`, `Panic`, `PanicHandler`, `BadNewsHandler`, `GuardedKeyDeriver`, `GuardedStrengthChecker`; `ProvingWorld`
   and `VaultWorld` stay inferred. **Surface gap:** neither entry exports a device store, so a host cannot build the
   `deviceDB` that `Bank.make` requires (Open Matters, TOP). Compacted twice (09:13, 09:23), after its first justify.
+* Thread 8 `checkers_once`: built, PR #553 at 7f83837bc on #552, in review. Scopes in CX only; `LeaseDated`; `Symbol.for`
+  brands on the DB base classes (two eslint-disables on the getters); host functions and the logger checked once, by their
+  guards; a host's `Infinity` is `ForeverMillis` inside. **For thread 9:** the second survey's four rows (plan, thread 9's
+  directives); `FetchOpts` and `BoxPutOpts` are `Z.input` now. The values sweep now covers PX and UX.
 * Thread 19 `utils_port`: reviewed (`fixed`), PR #534 at 576f347cd on #531, pushed; joins the chain's top. `UX` is the
   namespace for `shapes/shapes-utils.ts` (STYLE.md's table wants the row). `safebyok/utils`: `mash`, `mask(text, opts)`,
   `MaskOpts`, `fromB64`/`toB64` (crypto.ts's codec), `WhisperFieldAttributes`; `shapes/shapes-utils.ts` is a seventh shapes

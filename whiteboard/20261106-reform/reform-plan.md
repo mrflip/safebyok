@@ -325,6 +325,18 @@ by each `guard*` and `HostChecks`; keep the guards' own entry checks (they are e
 checks from `bankOpts`, or the reverse, whichever leaves one layer; `vault.tryCheckStrength(typed)` is cited in
 passphrase-strength.ts's `StrengthChecker` doc block and CUSTOMIZATION.md but does not exist: name `gating.checkStrength(typed)`
 and its verdict.*
+*Built (PR #553, on #552):* every row, no hatch needed: the scopes live only in CX (a VaultDB refuses a bad scope
+`bad_scope`; internal); `SX.LeaseSparse` is `LeaseDated`, `leaseQuery` the `vaultQuery`; VaultDB and DeviceDB known by a
+`Symbol.for` brand getter on each base class (two `eslint-disable-line @typescript-eslint/class-literal-property-style`,
+reported); the logger checked by its brand in the worlds and the friend; the host functions checked once, by their guards
+(`VX.bankOpts` lost the `fn()` checks; each guard names its option with `{ where }`); `gating.checkStrength` named in the two
+docs; the values sweep checked against `src/shapes/` (it had missed PX and UX); STYLE's `KX` row; `GX.vaultStamp` from
+`CX.vaultScope`, `SX.reqParams` from `boxQuery`, `VX.putListingOpts` gone; the defaults in `fetchOpts` and `boxPutOpts`,
+four destructure defaults deleted (`FetchOpts`, `BoxPutOpts` now `Z.input`); `GX.leaseMillis` refuses `Infinity`, a host's
+`Infinity` becomes `ForeverMillis` in `millisOf` and `horizonMillis` (`bank.autolockMinutes` reads back finite: changeset
+minor). The second survey (thread file): VX re-exports SX names, GX aliases `passphraseWayin`, `maxMillisSinceRefresh`
+checked in `listingOpts` and `storableOpts`, Bank parses `bankOpts` and discards the result: folded into thread 9's
+directives. Compacted once, after its first justify. In review (medium).
 
 ### 9. `types_ab`
 
@@ -344,6 +356,11 @@ on:** thread 8 (stacked). **Size:** one context; split by file if the list runs 
 *Directive (thread 7's review): the exported types `GuardedKeyDeriver`, `GuardedStrengthChecker` and `AskUser` name
 `PassphraseCleartext`, `PassphraseVerdict` and `AnyGating`, and `BankOpts` names `KeyDeriver`, `StrengthChecker`, `DeviceDB`
 and `VaultLogger`, none exported: export every type an exported signature names (be generous with exports).*
+*Directives (thread 8's second survey, the Coach's "then do another survey"): VX re-exports SX names unchanged or under the
+same name with another refusal kind (one definition, two import paths: keep one); GX re-exports `SX.passphraseWayin` as
+`passphraseWayinRecord` (one name); `maxMillisSinceRefresh` is checked in `listingOpts` and again in `storableOpts` (once);
+Bank's constructor parses `bankOpts` and throws the result away (use what you parsed, or parse once in the guards and not
+again). Each a subtraction, with thread 9's inferred-versus-handrolled call made for the types it touches.*
 
 ### 10. `kindvals_smush`
 
