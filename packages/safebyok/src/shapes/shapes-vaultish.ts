@@ -235,7 +235,6 @@ export type BoxSnapshot = Boxscope & Readonly<{
   present:       boolean
   exposed:       boolean
   veiled:        boolean
-  lockState:     EX.LockState
 }>
 
 // --

@@ -8,6 +8,7 @@ import type { Box } from '../../src/models/box'
 import type { GatingKind } from '../../src/shapes/shapes-enums'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
+import type { Whisper } from '../../src/shapes/shapes-core'
 import { Storable } from '../../src/models/storable'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
@@ -22,7 +23,7 @@ const onBadNews = (news: VaultError): void => { badNews.push(news) }
 const expectNoBadNews = (): void => { expect(badNews.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal([]) }
 afterEach(expectNoBadNews)
 
-// == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, whisperReveal, makeDialog
+// == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, whisperStoreOf, whisperReveal, makeDialog
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
@@ -62,11 +63,10 @@ const boxList = (boxes: readonly BoxSnapshot[]): string => boxes.map(({ boxlabel
 
 const boxRow = ({ boxlabel, present, sidecar }: BoxSnapshot): string => `${boxlabel} ${present ? JSON.stringify(sidecar) : 'deleted'}`
 
-/** The component that shows the whisper itself: `box.whisper`, read afresh at each paint, as a snapshot never holds it. */
-const whisperReveal = (box: Box) => (): string => {
-  const { whisper } = box
-  return Storable.isFUBag(whisper) ? whisper[Whispered] : JSON.stringify(whisper)
-}
+/** The store of the component that shows the whisper itself: `box.whisper` is its snapshot, as the box's snapshot never holds it. */
+const whisperStoreOf = (box: Box): Store<Whisper> => ({ subscribe: box.subscribe, getSnapshot: () => box.whisper })
+
+const whisperReveal = (whisper: Whisper): string => (Storable.isFUBag(whisper) ? whisper[Whispered] : JSON.stringify(whisper))
 
 /** The host's dialog: it records what it was shown for, and attempts what the user types; typing nothing closes it. */
 const makeDialog = () => {
@@ -132,7 +132,7 @@ describe("the proof", () => {
     const boxUi = mountComponent(box, boxRow, { hearsVault: true })
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     // The whisper's component watches the box alone, whose subscribers hear of a lock through the vault.
-    const revealUi = mountComponent(box, whisperReveal(box), { hearsVault: true })
+    const revealUi = mountComponent(whisperStoreOf(box), whisperReveal, { hearsVault: true })
     revealUi.expectRenders(['encrypted'])
     const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
     expect(boxRows).to.have.lengthOf(1)
@@ -152,7 +152,7 @@ describe("the proof", () => {
     vault.lock()
     bankUi.expectRenders(['ready: main locked'])
     vaultUi.expectRenders(['main locked'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
+    boxUi.expectRenders([])
     boxesUi.expectRenders([])
     revealUi.expectRenders(['locked'])
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
@@ -171,7 +171,7 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main unlocked'])
     vaultUi.expectRenders(['main unlocked'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
+    boxUi.expectRenders([])
     boxesUi.expectRenders([])
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
@@ -185,7 +185,7 @@ describe("the proof", () => {
     await TH.expectRefusal(vault.fetch(), 'vault_gone')
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
     boxesUi.expectRenders(['no boxes'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}', 'anthropic_api_key {"nickname":"work"}'])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     revealUi.expectRenders(['locked', 'encrypted'])
     await TH.expectRefusal(box.extractWhisper(), 'disabled')
 
