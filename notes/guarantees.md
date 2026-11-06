@@ -229,7 +229,7 @@ too, leaves them unspent as above, and the gating keeps no reference to zero the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`models/proving.ts`). Bytes refused before import: anything but
 32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/models/proving.test.ts`,
-`tests/models/wayin.test.ts`, `tests/models/gating.test.ts` (*gating.attempt*).
+`tests/wayin.test.ts`, `tests/models/gating.test.ts` (*gating.attempt*).
 
 **G3. The vaultKey is never stored naked, and never persisted as a handle.** It exists (a) as an
 *extractable* local where WebCrypto requires it to be wrapped: fresh in `buildWayin`

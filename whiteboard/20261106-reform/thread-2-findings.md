@@ -84,4 +84,13 @@ wayinkind, key_deriver_label, salt_b64, device_id, registered_at). Recommend dro
 **F11. G8's WebCrypto sentence is #511's, adopted verbatim.** It narrows the old claim: the old text
 counted "the cipher step of `Lease.cipheredWith`" among the caught; `Lease.sealWith`
 (`models/lease.ts:130`) catches nothing, and #511's wording says so. The meaning change is #511's,
-reviewed there; adopting it spares the restack.
+reviewed there; adopting it spares the restack. Review found the route wrong for the seal: `Vault.putBox`
+(`models/vault.ts:323-326`), `box.put` (`models/box.ts:152`) and `putExposed` reach `Lease.sealWith` with no
+`outcomeOf`, so a raw DOMException reaches the host, and only the `try*` forms wrap it. The sentence is
+corrected in #511 (ac7ecf8e9) and carried here word for word; #511's changeset tells a host.
+
+**F12. G2: "Checked by: ... `tests/wayin.test.ts`".** No core counterpart. `tests/models/wayin.test.ts`
+tests the record check, `pickle` and `toJSON`, none of G2. The nearest core case is
+`tests/models/proving.test.ts:387`, *binds the wayin to its vault: under another vault's stamp it will not
+open*. The citation stands as written. Recommend
+dropping it from G2, or porting the old core's case to the core.
