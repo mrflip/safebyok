@@ -9,6 +9,7 @@ import * as GX from '../shapes/shapes-gateish'
 import type { AnteProvings, AnyGating, AskUser, ClearsForGatingkind, GatingSnapshot, LaunchArgs, Prove, Run, VaultForGatingkind, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { VaultWorld } from '../shapes/shapes-vaultish'
+import * as SX from '../shapes/shapes-storage'
 import type { VaultRecord } from '../shapes/shapes-storage'
 import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
@@ -179,13 +180,13 @@ const RunForGatingkind: { [KindT in GatingKind]: Run<KindT> } = {
 
   replace_passphrase: async ({ ante, anteProving, nextProving }, { listing, vault, friend }) => {
     const nextWayin        = await nextProving.buildWayin(anteProving)
-    const passphrase_wayin = GX.passphraseWayinRecord.parse(nextWayin.pickle())
+    const passphrase_wayin = SX.passphraseWayinRecord.parse(nextWayin.pickle())
     return friend.landGate(vault, anteProving, () => listing.replacePassphrase({ ...ante, gate: { passphrase_wayin } }))
   },
 
   add_passkey: async ({ ante, proved, passkeyProving }, { listing, vault, friend }) => {
     const passkeyWayin  = await passkeyProving.buildWayin(proved)
-    const passkey_wayin = GX.passkeyWayinRecord.parse(passkeyWayin.pickle())
+    const passkey_wayin = SX.passkeyWayinRecord.parse(passkeyWayin.pickle())
     return friend.landGate(vault, proved, () => listing.addPasskey({ ...ante, gate: { passkey_wayin } }))
   },
 

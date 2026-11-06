@@ -30,26 +30,24 @@ export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinKindVals), 'bad_op
 export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
 // --
 
-// == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, passphraseWayinRecord, passkeyWayinRecord, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
-
-export const { passphraseWayin: passphraseWayinRecord, passkeyWayin: passkeyWayinRecord } = SX
+// == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
 
 export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
-  const passphraseWayinHeader = SX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  const passkeyWayinHeader    = SX.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passphraseWayinHeader = SX.passphraseWayinRecord.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passkeyWayinHeader    = SX.passkeyWayinRecord.omit({ vault_key_wayin_wrapped: true }).strip()
   return {
     passphraseWayinHeader,
     passkeyWayinHeader,
     wayinHeader: discrim('wayinkind', [passphraseWayinHeader, passkeyWayinHeader]),
-    wayinRecord: discrim('wayinkind', [passphraseWayinRecord, passkeyWayinRecord]),
+    wayinRecord: discrim('wayinkind', [SX.passphraseWayinRecord, SX.passkeyWayinRecord]),
   }
 })
 
 export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
 export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
 export type WayinHeader           = Z.infer<typeof wayinHeader>
-export type PassphraseWayinRecord = Z.infer<typeof passphraseWayinRecord>
-export type PasskeyWayinRecord    = Z.infer<typeof passkeyWayinRecord>
+export type PassphraseWayinRecord = Z.infer<typeof SX.passphraseWayinRecord>
+export type PasskeyWayinRecord    = Z.infer<typeof SX.passkeyWayinRecord>
 export type WayinRecord           = Z.infer<typeof wayinRecord>
 // --
 
@@ -63,8 +61,8 @@ export const gateEpoch = Checker(({ int }) => int.positive(), 'bad_record')
 
 export const gateProps = objCheck(() => ({
   gate_epoch:       gateEpoch,
-  passphrase_wayin: passphraseWayinRecord,
-  passkey_wayin:    passkeyWayinRecord.nullable(),
+  passphrase_wayin: SX.passphraseWayinRecord,
+  passkey_wayin:    SX.passkeyWayinRecord.nullable(),
 }), 'bad_record')
 
 export type GateProps = Z.infer<typeof gateProps>
