@@ -94,7 +94,7 @@ Three layers hold key material, and the words for each matter.
   material still inside the browser, never as bytes JavaScript sees. The one key safebyok stores
   this way is the leaseKey (`lease.cache`, through a `DeviceDB`'s `cache`). The core ships no IndexedDB `DeviceDB`
   of its own: its `MemoryDeviceDB` (`storage/memory-device-db.ts`) keeps the row by `structuredClone` in a Map
-  for the page's life, and `safebyok-indexeddb` runs on the old core. No other key is ever written anywhere: not to
+  for the page's life, and `safebyok-idb-old` runs on the old core. No other key is ever written anywhere: not to
   IndexedDB, not to the host's VaultDB, which receives only ciphertext and visible fields. The
   wayinKey (the strong key) in particular lives only as a handle in a `Proving`, for one gating,
   and is never persisted.
