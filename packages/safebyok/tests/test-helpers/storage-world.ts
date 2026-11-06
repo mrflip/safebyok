@@ -46,7 +46,6 @@ export const vaultTombstoneOf = (record: VaultRecord): VaultTombstone => SX.vaul
 /** The tombstone that deletes the box `record`, one revision on. */
 export const boxTombstoneOf = (record: BoxRecord): BoxTombstone => SX.boxTombstone.parse({ ...SX.boxSparse.parse(record), ...tombstoneFieldsOf(record) })
 
-
 /** The revision a record stands at, as a call's prior. */
 export const priorOf = SX.revisionOf
 /** A revision no record in these tests stands at. */
