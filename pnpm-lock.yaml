@@ -610,9 +610,9 @@ importers:
       publint:
         specifier: ^0.3.25
         version: 0.3.25
-      safebyok-old:
+      safebyok:
         specifier: workspace:*
-        version: link:../safebyok-old
+        version: link:../safebyok
       tsdown:
         specifier: ^0.23.3
         version: 0.23.3(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
