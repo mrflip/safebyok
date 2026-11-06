@@ -565,3 +565,11 @@ sites stay. No test deleted, no code changed. Empty changeset. **Levels:** worke
 on:** nothing unmerged (runs beside 21; the two touch different files). **Size:** one context for the mechanical part;
 **hatch:** if the first justify is not reached in one context, commit what is done, file, and the rest (by directory) is
 thread 23. Thread 10 (`kindvals_smush`) renames kind values everywhere: it must come after this one.
+*Built (PR #549, on main):* done in one context, no thread 23. `expectRefusal`, `expectBad`, `expectSyncRefusal` take
+`refusalkind` as optional; per-directory commits (`models/`, `storage/`, `shapes/`, `helpers/`, `loosened/` with
+`utils.test.ts`) strip every strip-kind and unsure-kind site: the helper argument, the quoted kind in titles, `act:
+'<kind>'` in vaultDB bad-answer assertions; `badnews` kind lists became length checks; `holdsCases` lost its `kind`
+parameter (all 26 callers named a strip kind). Kept whole as definitional: `helpers/validator.test.ts` (bar its guards'
+own refusals; the inventory had 106 strip there) and `refusals/*.test.ts`; `mask.test.ts` had three sites the inventory
+missed, stripped. `vitest/valid-title` warnings in `tests/models` went 116 to 73, every one left on a kept kind. Empty
+changeset. In review (`sonnet`, low).

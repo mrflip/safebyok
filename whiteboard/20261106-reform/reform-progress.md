@@ -47,6 +47,9 @@ Closer Look triage.
   prototype getter slips past; `buildLease` was the one case found.
 * Thread 21 `kind_docblocks`: filed, PR #548 at 88ec97a50 on main, docs only. The bad-news throw sites that do more
   than try-catch-throw: `unreadableRowOf` (second parse for `newer_format`) and `Lease.#vaultKey` (lock and evict first).
+* Thread 22 `kind_tests`: built, PR #549 at 4bbdb9f87 on main, in review. The test helpers' `refusalkind` is optional;
+  `holdsCases` takes no kind. `vitest/valid-title` counts what is left: every remaining warning is on a kept kind.
+  **For thread 10:** fewer kind words to rename in tests now; `validator.test.ts` and `refusals/*.test.ts` still name them.
 * Thread 19 `utils_port`: reviewed (`fixed`), PR #534 at 576f347cd on #531, pushed; joins the chain's top. `UX` is the
   namespace for `shapes/shapes-utils.ts` (STYLE.md's table wants the row). `safebyok/utils`: `mash`, `mask(text, opts)`,
   `MaskOpts`, `fromB64`/`toB64` (crypto.ts's codec), `WhisperFieldAttributes`; `shapes/shapes-utils.ts` is a seventh shapes
