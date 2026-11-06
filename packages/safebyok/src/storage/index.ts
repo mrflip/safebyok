@@ -4,7 +4,7 @@
 // == [The stores]: VaultDB, DeviceDB, and the two in memory
 export { VaultDB } from './vault-db-new'
 export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, Notice, PutAct, Tidied } from './vault-db-new'
-export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, RowOfVault } from './vault-db-new'
+export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, RowOfVault, VaultDBRelay } from './vault-db-new'
 export { DeviceDB } from './device-db-new'
 export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
