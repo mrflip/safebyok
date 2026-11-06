@@ -1,6 +1,6 @@
 # Thread 3: example pointers (2026-11-06)
 
-Branch `20261106-example_pointers`, PR #PR, based on main at 3d95d186e (holds #514). Justify: green (safebyok 1845 tests, no lint errors; the lint warnings are the repo's standing `valid-title` ones).
+Branch `20261106-example_pointers`, PR [#522](https://github.com/mrflip/safebyok/pull/522), based on main at 3d95d186e (holds #514). Justify: green (safebyok 1845 tests, no lint errors; the lint warnings are the repo's standing `valid-title` ones).
 
 * **Built**: a `// member @example N` pointer, or a new test, for every kept `@example` #514 left without one; `isVaultError`'s example made real.
   * Pointer on an existing test: `VaultLogger` 2 (`tests/helpers/logger.test.ts`, "takes the console itself"); `StrengthChecker` 2 (`passphrase-strength.test.ts`, the checker's own `load`); `stableJsonify` (`stable-jsonify.test.ts`); `storageUnavailable` (`tests/refusals/throwers.test.ts`); `PasskeyAnswer` (`vault-life.test.ts`, the next session unlocks by the passkey alone: `gating.attempt({ passkeyClear })`); `Whisper` 1 and 2 (the `whisper` case in `shapes-core.test.ts`, which already checks both literals); `BankedVaultScope` (`bank.test.ts`, "builds a vault by asking", with a new assertion that a vault made from `{ vaultlabel }` carries the bank's `applabel` and `user_id`).
