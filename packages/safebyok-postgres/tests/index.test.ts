@@ -1,8 +1,10 @@
+/** The package's entry point. */
+
 import { describe, expect, it } from 'vitest'
 import * as safebyokPostgres from '../src/index'
 
 describe("the package's entry point", () => {
-  it("exports exactly the public surface", () => {
-    expect(Object.keys(safebyokPostgres)).to.have.members(['postgresVaultDB', 'VaultChangeChannel', 'VaultNotifySql', 'VaultTablesSql'])
+  it("exports the vaultDB, the pool's client, and the SQL and channel it runs on", () => {
+    expect(Object.keys(safebyokPostgres)).to.have.members(['PostgresVaultDB', 'pgClientOf', 'VaultChangeChannel', 'VaultTablesSql'])
   })
 })
