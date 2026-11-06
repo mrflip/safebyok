@@ -134,8 +134,9 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 **Passphrase.** Naked: the host's dialog (`safebyok-react`'s `passphrase-modal.tsx` and
 `gating-modal.tsx`, on the old core until the package moves, hold what was typed in component state) →
 `gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's prove (`ProveForGatingkind`,
-`models/gating.ts`) → `checkedClears` (`GX.vaultBuildClears`, `vaultUnlockClears`, `passphraseReplaceClears`:
-shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
+`models/gating.ts`) → `checkedClears` (`GX.vaultBuildClears`, `vaultUnlockClears`, `passphraseReplaceClears`,
+`passkeyAddClears`, `passkeyRevokeClears`, `vaultDelClears`: shape only, `passphraseCleartext`), and for
+`revoke_passkey` and `del_vault` `provePassphrase` → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
 `buildNovel` → `Proving.checkStrength` → `invokeStrengthChecker` (`helpers/passphrase-strength.ts`) → the host's
 `strengthChecker`; both → `passphraseKeyOf` → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
 (`argon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
