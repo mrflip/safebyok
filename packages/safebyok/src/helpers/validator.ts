@@ -272,27 +272,33 @@ const disagreeing = (bag: object, other: object): readonly string[] => {
 const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
   bag:                custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
   consistencyRefusal: obj({
+    /** The kind a disagreement refuses with. */
     kind:    oneof(refusalKindVals),
+    /** A sentence, or one made from the names of the fields that disagree, never their values. */
     message: union([str, custom<(fieldnames: readonly string[]) => string>((val) => typeof val === 'function')]).optional(),
   }).strict(),
-  story:              obj({ where: str.optional(), advice: str.optional() }).strict(),
+  story:              obj({
+    /** Where the input was judged, a lead-in before the failures: `In Bank.make's options`. */
+    where:  str.optional(),
+    /** What to do, a sentence after the failures: `Leave it out for the bank's own.` */
+    advice: str.optional(),
+  }).strict(),
   objCheckOpts:       obj({
+    /** The kind thrown; 'bad_record' by default. */
     refusalkind: oneof(refusalKindVals).default('bad_record'),
-    extras:    oneof(['strict', 'strip']).default('strict'),
+    /** `strict`, the default, refuses a field the object does not take; `strip` drops it unread. */
+    extras:      oneof(['strict', 'strip']).default('strict'),
   }).strict(),
 }))
 
 // Each is an interface extending its Z.infer, not a type alias of it: Refusing names both, and
 // each is read off a Refusing, a loop TypeScript follows only through an interface's deferred members.
-/** What a disagreement refuses with: its `kind`, and its `message`, a sentence or one made from the names of the fields that disagree, never their values. */
+/** What a disagreement refuses with. */
 export interface ConsistencyRefusal extends Z.infer<typeof Checks.consistencyRefusal> {}
 
-/** The words a refusal puts around the failures it names: `where` the input was judged, a lead-in before them (`In Bank.make's options`), and `advice`, what to do, a sentence after them (`Leave it out for the bank's own.`). Neither quotes the input. */
+/** The words a refusal puts around the failures it names, neither quoting the input. */
 export interface Story extends Z.infer<typeof Checks.story> {}
 
-/** How an {@link objCheck} validator refuses.
- * - `refusalkind`      -- the kind thrown (default: 'bad_record')
- * - `extras: 'strict'` -- refuse a field the object does not take (default)
- * - `extras: 'strip'`  -- drop it unread */
+/** How an {@link objCheck} validator refuses, as a caller hands it in, defaults unapplied. */
 export interface ObjCheckOpts extends Z.input<typeof Checks.objCheckOpts> {}
 // --

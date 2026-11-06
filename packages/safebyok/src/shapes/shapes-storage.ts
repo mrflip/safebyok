@@ -154,8 +154,17 @@ export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Check
   return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
 }, [CX])
 
-export const vaultDBOpts = objCheck(({ num }) => ({ maxRecordBytes: num.positive().optional() }), 'bad_option')
-export const memoryVaultDBOpts = objCheck(({ uint }) => ({ ...vaultDBOpts.shape, maxBoxes: uint.optional() }), 'bad_option')
+/** The check of a vaultDB's options, refusing 'bad_option'. */
+export const vaultDBOpts = objCheck(({ num }) => ({
+  /** The most bytes one stored record may weigh; no limit by default. */
+  maxRecordBytes: num.positive().optional(),
+}), 'bad_option')
+/** The check of a memory vaultDB's options, refusing 'bad_option'. */
+export const memoryVaultDBOpts = objCheck(({ uint }) => ({
+  ...vaultDBOpts.shape,
+  /** The most live boxes one vault may hold; no limit by default. */
+  maxBoxes: uint.optional(),
+}), 'bad_option')
 
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
@@ -163,7 +172,9 @@ export type PutOpts = Readonly<Z.input<typeof putOpts>>
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
+/** What a vaultDB's constructor takes. */
 export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
+/** What a memory vaultDB's constructor takes. */
 export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 // --
 

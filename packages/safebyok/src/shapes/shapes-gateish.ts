@@ -150,14 +150,19 @@ export type VaultStamp = Z.infer<typeof vaultStamp>
 
 // == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
+/** The check of what a proving hears of the bank, refusing 'bad_option'. */
 export const { provingWorld } = Checkers('bad_option', ({ obj, custom, device_id }) => ({
   provingWorld: obj({
+    /** The bank's key deriver, guarded: it turns a passphrase into key bytes. */
     keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
+    /** The bank's strength checker, guarded: it judges a new passphrase. */
     strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
+    /** This device's id, written into the wayin header a proving mints. */
     device_id,
   }),
 }), [CX])
 
+/** What a proving hears of the bank: its two guarded host functions and this device's id. */
 export type ProvingWorld = Z.infer<typeof provingWorld>
 
 /** The arguments of the provings' statics. A `stamp` is whatever carries a {@link vaultStamp}, a record or a vault, stripped to one; a `gate` is whatever carries a {@link vaultStamp} as `stamp`, and {@link gateProps}, as a `Gate` does. */
@@ -235,12 +240,15 @@ export const leaseFriend = objCheck(({ fn }) => ({
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
+  /** Cache a lease's record on this device, in place of any it held. */
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
+  /** Drop the lease this device has cached. */
   tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
+/** All a lease or a proving hears of its vault, once {@link leaseFriend} has checked it. */
 export type LeaseFriend = Z.infer<typeof leaseFriend>
 
 export const leaseGrantOpts = objCheck(() => ({
@@ -288,10 +296,13 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
 
 /** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault takes a proving. */
 export const gatingFriend = objCheck(({ fn }) => ({
+  /** Unlock the vault with what a proving proved. */
   unlockByProof: fn<(vault: Vault, proved: Proving) => Promise<Vault>>(),
+  /** Store a changed gate by `commit`, then lease the vault under the epoch it landed. */
   landGate:      fn<(vault: Vault, proved: Proving, commit: () => Promise<VaultRecord>) => Promise<Vault>>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
+/** What a gating's run hears of its vault's private verbs, once {@link gatingFriend} has checked it. */
 export type GatingFriend = Z.infer<typeof gatingFriend>
 
 /** The check of what launches a gating. */

@@ -90,24 +90,42 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
   const maxMillis     = horizonMillis.optional()
-  const timelyOpts    = obj({ maxMillisSinceRefresh: maxMillis, maxWorldMillis: maxMillis })
-  const fetchOpts     = timelyOpts.extend({ ifAbsent: ifAbsent.default('fail') })
-  const boxPutOpts    = timelyOpts.extend({ ifAbsent: putIfAbsent.default('add'), ifPresent: ifPresent.default('repl') })
-  const boxCreateOpts = timelyOpts.extend({ ifAbsent: lit('add').default('add'), ifPresent: ifPresent.default('fail') })
+  const timelyOpts    = obj({
+    /** How long ago, at most, the record in hand was refreshed from the vaultDB; Infinity for no limit. */
+    maxMillisSinceRefresh: maxMillis,
+    /** How long ago, at most, the world the verb runs in was refreshed; Infinity for no limit. */
+    maxWorldMillis:        maxMillis,
+  })
+  const fetchOpts     = timelyOpts.extend({
+    /** What an absent thing does: `fail`, the default, refuses with the listing's absent refusal; `nil` resolves null. */
+    ifAbsent: ifAbsent.default('fail'),
+  })
+  const boxPutOpts    = timelyOpts.extend({
+    /** What an absent box does: `add`, the default, creates it. */
+    ifAbsent:  putIfAbsent.default('add'),
+    /** What a present box does: `repl`, the default, replaces it. */
+    ifPresent: ifPresent.default('repl'),
+  })
+  const boxCreateOpts = timelyOpts.extend({
+    /** Always `add`: a create creates. */
+    ifAbsent:  lit('add').default('add'),
+    /** What a present box does: `fail`, the default, refuses. */
+    ifPresent: ifPresent.default('fail'),
+  })
   const listener      = fn<() => void>()
   return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
 })
 
-/** How fresh the record in hand and the world must be before a verb goes on. The world heeds `maxWorldMillis`; the record, `maxMillisSinceRefresh`. */
+/** How fresh the record in hand and the world must be before a verb goes on. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
 
-/** `fetch`'s options: its {@link TimelyOpts}, and `ifAbsent`, how it treats a thing that is absent: `fail` by default, with the listing's absent refusal; `nil` resolves null. */
+/** `fetch`'s options, as a caller hands them in, defaults unapplied. */
 export type FetchOpts = Z.input<typeof fetchOpts>
 
-/** `box.put`'s options: its {@link TimelyOpts}, and an upcreate unless `ifAbsent` or `ifPresent` says otherwise. */
+/** `box.put`'s options, as a caller hands them in, defaults unapplied: an upcreate unless they say otherwise. */
 export type BoxPutOpts = Z.input<typeof boxPutOpts>
 
-/** `create`'s options: {@link BoxPutOpts}, with `ifPresent` defaulting to `fail`, and `ifAbsent` always `add`. */
+/** `create`'s options, as a caller hands them in, defaults unapplied. */
 export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
