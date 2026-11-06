@@ -144,12 +144,13 @@ describe("bank.hello", () => {
 
   it("keeps the device_id each bank was handed", async () => {
     const world = makeBankWorld()
-    const first = world.bankOn({ device_id: 'device_first' })
+    const [firstId, secondId] = [crypto.randomUUID(), crypto.randomUUID()]
+    const first = world.bankOn({ device_id: firstId })
     await first.hello()
-    const second = world.bankOn({ device_id: 'device_second' })
+    const second = world.bankOn({ device_id: secondId })
     await second.hello()
-    expect([first.device_id, first.snapshot.device_id]).to.deep.equal(['device_first', 'device_first'])
-    expect([second.device_id, second.snapshot.device_id]).to.deep.equal(['device_second', 'device_second'])
+    expect([first.device_id, first.snapshot.device_id]).to.deep.equal([firstId, firstId])
+    expect([second.device_id, second.snapshot.device_id]).to.deep.equal([secondId, secondId])
   })
 
   it("hears a vault made elsewhere over the watch it starts", async () => {
@@ -250,10 +251,10 @@ describe("bank.ensureVault", () => {
   })
 
   it.each([
-    ['hyphens, as a UUID has',        "0123-4567"],
-    ['capitals',                      "Device_One"],
-    ['an empty string',               ""],
-    ['more than 40 characters',       `d${'a'.repeat(40)}`],
+    ['a label in it',                 "device_one"],
+    ['no hyphens',                    "00000000000040008000000000000001"],
+    ['a digit short',                 "00000000-0000-4000-8000-00000000001"],
+    ['nothing in it',                 ""],
   ])("refuses at Bank.make a device_id with %s", (_what, device_id) => {
     TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }))
   })

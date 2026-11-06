@@ -3,13 +3,16 @@
 
 import { ScopepathDelimiter } from './consts'
 
-// == [Names]: labelTooLong, LabelShape, UserIdMissing, userIdTooLong, UserIdChars
+// == [Names]: labelTooLong, LabelShape, DeviceIdShape, UserIdMissing, userIdTooLong, UserIdChars
 
 /** A label longer than `maxChars`. */
 export const labelTooLong = (maxChars: number): string => `A label is at most ${String(maxChars)} characters`
 
 /** A label of the wrong shape. */
 export const LabelShape = "A label is lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two characters at least"
+
+/** A device_id that is no UUID. */
+export const DeviceIdShape = "A device_id is a UUID, such as crypto.randomUUID() makes, kept by the host for this device"
 
 /** An empty user_id. */
 export const UserIdMissing = "A user_id names the signed-in user, so it can't be empty"

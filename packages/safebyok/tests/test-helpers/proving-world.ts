@@ -103,7 +103,7 @@ export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string,
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
 /** The `device_id` a {@link provingWorldOf} world carries. */
-export const DeviceId = 'device_laptop'
+export const DeviceId = '00000000-0000-4000-8000-00000000000a'
 
 /** What a test may say of a {@link provingWorldOf} world: the host's own deriver and checker, which it wraps as a bank does. */
 export type ProvingWorldGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_id?: string | undefined }

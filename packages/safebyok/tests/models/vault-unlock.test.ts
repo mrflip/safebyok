@@ -235,7 +235,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
 
   it("takes up no lease another device cached before the gate changed: a revoked passkey's holder asks for the proof", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
-    const other = makeVaultWorld(demandStored(), { device_id: 'device_2' })
+    const other = makeVaultWorld(demandStored(), { device_id: '00000000-0000-4000-8000-000000000002' })
     const theirs = await other.listing.build(other.demandStored())
     await unlockTyping(theirs, byPasskey('laptop'))
     await revokeTyping(vault, Passphrase)

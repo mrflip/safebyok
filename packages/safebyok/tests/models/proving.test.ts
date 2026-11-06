@@ -488,7 +488,7 @@ const StampCases = [
 ] as const
 
 const HeaderCases = [
-  [{ device_id: 'device_elsewhere' }, 'a header whose device_id was swapped'],
+  [{ device_id: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose device_id was swapped'],
   [{ registered_at: T0 + 1 },         'a header whose registered_at moved'],
 ] as const
 

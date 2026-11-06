@@ -118,7 +118,7 @@ export type VaultWorldGiven = Partial<Omit<FakeBank, keyof ProvingWorldGiven>> &
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: VaultWorldGiven = {}) => {
-  const { onPanic, keyDeriver, strengthChecker, device_id = 'device_1', ...overrides } = worldOverrides
+  const { onPanic, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
@@ -217,7 +217,7 @@ export const vaultRoundTrip = async (sealer: Vault, opener: Vault): Promise<stri
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
 export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
-  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), provingWorldOf({ device_id: 'device_1' }))
+  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), provingWorldOf({ device_id: '00000000-0000-4000-8000-000000000001' }))
   await proving.buildWayin(NOVEL)
   return proving
 }

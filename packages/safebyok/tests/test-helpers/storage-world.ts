@@ -12,8 +12,8 @@ export const Now = Date.UTC(2026, 9, 15)
 
 const ciphered = { cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q' }
 
-export const passphraseWayin = SX.passphraseWayin.parse({ wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA', device_id: 'd1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
-export const passkeyWayin = SX.passkeyWayin.parse({ wayinkind: 'passkey', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), device_id: 'd1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
+export const passphraseWayin = SX.passphraseWayin.parse({ wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA', device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
+export const passkeyWayin = SX.passkeyWayin.parse({ wayinkind: 'passkey', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: Now, vault_key_wayin_wrapped: ciphered })
 
 export const vaultAt = (revision_seq = 0, vault_tok = 'life1'): VaultRecord => SX.vaultRecord.parse({
   ...vaultScope, fmt: SX.VaultFormat, revision_tok: `vrev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', vault_tok,

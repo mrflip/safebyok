@@ -45,7 +45,7 @@ const ctxOf = (purpose: string) => cipherCtx({ test: 'crypto' }, purpose)
 /** A vault's stamp, a box's and a wayin's header, as plain records: what the cipherCtx cases are built of. */
 const vaultStamp = { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vid', registered_at: 1 }
 const boxStamp = { boxlabel: 'anthropic', revision_tok: 'r1', written_at: 2 }
-const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', salt_b64: 'c2FsdA', device_id: 'd1', registered_at: 3 }
+const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', salt_b64: 'c2FsdA', device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: 3 }
 
 describe("cipherCtx", () => {
   // cipherCtx @example 1
