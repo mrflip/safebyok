@@ -1,6 +1,6 @@
 # Thread 18: device_id required, no device record (2026-11-06)
 
-Branch `20261106-deviceid_required`, PR #TBD, stacked on #527. Justify: green (safebyok 1848 tests,
+Branch `20261106-deviceid_required`, PR #532, stacked on #527. Justify: green (safebyok 1848 tests,
 61 files; every package green).
 
 * **Built**: `device_id` is a required field of `bankOpts` (`shapes/shapes-vaultish.ts`), still the
