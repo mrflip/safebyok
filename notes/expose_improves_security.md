@@ -132,7 +132,7 @@ function useAwsForm(box: Box) {
   const whisper = useSyncExternalStore(box.subscribe, () => box.whisper)
   useEffect(() => () => { box.unexpose() }, [box])            // leaving the form drops it
   return {
-    isEditable: ! Box.isFUBag(whisper),
+    isEditable: box.isShowing,                                // box is the Box, read live
     region: whisper.Target?.Region ?? '',
     id:     whisper.Credentials?.AccessKeyId ?? '',
     token:  whisper.Credentials?.SessionToken ?? '',
