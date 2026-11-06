@@ -24,6 +24,7 @@ export const argon2idWasmWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
 
 // hash-wasm refuses an empty password with a plain Error, and a vault never hands one over.
 // The vault keeps nothing of what a deriver throws, so a refusal here is for a host calling `deriveKeyBytes` directly.
+/** 32 key bytes from hash-wasm's Argon2id at `spec`. */
 const deriveWithWasm = async (spec: KeyDeriverSpec, passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array> => {
   checkSaltFits(spec, saltBytes)
   if (typeof WebAssembly === 'undefined') {
