@@ -13,11 +13,12 @@ guarantees are kept* means reading *The guarantees* first and checking the chang
 Last verified against the code 2026-10-27, on `main` after #302, with
 [#305](https://github.com/mrflip/safebyok/pull/305) applied; the access points, G5 and G8 amended
 2026-10-28 for [#316](https://github.com/mrflip/safebyok/pull/316) and the aead_narrow thread.
-Names and paths checked against `main` at 57f33ee9 on 2026-11-06 for
-[#517](https://github.com/mrflip/safebyok/pull/517), the guarantees_pass thread, with G8's WebCrypto sentence
-as [#511](https://github.com/mrflip/safebyok/pull/511) words it: a site the published core (`packages/safebyok`) has
-is cited there, the table's old-core files are cited in `packages/safebyok-old`, private and frozen, and a claim the
-code on `main` no longer bears stands as written and is listed in that PR's open questions.
+Names and paths checked against `main` at 57f33ee9 on 2026-11-06, for
+[#517](https://github.com/mrflip/safebyok/pull/517), the guarantees_pass thread. G8's WebCrypto sentence
+is as [#511](https://github.com/mrflip/safebyok/pull/511) words it. A site the published core
+(`packages/safebyok`) has is cited there. The table's old-core files are cited in `packages/safebyok-old`,
+private and frozen. A claim the code on `main` no longer bears stands as written, and that PR's open
+questions list it.
 
 ## Where the guarantees are kept
 
