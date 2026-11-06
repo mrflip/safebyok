@@ -10,8 +10,8 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, later: thread 1 (#518) filed; thread 2 (#517) reworked, in its second review; thread 3 (#522)
-ready and in review; thread 4 building, stacked on #513 (the Coach: proceed without the merges where possible); threads 5 to 10 wait for PRs #511 and #513 to
+**Status:** 2026-11-06, 04:45: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4 (#523)
+built, in review, stacked on #513; thread 11 (`duck_calibration`, from a Coach note) building from main; threads 5 to 10 wait for PRs #511 and #513 to
 merge, since they rewrite the same shapes and model files (see *Ground rules*).
 
 ## Read first
@@ -51,6 +51,12 @@ merge, since they rewrite the same shapes and model files (see *Ground rules*).
    sees; docs are `--empty`.
 8. **One worktree, one PR, base `main`**, a stacked PR saying "Stacked on #N" (PROCESS.md *Pull requests*). Never run
    justify under `rebase --exec`.
+9. **The Coach's merge line** (from 04:31): `main -> #513 -> #517 -> #521 -> #522 -> #512 -> #518 -> #519 -> #520 -> #511`,
+   written as "Stacked as main -> ..." in each body. A PR in it takes plain pushes on top only: no `file-thread`, no rebase,
+   no force-push. A thread stacked on a line PR files by rebasing onto that PR's current origin tip, not onto main.
+10. **A stale test citation gets its test** (the Coach on F12, 2026-11-06): where a guarantee or doc cites a test the core
+   lacks, write or find the core's test and cite it; only a claim about behaviour the code no longer bears is a finding.
+   Thread 2's "verbatim" rule was overstrong there.
 
 ## Threads
 
@@ -107,6 +113,11 @@ first, then carried here. Minor, to the same worker: the passkey chain's `isSafe
 `passkeyAnswer`); F1 gains `Lease.cipheredWith`, `grantLease`, `DeviceDB.getLease`, `guardStrengthChecker` and the
 *Bytes* IndexedDB bullet; G2's wayin test citation becomes a finding (Open Matters); G1's half-renamed sentence. F10 and F6
 are stronger than stated.
+*Second review (high):* `clean`; G8's route verified at every site and byte-identical to #511's; `refusalOf` has no caller
+(Open Matters: its fate); G8's seal list leaves out `boxListing.create` and `sealStampedString` (widen at the restack);
+open item 2's "the core's `Box`", G1's uncited core comparison, G9's friend sentence and two G8 leftovers go to F1's
+follow-up. **Filed** at 21cb34821; the Coach's line then rebased it onto #513. A commit for G2's core test follows the
+Coach's ruling (ground rule 10).
 
 ### 3. `example_pointers`
 
@@ -125,6 +136,10 @@ label that passes. **Levels:** worker `sonnet`; review `low`. **Depends on:** #5
 tests, five new tests (`capacity` had none), two examples dropped (`FarFuture`, `ForeverMillis`: they read options the
 core lacks; patch changeset), `isVaultError`'s example on `box.extractWhisper()`, and `PasskeyAnswer`'s stale example and
 sentence corrected. Its leftovers went to Cleanup *Finally* as directives for thread 5.
+*Review (low, sonnet):* `fixed`; two fixes (a bulk case's quotes; `PasskeyAnswer`'s body: in `unlock_vault` the passkey is
+taken in place of the passphrase, not beside it); five minor left (an undefined `passkey` in the example; three chained
+test titles; a long one-liner; the react example; #511's stale `VaultError` example, for thread 5). **Filed**: the Coach's
+line took the worker's tip; the two review fixes were cherry-picked on top and plain-pushed, tip 51741eb57.
 
 ### 4. `hello_listed`
 
@@ -137,6 +152,11 @@ a name that says it is not for hosts). Then the second parse goes. The test "ref
 fails its check" goes with the argument, or moves to the vault's hello. Minor changeset: a public signature changed.
 **Levels:** worker `sonnet`; review `low`. **Depends on:** #513 merged; cut stacked on #513's tip instead (the Coach,
 2026-11-06: "Proceed as well you can without it"). **Size:** small.
+
+*Built (PR #523, "Stacked on #513"):* `boxListing.hello()` takes nothing; `vault.hello` hands the boxes over by
+`boxListing._takeListed(listed)`, a public method whose underbar says not for hosts, with the one `eslint-disable-line
+unicorn/prefer-private-class-fields` the `_cheat_` methods carry (reported in the PR); the second parse is gone; the test
+moved to `vault.hello`; minor changeset. The name is an Open Matters row. In review (low).
 
 ### 5. `module_clock`
 
@@ -238,6 +258,19 @@ import in the core, its tests, the README and CUSTOMIZATION.md; the adapters and
 safebyok-old). `RefusalKind` is the public type a host switches over: minor changeset saying the new name. Mechanical,
 and wide, so it runs **last**, cut from the top of the line, where nothing else is rewriting those lines. **Levels:**
 worker `sonnet`; review `low`. **Depends on:** threads 5 to 9 filed, and #511 merged. **Size:** small.
+
+### 11. `duck_calibration`
+
+**The Coach** (a Coach note, 2026-11-06, flipped to proceed): "*Shapes and duck typing* opens with 'Duck typing is the
+design'. It also says a parameter accepts a broader duck where that's harmless. Would you please calibrate that against
+our new handroll vs instance vs inferred decision tree?"
+
+*Gloss:* STYLE.md *Shapes and duck typing* only, rewritten to the strength ground rule 6 and threads 6 to 8 support: a
+duck for in-repo bags, test fakes and structural worlds; a `Pick` of the class for a world; a `Symbol.for` brand for a DB
+across a package boundary and for a host function on its way in; the handrolled interface for host-facing contracts.
+Keeps the examples still true. **Levels:** worker `opus`; review `medium`. **Depends on:** nothing (cut from main at
+374098121). **Look-ahead:** thread 9 reads the recalibrated section before choosing per type; threads 6 to 8 build what it
+describes. **Size:** small.
 
 ## For the Coach
 

@@ -8,13 +8,15 @@ look things up here; they do not read it whole.
 ## State (2026-11-06)
 
 * Thread 1 `vocab_sweep`: filed, PR #518 at e9b58da04 (two reviews; plan, thread 1 *Review*).
-* Thread 2 `guarantees_pass`: PR #517 reviewed `flagged`; a rework worker corrects G8's route sentence in #511 and #517,
-  and lands the Cleanup calls F4, F6, F7, F10.
-* Thread 3 `example_pointers`: ready, PR #522, in review (low).
-* Thread 4 `hello_listed`: building, stacked on #513's tip (18a86b35a).
-* Threads 5 to 10 wait for PRs #511 and #513 to merge, or stack on them: the Coach is reworking the mergify queue
-  (2026-11-06) and said to proceed without the merges where possible. Thread 5 is cut from #511 rebased onto #513's line
-  if they are still unmerged when thread 4 files.
+* Thread 2 `guarantees_pass`: filed, PR #517 (two reviews, the second clean); in the Coach's line; a commit for G2's
+  core test is coming (plan, ground rule 10).
+* Thread 3 `example_pointers`: filed, PR #522 at 51741eb57; in the Coach's line.
+* Thread 4 `hello_listed`: built, PR #523, "Stacked on #513", in review (low).
+* Thread 11 `duck_calibration`: building from main (the Coach's note on STYLE.md *Shapes and duck typing*).
+* **The Coach keeps a merge line** (plan, ground rule 9): #513, #517, #521, #522, #512, #518, #519, #520, #511 in that
+  order. #511 and #513 conflict with each other in `refusals/throwers.ts` and `tests/test-helpers/models-world.ts`; the
+  line resolves that at #511's turn, on top. Thread 5 is cut once #511 and #513 are on main, or from the line's top if the
+  Coach says so.
 
 ## Facts the threads start from
 
