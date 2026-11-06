@@ -45,7 +45,7 @@ Closer Look triage.
   (`tests/vitest-setup.ts`) resets it after every test. **For thread 6:** `VX.world` is an empty strip check and `World`
   is `object` until the worlds are Picks. **For a sweep some time:** `consistent(raw, ...)` reads only own fields, so a
   prototype getter slips past; `buildLease` was the one case found.
-* Thread 21 `kind_docblocks`: built, PR #548 at 88ec97a50 on main, docs only, filing. The bad-news throw sites that do more
+* Thread 21 `kind_docblocks`: filed, PR #548 at 88ec97a50 on main, docs only. The bad-news throw sites that do more
   than try-catch-throw: `unreadableRowOf` (second parse for `newer_format`) and `Lease.#vaultKey` (lock and evict first).
 * Thread 19 `utils_port`: reviewed (`fixed`), PR #534 at 576f347cd on #531, pushed; joins the chain's top. `UX` is the
   namespace for `shapes/shapes-utils.ts` (STYLE.md's table wants the row). `safebyok/utils`: `mash`, `mask(text, opts)`,

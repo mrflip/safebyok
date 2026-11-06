@@ -553,7 +553,7 @@ changeset. **Levels:** worker `sonnet`; review `low`. **Depends on:** nothing un
 `locked_while_asking` out of `declineAtLock`'s doc block, `already_asking` out of VOCABULARY's gating row; `vault_gone` had
 no doc-block site outside `refusals/`. Keep and definitional sites untouched; empty changeset. The bad-news report: two
 throw sites exceed try-catch-throw (`unreadableRowOf`'s second parse to choose `newer_format`; `Lease.#vaultKey`'s lock and
-evict before `damaged_lease`), an Open Matters row. Filing at 88ec97a50.
+evict before `damaged_lease`), an Open Matters row. **Filed** at 88ec97a50, as cut, on main.
 
 ### 22. `kind_tests`
 
