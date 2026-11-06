@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# Queues a stack of pull requests in order. It finds the open, non-draft pull requests against the
+# base (or the numbers given), orders them by what each one's branch stands on, bottom first, and
+# labels each `queue` so Mergify lands them as one merge commit apiece (.mergify.yml, PROCESS.md,
+# *The history we keep*). Reports the stack and labels nothing unless given --apply.
+#
+# The pull requests to take can be given as numbers, or as any text that holds them, such as the
+# stack line of a PR's body pasted whole: every run of digits in it is a number. Their order there
+# does not matter, the script finds the order itself.
+#
+# A stack is one line: each head is an ancestor of the next. Pull requests that are not one line
+# (two branches off main, or one rebased since the one above it was cut) are refused with the pair
+# that breaks it, and nothing is labeled: a higher pull request queued before the one below it
+# lands the lower one's commits under its own merge commit. Restack them first (/restacker).
+# Drafts, a pull request already labeled `queue`, and one whose head is already in the base are
+# left out and named.
+#
+# It is the Coach's: PROCESS.md says an agent never queues a pull request, so an agent never runs
+# it with --apply.
+#
+# Written for the bash macOS ships (3.2) as well as a current one: no associative arrays, no
+# mapfile, and no empty arrays under `set -u`.
+#
+# Environment: GIT_MERGIFY_PAUSE, the seconds to wait between labels so that Mergify sees them in
+# order (default 3).
+#
+# Usage: scripts/git-mergify [--apply] [--base <branch>] [<pr number or text holding them>...]
+# Exits 0 when the stack is reported (or labeled), 1 on a failure, 2 on a bad argument, 3 when the
+# pull requests are not one line.
+set -euo pipefail
+
+usage="Usage: scripts/git-mergify [--apply] [--base <branch>] [<pr number or text holding them>...]"
+label=queue
+
+die() {
+  echo "git-mergify: $*" >&2
+  exit 1
+}
+
+refuseArgs() {
+  echo "git-mergify: $*" >&2
+  echo "$usage" >&2
+  exit 2
+}
+
+apply=no
+base=main
+text=''
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --apply) apply=yes ;;
+    --base)
+      if [[ $# -lt 2 ]]; then refuseArgs "--base needs a branch"; fi
+      base="$2"
+      shift
+      ;;
+    -h | --help) echo "$usage"; exit 0 ;;
+    --*) refuseArgs "no such option: $1" ;;
+    *) text="${text} ${1}" ;;
+  esac
+  shift
+done
+
+# The numbers in whatever text was given, one per line, each once.
+wanted=''
+if [[ -n "${text// /}" ]]; then
+  wanted="$(printf '%s' "$text" | { grep -o '[0-9][0-9]*' || true; } | sort -nu)"
+  if [[ -z "$wanted" ]]; then refuseArgs "no pull request number in:${text}"; fi
+  wanted="${wanted}"$'\n'
+fi
+
+git rev-parse --git-dir > /dev/null 2>&1 || die "not inside a git repository"
+git fetch --quiet origin || die "could not fetch origin"
+git rev-parse --verify --quiet "origin/${base}^{commit}" > /dev/null || die "origin has no branch ${base}"
+
+# Each open pull request against the base as <number> TAB <head sha> TAB <draft> TAB <labels> TAB <title>,
+# the labels as ",a,b," so that a pull request with none leaves no empty field for `read` to swallow.
+rows="$(gh pr list --state open --base "$base" --limit 200 --json number,headRefOid,isDraft,labels,title \
+  --jq '.[] | [.number, .headRefOid, .isDraft, ("," + ([.labels[].name] | join(",")) + ","), .title] | @tsv')" \
+  || die "gh could not list the pull requests"
+
+while IFS= read -r number; do
+  if [[ -z "$number" ]]; then continue; fi
+  printf '%s\n' "$rows" | awk -F '\t' -v n="$number" '$1 == n { found = 1 } END { exit ! found }' \
+    || die "#${number} is not an open pull request against ${base}"
+done <<< "$wanted"
+
+# The candidates, as <commits ahead of the base> TAB <number> TAB <head sha> TAB <title>, and what was left out.
+candidates=''
+skipped=''
+while IFS=$'\t' read -r number sha draft labels title; do
+  if [[ -z "$number" ]]; then continue; fi
+  if [[ -n "$wanted" ]] && ! printf '%s' "$wanted" | grep -qx "$number"; then continue; fi
+  git cat-file -e "${sha}^{commit}" 2> /dev/null || die "#${number}'s head ${sha} is not on origin: fetch failed to bring it"
+  if [[ "$draft" == true ]]; then
+    skipped="${skipped}  #${number} is a draft"$'\n'
+  elif [[ "$labels" == *",${label},"* ]]; then
+    skipped="${skipped}  #${number} is already labeled ${label}"$'\n'
+  elif git merge-base --is-ancestor "$sha" "origin/${base}"; then
+    skipped="${skipped}  #${number}'s head is already in ${base}"$'\n'
+  else
+    ahead="$(git rev-list --count "origin/${base}..${sha}")"
+    candidates="${candidates}${ahead}"$'\t'"${number}"$'\t'"${sha}"$'\t'"${title}"$'\n'
+  fi
+done <<< "$rows"
+
+if [[ -z "$candidates" ]]; then
+  if [[ -n "$skipped" ]]; then printf 'Left out:\n%s' "$skipped"; fi
+  echo "No pull request to queue."
+  exit 0
+fi
+
+stack="$(printf '%s' "$candidates" | sort -n -k1,1 -k2,2)"
+
+# One line: each head is an ancestor of the one above it.
+below_number=''
+below_sha=''
+while IFS=$'\t' read -r ahead number sha title; do
+  if [[ -n "$below_sha" ]] && ! git merge-base --is-ancestor "$below_sha" "$sha"; then
+    echo "git-mergify: not one line: #${below_number} is not under #${number}: its head is not in #${number}'s history." >&2
+    echo "Nothing was labeled. Restack the pull requests (/restacker), or name the ones that stack." >&2
+    exit 3
+  fi
+  below_number="$number"
+  below_sha="$sha"
+done <<< "$stack"
+
+echo "Stack, bottom first:"
+while IFS=$'\t' read -r ahead number sha title; do
+  printf '  #%s  %s\n' "$number" "$(printf '%.70s' "$title")"
+done <<< "$stack"
+if [[ -n "$skipped" ]]; then printf 'Left out:\n%s' "$skipped"; fi
+
+if [[ "$apply" != yes ]]; then
+  echo "Nothing was labeled: --apply labels them ${label}, in that order."
+  exit 0
+fi
+
+pause="${GIT_MERGIFY_PAUSE:-3}"
+first=yes
+while IFS=$'\t' read -r ahead number sha title; do
+  if [[ "$first" != yes ]]; then sleep "$pause"; fi
+  first=no
+  gh pr edit "$number" --add-label "$label" > /dev/null || die "could not label #${number}; those before it are queued"
+  echo "labeled #${number}"
+done <<< "$stack"

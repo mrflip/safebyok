@@ -54,6 +54,7 @@ Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
   draft PR, then merges each PR at its own head, in the order they were queued. It never rebases
   or updates a branch. The Coach queues a stack by labeling its PRs `queue`, bottom first; an
   agent never adds that label. Once a PR is queued, push to it only to fix what the queue refused.
+  `scripts/git-mergify` finds the stack and labels it in order (`--apply` to label; without it, a report).
 * **A PR's page shows the commits between it and its base.** In a stack every PR has base `main`
   (the "Stacked on #N" line carries the order), so it lists the PRs below it until they merge,
   then only its own commits.
