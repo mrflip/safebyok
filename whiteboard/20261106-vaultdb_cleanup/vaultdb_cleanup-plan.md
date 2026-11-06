@@ -332,7 +332,12 @@ should be only slightly larger than what we use now", then chose "32 bytes, both
 65,536 → 32 (`helpers/consts.ts`, the bound on a deriver spec's `salt_bytes`), and the stored
 `salt_b64` checked at no more than 32 bytes (`shapes-core.ts`, today only "not empty"). Today's
 deriver makes 16; the passkey salt is exactly 32 already. A changeset line: a host deriver spec
-asking for more than 32 salt bytes is refused at setup. Touches every adapter package, so it is cut
+asking for more than 32 salt bytes is refused at setup.
+
+Also (2026-11-06): the Coach on the Postgres channel, in chat, "host controls the device_id and is
+responsible for RLS. That should be written down": the Postgres README says the host owns the
+database roles, row-level security and who may LISTEN (the channel's naming is an open row).
+And `e2e/package.json` drops `safebyok-old` once the restacked line leaves no e2e import of it. Touches every adapter package, so it is cut
 from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
 mechanical; `sonnet` worker, `low` review.
 
@@ -397,6 +402,22 @@ built server-side from a fixed list of fields, never a spread of a refusal's met
 crosses; (6) an old client silently drops a newer server's optional field on a read-then-write
 (a sentence at 1.0); (7) `Tidied` is a type of its own, and a drift test checks the core's
 checkers against the schema.
+
+### 9. port_fastkey
+
+> do you have headroom to move safebyok-fastkey too?
+
+(the Coach, 2026-11-06, in chat.)
+
+*Gloss.* `packages/safebyok-fastkey` (87 lines of src: the WASM Argon2id deriver) imports
+`Argon2idWebV1`, `VaultError`, `checkSaltFits`, `parseKeyDeriverSpec` and the deriver types from
+`safebyok-old`, and its tests `safebyok-old/testing`. Move it onto the new core: export what it
+needs from `safebyok` (the deriver files exist in `packages/safebyok/src/deriver/`, unexported;
+exports are free), and from `safebyok/testing` what its tests need. Same bytes out as the core's
+pure-JS deriver, tested. Thread 7's 32-byte salt cap reaches this package through
+`parseKeyDeriverSpec`; it needs no change here. **Depends on:** nothing unmerged: cut from
+`origin/main`, joining the line at the restack (it touches `packages/safebyok/src/index.ts`, which
+#555/#558 may also touch). **Levels:** `sonnet` worker, `low` review. **Size:** S.
 
 ## For the Coach
 
