@@ -291,7 +291,24 @@ any mention of shared banks or a `mayReach` predicate. Two `notes/wontfix.md` en
 refuses a field name starting with `$` or holding non-ASCII at any depth of a record (its docs add
 empty and `_`-leading names, 16 levels of nesting, 1024 entries per object), and the GraphQL
 stream's best-effort stop (re-asked on each notice, so an idle stream stays open until its next
-change, and a `userIdOf` that does not look the session up live gives none). Touches every adapter package, so it is cut
+change, and a `userIdOf` that does not look the session up live gives none).
+
+Two more from the Coach (2026-11-06, the pgClientOf row), verbatim:
+
+> The cap is specified as a best effort limit. Can you ask a haiku to find the places I've written
+> that up recently -- they may look in notes and whiteboard -- and have you put it in relevant
+> places
+
+> Adding a concurrency cap is no light change, can you also add to guidance where it cautions
+> against concurrency that a row lock where one wasn't needed before is also a last resort?
+
+So thread 7 also: says the box cap is best effort wherever the new code states or implies it is
+exact, in the words of the Gallant `maxBoxes` block (`notes/gallant-docblocks.md:463-466`): the
+Postgres, GraphQL, Convex and IndexedDB READMEs, `memory-vault-db.ts:70`, `refusals/errors.ts:46`,
+`graphql-vault-db.ts:31`, and the Postgres doc that gives the vault-row lock an exact cap as its
+reason (its real reason is compare-and-set). And it adds to CLAUDE.md's "Insert no retry logic,
+abort controllers or other whizbangs" sentence (*What the package promises*) that a lock where
+none was needed before is a last resort too. Touches every adapter package, so it is cut
 from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
 mechanical; `sonnet` worker, `low` review.
 
