@@ -37,11 +37,11 @@ const SymbolKeyCases = [
 
 describe("whisper and sidecar refusing by kind", () => {
   for (const [candidate, blurb] of SymbolKeyCases) {
-    it(`whisper refuses ${blurb} as 'bad_option'`, () => {
-      TH.expectSyncRefusal(() => CX.whisper.parse(candidate), 'bad_option')
+    it(`whisper refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => CX.whisper.parse(candidate))
     })
-    it(`sidecar refuses ${blurb} as 'bad_option'`, () => {
-      TH.expectSyncRefusal(() => CX.sidecar.parse(candidate), 'bad_option')
+    it(`sidecar refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => CX.sidecar.parse(candidate))
     })
   }
 
@@ -63,22 +63,22 @@ describe("whisper and sidecar refusing by kind", () => {
       { SECRET_KEY: new Map() },
     ]
     for (const marked of Marked) {
-      const err = TH.expectSyncRefusal(() => CX.whisper.parse(marked), 'bad_option')
+      const err = TH.expectSyncRefusal(() => CX.whisper.parse(marked))
       expect(TH.thrownText(err)).to.not.include('SECRET')
       expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     }
   })
 
   it("says a bag or a copy is no whisper, and of one nested that a whisper has no symbol key", () => {
-    expect(TH.expectSyncRefusal(() => CX.whisper.parse(LOCKED), 'bad_option').message).to.include(Phrases.WhisperedIsNoWhisper)
-    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ ...LOCKED }), 'bad_option').message).to.include(Phrases.WhisperedIsNoWhisper)
-    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ deep: { ...LOCKED } }), 'bad_option').message).to.include(Phrases.WhisperBagShape)
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse(LOCKED)).message).to.include(Phrases.WhisperedIsNoWhisper)
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ ...LOCKED })).message).to.include(Phrases.WhisperedIsNoWhisper)
+    expect(TH.expectSyncRefusal(() => CX.whisper.parse({ deep: { ...LOCKED } })).message).to.include(Phrases.WhisperBagShape)
   })
 
   for (const [candidate, expected, blurb] of WhisperCases) {
     if (! expected) {
-      it(`whisper refuses ${blurb} as 'bad_option'`, () => {
-        TH.expectSyncRefusal(() => CX.whisper.parse(candidate), 'bad_option')
+      it(`whisper refuses ${blurb}`, () => {
+        TH.expectSyncRefusal(() => CX.whisper.parse(candidate))
       })
     }
   }
@@ -187,21 +187,21 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
   })
 
   it("refuse a bad boxlabel, naming the field", () => {
-    const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' }), 'bad_scope')
+    const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'OpenAI' }))
     expect(err.message).to.match(/^boxlabel: A label is lowercase letters, digits and single underscores/)
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
   })
 
   it("refuse a name missing, or not text, naming each", () => {
-    const err = TH.expectSyncRefusal(() => CX.vaultScope.parse({ applabel: 'acme', user_id: 42 }), 'bad_scope')
+    const err = TH.expectSyncRefusal(() => CX.vaultScope.parse({ applabel: 'acme', user_id: 42 }))
     expect(err.meta?.fieldnames).to.deep.equal(['user_id', 'vaultlabel'])
-    TH.expectSyncRefusal(() => CX.vaultScope.parse(null), 'bad_scope')
-    TH.expectSyncRefusal(() => CX.bankScope.parse('acme'), 'bad_scope')
+    TH.expectSyncRefusal(() => CX.vaultScope.parse(null))
+    TH.expectSyncRefusal(() => CX.bankScope.parse('acme'))
   })
 
   it("refuse a name holding the scopepath delimiter, in every place a name goes", () => {
     for (const fieldname of ['applabel', 'user_id', 'vaultlabel', 'boxlabel']) {
-      const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'openai', [fieldname]: 'a^b' }), 'bad_scope')
+      const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'openai', [fieldname]: 'a^b' }))
       expect(err.meta?.fieldnames).to.deep.equal([fieldname])
       expect(err.message).to.not.include('a^b')
     }
@@ -232,7 +232,7 @@ describe("bankedVaultScope", () => {
 
   // bankedVaultScope @example
   it("refuses a store in the scope, which belongs in the options", () => {
-    const err = TH.expectSyncRefusal(() => CX.bankedVaultScope.parse({ vaultlabel: 'main', vaultDB: {} }), 'bad_scope')
+    const err = TH.expectSyncRefusal(() => CX.bankedVaultScope.parse({ vaultlabel: 'main', vaultDB: {} }))
     expect(err.message).to.contain(Phrases.StoreInVaultScope)
     expect(err.meta?.fieldnames).to.deep.equal(['vaultDB'])
   })

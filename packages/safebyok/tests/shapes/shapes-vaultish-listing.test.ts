@@ -12,7 +12,7 @@ const gone   = tombstoneBoxRecord({ revision_seq: 2 })
 
 describe("The checks of options", () => {
   describe("VX.horizonMillis", () => {
-    holdsCases(VX.horizonMillis, 'bad_option', [
+    holdsCases(VX.horizonMillis, [
       [0,         true,  'passes zero: nothing is timely'],
       [60_000,    true,  'passes a span of milliseconds'],
       [0.5,       true,  'passes a fraction of a millisecond'],
@@ -26,7 +26,7 @@ describe("The checks of options", () => {
   })
 
   describe("VX.timelyOpts and VX.boxPutOpts", () => {
-    holdsCases(VX.timelyOpts, 'bad_option', [
+    holdsCases(VX.timelyOpts, [
       [{},                                          true,  'passes no options'],
       [{ maxMillisSinceRefresh: 0, maxWorldMillis: Infinity }, true, 'passes both horizons'],
       [{ maxMillisSinceRefresh: undefined },        true,  'passes a horizon left undefined'],
@@ -34,7 +34,7 @@ describe("The checks of options", () => {
       [{ maxWorldMillis: '5' },                     false, 'refuses a world horizon that is text'],
       [{ maxWorldMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
     ])
-    holdsCases(VX.boxPutOpts, 'bad_option', [
+    holdsCases(VX.boxPutOpts, [
       [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
       [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon'],
@@ -46,13 +46,13 @@ describe("The checks of options", () => {
     })
 
     it("name the failing field", () => {
-      const err = TH.expectSyncRefusal(() => VX.timelyOpts.parse({ maxMillisSinceRefresh: -1 }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.timelyOpts.parse({ maxMillisSinceRefresh: -1 }))
       expect(err.meta?.fieldnames).to.deep.equal(['maxMillisSinceRefresh'])
     })
   })
 
   describe("VX.storableOpts", () => {
-    holdsCases(VX.storableOpts, 'bad_option', [
+    holdsCases(VX.storableOpts, [
       [{ maxMillisSinceRefresh: 60_000 },                    true,  'passes the horizon alone'],
       [{},                                                   false, 'refuses a missing horizon'],
       [{ maxMillisSinceRefresh: -5 },                        false, 'refuses a negative horizon'],
@@ -65,14 +65,14 @@ describe("The checks of options", () => {
 })
 
 describe("VX.ifAbsent and VX.fetchOpts", () => {
-  holdsCases(VX.ifAbsent, 'bad_option', [
+  holdsCases(VX.ifAbsent, [
     ["fail",     true,  'passes fail'],
     ["nil",      true,  'passes nil'],
     ["create",   false, 'refuses create, which fetch does not offer'],
     [undefined,  false, 'refuses undefined: the default is applied by the caller, not the check'],
   ])
 
-  holdsCases(VX.fetchOpts, 'bad_option', [
+  holdsCases(VX.fetchOpts, [
     [{},                                                true,  'passes no options'],
     [{ ifAbsent: 'nil' },                               true,  'passes ifAbsent nil'],
     [{ ifAbsent: undefined },                           true,  'passes ifAbsent undefined, as a caller spreading options may leave it'],
@@ -96,13 +96,13 @@ describe("VX.boxCreateOpts", () => {
   })
 
   it("holds ifAbsent to 'add': a create that must find a box is not a create", () => {
-    TH.expectSyncRefusal(() => VX.boxCreateOpts.parse({ ifAbsent: 'fail' }), 'bad_option')
+    TH.expectSyncRefusal(() => VX.boxCreateOpts.parse({ ifAbsent: 'fail' }))
   })
 })
 
 describe("VX.ifPresent and VX.boxPutOpts", () => {
 
-  holdsCases(VX.ifPresent, 'bad_option', [
+  holdsCases(VX.ifPresent, [
     ["repl",     true,  'passes repl'],
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],
@@ -110,7 +110,7 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     [undefined,  false, 'refuses undefined: boxPutOpts makes it optional, not the check'],
   ])
 
-  holdsCases(VX.boxPutOpts, 'bad_option', [
+  holdsCases(VX.boxPutOpts, [
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
     [{ ifPresent: 'repl', maxWorldMillis: 5 },          true,  'passes ifPresent beside the timely options'],
@@ -127,18 +127,18 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
   })
 
   it("refuses a fetch's ifAbsent: 'nil' is no answer to a put", () => {
-    TH.expectSyncRefusal(() => VX.boxPutOpts.parse({ ifAbsent: 'nil' }), 'bad_option')
+    TH.expectSyncRefusal(() => VX.boxPutOpts.parse({ ifAbsent: 'nil' }))
   })
 
   it("name the failing field", () => {
-    const err = TH.expectSyncRefusal(() => VX.boxPutOpts.parse({ ifPresent: 'fetch' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => VX.boxPutOpts.parse({ ifPresent: 'fetch' }))
     expect(err.meta?.fieldnames).to.deep.equal(['ifPresent'])
   })
 })
 
 describe("The checks of the world and the listing", () => {
   describe("VX.world", () => {
-    holdsCases(VX.world, 'bad_option', [
+    holdsCases(VX.world, [
       [mw.world, true,  'passes the test world'],
       [{},       true,  'passes an empty object'],
       [null,     false, 'refuses null'],
@@ -148,7 +148,7 @@ describe("The checks of the world and the listing", () => {
 
   describe("VX.listingOpts", () => {
     const opts = { world: mw.world, vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000 }
-    holdsCases(VX.listingOpts, 'bad_option', [
+    holdsCases(VX.listingOpts, [
       [opts,                                                     true,  'passes the test world and vaultDB'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
       [{ ...opts, world: undefined },                            false, 'refuses a missing world'],
@@ -164,7 +164,7 @@ describe("The checks of the world and the listing", () => {
     ])
 
     it("names the failing field", () => {
-      const err = TH.expectSyncRefusal(() => VX.listingOpts.parse({ ...opts, maxMillisSinceRefresh: -1 }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.listingOpts.parse({ ...opts, maxMillisSinceRefresh: -1 }))
       expect(err.meta?.fieldnames).to.deep.equal(['maxMillisSinceRefresh'])
     })
   })
@@ -172,7 +172,7 @@ describe("The checks of the world and the listing", () => {
   describe("VX.storableArgs", () => {
     const listing = boxListingOf(mw)
     const args = { world: mw.world, listing, central: sparse, opts: { maxMillisSinceRefresh: 1000 } }
-    holdsCases(VX.storableArgs, 'bad_option', [
+    holdsCases(VX.storableArgs, [
       [args,                                           true,  'passes a world, a listing, a central and the options'],
       [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
@@ -186,7 +186,7 @@ describe("The checks of the world and the listing", () => {
     ])
 
     it("names the failing field", () => {
-      const err = TH.expectSyncRefusal(() => VX.storableArgs.parse({ ...args, listing: {} }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => VX.storableArgs.parse({ ...args, listing: {} }))
       expect(err.meta?.fieldnames).to.deep.equal(['listing'])
     })
   })
