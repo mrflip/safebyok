@@ -10,7 +10,7 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 16:15, **holding for a restack** (the stack 6 to 9 and #516 are dirty against main since #548 and #549 merged; the Coach runs `/restacker`): threads 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550)
+**Status:** 2026-11-06, 19:05, **thread 10 in review** (the Coach restacked 6 to 9 and merged 6 to 8; #557 clean on main; thread 10 cut from its tip, PR #564): threads 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550)
 -> 7 (#552) -> 8 (#553) -> 9 (#557) is filed and merging. Thread 10 (`kindvals_smush`, a repo-wide rename of the kind
 names) is the last of the plan and waits until #557 and the vaultdb_cleanup sprint's #555 (which rewrites the refusal and
 storage files) are both on main, then is cut from main. Open: #516 (this PR), the Closer Look triage, two Open Matters
@@ -411,6 +411,15 @@ worker `sonnet`; review `low`. **Depends on:** threads 5 to 9 filed, and #511 me
 from #557's tip: #555 rewrites `errors.ts`, `throwers.ts`, `phrases.ts`, `shapes-storage.ts` and the vaultDB tests, the
 files a rename of `RefusalKind` touches most. Rides along: export `DefaultLogger` and `DefaultStrengthChecker` if the Coach
 says so (Open Matters).*
+*Orchestrator (19:05):* the Coach had the stack 6 to 9 restacked onto main and merged #550, #552, #553; thread 10 was cut
+from #557's restacked tip (2d53fd2f2) on the Coach's word, not from main, with #555 still open: in #555's files only the
+renamed lines change.
+
+*Built (PR #564, stacked on #557):* `Refusalkind`, `refusalkindVals`, `wayinkindVals`, `gatingkindVals`,
+`correctablekindVals`, `Wayinkind`, `Gatingkind`; a sed over the core's src and tests (88 lines, 20 files) and STYLE.md's
+example of the pattern, no alias; `Refusalkind` the only public one (minor changeset). The README and CUSTOMIZATION.md had
+no hits. Left as phrases, not tags: `RefusalFamilyForKind`, `listedKindOf`, `namedKinds`, `familyKinds`, `WrongKindCases`,
+`asKind`, `QuotedKind` (Open Matters). `notes/gallant-test_titles.md` and `notes/old_vocabulary.md` keep the old names.
 
 ### 11. `duck_calibration`
 

@@ -5,7 +5,7 @@ look things up here; they do not read it whole.
 
 **Sprint doc:** https://claude.ai/artifact/DB1KsEoW5VKU99LDZTS3uk (tabs: Open Matters, Cleanup, Progress, Resolved). **Sprint PR:** #516.
 
-## State (2026-11-06, 16:15: holding for a restack of #550, #552, #553, #557, #516 onto main, then the merges of #557 and #555)
+## State (2026-11-06, 19:05: threads 6 to 8 merged after the Coach's restack, #557 clean on main, thread 10 built on its tip as PR #564 and in review; the wrap-up follows)
 
 Twenty-two threads planned; 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550) -> 7 (#552) -> 8 (#553) -> 9 (#557)
 filed, merging. Thread 10 (`kindvals_smush`) holds until #557 and the other sprint's #555 are on main, then is cut from
