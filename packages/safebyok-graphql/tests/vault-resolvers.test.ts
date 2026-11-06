@@ -1,11 +1,12 @@
 /** vaultResolvers and VaultSchemaSdl: who reaches which bank, and what a refusal carries over the wire. */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildSchema, graphql, isObjectType, parse, subscribe, validate } from 'graphql'
 import type { ExecutionResult, GraphQLSchema } from 'graphql'
 import { makeExecutableSchema } from '@graphql-tools/schema'
 import * as SX from 'safebyok/storage'
 import { PostgresVaultDB } from 'safebyok-postgres'
+import type { PostgresListen } from 'safebyok-postgres'
 import { VaultOperations } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 import * as TH from './test-helpers'
@@ -17,6 +18,24 @@ const unreachable = () => new PostgresVaultDB({ client: {
   query:       () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
   transaction: () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
 } })
+
+/** A server whose watches are counted while they listen, and a session whose user_id a test may revoke. */
+const watchedServer = async () => {
+  const listening = new Set<unknown>()
+  const listen: PostgresListen = async (channel, onNotify) => {
+    const unlisten = await TH.listen(channel, onNotify)
+    listening.add(onNotify)
+    return () => {
+      listening.delete(onNotify)
+      return unlisten()
+    }
+  }
+  const session: TH.TestContext = { user_id: 'u1' }
+  const schema = TH.schemaOver(await TH.serverOver({ listen }))
+  const heard = await subscribe({ schema, document: parse(VaultOperations.heard), variableValues: TH.bankScope, contextValue: session })
+  if (! ('next' in heard)) { throw new Error(`Expected a subscription, got ${JSON.stringify(heard)}`) }
+  return { listening, session, heard, browser: TH.browserOver(schema, TH.signedInAs('u1')) }
+}
 
 /** `source` run against `schema` as the server runs it, signed in as u1. */
 const served = async (schema: GraphQLSchema, source: string, variableValues: Record<string, unknown>): Promise<ExecutionResult> => (
@@ -70,6 +89,44 @@ describe("vaultResolvers", () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const heard = await subscribe({ schema, document: parse(VaultOperations.heard), variableValues: TH.bankScope, contextValue: { user_id: 'u2' } })
     expect(heard).to.have.nested.property('errors[0].extensions.kind', 'identity_revoked')
+  })
+
+  it("hears on while the session that subscribed stays signed in as its user", async () => {
+    await TH.emptyTables()
+    const { listening, heard, browser } = await watchedServer()
+    await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    expect(await heard.next()).to.have.property('done', false)
+    await browser.putBox(TH.boxAt(), { prior: SX.VoidRevision })
+    expect(await heard.next()).to.have.property('done', false)
+    expect(listening.size).to.eq(1)
+    await heard.return(undefined)
+    await vi.waitFor(() => { expect(listening.size).to.eq(0) })
+  })
+
+  it("ends a subscription, and stops its watch, once its session is signed out or in as another user", async () => {
+    for (const revoked of ['u2', null]) {
+      await TH.emptyTables()
+      const { listening, session, heard, browser } = await watchedServer()
+      await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+      expect(await heard.next()).to.have.property('done', false)
+      session.user_id = revoked
+      await browser.putBox(TH.boxAt(), { prior: SX.VoidRevision })
+      expect(await heard.next()).to.deep.eq({ done: true, value: undefined })
+      await vi.waitFor(() => { expect(listening.size).to.eq(0) })
+      await heard.return(undefined)
+    }
+  })
+
+  it("ends a subscription, and stops its watch, once its userIdOf throws, sending nothing of what it said", async () => {
+    await TH.emptyTables()
+    const { listening, session, heard, browser } = await watchedServer()
+    Object.defineProperty(session, 'user_id', { get: () => { throw new Error('session store s3cr3t-host is down') } })
+    await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    let ended: unknown = null
+    try { await heard.next() } catch (err) { ended = err }
+    expect(ended).to.have.nested.property('extensions.kind', 'unexpected_error')
+    expect(JSON.stringify(ended)).not.to.include('s3cr3t')
+    await vi.waitFor(() => { expect(listening.size).to.eq(0) })
   })
 
   it("sends a refusal's kind and message, never what the store's driver said", async () => {
