@@ -298,7 +298,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async hello(): Promise<this> {
     const listed = await this.listing.fetchListed(this)
     this.demandEnabled()
-    await this.boxListing.hello(listed)
+    await this.boxListing.hello()
+    await this.boxListing._takeListed(listed)
     return this
   }
 
