@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) built, in review; thread 15 (`list_boxes`, the Coach's "go ahead B") building on #523; the Closer Look
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) built, in review; thread 15 (`list_boxes`, the Coach's "go ahead B") building on #523; thread 16 (`utils_mash`) building on #518; the Closer Look
 tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
@@ -373,6 +373,16 @@ gone, `fetchListed`/`vaultRowOf`/`VX.boxesListed` gone; `takeWorld` stays on Vau
 package-bug thrower, no forward, no fate logic; VOCABULARY's `getVault` row in its own commit (it meets #518); minor
 changeset. **Levels:** worker `opus`; review `high`. **Depends on:** #523 (stacked). **Look-ahead:** thread 6 keeps
 `takeWorld` on the `BoxWorld` Pick; thread 8 brands the VaultDB. **Size:** one context.
+
+### 16. `utils_mash`
+
+**The Coach** (2026-11-06): "Yes, we're already dispensing similar kindnesses in safebyok/utils, call it `mash`."
+
+*Gloss:* the old core has `safebyok/utils` (`mask`, the b64 codec, `WhisperFieldAttributes`); the new core gets its
+`./utils` entry with `mash(text): Promise<string>`, SHA-256 of the text as lowercase hex, checked at entry, tested; the
+package.json export, the build entry and a size-budget line; VOCABULARY's deviceId snippet becomes
+`user_id: await mash(email)` and a **mash** row is added. Minor changeset. **Levels:** worker `sonnet`; review `low`.
+**Depends on:** #518 (stacked, in the Coach's line; plain pushes only). **Size:** small.
 
 ## For the Coach
 
