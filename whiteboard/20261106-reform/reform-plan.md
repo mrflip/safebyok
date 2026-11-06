@@ -10,7 +10,7 @@ RefusalkindVals, etc.").
 **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; style pass on
 `style-reviewer`'s pin. **Threads at once:** 3.
 
-**Status:** 2026-11-06, 19:05, **thread 10 in review** (the Coach restacked 6 to 9 and merged 6 to 8; #557 clean on main; thread 10 cut from its tip, PR #564): threads 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550)
+**Status:** 2026-11-06, 19:30, **wrapping up**: every thread merged or filed; the line is main → #557 → #564 → #516; was: threads 1 to 5 and 11 to 22 merged or filed; the stack 6 (#550)
 -> 7 (#552) -> 8 (#553) -> 9 (#557) is filed and merging. Thread 10 (`kindvals_smush`, a repo-wide rename of the kind
 names) is the last of the plan and waits until #557 and the vaultdb_cleanup sprint's #555 (which rewrites the refusal and
 storage files) are both on main, then is cut from main. Open: #516 (this PR), the Closer Look triage, two Open Matters
@@ -420,6 +420,8 @@ renamed lines change.
 example of the pattern, no alias; `Refusalkind` the only public one (minor changeset). The README and CUSTOMIZATION.md had
 no hits. Left as phrases, not tags: `RefusalFamilyForKind`, `listedKindOf`, `namedKinds`, `familyKinds`, `WrongKindCases`,
 `asKind`, `QuotedKind` (Open Matters). `notes/gallant-test_titles.md` and `notes/old_vocabulary.md` keep the old names.
+*Review (low, sonnet):* `clean`; nothing fixed, nothing left but a note that `KindT`, a type parameter, is not a tag.
+**Filed** at b061767dc on #557's tip 2d53fd2f2, by a plain push; the line is main → #557 → #564 → #516.
 
 ### 11. `duck_calibration`
 
