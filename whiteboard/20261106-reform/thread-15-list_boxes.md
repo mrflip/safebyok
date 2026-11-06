@@ -43,6 +43,15 @@ The design is the Coach's Recommendation B in the sprint's `listing-responsibili
     check `getBox` refusing `vault_gone`: that call now answers `disabled`, because the tombstone world received during
     hello vacates the box listing hello built, and the `boxListing` getter hands back the vacated one. A box verb's
     `vault_gone` already ended that way; hello now reaches it too. This is an open matter, not fixed here (no growth).
+* **Fate and deliver, per method** (the Coach's ground rule: in these methods, deletions and renames only):
+  * `Vault.takeWorld`: the `const row` line and the `vault_tok` branch are deleted. What is left is the existing
+    `receive` of the parsed row, on one line.
+  * `Listing.deliver`, `BoxListing.deliver` (there is none), `buildOrReceive`, `fateOver`, `handleIfAbsent` and
+    `Storable.reconcileCentral`: untouched. `listing.ts` and `storable.ts` are not in the diff.
+  * `BoxListing.list()` is a new method, not one of these. It replaces `_takeListed` and the call
+    `VaultListing.fetchListed` made. It holds two branches: `answer.world !== null` (a refusal such as
+    `storage_unavailable` carries no world) and `! answer.ok`, the same refusal tail as `VaultListing.list()`. It does
+    not call `deliver`, because `deliver` builds one record and `listBoxes` answers a list.
 * **Net lines per file** (`git diff --numstat e05c25d7d`):
 
   | File | + | - | net |
