@@ -6,14 +6,14 @@
 
 const deviceMillis = (): number => Date.now()
 
-const reading: { millis: () => number } = { millis: deviceMillis }
+const clock: { millis: () => number } = { millis: deviceMillis }
 
 /** The time now, in epoch milliseconds, by the device's clock. */
-export const nowMillis = (): number => reading.millis()
+export const nowMillis = (): number => clock.millis()
 
 /** For tests only: {@link nowMillis} answers what `fn` answers until {@link _cheat_clockReset}. */
-export const _cheat_clock = (fn: () => number): void => { reading.millis = fn }
+export const _cheat_clock = (fn: () => number): void => { clock.millis = fn }
 
 /** For tests only: {@link nowMillis} reads the device's clock again. */
-export const _cheat_clockReset = (): void => { reading.millis = deviceMillis }
+export const _cheat_clockReset = (): void => { clock.millis = deviceMillis }
 // --
