@@ -52,14 +52,14 @@ export const scopeOf = (user_id: string, vaultlabel = 'main'): VaultScope => ({ 
 
 /**
  * A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
- * never decrypt. It wraps the vault's first vaultKey, and was sealed by `device-one`.
+ * never decrypt. It wraps the vault's first vaultKey, and was sealed by `device_one`.
  */
 export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
   wayinkind:               'passphrase',
   key_deriver_label:       'test_digest_v0',
   // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
   salt_b64:                CX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
-  device_id:               'device-one',
+  device_id:               'device_one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
   ...overrides,

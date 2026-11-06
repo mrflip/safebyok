@@ -121,7 +121,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     logger:       quietLogger,
     keyDeriver:   testDeriver,
     strengthChecker: anyStrengthChecker,
-    device_id:    'device-1',
+    device_id:    'device_1',
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
