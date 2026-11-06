@@ -48,8 +48,11 @@ monstrous complexity of fateOver, which is overpromising and tripping on its own
 please. The crossing here is microscopic in practice, and the thinking pattern described here has led to catastrophe
 before. A world with a different vault tok should never reach BoxListing, because it is embedded in every request."
 And, on `takeWorld`: "should this method be on boxListing; would that help with the other life problem?" Answered: no;
-`takeWorld` stays on Vault, parses and receives the row, and a mismatched `vault_tok` is a package bug, since the vaultDB
-refuses a mismatched tok on every box verb. The rebirth paragraph below is struck accordingly; thread 15 builds the rest.
+`takeWorld` stays on Vault, parses and receives the row, and its `vault_tok` branch goes: the vaultDB refuses a mismatched
+tok on every box verb, and, the Coach: "If it did reach BoxListing, it would be after BoxListing had been disabled and the
+vault it's attached to removed." Also: "There is no respect in which it's acceptable for any part of the code to get more
+complex while performing this refactor, so please halt if it appears so."
+ The rebirth paragraph below is struck accordingly; thread 15 builds the rest.
 
 ## Recommendation: B
 
@@ -70,7 +73,7 @@ box listing, because `listBoxes` carries the `vault_tok` and the vaultDB answers
   `getVault`. `fetchListed`, `vaultRowOf` and `NothingListed` go (`vault-listing.ts:88-96, 203-210`). `boxListingOf` stays.
 - **Vault.** `hello()` calls `boxListing.hello()` (the watch first, so no notice falls between) then `boxListing.list()`.
   A refresh stays `fetch`/`hydrate`/`ensureTimely` → `getVault`. `takeWorld` remains the one place a box answer updates
-  the vault; it parses and receives, and a mismatched `vault_tok` is a package bug (no forward).
+  the vault; it parses and receives; its `vault_tok` branch goes (no forward, no thrower).
 - **BoxListing.** `list()` calls `listBoxes`; `deliver` hands `world` to `vault.takeWorld` before any box is built, sets
   `damaged_records` aside, vacates held boxes now damaged, builds each sparse box. `hello()` is the base class's watch.
   `get`, `fetch`, `put`, `del`, `create`, `puttable` unchanged. `_takeListed` goes.

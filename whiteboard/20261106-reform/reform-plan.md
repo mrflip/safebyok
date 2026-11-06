@@ -369,8 +369,10 @@ vault tok should never reach BoxListing, because it is embedded in every request
 *Gloss:* `listing-responsibilities.md`'s B with the two amendments: `listBoxes(vaultScope + vault_tok)` answers
 `{ boxes, damaged_records }` with the vault row as `world`, refusing `vault_mismatch` by `checkedVaultLife` as the box
 verbs do; `getVault` the row alone; `getBank` to `listVaults`; `VaultListing.list()`, `BoxListing.list()`, `_takeListed`
-gone, `fetchListed`/`vaultRowOf`/`VX.boxesListed` gone; `takeWorld` stays on Vault, parses and receives, a mismatched tok a
-package-bug thrower, no forward, no fate logic; VOCABULARY's `getVault` row in its own commit (it meets #518); minor
+gone, `fetchListed`/`vaultRowOf`/`VX.boxesListed` gone; `takeWorld` stays on Vault, parses and receives, its `vault_tok` branch
+deleted (the Coach: a mismatched world "would be after BoxListing had been disabled"), no thrower, no forward, no fate
+logic; the Coach: "There is no respect in which it's acceptable for any part of the code to get more complex while
+performing this refactor, so please halt if it appears so"; VOCABULARY's `getVault` row in its own commit (it meets #518); minor
 changeset. **Levels:** worker `opus`; review `high`. **Depends on:** #523 (stacked). **Look-ahead:** thread 6 keeps
 `takeWorld` on the `BoxWorld` Pick; thread 8 brands the VaultDB. **Size:** one context.
 
