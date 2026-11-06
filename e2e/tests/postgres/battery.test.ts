@@ -1,45 +1,48 @@
 // @vitest-environment node
-// The VaultDB battery and its races, run over a real Postgres through `pg`: the same
-// `describeVaultDB` that `packages/safebyok-postgres/tests/postgres-vault-db.test.ts` runs over a
-// PGlite, which runs one statement at a time. Here each device has a pool of its own, so the
-// statements the races hold and release run on separate connections, at once.
-import { describe, it } from 'vitest'
-import type { VaultDBOpts } from 'safebyok-old'
-import * as TH from './test-helpers'
+/** The VaultDB battery over a real Postgres through `pg`, each store a pool and a listener of its own, and its watch heard across servers. */
 
-const getDb = TH.useFileDatabase()
+import { expect, it, onTestFinished, vi } from 'vitest'
+import * as SX from 'safebyok/storage'
+import type { Notice } from 'safebyok/storage'
+import * as TH from 'safebyok/testing'
+import type { PostgresVaultDB } from 'safebyok-postgres'
+import * as PX from './test-helpers'
 
-/** A fresh, emptied database, and the postgresVaultDB a request signed in as `user_id` gets over it: one pool, one listener, as a server has. */
-const freshServer = async (vaultDBOpts: VaultDBOpts = {}) => {
-  const db = getDb()
-  await db.endDevices()
-  await db.empty()
-  return TH.deviceOver(db, undefined, { vaultDBOpts })
+const getDb = PX.useFileDatabase()
+
+const optsOf = new WeakMap<PostgresVaultDB, PX.StoreOpts>()
+
+const remembered = (vaultDB: PostgresVaultDB, opts: PX.StoreOpts): PostgresVaultDB => {
+  optsOf.set(vaultDB, opts)
+  return vaultDB
 }
 
-TH.describeOnPostgres('battery', "postgresVaultDB over a real Postgres", () => {
-  TH.describeVaultDB('postgresVaultDB over a real Postgres', async (vaultDBOpts) => {
-    const vaultDBFor = await freshServer(vaultDBOpts)
-    return TH.perUser((user_id) => vaultDBFor(user_id))
-  }, {
-    makeCappedVaultDB:     async (maxBoxes) => {
-      const db = getDb()
-      await db.endDevices()
-      await db.empty()
-      const vaultDBFor = TH.deviceOver(db, undefined, { maxBoxes })
-      return TH.perUser((user_id) => vaultDBFor(user_id))
-    },
-    makeVaultDBFor: async () => {
-      const vaultDBFor = await freshServer()
-      return (user_id) => vaultDBFor(user_id)
-    },
-    pushes:      true,
-    makeDevices: TH.devicesOver(getDb),
+const watching = (vaultDB: PostgresVaultDB): Notice[] => {
+  const notices: Notice[] = []
+  const unwatch = vaultDB.watch(TH.vaultScope, (notice) => { notices.push(notice) })
+  onTestFinished(unwatch)
+  return notices
+}
+
+PX.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
+  TH.describeVaultDBBattery("PostgresVaultDB", {
+    makeVaultDB:       async (opts = {}) => remembered(await PX.freshStore(getDb(), opts), opts),
+    makeCappedVaultDB: async (maxBoxes) => remembered(await PX.freshStore(getDb(), { maxBoxes }), { maxBoxes }),
+    makeTwin:          async (vaultDB) => await PX.storeOver(getDb(), optsOf.get(vaultDB)),
+    _cheat_rowsOf:     () => PX.rowsOf(getDb()),
   })
 
-  describe("postgresVaultDB's devices over a real Postgres, for the battery's races", () => {
-    it("send every write's statement through the race's turnstile", async () => {
-      await TH.expectRoundTripsThroughTurnstile(TH.devicesOver(getDb))
-    })
+  it("hears what another server stores, a box too large for a notice included", async () => {
+    const db = getDb()
+    const notices = watching(await PX.freshStore(db))
+    const other = await PX.storeOver(db)
+    const vault = TH.vaultAt()
+    const box = TH.boxAt(0, 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
+
+    await other.putVault(vault, { prior: SX.VoidRevision })
+    await other.putBox(box, { prior: SX.VoidRevision })
+
+    await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
+    expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
   })
 })
