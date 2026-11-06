@@ -75,6 +75,7 @@ const OperationOrder = ['veil', 'unveil', 'unexpose', 'expose', 'lock', 'unlock'
 
 const expectShows = (box: TestableBox, shown: keyof typeof Shows): void => {
   if (shown === 'value') { expect(box.whisper).to.deep.equal(Exposed) } else { expect(box.whisper).to.eq(Shows[shown]) }
+  expect(box.isShowing).to.eq(shown === 'value')
 }
 
 describe("box.whisper, state by operation (the Coach, 2026-11-05)", () => {
