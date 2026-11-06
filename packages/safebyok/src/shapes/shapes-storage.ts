@@ -5,7 +5,7 @@ import { Checker, Checkers, objCheck } from '../helpers/validator'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
-import { sidecar } from './shapes-core'
+import { type Boxscope, type VaultScope, sidecar } from './shapes-core'
 
 // == [Sentinels and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
 
@@ -49,22 +49,16 @@ export type Revision = Readonly<Z.infer<typeof revision>>
 export type Times    = Readonly<Z.infer<typeof times>>
 // --
 
-// == [Scopes]: bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope, BankScope, VaultScope, VaultQuery, Boxscope, BoxQuery, WatchScope
+// == [Scopes]: vaultQuery, boxQuery, watchScope, VaultQuery, BoxQuery, WatchScope
 
-export const { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope } = Checkers('bad_option', ({ obj, applabel, user_id, vaultlabel, boxlabel, vault_tok }) => {
-  const bankScope  = obj({ applabel, user_id })
-  const vaultScope = bankScope.extend({ vaultlabel })
-  const vaultQuery = vaultScope.extend({ vault_tok })
-  const boxscope   = vaultScope.extend({ boxlabel })
-  const boxQuery   = boxscope.extend({ vault_tok })
-  const watchScope = bankScope.extend({ vaultlabel: vaultlabel.optional() })
-  return { bankScope, vaultScope, vaultQuery, boxscope, boxQuery, watchScope }
-}, [CX])
+// A scope's validator is CX's, frozen; `unwrap()` is its object, to extend.
+export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_option', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
+  vaultQuery: vaultScope.unwrap().extend({ vault_tok }),
+  boxQuery:   boxscope.unwrap().extend({ vault_tok }),
+  watchScope: bankScope.unwrap().extend({ vaultlabel: vaultlabel.optional() }),
+}), [CX])
 
-export type BankScope  = Readonly<Z.infer<typeof bankScope>>
-export type VaultScope = Readonly<Z.infer<typeof vaultScope>>
 export type VaultQuery = Readonly<Z.infer<typeof vaultQuery>>
-export type Boxscope   = Readonly<Z.infer<typeof boxscope>>
 export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
 export type WatchScope = Readonly<Z.input<typeof watchScope>>
 // --
@@ -84,7 +78,7 @@ export type Gate = Readonly<Z.infer<typeof gate>>
 // == [Vault forms]: vaultSparse, vaultRecord, vaultTombstone, vaultRow, VaultSparse, VaultRecord, VaultTombstone, VaultRow, DamagedVault
 
 export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_option', ({ lit, discrim }) => {
-  const vaultSparse    = vaultScope.extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
+  const vaultSparse    = CX.vaultScope.unwrap().extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
   const vaultRecord    = vaultSparse.extend({ am: lit('a'), gate }).strict()
   const vaultTombstone = vaultSparse.extend({ am: lit('x') }).strict()
   const vaultRow       = discrim('am', [vaultRecord, vaultTombstone])
@@ -101,7 +95,7 @@ export type DamagedVault   = VaultSparse & Readonly<{ damagekind: EX.Damagekind 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
 export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
-  const boxSparse = boxscope.extend({
+  const boxSparse = CX.boxscope.unwrap().extend({
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
     /** The life of the box under its boxlabel: minted at its birth, and kept by every later revision. */
