@@ -102,7 +102,8 @@ const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWor
 
 // == [The battery]: describeVaultDBBattery
 
-/** Registers the cases every VaultDB must pass, under `label`; refuses, registering none, opts that lack a hook it needs. */
+// The opts are checked before anything registers, so a store missing a hook fails here, not inside each case.
+/** Registers the cases every VaultDB must pass, under `label`. */
 export const describeVaultDBBattery = <DBT extends VaultDB>(label: string, opts: VaultDBBatteryOpts<DBT>): void => {
   batteryOpts.parse(opts, { where: `describeVaultDBBattery("${label}")` })
   const world = worldOf(opts)
