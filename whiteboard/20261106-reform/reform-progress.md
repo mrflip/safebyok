@@ -40,7 +40,8 @@ triage, the kind_promises follow-on threads, the deviceId privacy line, the rebo
   `device_id` required-or-minted is an open question (the Coach recalls removing the mint; main still mints and caches).
 * Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
   `d` + 32 hex.
-* Thread 19 `utils_port`: built, PR #534 at 70203bd9f on #531, in review. `safebyok/utils`: `mash`, `mask(text, opts)`,
+* Thread 19 `utils_port`: reviewed (`fixed`), PR #534 at 576f347cd on #531, pushed; joins the chain's top. `UX` is the
+  namespace for `shapes/shapes-utils.ts` (STYLE.md's table wants the row). `safebyok/utils`: `mash`, `mask(text, opts)`,
   `MaskOpts`, `fromB64`/`toB64` (crypto.ts's codec), `WhisperFieldAttributes`; `shapes/shapes-utils.ts` is a seventh shapes
   module (thread 8's `ShapeModules` directory check will catch it). The entry now reaches `helpers/crypto.ts`, so
   `refusals/throwers` and `stable-jsonify` ride along; none of the vault.

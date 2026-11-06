@@ -471,7 +471,12 @@ on:** #531 (stacked). **Size:** small.
 `shapes/shapes-utils.ts`; the old tests under `tests/helpers/` path for path, the entry cases in `tests/utils.test.ts`;
 the **mask** row back in VOCABULARY; minor changeset. Deviations: `mask(text, ...)` not `whisper` (a whisper is an object);
 a non-string refuses `bad_option` (no `bad_whisper` in the core). `.size-limit.json`'s `mask` entry still measures
-safebyok-old (Cleanup). In review (`sonnet`, medium).
+safebyok-old (Cleanup). Reviewed.
+*Review (medium, sonnet):* `fixed`; parity with the old `mask` on every old case; four fixes (the shapes-utils reason back
+to a `//`; `WhisperFieldAttributes` really frozen; `UX.maskOpts` via a star import; `ii`). Left, minor: the `mask` size
+budget still measures safebyok-old (Cleanup); the entry's graph now holds `throwers`, `phrases` and `stable-jsonify`
+through the codec; `bad_option` for a non-string text is the catalog's matter; STYLE.md's namespace table wants a `UX`
+row (a two-liner on #534); doc blocks for the documentarian. Tip 576f347cd, pushed; joins the chain's top after #516.
 
 ### 20. `kind_promises`
 
