@@ -84,6 +84,7 @@ describe("parseLogger", () => {
     expect(() => { taken.error('x') }).to.not.throw()
   })
 
+  // VaultLogger @example 2
   it("takes the console itself", () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
     parseLogger(console).error('the adapter is broken')
