@@ -11,7 +11,7 @@ RefusalkindVals, etc.").
 `style-reviewer`'s pin. **Threads at once:** 3.
 
 **Status:** 2026-11-06, 05:15, **paused**: threads 1 (#518), 2 (#517) and 3 (#522) filed and in the Coach's merge line; thread 4
-(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; threads 18 (`deviceid_required`, on #527), 19 (`utils_port`, on #531) and 20 (`kind_promises`, on #531) building; #528 amended (adf4ea68b) with the guarded files; thread 18 (#532, `deviceid_required`) built, in review; the Closer Look
+(#523) filed on #513's tip; thread 11 (#525) filed on main; thread 12 (#526) and 14 (#527) filed on main; thread 13 (#528) filed on main; thread 15 (#530, `list_boxes`) filed on #523; thread 16 (#529, `utils_mash`) filed on #518; thread 17 (#531, `browser_entry`) filed on #529; threads 18 (`deviceid_required`, on #527), 19 (`utils_port`, on #531) and 20 (`kind_promises`, on #531) building; #528 amended (adf4ea68b) with the guarded files; threads 18 (#532, `deviceid_required`) and 19 (#534, `utils_port`) built, in review; thread 20 (#533, `kind_promises`) built as the inventory plus the docs strips, the code and test strips proposed as three follow-on threads (Open Matters); the Closer Look
 tab awaits the Coach's triage; #513 and #517 merged 05:10; threads 5 to 10 wait on
 #511 reaching main
 (`human/20261106-sprint_reform_paused.md`); threads 5 to 10 wait for PRs #511 and #513 to
@@ -460,6 +460,12 @@ it has one) and `WhisperFieldAttributes` into the new core's `safebyok/utils`, w
 **mask** row back into VOCABULARY; minor changeset. The zxcvbn checker with `browserOpts`, and the IndexedDB device DB,
 follow in later threads once thread 18 settles the device record. **Levels:** worker `sonnet`; review `medium`. **Depends
 on:** #531 (stacked). **Size:** small.
+*Built (PR #534, on #531):* `safebyok/utils` exports `mash`, `mask`, `MaskOpts`, `fromB64`, `toB64` (re-exports of
+`helpers/crypto.ts`'s codec) and `WhisperFieldAttributes`; `mask` in `helpers/mask.ts` with its options an `objCheck` in a new
+`shapes/shapes-utils.ts`; the old tests under `tests/helpers/` path for path, the entry cases in `tests/utils.test.ts`;
+the **mask** row back in VOCABULARY; minor changeset. Deviations: `mask(text, ...)` not `whisper` (a whisper is an object);
+a non-string refuses `bad_option` (no `bad_whisper` in the core). `.size-limit.json`'s `mask` entry still measures
+safebyok-old (Cleanup). In review (`sonnet`, medium).
 
 ### 20. `kind_promises`
 
@@ -482,3 +488,14 @@ list reported. Empty changeset. **Levels:** worker `opus`; review `medium`. **De
 * PRs #511, #513 and #514 gate threads 3 to 10. #505 (draft, rework) and #515 (`box_showing`) are not part of this
   sprint; thread 6 and 7 may meet #515's lines in `box.ts` at the restack.
 * Thread 2 will surface claims in guarantees.md the code no longer bears; those are rulings, not edits.
+
+*Built (PR #533, on #531, docs only):* the inventory (`thread-20-kind-promises.md`, `thread-20-test-sites.md`): about 55
+prose sites and about 569 test sites quoting a kind; kept as contract `vault_locked`, the four correctable kinds, `declined`,
+`stale_write`, `camped`, `storage_unavailable`, `vault_full`, `box_too_large`, `absent_*`, `identity_revoked`, `damaged_*`,
+`newer_format`, and "definitional" sites where the kind is the subject; stripped the misuse family, `record_conflict`,
+`vault_empty`, `vault_mismatch`, `gating_landed`, `attempt_in_flight`. Landed: five VOCABULARY strips, four CUSTOMIZATION
+strips, an empty changeset. Not landed (over the sixty-site limit): 32 doc-block sites in src and the test sites, proposed
+as three follow-on threads (doc blocks; tests under models/; tests under storage/, shapes/ and helpers/, which first
+make the kind optional in `expectRefusal`, `expectBad` and `expectSyncRefusal`). Unsure, for the Coach: `already_asking`,
+`locked_while_asking`, `vault_gone` outside the deleted-vault case. No review (no code in the diff); files once the restack
+lands, rebased onto #531's new tip.

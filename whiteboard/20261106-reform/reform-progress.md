@@ -40,6 +40,13 @@ triage, `device_id` required-or-minted, the guarded-file list, box verbs after a
   `device_id` required-or-minted is an open question (the Coach recalls removing the mint; main still mints and caches).
 * Thread 14 `deviceid_label`: filed, PR #527 at 846f0d285, on main. `device_id` is a `label` everywhere; the minted id is
   `d` + 32 hex.
+* Thread 19 `utils_port`: built, PR #534 at 70203bd9f on #531, in review. `safebyok/utils`: `mash`, `mask(text, opts)`,
+  `MaskOpts`, `fromB64`/`toB64` (crypto.ts's codec), `WhisperFieldAttributes`; `shapes/shapes-utils.ts` is a seventh shapes
+  module (thread 8's `ShapeModules` directory check will catch it). The entry now reaches `helpers/crypto.ts`, so
+  `refusals/throwers` and `stable-jsonify` ride along; none of the vault.
+* Thread 20 `kind_promises`: built, PR #533 at f853139b1 on #531, docs only (the inventory, five VOCABULARY and four
+  CUSTOMIZATION strips). The doc-block and test strips are three proposed threads; the test helpers want an optional
+  `refusalkind` first. Line numbers in the inventory are as of c74195a12: search by text after #511.
 * Thread 18 `deviceid_required`: built, PR #532 at 1e54de7aa on #527, in review. `device_id` is required (no mint, no device
   record); the DeviceDB keeps leases only: `cache`, `peek`, `vacate`, `leasesProvedBefore`, each with its `do*` hook.
   **For thread 7:** the Bank constructor's options destructure is one plain line, no default on `device_id`. **For the
