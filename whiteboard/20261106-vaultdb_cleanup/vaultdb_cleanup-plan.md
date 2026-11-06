@@ -14,7 +14,10 @@
   in part (the Coach, later the same day):* CTE vs transaction is settled as built ("let's wrap
   the thread up using your direction ... Handroll what you want"); notices keep whole rows ("fewer
   sparse records ... ratchet down the capacity limits"), waiting on the sizing table; `pg_user` is
-  still the Coach's ("I need to do some more considering").
+  settled as built (no pg_user option). Later still: a channel per user from the raw user_id
+  (long user_ids fail; the listener never unlistens; both in TODO.md), and tailored notice
+  payloads (box notices as `[...vault props, ...box props]`, the core taking no world from them):
+  a rework on #561 is building both; the sizing table's payload section is redone from it.
 
 ## The Coach's request, verbatim
 
