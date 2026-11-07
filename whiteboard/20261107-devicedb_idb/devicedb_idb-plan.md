@@ -142,6 +142,12 @@ pattern."
   (against G4). Unless the Coach rules otherwise, fix it in the base: `forget` also erases a row at
   its scope that fails its check, the Bank's sweep reaches damaged rows too, and the battery gains
   a case, so both stores inherit it.
+* **Ride-along (the Coach, 2026-11-07, on "Lease's stowAsStowCan reads oddly"):** "yeah you've
+  talked me into having it be .cache, not .stow, or at least that one method should remain. Your
+  call to have .hold, .holdFoo and cacheAsCacheCan, or .cache, .cacheFoo and cacheAsCacheCan".
+  *Orchestrator's call:* `Lease`'s verbs go back to `cache`, `tryCache` and `cacheAsCacheCan` (and
+  the lease friend's `tryStowLease` to `tryCacheLease`, `notes/guarantees.md` following); the
+  DeviceDB's own verbs stay `stow`, `peek`, `forget`, `listLeases`.
 * Tests: the thread 1 battery over `fake-indexeddb` (a core devDependency), first checking a
   `CryptoKey` survives its structured clone; the wipe; a size-limit line for `idbDeviceDB`.
 * `notes/guarantees.md`: the IndexedDB bullet's "The core ships no IndexedDB DeviceDB" goes.
