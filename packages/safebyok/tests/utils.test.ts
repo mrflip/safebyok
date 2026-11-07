@@ -35,7 +35,7 @@ describe("mash", () => {
     it(blurb, async () => { expect(await mash(text)).to.eq(digest) })
   }
 
-  it("answers 43 characters of unpadded base64url, the bytes toB64 writes", async () => {
+  it("answers 43 characters of unpadded base64url", async () => {
     const mashed = await mash('ada@example.com')
     expect(mashed).to.match(/^[\w-]{43}$/)
     expect(utils.fromB64(mashed)).to.have.lengthOf(32)

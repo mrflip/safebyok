@@ -80,13 +80,13 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.peek(asked)).to.be.null
       })
 
-      it("peeks null under another vault_tok: a row of another life is no row", async () => {
+      it("peeks null under another vault_tok", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         expect(await deviceDB.peek({ ...asked, vault_tok: 'tok_two' })).to.be.null
       })
 
-      it("keeps vaults apart by scope, and a bank apart from another", async () => {
+      it("keeps each vault scope apart", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         expect(await deviceDB.peek({ ...asked, vaultlabel: 'other' })).to.be.null
@@ -101,7 +101,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.peek({ ...asked, vault_tok: 'tok_two' })).to.not.be.null
       })
 
-      it("hands back a copy: changing a peeked row changes nothing stowed", async () => {
+      it("hands back a copy of the row stowed", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const peeked = (await deviceDB.peek(asked))!
@@ -116,14 +116,14 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.peek(asked)).to.be.null
       })
 
-      it("refuses a row without proved_at, and a malformed query", async () => {
+      it("refuses a malformed row or query", async () => {
         const deviceDB = await fresh()
         await expectRefusal(deviceDB.stow({ ...asked, lease_key: await makeLeaseKey() } as unknown as LeaseRow))
         await expectRefusal(deviceDB.peek({ ...asked, vaultlabel: 'No Good!' }))
         await expectRefusal(deviceDB.peek({ ...vaultScope } as never))
       })
 
-      it("answers each as an Outcome through its try form, refusing the same", async () => {
+      it("answers an Outcome through each try form", async () => {
         const deviceDB = await fresh()
         const stowed = await deviceDB.tryStow(await leaseRowOf())
         expect(stowed.ok).to.be.true
@@ -148,21 +148,21 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await rowsOf(deviceDB).leaseRowsOf()).to.have.lengthOf(0)
       })
 
-      it("leaves a row of another vault_tok where it stands: the old life's forget spares the new life's lease", async () => {
+      it("leaves a row of another vault_tok where it stands", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf({ vault_tok: 'tok_two' }))
         await deviceDB.forget(asked)
         expect(await deviceDB.peek({ ...asked, vault_tok: 'tok_two' })).to.not.be.null
       })
 
-      it("is a no-op where nothing is stowed, and again for a repeat", async () => {
+      it("is a no-op where nothing is stowed", async () => {
         const deviceDB = await fresh()
         await deviceDB.forget(asked)
         const forgotten = await deviceDB.tryForget(asked)
         expect(forgotten.ok).to.be.true
       })
 
-      it("lands after a stow called before it and not awaited: the calls land in the order made", async () => {
+      it("lands after a stow called before it and not awaited", async () => {
         const deviceDB = await fresh()
         const row = await leaseRowOf()
         const stowing = deviceDB.stow(row)
@@ -182,7 +182,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
     })
 
     describe("listLeases()", () => {
-      it("answers the scope, vault_tok and proved_at of every lease stowed, oldest first, and never its key", async () => {
+      it("answers every lease stowed, oldest first, without its key", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf({ vaultlabel: 'late', proved_at: T0 - Hour }))
         await deviceDB.stow(await leaseRowOf({ vaultlabel: 'early', proved_at: T0 - (3 * Hour) }))
