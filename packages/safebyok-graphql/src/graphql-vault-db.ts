@@ -44,7 +44,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 
   // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
   /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
-  get [DB.IsVaultDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
+  get [DB.IsVaultDB](): true { return true }
   // --
 
   // == [Construction]: constructor
