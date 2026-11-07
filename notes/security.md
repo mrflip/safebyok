@@ -2934,8 +2934,8 @@ added or folded into through the subagent, and no other entry changes.
   mind. **Sizes**: with names unbounded, the static 2 KiB allowance no longer bounds a
   box's other fields. It stays only as `Vault.make`'s plan for `maxBoxes` at the default
   checks; `putBox` now weighs each box with its scope as the UTF-8 bytes of its JSON and
-  refuses one over the adapter's `maxRecordBytes` (`box_too_large`) (amended 2026-11-07 (graphql_schema): `GraphQLVaultDB` accepts `maxRecordBytes` and enforces no
-  record size on the client; the server's own vaultDB holds and enforces the limit, and no field on the wire lets a browser raise it), and each `putBox()`
+  refuses one over the adapter's `maxRecordBytes` (`box_too_large`) (amended 2026-11-07 (graphql_schema): `GraphQLVaultDB` takes no `maxRecordBytes`, its options being `{ client }` alone (one given is refused
+  `bad_option`); the record-size limit is the server's hosted vaultDB's, which holds and enforces it, and no field on the wire lets a browser raise it), and each `putBox()`
   refuses a box heavier than the one it replaces when the vault, each box counted at twice
   `maxWhisperBytes`, 512 bytes for its fixed-size fields and its measured names and sidecar, would
   pass `maxVaultBytes` (`vault_full`). The vault's total is reckoned from the snapshot's listing,
