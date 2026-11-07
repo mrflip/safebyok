@@ -1,86 +1,69 @@
 # Thread 4: graphql_schema (2026-11-07)
 
 Branch `20261107-graphql_schema`, PR #571 (draft), stacked on #569 (thread 2, `20261107-idb_devicedb`). Status:
-**blocked after milestone 2**, as the handoff asked; milestones 3 (client) and 4 (finish) go to a fresh worker. Justify
-green: core 2,364, indexeddb 107 (2 skipped), postgres 123, convex 227, fastkey 49, graphql 18 (196 skipped, below),
-e2e 200, react 326.
+**blocked after milestone 3**, as the handoff asked; milestone 4 (finish) goes to a fresh worker. Justify green: core
+2,365, indexeddb 107 (2 skipped), postgres 123 (1), convex 227, fastkey 49, graphql 218 (3), e2e 200 (2), react 326.
 
 Authority: the Coach's rulings in `vaultdb_cleanup-plan.md` *8. graphql_schema* (on `origin/20261106-vaultdb_cleanup`)
-and `devicedb_idb-plan.md` *4. graphql_schema*.
+and `devicedb_idb-plan.md` *4. graphql_schema*. Milestones 1 and 2 in detail: `thread-4-graphql_schema-m1m2.md`.
 
-* **Built, milestone 1** (`3f4f21bf7`, `packages/safebyok`):
-  * **`VaultDBVerbs`** (`src/storage/vault-db-new.ts`): the brand plus each plain and `try*` front verb;
-    `VaultDBVerbnames` lists them; `abstract class VaultDB implements VaultDBVerbs`. `tidyGone` stays on the store.
-    `brandedVaultDB` asks for the brand and every verb; `BankOpts.vaultDB` and the listings take `VaultDBVerbs`.
-  * **Acts as enums** in `shapes-enums.ts`; `ListAct` exported.
-  * **Answer checkers `AX`** (`src/shapes/shapes-answers.ts`, from `safebyok/storage`): one per front verb,
-    `crossedNotice`, `crossedErr` (`{refusalkind, message, meta: {capacity, fieldnames, call} | null}`),
-    `crossedReqParams`, `damagedVault`, `damagedBox`. Strict; null stands for absent; a failure is `unexpected_error`.
-  * **The battery over any `VaultDBVerbs`**, with the hook `_cheat_storeOf(vaultDB) => VaultDB`.
-* **Built, milestone 2** (`30f02f3ce`, `349295716`):
-  * **The schema** (`safebyok-graphql/src/vault-schema.ts`, `VaultSchemaSdl`): every name starts `Safebyok`. Queries
-    `safebyokListVaults`, `GetVault`, `ListBoxes`, `GetBox`. Mutations `PutVault`, `PutBox`, `ReplacePassphrase`,
-    `AddPasskey`, `RevokePasskey`, `DelBox`, `DelVault`. Subscription `safebyokWatch(applabel, user_id, vaultlabel)`.
-    Scalars `SafebyokJson` (sidecar, `damaged_rows`, `err.meta`) and `SafebyokEpochMillis`. Typed row types,
-    unions `SafebyokVaultRow`/`BoxRow`/`Row`, typed inputs, `SafebyokRefusalkind` drawn from `refusalkindVals`.
-    The answer types carry `{ok act val world dbhas req_params err}`, with `err` a field and `act` a String.
-  * **The resolvers** (`vault-resolvers.ts`, `vaultResolvers({vaultDB, userIdOf})`): each runs the user_id gate (the
-    scope's user_id equals `userIdOf(context)`, else `identity_revoked`; a throwing `userIdOf` is `unexpected_error`),
-    calls the hosted vaultDB's `try*` verb, and returns the whole answer. `err.meta` is rebuilt from capacity,
-    fieldnames and call; no cause crosses. The watch re-runs the gate before each notice, and on a failure yields one
-    `identity_revoked` notice and ends, releasing the store's listen. A watch refused at the start (gate or bad scope)
-    yields one bad notice and ends. Exported types: `CrossingAnswer`, `CrossingNotice`, `VaultFieldArgs` (a map by
-    field name), `VaultFieldResolver`, `VaultResolvers`, `VaultResolversOpts`.
-  * **The documents** (`src/vault-operations.ts`, `VaultOperations`): one per root field, fragments only as used, no
-    `__typename`. Not yet exported: `src/index.ts` still exports the old client's own `VaultOperations`.
-  * **Relay retired**: `VaultDB.relay`, `VaultDBRelay` and their tests are gone from the core; breaking line in
-    `.changeset/20261107-graphql_schema.md`. The graphql line is `.changeset/20261107-graphql_schema-2.md`.
-  * **Tests** (`tests/vault-resolvers.test.ts`, 15): each verb's answer deep-equals the store's own `try*` answer once
-    through JSON and the core's AX; the gate on all 11 operations; refusals with their meta and no cause; the watch,
-    revoked mid-way; the schema's root fields, every document validated, the time scalar.
-* **Skipped until milestone 3**, each with a comment naming it: `tests/graphql-vault-db.test.ts`'s battery
-  (`describe.skip`); `tests/yoga-recipe.test.ts`'s browser half (`describe.skip`) and two of its tests (`it.skip`).
-  `GraphQLVaultDB` still sends the old operations. Four `vitest/no-disabled-tests` warnings, no suppressions.
-* **Decisions taken**:
-  * **Interface `VaultDBVerbs`, class `VaultDB` kept**; set aside: renaming the class, churning five packages.
-  * **`tidyGone` is off the interface and the wire**, by "exactly (and pretty much only) the front-end verbs".
-  * **Per-verb answer checkers**; unknown fields refused, not stripped; the wire error field is `refusalkind`.
-  * **Typed inputs**: a malformed type (a string `revision_seq`, an unknown field) is GraphQL's own validation error,
-    never reaching the store; a bad value in a String field (`am: 'q'`) is the store's `bad_option` in `err`.
-  * **Opts fields nullable, no SDL defaults**: absent means the store's default; an explicit null is `bad_option`.
-  * **Scalars hand-rolled on graphql's own `GraphQLScalarType`**, with v17's `coerce*` keys. Set aside:
-    `graphql-scalars`, a new dependency. On graphql 16 the coerce keys are ignored: Json still works, EpochMillis
-    goes unchecked, and the core checks every field anyway.
-* **Deviations**:
-  * **`SafebyokEpochMillis`**, not the plan's `EpochMillis`, keeping every schema name under `Safebyok`.
-  * **A refusal's cause no longer reaches the host's logs** through the resolvers; the old relay surfaced it.
-  * Milestone 1 removed a stale `eslint-disable-line` on the brand getter.
+* **Built, milestone 1** (`3f4f21bf7`): the core's `VaultDBVerbs` interface, which `VaultDB` implements; the answer
+  checkers (`shapes-answers.ts`, from `safebyok/storage`); the battery over any `VaultDBVerbs`, with `_cheat_storeOf`.
+* **Built, milestone 2** (`30f02f3ce`, `349295716`): the typed schema (`vault-schema.ts`), the resolvers calling the
+  hosted store's `try*` verbs behind the user_id gate (`vault-resolvers.ts`), the documents (`vault-operations.ts`),
+  and the core's `VaultDB.relay` retired.
+* **Built, milestone 3** (`b43fbf15d`, `4e686715e`):
+  * **`GraphQLVaultDB`** (`src/graphql-vault-db.ts`) is a class implementing `VaultDBVerbs`, no longer extending
+    `VaultDB`. Each `try*` verb parses its inputs with the core's own checks (so its refusals match a store's:
+    `bad_scope`, `bad_option`, fieldnames), sends `VaultOperations`' document (queries `network-only`), drops
+    `__typename` by path, and parses with the AX checker. A refusal gets `{call, req_params}` in its meta, as the
+    base class's do. The plain verbs are `goodAnswerOf(await this.tryX())`.
+  * **Errors**: a CombinedError with a `networkError` is `storage_unavailable`; one with GraphQL errors, or data
+    missing the field, is `unexpected_error` (`SchemaNotServed`), the CombinedError its cause.
+  * **`__typename`**: `dropTypename(bag, nested)` drops a selection's own and recurses only into the fields each
+    selection names (gate, wayins, ciphered fields, listing rows, `req_params.prior`, `err`). Never into a sidecar,
+    `damaged_rows` or `meta`. A test round-trips a sidecar holding `__typename`.
+  * **Watch**: heeds each result whose `data` differs from the one before (fetch's closing result repeats it);
+    when a result has `hasNext: false` and the watch is neither stopped nor revoked, resubscribes after
+    `afterAPause` (a private helper, `ResubscribeMillis = 1000`). `identity_revoked` ends it for good.
+  * **`VaultOperations`** exported from `src/vault-operations.ts`; the old copy, `answers` and `refusalSent` deleted.
+  * **Core**: `IsVaultDB` exported from `safebyok/storage`, since an outside implementer needs the brand.
+    `damagedVault`/`damagedBox` take any string label: a damaged row may be listed under a label failing the check.
+    That was a milestone 1 bug that un-skipping the battery found. It has a test in `shapes-answers.test.ts`.
+  * **Tests**: both batteries run end to end over GraphQL (in-process executeExchange, and the yoga recipe over
+    fetch), with `_cheat_storeOf` naming the server's PostgresVaultDB. New: the sidecar case; a GraphQL error; a
+    foreign schema; a refusal before sending; the watch's resubscribe, revoke and stop (a fake client and fake timers).
+  * **Changesets** brought up to date: the client line, `maxRecordBytes` breaking, the `IsVaultDB` export, damaged labels.
+* **Decisions taken** (milestone 3):
+  * **`goodAnswerOf`, not `valOf`**: a plain verb returns the whole `GoodAnswer`, and `valOf` returns only `val`.
+  * **`GraphQLVaultDBOpts` is `{ client }` alone**: `maxRecordBytes` belongs to the server's store. The test helpers
+    route `makeVaultDB(opts)` to the server. An `interface` with the `AssertEqual` check.
+  * **Stream end by `result.hasNext`**, not wonka's `onEnd` (wonka is not a dependency). executeExchange never ends a
+    subscription, so the resubscribe tests use a fake client.
+  * **`signedInAsAsked`** also reads `params.user_id`, for the gate verbs.
+* **Suppression**: one `eslint-disable-line @typescript-eslint/class-literal-property-style` on the brand getter.
+  The graphql config keeps the rule's default `fields`, the core sets `getters`, and `device-db-new.ts` does the same.
+  The alternative is to set `getters` in the graphql package's eslint config.
+* **Deviations**: `SafebyokEpochMillis`, not `EpochMillis`; a refusal's cause no longer reaches host logs through
+  the resolvers; `goodAnswerOf` in place of the handoff's literal `valOf`.
 * **Discoveries**:
-  * A `ReadableStream`'s own async iterator `return()` waits on a pending `next()`; the watch reads through a reader,
-    whose `cancel()` ends it at once.
-  * `makeExecutableSchema` and yoga's `createSchema` take scalar instances and `__resolveType` in the resolver map.
-  * Stale prose on the relay, left for milestone 4: `STYLE.md` 627-631 ("its GraphQL relay carries");
-    `outcome.ts`'s doc example ("a server relaying a verb"); `notes/security.md` around 323-328 (relayed records,
-    `__typename`), which only a sonnet subagent edits.
-* **What remains**:
-  * **3. Client**: `GraphQLVaultDB` as a class implementing `VaultDBVerbs`, over urql, sending
-    `src/vault-operations.ts`'s documents and parsing each answer with AX. Export the new `VaultOperations` from
-    `src/index.ts` and delete the old one. urql's cacheExchange adds `__typename` and does not export
-    `maskTypename`: drop it by explicit paths, never a deep strip (a sidecar key could be `__typename`). A GraphQL
-    error is `unexpected_error` with its cause; a network failure `storage_unavailable`. Resubscribe after a stream
-    ends (`resubscribeMillis`, about 1000), except after `identity_revoked`. Un-skip the tests above.
-  * **4. Finish**: a drift test walking AX against the schema; the battery over GraphQL, `_cheat_storeOf` naming the
-    server's store; yoga and e2e; READMEs (the host vacates a bank on any user_id change); the stale relay prose;
-    GraphQL's doc blocks; the changesets' client lines.
+  * urql's `mergeResultPatch` keeps the previous `data` reference, so fetch's closing `{hasNext: false}` result
+    repeats the last notice; skipping a repeated `data` reference handles it.
+  * A `ReadableStream`'s async iterator `return()` waits on a pending `next()`; the server's watch reads through a
+    reader.
+* **What remains, milestone 4**:
+  * A drift test walking AX against the schema.
+  * e2e.
+  * READMEs: the host vacates a bank on any user_id change; the yoga recipe's browser half (`browserVaultDB` no
+    longer takes opts); `GraphQLVaultDB({ client })` alone.
+  * Stale relay prose: `STYLE.md` 627-631 and `outcome.ts`'s doc example ("a server relaying a verb");
+    `notes/security.md` around 323-328, which only a sonnet subagent edits.
+  * GraphQL's doc blocks, to the current rules.
 * **For the Coach**, each a two-way call, my recommendation first:
-  * **Interface name** `VaultDBVerbs`: keep.
-  * **tidyGone off the wire**: keep it off.
-  * **Refuse, don't strip** unknown fields at the client: keep.
-  * **Wire failure kind** `unexpected_error`, rather than a new refusalkind: keep.
-  * **`_cheat_storeOf`** as the battery's hook: keep.
-  * **`SafebyokEpochMillis`** over `EpochMillis`: keep the prefix.
-  * **Hand-rolled scalars** over `graphql-scalars`: keep; ~30 lines on graphql's own API.
-  * **Explicit null opts refused** as `bad_option`: keep; or map null to absent in the resolver.
-  * **Type errors are GraphQL errors** before the store: keep; they are a client's bug, not a refusal.
-  * **No cause in host logs**: accept for now; a later `onRefusal` opt could log one server-side.
-  * **`__typename` dropped by path** and **resubscribe about 1s**: as planned.
+  * Milestones 1-2: interface name `VaultDBVerbs`; tidyGone off the wire; refuse, don't strip; `unexpected_error`
+    for wire failures; `_cheat_storeOf`; `SafebyokEpochMillis`; hand-rolled scalars; explicit null opts refused;
+    type errors as GraphQL errors; no cause in host logs. Keep each.
+  * **Resubscribe delay**: built as planned, a fixed 1s behind `afterAPause`; or resubscribe at once, with no timer
+    (a one-line change).
+  * **`maxRecordBytes` off the client**: keep; or accept it and ignore it, sparing hosts a breaking change.
+  * **Brand-getter lint**: keep the `eslint-disable-line`; or set `getters` in the graphql eslint config.
