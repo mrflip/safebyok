@@ -1,6 +1,6 @@
 # Thread 13: react_tidy (2026-11-07)
 
-Branch `20261107-react_tidy`, PR #TBD, cut from `origin/main` (a80589274). Justify: green
+Branch `20261107-react_tidy`, PR #583, cut from `origin/main` (a80589274). Justify: green
 (safebyok-react 220 tests; every package green).
 
 * **Built**:
@@ -42,3 +42,5 @@ Branch `20261107-react_tidy`, PR #TBD, cut from `origin/main` (a80589274). Justi
   size budgets did not move.
 * **For the Coach**: the add-passkey dialog still leaves an unused passkey after a wrong (non-empty)
   passphrase; TODO's existing *A passkey made for a refused putWayin* holds that question.
+* **Open questions** (also in the PR): the wrong-passphrase passkey left behind (leave it to TODO);
+  `Checkers` imported through `safebyok/storage` (fine as is).
