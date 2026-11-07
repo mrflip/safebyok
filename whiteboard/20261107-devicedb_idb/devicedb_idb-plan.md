@@ -6,8 +6,7 @@
 * **Issued by:** the Coach (flip), in the vaultdb_cleanup session, after the vaultdb line merged
   (#565 at 495cc5d6e). Orchestrated from that session, which keeps this sprint's doc.
 * **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; bookmark rev 2).
-* **Status:** thread 1 building; thread 2 waits on thread 1 and on the Coach's word on where the
-  IndexedDB plumbing lives (Open Matters, TOP).
+* **Status:** thread 1 in review (#567); then thread 3, thread 2, thread 4, each stacked on the last.
 
 ## The Coach's request, verbatim
 
@@ -123,17 +122,55 @@ pattern."
   The worker proposes how (a `deleteDatabase` per known name; `indexedDB.databases()` where a
   browser offers it, for every name matching the pattern), simply: a stale tab holding the old
   database open gets a documented row, not machinery.
-* **Where the transaction plumbing lives: waits on the Coach** (Open Matters, TOP). Either the
-  core gains `idb-keyval` (a runtime dependency) and `safebyok-indexeddb`'s `inOneStep` /
-  `abortOf` / `workOrAbandon` / `troubleOf` move into the core for both stores to share, or the
-  core hand-writes raw IndexedDB and the two stay apart (about 70 lines alike).
+* **Where the transaction plumbing lives: ruled (a).** The Coach: "did the old code have an idb
+  dependency? I'll go with whichever the old code did, as we talked it out and there was a reason we
+  did it that way". The old core depended on `idb-keyval` ^6.3.0, so the core gains `idb-keyval` as
+  a runtime dependency, and `safebyok-indexeddb/src/shelf.ts`'s `inOneStep`, `abortOf`,
+  `workOrAbandon` and `troubleOf` move into the core, shared by both stores (`safebyok-indexeddb`
+  imports them through `safebyok/storage` and keeps only its scopepaths and ranges). `troubleOf`'s
+  sentences name the store they speak for (vault or device). Check the current `idb-keyval`
+  release before pinning (PROCESS.md, *Dependencies*).
 * Tests: the thread 1 battery over `fake-indexeddb` (a core devDependency), first checking a
   `CryptoKey` survives its structured clone; the wipe; a size-limit line for `idbDeviceDB`.
 * `notes/guarantees.md`: the IndexedDB bullet's "The core ships no IndexedDB DeviceDB" goes.
 * Changeset: new store; not publicly released, so no back-compat; old device databases are deleted.
-* **Levels:** `high` review (leaseKey at rest). **Size:** M. **Depends on:** thread 1, and the
-  Coach's word on the plumbing.
+* **Levels:** `high` review (leaseKey at rest). **Size:** M. **Depends on:** thread 3 (stacked
+  on it, so the line stays linear).
+
+### 3. storage_door (carried from sprint vaultdb_cleanup, its thread 7)
+
+*The Coach's text and rulings:* verbatim in
+`whiteboard/20261106-vaultdb_cleanup/vaultdb_cleanup-plan.md`, section "7. storage_door", on branch
+20261106-vaultdb_cleanup (PR #554), including the 2026-11-07 rulings (Convex tombstone-full vault
+publicized in its README and `notes/wontfix.md`; `vaultChannelOf` checks its user_id).
+
+*Gloss.* As there: `safebyok/storage` aliased `DB` everywhere; STYLE.md says the storage validators
+live there; adapters' phrases move to the core's Phrases; shared-bank and `mayReach` mentions
+struck; two wontfix entries; best-effort box cap wording everywhere it is stated or implied exact;
+CLAUDE.md's whizbang sentence gains "a lock where none was needed before is a last resort";
+`MaxSaltBytes` 65,536 -> 32 and stored `salt_b64` at most 32 bytes (fastkey's cases to 32 and 33);
+the Postgres README on roles, RLS and LISTEN; `e2e/package.json` drops `safebyok-old` if nothing
+there imports it; PROCESS.md's peers line. The restack is merged, so it is cut now.
+**Levels:** `sonnet` worker, `low` review. **Size:** S-M, mechanical. **Depends on:** thread 1
+(stacked on it: thread 1's battery tests take the `DB` alias too).
+
+### 4. graphql_schema (carried from sprint vaultdb_cleanup, its thread 8)
+
+*The Coach's text and rulings:* verbatim in the same plan, section "8. graphql_schema", with the
+consensus of 2026-11-06 and the 2026-11-07 rulings: relay retired, "This is good, go for it";
+"graphql should expose exactly (and pretty much only) the front-end verbs that VaultDB does,
+including those three" (replacePassphrase, addPasskey, revokePasskey); a stream revoked mid-way
+ends with identity_revoked.
+
+*Gloss.* Rewrite safebyok-graphql once: a typed schema mirroring the try* answers (err a field,
+never a GraphQL error; EpochMillis; damaged_rows as JSON; live/tombstone union; a drift test); the
+server calls its hosted VaultDB's public verbs, gate verbs included, one operation each, returning
+the whole try* answer; the client its own class implementing an exported VaultDB interface (Bank,
+Listing and their opts typed by it; the duck check gains the try* verbs); answer checkers exported
+from the core; `VaultDB.relay` and `VaultDBRelay` removed. **Levels:** `high` review (the refusal
+surface and the server's checks). **Size:** L: hand it the milestones and the continue-on-blocked
+pattern from the start. **Depends on:** thread 2 (stacked; linear line).
 
 ## For the Coach
 
-* Where the IndexedDB plumbing lives (thread 2): see Open Matters.
+* Nothing open beyond the doc.
