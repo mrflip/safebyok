@@ -41,6 +41,29 @@ describe("BankProvider's bank", () => {
     expect(second?.user_id).to.eq('u2')
   })
 
+  it("makes a new bank when the applabel changes", async () => {
+    const { props, rerender } = provided()
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, applabel: 'globex' })
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(2) })
+    expect(TH.seenBanks.map(({ applabel }) => applabel)).to.deep.equal(['acme', 'globex'])
+    expect(TH.seenBanks[0]?.snapshot.stage).to.eq('made')
+  })
+
+  it("makes each bank with the device_id its deviceDB keeps for the bank's scope", async () => {
+    const deviceDB = new MemoryDeviceDB()
+    const kept = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u1' })
+    const { props, rerender } = provided({ deviceDB })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, user_id: 'u2' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    const [first, second] = TH.seenBanks
+    expect(first?.device_id).to.eq(kept.device_id)
+    const { device_id } = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u2' })
+    expect(second?.device_id).to.eq(device_id)
+    expect(second?.device_id).to.not.eq(kept.device_id)
+  })
+
   it("sweeps its bank as it unmounts", async () => {
     const { unmount } = provided()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
@@ -48,28 +71,117 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks[0]?.snapshot.stage).to.eq('made')
   })
 
-  it("makes no new bank for handlers written inline at each render", async () => {
-    const { props, rerender } = provided({ onBadNews: () => undefined, requestCleartext: undefined })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, onBadNews: () => undefined })
-    rerender({ ...props, onBadNews: () => undefined })
-    await act(async () => { await TH.wakeupAtNextTick() })
-    expect(TH.seenBanks).to.have.lengthOf(1)
-  })
-
   it("ends with one bank, ready, under StrictMode", async () => {
+    const making = vi.spyOn(Bank, 'make')
     const world = TH.makeBankWorld()
     render(<StrictMode><BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider></StrictMode>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    const live = TH.seenBanks.filter((bank) => bank.snapshot.stage === 'ready')
+    await act(async () => { await TH.wakeupAtNextTick() })
+    const live = making.mock.results.filter((made) => (made.value as Bank).snapshot.stage === 'ready')
     expect(live).to.have.lengthOf(1)
   })
 
-  it("throws an option Bank.make does not take to the nearest error boundary", () => {
+  it("makes no bank when the user signs out while its deviceDB answers", async () => {
+    const deviceDB = new MemoryDeviceDB()
+    const answering = TH.held()
+    const ensureBank = deviceDB.ensureBank.bind(deviceDB)
+    vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
+      await answering.promise
+      return ensureBank(scope)
+    })
+    const making = vi.spyOn(Bank, 'make')
+    const { props, rerender } = provided({ deviceDB })
+    rerender({ ...props, user_id: null })
+    answering.resolve(undefined)
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(making).not.toHaveBeenCalled()
+    expect(shown('bank')).to.eq('none')
+  })
+
+  it("throws a refused ensureBank to the nearest error boundary", async () => {
+    const deviceDB = new MemoryDeviceDB()
+    vi.spyOn(deviceDB, 'ensureBank').mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
+    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB })
+    const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
+    await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
+    expect(reported[0]).to.include({ refusalkind: 'storage_unavailable' })
+  })
+
+  it("throws a deviceDB that is no DeviceDB to the nearest error boundary", async () => {
+    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB: { ensureBank: vi.fn() } as unknown as MemoryDeviceDB })
+    const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
+    await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
+    expect(reported[0]).to.include({ refusalkind: 'bad_option' })
+  })
+
+  it("throws an option Bank.make does not take to the nearest error boundary", async () => {
     const props = { ...TH.providerPropsOf(TH.makeBankWorld()), leaseHours: 3 } as Props
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
-    expect(screen.getByText(/^caught: /)).to.exist
+    await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
+  })
+})
+
+describe("BankProvider's props", () => {
+  it("keeps its bank when a prop it was made with changes", async () => {
+    const { props, rerender } = provided()
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, keyDeriver: { ...props.keyDeriver } })
+    rerender({ ...props, autolockMinutes: 5 })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(TH.seenBanks).to.have.lengthOf(1)
+    expect(shown('bank')).to.eq('u1 ready')
+  })
+
+  it("says once, through the bank's logger, that a change to a prop it was made with is ignored", async () => {
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, keyDeriver: { ...props.keyDeriver } })
+    rerender({ ...props, autolockMinutes: 5 })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(spy.calls.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'BankProvider', props: ['keyDeriver'] }]])
+    expect(spy.calls[0]?.message).to.match(/^BankProvider ignored a change to its keyDeriver/)
+  })
+
+  it("names each prop that changed", async () => {
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, keyDeriver: { ...props.keyDeriver }, deviceDB: new MemoryDeviceDB() })
+    expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['deviceDB', 'keyDeriver'] })
+  })
+
+  it("names a handler given only after the bank was made", async () => {
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, onBadNews: () => undefined })
+    expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['onBadNews'] })
+  })
+
+  it("says nothing of handlers written inline at each render", async () => {
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger, onBadNews: () => undefined, onPanic: () => undefined })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, onBadNews: () => undefined, onPanic: () => undefined })
+    rerender({ ...props, onBadNews: () => undefined, onPanic: () => undefined })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(TH.seenBanks).to.have.lengthOf(1)
+    expect(spy.calls).to.deep.equal([])
+  })
+
+  it("says nothing of a prop the host makes anew for each user", async () => {
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, user_id: 'u2', deviceDB: new MemoryDeviceDB() })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    rerender({ ...props, user_id: null })
+    await waitFor(() => { expect(shown('bank')).to.eq('none') })
+    rerender({ ...props, user_id: 'u2', deviceDB: new MemoryDeviceDB() })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    expect(spy.calls).to.deep.equal([])
   })
 })
 
@@ -97,14 +209,14 @@ describe("BankProvider's handlers", () => {
     ['onBadNews', { onBadNews: 'not a function' }],
     ['onPanic', { onPanic: 'not a function' }],
     ['requestCleartext', { requestCleartext: 'not a function' }],
-  ])("throws %s given as no function to the nearest error boundary", (_name, misuse) => {
+  ])("throws %s given as no function to the nearest error boundary", async (_name, misuse) => {
     const props = { ...TH.providerPropsOf(TH.makeBankWorld()), ...misuse } as unknown as Props
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
-    expect(screen.getByText(/^caught: /)).to.exist
+    await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
-  it("makes no new bank for an onPanic written inline at each render", async () => {
+  it("calls an onPanic written inline at each render as it was last rendered", async () => {
     vi.stubGlobal('reportError', vi.fn())
     const first = vi.fn()
     const last = vi.fn()
@@ -119,6 +231,27 @@ describe("BankProvider's handlers", () => {
     expect(shown('vault')).to.eq('present locked')
   })
 
+  it("tells the onPanic the bank was made with of a panic once the props drop it", async () => {
+    vi.stubGlobal('reportError', vi.fn())
+    const madeWith = vi.fn()
+    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: madeWith })
+    rerender({ ...props, onPanic: undefined })
+    refuseErase(deviceDB)
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(madeWith).toHaveBeenCalledWith(Refusal) })
+    expect(shown('vault')).to.eq('present locked')
+  })
+
+  it("tells the onBadNews the bank was made with of bad news once the props drop it", async () => {
+    const madeWith = vi.fn()
+    const { props, rerender } = provided({ onBadNews: madeWith })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, onBadNews: undefined })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    TH.seenBanks[0]?.tellBadNews([Refusal])
+    expect(madeWith).toHaveBeenCalledWith(Refusal)
+  })
+
   it("leaves a vault whose lease survived its erase to be vacated when the host has no onPanic, as the core does", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
@@ -127,6 +260,19 @@ describe("BankProvider's handlers", () => {
     fireEvent.click(screen.getByText('Lock'))
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
+  })
+
+  it("tells an onPanic given only after the bank was made nothing, and leaves the vault to be vacated", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const later = vi.fn()
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    rerender({ ...props, onPanic: later })
+    refuseErase(deviceDB)
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
+    await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
+    expect(later).not.toHaveBeenCalled()
   })
 
   it("tells the next user's onPanic nothing of a panic from the bank it let go", async () => {
@@ -144,46 +290,6 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     expect(previous).not.toHaveBeenCalled()
     expect(next).not.toHaveBeenCalled()
-  })
-
-  it("says once, through the logger, that a prop which remakes the bank changed identity between renders", async () => {
-    const heard = [TH.spyLogger(), TH.spyLogger(), TH.spyLogger()]
-    const [first, second, third] = heard
-    const { props, rerender } = provided({ logger: first?.logger })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, logger: second?.logger })
-    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(2) })
-    rerender({ ...props, logger: third?.logger })
-    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(3) })
-    expect(first?.calls).to.deep.equal([])
-    expect(second?.calls.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'BankProvider', props: ['logger'] }]])
-    expect(second?.calls[0]?.message).to.match(/^BankProvider made its bank anew, letting its vaults go, because its logger changed identity between renders/)
-    expect(third?.calls).to.deep.equal([])
-  })
-
-  it("names each prop that changed identity", async () => {
-    const spy = TH.spyLogger()
-    const { props, rerender } = provided({ logger: spy.logger })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, user_id: 'u2' })
-    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    expect(spy.calls).to.deep.equal([])
-    rerender({ ...props, user_id: 'u2', keyDeriver: { ...props.keyDeriver }, deviceDB: new MemoryDeviceDB() })
-    await waitFor(() => { expect(spy.calls).to.have.lengthOf(1) })
-    expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['keyDeriver', 'deviceDB'] })
-  })
-
-  it("says nothing of a prop the host makes anew for each user", async () => {
-    const spy = TH.spyLogger()
-    const { props, rerender } = provided({ logger: spy.logger })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, user_id: 'u2', deviceDB: new MemoryDeviceDB() })
-    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    rerender({ ...props, user_id: null })
-    await waitFor(() => { expect(shown('bank')).to.eq('none') })
-    rerender({ ...props, user_id: 'u2', deviceDB: new MemoryDeviceDB() })
-    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    expect(spy.calls).to.deep.equal([])
   })
 })
 
@@ -263,6 +369,18 @@ describe("BankProvider's dialog", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
     expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['build_vault'])
     expect(dialogShown()).to.be.false
+  })
+
+  it("hands each gating to the host's requestCleartext as it was last rendered", async () => {
+    const first = vi.fn()
+    const handed: AnyGating[] = []
+    const { props, rerender } = provided({ requestCleartext: first })
+    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    rerender({ ...props, requestCleartext: async (gating) => { handed.push(gating); await gating.attempt(TH.byPassphrase(TH.Passphrase)) } })
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
+    expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['build_vault'])
+    expect(first).not.toHaveBeenCalled()
   })
 
   it("asks nobody when requestCleartext is null", async () => {
