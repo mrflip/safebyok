@@ -91,7 +91,7 @@ const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
 const serversOf = new WeakMap<GraphQLVaultDB, { route: Route, store: PostgresVaultDB }>()
 
 /** A fresh browser over emptied tables, through its own route, its server's store made with `opts` and at most `maxBoxes` boxes to a vault. */
-const makeVaultDB = async (opts: DB.VaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
+const makeVaultDB = async (opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
   await TH.emptyTables()
   const store = await TH.serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
   const route = vaultRoute(store, byHeader)

@@ -58,6 +58,7 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlo
   }
 
   const press = async () => {
+    if (asking) { return }
     setAsking(true)
     onGripe(null)
     try {
@@ -81,8 +82,10 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlo
   }
 
   return (
+    // aria-disabled, not disabled: a disabled button drops the focus, and the dialog's Escape with it,
+    // to the page's body, where the browser returns it once its prompt is dismissed.
     // eslint-disable-next-line jsx-a11y/no-autofocus -- only where a dialog makes the passkey its first choice: the WAI-ARIA dialog pattern moves focus to a dialog's first control
-    <button type="button" autoFocus={takesFocus} disabled={asking} onClick={() => { void press() }}>
+    <button type="button" autoFocus={takesFocus} aria-disabled={asking} onClick={() => { void press() }}>
       {Messages.passkeyButton}
     </button>
   )

@@ -16,7 +16,7 @@ describe("OutageVaultDB", () => {
     expect(listed.ok).to.be.true
   })
 
-  it("refuses each verb while offline, as an unreachable backend does, and answers again once back", async () => {
+  it("refuses each verb while offline", async () => {
     const vaultDB = makeOutage()
     vaultDB.setOnline(false)
     const listed = await vaultDB.tryListVaults(Scope)

@@ -1,7 +1,7 @@
 /** The vaultDB: the verbs the models call. A subclass writes the generic `do*` calls. */
 
 import type * as Z from 'zod'
-import { IsVaultDB } from '../helpers/consts'
+import { IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
-import type { AddPasskeyParams, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { AddPasskeyParams, AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, ListAct, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
@@ -58,10 +58,10 @@ export type BoxFetched   = { vault: unknown, box: unknown }
 export type Heard = { vault?: unknown, box?: unknown }
 // --
 
-// == [What a model calls]: VaultDBVerbs, VaultDBVerbnames
+// == [What a model calls]: VaultDB, VaultDBVerbnames
 
 /** The verbs a model calls on a vaultDB, each with its `try*` form. */
-export interface VaultDBVerbs {
+export interface VaultDB {
   /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
   readonly [IsVaultDB]: true
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
@@ -104,34 +104,37 @@ export interface VaultDBVerbs {
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void
 }
 
-/** The name of each verb of {@link VaultDBVerbs}, as a duck check asks a vaultDB to answer each with a function. */
+/** The name of each verb of {@link VaultDB}, as a duck check asks a vaultDB to answer each with a function. */
 export const VaultDBVerbnames = [
   'listVaults', 'tryListVaults', 'getVault', 'tryGetVault', 'listBoxes', 'tryListBoxes', 'getBox', 'tryGetBox',
   'putVault', 'tryPutVault', 'putBox', 'tryPutBox',
   'replacePassphrase', 'tryReplacePassphrase', 'addPasskey', 'tryAddPasskey', 'revokePasskey', 'tryRevokePasskey',
   'delBox', 'tryDelBox', 'delVault', 'tryDelVault', 'tidyGone', 'tryTidyGone', 'watch',
-] as const satisfies readonly (keyof VaultDBVerbs)[]
+] as const satisfies readonly (keyof VaultDB)[]
 
-true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<keyof VaultDBVerbs, typeof IsVaultDB>>
+true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<keyof VaultDB, typeof IsVaultDB>>
 // --
 
 const noUnwatching = (): void => undefined
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
-export abstract class VaultDB implements VaultDBVerbs {
-  // == [Props]: #maxRecordBytes, IsVaultDB
+export abstract class AdapterVaultDB implements VaultDB {
+  // == [Props]: #maxRecordBytes, IsVaultDB, IsAdapterVaultDB
 
   readonly #maxRecordBytes: number
 
   // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
   /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
   get [IsVaultDB](): true { return true }
+
+  /** True: the brand an adapter's store answers to, and a client of one does not. */
+  get [IsAdapterVaultDB](): true { return true }
   // --
 
   // == [Construction]: constructor
 
-  constructor(opts: VaultDBOpts = {}) {
-    const { maxRecordBytes = Infinity } = SX.vaultDBOpts.parse(opts)
+  constructor(opts: AdapterVaultDBOpts = {}) {
+    const { maxRecordBytes = Infinity } = SX.adapterVaultDBOpts.parse(opts)
     this.#maxRecordBytes = maxRecordBytes
   }
   // --

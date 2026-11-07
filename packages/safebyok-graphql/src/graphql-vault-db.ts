@@ -3,7 +3,7 @@ import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import type {
   AddPasskeyParams, Answer, BankListed, BankScope, BoxesListed, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelAct, DelOpts, GoodAnswer, GotAct,
-  IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, RevokePasskeyParams, VaultDBVerbs, VaultQuery,
+  IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, RevokePasskeyParams, VaultDB, VaultQuery,
   Tidied, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope,
 } from 'safebyok/storage'
 import { VaultOperations } from './vault-operations'
@@ -37,7 +37,7 @@ true satisfies Z.core.util.AssertEqual<GraphQLVaultDBOpts, Z.input<typeof graphQ
 // == [The VaultDB]: GraphQLVaultDB
 
 /** A vaultDB in the browser whose storage is your GraphQL server: `new GraphQLVaultDB({ client })`. */
-export class GraphQLVaultDB implements VaultDBVerbs {
+export class GraphQLVaultDB implements VaultDB {
   // == [Props]: #client, IsVaultDB
 
   readonly #client: GraphQLVaultClient

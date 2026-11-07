@@ -6,6 +6,7 @@ const FlavorCases: readonly (readonly [Refusalkind, string, string])[] = [
   // shown in place, to ask again:
   ["wrong_passphrase",    "in_place",  'a typo is shown beside the field'],
   ["wrong_passkey",       "in_place",  'a passkey that did not open the vault is shown in place'],
+  ["passkey_unavailable", "in_place",  'a browser or authenticator that cannot answer for a passkey is shown in place, the passphrase still open'],
   ["weak_passphrase",     "in_place",  "a weak new passphrase is shown in place, the checker's reason its message"],
   ["same_passphrase",     "in_place",  'a new passphrase that is the current one again is shown in place, to choose another'],
   // closing the dialog:

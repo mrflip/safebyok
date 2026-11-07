@@ -7,11 +7,13 @@ import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import * as TH from '../test-helpers'
 
 /** The calls a MemoryDeviceDB makes of its storage, any of which the next may be. */
-const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doDelRawLease'] as const
+const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doDelRawLease', 'doEnsureBank', 'doListBanks'] as const
 
 const memoryRowsOf = (deviceDB: MemoryDeviceDB): TH.DeviceDBRowCheats => ({
   plantLeaseRow: ({ applabel, user_id, vaultlabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(applabel, user_id, vaultlabel), row) },
   leaseRowsOf:   () => [...deviceDB._cheat_leaseRows().values()],
+  plantBankRow:  ({ applabel, user_id }, row) => { deviceDB._cheat_bankRows().set(ckeyOf(applabel, user_id), row) },
+  bankRowsOf:    () => [...deviceDB._cheat_bankRows().values()],
 })
 
 // Memory has no storage to fail, so the next call to it throws as a refused write would.

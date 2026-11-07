@@ -84,7 +84,7 @@ TH.describeVaultDBBattery("IdbVaultDB", {
 })
 
 describe("IdbVaultDB's options", () => {
-  it("takes a dbName and the VaultDB's own options", () => {
+  it("takes a dbName and the AdapterVaultDB's own options", () => {
     expect(new IdbVaultDB({ dbName: 'mine', maxRecordBytes: 1000 })).to.be.instanceOf(IdbVaultDB)
     expect(idbVaultDB()).to.be.instanceOf(IdbVaultDB)
   })
