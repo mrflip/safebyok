@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Vault, VaultError, type RequestCleartext } from 'safebyok'
+import { Vault, VaultError, Whispered, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type WhisperedBag } from 'safebyok'
 import { MemoryVaultDB, type VaultQuery } from 'safebyok/storage'
 import { BankProvider } from '../src/bank-provider'
-import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hooks'
+import { useBank, useBankSnapshot, useBox, useBoxSnapshot, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -29,6 +29,8 @@ describe("the hooks outside a BankProvider", () => {
     ['useBankSnapshot',  () => useBankSnapshot()],
     ['useVault',         () => useVault('main')],
     ['useVaultSnapshot', () => useVaultSnapshot('main')],
+    ['useBoxes',         () => useBoxes('main')],
+    ['useBox',           () => useBox('main', 'anthropic')],
   ] as const
 
   for (const [hookname, hook] of HookCases) {
@@ -95,5 +97,139 @@ describe("useVault and useVaultSnapshot", () => {
     const news: VaultError[] = []
     render(<BankProvider {...TH.providerPropsOf(world, { vaultDB, onBadNews: (told) => { news.push(told) } })}><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(news.map(({ refusalkind }) => refusalkind)).to.include('storage_unavailable') })
+  })
+})
+
+// == [Box hooks]: typingPassphrase, BoxPage, seenBoxes, boxWorld
+
+/** A requestCleartext that types the test's passphrase into every dialog. */
+const typingPassphrase: RequestCleartext = async (gating) => { await gating.attempt(TH.byPassphrase(TH.Passphrase)) }
+
+/** What a page shows of a box's snapshot: its revision and whether it is exposed. */
+const boxWords = (snapshot: BoxSnapshot | null): string => {
+  if (snapshot === null) { return 'none' }
+  return `revision ${String(snapshot.revision_seq)}, ${snapshot.exposed ? 'exposed' : 'sealed'}`
+}
+
+/** Why a whisper will not show, or 'shown'. */
+const whyHidden = (whisper: Whisper): string => (whisper as Partial<WhisperedBag>)[Whispered] ?? 'shown'
+
+/** What a page shows of a whisper: its apiKey, and why it will not show. */
+const whisperWords = (whisper: Whisper): string => `${String(whisper['apiKey'] ?? '-')} ${whyHidden(whisper)}`
+
+/** Shows what the box hooks say of no box. */
+const NoBox = () => {
+  const whisper = useWhisper(null)
+  const snapshot = useBoxSnapshot(null)
+  return <p>{`${String(Object.keys(whisper).length)} ${whyHidden(whisper)} ${String(snapshot === null)}`}</p>
+}
+
+/** The Box objects every {@link BoxPage} has been handed, each once. */
+const seenBoxes: Box[] = []
+
+/** What the box hooks say of `boxlabel` in the vault `main`, with the buttons a host's page would have. */
+const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
+  const { vault } = useVault('main')
+  const boxes = useBoxes('main')
+  const box = useBox('main', boxlabel)
+  const snapshot = useBoxSnapshot(box)
+  const whisper = useWhisper(box)
+  if (box !== null && ! seenBoxes.includes(box)) { seenBoxes.push(box) }
+  const make = async () => {
+    if (vault === null) { return }
+    await vault.ensureUnlocked()
+    const made = await vault.putBox({ boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })
+    await made.expose()
+  }
+  return (
+    <div>
+      <p data-testid="boxes">{boxes === null ? 'none' : boxes.map((listed) => listed.boxlabel).join(',')}</p>
+      <p data-testid="box">{boxWords(snapshot)}</p>
+      <p data-testid="whisper">{whisperWords(whisper)}</p>
+      <button type="button" onClick={() => { void make() }}>Make</button>
+      <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
+      <button type="button" onClick={() => { void vault?.ensureUnlocked() }}>Unlock</button>
+    </div>
+  )
+}
+
+const shownOfBox = (testid: 'boxes' | 'box' | 'whisper') => screen.getByTestId(testid).textContent
+
+/** A world whose vault `main` holds `anthropic`, its apiKey a fake, put from another device; and that device's vault. */
+const boxWorld = async () => {
+  const world = TH.makeBankWorld()
+  const { vault } = await TH.makeBankWithVault(world)
+  await vault.putBox({ boxlabel: 'anthropic', whisper: { apiKey: 'sk-ant-fake-stored' } }, { ifAbsent: 'add' })
+  return { world, vault }
+}
+// --
+
+describe("the box hooks", () => {
+  beforeEach(() => { seenBoxes.length = 0 })
+
+  it("read none until the vault is present, then the boxes it lists", async () => {
+    const { world } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
+    expect(shownOfBox('boxes')).to.eq('none')
+    expect(shownOfBox('box')).to.eq('none')
+    await waitFor(() => { expect(shownOfBox('boxes')).to.eq('anthropic') })
+    expect(shownOfBox('box')).to.eq('revision 0, sealed')
+  })
+
+  it("read none for a box not listed, then the box made from a click, exposed and blank", async () => {
+    const world = TH.makeBankWorld()
+    await TH.makeBankWithVault(world)
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(shownOfBox('boxes')).to.eq('') })
+    expect(shownOfBox('box')).to.eq('none')
+    fireEvent.click(screen.getByText('Make'))
+    await waitFor(() => { expect(shownOfBox('box')).to.eq('revision 0, exposed') })
+    expect(shownOfBox('boxes')).to.eq('anthropic')
+    expect(shownOfBox('whisper')).to.eq('- shown')
+  })
+
+  it("hand every component the same Box for a boxlabel", async () => {
+    const { world } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(screen.getAllByTestId('box').map(({ textContent }) => textContent)).to.deep.equal(['revision 0, sealed', 'revision 0, sealed']) })
+    expect(seenBoxes).to.have.lengthOf(1)
+  })
+
+  it("make a stored box through ifPresent get without writing, keeping its stored whisper", async () => {
+    const { world, vault } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(shownOfBox('box')).to.eq('revision 0, sealed') })
+    fireEvent.click(screen.getByText('Make'))
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored shown') })
+    expect(shownOfBox('box')).to.eq('revision 0, exposed')
+    const stored = await vault.fetchBox('anthropic')
+    expect(stored?.snapshot.revision_seq).to.eq(0)
+    expect(await stored?.extractWhisper()).to.deep.equal({ apiKey: 'sk-ant-fake-stored' })
+  })
+
+  it("read the whisper as a bag while it will not show: sealed, then locked, and shown again at an unlock", async () => {
+    const { world } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('- encrypted') })
+    fireEvent.click(screen.getByText('Make'))
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored shown') })
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('- locked') })
+    fireEvent.click(screen.getByText('Unlock'))
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored shown') })
+  })
+
+  it("read none again for a box deleted", async () => {
+    const { world, vault } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(shownOfBox('boxes')).to.eq('anthropic') })
+    await vault.delBox('anthropic')
+    await waitFor(() => { expect(shownOfBox('box')).to.eq('none') })
+    expect(shownOfBox('boxes')).to.eq('')
+  })
+
+  it("read a bag with no fields and no snapshot for no box", () => {
+    render(<NoBox />)
+    expect(screen.getByText('0 encrypted true')).to.exist
   })
 })

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
-import type { Bank, BankSnapshot, Vault, VaultSnapshot } from 'safebyok'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { Whispered, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type Vault, type VaultSnapshot, type Whisper, type WhisperedBag } from 'safebyok'
 import { useProvided } from './bank-provider'
 
 // == [Bank hooks]: useBank, useBankSnapshot, subscribeToNothing, getNothing
@@ -54,5 +54,42 @@ const useVaultFor = (hookname: string, vaultlabel: string): VaultHeld => {
 export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
   const { vault } = useVaultFor('useVaultSnapshot', vaultlabel)
   return useSyncExternalStore(vault?.subscribe ?? subscribeToNothing, vault?.getSnapshot ?? getNothing, getNothing)
+}
+// --
+
+// == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useWhisper, NoBoxBag
+
+/** The snapshots of the boxes present in the signed-in user's vault under `vaultlabel`, or null while the vault is not `present`. */
+export const useBoxes = (vaultlabel: string): readonly BoxSnapshot[] | null => {
+  const { vault } = useVaultFor('useBoxes', vaultlabel)
+  const boxes = vault?.boxListing ?? null
+  return useSyncExternalStore(boxes?.subscribe ?? subscribeToNothing, boxes?.getSnapshot ?? getNothing, getNothing)
+}
+
+/** The Box under `boxlabel` in the signed-in user's vault under `vaultlabel`, the same object wherever it is asked for; null until it is listed present. */
+export const useBox = (vaultlabel: string, boxlabel: string): Box | null => {
+  const { vault } = useVaultFor('useBox', vaultlabel)
+  const boxes = vault?.boxListing ?? null
+  const presentBox = useCallback(() => {
+    if (vault === null) { return null }
+    const box = vault.boxListing.at({ ...vault.scope, boxlabel })
+    return box?.isPresent === true ? box : null
+  }, [vault, boxlabel])
+  return useSyncExternalStore(boxes?.subscribe ?? subscribeToNothing, presentBox, getNothing)
+}
+
+/** The live snapshot of `box`, or null for no box. */
+export const useBoxSnapshot = (box: Box | null): BoxSnapshot | null => (
+  useSyncExternalStore(box?.subscribe ?? subscribeToNothing, box?.getSnapshot ?? getNothing, getNothing)
+)
+
+// Symbol.for, so the core's own check of a bag knows this one.
+const NoBoxBag: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
+const getNoBoxBag = (): Whisper => NoBoxBag
+
+/** The live whisper `box` shows, a bag with no fields while it will not show or there is no box; read it at each render, never keep it. */
+export const useWhisper = (box: Box | null): Whisper => {
+  const whisperOf = useCallback(() => box?.whisper ?? NoBoxBag, [box])
+  return useSyncExternalStore(box?.subscribe ?? subscribeToNothing, whisperOf, getNoBoxBag)
 }
 // --
