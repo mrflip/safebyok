@@ -6,7 +6,7 @@
 * **Issued by:** the Coach (flip), in the vaultdb_cleanup session, after the vaultdb line merged
   (#565 at 495cc5d6e). Orchestrated from that session, which keeps this sprint's doc.
 * **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; bookmark rev 2).
-* **Status:** threads 1 (#567) and 3 (#568) filed; thread 2 building; thread 4 waits on it.
+* **Status:** threads 1 (#567), 3 (#568) and 2 (#569) filed or filing; threads 4 and 5 cut from thread 2's tip, side by side.
 
 ## The Coach's request, verbatim
 
@@ -208,6 +208,34 @@ Listing and their opts typed by it; the duck check gains the try* verbs); answer
 from the core; `VaultDB.relay` and `VaultDBRelay` removed. **Levels:** `high` review (the refusal
 surface and the server's checks). **Size:** L: hand it the milestones and the continue-on-blocked
 pattern from the start. **Depends on:** thread 2 (stacked; linear line).
+
+### 5. idb_versions
+
+*The Coach's text (2026-11-07, Open Matters, proceed):* on "The IndexedDB vault database has no
+version in its name": "`${dbName}:device-v001-001-001` , frrom a string in consts." On "A deriver may
+still ask for an 8-byte salt" (Rec: raise fastkey's floor to 16, the vector tests building their
+spec past the check): took the Rec. Coach note: "16-byte salt, which is 22 characters -- thanks
+for translating -- yes min(22).max(43).regex(Patterns.b64url)". On "The device store's refusals
+say 'the vault'": "its still the abstraction for the user and the customer, so vault is
+appropriate" (no change).
+
+*Gloss.*
+* Database names carry a zero-padded three-part version from a string constant in the core's
+  consts: the device store `${dbName}:device-v001-001-001`, and safebyok-indexeddb's vault store
+  likewise (`${dbName}:vaults-v001-001-001`, its constant beside the device one). Each store wipes,
+  unread, its older versioned names and its unversioned or old-pattern ones (`${dbName}:device_db`,
+  `${dbName}:device-v1`, `${dbName}:vaults`), as thread 2's wipe does now.
+* fastkey's `MinArgon2SaltBytes` 8 -> 16 (the core's `MinSaltBytes`); its reference-vector tests
+  build their 8-byte spec past the check.
+* `Patterns.b64url` in the core, and `salt_b64` checked as
+  `str.min(22).max(43).regex(Patterns.b64url)`, replacing thread 2's computed regex.
+* Ride-alongs if the Coach flips them (rows on Open Matters): one clause in G4 naming the
+  damaged-row wontfix; one IndexedDB shelf per `dbName`, as the old core kept.
+* TODO.md: the demo's move to the new core must not run the old and new device stores under one
+  `dbName` (the new one wipes the old's live database).
+* Changesets: unreleased, no back-compat; old databases are wiped.
+**Levels:** `sonnet` worker, `medium` review. **Size:** S. **Depends on:** thread 2 (cut from its
+tip beside thread 4; the restack puts them in line).
 
 ## For the Coach
 
