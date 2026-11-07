@@ -93,3 +93,13 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 * *Orchestrator:* thread 12: a non-function handler is refused `bad_option` again. `onPanic` is held
   in a ref, and a host's having one or not is what remakes the bank. The remake warning is said once
   through `bank.logger`.
+
+## From thread 9 (browser_batteries, #579), before its review
+
+* *Orchestrator:* `safebyok/browser` exports `zxcvbnStrengthChecker`, `MinPassphraseChars` (12),
+  `MinZxcvbnScore` (3), `browserOpts({ dbName }?)` (the frozen bag of `keyDeriver`, `deviceDB`,
+  `strengthChecker`, the same bag for the same `dbName`, safe in render), `BrowserOpts`, and the
+  `StrengthChecker` type.
+* *Orchestrator:* `browserOpts` supplies **no `device_id`**: a host (the demo) keeps passing its own.
+* *Orchestrator:* a check made before the dictionary loads triggers the load. A failed load answers
+  weak with a "check your connection" reason, never throws.
