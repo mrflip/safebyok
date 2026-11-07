@@ -2,7 +2,7 @@
 
 Branch `20261107-graphql_schema`, PR #571, stacked on #569 (thread 2, `20261107-idb_devicedb`). Status: **ready**,
 milestones 1-4 built. Justify green (with `SAFEBYOK_PG_URL` set): core 2,365, indexeddb 107 (2 skipped), postgres 123
-(1), convex 227, fastkey 49, graphql 224 (3), e2e 298 (4), react 326.
+(1), convex 227, fastkey 49, graphql 228 (3), e2e 298 (4), react 326.
 
 Authority: the Coach's rulings in `vaultdb_cleanup-plan.md` *8. graphql_schema* (on `origin/20261106-vaultdb_cleanup`)
 and `devicedb_idb-plan.md` *4. graphql_schema*. Milestones 1 to 3 in detail: `thread-4-graphql_schema-m1m2.md`.
@@ -22,9 +22,8 @@ and `devicedb_idb-plan.md` *4. graphql_schema*. Milestones 1 to 3 in detail: `th
   * **Stream end by `result.hasNext`**, not wonka's `onEnd` (wonka is not a dependency). executeExchange never ends a
     subscription, so the resubscribe tests use a fake client.
   * **`signedInAsAsked`** also reads `params.user_id`, for the gate verbs.
-* **Suppression**: one `eslint-disable-line @typescript-eslint/class-literal-property-style` on the brand getter.
-  The graphql config keeps the rule's default `fields`, the core sets `getters`, and `device-db-new.ts` does the same.
-  The alternative is to set `getters` in the graphql package's eslint config.
+* **Suppression**: none. The graphql eslint config sets `class-literal-property-style` to `getters`, as the core's does
+  (off for tests), so the brand getter needs no disable (rework, below).
 * **Deviations**: `SafebyokEpochMillis`, not `EpochMillis`; a refusal's cause no longer reaches host logs through
   the resolvers; `goodAnswerOf` in place of the handoff's literal `valOf`.
 * **Discoveries**:
@@ -73,4 +72,23 @@ and `devicedb_idb-plan.md` *4. graphql_schema*. Milestones 1 to 3 in detail: `th
   * **Resubscribe delay**: built as planned, a fixed 1s behind `afterAPause`; or resubscribe at once, with no timer
     (a one-line change).
   * **`maxRecordBytes` off the client**: keep; or accept it and ignore it, sparing hosts a breaking change.
-  * **Brand-getter lint**: keep the `eslint-disable-line`; or set `getters` in the graphql eslint config.
+
+## Rework after the review at `high` (2026-11-07)
+
+Reviewer's fixes (`a824e9788` to `938890ae5`) stand. Done on top, one commit each:
+* **G304 restored**: `fieldOf` refuses a GraphQL error, or data missing the field, as `unexpected_error` with no cause
+  (graphql-js's variable-coercion errors can quote the variable sent, the record). The test asserts `cause` undefined;
+  the GraphQL changeset says so. A network error is unchanged: `storageUnavailable(err)` keeps the whole CombinedError
+  as its cause (its `networkError`, `response`, and any `graphQLErrors` it also holds). It is a failed fetch, not a
+  server's answer, but a non-2xx response's body could in principle quote a variable; narrowing the cause to
+  `err.networkError` is a one-line change, left for the Coach (Open matters).
+* **Peer range** `graphql: ^17.0.0`, and a changeset line (the scalars use graphql 17's coercion hooks).
+* **Lint**: `getters` in the graphql eslint config (and off for tests, as in the core); the `eslint-disable-line` is gone.
+* **README**: the watch's resubscribe is stated for fetch and server-sent events; over a WebSocket exchange two ends
+  send no closing result, so the watch does not subscribe again.
+* **Test titles**: the 14 listed, one outcome each, four tests split in two (the option defaults and null; the watch's
+  hearing and its listen released; the time past 32 bits and the fractional time; a notice heard once and the
+  resubscribe). Titles quote **no** refusal kind: the lint's own message (`vitest/valid-title`, core) and STYLE.md,
+  *Tests*, say a title quotes none, so the directive's "a refusal kind in quotes" was not followed; kinds already in
+  a title were dropped (graphql's lint has the rule off, so nothing enforces it there).
+* Left for the Coach or thread 6, per the directive: the rest of the review's minor findings.

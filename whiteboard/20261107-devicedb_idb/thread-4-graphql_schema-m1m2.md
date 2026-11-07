@@ -43,7 +43,7 @@ For whoever reworks the core's `VaultDBVerbs`, the answer checks, the schema or 
     `__typename` by path, and parses with the AX checker. A refusal gets `{call, req_params}` in its meta, as the
     base class's do. The plain verbs are `goodAnswerOf(await this.tryX())`.
   * **Errors**: a CombinedError with a `networkError` is `storage_unavailable`; one with GraphQL errors, or data
-    missing the field, is `unexpected_error` (`SchemaNotServed`), the CombinedError its cause.
+    missing the field, is `unexpected_error` (`SchemaNotServed`), no cause (G304).
   * **`__typename`**: `dropTypename(bag, nested)` drops a selection's own and recurses only into the fields each
     selection names (gate, wayins, ciphered fields, listing rows, `req_params.prior`, `err`). Never into a sidecar,
     `damaged_rows` or `meta`. A test round-trips a sidecar holding `__typename`.
