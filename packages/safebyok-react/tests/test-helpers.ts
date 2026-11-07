@@ -1,8 +1,5 @@
-/**
- * safebyok-react's test helpers: everything `safebyok/testing` has, a provider over a bank world,
- * a render that hears what React reports, a promise held for the test to settle, and a way to have
- * Suspense hide what it holds. Those that need JSX are in `test-helpers-react.tsx`, which it
- * re-exports. Star-import it as `TH` (`import * as TH from './test-helpers'`).
+/** safebyok-react's test helpers: everything `safebyok/testing` has, a provider over a bank world, a render that hears what React reports, a promise held for the test to settle, and a way to have Suspense hide what it holds.
+ * Those that need JSX are in `test-helpers-react.tsx`, which it re-exports. Star-import it as `TH` (`import * as TH from './test-helpers'`).
  */
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
@@ -59,9 +56,7 @@ export const Hider = ({ hiding }: { hiding: Promise<unknown> | null }) => {
 /** The device_id of the provider's bank in these tests. */
 export const DeviceId = '00000000-0000-4000-8000-0000000000c1'
 
-/**
- * A BankProvider's props over `world`'s vaultDB, signed in as the world's user, with a deviceDB of
- * its own, so a vault the world's bank built is locked to the provider's.
+/** A BankProvider's props over `world`'s vaultDB, signed in as the world's user, with a deviceDB of its own, so a vault the world's bank built is locked to the provider's.
  *
  * @example
  *   const world = TH.makeBankWorld()
@@ -84,10 +79,7 @@ export const withoutGesture = () => {
 
 // == [Held gatings]: heldGatingOf, building, unlocking, passphraseGatingOf
 
-/**
- * The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, held open
- * until it settles or the test calls `close`, as a host's requestCleartext holds it while its
- * dialog shows; and `raising`, the outcome of `raise`.
+/** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, held open until it settles or the test calls `close`, as a host's requestCleartext holds it while its dialog shows; and `raising`, the outcome of `raise`.
  *
  * @example
  *   await TH.makeBankWithVault(world)
