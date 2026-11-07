@@ -31,23 +31,23 @@ const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?
 
 // The types say a handler is a function or none, so a misused one is typed as the handler it is not:
 // Bank.make refuses it.
-/** What a handler prop is handed to Bank.make as when it is misuse: itself, to be refused `bad_option`; undefined for a function or none. */
+/** A handler prop that is not a function, for Bank.make to refuse; undefined for a function. */
 const misusedHandler = <HandlerT,>(given: HandlerT | null | undefined): HandlerT | undefined => (typeof given === 'function' ? undefined : given as HandlerT | undefined)
 
-/** Every Bank.make option but `user_id` and `requestCleartext`, which the provider takes its own way, and two for its dialogs. */
+/** What BankProvider is handed: the Bank.make options, the signed-in `user_id`, and the dialogs' props. */
 export type BankProviderProps = Omit<BankOpts, 'user_id' | 'requestCleartext'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then the provider holds no bank. */
   user_id:             string | null
-  /** What asks the user for a passphrase or passkey: left out, the provider's own dialogs; null, none, each ask declined. */
+  /** What asks the user for a passphrase or passkey: the provider's own dialogs when left out, none when null. */
   requestCleartext?:   RequestCleartext | null | undefined
-  /** What a password manager files a vault's passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
+  /** What a password manager files a vault's passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase. Default: the bank's strength checker's reason. */
+  /** What to say beside the field as the user chooses a passphrase. */
   passphraseAdvice?:   PassphraseAdvice | undefined
   children:            ReactNode
 }
 
-/** Make the signed-in user's bank, say hello, and hand it down to the hooks; its dialogs ask the user only on their gesture. */
+/** Make the signed-in user's bank, say hello, and hand it down to the hooks. */
 export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, passphraseAdvice, children, ...opts }: BankProviderProps) => {
   const { applabel, device_id, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic, ...unlisted } = opts
   // Each prop Bank.make does not take, by name, handed on to it so it is refused to the error
@@ -78,7 +78,7 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
   const hasPanicHandler = typeof onPanic === 'function'
   const misusedPanic = misusedHandler(onPanic)
 
-  /** Close `ending` if it is still the dialog showing, and resolve its ask: a gating still open then is declined. */
+  /** Close `ending` if it is still the dialog showing, and resolve its ask. */
   const endShowing = useCallback((ending: Showing) => {
     if (showingRef.current === ending) {
       showingRef.current = null

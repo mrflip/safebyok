@@ -22,7 +22,7 @@ export const passkeysAvailable = (): boolean => (
 
 /** What `createPasskey` asks of the host: how the authenticator shows the new passkey. */
 export type CreatePasskeyOpts = {
-  /** The relying party: the `name` the authenticator shows, and the `id`, the domain the passkey answers to; by default the page's own. */
+  /** The relying party: the `name` the authenticator shows, and the `id` domain the passkey answers to. */
   rp:       { name: string, id?: string | undefined }
   /** How the authenticator lists the passkey: an account `name` and a `displayName`. */
   user:     { name: string, displayName: string }
@@ -36,7 +36,7 @@ export type AskPasskeyOpts = {
   timeout?: number | undefined
 }
 
-/** Make a new passkey and hand back its first answer over a fresh salt, for an `add_passkey` gating's attempt; null when the user dismissed the prompt.
+/** Make a new passkey and return its first answer, or null when the user dismisses the prompt.
  *
  * @example
  *   const passkeyClear = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
@@ -80,7 +80,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
   return answerOf(credential_id, prfSaltBytes, answer)
 }
 
-/** Ask the passkey of `passkeyHeader` (a gating's `passkeyHeader`) for its answer over its own salt, for an `unlock_vault` gating's attempt; null when the user dismissed the prompt.
+/** Ask the passkey of `passkeyHeader` for its answer, or null when the user dismisses the prompt.
  *
  * @example
  *   const passkeyClear = await askPasskey(gating.passkeyHeader)
@@ -111,7 +111,7 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, opts: AskPas
   return passkeyClear
 }
 
-/** Hand `passkey` to `attempt`, then zero its bytes whatever the attempt did: a dialog hands each answer in once, and keeps no copy that opens the vault. */
+/** Hand `passkey` to `attempt`, then zero its bytes whatever the attempt did. */
 export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
   try {
     return await attempt(passkey)
@@ -145,7 +145,7 @@ const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
   return copied
 }
 
-/** `{ [field]: val }`, or nothing when `val` is undefined: WebAuthn's options take a field left out, never one set to undefined. */
+/** `{ [field]: val }`, or nothing when `val` is undefined. */
 const optional = <FieldT extends string, ValT>(field: FieldT, val: ValT | undefined): Partial<Record<FieldT, ValT>> => (
   val === undefined ? {} : { [field]: val } as Record<FieldT, ValT>
 )
@@ -158,7 +158,7 @@ const demandWebAuthn = () => {
 /** The refusal for an authenticator that gives no PRF answer. */
 const noPrf = () => new VaultError('wrong_passkey', Messages.noPrf)
 
-/** The credential a WebAuthn call resolves with, or null when the user dismissed it; its other refusals become VaultErrors, the browser's own error their cause. */
+/** The credential a WebAuthn call resolves with, or null when the user dismissed it. */
 const askAuthenticator = async (call: () => Promise<Credential | null>): Promise<PublicKeyCredential | null> => {
   let credential: Credential | null
   try {

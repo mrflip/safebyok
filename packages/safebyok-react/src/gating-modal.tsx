@@ -13,11 +13,11 @@ export type GatingModalProps = {
   gating:              AnyGating
   /** Called once, with the dialog's answer: 'unlocked' or 'deleted' once an attempt is ok, 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** The bank's `leaseMillis`, for the line that says how long an unlock lasts; left out, the dialog says nothing of it. */
+  /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
-  /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
+  /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a new passphrase. Default: the bank's strength checker's reason. */
+  /** What to say beside the field as the user chooses a new passphrase. */
   passphraseAdvice?:   PassphraseAdvice | undefined
   /** The relying party the vault's passkey is made and asked under, if not the page's own domain. */
   passkeyRpId?:        string | undefined
@@ -48,7 +48,7 @@ const NoDialog = ({ onDone }: Pick<GatingModalProps, 'onDone'>) => {
   return null
 }
 
-/** The dialog for any gating, by its `gatingkind`; a host's own `requestCleartext` may render it, resolving once `onDone` is told. */
+/** The dialog for any gating, by its `gatingkind`. */
 export const GatingModal = ({ gating, ...rest }: GatingModalProps) => {
   // The map pairs each kind with its dialog; the lookup cannot carry that pairing to the call.
   const Dialog = DialogForGatingkind[gating.gatingkind] as ComponentType<GatingModalProps> | undefined

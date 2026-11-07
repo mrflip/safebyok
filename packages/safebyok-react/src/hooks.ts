@@ -8,10 +8,10 @@ const unsubscribeFromNothing = () => { /* nothing was heard */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 const getNothing = () => null
 
-/** The signed-in user's bank the nearest BankProvider holds, or null while it holds none; call its verbs from an event handler. */
+/** The signed-in user's bank the nearest BankProvider holds, or null while it holds none. */
 export const useBank = (): Bank | null => useProvided('useBank').bank
 
-/** The live snapshot of the signed-in user's bank, its `stage` and the vaults it lists, or null while the provider holds no bank. */
+/** The live snapshot of the signed-in user's bank, or null while the provider holds no bank. */
 export const useBankSnapshot = (): BankSnapshot | null => {
   const { bank } = useProvided('useBankSnapshot')
   return useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
@@ -20,7 +20,7 @@ export const useBankSnapshot = (): BankSnapshot | null => {
 
 // == [Vault hooks]: VaultStage, VaultHeld, useVault, useVaultFor, useVaultSnapshot, WaitingHeld, UnbornHeld
 
-/** Where the vault a hook names stands: `waiting` until the bank is ready, `unborn` while it holds no live vault, else `present`. */
+/** Where the vault a hook names stands: `waiting`, `unborn` or `present`. */
 export type VaultStage = 'waiting' | 'unborn' | 'present'
 
 /** What {@link useVault} answers: the vault's stage, and its Vault object while it is `present`. */
@@ -29,7 +29,7 @@ export type VaultHeld = { stage: 'waiting' | 'unborn', vault: null } | { stage: 
 const WaitingHeld: VaultHeld = Object.freeze({ stage: 'waiting', vault: null })
 const UnbornHeld: VaultHeld = Object.freeze({ stage: 'unborn', vault: null })
 
-/** The signed-in user's vault under `vaultlabel` and where it stands, never asking the user; an `unborn` vault is built by `bank.ensureVault` from a click. */
+/** The signed-in user's vault under `vaultlabel` and where it stands. */
 export const useVault = (vaultlabel: string): VaultHeld => useVaultFor('useVault', vaultlabel)
 
 /** {@link useVault}'s work, for `hookname`: the vault the bank lists once ready, said hello to once. */
@@ -59,14 +59,14 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 
 // == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useWhisper, NoBoxBag
 
-/** The snapshots of the boxes present in the signed-in user's vault under `vaultlabel`, or null while the vault is not `present`. */
+/** The snapshots of the boxes in the signed-in user's vault under `vaultlabel`, or null while it is not `present`. */
 export const useBoxes = (vaultlabel: string): readonly BoxSnapshot[] | null => {
   const { vault } = useVaultFor('useBoxes', vaultlabel)
   const boxes = vault?.boxListing ?? null
   return useSyncExternalStore(boxes?.subscribe ?? subscribeToNothing, boxes?.getSnapshot ?? getNothing, getNothing)
 }
 
-/** The Box under `boxlabel` in the signed-in user's vault under `vaultlabel`, the same object wherever it is asked for; null until it is listed present. */
+/** The Box under `boxlabel` in the signed-in user's vault under `vaultlabel`, or null until it is listed present. */
 export const useBox = (vaultlabel: string, boxlabel: string): Box | null => {
   const { vault } = useVaultFor('useBox', vaultlabel)
   const boxes = vault?.boxListing ?? null
@@ -87,7 +87,7 @@ export const useBoxSnapshot = (box: Box | null): BoxSnapshot | null => (
 const NoBoxBag: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
 const getNoBoxBag = (): Whisper => NoBoxBag
 
-/** The live whisper `box` shows, a bag with no fields while it will not show or there is no box; read it at each render, never keep it. */
+/** The live whisper `box` shows, a bag with no fields while it will not show or there is no box. */
 export const useWhisper = (box: Box | null): Whisper => {
   const whisperOf = useCallback(() => box?.whisper ?? NoBoxBag, [box])
   return useSyncExternalStore(box?.subscribe ?? subscribeToNothing, whisperOf, getNoBoxBag)

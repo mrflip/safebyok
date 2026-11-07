@@ -5,7 +5,7 @@ import { WhisperFieldAttributes } from 'safebyok/utils'
 import { Messages } from './messages'
 import { useRevealToggle } from './reveal-toggle'
 
-/** A field showing the text at dotted `path` in the whisper of `box`, blank and read-only while it will not show; `BoxFields.of(box).save()` stores an edit.
+/** A field showing the text at dotted `path` in the whisper of `box`, blank and read-only while it will not show.
  *
  * @example
  *   <BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />
@@ -39,7 +39,7 @@ export const BoxWhisperField = ({ box, path, readOnly, ...passed }: BoxWhisperFi
   )
 }
 
-/** What a BoxWhisperField is handed: the box, the dotted path of the text in its whisper, and any other input attribute but a ref, a name, a value or a change handler. */
+/** What a BoxWhisperField is handed: the box, the dotted path, and input attributes. */
 export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'name' | 'value' | 'defaultValue' | 'onChange' | keyof typeof WhisperFieldAttributes> & {
   box:  Box
   path: string

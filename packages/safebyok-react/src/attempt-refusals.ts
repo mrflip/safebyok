@@ -1,6 +1,6 @@
 import { correctablekindVals, isVaultError } from 'safebyok'
 
-/** What a dialog does with a refusal a gating's attempt met: show it in place, close, show its trouble notice, or ignore a second submit. */
+/** What a dialog does with a refusal a gating's attempt met. */
 export type AttemptRefusalFlavor = 'in_place' | 'close' | 'trouble' | 'in_flight'
 
 /** The refusals a dialog shows in place, asking again: those the core leaves the gating open for. */
