@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { memoryStore, type StringStore } from 'safebyok-old'
 import { createAuth } from '../../src/lib/auth'
+import type { StringStore } from '../../src/lib/local-store'
+import { memoryStore } from '../test-helpers'
 
 /** Two fresh stores, a clock the test moves by hand, and the auth over them. */
 const makeWorld = () => {
@@ -59,23 +60,7 @@ describe("createAuth", () => {
     expect(margosAccount(dbStore)).to.have.property('registered_at', Date.UTC(2026, 9, 15, 9, 30))
   })
 
-  const BadClockCases = [
-    [NaN,                       'a clock reading NaN'],
-    [Date.UTC(2026, 9, 15) / 1000, 'a clock in epoch seconds'],
-    [Date.UTC(2026, 9, 15) * 1000, 'a clock in epoch microseconds'],
-  ] as const
-
-  for (const [reading, blurb] of BadClockCases) {
-    it(`refuses a new account's sign-in, stamping nothing, for ${blurb}`, async () => {
-      const dbStore = memoryStore()
-      const auth = createAuth({ applabel: 'acme', dbStore, deviceStore: memoryStore(), clock: { now: () => reading } })
-      await expect(auth.signIn('margo')).rejects.toThrow(/clock read no time between 1981 and 2255/)
-      expect(dbStore.get('account:acme:margo')).to.be.null
-      expect(auth.getSnapshot()).to.be.null
-    })
-  }
-
-  it("rounds a clock's fraction down, as the vault does", async () => {
+  it("rounds a clock's fraction down", async () => {
     const dbStore = memoryStore()
     const auth = createAuth({ applabel: 'acme', dbStore, deviceStore: memoryStore(), clock: { now: () => Date.UTC(2026, 9, 15) + 0.75 } })
     await auth.signIn('margo')

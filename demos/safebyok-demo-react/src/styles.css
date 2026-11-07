@@ -1,4 +1,4 @@
-/* DEMO JANK: just enough style to tell the layers apart. */
+/* Just enough style to tell the parts of the page apart. */
 
 :root {
   --ink:    #1a2330;
@@ -68,6 +68,13 @@ textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-heig
   margin: 0.75rem 0;
 }
 .session-bar input { width: 14rem; }
+
+.account-menu .vault-lock-control { display: inline-flex; gap: 0.5rem; align-items: center; }
+
+.flows { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); align-items: start; }
+.flow h2 { margin-top: 0; }
+
+.dev-tools { border-top: 3px double var(--line); margin-top: 2rem; padding-top: 0.5rem; }
 
 .vault-dashboard { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 1rem 1rem; margin: 0.75rem 0; }
 .ways-in { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 1rem 1rem; margin: 0.75rem 0; }

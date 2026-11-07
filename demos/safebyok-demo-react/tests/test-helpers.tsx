@@ -6,7 +6,11 @@ import { MemoryDeviceDB } from 'safebyok'
 import { MemoryVaultDB } from 'safebyok/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
 import { BankProvider, useBank, useVault, useVaultSnapshot } from 'safebyok-react'
+import { SessionBar } from '../src/components/SessionBar'
+import { useSession } from '../src/hooks/useSession'
 import { JokeModel } from '../src/lib/anthropic'
+import { createAuth, type Auth } from '../src/lib/auth'
+import type { StringStore } from '../src/lib/local-store'
 
 export * from 'safebyok/testing'
 
@@ -28,6 +32,28 @@ export const renderInBank = (ui: ReactNode, user_id: string | null = 'u1') => {
     </BankProvider>,
   )
   return { vaultDB }
+}
+
+/** A StringStore in memory, for the fake auth under test: each call a fresh, empty one. */
+export const memoryStore = (): StringStore => {
+  const texts = new Map<string, string>()
+  return {
+    get: (ckey) => texts.get(ckey) ?? null,
+    put: (ckey, text) => { texts.set(ckey, text) },
+    del: (ckey) => { texts.delete(ckey) },
+  }
+}
+
+/** A fake auth over fresh stores in memory. */
+export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStore: memoryStore(), deviceStore: memoryStore() })
+
+/** The SessionBar as the App renders it, handed the live session of `auth`. */
+export const LiveSessionBar = ({ auth }: { auth: Auth }) => <SessionBar auth={auth} session={useSession(auth)} />
+
+/** Types `userlabelText` into the sign-in strip and presses Sign in. */
+export const signInAs = (userlabelText: string) => {
+  fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: userlabelText } })
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 }
 
 /** Answers the passphrase dialog once it shows: types `passphrase` and submits, typing it again where the dialog asks to confirm it. */

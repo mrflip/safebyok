@@ -1,21 +1,18 @@
 import { useState } from 'react'
-import { useBank, useVault } from 'safebyok-react'
-import { useSession } from '../hooks/useSession'
-import type { Auth } from '../lib/auth'
+import type { Auth, Session } from '../lib/auth'
 import { keepStorage } from '../lib/persist-storage'
+import { AccountMenu } from './AccountMenu'
 
-/** The app's sign-in strip.
- * Typing a username signs you in (or up); there is no password, because
- * the demo's point is that the vault passphrase is a separate thing from signing in. Signing in
- * asks the browser to keep this site's storage, on the user's gesture. Signing out locks the
- * user's vaults on this device; deleting the account deletes its vault first.
+/** The app's sign-in strip while signed out, and the signed-in user's account menu after.
+ * Typing a username signs you in (or up); there is no password, because the demo's point is that
+ * the vault passphrase is a separate thing from signing in. Signing in asks the browser to keep
+ * this site's storage, on the user's gesture.
  */
-export const SessionBar = ({ auth }: { auth: Auth }) => {
-  const session = useSession(auth)
-  const bank = useBank()
-  const { stage, vault } = useVault('main')
+export const SessionBar = ({ auth, session }: { auth: Auth, session: Session | null }) => {
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
+
+  if (session !== null) { return <AccountMenu auth={auth} session={session} /> }
 
   const signIn = async () => {
     // The vault lives in this browser's IndexedDB, which the browser may evict unless asked not
@@ -30,49 +27,16 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
     }
   }
 
-  if (session === null) {
-    return (
-      <div className="session-bar">
-        <input
-          placeholder="username"
-          value={userlabelText}
-          onChange={(evt) => { setUserlabelText(evt.target.value) }}
-          onKeyDown={(evt) => { if (evt.key === 'Enter') { void signIn() } }}
-        />
-        <button onClick={() => { void signIn() }}>Sign in</button>
-        {gripe !== null && <span className="gripe">{gripe}</span>}
-      </div>
-    )
-  }
-
-  const signOut = () => {
-    bank?.lock()
-    auth.signOut()
-  }
-
-  const deleteAccount = async () => {
-    setGripe(null)
-    // Until the bank has heard from storage, nobody knows whether a vault is there to delete.
-    if (stage === 'waiting') { setGripe('Your vault is still loading: try again in a moment.'); return }
-    if (! globalThis.confirm('Delete this account and its vault? The secrets in it are gone for good.')) { return }
-    // The vault's dialog asks for the passphrase, which proves the deletion. A vault never born has
-    // nothing to delete: the account goes without it. Cancelled, the account stays, quietly.
-    if (stage === 'present') {
-      const deleted = await vault.tryDelVaultPrompt()
-      if (! deleted.ok) {
-        const { refusalkind, message } = deleted.err
-        if (refusalkind !== 'declined' && refusalkind !== 'locked_while_asking') { setGripe(message) }
-        return
-      }
-    }
-    await auth.deleteAccount()
-  }
-
   return (
     <div className="session-bar">
-      <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.user_id})</code></span>
-      <button onClick={signOut}>Sign out</button>
-      <button className="danger" onClick={() => { void deleteAccount() }}>Delete account</button>
+      <input
+        placeholder="username"
+        aria-label="username"
+        value={userlabelText}
+        onChange={(evt) => { setUserlabelText(evt.target.value) }}
+        onKeyDown={(evt) => { if (evt.key === 'Enter') { void signIn() } }}
+      />
+      <button onClick={() => { void signIn() }}>Sign in</button>
       {gripe !== null && <span className="gripe">{gripe}</span>}
     </div>
   )
