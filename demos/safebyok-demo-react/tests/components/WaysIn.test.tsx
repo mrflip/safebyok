@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Vault } from 'safebyok'
 import { WaysIn } from '../../src/components/WaysIn'
 import * as TH from '../test-helpers'
 
 const NextPassphrase = 'a whole new passphrase for the vault'
+
+afterEach(() => { vi.restoreAllMocks() })
 
 /** WaysIn beside the vault probe, in a bank for `u1`, with the vault built and unlocked. */
 const renderBuilt = async () => {
@@ -43,9 +46,10 @@ describe("WaysIn", () => {
 
   it("says nothing when the user cancels the dialog", async () => {
     await renderBuilt()
+    const prompting = vi.spyOn(Vault.prototype, 'tryReplacePassphrasePrompt')
     fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await TH.settleAsks()
+    await TH.settlePrompts(prompting)
     expect(screen.queryByRole('dialog')).to.be.null
     expect(document.querySelector('.ways-in .gripe')).to.be.null
   })
