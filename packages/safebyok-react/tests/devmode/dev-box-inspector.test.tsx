@@ -42,7 +42,7 @@ describe("DevBoxInspector", () => {
   it("asks for nothing and shows nothing of the whisper until a button is clicked", async () => {
     await renderOverBox()
     expect(status()).to.eq('vault present, locked; box revision 0, not exposed; not showing')
-    expect(whisperBlock('box.whisper').getByText('encrypted')).to.exist
+    expect(whisperBlock('box.whisper').getByText('unexposed')).to.exist
     expect(document.body.textContent).not.to.include(StoredKey)
   })
 

@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react'
-import { Whispered, type BoxPutOpts, type BoxSnapshot, type Whisper, type WhisperedBag } from 'safebyok'
-import { useBankSnapshot, useBox, useBoxes, useBoxIsShowing, useBoxSnapshot, useVault, useVaultSnapshot, useWhisper } from '../hooks'
+import type { BoxPutOpts, BoxSnapshot, Whisper } from 'safebyok'
+import { useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useVaultSnapshot, useWhisper } from '../hooks'
 import { Messages } from '../messages'
 import { useRevealToggle } from '../reveal-toggle'
 import { WhisperField } from '../whisper-field'
@@ -61,7 +61,8 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   const box = useBox(vaultlabel, boxlabel)
   const boxSnapshot = useBoxSnapshot(box)
   const whisper = useWhisper(box)
-  const isShowing = useBoxIsShowing(box)
+  const exposure = useBoxExposure(box)
+  const isShowing = (exposure === 'showing')
   const { lastCall, call } = useLastCall()
   const [fieldname, setFieldname] = useState('apiKey')
   // Kept off React's state, so the text typed never sits in a render.
@@ -120,7 +121,7 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
           onClick={() => { void call('putBox', () => putting({ [fieldname]: whisperText.current })) }}
         >putBox (typed)</button>
       </div>
-      <WhisperShown caption="box.whisper" whisper={isShowing ? whisper : null} hiddenWord={(whisper as Partial<WhisperedBag>)[Whispered]} />
+      <WhisperShown caption="box.whisper" whisper={isShowing ? whisper : null} hiddenWord={exposure} />
       <WhisperShown caption="extracted" whisper={extracted} hiddenWord="none extracted" />
       <LastCallLine lastCall={lastCall} />
     </div>

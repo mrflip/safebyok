@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Vault, VaultError, Whispered, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type WhisperedBag } from 'safebyok'
+import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure } from 'safebyok'
 import { MemoryVaultDB, type VaultQuery } from 'safebyok/storage'
 import { BankProvider } from '../src/bank-provider'
-import { useBank, useBankSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks'
+import { useBank, useBankSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -111,18 +111,16 @@ const boxWords = (snapshot: BoxSnapshot | null): string => {
   return `revision ${String(snapshot.revision_seq)}, ${snapshot.exposed ? 'exposed' : 'sealed'}`
 }
 
-/** Why a whisper will not show, or 'shown'. */
-const whyHidden = (whisper: Whisper): string => (whisper as Partial<WhisperedBag>)[Whispered] ?? 'shown'
-
-/** What a page shows of a whisper: its apiKey, and why it will not show. */
-const whisperWords = (whisper: Whisper): string => `${String(whisper['apiKey'] ?? '-')} ${whyHidden(whisper)}`
+/** What a page shows of a whisper: its apiKey, and where it stands. */
+const whisperWords = (whisper: Whisper, exposure: BoxExposure): string => `${String(whisper['apiKey'] ?? '-')} ${exposure}`
 
 /** Shows what the box hooks say of no box. */
 const NoBox = () => {
   const whisper = useWhisper(null)
   const snapshot = useBoxSnapshot(null)
   const isShowing = useBoxIsShowing(null)
-  return <p>{`${String(Object.keys(whisper).length)} ${whyHidden(whisper)} ${String(snapshot === null)} ${String(isShowing)}`}</p>
+  const exposure = useBoxExposure(null)
+  return <p>{`${String(Object.keys(whisper).length)} ${exposure} ${String(snapshot === null)} ${String(isShowing)}`}</p>
 }
 
 /** The Box objects every {@link BoxPage} has been handed, each once. */
@@ -135,6 +133,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   const box = useBox('main', boxlabel)
   const snapshot = useBoxSnapshot(box)
   const whisper = useWhisper(box)
+  const exposure = useBoxExposure(box)
   const isShowing = useBoxIsShowing(box)
   if (box !== null && ! seenBoxes.includes(box)) { seenBoxes.push(box) }
   const make = async () => {
@@ -147,7 +146,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
     <div>
       <p data-testid="boxes">{boxes === null ? 'none' : boxes.map((listed) => listed.boxlabel).join(',')}</p>
       <p data-testid="box">{boxWords(snapshot)}</p>
-      <p data-testid="whisper">{whisperWords(whisper)}</p>
+      <p data-testid="whisper">{whisperWords(whisper, exposure)}</p>
       <p data-testid="showing">{isShowing ? 'showing' : 'hidden'}</p>
       <button type="button" onClick={() => { void make() }}>Make</button>
       <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
@@ -156,7 +155,32 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   )
 }
 
-const shownOfBox = (testid: 'boxes' | 'box' | 'whisper' | 'showing') => screen.getByTestId(testid).textContent
+/** Whether `anthropic` in the vault `main` shows, wears its veil and where its whisper stands, with the buttons that veil it, unexpose it and lock its vault. */
+const VeilPage = () => {
+  const { vault } = useVault('main')
+  const box = useBox('main', 'anthropic')
+  const isShowing = useBoxIsShowing(box)
+  const isVeiled = useBoxSnapshot(box)?.veiled ?? false
+  const exposure = useBoxExposure(box)
+  const expose = async () => {
+    if ((vault === null) || (box === null)) { return }
+    await vault.ensureUnlocked()
+    await box.expose()
+  }
+  return (
+    <div>
+      <p data-testid="veil">{`${isShowing ? 'showing' : 'hidden'} ${isVeiled ? 'veiled' : 'bare'} ${exposure}`}</p>
+      <button type="button" disabled={box === null} onClick={() => { void expose() }}>Expose</button>
+      <button type="button" onClick={() => { box?.veil() }}>Veil</button>
+      <button type="button" onClick={() => { box?.unveil() }}>Unveil</button>
+      <button type="button" onClick={() => { box?.unexpose() }}>Unexpose</button>
+      <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
+      <button type="button" onClick={() => { void vault?.ensureUnlocked() }}>Unlock</button>
+    </div>
+  )
+}
+
+const shownOfBox = (testid: 'boxes' | 'box' | 'whisper' | 'showing' | 'veil') => screen.getByTestId(testid).textContent
 
 /** A world whose vault `main` holds `anthropic`, its apiKey a fake, put from another device; and that device's vault. */
 const boxWorld = async () => {
@@ -188,7 +212,7 @@ describe("the box hooks", () => {
     fireEvent.click(screen.getByText('Make'))
     await waitFor(() => { expect(shownOfBox('box')).to.eq('revision 0, exposed') })
     expect(shownOfBox('boxes')).to.eq('anthropic')
-    expect(shownOfBox('whisper')).to.eq('- shown')
+    expect(shownOfBox('whisper')).to.eq('- showing')
   })
 
   it("hand every component the same Box for a boxlabel", async () => {
@@ -203,23 +227,23 @@ describe("the box hooks", () => {
     render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
     await waitFor(() => { expect(shownOfBox('box')).to.eq('revision 0, sealed') })
     fireEvent.click(screen.getByText('Make'))
-    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored shown') })
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored showing') })
     expect(shownOfBox('box')).to.eq('revision 0, exposed')
     const stored = await vault.fetchBox('anthropic')
     expect(stored?.snapshot.revision_seq).to.eq(0)
     expect(await stored?.extractWhisper()).to.deep.equal({ apiKey: 'sk-ant-fake-stored' })
   })
 
-  it("read the whisper as a bag while it will not show", async () => {
+  it("read why the whisper hides while it will not show", async () => {
     const { world } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
-    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('- encrypted') })
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('- unexposed') })
     fireEvent.click(screen.getByText('Make'))
-    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored shown') })
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored showing') })
     fireEvent.click(screen.getByText('Lock'))
     await waitFor(() => { expect(shownOfBox('whisper')).to.eq('- locked') })
     fireEvent.click(screen.getByText('Unlock'))
-    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored shown') })
+    await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored showing') })
   })
 
   it("read whether the box shows its whisper, through expose and lock", async () => {
@@ -251,8 +275,37 @@ describe("the box hooks", () => {
     expect(shownOfBox('boxes')).to.eq('none')
   })
 
-  it("read a bag with no fields and no snapshot for no box", () => {
+  it("read whether a box shows and wears its veil", async () => {
+    const { world } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><VeilPage /></BankProvider>)
+    await waitFor(() => { expect(screen.getByText('Expose')).to.have.property('disabled', false) })
+    expect(shownOfBox('veil')).to.eq('hidden bare unexposed')
+    fireEvent.click(screen.getByText('Expose'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('showing bare showing') })
+    fireEvent.click(screen.getByText('Veil'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('hidden veiled veiled') })
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('hidden veiled locked') })
+    fireEvent.click(screen.getByText('Unlock'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('hidden veiled veiled') })
+    fireEvent.click(screen.getByText('Unveil'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('showing bare showing') })
+  })
+
+  it("read the veil gone once the box is unexposed", async () => {
+    const { world } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><VeilPage /></BankProvider>)
+    await waitFor(() => { expect(screen.getByText('Expose')).to.have.property('disabled', false) })
+    fireEvent.click(screen.getByText('Expose'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('showing bare showing') })
+    fireEvent.click(screen.getByText('Veil'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('hidden veiled veiled') })
+    fireEvent.click(screen.getByText('Unexpose'))
+    await waitFor(() => { expect(shownOfBox('veil')).to.eq('hidden bare unexposed') })
+  })
+
+  it("read the empty answers for no box", () => {
     render(<NoBox />)
-    expect(screen.getByText('0 encrypted true false')).to.exist
+    expect(screen.getByText('0 unexposed true false')).to.exist
   })
 })
