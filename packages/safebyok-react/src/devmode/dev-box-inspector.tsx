@@ -32,7 +32,7 @@ export const DevBoxInspector = ({ defaultVaultlabel = 'main', defaultBoxlabel = 
       </div>
       {isPicked
         ? <BoxVerbs key={`${vaultlabel}/${boxlabel}`} vaultlabel={vaultlabel} boxlabel={boxlabel} />
-        : <p className="quiet">Name a vault and a box: letters, digits and underbars, up to 40.</p>}
+        : <p className="quiet">Name a vault and a box: lowercase letters, digits and single underbars, from a letter to a letter or digit, 2 to 40 long.</p>}
     </section>
   )
 }
