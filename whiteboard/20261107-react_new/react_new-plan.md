@@ -477,6 +477,12 @@ shows it beside the other two.
   the changeset, TODO.md.
 * *Depends on:* *Orchestrator:* nothing unmerged: 11 and 12 are on main. Cut from `origin/main`.
   *Size:* small.
+* *Review:* medium, fixed (#583): `attemptOnce` refused a non-function attempt before its `try`, so a
+  good answer's bytes went unzeroed (now checked inside; the test asserts the zeroing); three test
+  titles. Left: the double-press guard reads state, not a ref (a row); `passkeyRpId` unchecked at
+  render, like the other dialog props; the header check repeats part of the core's salt check (a
+  row); only `''` counts as empty, as ruled; `aria-disabled` drops `:disabled` styling (not named in
+  the changeset: nothing styles it).
 
 ### 14. react_doc_trim
 

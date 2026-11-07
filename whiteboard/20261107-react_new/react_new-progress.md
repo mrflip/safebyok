@@ -131,3 +131,10 @@ main). Thread 10 is folded into 5 (the demo on `browserOpts`) and 8 (`DevDeviceD
 
 * *Orchestrator:* every doc block in `packages/safebyok-react/src` is one line, and the README is two
   lines. New doc blocks follow suit. Expect doc-block conflicts with 5 and 13 at the restack.
+
+## From thread 13 (react_tidy, #583)
+
+* *Orchestrator:* `passkey.ts` checks its arguments with one module-level `Checkers('bad_option', ...)`;
+  `Checkers` reaches safebyok-react through `safebyok/storage`. The passkey button uses
+  `aria-disabled`. `BankProvider` takes `passkeyRpId`. `AddPasskeyModal` refuses an empty passphrase
+  with `Messages.passphraseFirst` before any WebAuthn call.
