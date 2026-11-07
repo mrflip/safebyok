@@ -36,17 +36,17 @@ describe("bank.autolock", () => {
     world.advance(AutolockMillis + 1)
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const fresh = world.bankOn({ requestCleartext })
-    const scan = vi.spyOn(world.deviceDB, 'tryListLeases')
+    const tryListLeases = vi.spyOn(world.deviceDB, 'tryListLeases')
     const tryForget = vi.spyOn(world.deviceDB, 'tryForget')
     await fresh.hello()
-    expect(scan).not.toHaveBeenCalled()
+    expect(tryListLeases).not.toHaveBeenCalled()
     expect(world.leaseRows()).to.have.lengthOf(1)
     const vault = fresh.vaultAt(VaultScopeGiven)
     await vault?.ensureUnlocked()
     expect(tryForget).not.toHaveBeenCalled()
     expect(requestCleartext).toHaveBeenCalledOnce()
     expect(vault?.isUnlocked).to.be.true
-    expect(scan).not.toHaveBeenCalled()
+    expect(tryListLeases).not.toHaveBeenCalled()
     expect(world.leaseRows()).to.have.lengthOf(1)
     expect((world.leaseRows()[0] as LeaseRow).proved_at).to.eq(T0 + AutolockMillis + 1)
   })
@@ -171,7 +171,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.deep.equal(rowsBefore)
   })
 
-  it("tells a refused scan as bad news, never throwing", async () => {
+  it("tells a refused listing as bad news, never throwing", async () => {
     const world = makeBankWorld()
     const onBadNews = vi.fn()
     const bank = world.bankOn({ onBadNews })
