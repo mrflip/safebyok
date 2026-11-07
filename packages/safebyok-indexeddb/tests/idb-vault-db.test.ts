@@ -2,6 +2,7 @@
 
 // fake-indexeddb installs IndexedDB's globals before the adapter loads: real transactions and structured clone, with no browser.
 import 'fake-indexeddb/auto'
+import { promisifyRequest } from 'idb-keyval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as TH from 'safebyok/testing'
 import * as DB from 'safebyok/storage'
@@ -9,7 +10,7 @@ import { IdbVaultDB, idbVaultDB } from '../src/idb-vault-db'
 import type { IdbVaultDBOpts } from '../src/idb-vault-db'
 import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultScopepathOf } from '../src/shelf'
 
-// == [World]: makeVaultDB, idbRowsOf, failNextCall
+// == [World]: makeVaultDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
 
 /** The database each store under test was made over, by store. */
 const dbNameOf = new WeakMap<IdbVaultDB, string>()
@@ -44,6 +45,25 @@ const failNextCall = (): void => {
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
     throw new DOMException('The database connection is closing.', 'InvalidStateError')
   })
+}
+
+/** The name of every database IndexedDB holds now. */
+const dbNamesNow = async (): Promise<string[]> => {
+  const dbs = await indexedDB.databases()
+  return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
+}
+
+// idb-keyval holds its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
+/** Makes the database `dbname` holding one row in an object store, and closes it. */
+const plantClosedDB = async (dbname: string): Promise<void> => {
+  const storename = 'rows'
+  const opening = indexedDB.open(dbname)
+  opening.addEventListener('upgradeneeded', () => { opening.result.createObjectStore(storename) })
+  const db = await promisifyRequest(opening)
+  const tx = db.transaction(storename, 'readwrite')
+  tx.objectStore(storename).put({ wrapped: 'old' }, 'row')
+  await promisifyRequest(tx)
+  db.close()
 }
 
 afterEach(() => {
@@ -105,6 +125,36 @@ describe("IdbVaultDB's databases", () => {
     await TH.eventually(() => notices.length > 0)
     expect(notices).to.have.lengthOf(1)
     unwatch()
+  })
+})
+
+describe("IdbVaultDB's database name and wipe", () => {
+  it("names its database with its version", async () => {
+    const vaultDB = makeVaultDB()
+    await vaultDB.listVaults(TH.bankScope)
+    expect(await dbNamesNow()).to.include(`${dbNameOf.get(vaultDB)!}:vaults-v${DB.VaultsDBVersion}`)
+    expect(DB.VaultsDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
+  })
+
+  it("deletes the unversioned vault database and each older version's, unread, on its first call", async () => {
+    const dbName = `test-${crypto.randomUUID()}`
+    const oldnames = [`${dbName}:vaults`, `${dbName}:vaults-v1`, `${dbName}:vaults-v001-001-000`, `${dbName}:vaults-v000-009-009`]
+    for (const oldname of oldnames) { await plantClosedDB(oldname) }
+    expect(await dbNamesNow()).to.include.members(oldnames)
+    await new IdbVaultDB({ dbName }).listVaults(TH.bankScope)
+    await vi.waitFor(async () => {
+      const dbnames = await dbNamesNow()
+      expect(dbnames.filter((dbname) => oldnames.includes(dbname))).to.deep.equal([])
+    })
+  })
+
+  it("leaves a newer version's database, another dbName's, and the device store's where they stand", async () => {
+    const dbName = `test-${crypto.randomUUID()}`
+    const kept = [`${dbName}:vaults-v001-002-000`, `${dbName}:device_db`, `${dbName}:device-v001-001-001`, `other-${dbName}:vaults`]
+    for (const keptname of kept) { await plantClosedDB(keptname) }
+    await new IdbVaultDB({ dbName }).listVaults(TH.bankScope)
+    await TH.aWhile()
+    expect(await dbNamesNow()).to.include.members(kept)
   })
 })
 

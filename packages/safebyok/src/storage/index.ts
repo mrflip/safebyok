@@ -12,8 +12,11 @@ export type { Awaitable } from '../helpers/helpers'
 export { ckeyOf } from '../helpers/helpers'
 // --
 
-// == [IndexedDB]: the one transaction an IndexedDB store takes per call, and the row at a scopepath within it
+// == [IndexedDB]: the one transaction an IndexedDB store takes per call, the row at a scopepath within it, and the versioned shelf
 export { inOneStep, rowAt } from './idb-transaction'
+export { versionedShelfOf } from './idb-shelf'
+export type { VersionedShelfSpec } from './idb-shelf'
+export { VaultsDBVersion } from '../helpers/consts'
 // --
 
 // == [The rows]: sentinels, scopes, records, options and the helpers that read a row

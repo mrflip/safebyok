@@ -27,7 +27,7 @@ const makeDeviceDB = (dbName = freshDbName()): IdbDeviceDB => {
 
 /** The backdoor to a store's lease rows, through a connection of its own to the store's database. */
 const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
-  const shelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v1`, 'leases')
+  const shelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v001-001-001`, 'leases')
   return {
     plantLeaseRow: async ({ applabel, user_id, vaultlabel }, row) => { await inOneStep(shelf, 'readwrite', (store) => { store.put(row, [applabel, user_id, vaultlabel]) }) },
     leaseRowsOf:   async () => await inOneStep(shelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
@@ -92,7 +92,7 @@ describe("IdbDeviceDB's database", () => {
   it("names its database with its version", async () => {
     const dbName = freshDbName()
     await makeDeviceDB(dbName).listLeases()
-    expect(await dbNamesNow()).to.include(`${dbName}:device-v1`)
+    expect(await dbNamesNow()).to.include(`${dbName}:device-v001-001-001`)
   })
 
   it("refuses each call where there is no IndexedDB", async () => {
@@ -110,16 +110,25 @@ describe("IdbDeviceDB's database", () => {
 describe("IdbDeviceDB's wipe of the old databases", () => {
   it("deletes the old core's device database and each earlier version's, unread, on its first call", async () => {
     const dbName = freshDbName()
-    const oldnames = [`${dbName}:device_db`, `${dbName}:device-v0`]
+    const oldnames = [`${dbName}:device_db`, `${dbName}:device-v0`, `${dbName}:device-v1`, `${dbName}:device-v001-001-000`, `${dbName}:device-v000-009-009`]
     await plantClosedDB(oldnames[0]!, 'records')
-    await plantClosedDB(oldnames[1]!, 'leases')
+    for (const oldname of oldnames.slice(1)) { await plantClosedDB(oldname, 'leases') }
     expect(await dbNamesNow()).to.include.members(oldnames)
     await makeDeviceDB(dbName).listLeases()
     await vi.waitFor(async () => {
       const dbnames = await dbNamesNow()
       expect(dbnames.filter((dbname) => oldnames.includes(dbname))).to.deep.equal([])
     })
-    expect(await dbNamesNow()).to.include(`${dbName}:device-v1`)
+    expect(await dbNamesNow()).to.include(`${dbName}:device-v001-001-001`)
+  })
+
+  it("leaves a newer version's database, as an updated tab of the page made it", async () => {
+    const dbName = freshDbName()
+    const newername = `${dbName}:device-v001-002-000`
+    await plantClosedDB(newername, 'leases')
+    await makeDeviceDB(dbName).listLeases()
+    await TH.aWhile()
+    expect(await dbNamesNow()).to.include(newername)
   })
 
   it("answers its calls while another tab holds an old database open", async () => {

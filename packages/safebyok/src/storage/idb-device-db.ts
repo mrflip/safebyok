@@ -1,12 +1,14 @@
 /** The deviceDB in this browser's IndexedDB: each generic call one transaction, the leaseKey kept as a handle by structured clone. */
 
-import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
+import { promisifyRequest, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+import { DeviceDBVersion } from '../helpers/consts'
 import { DeviceDB } from './device-db-new'
+import { versionedShelfOf } from './idb-shelf'
 import { inOneStep, rowAt } from './idb-transaction'
 
 // == [Options]: IdbDeviceDBOpts, idbDeviceDBOpts
@@ -20,11 +22,7 @@ export interface IdbDeviceDBOpts {
 const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
-// == [The database]: DeviceDBVersion, LeaseScopepath, leaseScopepathOf, deviceShelfOf, oldDeviceDBNamesOf
-
-// The version in the database's name marks a layout, so an old or unsafe one is known by name alone, and
-// deleted unread. Raise it when the stored layout changes; every name below it is deleted.
-const DeviceDBVersion = 1
+// == [The database]: LeaseScopepath, leaseScopepathOf, deviceShelfOf
 
 /** Where the shelf files a vault's lease row. */
 type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
@@ -32,26 +30,10 @@ type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
 /** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
 
-// The old databases are deleted on the shelf's first transaction and never awaited: a tab still holding one
-// open holds its delete back until it closes (notes/wontfix.md), and the shelf's own database is another.
-/** The shelf of the database `dbName`, whose first transaction deletes every older device database of `dbName`. */
-const deviceShelfOf = (dbName: string): UseStore => {
-  const shelf = createStore(`${dbName}:device-v${String(DeviceDBVersion)}`, 'leases')
-  let isWiped = false
-  return async (txMode, callback) => {
-    if (! isWiped) {
-      isWiped = true
-      for (const oldname of oldDeviceDBNamesOf(dbName)) { indexedDB.deleteDatabase(oldname) }
-    }
-    return await shelf(txMode, callback)
-  }
-}
-
-/** The name of every device database of `dbName` older than this version: the old core's, and each earlier version's. */
-const oldDeviceDBNamesOf = (dbName: string): string[] => [
-  `${dbName}:device_db`,
-  ...Array.from({ length: DeviceDBVersion }, (_slot, ii) => `${dbName}:device-v${String(ii)}`),
-]
+/** The shelf of the device database of `dbName`, whose first transaction deletes the old core's and every older version's. */
+const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
+  dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`],
+})
 // --
 
 /** A device store that keeps this device's leases in its browser's IndexedDB. */

@@ -1,0 +1,7 @@
+---
+"safebyok": minor
+"safebyok-indexeddb": minor
+"safebyok-fastkey": minor
+---
+
+Each IndexedDB database now carries a layout version in its name, three zero-padded parts: the device store's is `${dbName}:device-v001-001-001`, and `safebyok-indexeddb`'s vault store is `${dbName}:vaults-v001-001-001`. Each store deletes, unread and on its first call, its older databases of that `dbName`: the old core's `device_db`, `device-v1` and any lower version, and the unversioned `vaults` and any lower `vaults-v...`. A browser that held vaults in `${dbName}:vaults` finds them gone, as safebyok is not yet released and keeps no migration; a host that runs the old and the new device store under one `dbName` has the new one wipe the old one's live database. `safebyok/storage` adds `versionedShelfOf` and `VaultsDBVersion`, for an IndexedDB adapter's own versioned shelf. A key deriver's spec must now ask for a `salt_bytes` of 16 to 32, not 8 to 32, as the stored `salt_b64` already did, and `safebyok-fastkey` refuses the same specs; `salt_b64` is checked as 22 to 43 base64url characters through a new `Patterns.b64url`.

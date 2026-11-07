@@ -1,6 +1,7 @@
 /** The shelf: the one object store of an IdbVaultDB's database, where each vault row and box row is filed under an array scopepath. */
 
-import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
+import { promisifyRequest, type UseStore } from 'idb-keyval'
+import { VaultsDBVersion, versionedShelfOf } from 'safebyok/storage'
 import type { BankScope, BoxQuery, VaultQuery, VaultScope } from 'safebyok/storage'
 
 // == [Scopepaths]: VaultScopepath, BoxScopepath, vaultScopepathOf, boxScopepathOf, vaultlabelOf, boxPlaceOf, vaultsRangeOf, lifeRangeOf, bankBoxesRangeOf
@@ -46,8 +47,10 @@ export const bankBoxesRangeOf = ({ applabel, user_id }: BankScope): IDBKeyRange 
 
 // == [The database]: shelfOf, filedIn, Filed
 
-/** The shelf of the database `dbName`, opened on its first transaction. */
-export const shelfOf = (dbName: string): UseStore => createStore(`${dbName}:vaults`, 'rows')
+/** The shelf of the vault database of `dbName`, whose first transaction deletes every older vault database of `dbName`. */
+export const shelfOf = (dbName: string): UseStore => versionedShelfOf({
+  dbName, dbstem: 'vaults', version: VaultsDBVersion, storename: 'rows', oldnames: [`${dbName}:vaults`],
+})
 
 /** A row as the shelf files it: its scopepath, and the row as stored. */
 export type Filed = { scopepath: IDBValidKey, row: unknown }

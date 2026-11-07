@@ -1,0 +1,58 @@
+/** The versioned shelf: an IndexedDB store's one object store, in a database whose name carries a layout version, with every older database of its kind deleted. */
+
+import { createStore, type UseStore } from 'idb-keyval'
+
+// == [The versioned shelf]: VersionedShelfSpec, versionedShelfOf, isOlderDBName, wipeOlderDBs
+
+/** What names a versioned shelf: its host's `dbName`, which kind of database it is, and the layout version. */
+export interface VersionedShelfSpec {
+  /** The host's `dbName`, which every database of the bank begins with. */
+  dbName:    string
+  /** The kind of database, `device` or `vaults`: the part of the name before `-v` and the version. */
+  dbstem:    string
+  /** The layout version, three zero-padded parts (`001-001-001`), so that a name sorts as its version does. */
+  version:   string
+  /** The one object store of the database. */
+  storename: string
+  /** The names, whole, of the databases of this kind from before it carried a version. */
+  oldnames:  string[]
+}
+
+const VersionPattern = /^\d{3}-\d{3}-\d{3}$/
+
+/** The shelf of the database `dbName:dbstem-v<version>`, whose first transaction deletes every older database of its kind. */
+export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
+  const shelf = createStore(`${spec.dbName}:${spec.dbstem}-v${spec.version}`, spec.storename)
+  let isWiped = false
+  return async (txMode, callback) => {
+    if (! isWiped) {
+      isWiped = true
+      // The old databases are deleted unread and never awaited: a tab still holding one open holds its delete back (notes/wontfix.md).
+      void wipeOlderDBs(spec)
+    }
+    return await shelf(txMode, callback)
+  }
+}
+
+/** True for the name of a database of `spec`'s kind that is older than its version: unversioned, in an earlier pattern, or lower. */
+const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
+  if (spec.oldnames.includes(dbname)) { return true }
+  const stemmed = `${spec.dbName}:${spec.dbstem}-v`
+  if (! dbname.startsWith(stemmed)) { return false }
+  const version = dbname.slice(stemmed.length)
+  return (! VersionPattern.test(version)) || (version < spec.version)
+}
+
+// The wipe is hygiene, so a browser that cannot list its databases leaves them for the next page load rather than failing the vault.
+/** Starts the deletion of every database now in the browser that {@link isOlderDBName} names. */
+const wipeOlderDBs = async (spec: VersionedShelfSpec): Promise<void> => {
+  try {
+    const listed = await indexedDB.databases()
+    for (const { name: dbname } of listed) {
+      if ((dbname !== undefined) && isOlderDBName(spec, dbname)) { indexedDB.deleteDatabase(dbname) }
+    }
+  } catch {
+    // no IndexedDB, or none that lists its databases
+  }
+}
+// --
