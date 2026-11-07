@@ -1,4 +1,5 @@
 import { BankProvider } from 'safebyok-react'
+import { DevBoxInspector, DevDeviceDBInspector, DevVaultDBInspector } from 'safebyok-react/devmode'
 import { KnockKnockExposed } from './components/KnockKnockExposed'
 import { KnockKnockFields } from './components/KnockKnockFields'
 import { KnockKnockSealed } from './components/KnockKnockSealed'
@@ -36,6 +37,9 @@ const Page = ({ session }: { session: Session | null }) => (
     <aside className="dev-tools" aria-label="Developer tools">
       <h2>Behind the scenes</h2>
       <OutageSwitch vaultDB={vaultDB} />
+      <DevBoxInspector defaultBoxlabel="anthropic_api_key" />
+      <DevVaultDBInspector vaultDB={vaultDB} />
+      <DevDeviceDBInspector deviceDB={bankOpts.deviceDB} />
     </aside>
   </main>
 )
