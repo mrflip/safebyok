@@ -18,6 +18,15 @@ describe("safebyok", () => {
     expectTypeOf<Front.VaultError['family']>().toEqualTypeOf<Front.RefusalFamily>()
   })
 
+  it("exports the patterns and limits an input checks a label or a user_id by", () => {
+    expect(Front.Patterns.label.test('my_vault')).to.be.true
+    expect(Front.Patterns.label.test('my__vault')).to.be.false
+    expect(Front.Patterns.user_id.test('user@example.com')).to.be.true
+    expect(Front.Patterns.user_id.test('..')).to.be.false
+    expect(Front.MaxLabelChars).to.eq(40)
+    expect(Front.MaxUserIdChars).to.eq(100)
+  })
+
   it("exports the device store a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
     expect(new Front.MemoryDeviceDB()).toBeInstanceOf(Front.DeviceDB)
     expectTypeOf<Front.MemoryDeviceDB>().toExtend<Front.BankOpts['deviceDB']>()

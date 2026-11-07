@@ -55,6 +55,9 @@ export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   return made
 }
 
+/** Forgets the page's shelf of the database `dbname`, so the next `versionedShelfOf` of it opens a connection of its own. */
+export const _cheat_forgetShelf = (dbname: string): void => { shelves.delete(dbname) }
+
 /** True for the name of a database of `spec`'s stem at an older version. */
 const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
   const stemmed = `${spec.dbName}:${spec.dbstem}-v`

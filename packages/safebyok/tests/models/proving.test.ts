@@ -2,6 +2,7 @@ import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes, isGuarded } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
+import { argon2idDeriver } from '../../src/deriver/argon2id-webv1'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
 import { salt_b64, vaultScope } from '../../src/shapes/shapes-core'
@@ -375,6 +376,19 @@ describe("guardKeyDeriver(hostDeriver)", () => {
     await guardKeyDeriver(hostDeriver).load()
     expect(hostLoad.mock.contexts[0]).to.eq(hostDeriver)
     await guardKeyDeriver(TH.testDeriver).load()
+  })
+
+  it("passes the deriver's own refusal of a salt that does not fit through as itself, not as unexpected_error", async () => {
+    const deriver = argon2idDeriver({ algorithm: 'argon2id', key_deriver_label: 'cheap_argon2id_v0', memory_kib: 8, iterations: 1, parallelism: 1, salt_bytes: 16, output_bytes: 32 })
+    const err = await TH.expectRefusal(guardKeyDeriver(deriver).deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), new Uint8Array(15)), 'bad_option')
+    expect(err.message).to.match(/salt of 16 bytes/)
+  })
+
+  it("replaces anything else the deriver throws with unexpected_error, naming nothing it said", async () => {
+    const deriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(new TypeError(`cannot derive ${TestPassphrase}`)) }
+    const err = await TH.expectRefusal(guardKeyDeriver(deriver).deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), new Uint8Array(16)), 'unexpected_error')
+    expect(err.message).to.not.include(TestPassphrase)
+    expect(err.cause).to.be.undefined
   })
 
   it("refuses a load that fails, with what it threw as the cause", async () => {

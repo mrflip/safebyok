@@ -8,6 +8,7 @@
  * shouldn't, and a world of banks over one in-memory vaultDB, each device with its own deviceDB, where a dialog types the passphrase a test sets. The battery every VaultDB runs, and the scopes and rows it is built from, and the battery every DeviceDB runs. For tests only, and under vitest: the deriver is worthless against a brute-forcer.
  */
 export { _cheat_clock, _cheat_clockReset } from '../src/helpers/clock'
+export { _cheat_forgetShelf } from '../src/storage/idb-shelf'
 export { testDeriver, anyStrengthChecker, fakeCiphered, scopeOf, wayinOf, passkeyOf, tweakB64 } from './test-helpers/builders'
 export type { FakeCiphered } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, makeLatch, beforeNextCall,

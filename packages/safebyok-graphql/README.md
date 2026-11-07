@@ -84,7 +84,7 @@ cache in front of it changes nothing. `fetchSubscriptions: true` carries `watch`
 events; a Client with a WebSocket exchange for subscriptions serves as well. A watch's stream that
 ends by a closing result, an error or a refusal is told once, as bad news, to the bank's `onBadNews`
 (`storage_unavailable`, `unexpected_error` for a GraphQL error, or the refusal itself), and is not subscribed again:
-whether to start over is yours. A stream that ends refused as `identity_revoked` tells nothing more.
+whether to start over is yours, and a watch that has ended starts again on `goodbye()` then `hello()`. A stream that ends refused as `identity_revoked` tells nothing more.
 Over a WebSocket exchange (urql's `subscriptionExchange` with graphql-ws), a stream that ends before
 its first result, or on a graphql-ws error, sends no closing result, so its end goes untold.
 

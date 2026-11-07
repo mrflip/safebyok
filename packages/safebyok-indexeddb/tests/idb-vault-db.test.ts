@@ -23,8 +23,12 @@ const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
   return vaultDB
 }
 
-/** A second store over the same database, as another tab holds. */
-const makeTwin = (vaultDB: IdbVaultDB): IdbVaultDB => new IdbVaultDB({ dbName: dbNameOf.get(vaultDB) })
+/** A second store over the same database, on a connection of its own, as another tab holds. */
+const makeTwin = (vaultDB: IdbVaultDB): IdbVaultDB => {
+  const dbName = dbNameOf.get(vaultDB)!
+  TH._cheat_forgetShelf(`${dbName}:vaults-v${DB.VaultsDBVersion}`)
+  return new IdbVaultDB({ dbName })
+}
 
 /** The backdoor to a store's rows, through a connection of its own to the store's database. */
 const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
