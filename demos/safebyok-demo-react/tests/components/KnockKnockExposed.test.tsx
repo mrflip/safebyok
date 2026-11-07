@@ -60,7 +60,7 @@ const storedBoxRows = (vaultDB: MemoryVaultDB) => {
 }
 
 describe("KnockKnockExposed", () => {
-  it("builds the vault and an empty box on Add key, and shows its field ready to type in", async () => {
+  it("shows an empty field on Add key", async () => {
     renderFlow()
     expect(screen.getByText('No key saved yet.')).to.not.be.null
     const field = await addKey()
@@ -83,7 +83,7 @@ describe("KnockKnockExposed", () => {
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
-  it("hides the field on Done, and shows the saved key again on Edit key", async () => {
+  it("shows the saved key again on Edit key after Done", async () => {
     renderFlow()
     const field = await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -112,7 +112,7 @@ describe("KnockKnockExposed", () => {
     await waitFor(() => { expect(screen.getByTestId('showing').textContent).to.eq('hidden') })
   })
 
-  it("knocks with the saved key, and shows Claude's punchline", async () => {
+  it("knocks with the saved key", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     renderFlow()
@@ -148,7 +148,7 @@ describe("KnockKnockExposed", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("asks for the key at a knock before one is saved, sending nothing", async () => {
+  it("asks for the key at a knock before one is saved", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     renderFlow()
@@ -158,7 +158,7 @@ describe("KnockKnockExposed", () => {
     await TH.expectProbe('unborn none')
   })
 
-  it("says nothing when the user cancels the dialog, and builds no vault", async () => {
+  it("stays quiet when the user cancels the dialog", async () => {
     renderFlow()
     const prompting = vi.spyOn(Bank.prototype, 'ensureVault')
     fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
