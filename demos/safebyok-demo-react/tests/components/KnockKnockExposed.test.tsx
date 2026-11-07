@@ -26,14 +26,14 @@ const Host = () => {
 }
 
 /** The API key field, once a box backs it. */
-const apiKeyField = async () => await screen.findByLabelText<HTMLInputElement>('Anthropic API key')
+const apiKeyField = async () => screen.findByLabelText<HTMLInputElement>('Anthropic API key')
 
 /** Presses Add key, builds the vault through the provider's dialog, and waits for the empty field. */
 const addKey = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
   await TH.answerPassphraseDialog()
   await screen.findByRole('button', { name: 'Save' })
-  return await apiKeyField()
+  return apiKeyField()
 }
 
 /** Adds the key, types the fake one into its field, and saves it. */
