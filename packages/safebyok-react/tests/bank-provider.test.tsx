@@ -104,7 +104,7 @@ describe("BankProvider's handlers", () => {
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
-  it("makes no new bank for an onPanic written inline at each render, and tells the last render's", async () => {
+  it("makes no new bank for an onPanic written inline at each render", async () => {
     vi.stubGlobal('reportError', vi.fn())
     const first = vi.fn()
     const last = vi.fn()
@@ -129,7 +129,7 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
   })
 
-  it("tells the next user's onPanic nothing of a panic from the bank it let go; the platform hears it", async () => {
+  it("tells the next user's onPanic nothing of a panic from the bank it let go", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
@@ -161,7 +161,7 @@ describe("BankProvider's handlers", () => {
     expect(third?.calls).to.deep.equal([])
   })
 
-  it("names each prop that changed, and says nothing for a change of user alone", async () => {
+  it("names each prop that changed identity", async () => {
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ logger: spy.logger })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
