@@ -1,12 +1,12 @@
 import { useCallback } from 'react'
-import type { VaultDBVerbs } from 'safebyok'
+import type { VaultDB } from 'safebyok'
 import { boxSparse, nextRevisionOf, revisionOf } from 'safebyok/storage'
 import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow } from 'safebyok/storage'
 import { useBank } from '../hooks'
 import { LastCallLine, jsonOf, timeOf, useLastCall, useListing } from './last-call'
 
 /** What a DevVaultDBInspector is handed: the vaultDB whose rows it shows. */
-export type DevVaultDBInspectorProps = { vaultDB: VaultDBVerbs }
+export type DevVaultDBInspectorProps = { vaultDB: VaultDB }
 
 /** A table of the signed-in user's rows in `vaultDB` as its verbs answer them, with a raw button for each get and del it offers. */
 export const DevVaultDBInspector = ({ vaultDB }: DevVaultDBInspectorProps) => {
@@ -27,7 +27,7 @@ export const DevVaultDBInspector = ({ vaultDB }: DevVaultDBInspectorProps) => {
 type BankRows = { listed: BankListed, boxesOf: ReadonlyMap<string, BoxesListed> }
 
 /** The rows `listVaults` answers for `scope`, and those `listBoxes` answers for each live vault among them. */
-const listBankRows = async (vaultDB: VaultDBVerbs, scope: BankScope): Promise<BankRows> => {
+const listBankRows = async (vaultDB: VaultDB, scope: BankScope): Promise<BankRows> => {
   const { val: listed } = await vaultDB.listVaults(scope)
   const live = listed.vaults.filter((row): row is VaultRecord => row.am === 'a')
   const boxesListed = await Promise.all(live.map(async ({ vaultlabel, vault_tok }) => {
@@ -38,7 +38,7 @@ const listBankRows = async (vaultDB: VaultDBVerbs, scope: BankScope): Promise<Ba
 }
 
 /** The rows of the bank at `scope`, listed again at each change the vaultDB's watch tells of. */
-const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDBVerbs, scope: BankScope }) => {
+const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope }) => {
   const list = useCallback(() => listBankRows(vaultDB, scope), [vaultDB, scope])
   const watch = useCallback((onChange: () => void) => vaultDB.watch(scope, onChange), [vaultDB, scope])
   const { val: rows, trouble, relist } = useListing(list, watch)
@@ -117,7 +117,7 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
 }
 
 /** `delBox` of `boxRow` at the revision listed: its live row, its tombstone, or its damaged row. */
-const delBoxRow = (vaultDB: VaultDBVerbs, boxRow: BoxSparse | DamagedBox) => {
+const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse | DamagedBox) => {
   const sparse = boxSparse.parse(boxRow)
   return vaultDB.delBox({ ...sparse, ...nextRevisionOf(sparse, Date.now()), am: 'x' }, { prior: revisionOf(sparse) })
 }
