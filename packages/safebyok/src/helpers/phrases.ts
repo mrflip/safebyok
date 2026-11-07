@@ -486,7 +486,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, s
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed, so the bank could not derive a key from a passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a deriver that fetches its code, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, boxTooLarge, VaultFull, DamagedRecord, NewerFormat, SeqNotNext, RecordPreparedWrong, StorageError, storeFailed, storeThrew
+// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, storeFailed, storeThrew
 
 /** No row stored for this life of the vault, where one was. */
 export const VaultEmpty = "Nothing is stored for this life of the vault: read the vault again by its scope."
@@ -509,30 +509,33 @@ export const AbsentBox = "No box is stored under that label."
 /** A change of the gate refused, `why` saying which check it failed. */
 export const gateIssue = (why: string): string => `This change of the gate was refused: ${why}`
 
+/** Why a gate verb naming a registered_at the stored vault does not hold is refused, as {@link gateIssue}'s `why`. */
+export const RegisteredAtNotStored = "its registered_at is not the stored one."
+
 /** A box record over the bytes its storage holds in one record. */
 export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage holds in one record.`
 
 /** A vault holding as many boxes as its storage allows. */
 export const VaultFull = "This vault holds as many boxes as its storage allows."
 
-/** A stored row that failed its checks, set aside. */
-export const DamagedRecord = "The stored record failed its checks, so it is set aside."
-
-/** A stored row in a format newer than this package reads. */
-export const NewerFormat = "The stored record is in a format newer than this version of the package reads."
+/** A write the storage itself had no room for. */
+export const StorageFull = "The vault's storage has no room left for this write: free some, then try again. The storage adapter's own error is this error's cause."
 
 /** A put whose revision_seq is not one past its prior's. */
 export const SeqNotNext = "A record's revision_seq must be one past its prior's."
-
-/** A record safebyok prepared for its vaultDB that fails the record's own checks. */
-export const RecordPreparedWrong = "safebyok prepared a record its vaultDB will not take, so nothing was stored: a bug in safebyok, which a retry will not mend. What the check found is this error's cause."
-
-/** A vaultDB's store failing, its own error the cause. */
-export const StorageError = "The vault's storage failed: its own error is this error's cause."
 
 /** A device store's failure in `call`, `named` the sentence naming what it threw, or blank. */
 export const storeFailed = (call: string, named: string): string => `This device's own storage failed in ${call}: try again.${named}`
 
 /** The sentence naming what a device store threw, by its `name` alone. */
 export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
+// --
+
+// == [Refusals: storage backends]: storageFailed, IdentityRevoked
+
+/** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
+export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
+
+/** A storage backend that no longer serves the user the call names. */
+export const IdentityRevoked = "The vault's storage no longer serves this user: they signed out, or another user signed in. Open the vault again for the user signed in."
 // --

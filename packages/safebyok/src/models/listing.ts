@@ -257,7 +257,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if ((! this.#isEnabled) || (! this.isOwnRow(val))) { return }
     void (async () => {
       const { ok, err } = await outcomeOf(() => {
-        this.world.takeWorld(world)
+        if (world !== null) { this.world.takeWorld(world) }
         return this.#isEnabled ? this.buildOrReceive(val) : null
       })
       if (! ok) { this.world.tellBadNews([err]) }

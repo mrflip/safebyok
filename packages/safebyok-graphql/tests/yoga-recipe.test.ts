@@ -1,35 +1,33 @@
-// The README's Yoga recipe, run: its server half (a Yoga route over vaultResolvers and
-// postgresVaultDB) and its client half (graphqlVaultDB over an urql Client posting to it), with
-// only the wiring a test needs changed -- the request's user comes from a header instead of a
-// session cookie, the database is a PGlite, and fetch calls the route in-process. Change one and
-// the README changes with it.
+// The README's recipe, run: its route (Yoga over vaultResolvers and a PostgresVaultDB) and its
+// browser half (GraphQLVaultDB over an urql Client posting to it), with only the wiring a test
+// needs changed: the request's user comes from a header in place of a session cookie, the database
+// is a PGlite, and fetch calls the route in-process. Change one and the README changes with it.
+
 import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import { memoryDeviceDB } from 'safebyok-old'
-import { postgresVaultDB } from 'safebyok-postgres'
+import * as SX from 'safebyok/storage'
+import { PostgresVaultDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
-import * as TH from './test-helpers'
-import { graphqlVaultDB } from '../src/index'
+import { GraphQLVaultDB, VaultOperations } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
+import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-// ------------------------------------------------------------------------- the server half
+// == [The recipe]: vaultRoute, browserVaultDB
 
-/** The README's route, over `pool` and `listen`, its signed-in user found by `signedInUserId`. */
-const vaultRoute = (pool: PostgresClient, listen: PostgresListen | undefined, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) => {
+/** The README's route over `vaultDB`, its signed-in user found by `signedInUserId`. */
+const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) => {
   /** What each request's resolvers know of it: the user your own auth signed in, or null. */
   type VaultContext = { user_id: string | null }
-
   const schema = createSchema<VaultContext>({
     typeDefs:  [VaultSchemaSdl],
-    resolvers: [vaultResolvers({ vaultDBFor: ({ user_id }: VaultContext) => postgresVaultDB({ client: pool, user_id, listen }) })],
+    resolvers: [vaultResolvers({ vaultDB, userIdOf: ({ user_id }: VaultContext) => user_id })],
   })
   const { handleRequest } = createYoga<object, VaultContext>({
     schema,
     graphqlEndpoint: '/api/graphql',
-    // Made per request, for the user your own auth signed in -- never one the request names.
     context:         async ({ request }) => ({ user_id: await signedInUserId(request) }),
     maskedErrors:    { isDev },
     logging:         false,
@@ -37,119 +35,116 @@ const vaultRoute = (pool: PostgresClient, listen: PostgresListen | undefined, si
   return async (request: Request): Promise<Response> => await handleRequest(request, {})
 }
 
-// ------------------------------------------------------------------------- the client half
-
-/** The README's browser half: graphqlVaultDB over an urql Client that posts to the route, and subscribes over it too. */
-const browserVaultDB = (fetcher: typeof fetch) => graphqlVaultDB({ client: new Client({
+/** The README's browser half: a GraphQLVaultDB over an urql Client that posts to the route, and subscribes over it too. */
+const browserVaultDB = (fetcher: typeof fetch, opts: SX.VaultDBOpts = {}) => new GraphQLVaultDB({ ...opts, client: new Client({
   url:                'https://app.example.test/api/graphql',
   exchanges:          [fetchExchange],
   fetchSubscriptions: true,
   fetch:              fetcher,
 }) })
+// --
 
-// ------------------------------------------------------------------------------------- tests
+// == [Wiring]: Route, byHeader, overTheNetwork, browserFor, signedInAsAsked
 
-/** The test's stand-in for a session: the request's `x-test-user` header, URI-encoded, as a header holds only Latin-1. */
-const byHeader = (request: Request) => {
-  const userHeader = request.headers.get('x-test-user')
-  return Promise.resolve(userHeader === null ? null : decodeURIComponent(userHeader))
-}
+type Route = (request: Request) => Promise<Response>
 
-/** The route over this file's database, signing each request in as its `x-test-user` header. */
-const routeOver = async () => {
-  const db = await TH.emptyDatabase()
-  return vaultRoute(db, TH.listenOn(db), byHeader)
-}
+/** The test's stand-in for a session: the request's `x-test-user` header. */
+const byHeader = (request: Request) => Promise.resolve(request.headers.get('x-test-user'))
 
-/** A browser for `user_id`: its fetch reaches `route` in-process, signed in as that user. */
-const browserFor = (route: (request: Request) => Promise<Response>, user_id: string | null) => (
-  browserVaultDB((url, init) => {
-    const request = new Request(url, init)
-    if (user_id !== null) { request.headers.set('x-test-user', encodeURIComponent(user_id)) }
-    return route(request)
+/** `response` as the browser receives it: as a network does, a fetch the browser aborts cancels the body the server is sending. */
+const overTheNetwork = (request: Request, response: Response): Response => {
+  if (response.body === null) { return response }
+  const sending = response.body.getReader()
+  request.signal.addEventListener('abort', () => { void sending.cancel() })
+  const received = new ReadableStream<Uint8Array>({
+    pull: async (controller) => {
+      const chunk = await sending.read()
+      if (chunk.done) { controller.close() } else { controller.enqueue(chunk.value) }
+    },
   })
+  return new Response(received, response)
+}
+
+/** A browser whose fetch reaches `route` in-process, signed in as `signedInAs` says of each operation's variables. */
+const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown>) => string | null, opts: SX.VaultDBOpts = {}) => (
+  browserVaultDB(async (url, init) => {
+    const request = new Request(url, init)
+    const user_id = signedInAs(await variablesOf(request.clone()))
+    if (user_id !== null) { request.headers.set('x-test-user', user_id) }
+    return overTheNetwork(request, await route(request))
+  }, opts)
 )
 
-TH.describeVaultDB('the README Yoga recipe, over postgresVaultDB', async () => {
-  const route = await routeOver()
-  return TH.perUser((user_id) => browserFor(route, user_id))
-}, {
-  makeVaultDBFor: async () => {
-    const route = await routeOver()
-    return (user_id) => browserFor(route, user_id)
-  },
+/** The variables an operation was sent with: in the URL, as urql sends a query by GET, or in the body. */
+const variablesOf = async (request: Request): Promise<Record<string, unknown>> => {
+  const inUrl = new URL(request.url).searchParams.get('variables')
+  const sent = (inUrl === null) ? (await request.json() as { variables?: unknown }).variables : JSON.parse(inUrl) as unknown
+  return (sent ?? {}) as Record<string, unknown>
+}
+
+/** Signs each operation in as the user it asks for, as TH.signedInAsAsked does in-process. */
+const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
+  TH.signedInAsAsked({ variables } as unknown as Parameters<TH.Signing>[0]).user_id
+)
+
+const routes = new WeakMap<GraphQLVaultDB, Route>()
+
+/** A fresh browser over emptied tables, through its own route. */
+const makeVaultDB = async (opts: SX.VaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
+  await TH.emptyTables()
+  const route = vaultRoute(await TH.serverOver((maxBoxes === undefined) ? {} : { maxBoxes }), byHeader)
+  const vaultDB = browserFor(route, signedInAsAsked, opts)
+  routes.set(vaultDB, route)
+  return vaultDB
+}
+// --
+
+TH.describeVaultDBBattery("the README's Yoga recipe", {
+  makeVaultDB:          async (opts) => await makeVaultDB(opts),
+  makeCappedVaultDB:    async (maxBoxes) => await makeVaultDB({}, maxBoxes),
+  makeTwin:             (vaultDB) => browserFor(routes.get(vaultDB)!, signedInAsAsked),
+  _cheat_rowsOf:        () => TH.rowsOf(),
+  boxNoticesCarryVault: false,
 })
 
-describe("the README Yoga recipe", () => {
-  it("carries a real vault, made and opened by the core in the browser", async () => {
-    const route = await routeOver()
-    const vault = await TH.settledVault({
-      applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.quietLogger,
-    })
-    await TH.unlock(vault, 'correct horse battery staple')
-    await vault.putBox({ boxlabel: 'anthropic_api_key' }, 'sk-ant-test-not-a-real-key')
-    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    TH.closeVault(vault)
+describe("the README's Yoga recipe", () => {
+  it("refuses a browser signed in as one user the bank of another", async () => {
+    await TH.emptyTables()
+    const route = vaultRoute(await TH.serverOver(), byHeader)
+    const intruder = browserFor(route, () => 'u2')
+    await TH.expectRefusal(intruder.putVault(TH.vaultAt(), { prior: SX.VoidRevision }), 'identity_revoked')
+    await TH.expectRefusal(browserFor(route, () => null).listVaults(TH.bankScope), 'identity_revoked')
+    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
+  })
+
+  it("stops the server's watch once the browser stops watching", async () => {
+    let watching = 0
+    const listen: PostgresListen = async (channel, onNotify) => {
+      watching += 1
+      const unlisten = await TH.listen(channel, onNotify)
+      return () => {
+        watching -= 1
+        return unlisten()
+      }
+    }
+    const browser = browserFor(vaultRoute(await TH.serverOver({ listen }), byHeader), signedInAsAsked)
+    const unwatch = browser.watch(TH.bankScope, () => undefined)
+    await expect.poll(() => watching).to.eq(1)
+    unwatch()
+    await expect.poll(() => watching).to.eq(0)
   })
 
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {
-    const dbDown = new Error('password authentication failed for user "vault_owner"')
-    const route = vaultRoute(TH.failingClient(dbDown), undefined, () => Promise.resolve('u1'), true)
-    const document = 'query ($applabel: String!, $user_id: String!, $vaultlabel: String!) { safebyokGetVault(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel) { vault { vault_tok } } }'
-    const variables = TH.scopeOf('u1')
+    const driverError = new Error('password authentication failed for user "vault_owner"')
+    const client: PostgresClient = { query: () => Promise.reject(driverError), transaction: () => Promise.reject(driverError) }
+    const route = vaultRoute(new PostgresVaultDB({ client }), () => Promise.resolve('u1'), true)
     const response = await route(new Request('https://app.example.test/api/graphql', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
-      body:    JSON.stringify({ query: document, variables }),
+      body:    JSON.stringify({ query: VaultOperations.getVault, variables: TH.vaultScope }),
     }))
     const sent = await response.text()
     expect(sent).to.include('storage_unavailable')
-    expect(sent).to.not.include('vault_owner')
-  })
-
-  it("pushes another device's write to a subscriber, over server-sent events", async () => {
-    const route = await routeOver()
-    const elsewhere = browserFor(route, 'u1')
-    // The vault first, as it takes two writes and a subscriber may hear them as one change or two.
-    const { vault_tok } = await TH.ensureGated(elsewhere, TH.vaultRecordOf('u1'))
-    const { heard, unsubscribe } = await TH.liveWatch(browserFor(route, 'u1'), TH.scopeOf('u1'))
-    await TH.expectingGood(elsewhere).tryPutBox(TH.scopeOf('u1'), { vault_tok, revision_tok: null }, TH.boxOf('openai', 'r1'))
-    await TH.eventually(() => heard.count > 0)
-    unsubscribe()
-    expect(heard.count).to.eq(1)
-  })
-
-  it("stops listening to Postgres when a subscriber goes before any write, over server-sent events", async () => {
-    const db = await TH.emptyDatabase()
-    const listening = { count: 0 }
-    const listen: PostgresListen = async (channel, onNotify) => {
-      const unlisten = await db.listen(channel, onNotify)
-      listening.count += 1
-      return async () => {
-        listening.count -= 1
-        await unlisten()
-      }
-    }
-    const route = vaultRoute(db, listen, byHeader)
-    // As a network does, a fetch the browser aborts cancels the response body the server is sending.
-    const browser = browserVaultDB(async (url, init) => {
-      const request = new Request(url, init)
-      request.headers.set('x-test-user', 'u1')
-      const response = await route(request)
-      const sending = response.body!.getReader()
-      request.signal.addEventListener('abort', () => { void sending.cancel() })
-      const received = new ReadableStream<Uint8Array>({
-        pull: async (controller) => {
-          const chunk = await sending.read()
-          if (chunk.done) { controller.close() } else { controller.enqueue(chunk.value) }
-        },
-      })
-      return new Response(received, response)
-    })
-    const unsubscribe = browser.subscribe(TH.scopeOf('u1'), () => undefined)
-    await TH.eventually(() => listening.count === 1)
-    unsubscribe()
-    await TH.eventually(() => listening.count === 0)
-    expect(listening.count).to.eq(0)
+    expect(sent).not.to.include('vault_owner')
   })
 })

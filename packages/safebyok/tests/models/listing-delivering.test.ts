@@ -206,6 +206,18 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 })
 
+describe("listing: a notice without its vault row", () => {
+  it("delivers the box, the world's vault row kept as it was", async () => {
+    const listing = boxListingOf(held.mw)
+    await listing.hello()
+    held.mw.clearCalls()
+    await held.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }), null)
+    expect(held.mw.callsOf('takeWorld')).to.deep.equal([])
+    expect(held.mw.badnews).to.deep.equal([])
+    expect(listing.at(scopeOf('noticed'))?.isPresent).to.be.true
+  })
+})
+
 describe("listing: a record of another vault_tok meets no instance held", () => {
   const OtherVault = 'vault-tok-other'
 

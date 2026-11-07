@@ -1,78 +1,47 @@
 // @vitest-environment node
-// Writers for a vault's last places, on a real Postgres and no turnstile: separate pools, so the
-// statements run on separate connections at the same moment, as the postgres README's
-// "best effort" says they may. PGlite runs one statement at a time and cannot show it.
+/** Writers for a vault's last place on a real Postgres, each on a pool of its own, so their statements run at the same moment. */
+
 import { expect, it } from 'vitest'
+import * as SX from 'safebyok/storage'
 import * as TH from './test-helpers'
 
 const getDb = TH.useFileDatabase()
-const u1 = TH.scopeOf('u1')
 
-/** The boxlabels the u1 vault lists, through a device of its own. */
-const listed = async (vaultDBFor: ReturnType<typeof TH.deviceOver>): Promise<string[]> => {
-  const boxes = await TH.boxesOf(vaultDBFor('u1'), u1)
-  return boxes.map((box) => box.boxlabel)
-}
-
-TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgres", () => {
+TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres", () => {
   const Cap = 5
   const Racers = 8
   const Rounds = 5
 
-  it("leaves writers racing for the last place with some landed, none refused for another reason, and each that landed readable and listed (bounds and read-back, not the limit)", async () => {
+  it("lands exactly as many racing writers as the cap has room for, and refuses the rest as full", async () => {
     const db = getDb()
     for (let round = 0; round < Rounds; round += 1) {
-      await db.endDevices()
-      await db.empty()
-      const first = TH.deviceOver(db, undefined, { maxBoxes: Cap })
-      await TH.filled(first('u1'), ['stored_one', 'stored_two', 'stored_three', 'stored_four'])
-      const racers = Array.from({ length: Racers }, (_slot, idx) => ({ boxlabel: `racer_${String(idx)}`, vaultDB: TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1') }))
+      const first = await TH.freshStore(db, { maxBoxes: Cap })
+      await first.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+      for (const boxlabel of ['one', 'two', 'three', 'four']) { await first.putBox(TH.boxAt(0, 'life1', { boxlabel }), { prior: SX.VoidRevision }) }
+      const racers = await Promise.all(Array.from({ length: Racers }, async () => await TH.storeOver(db, { maxBoxes: Cap })))
 
-      const outcomes = await Promise.all(racers.map(({ boxlabel, vaultDB }) => vaultDB.tryPutBox(u1, TH.noBoxYet, TH.boxOf(boxlabel, 'sk-fake'))))
+      const answers = await Promise.all(racers.map(async (racer, idx) => await racer.tryPutBox(TH.boxAt(0, 'life1', { boxlabel: `racer_${String(idx)}` }), { prior: SX.VoidRevision })))
 
-      const landed = racers.filter((_racer, idx) => outcomes[idx]?.ok)
-      const refusedKinds = outcomes.flatMap((outcome) => (outcome.ok ? [] : outcome.err.refusalkind))
-      expect(landed.length).to.be.within(1, Racers)
-      expect(refusedKinds.filter((kind) => kind !== 'vault_full')).to.deep.equal([])
-      expect(await TH.boxesStored(db)).to.eq(4 + landed.length)
-      for (const { boxlabel } of landed) { expect(await TH.expectGood(first('u1').tryGetBox(u1, boxlabel, TH.inThisVault))).to.not.be.null }
-      expect(await listed(first)).to.have.lengthOf(4 + landed.length)
+      expect(answers.filter(({ ok }) => ok)).to.have.lengthOf(1)
+      expect(answers.filter(({ ok, err }) => (! ok) && (! SX.isVaultError(err, 'vault_full')))).to.deep.equal([])
+      const { val: { boxes } } = await first.listBoxes(TH.vaultQuery)
+      expect(boxes).to.have.lengthOf(Cap)
     }
   })
 
-  it("lets a write past the limit land, as the README says it may: a writer whose count began before another's box committed", async () => {
+  it("leaves no live box under a vault deleted while boxes were written to it", async () => {
     const db = getDb()
-    await db.empty()
-    const device = TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1')
-    await TH.filled(device, ['one', 'two', 'three', 'four'])
-    const racer = await db.client()
-    await racer.query('BEGIN')
-    await TH.insertRawBox(racer, 'fifth_in_flight', 'one')
+    const first = await TH.freshStore(db)
+    const vault = TH.vaultAt()
+    await first.putVault(vault, { prior: SX.VoidRevision })
+    const writers = await Promise.all(Array.from({ length: Racers }, async () => await TH.storeOver(db)))
 
-    await TH.expectingGood(device).tryPutBox(u1, TH.noBoxYet, TH.boxOf('also_fifth', 'sk-fake'))
-    await racer.query('COMMIT')
+    await Promise.all([
+      first.delVault(TH.vaultTombstoneOf(vault), { prior: SX.revisionOf(vault) }),
+      ...writers.map(async (writer, idx) => await writer.tryPutBox(TH.boxAt(0, 'life1', { boxlabel: `writer_${String(idx)}` }), { prior: SX.VoidRevision })),
+    ])
 
-    expect(await TH.boxesStored(db)).to.eq(Cap + 1)
-    expect(await TH.expectingGood(device).tryGetBox(u1, 'also_fifth', TH.inThisVault)).to.not.be.null
-    expect(await TH.expectingGood(device).tryGetBox(u1, 'fifth_in_flight', TH.inThisVault)).to.not.be.null
-  })
-
-  it("keeps every box that landed past the limit readable, refuses a new one until deleted boxes make room, and then lands it", async () => {
-    const db = getDb()
-    await db.empty()
-    const device = TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1')
-    await TH.filled(device, ['one', 'two', 'three', 'four'])
-    const racer = await db.client()
-    await racer.query('BEGIN')
-    await TH.insertRawBox(racer, 'fifth_in_flight', 'one')
-    await TH.expectingGood(device).tryPutBox(u1, TH.noBoxYet, TH.boxOf('also_fifth', 'sk-fake'))
-    await racer.query('COMMIT')
-
-    await TH.expectBad(device.tryPutBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake')), 'vault_full')
-    await TH.expectingGood(device).tryDelBox(u1, 'one', TH.deleting('rev-sk-fake-one'))
-    await TH.expectBad(device.tryPutBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake')), 'vault_full')
-    await TH.expectingGood(device).tryDelBox(u1, 'two', TH.deleting('rev-sk-fake-two'))
-    await TH.expectingGood(device).tryPutBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake'))
-    expect(await TH.boxesStored(db)).to.eq(Cap)
+    const boxrows = await TH.rowsOf(db).boxRowsOf(TH.vaultScope, 'life1')
+    expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.deep.equal([])
   })
 })

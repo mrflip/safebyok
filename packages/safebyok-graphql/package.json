@@ -2,7 +2,7 @@
   "name": "safebyok-graphql",
   "private": false,
   "version": "0.5.0",
-  "description": "GraphQL storage for safebyok: the schema and resolvers that carry a server-side VaultDB's verbs, and the VaultDB over an urql Client that calls them from the browser.",
+  "description": "GraphQL storage for safebyok: the schema and resolvers that carry a server's VaultDB to the browser, and the VaultDB over an urql Client that calls them.",
   "keywords": [
     "safebyok",
     "graphql",
@@ -65,7 +65,7 @@
     "graphql": "^17.0.2",
     "graphql-yoga": "^6.0.1",
     "publint": "^0.3.25",
-    "safebyok-old": "workspace:*",
+    "safebyok": "workspace:*",
     "safebyok-postgres": "workspace:*",
     "tsdown": "^0.23.3",
     "typescript": "6.0.3",
@@ -76,7 +76,7 @@
   "peerDependencies": {
     "@urql/core": "^6.0.0",
     "graphql": "^16.3.0 || ^17.0.0",
-    "safebyok-old": "workspace:^"
+    "safebyok": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@urql/core": {

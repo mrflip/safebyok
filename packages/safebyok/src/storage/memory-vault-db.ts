@@ -1,19 +1,20 @@
 /** The vaultDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code. */
 
-import { type BoxesFetched, type BoxFetched, type BoxLanding, type Heard, type Landing, type PutTerms, type RowOfVault, type Tidied, VaultDB } from './vault-db-new'
+import { type BoxesFetched, type BoxFetched, type BoxLanding, type Heard, type Landing, type RowOfVault, type Tidied, VaultDB } from './vault-db-new'
 import { ckeyOf } from '../helpers/helpers'
 import * as Refuse from '../refusals/throwers'
 import * as SX from '../shapes/shapes-storage'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
-import type { BoxQuery, BoxRecord, BoxTombstone, MemoryVaultDBOpts, Revision, VaultQuery, VaultRecord, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { BoxQuery, BoxRecord, BoxTombstone, DelOpts, MemoryVaultDBOpts, PutOptsGiven, VaultQuery, VaultRecord, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
 
 type BoxLife = { scope: VaultScope, vault_tok: string, boxrows: Map<string, unknown> }
 type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
 
-const meetsTerms = (ante: unknown, { prior, mayReplaceLive, mayAdd }: PutTerms): boolean => (
-  SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? mayReplaceLive : mayAdd)
+/** True when a put under `opts` may land over `ante`, the row it would replace. */
+const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
+  SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
 )
 
 export class MemoryVaultDB extends VaultDB {
@@ -34,7 +35,7 @@ export class MemoryVaultDB extends VaultDB {
   }
   // --
 
-  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #storeVaultRow, #storeBoxRow, #demandRoom, #tell
+  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #storeVaultRow, #storeBoxRow, #demandRoom, #tombstoneBoxes, #tell
 
   /** For tests: the bank's own map of vault rows, by vaultlabel. */
   _cheat_vaultRowsOf({ applabel, user_id }: BankScope): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
@@ -75,6 +76,17 @@ export class MemoryVaultDB extends VaultDB {
     if (used >= this.#maxBoxes) { throw Refuse.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }
   }
 
+  /** Tombstones every live box row of the life `tombstone` ends. */
+  #tombstoneBoxes(tombstone: VaultTombstone): void {
+    const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
+    for (const [boxlabel, box] of boxrows) {
+      const boxTombstone = SX.boxTombstoneOf(box, tombstone.written_at)
+      if (boxTombstone === null) { continue }
+      boxrows.set(boxlabel, boxTombstone)
+      this.#tell(tombstone, { vault: this.#vaultRowOf(tombstone), box: boxTombstone })
+    }
+  }
+
   /** Each heeder hears on a later tick, so that nothing it does touches the transaction that told it. */
   #tell(scope: VaultScope, heard: Heard): void {
     for (const { scope: heardScope, hear } of this.#heeders) {
@@ -101,18 +113,18 @@ export class MemoryVaultDB extends VaultDB {
     return { vault: structuredClone(this.#vaultRowOf(asked)), box: structuredClone(this._cheat_boxRowsOf(asked, asked.vault_tok).get(asked.boxlabel) ?? null) }
   }
 
-  protected doPutVault(record: VaultRecord, terms: PutTerms): Landing {
+  protected doPutVault(record: VaultRecord, opts: PutOptsGiven): Landing {
     const ante = this.#vaultRowOf(record)
-    const landed = meetsTerms(ante, terms)
+    const landed = isPutAllowed(ante, opts)
     if (landed) { this.#storeVaultRow(record) }
     return { landed, ante: structuredClone(ante) }
   }
 
-  protected doPutBox(record: BoxRecord, terms: PutTerms): BoxLanding {
+  protected doPutBox(record: BoxRecord, opts: PutOptsGiven): BoxLanding {
     const vault = this.#vaultRowOf(record)
     const boxrows = this._cheat_boxRowsOf(record, record.vault_tok)
     const ante = boxrows.get(record.boxlabel) ?? null
-    const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && meetsTerms(ante, terms)
+    const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
     if (landed) {
       this.#demandRoom(boxrows, ante)
       this.#storeBoxRow(boxrows, vault, record)
@@ -120,25 +132,19 @@ export class MemoryVaultDB extends VaultDB {
     return { landed, ante: structuredClone(ante), vault: structuredClone(vault) }
   }
 
-  protected doDelVault(tombstone: VaultTombstone, prior: Revision): Landing {
+  protected doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Landing {
     const ante = this.#vaultRowOf(tombstone)
     const isOurs = SX.isLiveRowUnder(ante, tombstone.vault_tok)
-    const isNamedDamage = SX.isDamagedVaultAt(ante, tombstone, prior)
-    const isStopped = isOurs ? (! SX.isRowAt(ante, prior)) : ((ante !== null) && (! SX.vaultRow.safeParse(ante).success) && (! isNamedDamage))
-    if (isStopped) { return { landed: false, ante: structuredClone(ante) } }
-    const landed = isOurs || isNamedDamage
+    const isDamaged = (ante !== null) && (! SX.vaultRow.safeParse(ante).success)
+    const landed = (isOurs && SX.isRowAt(ante, prior)) || SX.isDamagedVaultAt(ante, tombstone, prior)
+    // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
+    if ((! landed) && (isOurs || isDamaged)) { return { landed, ante: structuredClone(ante) } }
     if (landed) { this.#storeVaultRow(tombstone) }
-    const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
-    for (const [boxlabel, box] of boxrows) {
-      const boxTombstone = SX.boxTombstoneOf(box, tombstone.written_at)
-      if (boxTombstone === null) { continue }
-      boxrows.set(boxlabel, boxTombstone)
-      this.#tell(tombstone, { vault: this.#vaultRowOf(tombstone), box: boxTombstone })
-    }
+    this.#tombstoneBoxes(tombstone)
     return { landed, ante: structuredClone(ante) }
   }
 
-  protected doDelBox(tombstone: BoxTombstone, prior: Revision): BoxLanding {
+  protected doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): BoxLanding {
     const vault = this.#vaultRowOf(tombstone)
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     const ante = boxrows.get(tombstone.boxlabel) ?? null

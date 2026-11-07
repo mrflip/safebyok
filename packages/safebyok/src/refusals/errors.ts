@@ -25,10 +25,8 @@ import type { Capacity } from '../shapes/shapes-storage'
  * A record that fails its checks is named for its direction, by a VaultDB and a vault alike. One
  * read from storage that fails them is `damaged_row`, on the way out, and a box that will not open
  * under the lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. One
- * handed in is `bad_option`, on the way in; `bad_record` where one check serves both ways. The
- * record a vaultDB verb is handed is safebyok's own to prepare, so one failing there is
- * `unexpected_error`, though the options beside it are `bad_option`. A storage adapter's answer
- * that cannot be, one revision under two toks say, is `record_conflict`.
+ * handed in is `bad_option`, on the way in; `bad_record` where one check serves both ways. A
+ * storage adapter's answer that cannot be, one revision under two toks say, is `record_conflict`.
  *
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
  * altered, since decryption fails alike; the message says so.
@@ -47,7 +45,7 @@ export const refusalkindVals = [
   'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, argon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
   'damaged_box',         // a box's whisper would not open under the vault's lease, or opened to no whisper this package knows
-  'newer_format',        // a stored vault in a form this version does not know, or naming a key deriver this handle was not built with: update safebyok
+  'newer_format',        // a stored wayin naming a key deriver this handle was not built with: update safebyok
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
@@ -66,7 +64,7 @@ export const refusalkindVals = [
   'camped',              // a vaultDB put told not to replace a live row found one there
   'vault_empty',         // a vaultDB call named a vault_tok no row holds, and no live row stands there: nothing of this life
   'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
-  'gate_issue',          // a vaultDB gate verb whose params fail the integrity checks against the stored row
+  'gate_issue',          // a vaultDB gate verb whose params disagree with the stored row: its registered_at
   'disabled',            // a call on an object let go by a sweep, a vacate or a delete: it answers nothing more, and the bank has a fresh one
 ] as const
 export type Refusalkind = typeof refusalkindVals[number]

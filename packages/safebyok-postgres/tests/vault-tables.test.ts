@@ -1,184 +1,61 @@
+/** VaultTablesSql: the file a migration tool copies, and the tables it makes. */
+
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, expect, it } from 'vitest'
+import * as SX from 'safebyok/storage'
+import { VaultTablesSql } from '../src/index'
 import * as TH from './test-helpers'
-import { VaultRowColumns, BoxColumns, TombstoneColumns } from '../src/columns'
-import { VaultChangeChannel, VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
-
-const TypeForKind = { text: 'text', bigint: 'bigint', jsonb: 'jsonb' } as const
-
-const describedColumns = async (db: PGlite, table: string) => {
-  /** A column as information_schema describes it: its name and its type. */
-  type DescribedColumn = { column_name: string, data_type: string }
-
-  const { rows } = await db.query<DescribedColumn>(
-    'SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position',
-    [table],
-  )
-  return rows.map((row) => [row.column_name, row.data_type])
-}
-
-// Primary, unique, foreign and check constraints: every key a table has, and none of the NOT NULLs
-// a newer Postgres also lists there.
-const describedKeys = async (db: PGlite, table: string) => {
-  /** A key as pg_constraint describes it: its name and its definition. */
-  type DescribedKey = { conname: string, definition: string }
-
-  const { rows } = await db.query<DescribedKey>(
-    "SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f', 'c') ORDER BY conname",
-    [table],
-  )
-  return rows.map((row) => [row.conname, row.definition])
-}
 
 TH.bootDatabaseFirst()
 
-/** A PGlite of its own with VaultTablesSql run in it and nothing else, made once per file. */
-const tablesOnly: { db?: Promise<PGlite> } = {}
-const tablesOnlyDatabase = async (): Promise<PGlite> => {
-  tablesOnly.db ??= (async () => {
-    const db = new PGlite()
-    await db.exec(VaultTablesSql)
-    return db
-  })()
-  const db = await tablesOnly.db
-  await db.exec('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones')
-  return db
+/** Each column of `table` as information_schema describes it: its name, type and nullability. */
+const columnsOf = async (table: string): Promise<string[][]> => {
+  const db = await TH.database()
+  const { rows } = await db.query<{ column_name: string, data_type: string, is_nullable: string }>(
+    'SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position', [table],
+  )
+  return rows.map(({ column_name, data_type, is_nullable }) => [column_name, data_type, is_nullable])
 }
-beforeAll(async () => { await tablesOnlyDatabase() }, TH.BootMillis)
+
+/** Each primary, unique, foreign or check key of `table`, as Postgres defines it. */
+const keysOf = async (table: string): Promise<string[]> => {
+  const db = await TH.database()
+  const { rows } = await db.query<{ definition: string }>(
+    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f', 'c')", [table],
+  )
+  return rows.map(({ definition }) => definition)
+}
 
 describe("VaultTablesSql", () => {
-  it("is the package's vault-tables.sql, word for word", () => {
-    const shipped = readFileSync(path.join(import.meta.dirname, '..', 'vault-tables.sql'), 'utf8')
-    expect(VaultTablesSql).to.eq(shipped)
+  it("is the vault-tables.sql the package ships", () => {
+    expect(readFileSync(path.join(import.meta.dirname, '..', 'vault-tables.sql'), 'utf8')).to.equal(VaultTablesSql)
   })
 
-  it("can be run again over the tables it made, keeping their rows", async () => {
-    const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
+  it("is safe to run again, keeping the rows already stored", async () => {
+    const vaultDB = await TH.makeVaultDB()
+    await vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    const db = await TH.database()
     await db.exec(VaultTablesSql)
-    expect(await TH.vaultRecordIn(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.deep.equal(TH.vaultRecordOf('u1'))
+    expect(await vaultDB.getVault(TH.vaultScope)).to.deep.include({ act: 'got', val: TH.vaultAt() })
   })
 
-  it("makes the vault record's columns exactly as the adapter writes it, in order, and no more", async () => {
+  it("makes a vaults table keyed by bank and vaultlabel, and a boxes table keyed by life and boxlabel, each row a jsonb", async () => {
+    expect(await columnsOf('safebyok_vaults')).to.deep.equal([
+      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'], ['vault', 'jsonb', 'NO'],
+    ])
+    expect(await keysOf('safebyok_vaults')).to.deep.equal(['PRIMARY KEY (applabel, user_id, vaultlabel)'])
+    expect(await columnsOf('safebyok_boxes')).to.deep.equal([
+      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'], ['vault_tok', 'text', 'NO'], ['boxlabel', 'text', 'NO'], ['box', 'jsonb', 'NO'],
+    ])
+    expect(await keysOf('safebyok_boxes')).to.deep.equal(['PRIMARY KEY (applabel, user_id, vaultlabel, vault_tok, boxlabel)'])
+  })
+
+  it("turns on row-level security for both tables", async () => {
     const db = await TH.database()
-    expect(await describedColumns(db, 'safebyok_vaults')).to.deep.equal(VaultRowColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
-  })
-
-  it("makes the tombstone's columns exactly as the adapter writes them, in order, and no more", async () => {
-    const db = await TH.database()
-    expect(await describedColumns(db, 'safebyok_vault_tombstones')).to.deep.equal(TombstoneColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
-  })
-
-  it("makes a box's columns exactly as the adapter writes them, after its vault's scope and vault_tok", async () => {
-    const db = await TH.database()
-    const adapterColumns = [['applabel', 'text'], ['user_id', 'text'], ['vaultlabel', 'text'], ['vault_tok', 'text']]
-    expect(await describedColumns(db, 'safebyok_boxes')).to.deep.equal([
-      ...adapterColumns,
-      ...BoxColumns.map(([field, kind]) => [field, TypeForKind[kind]]),
-    ])
-  })
-
-  it("names each key for its table, as Postgres does a key made with the table", async () => {
-    const db = await tablesOnlyDatabase()
-    expect(await describedKeys(db, 'safebyok_vaults')).to.deep.equal([
-      ['safebyok_vaults_applabel_user_id_vaultlabel_vault_tok_key', 'UNIQUE (applabel, user_id, vaultlabel, vault_tok)'],
-      ['safebyok_vaults_pkey',                                     'PRIMARY KEY (applabel, user_id, vaultlabel)'],
-    ])
-    expect(await describedKeys(db, 'safebyok_vault_tombstones')).to.deep.equal([
-      ['safebyok_vault_tombstones_pkey', 'PRIMARY KEY (applabel, user_id, vaultlabel)'],
-    ])
-    expect(await describedKeys(db, 'safebyok_boxes')).to.deep.equal([
-      ['safebyok_boxes_applabel_user_id_vaultlabel_vault_tok_fkey', 'FOREIGN KEY (applabel, user_id, vaultlabel, vault_tok) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel, vault_tok) ON DELETE CASCADE'],
-      ['safebyok_boxes_pkey',                                      'PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel)'],
-    ])
-  })
-
-  it("holds every column NOT NULL but the vault record's passphrase and passkey, a SQL null for a JSON null, and defaults none but a box's sidecar, to {}", async () => {
-    const db = await tablesOnlyDatabase()
-    const { rows } = await db.query(
-      "SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_boxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
+    const { rows } = await db.query<{ relname: string, relrowsecurity: boolean }>(
+      "SELECT relname, relrowsecurity FROM pg_class WHERE relname IN ('safebyok_vaults', 'safebyok_boxes') ORDER BY relname",
     )
-    expect(rows).to.have.deep.members([
-      { table_name: 'safebyok_vaults', column_name: 'passphrase', is_nullable: 'YES', column_default: null },
-      { table_name: 'safebyok_vaults', column_name: 'passkey', is_nullable: 'YES', column_default: null },
-      { table_name: 'safebyok_boxes',  column_name: 'sidecar', is_nullable: 'NO',  column_default: "'{}'::jsonb" },
-    ])
-  })
-
-  it("never changes the columns of a table already there, so a table of another release's shape stays as it was until the host drops it", async () => {
-    const db = await tablesOnlyDatabase()
-    const elderColumns = await db.transaction(async (tx) => {
-      await tx.exec('CREATE SCHEMA elder; SET LOCAL search_path TO elder')
-      await tx.exec('CREATE TABLE safebyok_boxes (applabel text, revision_id text)')
-      await tx.exec(VaultTablesSql)
-      const { rows } = await tx.query<{ column_name: string }>(
-        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'elder' AND table_name = 'safebyok_boxes' ORDER BY ordinal_position",
-      )
-      await tx.rollback()
-      return rows.map((row) => row.column_name)
-    })
-    expect(elderColumns).to.deep.equal(['applabel', 'revision_id'])
-  })
-
-  it("makes tables and their keys, and no function, trigger or table beyond the three", async () => {
-    const db = await tablesOnlyDatabase()
-    const { rows: triggers } = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
-    const { rows: functions } = await db.query("SELECT proname FROM pg_proc JOIN pg_namespace ON pg_namespace.oid = pronamespace WHERE nspname = 'public'")
-    const { rows: tables } = await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")
-    expect(triggers).to.deep.equal([])
-    expect(functions).to.deep.equal([])
-    expect(tables).to.deep.equal([{ tablename: 'safebyok_boxes' }, { tablename: 'safebyok_vault_tombstones' }, { tablename: 'safebyok_vaults' }])
-  })
-
-  it("keeps every row from a role that is not the tables' owner", async () => {
-    const db = await TH.emptyDatabase()
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
-    await db.exec('CREATE ROLE stranger; GRANT SELECT, INSERT ON safebyok_vaults TO stranger')
-    try {
-      await db.exec('SET ROLE stranger')
-      const { rows } = await db.query('SELECT * FROM safebyok_vaults')
-      expect(rows).to.have.lengthOf(0)
-      await TH.expectBad(TH.requestFor(db, 'u2').tryEnsureVault(TH.gatelessOf('u2')), 'not_permitted')
-    } finally {
-      await db.exec('RESET ROLE; DROP OWNED BY stranger; DROP ROLE stranger')
-    }
-  })
-})
-
-describe("VaultNotifySql", () => {
-  it("is the package's vault-notify.sql, word for word", () => {
-    const shipped = readFileSync(path.join(import.meta.dirname, '..', 'vault-notify.sql'), 'utf8')
-    expect(VaultNotifySql).to.eq(shipped)
-  })
-
-  it("notifies the channel the adapter listens on", () => {
-    expect(VaultNotifySql).to.include(`pg_notify('${VaultChangeChannel}'`)
-  })
-
-  it("can be run again over the triggers it made", async () => {
-    const db = await TH.database()
-    await db.exec(VaultNotifySql)
-    await db.exec(VaultNotifySql)
-    const { rows } = await db.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal ORDER BY tgname")
-    expect(rows).to.deep.equal([{ tgname: 'safebyok_boxes_changed' }, { tgname: 'safebyok_vaults_changed' }])
-  })
-
-  it("is what push needs: a vault over tables without it never hears another request's write, and works whole", async () => {
-    const db = await tablesOnlyDatabase()
-    const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
-    await TH.ensureGated(TH.requestFor(db, 'u1'), TH.vaultRecordOf('u1'))
-    await TH.expectGood(TH.requestFor(db, 'u1').tryPutBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')))
-    await TH.wakeupAtNextTick()
-    expect(heard.count).to.eq(0)
-    expect(await TH.boxesOf(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))).to.have.lengthOf(1)
-    unsubscribe()
-  })
-})
-
-describe("VaultChangeChannel", () => {
-  it("is the channel a listen hook is handed", () => {
-    expect(VaultChangeChannel).to.eq('safebyok_vault_changes')
+    expect(rows).to.deep.equal([{ relname: 'safebyok_boxes', relrowsecurity: true }, { relname: 'safebyok_vaults', relrowsecurity: true }])
   })
 })

@@ -27,7 +27,7 @@
     "build": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm -r --stream build",
     "justify:root": "all() { pnpm lint:root; lint=$?; pnpm typecheck:root; typecheck=$?; pnpm test:root; exit $(( lint || typecheck || $? )); }; all",
     "justify": "all() { pnpm install || exit; pnpm lint; lint=$?; pnpm lint:workflows; workflows=$?; pnpm typecheck; typecheck=$?; pnpm test; tested=$?; pnpm size:check; exit $(( lint || workflows || typecheck || tested || $? )); }; all",
-    "size": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter safebyok-old --filter safebyok-fastkey --filter safebyok-indexeddb --filter safebyok-react build && size-limit",
+    "size": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter safebyok --filter safebyok-old --filter safebyok-fastkey --filter safebyok-indexeddb --filter safebyok-react build && size-limit",
     "size:check": "size-limit",
     "size:budget": "node scripts/size-budget.ts",
     "demo:react": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-demo-react^...' build && pnpm --filter safebyok-demo-react dev",

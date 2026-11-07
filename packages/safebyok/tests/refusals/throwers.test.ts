@@ -89,6 +89,16 @@ describe("Refusals.storageUnavailable", () => {
   })
 })
 
+describe("Refusals.storageFull", () => {
+  it("makes a refusal of a write the storage had no room for", () => {
+    const quota = new Error('quota exceeded')
+    const refusal = Refusals.storageFull(quota)
+    expect(refusal.refusalkind).to.eq('vault_full')
+    expect(refusal.message).to.eq(Phrases.StorageFull)
+    expect(refusal.cause).to.eq(quota)
+  })
+})
+
 describe("Refusals.unexpectedError", () => {
   it("makes a misuse refusal of a bug, the thrown value its cause", () => {
     const thrown = new TypeError("Cannot read properties of undefined (reading 'wayins')")
@@ -105,5 +115,29 @@ describe("Refusals.unexpectedError", () => {
     const cause = Refusals.unexpectedError({ code: 7 }).cause as Error
     expect(cause).to.be.instanceOf(Error)
     expect(cause.cause).to.deep.equal({ code: 7 })
+  })
+})
+
+describe("Refusals.storageFailed", () => {
+  it("names the call and what was thrown by its name, carrying nothing else of it", () => {
+    const thrown = new Error('[Request ID: 1a2b] Server Error: Uncaught Error in putBox with args {"whisper_ciphered":"c2VjcmV0"}')
+    const err = Refusals.storageFailed('putBox', thrown)
+    expect(err).to.include({ refusalkind: 'storage_unavailable' })
+    expect(err).not.to.have.property('cause')
+    expect(err.message).to.equal(Phrases.storageFailed('putBox', Phrases.storeThrew('Error')))
+    expect(err.message).not.to.include('c2VjcmV0')
+  })
+
+  it("names no thrown at all for a throw that has no name", () => {
+    expect(Refusals.storageFailed('getVault', undefined).message).to.equal(Phrases.storageFailed('getVault', ''))
+  })
+})
+
+describe("Refusals.identityRevoked", () => {
+  it("says to open the vault again", () => {
+    const err = Refusals.identityRevoked()
+    expect(err).to.be.instanceOf(VaultError)
+    expect(err).to.include({ refusalkind: 'identity_revoked' })
+    expect(err.message).to.match(/Open the vault again/)
   })
 })

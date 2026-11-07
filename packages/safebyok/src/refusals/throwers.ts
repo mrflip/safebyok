@@ -210,7 +210,7 @@ export const suppliedSpecChanged = (label: string): VaultError => new VaultError
 export const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => new VaultError('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
 // --
 
-// == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, damagedRecord, newerFormat, seqNotNext, recordPreparedWrong, storageError
+// == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext
 
 /* The refusals of a vaultDB, each read the same in an answer and an error: `meta` holds the `world` and `dbhas` the answer carries. */
 
@@ -250,15 +250,12 @@ export const vaultFull = (capacity: SX.Capacity): VaultError => (
   new VaultError('vault_full', Phrases.VaultFull, { meta: { capacity } })
 )
 
-export const damagedRecord = (): VaultError => new VaultError('damaged_row', Phrases.DamagedRecord)
-
-export const newerFormat = (): VaultError => new VaultError('newer_format', Phrases.NewerFormat)
+/** A `vault_full` refusal for a write storage itself had no room for, `cause` what the backend threw. */
+export const storageFull = (cause: Thrown): VaultError => (
+  new VaultError('vault_full', Phrases.StorageFull, { cause: sanitizeForeignError(cause) })
+)
 
 export const seqNotNext = (): VaultError => new VaultError('bad_option', Phrases.SeqNotNext)
-
-export const recordPreparedWrong = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.RecordPreparedWrong, { cause })
-
-export const storageError = (cause: unknown): VaultError => new VaultError('storage_unavailable', Phrases.StorageError, { cause })
 // --
 
 // == [DeviceDB Throwers]: storeFailed
@@ -269,4 +266,18 @@ export const storeFailed = (call: string, thrown: unknown): VaultError => {
   const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
   return new VaultError('storage_unavailable', Phrases.storeFailed(call, named))
 }
+// --
+
+// == [Backend Throwers]: storageFailed, identityRevoked
+
+// A backend's error may quote the call's arguments, so only its `name` is kept.
+/** A storage backend's failure as `storage_unavailable`, naming the call and the thrown `name` and nothing else. */
+export const storageFailed = (call: string, thrown: unknown): VaultError => {
+  const thrownName = thrownNameOf(thrown)
+  const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
+  return new VaultError('storage_unavailable', Phrases.storageFailed(call, named))
+}
+
+/** An `identity_revoked` refusal: the storage backend no longer serves the user the call names. */
+export const identityRevoked = (): VaultError => new VaultError('identity_revoked', Phrases.IdentityRevoked)
 // --
