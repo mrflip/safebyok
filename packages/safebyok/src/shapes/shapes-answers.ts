@@ -35,8 +35,9 @@ export const { crossedErr, crossedReqParams, damagedVault, damagedBox } = Checke
     revision_seq: int.nullable().default(null),
     prior:        SX.revision.strict().nullable().default(null),
   }).strict()
-  const damagedVault = SX.vaultSparse.extend({ am: lit('d'), damagekind: oneof(EX.damagekindVals) }).strict()
-  const damagedBox   = SX.boxSparse.extend({ am: lit('d'), damagekind: oneof(EX.damagekindVals) }).strict()
+  // A damaged row's label is the one it is stored under, which may fail a label's check: a reason it is listed.
+  const damagedVault = SX.vaultSparse.extend({ vaultlabel: str, am: lit('d'), damagekind: oneof(EX.damagekindVals) }).strict()
+  const damagedBox   = SX.boxSparse.extend({ boxlabel: str, am: lit('d'), damagekind: oneof(EX.damagekindVals) }).strict()
   return { crossedErr, crossedReqParams, damagedVault, damagedBox }
 }, [CX])
 

@@ -71,6 +71,14 @@ describe("AX's answer checks", () => {
     expect(() => AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, vaults: [...listed.val.vaults, damaged] } })).to.throw(VaultError)
   })
 
+  it("take a damaged row under the label it is stored under, though that label fails a label's check", async () => {
+    const vaultDB = await storeWithBox()
+    const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
+    const misnamed = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'Not A Label' }, { vault_tok: 'life1' })
+    const parsed = AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [misnamed] } })
+    expect(parsed.ok && parsed.val.damaged_rows).to.deep.eq([misnamed])
+  })
+
   it("refuse a field this copy does not know, an act its verb never answers, or a missing world", async () => {
     const vaultDB = await storeWithBox()
     const got = crossed(await vaultDB.tryGetVault(vaultScope)) as Record<string, unknown>
