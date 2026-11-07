@@ -21,4 +21,35 @@ describe("safebyok", () => {
     expect(new Front.MemoryDeviceDB()).toBeInstanceOf(Front.DeviceDB)
     expectTypeOf<Front.MemoryDeviceDB>().toExtend<Front.BankOpts['deviceDB']>()
   })
+
+  it("exports what a React host's gating dialogs branch on: the correctable refusal kinds and the types of a gating's state", () => {
+    expect(Front.correctablekindVals).to.deep.equal(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'])
+    expectTypeOf<(typeof Front.correctablekindVals)[number]>().toExtend<Front.Refusalkind>()
+    expectTypeOf<Front.Gating['gatingkind']>().toEqualTypeOf<Front.Gatingkind>()
+    expectTypeOf<Front.Gating['passkeyHeader']>().toEqualTypeOf<Front.WayinHeader | null>()
+    expectTypeOf<Front.PasskeyWayinHeader>().toExtend<Front.WayinHeader>()
+    expectTypeOf<Front.PassphraseWayinHeader>().toExtend<Front.WayinHeader>()
+    expectTypeOf<ReturnType<Front.Vault['lockState']>>().toEqualTypeOf<Front.LockState>()
+    expectTypeOf<ReturnType<Front.Bank['lockState']>>().toEqualTypeOf<Front.LockState>()
+    expectTypeOf<Front.BankSnapshot['stage']>().toEqualTypeOf<Front.BankStage>()
+    expectTypeOf<Front.DamagedBox['damagekind']>().toEqualTypeOf<Front.Damagekind>()
+    expectTypeOf<Front.DamagedBox>().toExtend<Front.BoxSparse>()
+  })
+
+  it("exports the byte counts and the minute a passkey call and an autolock setting need", () => {
+    expect(Front.PasskeySaltBytes).to.eq(32)
+    expect(Front.PrfAnswerBytes).to.eq(32)
+    expect(Front.MinuteMillis).to.eq(60_000)
+    expectTypeOf<Front.PasskeyAnswer['prfBytes']>().toExtend<Uint8Array>()
+  })
+
+  it("exports HostErrorSanitizer, whose refusalFor makes a VaultError that carries nothing of what was thrown", () => {
+    const foreign = new Error('the passphrase was hunter2')
+    const refusal = Front.HostErrorSanitizer.refusalFor(foreign, 'storage_unavailable', "The vault's storage failed: try again shortly.")
+    expect(Front.isVaultError(refusal)).to.be.true
+    expect(refusal.refusalkind).to.eq('storage_unavailable')
+    expect(refusal.message).to.eq("The vault's storage failed: try again shortly.")
+    expect(refusal.cause).to.be.undefined
+    expect(JSON.stringify(refusal)).to.not.contain('hunter2')
+  })
 })
