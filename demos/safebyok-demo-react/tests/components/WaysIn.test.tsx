@@ -53,4 +53,38 @@ describe("WaysIn", () => {
     expect(screen.queryByRole('dialog')).to.be.null
     expect(document.querySelector('.ways-in .gripe')).to.be.null
   })
+
+  it("offers no fingerprint in a browser without WebAuthn", async () => {
+    await renderBuilt()
+    expect(screen.queryByRole('button', { name: 'Add fingerprint' })).to.be.null
+    expect(screen.queryByRole('button', { name: 'Remove fingerprint' })).to.be.null
+  })
+
+  it("adds a fingerprint through the provider's dialog, then offers only to remove it, which leaves the passphrase alone", async () => {
+    TH.installFakeAuthenticator()
+    await renderBuilt()
+    expect(screen.queryByRole('button', { name: 'Remove fingerprint' })).to.be.null
+    fireEvent.click(screen.getByRole('button', { name: 'Add fingerprint' }))
+    await TH.answerPasskeyAddDialog()
+    await screen.findByText(/^passkey/)
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    expect(screen.queryByRole('button', { name: 'Add fingerprint' })).to.be.null
+    fireEvent.click(screen.getByRole('button', { name: 'Remove fingerprint' }))
+    await TH.answerPasskeyRevokeDialog()
+    await screen.findByText('no passkey')
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    expect(screen.getByRole('button', { name: 'Add fingerprint' })).to.not.be.null
+    await TH.expectProbe('present unlocked')
+  })
+
+  it("says nothing when the user cancels the fingerprint's dialog", async () => {
+    TH.installFakeAuthenticator()
+    await renderBuilt()
+    const prompting = vi.spyOn(Vault.prototype, 'tryAddPasskeyPrompt')
+    fireEvent.click(screen.getByRole('button', { name: 'Add fingerprint' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    await TH.settlePrompts(prompting)
+    expect(screen.queryByRole('dialog')).to.be.null
+    expect(document.querySelector('.ways-in .gripe')).to.be.null
+  })
 })

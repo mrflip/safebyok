@@ -1,6 +1,6 @@
 /** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over stores in memory, to watch the vault beside it, to answer the dialogs the provider raises, and to stand in for Anthropic. */
 import type { ReactNode } from 'react'
-import { expect, type MockInstance } from 'vitest'
+import { expect, onTestFinished, vi, type MockInstance } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryDeviceDB } from 'safebyok'
 import { MemoryVaultDB } from 'safebyok/storage'
@@ -54,6 +54,40 @@ export const answerReplacementDialog = async (antePassphrase: string, nextPassph
 export const answerDeletionDialog = async (passphrase = Passphrase) => {
   fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete vault' }))
+}
+
+/** Answers the dialog that adds a passkey once it shows: types `passphrase` and presses Add passkey, the browser's prompt answered by {@link installFakeAuthenticator}. */
+export const answerPasskeyAddDialog = async (passphrase = Passphrase) => {
+  fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add passkey' }))
+}
+
+/** Answers the dialog that removes the passkey once it shows: types `passphrase` and presses Remove passkey. */
+export const answerPasskeyRevokeDialog = async (passphrase = Passphrase) => {
+  fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove passkey' }))
+}
+
+/** A browser offering WebAuthn for one test, whose authenticator makes passkeys that answer the PRF extension at once, each with random bytes. */
+export const installFakeAuthenticator = () => {
+  vi.stubGlobal('PublicKeyCredential', FakePublicKeyCredential)
+  Object.defineProperty(navigator, 'credentials', { value: { create }, configurable: true })
+  onTestFinished(() => {
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(navigator, 'credentials')
+  })
+}
+
+/** The fake authenticator's `navigator.credentials.create`: a new passkey, its PRF answer random. */
+const create = () => Promise.resolve({
+  type:                      'public-key',
+  rawId:                     crypto.getRandomValues(new Uint8Array(16)).buffer,
+  getClientExtensionResults: () => ({ prf: { enabled: true, results: { first: crypto.getRandomValues(new Uint8Array(32)) } } }),
+})
+
+/** Stands in for the browser's PublicKeyCredential, whose presence says the browser offers WebAuthn. */
+class FakePublicKeyCredential {
+  readonly type = 'public-key'
 }
 
 /** Waits, inside React's act, until each call `prompting` heard has settled and the handler that awaited it has heard. */
