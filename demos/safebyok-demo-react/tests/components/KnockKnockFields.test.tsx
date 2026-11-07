@@ -130,6 +130,7 @@ describe("KnockKnockFields", () => {
     TH.renderInBank(<><KnockKnockFields /><BoxVeiler /><TH.VaultProbe /></>)
     await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Veil' }))
+    await screen.findByRole('button', { name: 'Edit key' })
     await knockAs('Banana')
     await screen.findByText(Punchline)
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
