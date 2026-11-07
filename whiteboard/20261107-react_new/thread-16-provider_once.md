@@ -1,8 +1,8 @@
 # Thread 16: BankProvider makes its bank once per scope (2026-11-07)
 
 Branch `20261107-provider_once`, PR [#589](https://github.com/mrflip/safebyok/pull/589), stacked on [#586](https://github.com/mrflip/safebyok/pull/586) (thread 15,
-`deviceDB.ensureBank`). Justify: green (safebyok-react 200 tests, demo 60, every package green, size budgets met;
-`BankProvider` 6.41 kB of 9.4 kB).
+`deviceDB.ensureBank`). Justify: green (safebyok 2471 tests, safebyok-react 204, demo 60, every package green, size budgets met;
+`BankProvider` 6.45 kB of 9.4 kB).
 
 * **Built** (`packages/safebyok-react/src/bank-provider.tsx`, its tests, the demo):
   * `BankProvider` makes its bank once per `applabel` + `user_id`: the bank effect's dependencies are
@@ -17,7 +17,7 @@ Branch `20261107-provider_once`, PR [#589](https://github.com/mrflip/safebyok/pu
     render throws it to the nearest error boundary: the same place a failed make went before.
   * The handlers (`onBadNews`, `onPanic`, `requestCleartext`) are called through `latestProps`, so an inline one is
     called as last rendered. Whether a handler exists, and a misused (non-function) one, is fixed at the making.
-    `panicWhileHeld` throws the refusal (to the platform, through the core) when the latest props hold no `onPanic`.
+    An `onBadNews` or `onPanic` dropped after the making falls back to the one the bank was made with (rework, below).
   * The ignored-change warning: `fixedPropsOf(props)` picks the eight Bank.make option props plus handler presence;
     `madeWith` holds it for the bank made. An effect with no dependency list compares the latest to `madeWith` each
     commit, only while `provided.bank` is set (so not in the render where the scope changes), and warns once per
@@ -47,9 +47,27 @@ Branch `20261107-provider_once`, PR [#589](https://github.com/mrflip/safebyok/pu
     later is ignored and should be said.
 
 * **Discoveries**:
-  * A misused `deviceDB` (not a DeviceDB at all) now reaches the boundary as a `TypeError` from `deviceDB.ensureBank`,
-    not `bad_option` from Bank.make: `isDeviceDB` is not exported from `safebyok`. Open matter.
   * A host still passing `device_id` (plain JS) has it silently overridden by the ensured one. Open matter.
   * The demo restack will meet #587's `deviceIdOf` -> `ensureDeviceId` rename in `stores.ts`: resolve by deleting both.
+
+* **Rework after review** (two commits on top of the reviewer's three):
+  * **A dropped handler falls back.** The build read `guardOnPanic` (`packages/safebyok/src/models/bank.ts`) wrong:
+    it does not treat a throwing handler as a panic nobody hears. It reports the throw to the platform and still
+    answers true (heard), so the vault is never vacated; only a bank made with no `onPanic` at all vacates. So
+    `panicWhileHeld` and `tellWhileHeld` now call the latest props' handler when it is a function, else the one the
+    bank was made with (`onBadNews`/`onPanic` from the effect's `making`). "The bank has a handler" holds for the
+    bank's life, matching what Bank.make was told; the ignored-change warning already names the dropped prop. A
+    let-go bank's panic is still thrown (reported to the platform, never the next user's handler). Set aside: throwing
+    when the latest has none (the build's, wrong as above); remaking the bank on a dropped handler (what this thread
+    removed). Tests: drop `onPanic` after make, a panic reaches the made-with one and the vault stays; drop
+    `onBadNews`, `bank.tellBadNews` reaches the made-with one. Both fail on the old code (checked).
+  * **A misused `deviceDB` is refused `bad_option`.** The core already had `brandedDeviceDB` (a `Checker` on
+    `isDeviceDB`, `shapes/shapes-vaultish.ts`, the check `bankOpts` uses), exported from no entry point; it is now
+    exported from `safebyok/storage` beside `DeviceDB` (no checker sat on any entry point before; `storage` is where
+    the DeviceDB contract and `Checker` live). `BankProvider` parses `deviceDB` with it (`where: 'deviceDB'`) inside
+    the make's `try`, so a refusal reaches the boundary by the same `refused` path. Second changeset
+    `.changeset/20261107-provider_once-2.md`, safebyok patch (as directed; PROCESS.md reads minor for an exported
+    name, moot in the lockstep group beside safebyok-react's minor). Test: an object with an `ensureBank` that is no
+    DeviceDB reaches the boundary `bad_option`; fails on the old code (checked).
 
 * **For the Coach**: the open matters in the PR body.
