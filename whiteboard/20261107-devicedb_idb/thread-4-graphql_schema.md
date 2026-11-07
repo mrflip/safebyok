@@ -1,6 +1,6 @@
 # Thread 4: graphql_schema (2026-11-07)
 
-Branch `20261107-graphql_schema`, PR #TBD, stacked on #569 (thread 2, `20261107-idb_devicedb`). Status: **blocked after
+Branch `20261107-graphql_schema`, PR #571 (draft), stacked on #569 (thread 2, `20261107-idb_devicedb`). Status: **blocked after
 two compactions**, milestone 1 (core) committed; milestones 2-4 not begun. Justify green: core 2,368, indexeddb 107
 (2 skipped), postgres 123, convex 227, fastkey 49, graphql 210 (3 skipped), e2e 200.
 
