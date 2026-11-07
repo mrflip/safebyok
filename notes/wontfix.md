@@ -63,10 +63,10 @@ not as a settled ruling, and check it against the current design before relying 
   delete the vaultDB refuses still logs the user out of this device, and they log back in to try the
   delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
-* 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
+* 2026-11-03 (unrace, `notes/design-proof.md`, *The lease*): **a `lock()` during
   the cache's `Lease.buildFromCache` loses.** The vault reads unlocked on the lease built from the cache, the lock's erase
   stands, and the next session asks for a proof. The next `lock()` ends that session.
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+* 2026-11-03 (the Coach, unrace, `notes/design-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here):
   **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
   the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
@@ -85,17 +85,17 @@ not as a settled ruling, and check it against the current design before relying 
   the gating's check whole.** The gating replaces a foreign throw from a getter with `unexpected_error`, keeping nothing of it, but passes a
   `VaultError` as it came and does not inspect its text; one a host's getter throws with the passphrase in its
   message reaches the caller whole. The Coach: "Wontfix agreed".
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Changing the gate*, and *Rows for
+* 2026-11-03 (the Coach, unrace, `notes/design-proof.md`, *Changing the gate*, and *Rows for
   `notes/wontfix.md`*, since moved here): **a gate change leaves another device's session lease to run.** No device
   locks on it: another device's session keeps its lease to its `lock()` or next `bank.autolock`, and its cached lease, of the
   older `gate_epoch`, is forgotten at its next session.
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+* 2026-11-03 (the Coach, unrace, `notes/design-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **a damaged row stays until the customer names it for
   deletion.** It still counts toward `maxBoxes`. Ruled: the customer clears it with their own store's tools; not built yet.
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+* 2026-11-03 (the Coach, unrace, `notes/design-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **cross-tab complications, all of them.** Tab A's `lock()` or
   vacate leaves tab B unlocked, and nothing tells it.
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
+* 2026-11-03 (the Coach, unrace, `notes/design-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **a put can land though its answer is lost.**
 * 2026-11-04 (the Coach, on `Lease.buildFromCache` rejecting where a clock throws): **anything to do with a host clock.**
   The package reads the device's clock, `Date.now()`; a host has none to pass, and a test sets it with
