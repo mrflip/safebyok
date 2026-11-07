@@ -88,6 +88,34 @@ describe("BoxWhisperField", () => {
     expect(theField().value).to.eq('sk-ant-fake-edited')
   })
 
+  it("masks the field again when it hides, so an unlock never shows the whisper unasked", async () => {
+    const { vault, box } = await boxOfWorld()
+    render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
+    await exposing(box)
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(theField().type).to.eq('text')
+    act(() => { vault.lock() })
+    expect(theField().type).to.eq('password')
+    await act(async () => { await vault.ensureUnlocked() })
+    expect(theField().type).to.eq('password')
+    expect(theField().value).to.eq(StoredKey)
+    expect(screen.getByRole('button', { name: 'Show' }).getAttribute('aria-pressed')).to.eq('false')
+  })
+
+  it("masks the field again at a veil, keeping the input it bound", async () => {
+    const { box } = await boxOfWorld()
+    render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
+    await exposing(box)
+    const field = theField()
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    act(() => { box.veil() })
+    act(() => { box.unveil() })
+    expect(theField()).to.eq(field)
+    expect(field.type).to.eq('password')
+    expect(field.value).to.eq(StoredKey)
+    expect(box.snapshot.exposed).to.be.true
+  })
+
   describe("keeps the whisper out of React and the page's markup", () => {
     it("writes no value attribute and no name, hidden or shown", async () => {
       const { box } = await boxOfWorld()

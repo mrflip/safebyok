@@ -8,6 +8,12 @@ const Revealed = () => {
   return <><input id="secret_field" aria-label="secret" type={reveal.fieldType} />{reveal.button('secret_field')}</>
 }
 
+/** Its second example: a field that shows only while `isFieldShowing`. */
+const RevealedWhile = ({ isFieldShowing }: { isFieldShowing: boolean }) => {
+  const reveal = useRevealToggle('Show', 'Hide', isFieldShowing)
+  return <><input id="secret_field" aria-label="secret" type={reveal.fieldType} />{reveal.button('secret_field')}</>
+}
+
 describe("useRevealToggle", () => {
   it("starts hidden, and the button flips the field's type, saying which way it is set", () => {
     render(<Revealed />)
@@ -26,5 +32,18 @@ describe("useRevealToggle", () => {
     expect(toggle.getAttribute('aria-controls')).to.eq('secret_field')
     expect(toggle.getAttribute('type')).to.eq('button')
     expect(toggle.getAttribute('aria-pressed')).to.eq('false')
+  })
+
+  it("goes back to hidden when its field hides, and stays hidden when it shows again", () => {
+    // useRevealToggle @example 2
+    const { rerender } = render(<RevealedWhile isFieldShowing />)
+    const field = screen.getByLabelText<HTMLInputElement>('secret')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field.type).to.eq('text')
+    rerender(<RevealedWhile isFieldShowing={false} />)
+    expect(field.type).to.eq('password')
+    rerender(<RevealedWhile isFieldShowing />)
+    expect(field.type).to.eq('password')
+    expect(screen.getByRole('button', { name: 'Show' }).getAttribute('aria-pressed')).to.eq('false')
   })
 })

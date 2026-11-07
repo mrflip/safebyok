@@ -13,8 +13,8 @@ import { useRevealToggle } from './reveal-toggle'
  *   <button onClick={() => BoxFields.of(box).save()}>Save</button>
  */
 export const BoxWhisperField = ({ box, path, readOnly, ...passed }: BoxWhisperFieldProps) => {
-  const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper)
   const isShowing = useSyncExternalStore(box.subscribe, () => box.isShowing)
+  const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper, isShowing)
   const ownId = useId()
   const fieldId = passed.id ?? ownId
   return (
