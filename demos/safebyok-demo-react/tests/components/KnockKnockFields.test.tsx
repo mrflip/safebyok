@@ -56,7 +56,7 @@ describe("KnockKnockFields", () => {
     expect(screen.getByRole('button', { name: 'Save' })).to.not.be.null
   })
 
-  it("keeps the field showing after Add key under StrictMode, whose second mount of the field must not hide it", async () => {
+  it("keeps the field showing after Add key under StrictMode", async () => {
     TH.renderInBank(<StrictMode><KnockKnockFields /><TH.VaultProbe /></StrictMode>)
     const field = await addKey()
     fireEvent.change(field, { target: { value: FakeApiKey } })

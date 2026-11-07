@@ -39,7 +39,7 @@ describe("App", () => {
     expect(screen.queryByText('margo')).to.be.null
   })
 
-  it("says the backend is off when the outage switch is, and recovers once it is back on", async () => {
+  it("says the backend is off while the outage switch is", async () => {
     render(<App />)
     TH.signInAs('margo')
     const adding = await screen.findByRole<HTMLButtonElement>('button', { name: 'Add key' })
