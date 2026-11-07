@@ -285,8 +285,9 @@ waits, unfiled, in /workspace/byok-docblock_trim. *Rework once ruled (orchestrat
 G8 side as ruled; escape `-` and `|` in `Patterns.user_id`/`b64url` so each `source` works as an
 HTML `pattern` (v flag); one sentence back on `VaultDBVerbs.watch`: nothing may count on a notice
 arriving; the changeset names `_cheat_forgetShelf` on `safebyok/testing`; `makeTwin` asserts its
-twin holds a new connection. Left: dropped "each do* one atomic step" from base headers (the do*
-blocks keep "in one step"); mixed doc-block mood; the `!` in makeTwin, as `idbRowsOf` has.
+twin holds a new connection; the DeviceDB and VaultDB class headers say again that a subclass
+writes only the `do*` hooks, each one atomic step (a contract for adapter authors, cut by the trim;
+the behaviour never changed). Left: mixed doc-block mood; the `!` in makeTwin, as `idbRowsOf` has.
 
 ### 4b. #571's second rework (the Coach, 2026-11-07, Open Matters)
 
