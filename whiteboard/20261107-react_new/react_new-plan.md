@@ -14,8 +14,8 @@
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
 * **Status:** running. Merged: 1, 2, 3, 4, 5 (#584), 9, 11, 12, 14. Filed, open: 13 (#583), 17
-  (#585, on 13), 15 (#586), 5's follow-up (#587). Building: 6 (on #587), 8 (on main), 16 (on #586).
-  Waiting: 7 on 6; 18 on a slot (cut from #586). Thread 10 folded into 5 and 8.
+  (#585), 15 (#586), 5's follow-up (#587), 6 (#588), 8 (#590). Reviewing: 16's rework (#589).
+  Building: 7 (on #588). Waiting: 18, to be cut from #589's tip. Thread 10 folded into 5 and 8.
 
 ## Read first
 
@@ -316,6 +316,10 @@ The form's whisper handling aims at the note's twelve lines. Where safebyok-reac
 of it (a `useExposedWhisper`-style hook), propose it in open matters rather than build it.
 * *Levels:* worker `sonnet`.
 * *Depends on:* 5. *Size:* small.
+* *Review:* medium, **flagged** (#588): with flows 3 and 2 sharing one Box, typing in the managed
+  field and saving in the exposed flow sealed a stale key while saying "Saved.". My call: each flow
+  keeps a key in a box of its own (a row). Rework, then a second review (low): clean. Also fixed:
+  three test-only nits. Left: the flows' shared helpers lack direct tests (thread 7 adds them).
 
 ### 7. demo_sealed
 
@@ -350,6 +354,11 @@ folder.
 * *Touches:* `packages/safebyok-react` (new `src/devmode/`, `package.json`, `tsdown.config.ts`, a
   size line of its own; no README sections), demo `App.tsx`.
 * *Depends on:* 5. Runs beside 6 and 7. *Size:* medium.
+* *Review:* medium, fixed (#590): a damaged lease row's bad timestamp threw during render and took
+  down a host's tree (now shown as the bare number); the label hint; an alert's wording; two style
+  nits. Confirmed in `dist`: the panels stay off the front door. Left: a damaged row with a bad
+  label can't be deleted (the core refuses it); a watch that ends goes quiet; doc blocks and seven
+  test titles for the documentarian. `useBoxIsShowing` is a new main-entry export.
 
 ### 9. browser_batteries
 
@@ -572,6 +581,12 @@ below are mine as the React developer, on their merits.
 * README: none (thread 14 cut it). Tests: what the provider does now; the remake tests go.
 * *Depends on:* 15, and 5 (the demo it edits): cut once both are on main, or restacked into a line.
   *Size:* medium.
+* *Review:* high, **flagged** (#589): a handler dropped after make: the provider threw, but
+  `guardOnPanic` counts a throw as heard, so the vault was never vacated; a dropped `onBadNews`
+  swallowed news. Rework: fall back to the handler the bank was made with; a misused `deviceDB` is
+  refused `bad_option` via the core's `brandedDeviceDB` (now exported from `safebyok/storage`).
+  Also fixed in review: `fixedPropsOf` guarded by `satisfies`; the changeset's handler sentence.
+  Second review running.
 
 ### 17. passkey_unavailable
 
