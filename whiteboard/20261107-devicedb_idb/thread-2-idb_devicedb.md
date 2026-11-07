@@ -1,6 +1,6 @@
 # Thread 2: idb_devicedb (2026-11-07)
 
-Branch `20261107-idb_devicedb`, PR #PRNUM, stacked on #568 (thread 3, `20261107-storage_door`), which stacks on #567.
+Branch `20261107-idb_devicedb`, PR #569, stacked on #568 (thread 3, `20261107-storage_door`), which stacks on #567.
 Justify green: core 2,344, indexeddb 107 (2 skipped), postgres 123, convex 227, fastkey 49, graphql 210, e2e 200;
 size: idbDeviceDB (core) 7.43 kB of 11, idbVaultDB 1.42 kB of 2.5 (was 2.9).
 The plan's thread 2 gloss (`devicedb_idb-plan.md`, about lines 116-160) and the coordinator's two later directives are the authority.
