@@ -37,12 +37,12 @@ export const Messages = {
   newField:           'new passphrase',
   confirmNewField:    'confirm new passphrase',
   changeButton:       'Change passphrase',
-  putPasskeyTitle:    'Add a passkey',
-  putPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',
-  putPasskeyButton:   'Add passkey',
-  delPasskeyTitle:    'Remove your passkey',
-  delPasskeyBlurb:    'Enter your vault passphrase to remove the passkey. You will unlock with the passphrase alone, on every device.',
-  delPasskeyButton:   'Remove passkey',
+  addPasskeyTitle:    'Add a passkey',
+  addPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',
+  addPasskeyButton:   'Add passkey',
+  revokePasskeyTitle:  'Remove your passkey',
+  revokePasskeyBlurb:  'Enter your vault passphrase to remove the passkey. You will unlock with the passphrase alone, on every device.',
+  revokePasskeyButton: 'Remove passkey',
   delVaultTitle:      'Delete your vault',
   delVaultBlurb:      'Every secret in this vault is deleted for good, on every device, and cannot be recovered. Enter your vault passphrase to delete it.',
   delVaultButton:     'Delete vault',
@@ -53,14 +53,13 @@ export const Messages = {
   troubleWord:       (doing: string) => `This app ran into a problem of its own, not one you caused, and could not ${doing}. Your secrets are safe. Close this, reload the page, and try again.`,
   closeButton:       'Close',
 
-  // The passkey button
+  // The passkey button, and what the browser's passkey calls refuse with
   passkeyButton:     'Use a passkey',
   passkeyTrouble:    "Your passkey can't be used here just now. Unlock with your passphrase instead.",
   noPasskeyToAsk:    'This vault has no passkey to ask: unlock it with your passphrase, then add one.',
-  passkeyDamaged:    "This vault's passkey is stored damaged, so it can't be asked. Unlock with your passphrase, then add a passkey again: the new one takes its place.",
-  noWebAuthn:        'This browser offers no passkeys (WebAuthn): unlock with a passphrase.',
-  noPrf:             "This passkey's authenticator does not offer the PRF extension a passkey unlock needs: unlock with a passphrase, or try another device or security key.",
-  passkeyAskFailed:  "The browser could not ask for a passkey: unlock with a passphrase. The browser's own error is this error's cause.",
+  noWebAuthn:        'This browser offers no passkeys (WebAuthn): use your passphrase.',
+  noPrf:             "This passkey's authenticator does not offer the PRF extension a vault's passkey needs: use your passphrase, or try another device or security key.",
+  passkeyAskFailed:  "Your browser couldn't ask for a passkey just now: try again, or use your passphrase.",
 
   // The whisper field
   showWhisper:       'Show',
