@@ -86,13 +86,29 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./devmode": {
+      "@safebyok/source": "./src/devmode/index.ts",
+      "import": "./dist/devmode/index.js",
+      "require": "./dist/devmode/index.cjs"
+    },
     "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "devmode": [
+        "./dist/devmode/index.d.cts"
+      ]
+    }
   },
   "publishConfig": {
     "exports": {
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./devmode": {
+        "import": "./dist/devmode/index.js",
+        "require": "./dist/devmode/index.cjs"
       },
       "./package.json": "./package.json"
     }

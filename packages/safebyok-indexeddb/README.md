@@ -27,7 +27,7 @@ Hand it to the core wherever a `VaultDB` is asked for.
 
 * **`dbName`** names the database, default `'safebyok'`; the rows go in `<dbName>:vaults-v001-001-001`, and a vault database of an older name is deleted unread. Two
   stores made with one `dbName`, in one tab or two, share the rows.
-* **`maxRecordBytes`** is the VaultDB's own: the largest box record a `putBox` takes.
+* **`maxRecordBytes`** is the AdapterVaultDB's own: the largest box record a `putBox` takes.
 * An option it cannot use refuses with kind `bad_option`.
 
 ## What it promises
@@ -57,7 +57,7 @@ of a life that is over.
 This package is the example of a key-value backend. To store vaults in another key-value store,
 copy it:
 
-* **Extend `VaultDB` from `safebyok/storage` and write its `do*` methods**, never its public
+* **Extend `AdapterVaultDB` from `safebyok/storage` and write its `do*` methods**, never its public
   verbs: the base class checks scope and options on the way in, validates every row on the way
   out, and turns a put or deletion that did not land into its refusal.
 * **Do each `do*` in one transaction of your store**, reading the vault row beside the rows it

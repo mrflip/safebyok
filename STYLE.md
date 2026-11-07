@@ -617,10 +617,10 @@ the scope.
 
 * **An interface a host implements is typed as what belongs there**, never `unknown`, with its doc
   block saying what is checked and by whom. The check keeps damage out, not the type.
-* **A DB handed across the package boundary carries a brand, not a duck.** A VaultDB or DeviceDB
-  extends our base class and is known by its `Symbol.for` brand: a duck check passes anything with
-  the right method names, and `instanceof` fails the second copy of safebyok an adapter package may
-  bundle.
+* **A DB handed across the package boundary carries a brand, not a duck.** An AdapterVaultDB or
+  DeviceDB extends our base class, and any VaultDB, a client too, is known by its `Symbol.for` brand:
+  a duck check passes anything with the right method names, and `instanceof` fails the second copy
+  of safebyok an adapter package may bundle.
 * **A host's function is wrapped once, on its way in.** Each function a host hands `Bank.make`
   (`requestCleartext`, the key deriver, the strength checker, `onPanic`, ...) is wrapped at `Bank`'s
   constructor into a checked, branded thing that checks what the function answers (*Validation*).
@@ -629,7 +629,7 @@ the scope.
   record it is sent that it will use. A server's word that a record is damaged it may take: the
   worst a lying server does with that is offer to delete what it could delete anyway. It still
   parses the word itself (a damaged box's label, its kind of damage, its token).
-* **A wire sharpens an interface.** A store's client implements the same `VaultDBVerbs` as the
+* **A wire sharpens an interface.** A store's client implements the same `VaultDB` as the
   store, and each GraphQL operation answers what its verb's `try*` form answers, so a browser's
   adapter checks the server's answer with the core's answer checks and hands it on. Where the two
   would differ, change the VaultDB.

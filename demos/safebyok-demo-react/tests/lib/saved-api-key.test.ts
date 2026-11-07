@@ -1,0 +1,84 @@
+import { describe, expect, it } from 'vitest'
+import { Bank, MemoryDeviceDB, type Vault } from 'safebyok'
+import { MemoryVaultDB } from 'safebyok/storage'
+import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
+import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../../src/lib/saved-api-key'
+
+const Boxlabel = 'anthropic_api_key_test'
+const FakeApiKey = 'sk-ant-fake-saved-key'
+
+/** A said-hello bank whose dialog types the right passphrase at once, over storage in memory. */
+const makeBank = async () => {
+  const bank = Bank.make({
+    applabel: 'acme', user_id: 'u1', device_id: '00000000-0000-4000-8000-0000000000d1',
+    vaultDB: new MemoryVaultDB(), deviceDB: new MemoryDeviceDB(),
+    keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger,
+    requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: Passphrase }) },
+  })
+  await bank.hello()
+  return bank
+}
+
+/** The user's vault, built and unlocked. */
+const makeVault = async (): Promise<Vault> => {
+  const bank = await makeBank()
+  const vault = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
+  await vault.ensureUnlocked()
+  return vault
+}
+
+/** `vault` with a box at `Boxlabel` sealing `whisper`. */
+const putWhisper = async (vault: Vault, whisper: object) => { await vault.putBox({ boxlabel: Boxlabel, whisper }) }
+
+describe("extractSavedApiKey", () => {
+  it("answers null for no vault", async () => {
+    expect(await extractSavedApiKey(null, Boxlabel)).to.be.null
+  })
+
+  it("answers null for a boxlabel with no box", async () => {
+    expect(await extractSavedApiKey(await makeVault(), Boxlabel)).to.be.null
+  })
+
+  it("answers null for an empty apiKey", async () => {
+    const vault = await makeVault()
+    await putWhisper(vault, { apiKey: '' })
+    expect(await extractSavedApiKey(vault, Boxlabel)).to.be.null
+  })
+
+  it("answers null for an apiKey that is no string", async () => {
+    const vault = await makeVault()
+    await putWhisper(vault, { apiKey: 42 })
+    expect(await extractSavedApiKey(vault, Boxlabel)).to.be.null
+  })
+
+  it("answers the saved key", async () => {
+    const vault = await makeVault()
+    await putWhisper(vault, { apiKey: FakeApiKey })
+    expect(await extractSavedApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
+  })
+
+  it("unlocks a locked vault to answer the saved key", async () => {
+    const vault = await makeVault()
+    await putWhisper(vault, { apiKey: FakeApiKey })
+    vault.lock()
+    expect(await extractSavedApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
+  })
+})
+
+describe("ensureApiKeyBoxExposed", () => {
+  it("builds the vault and an exposed, empty box where there is none", async () => {
+    const box = await ensureApiKeyBoxExposed(await makeBank(), Boxlabel)
+    expect(box.snapshot.exposed).to.be.true
+    expect(box.whisper).to.deep.equal({})
+  })
+
+  it("exposes the box where one is saved, and shows its key", async () => {
+    const bank = await makeBank()
+    const vault = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
+    await vault.ensureUnlocked()
+    await putWhisper(vault, { apiKey: FakeApiKey })
+    const box = await ensureApiKeyBoxExposed(bank, Boxlabel)
+    expect(box.snapshot.exposed).to.be.true
+    expect(box.whisper).to.deep.equal({ apiKey: FakeApiKey })
+  })
+})

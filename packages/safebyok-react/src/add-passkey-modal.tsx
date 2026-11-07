@@ -34,6 +34,8 @@ const AddPasskeyForm = ({ gating, onDone: done, passphraseUsername, passkeyRpId 
 
   const addPasskey = async () => {
     const passphraseClear = fieldRef.current?.value ?? ''
+    // The passkey is made before the passphrase is proven: with none typed, it would be left unused.
+    if (passphraseClear === '') { setGripe({ text: Messages.passphraseFirst, fromPasskey: false }); fieldRef.current?.focus(); return }
     setGripe(null)
     let made: PasskeyAnswer | null
     try {

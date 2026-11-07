@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Vault, VaultError, Whispered, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type WhisperedBag } from 'safebyok'
 import { MemoryVaultDB, type VaultQuery } from 'safebyok/storage'
 import { BankProvider } from '../src/bank-provider'
-import { useBank, useBankSnapshot, useBox, useBoxSnapshot, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks'
+import { useBank, useBankSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -121,7 +121,8 @@ const whisperWords = (whisper: Whisper): string => `${String(whisper['apiKey'] ?
 const NoBox = () => {
   const whisper = useWhisper(null)
   const snapshot = useBoxSnapshot(null)
-  return <p>{`${String(Object.keys(whisper).length)} ${whyHidden(whisper)} ${String(snapshot === null)}`}</p>
+  const isShowing = useBoxIsShowing(null)
+  return <p>{`${String(Object.keys(whisper).length)} ${whyHidden(whisper)} ${String(snapshot === null)} ${String(isShowing)}`}</p>
 }
 
 /** The Box objects every {@link BoxPage} has been handed, each once. */
@@ -134,6 +135,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   const box = useBox('main', boxlabel)
   const snapshot = useBoxSnapshot(box)
   const whisper = useWhisper(box)
+  const isShowing = useBoxIsShowing(box)
   if (box !== null && ! seenBoxes.includes(box)) { seenBoxes.push(box) }
   const make = async () => {
     if (vault === null) { return }
@@ -146,6 +148,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
       <p data-testid="boxes">{boxes === null ? 'none' : boxes.map((listed) => listed.boxlabel).join(',')}</p>
       <p data-testid="box">{boxWords(snapshot)}</p>
       <p data-testid="whisper">{whisperWords(whisper)}</p>
+      <p data-testid="showing">{isShowing ? 'showing' : 'hidden'}</p>
       <button type="button" onClick={() => { void make() }}>Make</button>
       <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
       <button type="button" onClick={() => { void vault?.ensureUnlocked() }}>Unlock</button>
@@ -153,7 +156,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   )
 }
 
-const shownOfBox = (testid: 'boxes' | 'box' | 'whisper') => screen.getByTestId(testid).textContent
+const shownOfBox = (testid: 'boxes' | 'box' | 'whisper' | 'showing') => screen.getByTestId(testid).textContent
 
 /** A world whose vault `main` holds `anthropic`, its apiKey a fake, put from another device; and that device's vault. */
 const boxWorld = async () => {
@@ -219,6 +222,17 @@ describe("the box hooks", () => {
     await waitFor(() => { expect(shownOfBox('whisper')).to.eq('sk-ant-fake-stored shown') })
   })
 
+  it("read whether the box shows its whisper, through expose and lock", async () => {
+    const { world } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(shownOfBox('box')).to.eq('revision 0, sealed') })
+    expect(shownOfBox('showing')).to.eq('hidden')
+    fireEvent.click(screen.getByText('Make'))
+    await waitFor(() => { expect(shownOfBox('showing')).to.eq('showing') })
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(shownOfBox('showing')).to.eq('hidden') })
+  })
+
   it("read none again for a box deleted", async () => {
     const { world, vault } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
@@ -239,6 +253,6 @@ describe("the box hooks", () => {
 
   it("read a bag with no fields and no snapshot for no box", () => {
     render(<NoBox />)
-    expect(screen.getByText('0 encrypted true')).to.exist
+    expect(screen.getByText('0 encrypted true false')).to.exist
   })
 })

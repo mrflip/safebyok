@@ -1,7 +1,8 @@
-import { useId, useSyncExternalStore, type ComponentPropsWithoutRef } from 'react'
+import { useId, type ComponentPropsWithoutRef } from 'react'
 import type { Box } from 'safebyok'
 import { BoxFields } from 'safebyok/dom'
 import { WhisperFieldAttributes } from 'safebyok/utils'
+import { useBoxIsShowing } from './hooks'
 import { Messages } from './messages'
 import { useRevealToggle } from './reveal-toggle'
 
@@ -13,7 +14,7 @@ import { useRevealToggle } from './reveal-toggle'
  *   <button onClick={() => BoxFields.of(box).save()}>Save</button>
  */
 export const BoxWhisperField = ({ box, path, readOnly, ...passed }: BoxWhisperFieldProps) => {
-  const isShowing = useSyncExternalStore(box.subscribe, () => box.isShowing)
+  const isShowing = useBoxIsShowing(box)
   const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper, isShowing)
   const ownId = useId()
   const fieldId = passed.id ?? ownId

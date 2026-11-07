@@ -4,7 +4,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
-import type { Notice, VaultDB, VaultDBVerbs } from '../../src/storage/vault-db-new'
+import type { AdapterVaultDB, Notice, VaultDB } from '../../src/storage/vault-db'
 import { bankScope, vaultScope, boxscope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, priorOf, vaultQuery, boxQuery } from './storage-world'
 import { aWhile, beforeNextCall } from './timing'
 import { gateParamsOf } from './vault-db-battery-puts'
@@ -17,14 +17,14 @@ const splitOf = <AnswerT extends { ok: boolean }>(answers: AnswerT[]) => ({
 })
 
 /** Runs `meanwhile`, another device's doings, just before the gate verb's doPutVault, after its doGetVault found the live row. */
-const slipInFront = (vaultDB: VaultDB, meanwhile: () => Promise<unknown>): void => {
+const slipInFront = (vaultDB: AdapterVaultDB, meanwhile: () => Promise<unknown>): void => {
   /** A store seen as the protected call a gate verb moves the vault row by. */
   type MovesVaultRow = { doPutVault: (...args: never[]) => Promise<unknown> }
   beforeNextCall(vaultDB as unknown as MovesVaultRow, 'doPutVault', meanwhile)
 }
 
 /** A watch on `vaultDB` at `scope`, closed when the test ends, and the notices it has heard so far. */
-const watching = (vaultDB: VaultDBVerbs, scope: WatchScope) => {
+const watching = (vaultDB: VaultDB, scope: WatchScope) => {
   const notices: Notice[] = []
   const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
   onTestFinished(unwatch)

@@ -32,7 +32,7 @@ import { type BoxDna, type BoxWorld, type Fetched, type ListingOpts, type Listin
 import { type BoxQuery, type BoxRow, type BoxTombstone, type DelOpts, type IfAbsentOpts, type PutOpts, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { Notice } from '../../src/storage/vault-db-new'
+import type { Notice } from '../../src/storage/vault-db'
 import * as Refuse from '../../src/refusals/throwers'
 import { fakeCiphered } from './builders'
 
