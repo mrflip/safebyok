@@ -23,7 +23,7 @@ describe("safebyok", () => {
   })
 
   it("exports what a React host's gating dialogs branch on: the correctable refusal kinds and the types of a gating's state", () => {
-    expect(Front.correctablekindVals).toEqual(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'])
+    expect(Front.correctablekindVals).to.deep.equal(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'])
     expectTypeOf<(typeof Front.correctablekindVals)[number]>().toExtend<Front.Refusalkind>()
     expectTypeOf<Front.Gating['gatingkind']>().toEqualTypeOf<Front.Gatingkind>()
     expectTypeOf<Front.Gating['passkeyHeader']>().toEqualTypeOf<Front.WayinHeader | null>()
@@ -37,19 +37,19 @@ describe("safebyok", () => {
   })
 
   it("exports the byte counts and the minute a passkey call and an autolock setting need", () => {
-    expect(Front.PasskeySaltBytes).toBe(32)
-    expect(Front.PrfAnswerBytes).toBe(32)
-    expect(Front.MinuteMillis).toBe(60_000)
+    expect(Front.PasskeySaltBytes).to.eq(32)
+    expect(Front.PrfAnswerBytes).to.eq(32)
+    expect(Front.MinuteMillis).to.eq(60_000)
     expectTypeOf<Front.PasskeyAnswer['prfBytes']>().toExtend<Uint8Array>()
   })
 
   it("exports HostErrorSanitizer, whose refusalFor makes a VaultError that carries nothing of what was thrown", () => {
     const foreign = new Error('the passphrase was hunter2')
     const refusal = Front.HostErrorSanitizer.refusalFor(foreign, 'storage_unavailable', "The vault's storage failed: try again shortly.")
-    expect(Front.isVaultError(refusal)).toBe(true)
-    expect(refusal.refusalkind).toBe('storage_unavailable')
-    expect(refusal.message).toBe("The vault's storage failed: try again shortly.")
-    expect(refusal.cause).toBeUndefined()
-    expect(JSON.stringify(refusal)).not.toContain('hunter2')
+    expect(Front.isVaultError(refusal)).to.be.true
+    expect(refusal.refusalkind).to.eq('storage_unavailable')
+    expect(refusal.message).to.eq("The vault's storage failed: try again shortly.")
+    expect(refusal.cause).to.be.undefined
+    expect(JSON.stringify(refusal)).to.not.contain('hunter2')
   })
 })
