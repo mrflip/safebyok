@@ -18,6 +18,7 @@ export interface VersionedShelfSpec {
   oldnames:  string[]
 }
 
+/** A layout version: three zero-padded parts. */
 const VersionPattern = /^\d{3}-\d{3}-\d{3}$/
 
 /** The shelf of the database `dbName:dbstem-v<version>`, whose first transaction deletes every older database of its kind. */
