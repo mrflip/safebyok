@@ -91,7 +91,7 @@ describe("BankProvider's handlers", () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
-  const refuseErase = (deviceDB: MemoryDeviceDB) => vi.spyOn(deviceDB, 'tryVacate').mockResolvedValue(TH.bad(Refusal))
+  const refuseErase = (deviceDB: MemoryDeviceDB) => vi.spyOn(deviceDB, 'tryForget').mockResolvedValue(TH.bad(Refusal))
 
   it.each([
     ['onBadNews', { onBadNews: 'not a function' }],
@@ -136,7 +136,7 @@ describe("BankProvider's handlers", () => {
     const erasing = TH.held<ReturnType<typeof TH.bad>>()
     const previous = vi.fn()
     const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: previous })
-    vi.spyOn(deviceDB, 'tryVacate').mockReturnValue(erasing.promise)
+    vi.spyOn(deviceDB, 'tryForget').mockReturnValue(erasing.promise)
     fireEvent.click(screen.getByText('Lock'))
     rerender({ ...props, user_id: 'u2', onPanic: next })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
