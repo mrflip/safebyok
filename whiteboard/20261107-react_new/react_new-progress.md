@@ -5,7 +5,7 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 
 ## Where things stand
 
-*Orchestrator:* planned 2026-11-07. Thread 1 underway.
+*Orchestrator:* thread 1 filed (#573); thread 2 building.
 
 ## Facts every thread may need
 
@@ -27,3 +27,15 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
   * The clears by kind are `ClearsForGatingkind` in `shapes/shapes-gateish.ts`.
   * Vault gate verbs: `replacePassphrasePrompt`, `addPasskeyPrompt`, `revokePasskeyPrompt`,
     `delVaultPrompt`.
+
+## From thread 1 (core_for_react, #573)
+
+* *Orchestrator:* `safebyok` now exports `correctablekindVals`, `PasskeySaltBytes`, `PrfAnswerBytes`
+  (32), `MinuteMillis`, `HostErrorSanitizer` (a namespace; `HostErrorSanitizer.refusalFor(foreign,
+  kind, message)` reads nothing of `foreign`), and the types `Gatingkind`, `LockState`, `Wayinkind`,
+  `Damagekind`, `BankStage`, `DamagedBox`, `BoxSparse`, `WayinHeader`, `PasskeyWayinHeader`,
+  `PassphraseWayinHeader`, `PasskeyAnswer`.
+* *Orchestrator:* there is no `isCorrectable` export (it waits on the devicedb_idb line). Test a
+  refusal with `(correctablekindVals as readonly string[]).includes(err.refusalkind)`.
+* *Orchestrator:* `stage` is on `BankSnapshot` (`bank.snapshot.stage`), not on `Bank`.
+  `gating.passkeyHeader` is `WayinHeader | null`.

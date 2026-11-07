@@ -13,7 +13,7 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 2; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** thread 1 building.
+* **Status:** thread 1 filed (#573); thread 2 building.
 
 ## Read first
 
@@ -145,6 +145,7 @@ Re-exports in `src/index.ts`, with tests in `tests/index.test.ts`; a changeset.
 * *Levels:* worker `sonnet`; review `low`.
 * *Depends on:* nothing. *Size:* small.
 * *Look-ahead:* threads 2 and 3 import these. Name the passkey header type as the core names it.
+* *Review:* `low`, fixed. The style pass put the three new tests in chai form. Left, minor: the `HostErrorSanitizer` test doesn't say it covers `refusalFor`'s `@example`; no hostile-input case for `refusalFor` (moved to Cleanup); two compound test titles. PR #573.
 
 ### 2. react_port
 
