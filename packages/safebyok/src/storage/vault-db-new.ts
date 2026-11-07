@@ -42,7 +42,7 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 }
 // --
 
-// == [What a store answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard, VaultDBRelay
+// == [What a store answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
 
 /** The answer of a conditional write: whether it landed, and `ante`, the row it replaced, or that stands in its way. Null is a void row. */
 export type Landing = { landed: boolean, ante: unknown }
@@ -56,21 +56,6 @@ export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
 export type BoxFetched   = { vault: unknown, box: unknown }
 // A box's notice may come without its vault row: the vault changes slowly, and arrives in its own notices.
 export type Heard = { vault?: unknown, box?: unknown }
-
-/** A VaultDB's generic calls, for a server to carry to a VaultDB in a browser: each checks what it is handed, as its verb does. */
-export type VaultDBRelay = {
-  listVaults: (scope: unknown) => Promise<RowOfVault[]>
-  getVault:   (scope: unknown) => Promise<unknown>
-  listBoxes:  (asked: unknown) => Promise<BoxesFetched>
-  getBox:     (asked: unknown) => Promise<BoxFetched>
-  putVault:   (record: unknown, opts: unknown) => Promise<Landing>
-  putBox:     (record: unknown, opts: unknown) => Promise<BoxLanding>
-  delVault:   (tombstone: unknown, opts: unknown) => Promise<Landing>
-  delBox:     (tombstone: unknown, opts: unknown) => Promise<BoxLanding>
-  tidyGone:   (scope: unknown) => Promise<Tidied>
-  watch:      (scope: unknown, hear: (heard: Heard) => void) => () => void
-}
-
 // --
 
 // == [What a model calls]: VaultDBVerbs, VaultDBVerbnames
@@ -414,49 +399,6 @@ export abstract class VaultDB implements VaultDBVerbs {
   async tryTidyGone(scope: BankScope) { return answerOf(() => this.tidyGone(scope)) }
   // --
 
-  // == [Relay]: relay
-
-  /** This store's generic calls, for a server relaying them: each refuses what its verb would refuse before storage is asked. */
-  get relay(): VaultDBRelay {
-    return {
-      listVaults: async (scope) => await relayed(() => this.doListVaults(CX.bankScope.parse(scope))),
-      getVault:   async (scope) => await relayed(() => this.doGetVault(CX.vaultScope.parse(scope))),
-      listBoxes:  async (asked) => await relayed(() => this.doListBoxes(SX.vaultQuery.parse(asked))),
-      getBox:     async (asked) => await relayed(() => this.doGetBox(SX.boxQuery.parse(asked))),
-      putVault:   async (record, opts) => await relayed(() => {
-        const vaultRecord = SX.vaultRecord.parse(record)
-        // putOpts, not the putVault verb's putVaultOpts: a gate verb in the browser moves a live vault
-        // row through doPutVault with `ifPresent: 'repl'`, and its checks of the gate run there alone.
-        const putOpts = SX.putOpts.parse(opts)
-        demandNextSeq(vaultRecord, putOpts.prior)
-        return this.doPutVault(vaultRecord, putOpts)
-      }),
-      putBox: async (record, opts) => await relayed(() => {
-        const boxRecord = SX.boxRecord.parse(record)
-        const putOpts = SX.putOpts.parse(opts)
-        demandNextSeq(boxRecord, putOpts.prior)
-        const recordBytes = jsonBytes(boxRecord)
-        if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-        return this.doPutBox(boxRecord, putOpts)
-      }),
-      delVault: async (tombstone, opts) => await relayed(() => {
-        const vaultTombstone = SX.vaultTombstone.parse(tombstone)
-        const delOpts = SX.delOpts.parse(opts)
-        demandNextSeq(vaultTombstone, delOpts.prior)
-        return this.doDelVault(vaultTombstone, delOpts)
-      }),
-      delBox: async (tombstone, opts) => await relayed(() => {
-        const boxTombstone = SX.boxTombstone.parse(tombstone)
-        const delOpts = SX.delOpts.parse(opts)
-        demandNextSeq(boxTombstone, delOpts.prior)
-        return this.doDelBox(boxTombstone, delOpts)
-      }),
-      tidyGone: async (scope) => await relayed(() => this.doTidyGone(CX.bankScope.parse(scope))),
-      watch:    (scope, hear) => this.doWatch(SX.watchScope.parse(scope), hear),
-    }
-  }
-  // --
-
   // == [Watch]: watch
 
   /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. Nothing may count on a notice arriving. */
@@ -499,19 +441,12 @@ export abstract class VaultDB implements VaultDBVerbs {
   // --
 }
 
-// == [Helpers]: refusalOf, relayed, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
+// == [Helpers]: refusalOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
 
 /** What a verb throws: a refusal as it came, anything else `storage_unavailable`, each carrying the verb and the request's safe metadata. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
   const refusal = storageTroubleOf(thrown)
   return Object.assign(refusal, { meta: { ...refusal.meta, call, req_params } })
-}
-
-/** What `call` answers, or its throw as a refusal: a refusal as it came, anything else `storage_unavailable`. */
-const relayed = async <ValT>(call: () => Awaitable<ValT>): Promise<ValT> => {
-  try {
-    return await call()
-  } catch (err) { throw storageTroubleOf(err) }
 }
 
 /** The vault row a store answered, where it is live in the life `asked` names. */
