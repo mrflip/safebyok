@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bank, MinuteMillis, type AnyGating, type BadNewsHandler, type BankOpts, type RequestCleartext, type Vault } from 'safebyok'
+import { Bank, MinuteMillis, type AnyGating, type BadNewsHandler, type BankOpts, type PanicHandler, type RequestCleartext, type Vault } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import type { PassphraseAdvice } from './modal'
 
@@ -28,6 +28,11 @@ const AutolockEveryMillis = MinuteMillis
 
 /** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
+
+// The types say a handler is a function or none, so a misused one is typed as the handler it is not:
+// Bank.make refuses it.
+/** What a handler prop is handed to Bank.make as when it is misuse: itself, to be refused `bad_option`; undefined for a function or none. */
+const misusedHandler = <HandlerT,>(given: HandlerT | null | undefined): HandlerT | undefined => (typeof given === 'function' ? undefined : given as HandlerT | undefined)
 
 /** Every Bank.make option but `user_id` and `requestCleartext`, which the provider takes its own way, and two for its dialogs. */
 export type BankProviderProps = Omit<BankOpts, 'user_id' | 'requestCleartext'> & {
@@ -62,7 +67,16 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
   // so a handler written inline makes no new bank. Left out, the bank's own logger hears it.
   const badNewsRef = useRef(onBadNews)
   useEffect(() => { badNewsRef.current = onBadNews })
-  const hasBadNewsHandler = onBadNews !== undefined
+  // A handler that is no function reaches Bank.make as it came, which refuses it `bad_option`.
+  const hasBadNewsHandler = typeof onBadNews === 'function'
+  const misusedBadNews = misusedHandler(onBadNews)
+
+  // The host's onPanic as of the last commit, held as onBadNews is. The bank is handed a handler
+  // only while the host has one: the core vacates a vault whose panic nobody hears.
+  const panicRef = useRef(onPanic)
+  useEffect(() => { panicRef.current = onPanic })
+  const hasPanicHandler = typeof onPanic === 'function'
+  const misusedPanic = misusedHandler(onPanic)
 
   /** Close `ending` if it is still the dialog showing, and resolve its ask: a gating still open then is declined. */
   const endShowing = useCallback((ending: Showing) => {
@@ -89,11 +103,17 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
   // The host's requestCleartext as of the last commit, held as onBadNews is.
   const hostAskerRef = useRef(requestCleartext)
   useEffect(() => { hostAskerRef.current = requestCleartext })
+  const misusedAsker = requestCleartext === null ? undefined : misusedHandler(requestCleartext)
   const askUser = useCallback(async (gating: AnyGating) => {
     const hosts = hostAskerRef.current
     if (hosts === undefined) { await askByDialog(gating); return }
     if (hosts !== null) { await hosts(gating) }
   }, [askByDialog])
+
+  // The props that make a bank anew when they change, as the last bank effect had them, and
+  // whether a change of any was warned of yet.
+  const remakers = useRef<Record<string, unknown> | null>(null)
+  const toldOfRemakers = useRef(false)
 
   // The bank the provider holds now, the signed-in user's, made and swept by the effect below.
   const [held, setHeld] = useState<Provided>(NoneHeld)
@@ -108,14 +128,28 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
     const kept = { held: true }
     const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? badNewsRef.current?.(news) : undefined)
     const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
+    // The core reports a panic handler's throw to the platform, as it does a panic nobody hears:
+    // a let-go bank's panic goes there, and never to the next user's handler.
+    const panicWhileHeld: PanicHandler = async (refusal) => {
+      if (! kept.held) { throw refusal }
+      await panicRef.current?.(refusal)
+    }
     // `satisfies` fails the build if a Bank.make option is ever added and not passed through.
     const bankOpts = {
-      ...refusable, applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onPanic,
-      onBadNews: hasBadNewsHandler ? tellWhileHeld : undefined,
-      requestCleartext: askWhileHeld,
+      ...refusable, applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes,
+      onBadNews:        hasBadNewsHandler ? tellWhileHeld : misusedBadNews,
+      onPanic:          hasPanicHandler ? panicWhileHeld : misusedPanic,
+      requestCleartext: misusedAsker ?? askWhileHeld,
     } satisfies Record<keyof BankOpts, unknown>
     // A refused option throws from here to the nearest error boundary.
     const bank = Bank.make(bankOpts)
+    const lastRemakers = remakers.current
+    remakers.current = { logger, keyDeriver, strengthChecker, vaultDB, deviceDB }
+    const changed = lastRemakers === null ? [] : Object.keys(remakers.current).filter((ckey) => lastRemakers[ckey] !== remakers.current?.[ckey])
+    if (changed.length > 0 && ! toldOfRemakers.current) {
+      toldOfRemakers.current = true
+      bank.logger.warn(`BankProvider made its bank anew, letting its vaults go, because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and does so each time: define it once, outside the component, or memoize it.`, { call: 'BankProvider', props: changed })
+    }
     // The effect owns the bank, making it and sweeping it, so a re-run effect (StrictMode's, a hidden
     // Activity shown again) makes a fresh one; the render reads the bank the effect holds now.
     setHeld({ bank, helloedVaults: new WeakSet<Vault>() })
@@ -131,7 +165,7 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
       if (showingRef.current !== null) { endShowing(showingRef.current) }
       setHeld(NoneHeld)
     }
-  }, [user_id, applabel, device_id, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onPanic, hasBadNewsHandler, unlistedJson, askUser, endShowing])
+  }, [user_id, applabel, device_id, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, hasBadNewsHandler, misusedBadNews, hasPanicHandler, misusedPanic, misusedAsker, unlistedJson, askUser, endShowing])
 
   return (
     <BankContext.Provider value={provided}>
