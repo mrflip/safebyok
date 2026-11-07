@@ -237,6 +237,25 @@ appropriate" (no change).
 **Levels:** `sonnet` worker, `medium` review. **Size:** S. **Depends on:** thread 2 (cut from its
 tip beside thread 4; the restack puts them in line).
 
+### 6. docblock_trim
+
+*The Coach's text (2026-11-07, old sprint doc, proceed):* on "A documentarian run on the new
+VaultDB" (Rec: one run over storage/ and the four adapter packages): "will do this later, leaving
+the cell; same with a couple others below, or they need explanation from another cell", then "as
+with the other, just knock them back to one or two lines using the new rules not the old prose".
+On "TOP Two full Convex vaults break tidy and watch" (Rec: scope the watch and tidyGone to one
+vault per call before a wider release; meanwhile the README names the limit): "once the sprint
+ends we'll adjust the size limits, so go ahead".
+
+*Gloss.* No documentarian. Cut the doc blocks of `packages/safebyok/src/storage/` and the
+Postgres, Convex and IndexedDB packages to one or two lines by STYLE.md's current rules
+(`notes/gallant-docblocks.md`); GraphQL's are rewritten in thread 4. Doc blocks only: behaviour and
+names stay. The Convex README names the limit (a bank whose vaults together pass Convex's 16 MiB
+read makes tidyGone throw and the watch go quiet); the scoping is not built (*orchestrator's
+reading:* the size limits adjusted after the sprint should make it unnecessary). **Levels:**
+`sonnet` worker, `low` review. **Size:** S-M, mechanical. **Depends on:** threads 4 and 5 (cut
+after both file and are restacked into a line, as it touches their files).
+
 ## For the Coach
 
 * Nothing open beyond the doc.
