@@ -19,13 +19,13 @@ export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
 /** What PasskeyUnlockButton is handed. */
 export type PasskeyUnlockButtonProps = {
   /** The gating the passkey answers, as the bank handed it to `requestCleartext`. */
-  gating:     Gating<'unlock_vault'>
+  gating:      Gating<'unlock_vault'>
   /** Called once the gating is answered: 'unlocked', or 'declined' for a refusal that closes the dialog. */
-  onDone:     (answer: 'unlocked' | 'declined') => void
+  onDone:      (answer: 'unlocked' | 'declined') => void
   /** What the button has to say: a calm message, or null when what it said last no longer stands. */
-  onGripe:    (gripe: string | null) => void
+  onGripe:     (gripe: string | null) => void
   /** The relying party the passkey was made under, if not the page's own domain. */
-  rpId?:      string | undefined
+  rpId?:       string | undefined
   /** Whether the button takes the focus when it first shows: true where it is the dialog's first choice. */
   takesFocus?: boolean | undefined
 }
