@@ -21,8 +21,11 @@ export const MinZxcvbnScore = 3
 /** What the checker is handed: the passphrase as typed, and the scope of its vault. */
 const checkerInput = objCheck(({ passphraseCleartext, vaultScope }) => ({ typed: passphraseCleartext, scope: vaultScope }), 'bad_option', [GX, CX])
 
+// Intl.Segmenter is missing from browsers before 2024 and from React Native's Hermes; there each code point counts as one.
 /** How many characters `typed` holds, as its reader counts them. */
-const graphemeCount = (typed: string): number => [...new Intl.Segmenter().segment(typed)].length
+const graphemeCount = (typed: string): number => (
+  typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(typed)].length : (typed.match(/./gsu) ?? []).length
+)
 
 // The dictionary is most of zxcvbn's weight, so it comes in as a chunk of its own, at the bank's hello, never at import.
 // A failed import leaves the judge unbuilt, so the next load tries again.

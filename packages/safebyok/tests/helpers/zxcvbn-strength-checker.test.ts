@@ -26,6 +26,7 @@ const freshCheckerOverChunk = async () => {
 const judgedAsync = async (typed: string, vaultScope: VaultScope) => zxcvbnStrengthChecker(typed, vaultScope)
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   vi.doUnmock('@zxcvbn-ts/language-common')
   vi.resetModules()
 })
@@ -72,6 +73,12 @@ describe("zxcvbnStrengthChecker", () => {
     const family = '\u{1F468}‍\u{1F469}‍\u{1F467}'
     expect(family).to.have.lengthOf(8)
     expect(await zxcvbnStrengthChecker(`${family}${family}abcde`, scope)).to.deep.equal({ strong: false, reason: Phrases.passphraseTooShort(12) })
+  })
+
+  it("counts code points where the runtime has no Intl.Segmenter", async () => {
+    vi.stubGlobal('Intl', Object.create(Intl, { Segmenter: { value: undefined } }))
+    expect(await zxcvbnStrengthChecker('Tr0ub4dor&3', scope)).to.deep.equal({ strong: false, reason: Phrases.passphraseTooShort(12) })
+    expect(await zxcvbnStrengthChecker('mauve lantern quietly orbits', scope)).to.eq(StrongVerdict)
   })
 
   it("refuses the vault's own names, which a guesser who knows the user tries first", async () => {
