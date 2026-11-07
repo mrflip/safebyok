@@ -11,7 +11,7 @@
 * **Sprint PR:** #572 (draft).
 * **Sprint doc:** https://claude.ai/artifact/UN5fpxiLeEaLHjpFgBiHg9 (doc
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
-  matters table mnx96vk4741.393, bookmark rev 23; Cleanup body 6cb5c40d-1cc7; Progress body
+  matters table mnx96vk4741.393, bookmark rev 34; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
 * **Status:** filed 1 (#573), 2 (#574), 3 (#577), 4 (#576), 12 (#575). Thread 11 building from 3. Thread 5
   waits on the Coach's `/restacker 573 574 576 577 575`.
