@@ -1,6 +1,6 @@
 # Thread 18: VaultDB names (2026-11-07)
 
-Branch `20261107-vaultdb_names`, PR #PRNUM, stacked on #589 (thread 16), which stands on #586.
+Branch `20261107-vaultdb_names`, PR #593, stacked on #589 (thread 16), which stands on #586.
 Justify: green; safebyok 2473 tests, graphql 235 (+3 skipped), indexeddb 110, postgres 123,
 convex 227, react 205, e2e 298, demo 60; lint 0 errors.
 
