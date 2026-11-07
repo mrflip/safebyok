@@ -36,8 +36,7 @@ describe("GraphQLVaultDB over the typed schema", () => {
 /** What one call of a fake client hands back, as urql's own `OperationResult` holds it. */
 type FakeResult = { data?: unknown, error?: CombinedError, hasNext?: boolean }
 
-/**
- * A GraphQLVaultDB over a fake urql Client whose queries and mutations answer `asked`, and each of whose subscriptions
+/** A GraphQLVaultDB over a fake urql Client whose queries and mutations answer `asked`, and each of whose subscriptions
  * hands the test its callback, first handing that callback `atOnce` where given; `unsubscribed` counts the stops.
  */
 const fakeClient = (asked: FakeResult = {}, atOnce?: FakeResult) => {

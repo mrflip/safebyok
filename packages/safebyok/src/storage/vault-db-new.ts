@@ -100,8 +100,7 @@ export interface VaultDBVerbs {
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
   tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
   tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>>
-  /**
-   * Tells `onNotice` of rows that change under a bank or a vault, and `onBadNews` of a watch it ends unbidden; returns how to stop.
+  /** Tells `onNotice` of rows that change under a bank or a vault, and `onBadNews` of a watch it ends unbidden; returns how to stop.
    * Nothing may count on a notice arriving.
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void
