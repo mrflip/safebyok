@@ -51,4 +51,12 @@ describe("DevDeviceDBInspector", () => {
     fireEvent.click(within(leaseRow('mangled')).getByRole('button', { name: 'delRawLease' }))
     await waitFor(() => { expect(screen.queryByText('mangled')).to.be.null })
   })
+
+  it("shows a damaged row's proved_at that names no time as its number", async () => {
+    const { world } = await renderOverLease()
+    world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled', proved_at: NaN })
+    includingDamaged()
+    await waitFor(() => { expect(leaseRow('mangled')).to.exist })
+    expect(within(leaseRow('mangled')).getByText('NaN')).to.exist
+  })
 })

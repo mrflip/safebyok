@@ -3,7 +3,7 @@ import type { VaultDBVerbs } from 'safebyok'
 import { boxSparse, nextRevisionOf, revisionOf } from 'safebyok/storage'
 import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow } from 'safebyok/storage'
 import { useBank } from '../hooks'
-import { LastCallLine, jsonOf, useLastCall, useListing } from './last-call'
+import { LastCallLine, jsonOf, timeOf, useLastCall, useListing } from './last-call'
 
 /** What a DevVaultDBInspector is handed: the vaultDB whose rows it shows. */
 export type DevVaultDBInspectorProps = { vaultDB: VaultDBVerbs }
@@ -121,7 +121,4 @@ const delBoxRow = (vaultDB: VaultDBVerbs, boxRow: BoxSparse | DamagedBox) => {
   const sparse = boxSparse.parse(boxRow)
   return vaultDB.delBox({ ...sparse, ...nextRevisionOf(sparse, Date.now()), am: 'x' }, { prior: revisionOf(sparse) })
 }
-
-/** `millis` as an ISO time, for a person to read. */
-const timeOf = (millis: number): string => new Date(millis).toISOString()
 // --

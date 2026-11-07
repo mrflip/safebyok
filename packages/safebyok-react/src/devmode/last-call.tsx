@@ -42,6 +42,13 @@ export const isLabel = (text: string): boolean => (text.length <= MaxLabelChars)
 /** `answer` as indented JSON, for the panel to show whole. */
 export const jsonOf = (answer: unknown): string => JSON.stringify(answer, null, 2)
 
+// A damaged row's time can be any number, and toISOString throws, in render, on one past a Date's range.
+/** `millis` as an ISO time, for a person to read, or as the bare number where it names no time. */
+export const timeOf = (millis: number): string => {
+  const when = new Date(millis)
+  return Number.isNaN(when.getTime()) ? String(millis) : when.toISOString()
+}
+
 /** What a panel's listing holds: the rows last listed, null before the first, and the refusal of the last attempt. */
 export type Listing<ValT> = { val: ValT | null, trouble: string | null }
 

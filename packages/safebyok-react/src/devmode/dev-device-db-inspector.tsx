@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import type { DeviceDB } from 'safebyok'
 import { leaseQuery, vaultScope } from 'safebyok/storage'
 import type { LeaseQuery, VaultScope } from 'safebyok/storage'
-import { LastCallLine, useLastCall, useListing } from './last-call'
+import { LastCallLine, timeOf, useLastCall, useListing } from './last-call'
 
 /** What a DevDeviceDBInspector is handed: the deviceDB whose rows it shows. */
 export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }
@@ -99,7 +99,7 @@ const LeaseRowLine = ({ row, onForget, onDelRaw }: LeaseRowLineProps) => {
 /** What a cell shows of a row's field: a time, number, word or token as is, and of anything else only its kind. */
 const cellOf = (fieldname: string, val: unknown): string => {
   if (val === undefined) { return '–' }
-  if ((fieldname === 'proved_at') && (typeof val === 'number')) { return new Date(val).toISOString() }
+  if ((fieldname === 'proved_at') && (typeof val === 'number')) { return timeOf(val) }
   if ((typeof val === 'number') || (typeof val === 'boolean') || (val === null)) { return String(val) }
   if ((typeof val === 'string') && (LeaseColumns as readonly string[]).includes(fieldname)) { return val }
   if (typeof val === 'string') { return `<string of ${String(val.length)}>` }
