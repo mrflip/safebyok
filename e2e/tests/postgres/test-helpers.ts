@@ -16,10 +16,10 @@ export * from 'safebyok/testing'
 export const PgUrlVar = 'SAFEBYOK_PG_URL'
 
 /** Every suite this directory has, by the name {@link describeOnPostgres} knows it. */
-export type PostgresSuite = 'battery' | 'races'
+export type PostgresSuite = 'battery' | 'races' | 'graphql'
 
 /** The suites that run against a real Postgres when {@link PgUrlVar} names one; every other Postgres test runs over a PGlite in the package. */
-export const OnRealPostgres: readonly PostgresSuite[] = ['battery', 'races']
+export const OnRealPostgres: readonly PostgresSuite[] = ['battery', 'races', 'graphql']
 
 /** The connection string of the Postgres to run against, or undefined where there is none, which skips every suite. */
 export const postgresUrl = (): string | undefined => {
