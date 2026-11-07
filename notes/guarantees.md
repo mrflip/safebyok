@@ -198,7 +198,8 @@ from the store by `DeviceDB.forget`: through `lease.vacate` or `Lease.forget` (`
 vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `forgetOutdated`, in
 `Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `bank.vacate`
 (`#eraseOwnLeases`). `bank.autolock` erases a row by `vault.lock()`. The Bank's scan, `DeviceDB.listLeases`,
-answers rows without one, as only `peek` answers a `lease_key`. Neither the Vault nor the Bank holds a record.
+answers rows without one. Only `peek` and `listRawLeases`, which no Vault or Bank calls, answer a `lease_key`, to
+whoever holds the deviceDB (G9). Neither the Vault nor the Bank holds a record.
 Operates: `Lease.#vaultKey` (`unwrapKeyUnder`) alone.
 
 **whisper.** Naked: the host → `vault.putBox`, `box.put`, `box.putExposed`, `vault.boxListing.create`, and
