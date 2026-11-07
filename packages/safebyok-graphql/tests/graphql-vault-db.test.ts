@@ -174,6 +174,15 @@ describe("GraphQLVaultDB's watch", () => {
     expect(badnews).to.deep.eq([])
   })
 
+  it("tells the refusal that ends a stream as itself", () => {
+    const { streams, badnews } = watched()
+    const scopeNotice = { safebyokWatch: { ok: false, act: 'bad_scope', val: null, world: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
+    streams[0]?.({ data: scopeNotice, hasNext: true })
+    streams[0]?.({ data: scopeNotice, hasNext: false })
+    expect(badnews).to.have.length(1)
+    expect(badnews[0]).to.include({ refusalkind: 'bad_scope', message: 'No such scope' })
+  })
+
   it("tells nothing of a stream that ends once stopped", () => {
     const { streams, counts, badnews, stop } = watched()
     stop()

@@ -208,9 +208,13 @@ export class GraphQLVaultDB implements VaultDBVerbs {
         return
       }
       // The closing result of a stream over fetch repeats the data of the notice before it.
-      const isRevoked = (result.data !== heardData) && heedNotice(result, onNotice)
+      const refusal = (result.data === heardData) ? null : heedNotice(result, onNotice)
       heardData = result.data
-      if (isRevoked) { end(null) } else if (! result.hasNext) { end(new DB.VaultError('storage_unavailable', DB.WatchEnded, { meta: { call: 'watch' } })) }
+      if (refusal !== null) {
+        end(DB.isVaultError(refusal, 'identity_revoked') ? null : refusal)
+      } else if (! result.hasNext) {
+        end(new DB.VaultError('storage_unavailable', DB.WatchEnded, { meta: { call: 'watch' } }))
+      }
     })
     // A stream that ended as it began ended before `end` had its subscription to stop.
     if (! watching.isOn) { watching.subscription.unsubscribe() }
@@ -288,17 +292,17 @@ const codeOf = (thrown: unknown): string | null => {
   return (typeof code === 'string') && /^[A-Z][A-Z0-9_]{0,39}$/.test(code) ? code : null
 }
 
-/** Hands `onNotice` the notice `result` carries, answering true for the notice that ends the watch for good. */
-const heedNotice = ({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): boolean => {
+/** Hands `onNotice` the notice `result` carries, answering the refusal of a notice that ends the watch, or null. */
+const heedNotice = ({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): DB.VaultError | null => {
   // A notice is a hint to fetch again, so one of the wrong shape is passed over.
-  if ((typeof data !== 'object') || (data === null)) { return false }
+  if ((typeof data !== 'object') || (data === null)) { return null }
   const crossed = DB.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
-  if (! crossed.success) { return false }
+  if (! crossed.success) { return null }
   if (crossed.data.ok) {
     onNotice(crossed.data.val)
-    return false
+    return null
   }
-  return DB.isVaultError(crossed.data.err, 'identity_revoked')
+  return crossed.data.err
 }
 // --
 
