@@ -47,14 +47,14 @@ describe("versionedShelfOf(spec)", () => {
   })
 
   const RefusedCases = [
-    ['an empty dbName',        { dbName: '' }],
-    ['an empty dbstem',        { dbstem: '' }],
-    ['an empty storename',     { storename: '' }],
-    ['a version of one part',  { version: '1' }],
-    ['a version not padded',   { version: '1-1-1' }],
-    ['a version of four parts', { version: '001-001-001-001' }],
-    ['an empty old name',      { oldnames: [''] }],
-    ['old names that are no list', { oldnames: 'device_db' }],
+    ['an empty dbName',             { dbName: "" }],
+    ['an empty dbstem',             { dbstem: "" }],
+    ['an empty storename',          { storename: "" }],
+    ['a version of one part',       { version: "1" }],
+    ['a version not padded',        { version: "1-1-1" }],
+    ['a version of four parts',     { version: "001-001-001-001" }],
+    ['an empty old name',           { oldnames: [""] }],
+    ['old names that are no list',  { oldnames: "device_db" }],
   ] as const
 
   it.each(RefusedCases)("refuses %s", (_what, over) => {

@@ -264,12 +264,12 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
 
   // The record's check lets these through: a length no unpadded base64url has, and a last character with stray padding bits.
   const UndecodedSaltCases = [
-    ['25 characters',                    'A'.repeat(25)],
-    ['41 characters',                    'A'.repeat(41)],
-    ['22 characters, stray padding bits', `${'A'.repeat(21)}B`],
+    ['25 characters',                     "A".repeat(25)],
+    ['41 characters',                     "A".repeat(41)],
+    ['22 characters, stray padding bits', `${"A".repeat(21)}B`],
   ] as const
 
-  it.each(UndecodedSaltCases)("refuses a stored salt that will not decode, %s, as 'bad_record', quoting none of it and never asking the deriver", async (_what, salt) => {
+  it.each(UndecodedSaltCases)("refuses a stored salt that will not decode, %s", async (_what, salt) => {
     const { gate } = await gateWithBoth()
     const { passphrase_wayin } = gate.pickle()
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
