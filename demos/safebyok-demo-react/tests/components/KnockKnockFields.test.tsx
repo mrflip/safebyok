@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
@@ -53,6 +54,14 @@ describe("KnockKnockFields", () => {
     await TH.expectProbe('present unlocked')
     expect(field.value).to.eq('')
     expect(screen.getByRole('button', { name: 'Save' })).to.not.be.null
+  })
+
+  it("keeps the field showing after Add key under StrictMode, whose second mount of the field must not hide it", async () => {
+    TH.renderInBank(<StrictMode><KnockKnockFields /><TH.VaultProbe /></StrictMode>)
+    const field = await addKey()
+    fireEvent.change(field, { target: { value: FakeApiKey } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Saved.')).to.not.be.null
   })
 
   it("saves what was typed, encrypted, never putting it in the page's markup", async () => {
