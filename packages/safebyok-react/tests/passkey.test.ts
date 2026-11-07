@@ -37,8 +37,8 @@ describe("createPasskey", () => {
     const made = await createPasskey(TH.PasskeyMaking)
     expect(made).to.not.be.null
     expect(authenticator.credentialIds()).to.deep.equal([made?.credential_id])
-    expect(fromB64(made?.prf_salt_b64 ?? '')).to.have.length(PasskeySaltBytes)
-    expect(made?.prfBytes).to.have.length(PrfAnswerBytes)
+    expect(fromB64(made?.prf_salt_b64 ?? '')).to.have.lengthOf(PasskeySaltBytes)
+    expect(made?.prfBytes).to.have.lengthOf(PrfAnswerBytes)
     expect(made?.prfBytes.some((byte) => byte !== 0)).to.be.true
   })
 
@@ -65,7 +65,7 @@ describe("createPasskey", () => {
   it("asks the new passkey again when its authenticator answers only when asked", async () => {
     const authenticator = TH.installFakeAuthenticator({ prfAtCreate: false })
     const made = await createPasskey(TH.PasskeyMaking)
-    expect(authenticator.calls.get).to.have.length(1)
+    expect(authenticator.calls.get).to.have.lengthOf(1)
     expect(made?.prfBytes.some((byte) => byte !== 0)).to.be.true
   })
 
@@ -110,14 +110,14 @@ describe("askPasskey", () => {
   it("refuses a vault with no passkey before the browser is asked", async () => {
     const authenticator = TH.installFakeAuthenticator()
     expect(await refusalOf(askPasskey(null))).to.include({ refusalkind: 'absent_wayin', message: Messages.noPasskeyToAsk })
-    expect(authenticator.calls.get).to.have.length(0)
+    expect(authenticator.calls.get).to.have.lengthOf(0)
   })
 
   it("refuses a passkey stored under a credential id that is not base64url, before the browser is asked", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const asking = askPasskey(headerOf('not base64url!', 'AAAA'))
     expect(await refusalOf(asking)).to.include({ refusalkind: 'bad_record' })
-    expect(authenticator.calls.get).to.have.length(0)
+    expect(authenticator.calls.get).to.have.lengthOf(0)
   })
 
   it("resolves null when the user dismisses the prompt, or has not the passkey at hand", async () => {

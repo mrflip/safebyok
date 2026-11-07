@@ -108,7 +108,7 @@ describe("PasskeyUnlockButton", () => {
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    await waitFor(() => { expect(authenticator.answersHanded()).to.have.length(2) })
+    await waitFor(() => { expect(authenticator.answersHanded()).to.have.lengthOf(2) })
     expect(attempts).not.toHaveBeenCalled()
     rerender(TH.inActivity('visible', ui))
     await waitFor(() => { expect(screen.getByText(Messages.passkeyButton)).to.have.property('disabled', false) })

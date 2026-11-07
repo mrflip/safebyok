@@ -58,7 +58,7 @@ describe("AddPasskeyModal", () => {
     const attempts = vi.spyOn(Gating.prototype, 'attempt')
     authenticator.refuseNext('NotAllowedError')
     TH.submitPasskeyAdd(TH.Passphrase)
-    await waitFor(() => { expect(authenticator.calls.create).to.have.length(1) })
+    await waitFor(() => { expect(authenticator.calls.create).to.have.lengthOf(1) })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(attempts).not.toHaveBeenCalled()
     expect(answers).to.deep.equal([])
@@ -80,7 +80,7 @@ describe("AddPasskeyModal", () => {
     fireEvent.click(screen.getByText(Messages.addPasskeyButton))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
     await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
-    expect(authenticator.calls.create).to.have.length(1)
+    expect(authenticator.calls.create).to.have.lengthOf(1)
   })
 
   it("answers declined on Cancel, and the vault holds no passkey", async () => {
@@ -99,7 +99,7 @@ describe("AddPasskeyModal", () => {
     TH.submitPasskeyAdd(TH.Passphrase)
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    await waitFor(() => { expect(authenticator.answersHanded()).to.have.length(1) })
+    await waitFor(() => { expect(authenticator.answersHanded()).to.have.lengthOf(1) })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(attempts).not.toHaveBeenCalled()
     expect(gating.isOpen).to.be.true
