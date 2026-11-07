@@ -617,10 +617,10 @@ the scope.
 
 * **An interface a host implements is typed as what belongs there**, never `unknown`, with its doc
   block saying what is checked and by whom. The check keeps damage out, not the type.
-* **A DB handed across the package boundary carries a brand, not a duck.** A VaultDB or DeviceDB
-  extends our base class and is known by its `Symbol.for` brand: a duck check passes anything with
-  the right method names, and `instanceof` fails the second copy of safebyok an adapter package may
-  bundle.
+* **A DB handed across the package boundary carries a brand, not a duck.** An AdapterVaultDB or
+  DeviceDB extends our base class, and any VaultDB, a client too, is known by its `Symbol.for` brand:
+  a duck check passes anything with the right method names, and `instanceof` fails the second copy
+  of safebyok an adapter package may bundle.
 * **A host's function is wrapped once, on its way in.** Each function a host hands `Bank.make`
   (`requestCleartext`, the key deriver, the strength checker, `onPanic`, ...) is wrapped at `Bank`'s
   constructor into a checked, branded thing that checks what the function answers (*Validation*).
