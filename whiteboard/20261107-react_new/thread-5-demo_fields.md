@@ -1,7 +1,7 @@
 # Thread 5: demo, managed fields (2026-11-07)
 
-Branch `20261107-demo_fields`, PR [#584](https://github.com/mrflip/safebyok/pull/584), stacked on [#579](https://github.com/mrflip/safebyok/pull/579)
-(thread 9, browser batteries). Justify: green; safebyok-react 194 passed, the demo 65 passed, every other package unchanged.
+Branch `20261107-demo_fields`, PR [#584](https://github.com/mrflip/safebyok/pull/584) (merged); the review's rework and the
+reviewer's three fixes follow up in PR [#587](https://github.com/mrflip/safebyok/pull/587), on main. Justify: green; safebyok-react 194 passed, the demo 65 passed, every other package unchanged.
 
 * **Built**:
   * **The page** (`demos/safebyok-demo-react/src/App.tsx`): the Knock-Knock Machine. A header
