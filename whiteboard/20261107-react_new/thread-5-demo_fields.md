@@ -1,7 +1,7 @@
 # Thread 5: demo, managed fields (2026-11-07)
 
 Branch `20261107-demo_fields`, PR [#584](https://github.com/mrflip/safebyok/pull/584), stacked on [#579](https://github.com/mrflip/safebyok/pull/579)
-(thread 9, browser batteries). Justify: green; safebyok-react 194 passed, the demo 62 passed, every other package unchanged.
+(thread 9, browser batteries). Justify: green; safebyok-react 194 passed, the demo 65 passed, every other package unchanged.
 
 * **Built**:
   * **The page** (`demos/safebyok-demo-react/src/App.tsx`): the Knock-Knock Machine. A header
@@ -13,14 +13,15 @@ Branch `20261107-demo_fields`, PR [#584](https://github.com/mrflip/safebyok/pull
   * **`KnockKnockFields`**: `useBox('main', 'anthropic_api_key')`, `BoxWhisperField path="apiKey"`.
     *Add key*/*Edit key* runs `bank.ensureVault` -> `vault.ensureUnlocked()` -> `vault.putBox({
     boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })` -> `box.expose()` (skipped
-    when already exposed). *Save* is `BoxFields.of(box).save()`; *Done* is `box.unexpose()`.
+    when already exposed). *Save* is `BoxFields.of(box).save()`; *Done* is `box.unexpose()`, run through the same `perform` as
+    the other buttons so it clears an earlier "Saved." and any gripe.
   * **`KnockForm`** (`src/components/KnockForm.tsx`): the shared knock half, "Who's there?",
-    *Knock*, the punchline, handed `apiKeyOf: () => Promise<string | null>` and `isReady`. Threads
-    6 and 7 should reuse it, each passing its own `apiKeyOf`.
+    *Knock*, the punchline, handed `extractApiKey: () => Promise<string | null>` and `isReady`.
+    Threads 6 and 7 should reuse it, each passing its own `extractApiKey`.
   * **`AccountMenu`**: `VaultLockControl` (which carries Create vault), Sign out (locks, then signs
     out), Delete account, and `WaysIn` (passphrase, passkey, fingerprint button) under it.
   * **Storage** (`src/lib/stores.ts`): `{ ...browserOpts({ dbName: Applabel }), applabel,
-    device_id: deviceIdOf(), vaultDB }`. `deviceIdOf` mints a `crypto.randomUUID()` once into
+    device_id: ensureDeviceId(), vaultDB }`. `ensureDeviceId` mints a `crypto.randomUUID()` once into
     localStorage (`safebyok-demo:device_id`). The MemoryDeviceDB and character-counting
     strength checker are gone.
   * **Outage switch** (`src/lib/outage-vault-db.ts`, `src/components/OutageSwitch.tsx`):
@@ -35,12 +36,18 @@ Branch `20261107-demo_fields`, PR [#584](https://github.com/mrflip/safebyok/pull
     remounting the input), and `BoxWhisperField` passes `box.isShowing`. `VaultLockControl`'s
     Unlock calls `vault.tryEnsureUnlocked()` on the vault in hand.
   * **Tests**: the demo's for each new piece (`KnockKnockFields`, including one under
-    StrictMode; `AccountMenu`; `OutageVaultDB`; `localStore`; `deviceIdOf`/`bankOpts`; App's
+    StrictMode; `AccountMenu`; `OutageVaultDB`; `localStore`; `ensureDeviceId`/`bankOpts`; App's
     outage round trip); safebyok-react's for the reveal reset (lock, veil) and the Unlock.
 * **Decisions taken**:
-  * **A knock reads the saved whisper** through `vault.getBox(Boxlabel, { ifAbsent: 'nil' })`,
-    exposing it if hidden, never `putBox`: a knock with no key builds no empty box, and an
-    unsaved edit in the field is not what is sent. Exposing at a knock shows the field (masked).
+  * **A knock sends the saved key, always**: `vault.ensureUnlocked()` on the vault from `useVault`,
+    `vault.getBox(Boxlabel, { ifAbsent: 'nil' })`, then `await box.extractWhisper()`. Never
+    `putBox` (a knock with no key builds no empty box), and never the exposed whisper: once the
+    box is exposed, `box.whisper` is the working copy, so an unsaved edit followed by a lock or a
+    failed Save would be sent, and a veiled box would read as keyless. A knock leaves the field as
+    it was. (Set aside, from the build: exposing the box at a knock and reading `box.whisper`; the
+    review found the two holes above. Tests: edit, lock, knock; veiled box, knock.)
+  * **Names**: `extractApiKey` and `ensureDeviceId` do work, so they are not `fooOf` (STYLE.md
+    keeps `fooOf` for pure functions); renamed from `apiKeyOf` and `deviceIdOf` in the rework.
   * **Knock is disabled until the bank is ready**: a knock before `bank.hello()` settled refused
     "This bank isn't ready".
   * **Delete account** confirms with `confirm()` only on the unborn path; for a present vault
