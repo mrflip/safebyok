@@ -14,7 +14,7 @@
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
 * **Status:** running. Merged: 1, 2, 3, 4, 9, 11, 12, 14. Filed: 13 (#583). Reviewing: 5 (#584).
-  Building: 15, 17 (on #583). Waiting: 6, 7, 8 on 5; 16 on 15 and 5. Thread 10 folded into 5 and 8.
+  Building: 15, 17 (on #583). Waiting: 6, 7, 8 on 5; 16 on 15 and 5; 18 for a free slot. Thread 10 folded into 5 and 8.
 
 ## Read first
 
@@ -569,6 +569,38 @@ shows it beside the other two.
 * Ride-along from the Cleanup list (#573 review): hostile-input tests for
   `HostErrorSanitizer.refusalFor` (`undefined`, a string, an object whose getters throw).
 * *Depends on:* 13 (#583, which reworks `passkey.ts`). Cut from its tip once filed. *Size:* small.
+
+### 18. vaultdb_names
+
+> can you do a thread -- at your leisure -- to rename the VaultDB file to vault-db (not vault-db-new),
+> have
+> * the class now called VaultDB (The parent of the other adapters) be AdapterVaultDB;
+> * the interface VaultDBVerbs become VaultDB
+
+*Gloss.* *Orchestrator:* the Coach in chat, 2026-11-07.
+* `packages/safebyok/src/storage/vault-db-new.ts` → `vault-db.ts`; every import follows.
+* The class `VaultDB` (the base the adapters extend: `MemoryVaultDB`, `IdbVaultDB`, the Postgres,
+  Convex and GraphQL ones) → `AdapterVaultDB`. The interface `VaultDBVerbs` (what a bank takes) →
+  `VaultDB`. Export lines (`src/index.ts`, `storage/index.ts`) follow; pre-1.0, no aliases.
+* Names built on them follow where they name the same thing: `isVaultDBVerbs`, `VaultDBVerbnames`,
+  the phrases (`VaultDBShape` says "an instance of the VaultDB class": now `AdapterVaultDB`), the
+  `IsVaultDB` brand if it marks the class. Where a new name would collide (`isVaultDB` already
+  exists in `helpers/consts.ts`), the worker picks, says so in the PR, and never coins a verb.
+* Prose: VOCABULARY.md, STYLE.md, README.md, TODO.md, `notes/` (not `notes/security.md`: a `sonnet`
+  subagent edits that one, as its header says), package READMEs, e2e. "VaultDB" in prose meaning
+  the interface stays; meaning the base class, becomes `AdapterVaultDB`. Historic folders
+  (`whiteboard/` other than this sprint's, `winboard/`, `human/`), CHANGELOGs, `.changeset/` files
+  already written, `packages/safebyok-old/` and `packages/safebyok-idb-old/` are left alone.
+* A changeset for each published package changed: what a host renames (an adapter author extends
+  `AdapterVaultDB`; a host typing the bank's store says `VaultDB`).
+* *Levels:* worker default; review `low`; style pass `opus` (naming and vocabulary).
+* *Touches:* packages safebyok, safebyok-indexeddb, -postgres, -convex, -graphql, -react if it names
+  them, the demo, e2e, docs.
+* *Depends on:* nothing unmerged. Cut from `origin/main` when a slot frees ("at your leisure").
+  Thread 8 (`DevVaultDBInspector`) and 16 meet these names: whichever lands later follows them.
+  *Size:* medium (wide but mechanical).
+* *Open:* `storage/device-db-new.ts` has the same `-new` suffix; thread 15 is in it now. A row asks
+  whether 18 renames it too, after 15.
 
 ## For the Coach
 
