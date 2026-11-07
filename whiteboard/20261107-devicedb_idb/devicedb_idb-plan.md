@@ -357,6 +357,20 @@ notes/security.md (sonnet). **Levels:** review `high` (guarantees). **Depends on
 with the Coach. The logger is left alone (the Coach). No `box.isVeiled` exists; the doc points at `box.isShowing`,
 `isWhisperedBag` and the ALLCAP sentinels.
 
+### 8. is_booleans (the Coach, 2026-11-07, in chat)
+
+> I may we change lockState everywhere to isLocked if Boolean or locked if enum.
+>
+> Is throughout, anything designed in the 20s seems to agree. Is for booleans and word for enum, state is a smell
+
+*Orchestrator:* `LockState` is two-valued, so it becomes a boolean: `isLocked` on instances (the getter already exists on
+Vault and Storable) and on the vault snapshot; the `lockState()` methods (vault, box, listing, bank, world), `LockState` and
+`lockStateVals` go. Every snapshot boolean becomes `is…`: the box snapshot's `exposed`, `veiled`, `full`, `present` become
+`isExposed`, `isVeiled`, `isFull`, `isPresent`, matching the instance getters; audit the vault, bank and listing snapshots
+for the same, and any other public `*State` name or bare-adjective boolean. STYLE.md *Naming* gains the rule. About 140
+`lockState` uses in 36 files, mostly tests; core, safebyok-react (`vault-controls.tsx`, the inspectors), the demo. Public
+surface, no stored shape. **Depends on:** #594 (stacked on it, after its squash). **Levels:** review `medium`. **Size:** M.
+
 ## For the Coach
 
 * Nothing open beyond the doc.
