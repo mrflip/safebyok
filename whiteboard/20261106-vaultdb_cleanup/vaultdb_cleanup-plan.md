@@ -354,6 +354,12 @@ peer on `safebyok` now. Touches every adapter package, so it is cut
 from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
 mechanical; `sonnet` worker, `low` review.
 
+*Rulings, 2026-11-07 (Open Matters, proceed):* "A Convex vault full of tombstones needs a
+delVault": *Coach:* "publicize and accept": the Convex README and `notes/wontfix.md` say that once
+deleted boxes fill a vault's cap it refuses new box labels until the vault is deleted.
+"vaultChannelOf checks nothing it is given": took the Rec: check the user_id at the export
+(bad_option for an invalid one). **Carried into sprint devicedb_idb as its thread 3.**
+
 ### 8. graphql_schema (after the restack)
 
 The Coach's ruling on Open Matters, 2026-11-06 (proceed), verbatim. The matter was "Rows cross
@@ -415,6 +421,14 @@ built server-side from a fixed list of fields, never a spread of a refusal's met
 crosses; (6) an old client silently drops a newer server's optional field on a read-then-write
 (a sentence at 1.0); (7) `Tidied` is a type of its own, and a drift test checks the core's
 checkers against the schema.
+
+*Rulings, 2026-11-07 (Open Matters, proceed):* the relay row, Rec "adopt your proposal: the
+browser class implements an extracted VaultDB interface, each verb is one operation returning the
+whole try* answer, and relay is retired": *Coach:* "This is good, go for it". The gate verbs row:
+*Coach:* "graphql should expose exactly (and pretty much only) the front-end verbs that VaultDB
+does, including those three." (replacePassphrase, addPasskey, revokePasskey). "A stream revoked
+mid-way ends silently": took the Rec: end it with identity_revoked. So the GraphQL hold is lifted
+for this thread. **Carried into sprint devicedb_idb as its thread 4.**
 
 ### 9. port_fastkey
 
