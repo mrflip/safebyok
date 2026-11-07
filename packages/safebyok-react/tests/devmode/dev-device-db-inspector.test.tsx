@@ -44,7 +44,7 @@ describe("DevDeviceDBInspector", () => {
     const { world } = await renderOverLease()
     world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled' })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
-    await waitFor(() => { expect(screen.getAllByRole('row')).to.have.length(2) })
+    await waitFor(() => { expect(screen.getAllByRole('row')).to.have.lengthOf(2) })
     includingDamaged()
     await waitFor(() => { expect(leaseRow('mangled')).to.exist })
     expect(within(leaseRow('mangled')).queryByRole('button', { name: 'forget' })).to.be.null
