@@ -1,5 +1,5 @@
 import { isVaultError, type Bank, type Outcome } from 'safebyok'
-import { useBank, useVault, useVaultSnapshot } from './hooks'
+import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks'
 import { Messages } from './messages'
 
 /** The lock state of the signed-in user's vault under `vaultlabel` with a Lock or Unlock button, for an account menu; a Create vault button while it is unborn. */
@@ -27,12 +27,14 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
 /** A button that builds the signed-in user's vault under `vaultlabel` from the click, asking the user for its new passphrase. */
 export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
+  // `bank.ensureVault` refuses until the bank's hello has landed.
+  const isReady = (useBankSnapshot()?.stage === 'ready')
   const create = async () => {
-    if (bank === null) { return }
+    if ((bank === null) || (! isReady)) { return }
     tellUnlessDeclined(bank, await bank.tryEnsureVault({ vaultlabel }))
   }
   return (
-    <button type="button" className="create-vault-button" disabled={bank === null} onClick={() => { void create() }}>
+    <button type="button" className="create-vault-button" disabled={! isReady} onClick={() => { void create() }}>
       {Messages.createButton}
     </button>
   )
