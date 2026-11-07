@@ -1,13 +1,13 @@
 // Kept off the front door (`safebyok`) so a host's autocomplete never meets the adapter's contract, and an adapter's imports name one door.
-/** `safebyok/storage`: what a storage adapter is written against, the VaultDB and the DeviceDB. */
+/** `safebyok/storage`: what a storage adapter is written against, the AdapterVaultDB and the DeviceDB. */
 
-// == [The stores]: VaultDB, DeviceDB, and the two in memory
-export { VaultDB } from './vault-db-new'
-export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied } from './vault-db-new'
-export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, RowOfVault, VaultDBVerbs } from './vault-db-new'
-export { VaultDBVerbnames } from './vault-db-new'
-export { IsVaultDB } from '../helpers/consts'
-export { DeviceDB } from './device-db-new'
+// == [The stores]: AdapterVaultDB, VaultDB, DeviceDB, their brands, and the two in memory
+export { AdapterVaultDB } from './vault-db'
+export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied } from './vault-db'
+export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, RowOfVault, VaultDB } from './vault-db'
+export { VaultDBVerbnames } from './vault-db'
+export { IsAdapterVaultDB, IsVaultDB, isAdapterVaultDB, isVaultDB } from '../helpers/consts'
+export { DeviceDB } from './device-db'
 export { brandedDeviceDB } from '../shapes/shapes-vaultish'
 export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
@@ -39,8 +39,8 @@ export type { BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox } from '../
 export type { Sidecar, WhisperJson } from '../shapes/shapes-core'
 export { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } from '../shapes/shapes-storage'
 export type { AddPasskeyParams, ReplacePassphraseParams, RevokePasskeyParams } from '../shapes/shapes-storage'
-export { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
-export type { Capacity, DelOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReqParams, VaultDBOpts } from '../shapes/shapes-storage'
+export { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
+export type { AdapterVaultDBOpts, Capacity, DelOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReqParams } from '../shapes/shapes-storage'
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'

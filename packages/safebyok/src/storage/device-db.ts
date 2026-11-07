@@ -17,7 +17,7 @@ export abstract class DeviceDB {
 
   // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
   /** True: the brand a model knows a deviceDB by, from whichever copy of safebyok. */
-  get [IsDeviceDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
+  get [IsDeviceDB](): true { return true }
   // --
 
   // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases, delRawLease, tryDelRawLease

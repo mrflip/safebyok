@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { makeLeaseKey } from '../../src/helpers/crypto'
-import { DeviceDB } from '../../src/storage/device-db-new'
+import { DeviceDB } from '../../src/storage/device-db'
 import * as TH from '../test-helpers'
 
 const asked = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'tok_one' }

@@ -7,7 +7,7 @@ import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { BankRow, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 import { BankDBVersion, DeviceDBVersion } from '../helpers/consts'
-import { DeviceDB } from './device-db-new'
+import { DeviceDB } from './device-db'
 import { versionedShelfOf } from './idb-shelf'
 import { inOneStep, rowAt } from './idb-transaction'
 

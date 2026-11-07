@@ -1,7 +1,7 @@
 /** The deviceDB in memory. */
 
 import { ckeyOf } from '../helpers/helpers'
-import { DeviceDB } from './device-db-new'
+import { DeviceDB } from './device-db'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { BankRow, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
