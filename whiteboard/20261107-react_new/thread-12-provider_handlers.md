@@ -1,6 +1,6 @@
 # Thread 12: provider_handlers (2026-11-07)
 
-Branch `20261107-provider_handlers`, PR filed against main, stacked on #574 (itself on #573). Justify: green -- safebyok-react 10 files, 105 tests (9 added); every other package as before.
+Branch `20261107-provider_handlers`, PR #575 against main, stacked on #574 (itself on #573). Justify: green -- safebyok-react 10 files, 105 tests (9 added); every other package as before.
 
 * **Built** (all in `packages/safebyok-react/src/bank-provider.tsx`, its tests, the README's provider section, and a changeset)
   * A handler prop that is no function (`onBadNews`, `onPanic`, `requestCleartext`; null too, but `requestCleartext` null still means "ask no one") reaches `Bank.make` as given, so it refuses `bad_option` to the error boundary. `misusedHandler` hands such a value on and undefined for a function or none.
@@ -12,7 +12,7 @@ Branch `20261107-provider_handlers`, PR filed against main, stacked on #574 (its
   * Giving or dropping `onPanic` remakes the bank, as `onBadNews` already did, because the core acts on whether the host has one. The README says so.
   * The warning goes through `bank.logger` (the one the bank settled: the host's logger, else the default), not through a logger the provider settles itself.
 * **Deviations**: none. No `eslint-disable`, no `@ts-expect-error`. One cast, in `misusedHandler`, typing a misused handler as the handler it is not.
-* **Discoveries**: `BankOpts`' `onPanic` and `requestCleartext` accept `unknown` for lint's purposes but `tsc` wants a handler type; `Bank.make` accepts `null` for `onBadNews` as a refusal (not nullable), so a JS host's null is now refused where the old provider allowed it.
+* **Discoveries**: a JS host's `onBadNews: null` is now refused `bad_option` (the old provider let it through); `onBadNews: undefined` is the way to give none.
 
 ## Open questions
 * **Let-go bank's panic**: the throw-to-platform choice above, versus a core change letting a handler answer "unheard" (a core design point, not touched).
