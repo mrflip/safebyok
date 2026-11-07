@@ -44,7 +44,7 @@ describe("AX's answer checks", () => {
       [AX.delVaultAnswer,   await vaultDB.tryDelVault(vaultTombstoneOf(vaultAt()), { prior: SX.revisionOf(vaultAt()) })],
     ] as const
     for (const [check, answer] of answers) {
-      expect(answer.ok, answer.ok ? "" : `${answer.act}: ${answer.err.message}`).to.equal(true)
+      expect(answer.ok, answer.ok ? "" : `${answer.act}: ${answer.err.message}`).to.be.true
       expect(check.parse(crossed(answer))).to.deep.equal({ dbhas: null, ...answer })
     }
   })
@@ -52,15 +52,15 @@ describe("AX's answer checks", () => {
   it("parse a refusal that crossed to a VaultError of its kind, its meta holding the act, world and request", async () => {
     const vaultDB = await storeWithBox()
     const answer = await vaultDB.tryPutVault(vaultAt(1), { prior: stale })
-    expect(answer.ok).to.equal(false)
+    expect(answer.ok).to.be.false
     const parsed = AX.putVaultAnswer.parse(crossed(answer))
-    expect(parsed.ok).to.equal(false)
+    expect(parsed.ok).to.be.false
     if (parsed.ok || answer.ok) { return }
     expect(parsed.err).to.be.instanceOf(VaultError)
     expect(parsed.err.refusalkind).to.equal(answer.err.refusalkind)
     expect(parsed.err.message).to.equal(answer.err.message)
     expect(parsed.err.meta).to.deep.include({ act: answer.act, world: answer.world, req_params: answer.req_params })
-    expect(parsed.err.cause).to.equal(undefined)
+    expect(parsed.err.cause).to.be.undefined
   })
 
   it("take a damaged row only under damaged_rows", async () => {

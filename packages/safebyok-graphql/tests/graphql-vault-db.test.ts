@@ -70,7 +70,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     const { vaultDB } = fakeClient({ error: combined })
     const answer = await vaultDB.tryGetVault(TH.vaultScope)
     expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', world: null, req_params: TH.vaultScope })
-    expect(DB.isVaultError(answer.err, 'unexpected_error')).to.eq(true)
+    expect(DB.isVaultError(answer.err, 'unexpected_error')).to.be.true
     expect(answer.err?.cause).to.be.instanceOf(Error)
     expect(answer.err?.meta).to.deep.include({ call: 'getVault' })
     await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'unexpected_error')
