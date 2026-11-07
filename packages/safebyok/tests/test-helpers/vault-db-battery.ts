@@ -85,7 +85,7 @@ export type BatteryWorld = {
 const notGiven = (hookname: string) => (): never => { throw new TypeError(`The store gave the battery no ${hookname}.`) }
 
 // Every store a world's hooks are handed is one its own factories made, so the narrowing to DBT holds;
-// a world given no `_cheat_storeOf` was handed VaultDBs.
+// a world given no `_cheat_storeOf` was handed AdapterVaultDBs.
 const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
   const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, _cheat_failNextCall, _cheat_storeOf, watches = true, boxNoticesCarryVault = true } = opts
   const fresh = async (dbOpts?: AdapterVaultDBOpts): Promise<VaultDB> => await makeVaultDB(dbOpts)
