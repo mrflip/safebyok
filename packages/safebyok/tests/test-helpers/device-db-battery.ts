@@ -5,7 +5,7 @@ import { makeLeaseKey } from '../../src/helpers/crypto'
 import { objCheck } from '../../src/helpers/validator'
 import type { Awaitable } from '../../src/helpers/helpers'
 import type { BankScope, VaultScope } from '../../src/shapes/shapes-core'
-import { device_id } from '../../src/shapes/shapes-core'
+import * as CX from '../../src/shapes/shapes-core'
 import type { LeaseRow } from '../../src/shapes/shapes-storage'
 import type { DeviceDB } from '../../src/storage/device-db-new'
 import { expectBad, expectGood, expectRefusal } from './refusals'
@@ -300,7 +300,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
       it("makes the bank row on the first call, its device_id a fresh UUID, and answers it again on the next", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureBank(bankScope)
-        expect(device_id.safeParse(made.device_id).success).to.be.true
+        expect(CX.device_id.safeParse(made.device_id).success).to.be.true
         expect(made).to.deep.equal({ ...bankScope, device_id: made.device_id })
         expect(await deviceDB.ensureBank(bankScope)).to.deep.equal(made)
         expect(await deviceDB.listRawBanks()).to.deep.equal([made])
@@ -355,7 +355,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         const deviceDB = await fresh()
         await rowsOf(deviceDB).plantBankRow(bankScope, { ...bankScope, device_id: 'not-a-uuid' })
         const made = await deviceDB.ensureBank(bankScope)
-        expect(device_id.safeParse(made.device_id).success).to.be.true
+        expect(CX.device_id.safeParse(made.device_id).success).to.be.true
         expect(await deviceDB.ensureBank(bankScope)).to.deep.equal(made)
         expect(await rowsOf(deviceDB).bankRowsOf()).to.deep.equal([made])
       })
