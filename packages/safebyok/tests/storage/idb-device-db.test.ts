@@ -39,7 +39,7 @@ const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
 const failNextCall = async (deviceDB: IdbDeviceDB): Promise<void> => {
   await deviceDB.listLeases()
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
-    throw new DOMException('The database connection is closing.', 'InvalidStateError')
+    throw new DOMException("The database connection is closing.", 'InvalidStateError')
   })
 }
 
