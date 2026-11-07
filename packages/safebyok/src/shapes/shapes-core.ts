@@ -10,7 +10,9 @@ import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { KeyDeriver } from '../deriver/basederiver'
 
 // Unpadded base64url spends four characters on three bytes: 16 bytes are 22 characters, and 32 are 43.
+/** The number of unpadded base64url characters that hold `nBytes` bytes. */
 const b64CharsOf = (nBytes: number): number => Math.ceil((nBytes * 4) / 3)
+/** A passphrase salt's text: base64url characters, as many as {@link MinSaltBytes} to {@link MaxSaltBytes} bytes take. */
 const SaltB64Pattern = new RegExp(`^[A-Za-z0-9_-]{${String(b64CharsOf(MinSaltBytes))},${String(b64CharsOf(MaxSaltBytes))}}$`)
 
 // == [Ciphered]: ciphered, Ciphered
