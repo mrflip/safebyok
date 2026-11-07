@@ -1,8 +1,8 @@
-# react_new: safebyok-react and the demo on the new core
+# react_new: design notes (inventory, core gaps, the plan before the sprint)
 
 Branch `20261107-react_new`, worktree `../byok-react_new`, cut from `origin/main` at `b0458e43a`.
 Read on main, not on the base checkout's `20261104-newdesign_plan`, which is 297 commits behind.
-Regressions and concerns we accept for now: [regressions.md](regressions.md).
+Regressions and concerns we accept for now: [regressions.md](regressions.md). The sprint plan, react_new-plan.md, is newer wherever the two disagree.
 
 ## 1. Inventory
 

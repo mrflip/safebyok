@@ -5,8 +5,8 @@ import * as Front from '../src/index'
 
 describe("safebyok", () => {
   it("exports each type its exported signatures name", () => {
-    expectTypeOf<Front.BankOpts['vaultDB']>().toEqualTypeOf<Front.VaultDBVerbs>()
-    expectTypeOf<Front.VaultDB>().toExtend<Front.BankOpts['vaultDB']>()
+    expectTypeOf<Front.BankOpts['vaultDB']>().toEqualTypeOf<Front.VaultDB>()
+    expectTypeOf<Front.AdapterVaultDB>().toExtend<Front.BankOpts['vaultDB']>()
     expectTypeOf<Front.BankOpts['deviceDB']>().toEqualTypeOf<Front.DeviceDB>()
     expectTypeOf<Front.BankOpts['keyDeriver']>().toEqualTypeOf<Front.KeyDeriver>()
     expectTypeOf<Front.BankOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()
@@ -33,7 +33,7 @@ describe("safebyok", () => {
   })
 
   it("exports what a React host's gating dialogs branch on: the correctable refusal kinds and the types of a gating's state", () => {
-    expect(Front.correctablekindVals).to.deep.equal(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'])
+    expect(Front.correctablekindVals).to.deep.equal(['wrong_passphrase', 'wrong_passkey', 'passkey_unavailable', 'weak_passphrase', 'same_passphrase'])
     expectTypeOf<(typeof Front.correctablekindVals)[number]>().toExtend<Front.Refusalkind>()
     expectTypeOf<Front.Gating['gatingkind']>().toEqualTypeOf<Front.Gatingkind>()
     expectTypeOf<Front.Gating['passkeyHeader']>().toEqualTypeOf<Front.WayinHeader | null>()

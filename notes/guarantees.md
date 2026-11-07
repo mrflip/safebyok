@@ -47,7 +47,7 @@ without the wrap's brand (`isGuarded`, `helpers/consts.ts`). `keyDeriver` is wra
 (`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, reading nothing
 of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), the `askUser` a gating calls, which
 answers false for a throw and drops it, for `Gating.#askHost` to refuse as `requestCleartextThrew`. `onPanic`, which
-hears a refusal and no secret, is wrapped there too, by `guardOnPanic`. The `DeviceDB` (`storage/device-db-new.ts`, `storage/memory-device-db.ts`) stores the leaseKey
+hears a refusal and no secret, is wrapped there too, by `guardOnPanic`. The `DeviceDB` (`storage/device-db.ts`, `storage/memory-device-db.ts`) stores the leaseKey
 opaque, and what a store throws is replaced at `storeFailed` (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb),
 which keeps nothing of it (G8).
 
@@ -189,7 +189,7 @@ only as `box_key_wrapped`.
 `Proving.buildLease`, from the vault's `#unlockByProof` and `#renewLease`. Carried, as the `lease_key` of a
 `LeaseRecord`: `Lease.#record`, the Lease the vault holds in `#lease` (`#attachLease`) → `lease.cacheAsCacheCan` →
 `lease.cache` → the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
-(`storage/device-db-new.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
+(`storage/device-db.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
 `structuredClone` into a Map); read back, from
 `vault.ensureUnlocked`, by `Lease.buildFromCache` (`tryPeekLease` → `DeviceDB.peek`), which checks the row with
 `leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.vacate`, at a sweep
@@ -276,7 +276,7 @@ algorithm, or for another use reads as `damaged_lease` (`isLeaseKey`, `shapes-ga
 non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
 vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease
 record, is inside the trust boundary, as the host already is (SECURITY.md, *What is outside
-safebyok's protection*). Kept by: `models/lease.ts`, `storage/device-db-new.ts`, `shapes/shapes-gateish.ts`. Checked by:
+safebyok's protection*). Kept by: `models/lease.ts`, `storage/device-db.ts`, `shapes/shapes-gateish.ts`. Checked by:
 `tests/models/lease.test.ts` (*makes its leaseKey non-extractable, usable only to wrap and unwrap*, and
 *Lease.buildFromCache*'s *tells a cached record whose leaseKey is extractable as 'damaged_lease' bad news, quoting
 none of it, answers null and leaves it in place*, one of a list of cases under one title).
@@ -341,7 +341,7 @@ from `putBox`, `box.put`, `putExposed`, `vault.boxListing.create` or the public 
 error carries a name and a message, never key material. A device-store failure's cause never crosses to the host: `storeFailed`
 (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb) keeps neither what the store threw nor its message,
 only its `name`, as a `DeviceDB` is handed every lease record and the logger hands a condition to the
-host whole (`tests/storage/device-db-new.test.ts`, *a deviceDB whose store throws*). `unexpectedError` keeps a foreign throw
+host whole (`tests/storage/device-db.test.ts`, *a deviceDB whose store throws*). `unexpectedError` keeps a foreign throw
 as `cause` only where the thrower heard no secret. The invariant at the one catch that ends each
 Lease and Box `try*` form (`outcomeOf`, `outcome.ts`) is checkable by reading what can reach it: a
 refusal (passed as itself), the vault's demand, or a bug's own throw from this package's lines;

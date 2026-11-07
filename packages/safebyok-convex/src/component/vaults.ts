@@ -8,7 +8,7 @@ import * as Tallies from './tallies'
 import type { BoxDocGiven, Life } from './tallies'
 import * as CVX from './validators'
 
-// One function for each of the VaultDB's generic calls, reached through the host's wrapper, which
+// One function for each of the AdapterVaultDB's generic calls, reached through the host's wrapper, which
 // has already proved the caller is the user each call names. Convex runs a mutation as one
 // serializable transaction, so each put and del is one atomic step: it reads the rows it judges,
 // decides by the core's own predicates, and writes, or not, in one go. A query reads one snapshot.

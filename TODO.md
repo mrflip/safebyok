@@ -53,6 +53,12 @@ Small irritants, each a few lines, picked up by whoever is nearby.
 
 In order. A later item that depends on an earlier one says so.
 
+* **A void vault in place of the create dialog.** The Coach, 2026-11-07 (thread 11 of the react_new
+  sprint, [#578](https://github.com/mrflip/safebyok/pull/578)): an unborn vault starts as a
+  tombstone, as a box does, so `bank.ensureVault` never opens a dialog by itself. A thread of its
+  own, after the react_new sprint. Meanwhile the React layer works around it: `useVault` never
+  asks, and the first click that needs the vault creates it.
+
 ## Side quests
 
 Straightforward, likely to be done, not needed yet. Each is a thread cut from `main`.
@@ -205,6 +211,8 @@ into nothing, and each retry makes another. The earlier `addPasskey(passphrase, 
 the authenticator only once the proof held, at the cost of host code inside the call. Decide, once
 the control flow is mature, whether the user experience earns a check of the passphrase ahead of
 `createPasskey` (a separate call, or a maker again), or whether the README's note is enough.
+`safebyok-react`'s add-passkey dialog asks for the passphrase before `createPasskey` when the field
+is empty (the Coach, 2026-11-07); a typo still leaves a passkey behind.
 
 ### Identity should not be tied to the backing database
 

@@ -66,7 +66,7 @@ export const GuardedExpected = "Expected a host's function as Bank.make wraps it
 export const GuardedLoggerExpected = "Expected a logger as Bank.make guards it"
 
 /** Anything but a vaultDB branded by safebyok and answering each of its verbs, where a vaultDB is asked. */
-export const VaultDBExpected = "Expected a VaultDB: a store or client branded by safebyok's VaultDB, answering each of its verbs"
+export const VaultDBExpected = "Expected a VaultDB: a store or client branded by safebyok, answering each of its verbs"
 
 /** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
@@ -123,7 +123,7 @@ export const leaseHoursShape = (maxHours: number): string => `Expected a number 
 export const MinutesShape = "Expected a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity"
 
 /** A `vaultDB` that is no storage adapter. */
-export const VaultDBShape = "Expected a storage adapter, an instance of the VaultDB class: localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
+export const VaultDBShape = "Expected a storage adapter, an instance of the AdapterVaultDB class: localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
 
 /** A `deviceDB` that is no device store. */
 export const DeviceDBShape = "Expected a device store, an instance of the DeviceDB class: new MemoryDeviceDB(), or your own class that extends DeviceDB, both imported from 'safebyok'"

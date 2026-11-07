@@ -57,7 +57,7 @@ describe("AccountMenu", () => {
     await TH.expectProbe('present locked')
   })
 
-  it("deletes the vault through the provider's dialog, then the account, with no confirm before it", async () => {
+  it("deletes the vault and the account behind the provider's dialog alone", async () => {
     const confirm = vi.spyOn(globalThis, 'confirm')
     const { auth } = await renderWithVault()
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))

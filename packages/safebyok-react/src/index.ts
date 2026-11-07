@@ -4,7 +4,7 @@
 export { BankProvider } from './bank-provider'
 export type { BankProviderProps } from './bank-provider'
 export { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks'
-export { useBox, useBoxes, useBoxSnapshot, useWhisper } from './hooks'
+export { useBox, useBoxes, useBoxIsShowing, useBoxSnapshot, useWhisper } from './hooks'
 export type { VaultHeld, VaultStage } from './hooks'
 export { BoxWhisperField } from './box-whisper-field'
 export type { BoxWhisperFieldProps } from './box-whisper-field'
