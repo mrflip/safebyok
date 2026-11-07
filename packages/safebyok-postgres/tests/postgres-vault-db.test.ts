@@ -202,7 +202,7 @@ describe("PostgresVaultDB's channels", () => {
     expect(vaultChannelOf('u1')).to.eq('safebyok_u1')
   })
 
-  it("refuses a user_id that is empty, holds a character outside the set, or is dots alone", () => {
+  it("refuses a user_id that fails its check", () => {
     for (const user_id of ['', 'a b', 'a/b', '..', 'caf\u{E9}', 7 as never]) {
       TH.expectSyncRefusal(() => vaultChannelOf(user_id), 'bad_option')
     }
