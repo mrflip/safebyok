@@ -289,6 +289,12 @@ twin holds a new connection; the DeviceDB and VaultDB class headers say again th
 writes only the `do*` hooks, each one atomic step (a contract for adapter authors, cut by the trim;
 the behaviour never changed). Left: mixed doc-block mood; the `!` in makeTwin, as `idbRowsOf` has.
 
+*Rework (started 2026-11-07, ahead of the G8 ruling):* the list above, plus the Coach in chat on
+Closer Look item 5: "I'm for a full read. returning the key and value together makes sense, have a
+worker do this." `doListLeases` returns each row with its scopepath; `listRawLeases` answers
+`{ scopepath, row }`; `delRawLease` takes that scopepath, checked by its interface only;
+`listLeases` stays a full read. G8 follows once ruled.
+
 ### 4b. #571's second rework (the Coach, 2026-11-07, Open Matters)
 
 * tidyGone: "by \"front-end\" I should better have said \"public interface\" -- tidyGone is one of
