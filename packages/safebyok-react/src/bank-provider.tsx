@@ -110,9 +110,10 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
     if (hosts !== null) { await hosts(gating) }
   }, [askByDialog])
 
-  // The props that make a bank anew when they change, as the last bank effect had them, and
-  // whether a change of any was warned of yet.
-  const remakers = useRef<Record<string, unknown> | null>(null)
+  // The user and the props that make a bank anew when they change, as the last bank effect had them
+  // (none past a sign-out), and whether a change of any was warned of yet. A prop the host makes
+  // anew for each user changes with the user, and is no mistake.
+  const remakers = useRef<{ user_id: string, props: Record<string, unknown> } | null>(null)
   const toldOfRemakers = useRef(false)
 
   // The bank the provider holds now, the signed-in user's, made and swept by the effect below.
@@ -122,7 +123,7 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
   const provided = held.bank !== null && held.bank.user_id === user_id ? held : NoneHeld
 
   useEffect(() => {
-    if (user_id === null) { return }
+    if (user_id === null) { remakers.current = null; return }
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
     // Once swept, the bank tells and asks no one: the handler now may be the next user's.
     const kept = { held: true }
@@ -143,9 +144,10 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
     } satisfies Record<keyof BankOpts, unknown>
     // A refused option throws from here to the nearest error boundary.
     const bank = Bank.make(bankOpts)
-    const lastRemakers = remakers.current
-    remakers.current = { logger, keyDeriver, strengthChecker, vaultDB, deviceDB }
-    const changed = lastRemakers === null ? [] : Object.keys(remakers.current).filter((ckey) => lastRemakers[ckey] !== remakers.current?.[ckey])
+    const last = remakers.current
+    const props: Record<string, unknown> = { logger, keyDeriver, strengthChecker, vaultDB, deviceDB }
+    remakers.current = { user_id, props }
+    const changed = last?.user_id === user_id ? Object.keys(props).filter((ckey) => last.props[ckey] !== props[ckey]) : []
     if (changed.length > 0 && ! toldOfRemakers.current) {
       toldOfRemakers.current = true
       bank.logger.warn(`BankProvider made its bank anew, letting its vaults go, because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and does so each time: define it once, outside the component, or memoize it.`, { call: 'BankProvider', props: changed })
