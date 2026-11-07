@@ -146,10 +146,19 @@ pattern."
   documentarian to rewrite slop"): the renamed verbs' doc blocks in `device-db-new.ts`,
   `memory-device-db.ts` and `models/lease.ts` (and the new store's) are one line of purpose; cut
   what reads the body aloud or adds a second fact. No documentarian.
-* **Ride-along: salt_b64 by string length** (the Coach: "This is not necessary. Just check the
-  string length"): thread 3 decodes `salt_b64` to cap it at 32 bytes; replace that with a string
-  length check, `min(1).max(43)` (unpadded base64url of 32 bytes is at most 43 characters), the
-  decode removed; the changeset line follows.
+* **Ride-along: salt_b64 by its characters and length** (the Coach, in the cell: "Just check the
+  string length"; then in chat: "yes validate on: max(43), only b64url characters, and the string
+  length of a 16-bit key since I think that's our minimum anyway"): read as a 16-byte minimum, so
+  `salt_b64` matches `^[A-Za-z0-9_-]{22,43}$`, the decode removed; the changeset line follows.
+* **listRawLeases** (the Coach: "I think this is why the old name for listLeases was big and
+  ugly. Add listRawLeases that will return the leases as bags; the other can use it, or not -- I
+  vote not if you want a tiebreaker."): `listRawLeases()` / `tryListRawLeases()` answer every
+  stored row as a bag, damaged ones included, reading `doListLeases` themselves; `listLeases` does
+  not go through it. A battery case. Bank unchanged.
+* **Postgres internals stay exactly as they are** (the Coach: "we don't need an exact count,
+  absolutely not worth adding a lock for. We need transactionality, but I want to take a close look
+  at the code anyway after everything is end-to-end, so leave the PG internals exactly where it is
+  now.").
 * **Ride-along (the Coach, 2026-11-07, on "Lease's stowAsStowCan reads oddly"):** "yeah you've
   talked me into having it be .cache, not .stow, or at least that one method should remain. Your
   call to have .hold, .holdFoo and cacheAsCacheCan, or .cache, .cacheFoo and cacheAsCacheCan".
