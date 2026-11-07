@@ -4,10 +4,10 @@ import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 import { isQuietRefusal } from '../lib/refusals'
 
 /** What a KnockForm is handed: how its flow fetches the API key at each knock, null where none is saved; and whether the flow can yet. */
-export type KnockFormProps = { apiKeyOf: () => Promise<string | null>, isReady: boolean }
+export type KnockFormProps = { extractApiKey: () => Promise<string | null>, isReady: boolean }
 
 /** The knock-knock half of a flow: who's there, a Knock button, and Claude's punchline, told with the key the flow hands over. */
-export const KnockForm = ({ apiKeyOf, isReady }: KnockFormProps) => {
+export const KnockForm = ({ extractApiKey, isReady }: KnockFormProps) => {
   const fieldId = useId()
   const [whosThereText, setWhosThereText] = useState('')
   const [joke, setJoke] = useState<string | null>(null)
@@ -20,7 +20,7 @@ export const KnockForm = ({ apiKeyOf, isReady }: KnockFormProps) => {
     setGripe(null)
     setIsKnocking(true)
     try {
-      const apiKey = await apiKeyOf()
+      const apiKey = await extractApiKey()
       if (apiKey === null) { setGripe('Save your Anthropic API key first.'); return }
       setJoke(await tellKnockKnockJoke(apiKey, whosThere))
     } catch (err) {

@@ -56,7 +56,7 @@ export const KnockKnockFields = () => {
 
   // What the knock reads is the whisper as saved, not an edit still in the field.
   // The vault in hand, never bank.ensureVault: a knock with no vault builds none.
-  const apiKeyOf = async (): Promise<string | null> => {
+  const extractApiKey = async (): Promise<string | null> => {
     if (vault === null) { return null }
     await vault.ensureUnlocked()
     const stored = await vault.getBox(Boxlabel, { ifAbsent: 'nil' })
@@ -88,7 +88,7 @@ export const KnockKnockFields = () => {
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm apiKeyOf={apiKeyOf} isReady={isReady} />
+      <KnockForm extractApiKey={extractApiKey} isReady={isReady} />
     </section>
   )
 }
