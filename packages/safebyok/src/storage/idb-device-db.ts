@@ -3,10 +3,10 @@
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'
-import type { VaultScope } from '../shapes/shapes-core'
+import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
-import { DeviceDBVersion } from '../helpers/consts'
+import type { BankRow, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+import { BankDBVersion, DeviceDBVersion } from '../helpers/consts'
 import { DeviceDB } from './device-db-new'
 import { versionedShelfOf } from './idb-shelf'
 import { inOneStep, rowAt } from './idb-transaction'
@@ -23,25 +23,37 @@ export interface IdbDeviceDBOpts {
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
-// == [The database]: LeaseScopepath, leaseScopepathOf, deviceShelfOf
+// == [The databases]: LeaseScopepath, BankScopepath, leaseScopepathOf, bankScopepathOf, deviceShelfOf, bankShelfOf
 
-/** Where the shelf files a vault's lease row. */
+/** Where the lease shelf files a vault's lease row. */
 type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
+/** Where the bank shelf files a bank's row. */
+type BankScopepath = [applabel: string, user_id: string]
 
 /** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
+/** The scopepath of the bank row at `scope`. */
+const bankScopepathOf = ({ applabel, user_id }: BankScope): BankScopepath => [applabel, user_id]
 
-/** The shelf of the device database of `dbName`. */
+/** The shelf of the device database of `dbName`, which holds the leases. */
 const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
 })
+
+// A database of its own, as a versioned shelf holds one object store: a second store in the device database would move its
+// version on, and every device would forget its leases.
+/** The shelf of the bank database of `dbName`, which holds the bank rows. */
+const bankShelfOf = (dbName: string): UseStore => versionedShelfOf({
+  dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
+})
 // --
 
-/** A device store that keeps this device's leases in its browser's IndexedDB. */
+/** A device store that keeps this device's leases and bank rows in its browser's IndexedDB. */
 export class IdbDeviceDB extends DeviceDB {
-  // == [Props]: #shelf
+  // == [Props]: #leaseShelf, #bankShelf
 
-  readonly #shelf: UseStore
+  readonly #leaseShelf: UseStore
+  readonly #bankShelf: UseStore
   // --
 
   // == [Construction]: constructor
@@ -49,33 +61,47 @@ export class IdbDeviceDB extends DeviceDB {
   constructor(opts: IdbDeviceDBOpts = {}) {
     const { dbName = 'safebyok' } = idbDeviceDBOpts.parse(opts, { where: "In IdbDeviceDB's options" })
     super()
-    this.#shelf = deviceShelfOf(dbName)
+    this.#leaseShelf = deviceShelfOf(dbName)
+    this.#bankShelf = bankShelfOf(dbName)
   }
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doListBanks
 
   protected async doStow(row: LeaseRow): Promise<void> {
-    await inOneStep(this.#shelf, 'readwrite', (store) => { store.put(row, leaseScopepathOf(row)) })
+    await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.put(row, leaseScopepathOf(row)) })
   }
 
   protected async doPeek(scope: VaultScope): Promise<unknown> {
-    return await inOneStep(this.#shelf, 'readonly', (store) => rowAt(store, leaseScopepathOf(scope)))
+    return await inOneStep(this.#leaseShelf, 'readonly', (store) => rowAt(store, leaseScopepathOf(scope)))
   }
 
   protected async doForget(asked: LeaseQuery): Promise<void> {
-    await inOneStep(this.#shelf, 'readwrite', async (store) => {
+    await inOneStep(this.#leaseShelf, 'readwrite', async (store) => {
       const stored = SX.leaseRow.safeParse(await rowAt(store, leaseScopepathOf(asked)))
       if (stored.success && (stored.data.vault_tok === asked.vault_tok)) { store.delete(leaseScopepathOf(asked)) }
     })
   }
 
   protected async doListLeases(): Promise<unknown[]> {
-    return await inOneStep(this.#shelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll()))
+    return await inOneStep(this.#leaseShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll()))
   }
 
   protected async doDelRawLease(scope: VaultScope): Promise<void> {
-    await inOneStep(this.#shelf, 'readwrite', (store) => { store.delete(leaseScopepathOf(scope)) })
+    await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.delete(leaseScopepathOf(scope)) })
+  }
+
+  protected async doEnsureBank(made: BankRow): Promise<unknown> {
+    return await inOneStep(this.#bankShelf, 'readwrite', async (store) => {
+      const stored = await rowAt(store, bankScopepathOf(made))
+      if (SX.bankRow.safeParse(stored).success) { return stored }
+      store.put(made, bankScopepathOf(made))
+      return made
+    })
+  }
+
+  protected async doListBanks(): Promise<unknown[]> {
+    return await inOneStep(this.#bankShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll()))
   }
   // --
 }

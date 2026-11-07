@@ -25,19 +25,23 @@ const makeDeviceDB = (dbName = freshDbName()): IdbDeviceDB => {
   return deviceDB
 }
 
-/** The backdoor to a store's lease rows, through a connection of its own to the store's database. */
+/** The backdoor to a store's lease and bank rows, through connections of its own to the store's databases. */
 const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
-  const shelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v001-001-001`, 'leases')
+  const leaseShelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v001-001-001`, 'leases')
+  const bankShelf = createStore(`${dbNameOf.get(deviceDB)!}:bank-v001-001-001`, 'bank')
   return {
-    plantLeaseRow: async ({ applabel, user_id, vaultlabel }, row) => { await inOneStep(shelf, 'readwrite', (store) => { store.put(row, [applabel, user_id, vaultlabel]) }) },
-    leaseRowsOf:   async () => await inOneStep(shelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
+    plantLeaseRow: async ({ applabel, user_id, vaultlabel }, row) => { await inOneStep(leaseShelf, 'readwrite', (store) => { store.put(row, [applabel, user_id, vaultlabel]) }) },
+    leaseRowsOf:   async () => await inOneStep(leaseShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
+    plantBankRow:  async ({ applabel, user_id }, row) => { await inOneStep(bankShelf, 'readwrite', (store) => { store.put(row, [applabel, user_id]) }) },
+    bankRowsOf:    async () => await inOneStep(bankShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
   }
 }
 
-// The store's database is opened first, so its upgrade transaction is not the one to fail.
+// The store's databases are opened first, so neither upgrade transaction is the one to fail.
 /** Makes the next transaction any store opens fail, as it does when the browser closes the database under the page. */
 const failNextCall = async (deviceDB: IdbDeviceDB): Promise<void> => {
   await deviceDB.listLeases()
+  await deviceDB.listRawBanks()
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
     throw new DOMException("The database connection is closing.", 'InvalidStateError')
   })
@@ -93,6 +97,16 @@ describe("IdbDeviceDB's database", () => {
     const dbName = freshDbName()
     await makeDeviceDB(dbName).listLeases()
     expect(await dbNamesNow()).to.include(`${dbName}:device-v001-001-001`)
+  })
+
+  it("keeps its bank rows in a database of their own, named with its version, beside the leases'", async () => {
+    const dbName = freshDbName()
+    const deviceDB = makeDeviceDB(dbName)
+    await deviceDB.stow({ ...TH.vaultScope, vault_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
+    const made = await deviceDB.ensureBank(TH.bankScope)
+    expect(await dbNamesNow()).to.include.members([`${dbName}:device-v001-001-001`, `${dbName}:bank-v001-001-001`])
+    expect(await makeDeviceDB(dbName).ensureBank(TH.bankScope)).to.deep.equal(made)
+    expect(await makeDeviceDB().ensureBank(TH.bankScope)).to.not.deep.equal(made)
   })
 
   it("refuses each call where there is no IndexedDB", async () => {

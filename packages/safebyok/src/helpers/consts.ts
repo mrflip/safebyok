@@ -28,6 +28,9 @@ export const ForeverMillis = FarFuture - FarPast
 /** The layout version in the name of the device database, `${dbName}:device-v001-001-001`. */
 export const DeviceDBVersion = '001-001-001'
 
+/** The layout version in the name of the bank database, `${dbName}:bank-v001-001-001`. */
+export const BankDBVersion = '001-001-001'
+
 /** The layout version in the name of the IndexedDB vault database, `${dbName}:vaults-v001-001-001`. */
 export const VaultsDBVersion = '001-001-001'
 
