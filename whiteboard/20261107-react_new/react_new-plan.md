@@ -13,8 +13,9 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 53; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** filed 1 (#573), 2 (#574), 3 (#577), 4 (#576), 12 (#575); 11 (#578) filing. Threads 5 and
-  13 wait on the Coach's `/restacker 573 574 576 577 575 578`.
+* **Status:** filed 1 (#573), 2 (#574), 3 (#577), 4 (#576), 12 (#575), 11 (#578). Thread 9 building from
+  main (the devicedb_idb line merged at de4943bd6). Threads 5 and 13 wait on the Coach's
+  `/restacker 573 574 576 577 575 578`, which also brings the line onto the new main.
 
 ## Read first
 
@@ -57,11 +58,11 @@ Every worker has CLAUDE.md. Beyond it, by thread:
 * **Dependencies** that `safebyok-old` used may be added without asking first. Name each one in the
   thread file and the PR. Any other runtime dependency is proposed first (PROCESS.md,
   *Dependencies*).
-* **The `devicedb_idb` line (#567 → #568 → #569 → #570) is in flight** on the core: DeviceDB verbs
-  become `stow`, `peek`, `forget`, `listLeases`, and `IdbDeviceDB` joins `safebyok/browser`. Until it
-  merges, touch no core file it changes beyond a re-export in `src/index.ts`:
-  `helpers/consts.ts`, `helpers/phrases.ts`, `refusals/errors.ts`, `shapes/*`, `storage/*`,
-  `models/bank.ts`, `models/lease.ts`, `models/vault.ts`.
+* **The `devicedb_idb` line (#567 → #570) merged** at `de4943bd6` (*Orchestrator:* 2026-11-07, after
+  threads 1 to 4 were cut). DeviceDB verbs are now `stow`, `peek`, `forget`, `listLeases` and
+  `listRawLeases`. `IdbDeviceDB` / `idbDeviceDB` are in `safebyok/browser`. Threads cut before the
+  merge reach it at the Coach's restack. Core files are no longer off limits beyond the sprint's own
+  rule: the smallest additive change a thread needs.
 * **The demo's storage until thread 10:**
   * `idbVaultDB` from `safebyok-indexeddb`, which is on the new core on main;
   * `MemoryDeviceDB`, so every reload asks for the passphrase;
@@ -360,8 +361,8 @@ More detail:
   PR. Link it; don't restate it.
 * *Touches:* `packages/safebyok/src/browser.ts`, a new checker module, `package.json`, README,
   CUSTOMIZATION.md, `.size-limit.json`.
-* *Depends on:* the `devicedb_idb` line (#567 → #568 → #569 → #570) on main. Cut from main once it
-  has merged. *Size:* medium.
+* *Depends on:* the `devicedb_idb` line, merged at `de4943bd6`. *Orchestrator:* cut from main there.
+  *Size:* medium.
 
 ### 10. demo_browser
 
@@ -454,8 +455,6 @@ shows it beside the other two.
 * **Run `/restacker 573 574 576 577 575 578`** (line `main → #573 → #574 → #576 → #577 → #575 →
   #578`). Threads 5 and 13 wait on it; the skill refuses agents from the base checkout.
 
-* Threads 9 and 10 wait on the `devicedb_idb` line (`main → #567 → #568 → #569 → #570`) merging,
-  which waits on your restack. The other threads don't.
 * The base checkout's `whiteboard/20261107-react_new/` holds my pre-sprint drafts (`plan.md`,
   `regressions.md`). This directory's copies (`design.md`, `regressions.md`) are current. I haven't
   touched the base checkout's.
