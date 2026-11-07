@@ -139,7 +139,7 @@ shows a change only once it has landed.
   It shouts: a refused scan is bad news, and a lock whose erase is refused panics
 * The device caches only leases and the device record, not vault or box records, and no refresh timer runs
 * The goal: when lock is called, nothing crosses it. We get there with simple code that can be analyzed in context, so a
-  crossing is raised in one sentence (`reference-timings.md`), not fine-tuned
+  crossing is raised in one sentence (`whiteboard/20261102-newdesign/reference-timings.md`), not fine-tuned
 * A box birth: `vault.putBox` with no box listed makes the record over the sentinel prior, seals it, puts (`born` or
   `reborn`), and the answer is delivered. A sidecar-only `send` unseals and reseals, as the box stamp binds the sidecar
 * A cached lease is never shrugged off when it clearly must not stand. Where a user proving authority and intent to
@@ -338,7 +338,7 @@ run returns → gating settles ok → ensureUnlocked resolves
 A gate is the one thing about a vault record that changes, so a change has a vaultDB verb of its own, named for what
 it does: `replacePassphrase`, `addPasskey` or `revokePasskey`. No client-side next gate exists: a `Gate` is a read-only
 view of a record's gate, and adopt makes a new one from each record. Each verb lets the
-vaultDB check more (`newdesign-vaultdb.md`, VG1 to VG3). Each change ends the same way, and needs nothing the vault
+vaultDB check more (`notes/design-vaultdb.md`, VG1 to VG3). Each change ends the same way, and needs nothing the vault
 does not already carry:
 
 ```text
@@ -511,7 +511,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (
 
 Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
 
-* **The gating family:** `ProveForGatingkind`, its kind-keyed type maps and the casts they force, and `#settled`, `#outcome` and their flags. "same family of design smells around gating". See `unrace-gating-prompt.md`.
+* **The gating family:** `ProveForGatingkind`, its kind-keyed type maps and the casts they force, and `#settled`, `#outcome` and their flags. "same family of design smells around gating". See `whiteboard/20261102-newdesign/unrace-gating-prompt.md`.
 * **The cache and the erase on one control path:** `lease.tryCache()` before the settle, the erase before the first await. "that sounds dangerous".
 * **Clears:** `spendClears` and `checkedClears` reach into the host's objects, and who owns a passkey answer's PRF bytes is open. "I assumed that the buffer exhaustion was best practice".
 * **`heldLease.isForgotten`:** a lease object acting as the test that a lock crossed a gate change. Wants a later investigation.
