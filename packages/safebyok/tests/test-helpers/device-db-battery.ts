@@ -58,7 +58,7 @@ const notGiven = (hookname: string) => (): never => { throw new TypeError(`The s
 export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opts: DeviceDBBatteryOpts<DBT>): void => {
   batteryOpts.parse(opts, { where: `describeDeviceDBBattery("${label}")` })
   const { makeDeviceDB, _cheat_rowsOf, _cheat_failNextCall } = opts
-  const fresh = async (): Promise<DBT> => await makeDeviceDB()
+  const fresh = async (): Promise<DBT> => makeDeviceDB()
   const rowsOf = _cheat_rowsOf ?? notGiven('_cheat_rowsOf')
   const failNextCall = _cheat_failNextCall ?? notGiven('_cheat_failNextCall')
   const noRows = _cheat_rowsOf === undefined
