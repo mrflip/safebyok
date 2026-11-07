@@ -1,6 +1,6 @@
 # Thread 3: react_dialogs (2026-11-07)
 
-Branch `20261107-react_dialogs`, PR #N, stacked on #574. Justify: green -- safebyok-react 12 files,
+Branch `20261107-react_dialogs`, PR #577, stacked on #574. Justify: green -- safebyok-react 12 files,
 111 tests; the demo 9 files, 44 tests; every other package as before; size budgets within.
 
 * **Built**
