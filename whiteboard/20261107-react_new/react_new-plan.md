@@ -8,7 +8,12 @@
   [design.md](design.md).
 * **Sprint worktree:** `../byok-react_new`, branch `20261107-react_new`, from `origin/main` at
   `495cc5d6e` (the vaultdb line merged).
-* **Status:** planned; thread 1 starting.
+* **Sprint PR:** #572 (draft).
+* **Sprint doc:** https://claude.ai/artifact/UN5fpxiLeEaLHjpFgBiHg9 (doc
+  dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
+  matters table mnx96vk4741.393, bookmark rev 2; Cleanup body 6cb5c40d-1cc7; Progress body
+  4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
+* **Status:** thread 1 building.
 
 ## Read first
 
