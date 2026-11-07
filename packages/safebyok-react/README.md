@@ -78,14 +78,20 @@ make a `vaultDB`, a `deviceDB`, a `keyDeriver`, a `strengthChecker` or a `logger
 the component (or memoize it): one written in the props is a new one at every render, and makes
 the bank anew each time, ending any dialog.
 
-A handler is the exception: `onBadNews` and `requestCleartext` make no new bank as they change, so
-they may be written inline. The bank calls whichever the last render passed:
+A handler is the exception: `onBadNews`, `onPanic` and `requestCleartext` make no new bank as they
+change, so they may be written inline. The bank calls whichever the last render passed:
 
 ```tsx
 <BankProvider {...opts} user_id={user_id} onBadNews={(news) => { telemetry.report(news.refusalkind) }}>
   <App />
 </BankProvider>
 ```
+
+Only giving a handler, or dropping it, makes a new bank, since the core acts on whether the host
+has one: with no `onPanic`, a vault whose lease survived its erase is vacated. A handler that is no
+function is thrown to your boundary as `bad_option`. A `vaultDB`, `deviceDB`, `keyDeriver`,
+`strengthChecker` or `logger` that changes identity between renders is warned of once, through the
+bank's logger.
 
 The provider owns the bank it makes. A bank serves one user: a new user or a sign-out sweeps the
 bank, and the next user gets a bank of their own. The provider makes its bank in an effect, so
