@@ -313,19 +313,19 @@ added or folded into through the subagent, and no other entry changes.
   (4) `vaultRecordHeldBy(vault)` (reading through the Symbol-keyed `vault[provingTools]`; amended 2026-10-27 (proving_tidy), it read through a private `toolsOf` WeakMap lookup) is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
   record a Vault object holds, gate and wrapped vaultKeys included. No entry point exports it and nothing in `src/` calls it.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
-  `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
+  `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every read (amended 2026-11-07 (graphql_schema): a browser's `GraphQLVaultDB` checks what a server sends with the core's answer checkers instead).**
   (1) `doGetVault` and `doEnsureVault` hand up the vault record exactly as stored and the box rows split by the exported `splitStoredBoxes`, so an
   adapter adds one line and never judges (amended 2026-10-27 (tidy): `StoredVault.vault` (amended 2026-10-28 (db_hooks): named `VaultReadResponse` when this was written) is typed `unknown`, as `StoredBox.box` is, so an
   adapter hands rows up uncast; the base class checks them as before). A box whose record fails its strict check, or names another boxlabel than the row it is filed under, is a
   `BoxDamaged` `{ boxlabel, revision_tok, damage }`, listed apart from the sound boxes and never among them. `damage` is `newer_format` for a record
   naming a `format` this version neither writes nor wrote before, `damaged` otherwise. Nothing else of a damaged record is kept or shown (its revision
   only when it holds one as text).
-  (2) The base class checks every read again, including what a server relays to a browser (GraphQL, a Postgres route). Each sound box is judged again
+  (2) The base class checks every read again, for a store that runs in the same process (amended 2026-11-07 (graphql_schema): it no longer covers what a server sends to a browser; the browser's `GraphQLVaultDB` checks every answer with the core's strict answer checkers, `AX`, from `safebyok/storage`, and fails as `unexpected_error` on anything out of step). Each sound box is judged again
   exactly as the split judges a row; one that fails is listed damaged under its own boxlabel. A server's word that a box is damaged is taken, but
-  each damaged entry is parsed strictly (boxlabel a label, `damage` one of the two values, revision a non-empty string or null, no other field), and an
+  each damaged entry is parsed strictly (boxlabel a label (amended 2026-11-07 (graphql_schema): the answer checkers' `damagedVault` and `damagedBox` accept any string label, so a row listed under a label that fails the label check is still carried), `damage` one of the two values, revision a non-empty string or null, no other field), and an
   entry that fails refuses the whole read as `corrupt_record`. The worst a lying server does with that word is offer the user to delete or overwrite a
   box it could delete or overwrite anyway. The vault record is still refused `damaged_vault` when it names another scope than asked.
-  (3) The GraphQL browser adapter rebuilds each relayed record from its own fields, dropping GraphQL's `__typename`, before the strict parse.
+  (3) The GraphQL browser adapter drops GraphQL's `__typename` before the strict parse (amended 2026-11-07 (graphql_schema): by explicit paths only, the selection's own and the typed fields each selection names (gate, wayins, ciphered fields, listing rows, `req_params.prior`, `err`), never inside a box's sidecar, a damaged row or a refusal's meta, which are carried whole as JSON; it then parses with the core's answer checkers; it used to rebuild each relayed record from its own fields).
   (4) Names: a stale vault-record update's refusal now carries what is stored as `meta.vault_stored` (was `meta.vault_props_stored`), and `putVaultProps` is
   `putVaultRecord`; older entries that use the old names refer to these.
 * 2026-10-26 (thread cipher_ctx, branch `20261026-cipher_ctx`): **every ctx is now `cipherCtx(stamp, purpose, header)`: it binds the
@@ -2858,7 +2858,15 @@ added or folded into through the subagent, and no other entry changes.
   fields) in its document cache, though every vault query is `network-only` and never answered
   from it. A subscription's user is fixed when it starts (over a websocket, when the connection
   opened), so a session revoked meanwhile keeps hearing the vault's scope -- never a record --
-  until the subscription ends.
+  until the subscription ends. (amended 2026-11-07 (graphql_schema): `GraphQLVaultDB`'s watch no longer resubscribes when its stream ends, so a
+  subscription is never reopened under a user fixed at an earlier start. A stream ending by a closing result or an error is reported once as a
+  VaultError through the optional third parameter of `VaultDBVerbs.watch`, `onBadNews`, which the core's listings route to the bank's bad-news
+  channel (the host's `onBadNews`, else `logger.warn`); an `identity_revoked` notice ends the watch quietly, as before. The reported error carries
+  no server text: a GraphQL error is `unexpected_error` with no cause, a network error is the sanitized cause of the 2026-10-17 GraphQL entry
+  below, a closing result is `storage_unavailable` with the fixed phrase `WatchEnded` and meta `{ call: 'watch' }`. `tidyGone` and `tryTidyGone`
+  are now verbs of the public `VaultDBVerbs` and cross as the mutation `safebyokTidyGone(applabel, user_id)`, served behind the same `user_id` gate
+  as every other operation (`served(context, scope.user_id, ...)`): refused `identity_revoked`, without calling the vaultDB, unless it is the
+  signed-in user's bank.)
 * 2026-10-15: **a second implementation behind one label.** `safebyok-fastkey` runs Argon2id
   through `hash-wasm` (4.12.0, MIT, no dependencies; its Argon2 is C written for it after Go's
   `x/crypto/argon2`, compiled to WebAssembly and embedded in its JavaScript; widely used, but
@@ -2926,7 +2934,8 @@ added or folded into through the subagent, and no other entry changes.
   mind. **Sizes**: with names unbounded, the static 2 KiB allowance no longer bounds a
   box's other fields. It stays only as `Vault.make`'s plan for `maxBoxes` at the default
   checks; `putBox` now weighs each box with its scope as the UTF-8 bytes of its JSON and
-  refuses one over the adapter's `maxRecordBytes` (`box_too_large`), and each `putBox()`
+  refuses one over the adapter's `maxRecordBytes` (`box_too_large`) (amended 2026-11-07 (graphql_schema): `GraphQLVaultDB` takes no `maxRecordBytes`, its options being `{ client }` alone (one given is refused
+  `bad_option`); the record-size limit is the server's hosted vaultDB's, which holds and enforces it, and no field on the wire lets a browser raise it), and each `putBox()`
   refuses a box heavier than the one it replaces when the vault, each box counted at twice
   `maxWhisperBytes`, 512 bytes for its fixed-size fields and its measured names and sidecar, would
   pass `maxVaultBytes` (`vault_full`). The vault's total is reckoned from the snapshot's listing,
@@ -3670,7 +3679,11 @@ added or folded into through the subagent, and no other entry changes.
   (amended 2026-10-19: except a VaultError of kind `not_permitted` or `identity_revoked`, which crosses as it is)
   with a generic "the server's setup is wrong" message; its own message, which may name the host's
   setup or the env var names of secrets, is kept only server-side, as the non-enumerable `cause`
-  of the GraphQL error.
+  of the GraphQL error. (amended 2026-11-07 (graphql_schema): a failed request, urql's network error, refuses `storage_unavailable` with a
+  fresh Error as `cause` holding only the thrown error's name (`thrownName`), the HTTP status and a code such as `ECONNREFUSED`, kept only when a
+  word of capitals (`/^[A-Z][A-Z0-9_]{0,39}$/`): never urql's `CombinedError`, the network error's message or a response body, since urql makes a
+  non-JSON body or a `statusText` into that message and a body may quote the record sent (`networkTroubleOf`, `statusOf`, `codeOf`,
+  `graphql-vault-db.ts`). A GraphQL error stays `unexpected_error` with no cause.)
 * 2026-10-17 (thread 5b, store_base, G247): **the Convex component checks vault props update's
   `vault_id` and epoch.** The component's `putVaultProps` (`safebyok-convex/src/component/vaults.ts`)
   writes only when the new vault props keep the stored `vault_id` and its `unlock_epoch` is greater

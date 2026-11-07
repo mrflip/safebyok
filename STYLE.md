@@ -54,6 +54,7 @@ is a bug.
   | `SX`  | `src/shapes/shapes-storage.ts`                  |
   | `UX`  | `src/shapes/shapes-utils.ts`                    |
   | `GX`  | `src/shapes/shapes-gateish.ts`                  |
+  | `AX`  | `src/shapes/shapes-answers.ts`                  |
   | `VX`  | `src/shapes/shapes-vaultish.ts`                 |
   | `KX`  | `src/deriver/shapes.ts`                         |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
@@ -624,13 +625,14 @@ the scope.
   (`requestCleartext`, the key deriver, the strength checker, `onPanic`, ...) is wrapped at `Bank`'s
   constructor into a checked, branded thing that checks what the function answers (*Validation*).
   Past it nothing calls the bare function; a parameter takes the branded thing.
-* **A browser checks what a server relays.** A server is not trusted, so a browser checks each
+* **A browser checks what a server sends.** A server is not trusted, so a browser checks each
   record it is sent that it will use. A server's word that a record is damaged it may take: the
   worst a lying server does with that is offer to delete what it could delete anyway. It still
   parses the word itself (a damaged box's label, its kind of damage, its token).
-* **A wire sharpens an interface.** A VaultDB's half has the shape its GraphQL relay carries, so a
-  browser's adapter passes the server's answer through. Where the two would differ, change the
-  VaultDB.
+* **A wire sharpens an interface.** A store's client implements the same `VaultDBVerbs` as the
+  store, and each GraphQL operation answers what its verb's `try*` form answers, so a browser's
+  adapter checks the server's answer with the core's answer checks and hands it on. Where the two
+  would differ, change the VaultDB.
 
 ## Crossings, spreading and logging
 
