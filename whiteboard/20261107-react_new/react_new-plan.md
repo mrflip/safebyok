@@ -471,6 +471,8 @@ shows it beside the other two.
   * A TODO.md entry: a void vault in place of the create dialog (an unborn vault starts as a
     tombstone, as boxes do, so `bank.ensureVault` never opens a dialog by itself), a thread of its
     own after this sprint.
+  * The add-passkey dialog refuses an empty passphrase before it makes the passkey, so a slip
+    leaves no unused passkey behind (sent to the worker as a directive mid-build).
 * *Touches:* `passkey.ts`, `passkey-unlock-button.tsx`, `bank-provider.tsx`, their tests, VOCABULARY.md,
   the changeset, TODO.md.
 * *Depends on:* *Orchestrator:* nothing unmerged: 11 and 12 are on main. Cut from `origin/main`.

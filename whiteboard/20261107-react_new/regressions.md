@@ -37,3 +37,19 @@ likely as delete-and-rebuild behind a warning.
 
 A host sees: a user who forgot the passphrase, with no passkey, deletes the vault (Delete account)
 and starts again.
+
+## Autolock runs on a one-minute timer
+
+The core sets no timers, so `BankProvider` calls `bank.autolock()` every minute. *Orchestrator:* the
+Coach (2026-11-07): autolock is meant to work on the scale of weeks, and a timer is not the right
+solution; left as it is for now.
+
+A host sees: nothing different today; the mechanism is expected to change.
+
+## No "Replace fingerprint"
+
+The core refuses to add a passkey while the vault holds one, so the demo offers Add or Remove, never
+Replace; the old demo had Replace. *Orchestrator:* accepted (the Coach, 2026-11-07): Replace is
+Remove then Add.
+
+A host sees: a user who wants a new passkey removes the old one first.
