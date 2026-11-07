@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { PasskeySaltBytes, PrfAnswerBytes, VaultError, type WayinHeader } from 'safebyok'
 import { fromB64 } from 'safebyok/utils'
 import { Messages } from '../src/messages'
@@ -127,6 +127,17 @@ describe("askPasskey", () => {
     const [held, absent] = [headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''), headerOf('AAAAAAAAAAAAAAAAAAAAAA', made?.prf_salt_b64 ?? '')]
     expect(await askPasskey(held)).to.be.null
     expect(await askPasskey(absent)).to.be.null
+  })
+
+  it("refuses an answer from a passkey it did not offer, zeroing that answer", async () => {
+    TH.installFakeAuthenticator()
+    const made = await createPasskey(TH.PasskeyMaking)
+    const answer = crypto.getRandomValues(new Uint8Array(PrfAnswerBytes))
+    const otherCredential = { type: 'public-key', rawId: new Uint8Array(16).buffer, getClientExtensionResults: () => ({ prf: { results: { first: answer } } }) }
+    vi.spyOn(navigator.credentials, 'get').mockResolvedValue(otherCredential as unknown as Credential)
+    const asking = askPasskey(headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''))
+    expect(await refusalOf(asking)).to.include({ refusalkind: 'wrong_passkey' })
+    expect(answer.every((byte) => byte === 0)).to.be.true
   })
 
   it("refuses, in words a dialog shows, in a browser without WebAuthn", async () => {

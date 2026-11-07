@@ -104,9 +104,11 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, opts: AskPas
   }))
   if (asked === null) { return null }
   const answer = asked.getClientExtensionResults().prf?.results?.first
+  if (answer === undefined) { throw noPrf() }
+  const passkeyClear = answerOf(credential_id, saltBytes, answer)
   // A browser answers only for the credential it was offered; one that does not has nothing to unlock.
-  if (answer === undefined || toB64(new Uint8Array(asked.rawId)) !== credential_id) { throw noPrf() }
-  return answerOf(credential_id, saltBytes, answer)
+  if (toB64(new Uint8Array(asked.rawId)) !== credential_id) { passkeyClear.prfBytes.fill(0); throw noPrf() }
+  return passkeyClear
 }
 
 /** Hand `passkey` to `attempt`, then zero its bytes whatever the attempt did: a dialog hands each answer in once, and keeps no copy that opens the vault. */
