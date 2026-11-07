@@ -2,13 +2,13 @@
 
 // fake-indexeddb installs IndexedDB's globals before the adapter loads: real transactions and structured clone, with no browser.
 import 'fake-indexeddb/auto'
-import { promisifyRequest } from 'idb-keyval'
+import { createStore, promisifyRequest } from 'idb-keyval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as TH from 'safebyok/testing'
 import * as DB from 'safebyok/storage'
 import { IdbVaultDB, idbVaultDB } from '../src/idb-vault-db'
 import type { IdbVaultDBOpts } from '../src/idb-vault-db'
-import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultScopepathOf } from '../src/shelf'
+import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, vaultScopepathOf } from '../src/shelf'
 
 // == [World]: makeVaultDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
 
@@ -28,7 +28,7 @@ const makeTwin = (vaultDB: IdbVaultDB): IdbVaultDB => new IdbVaultDB({ dbName: d
 
 /** The backdoor to a store's rows, through a connection of its own to the store's database. */
 const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
-  const shelf = shelfOf(dbNameOf.get(vaultDB)!)
+  const shelf = createStore(`${dbNameOf.get(vaultDB)!}:vaults-v${DB.VaultsDBVersion}`, 'rows')
   return {
     plantVaultRow: async (scope, row) => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, vaultScopepathOf(scope)) }) },
     plantBoxRow:   async (scope, vault_tok, row) => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, boxScopepathOf({ ...scope, vault_tok })) }) },
