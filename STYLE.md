@@ -54,6 +54,7 @@ is a bug.
   | `SX`  | `src/shapes/shapes-storage.ts`                  |
   | `UX`  | `src/shapes/shapes-utils.ts`                    |
   | `GX`  | `src/shapes/shapes-gateish.ts`                  |
+  | `AX`  | `src/shapes/shapes-answers.ts`                  |
   | `VX`  | `src/shapes/shapes-vaultish.ts`                 |
   | `KX`  | `src/deriver/shapes.ts`                         |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
