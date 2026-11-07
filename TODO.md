@@ -389,6 +389,16 @@ anything: the host must load the vault again. The design question: who notices a
 instance of the old life is let go, its listeners told, and the listing rebuilt under the new
 `vault_tok`, with its device cache cleared.
 
+### An extended key structure for the deviceDB
+
+The Coach (2026-11-07, on the devicedb_verbs thread): "I've got concerns about the key structure
+(or I can put it more cheerfully: I believe that an extended key structure can ameliorate some
+problems) but I'll leave that for later". Today a lease row is keyed by its scope (applabel,
+user id, vaultlabel) alone, and its `vault_tok` is a field checked against the query: `peek`
+checks it in the base, and `forget` leaves the check to the store, one atomic step with its
+delete. A key that also held the `vault_tok` would make `forget` a delete at a key, with no check
+to run. The design question: which fields the key holds, and what it ameliorates beyond that.
+
 ## Potential Optimizations
 
 ### A storage read begun before a create can undo it
