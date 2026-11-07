@@ -10,7 +10,7 @@ import { objCheck } from '../helpers/validator'
 export interface VersionedShelfSpec {
   /** The host's `dbName`, which every database of the bank begins with. */
   dbName:    string
-  /** The kind of database, `device` or `vaults`: the part of the name before `-v` and the version. */
+  /** The kind of database, `device`, `bank` or `vaults`: the part of the name before `-v` and the version. */
   dbstem:    string
   /** The layout version, three zero-padded parts (`001-001-001`), so that a name sorts as its version does. */
   version:   string

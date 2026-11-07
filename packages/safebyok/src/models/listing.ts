@@ -3,7 +3,7 @@
 import { verifyConsistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { VaultError, isVaultError } from '../refusals/errors'
-import type { GoodAnswer, Notice as VaultDBNotice, VaultDBVerbs } from '../storage/vault-db-new'
+import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db'
 import type { IfAbsent, LockState } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
@@ -22,7 +22,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
   readonly maxMillisSinceRefresh: number
-  protected readonly vaultDB: VaultDBVerbs
+  protected readonly vaultDB: VaultDB
 
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()

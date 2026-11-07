@@ -3,17 +3,17 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven,
-  RowOfVault, Tidied, VaultDBOpts, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope,
+  AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven,
+  RowOfVault, Tidied, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope,
 } from 'safebyok/storage'
 import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './shelf'
 
 // == [Options]: IdbVaultDBOpts, idbVaultDBOpts
 
-/** What an IdbVaultDB is made with: the VaultDB's options, and `dbName` ('safebyok' if left out). */
-export type IdbVaultDBOpts = VaultDBOpts & { dbName?: string | undefined }
+/** What an IdbVaultDB is made with: the AdapterVaultDB's options, and `dbName` ('safebyok' if left out). */
+export type IdbVaultDBOpts = AdapterVaultDBOpts & { dbName?: string | undefined }
 
-const idbVaultDBOpts = DB.objCheck(({ str }) => ({ ...DB.vaultDBOpts.shape, dbName: str.min(1).optional() }), 'bad_option')
+const idbVaultDBOpts = DB.objCheck(({ str }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional() }), 'bad_option')
 // --
 
 // == [Helpers]: Rung, isPutAllowed, isHeardBy
@@ -33,7 +33,7 @@ const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
 // --
 
 /** A vaultDB in this browser's IndexedDB, whose watch hears every tab's writes. */
-export class IdbVaultDB extends DB.VaultDB {
+export class IdbVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #shelf, #bellname
 
   readonly #shelf: UseStore
@@ -43,14 +43,14 @@ export class IdbVaultDB extends DB.VaultDB {
   // == [Construction]: constructor
 
   constructor(opts: IdbVaultDBOpts = {}) {
-    const { dbName = 'safebyok', ...vaultDBOpts } = idbVaultDBOpts.parse(opts, { where: "In IdbVaultDB's options" })
-    super(vaultDBOpts)
+    const { dbName = 'safebyok', ...adapterVaultDBOpts } = idbVaultDBOpts.parse(opts, { where: "In IdbVaultDB's options" })
+    super(adapterVaultDBOpts)
     this.#shelf = shelfOf(dbName)
     this.#bellname = `safebyok-indexeddb:${dbName}`
   }
   // --
 
-  // == [Protected, the generic calls of VaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
     const filed = await DB.inOneStep(this.#shelf, 'readonly', (store) => filedIn(store, vaultsRangeOf(scope)))

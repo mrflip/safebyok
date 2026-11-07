@@ -28,6 +28,9 @@ export const ForeverMillis = FarFuture - FarPast
 /** The layout version in the name of the device database, `${dbName}:device-v001-001-001`. */
 export const DeviceDBVersion = '001-001-001'
 
+/** The layout version in the name of the bank database, `${dbName}:bank-v001-001-001`. */
+export const BankDBVersion = '001-001-001'
+
 /** The layout version in the name of the IndexedDB vault database, `${dbName}:vaults-v001-001-001`. */
 export const VaultsDBVersion = '001-001-001'
 
@@ -90,6 +93,13 @@ export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
 
 /** True for a VaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsVaultDB}. */
 export const isVaultDB = (val: unknown): val is { [IsVaultDB]: true } => answersTrueTo(val, IsVaultDB)
+
+// `Symbol.for`, for the same reason as IsVaultDB.
+/** The tag an AdapterVaultDB answers true to, and no client of one, as a GraphQLVaultDB is. */
+export const IsAdapterVaultDB: unique symbol = Symbol.for('@safebyok/adaptervaultdb')
+
+/** True for an AdapterVaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsAdapterVaultDB}. */
+export const isAdapterVaultDB = (val: unknown): val is { [IsAdapterVaultDB]: true } => answersTrueTo(val, IsAdapterVaultDB)
 
 // `Symbol.for`, for the same reason as IsVaultDB.
 /** The tag a DeviceDB answers true to, so a model can tell one from a duck. */

@@ -77,6 +77,14 @@ describe("GraphQLVaultDB's constructor", () => {
   })
 })
 
+describe("GraphQLVaultDB's brands", () => {
+  it("is a VaultDB, as a bank takes one, and no AdapterVaultDB, as a server's resolvers take one", () => {
+    const vaultDB = new GraphQLVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
+    expect(DB.isVaultDB(vaultDB)).to.be.true
+    expect(DB.isAdapterVaultDB(vaultDB)).to.be.false
+  })
+})
+
 describe("GraphQLVaultDB's answers off the wire", () => {
   it("refuses a GraphQL error with no cause", async () => {
     const combined = new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')] })
