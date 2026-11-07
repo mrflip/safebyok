@@ -68,6 +68,12 @@ a key holding the `vault_tok`, so `forget` is a delete at a key) is for later, a
 
 ### 1. devicedb_verbs
 
+*Review:* fixed (medium): three test fixes (a `fresh` helper, ten one-clause titles, a leftover
+`scan` spy name). Left minor: a damaged lease row outlives a vacate (→ thread 2, Open Matters);
+doc blocks of the renamed verbs (→ a documentarian row); the `tellBadNews` doc's "cache put";
+older two-outcome lease test titles; guarantees prose; `stowAsStowCan` (Open Matters); the
+battery exporting `notGiven`.
+
 *The Coach's text:* "change mash, as described. change the verbs to stow, peek, forget,
 listLeases; implement listleases as described." and item 4 of the quote above.
 
@@ -130,6 +136,12 @@ pattern."
   imports them through `safebyok/storage` and keeps only its scopepaths and ranges). `troubleOf`'s
   sentences name the store they speak for (vault or device). Check the current `idb-keyval`
   release before pinning (PROCESS.md, *Dependencies*).
+* **A damaged lease row outlives a vacate** (#567 review; Open Matters, TOP, the orchestrator's
+  Rec pending): `forget` deletes only a row that passes its check, and `listLeases` leaves damaged
+  rows out, so a damaged row with a live `lease_key` survives an `identity_revoked` vacate
+  (against G4). Unless the Coach rules otherwise, fix it in the base: `forget` also erases a row at
+  its scope that fails its check, the Bank's sweep reaches damaged rows too, and the battery gains
+  a case, so both stores inherit it.
 * Tests: the thread 1 battery over `fake-indexeddb` (a core devDependency), first checking a
   `CryptoKey` survives its structured clone; the wipe; a size-limit line for `idbDeviceDB`.
 * `notes/guarantees.md`: the IndexedDB bullet's "The core ships no IndexedDB DeviceDB" goes.
