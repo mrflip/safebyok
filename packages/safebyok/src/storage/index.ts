@@ -8,6 +8,7 @@ export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, Ro
 export { VaultDBVerbnames } from './vault-db-new'
 export { IsVaultDB } from '../helpers/consts'
 export { DeviceDB } from './device-db-new'
+export { brandedDeviceDB } from '../shapes/shapes-vaultish'
 export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
 export type { Awaitable } from '../helpers/helpers'
@@ -43,8 +44,8 @@ export type { Capacity, DelOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOp
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'
-export { leaseQuery, leaseDated, leaseRow } from '../shapes/shapes-storage'
-export type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+export { leaseQuery, leaseDated, leaseRow, bankRow } from '../shapes/shapes-storage'
+export type { BankRow, LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 // --
 
 // == [Answers off a wire]: the checks a client of a vaultDB parses each answer with, an absent field arriving as null

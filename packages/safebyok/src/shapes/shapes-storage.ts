@@ -304,7 +304,7 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow
+// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, bankRow, BankRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
 export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis }) => {
@@ -316,4 +316,9 @@ export type LeaseQuery   = Z.infer<typeof leaseQuery>
 /** A stowed lease as the deviceDB dates it: its query and its `proved_at`. */
 export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
+
+/** The bank row: the `device_id` this device goes by in one bank scope. */
+export const bankRow = objCheck(({ applabel, user_id, device_id }) => ({ applabel, user_id, device_id }), 'bad_record', [CX])
+
+export type BankRow      = Z.infer<typeof bankRow>
 // --
