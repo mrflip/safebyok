@@ -6,7 +6,7 @@
 * **Issued by:** the Coach (flip), in the vaultdb_cleanup session, after the vaultdb line merged
   (#565 at 495cc5d6e). Orchestrated from that session, which keeps this sprint's doc.
 * **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; bookmark rev 2).
-* **Status:** thread 1 in review (#567); then thread 3, thread 2, thread 4, each stacked on the last.
+* **Status:** threads 1 (#567) and 3 (#568) filed; thread 2 building; thread 4 waits on it.
 
 ## The Coach's request, verbatim
 
@@ -186,7 +186,10 @@ there imports it; PROCESS.md's peers line. The restack is merged, so it is cut n
 consensus of 2026-11-06 and the 2026-11-07 rulings: relay retired, "This is good, go for it";
 "graphql should expose exactly (and pretty much only) the front-end verbs that VaultDB does,
 including those three" (replacePassphrase, addPasskey, revokePasskey); a stream revoked mid-way
-ends with identity_revoked.
+ends with identity_revoked. Later the same day, on "One userIdOf blip silences a signed-in
+device" (old sprint doc): "We should make public that the host must vacate a bank on any user_id
+change. -- we are not responsible for that, and it will never update on any object." So the core
+and GraphQL READMEs say so, and the rewritten client resubscribes after a stream ends.
 
 *Gloss.* Rewrite safebyok-graphql once: a typed schema mirroring the try* answers (err a field,
 never a GraphQL error; EpochMillis; damaged_rows as JSON; live/tombstone union; a drift test); the
