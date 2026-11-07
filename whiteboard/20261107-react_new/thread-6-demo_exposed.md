@@ -1,6 +1,6 @@
 # Thread 6: demo, exposed whisper (2026-11-07)
 
-Branch `20261107-demo_exposed`, PR to follow below, stacked on [#587](https://github.com/mrflip/safebyok/pull/587). Justify: green; the demo 78 passed (13 new), every other package unchanged.
+Branch `20261107-demo_exposed`, PR [#588](https://github.com/mrflip/safebyok/pull/588), stacked on [#587](https://github.com/mrflip/safebyok/pull/587). Justify: green; the demo 78 passed (13 new), every other package unchanged.
 
 * **Built**:
   * **`KnockKnockExposed`** (`demos/safebyok-demo-react/src/components/KnockKnockExposed.tsx`), flow 2: `useBox('main', 'anthropic_api_key')` + `useWhisper(box)`, a controlled password input of `apiKey` (a string, else `''`). Typing is `box.patchWhisper({ apiKey })`, *Save* is `box.putExposed()`, *Done* is `box.unexpose()` through `perform` (clears "Saved."), and an effect's cleanup runs `box.unexpose()` at unmount. *Add key*/*Edit key* exposes from a click only. The field is disabled while the box does not show.
@@ -16,3 +16,8 @@ Branch `20261107-demo_exposed`, PR to follow below, stacked on [#587](https://gi
   * A StrictMode simulated unmount at first mount cannot hide a key: exposure only happens from a click after mount.
   * `useWhisper` returns an index-signature object (`noPropertyAccessFromIndexSignature`), so the component destructures `{ apiKey }`.
 * **For the Coach**: see the proposals in the PR's open questions.
+
+## Open matters
+
+* **`useExposedWhisper(box)` in safebyok-react**: recommend a thread after the sprint; `useBoxIsShowing` first as the small step.
+* **Holder count for exposure**: accepted as is; recommend leave.
