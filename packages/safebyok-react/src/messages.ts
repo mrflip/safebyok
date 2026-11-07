@@ -69,6 +69,11 @@ export const Messages = {
   // The whisper field
   showWhisper:       'Show',
   hideWhisper:       'Hide',
+
+  // The vault's lock control, for an account menu
+  vaultLocked:       'Vault locked',
+  vaultUnlocked:     'Vault unlocked',
+  lockButton:        'Lock',
 } as const
 
 /** What each kind of gating's dialog was doing, as `Messages.troubleWord` says it could not. */

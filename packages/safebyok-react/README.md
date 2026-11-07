@@ -40,6 +40,13 @@ otherwise write itself.
 * `WhisperField` -- the field a user types or pastes a whisper into, hidden as they type, with a
   Show / Hide button; password managers and autofill are turned away (*Entering a whisper*,
   below).
+* `useBoxes(vaultlabel)`, `useBox(vaultlabel, boxlabel)`, `useBoxSnapshot(box)` and
+  `useWhisper(box)` -- the boxes a vault lists, one Box, its live snapshot, and the whisper it
+  shows (*A vault's boxes*, below).
+* `BoxWhisperField` -- a field bound to one leaf of a box's whisper, which never passes through
+  React (*A box's whisper field*, below).
+* `VaultLockControl` and `CreateVaultButton` -- the lock state and a Lock or Unlock button for an
+  account menu, and the button that creates a vault (*The account menu*, below).
 
 ## Install
 
@@ -293,6 +300,94 @@ passphrase dialog are uncontrolled for that reason; a field of your own should b
 `mask(whisper)` (from `safebyok/utils`) where the user only needs to tell keys apart; read a
 whisper into state only when the user asks to see or edit it, and drop it (set the state back)
 when they hide it, save, or navigate away.
+
+## A vault's boxes
+
+The box hooks read what the vault's box listing holds, and never ask the user or fetch:
+
+* `useBoxes(vaultlabel)` -- the snapshots of the boxes present in the vault, live; `null` while
+  the vault is not `present`.
+* `useBox(vaultlabel, boxlabel)` -- the Box under that label, `null` until the listing holds it
+  present (and again once it is deleted). Every component asking for a label gets the same Box,
+  so a whisper exposed in one place shows wherever that box is read.
+* `useBoxSnapshot(box)` -- the box's live snapshot (`exposed`, `veiled`, its revision), or `null`
+  for no box.
+* `useWhisper(box)` -- `box.whisper`, live: the whisper while it shows, and a bag with no fields
+  while it does not (not exposed, the vault locked, or the box veiled) or there is no box. Read
+  it at each render; a reference you keep outlives a lock.
+
+Each takes `null`, so a component can call it before the box is listed. Make or fetch a box, and
+expose it, from a click: `expose` and `put` refuse while the vault is locked, so unlock first.
+
+```tsx
+const ApiKeyPanel = () => {
+  const { vault } = useVault('main')
+  const box = useBox('main', 'anthropic_api_key')
+  const whisper = useWhisper(box)
+  const open = async () => {
+    if (! vault) { return }
+    await vault.ensureUnlocked()                                  // asks for the passphrase if locked
+    const made = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })
+    await made.expose()
+  }
+  return box?.isShowing
+    ? <p>Key ends in {String(whisper.apiKey ?? '').slice(-4)}</p>
+    : <button onClick={() => { open().catch(showRefusal) }}>Show key</button>
+}
+```
+
+`ifPresent: 'get'` answers a stored box as it is, writing nothing; `ifAbsent: 'add'` stores a new
+one, its whisper empty. Unexposing (`box.unexpose()`) hides the whisper from every component that
+reads the same box.
+
+## A box's whisper field
+
+`BoxWhisperField` binds an input to the text at a dotted `path` in a box's whisper, through
+`BoxFields.of(box).bind(path)` from `safebyok/dom`. The value goes between the box and the element
+directly: never through React's props or state, nor into the element's `value` attribute. It is a
+`type="password"` field carrying `WhisperFieldAttributes`, with a Show / Hide button that changes
+only what the field displays (the box stays as it is: this is not `box.veil()`). It is blank and
+read-only while the whisper will not show, and an edit made before a lock comes back at the
+unlock. It takes no `ref`, `name`, `value` or `onChange`: unnamed, a form submitted natively
+sends none of it.
+
+```tsx
+import { BoxFields } from 'safebyok/dom'
+import { BoxWhisperField, useBox, useBoxSnapshot, useVault } from 'safebyok-react'
+
+const ApiKeyEditor = () => {
+  const { vault } = useVault('main')
+  const box = useBox('main', 'anthropic_api_key')
+  const snapshot = useBoxSnapshot(box)
+  if (! vault || ! box) { return null }
+  const edit = async () => { await vault.ensureUnlocked(); await box.expose() }
+  return (
+    <>
+      <BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />
+      {snapshot?.exposed
+        ? <button onClick={() => { void BoxFields.of(box).trySave().then(showOutcome) }}>Save</button>
+        : <button onClick={() => { edit().catch(showRefusal) }}>Edit</button>}
+    </>
+  )
+}
+```
+
+`showOutcome` and `showRefusal` are yours to write. Nothing is stored until
+`BoxFields.of(box).save()`. When the last field bound to a box unmounts,
+the box unexposes. So expose from a click after the field mounts, never in an effect or before:
+under `StrictMode`, React's rehearsal unmounts the field once, and that unexposes a box exposed
+earlier.
+
+## The account menu
+
+`<VaultLockControl vaultlabel="main" />` shows whether the vault is locked, with a Lock button
+(`vault.lock()`) or an Unlock button (`bank.ensureVault`, then `vault.ensureUnlocked()`, which
+shows the passphrase dialog). While the vault is unborn it renders `<CreateVaultButton
+vaultlabel="main" />`, which builds the vault from the click (`bank.ensureVault`, asking for a new
+passphrase); while the bank is not ready it renders nothing. A user declining the dialog is no
+news; any other refusal goes to the bank's `onBadNews`. Both are unstyled, under the
+`vault-lock-control` and `create-vault-button` class names, and the control carries
+`data-lock-state`. Their words are in `src/messages.ts`.
 
 ## Development
 
