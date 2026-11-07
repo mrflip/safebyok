@@ -1,6 +1,7 @@
 /** The deviceDB in this browser's IndexedDB: each generic call one transaction, the leaseKey kept as a handle by structured clone. */
 
 import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
+import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -10,8 +11,11 @@ import { inOneStep, rowAt } from './idb-transaction'
 
 // == [Options]: IdbDeviceDBOpts, idbDeviceDBOpts
 
-/** What an IdbDeviceDB is made with: `dbName`, the name its database is made under ('safebyok' if left out). */
-export type IdbDeviceDBOpts = { dbName?: string | undefined }
+/** What an IdbDeviceDB is made with. */
+export interface IdbDeviceDBOpts {
+  /** The name its database is made under, 'safebyok' if left out. */
+  dbName?: string | undefined
+}
 
 const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
@@ -91,3 +95,5 @@ export class IdbDeviceDB extends DeviceDB {
 
 /** A device store in this browser's IndexedDB, what a browser app hands `Bank.make`. */
 export const idbDeviceDB = (opts?: IdbDeviceDBOpts): IdbDeviceDB => new IdbDeviceDB(opts)
+
+true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>
