@@ -13,9 +13,9 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** running. Merged: 1, 2, 3, 4, 5 (#584), 9, 11, 12, 14. Filed, open: 13 (#583), 17
-  (#585), 15 (#586), 5's follow-up (#587), 6 (#588), 16 (#589), 8 (#590), 7 (#591). Building: 18 (on
-  #589). Then wrap-up. Thread 10 folded into 5 and 8.
+* **Status:** wrapping up. Merged: 1, 2, 3, 4, 5 (#584), 9, 11, 12, 14. Filed: 13 (#583), 17 (#585),
+  15 (#586), 16 (#589), 18 (#593), 5's follow-up (#587), 6 (#588), 7 (#591), 8 (#590). Restacking into
+  main → #586 → #589 → #593 → #583 → #585 → #587 → #588 → #591 → #590 → #572.
 
 ## Read first
 
@@ -653,6 +653,10 @@ below are mine as the React developer, on their merits.
 * `storage/device-db-new.ts` → `device-db.ts` too (the Coach, 2026-11-07), with every import. Ride-along:
   `idb-shelf.ts`'s `dbstem` doc says "`device` or `vaults`"; add `bank` (#586 review). Thread
   15 (#586) is in that file: cut 18 after 15 files, from its tip or from main once #586 merges.
+* *Review:* low, fixed (#593): STYLE.md, VOCABULARY.md and two test comments still meant the base
+  class by `VaultDB`; `.to.eql`. Confirmed: no stale names; the graphql brand check works across
+  copies. Left: `Phrases.VaultDBShape` is unused and stale; a doc block and three test titles; the
+  core README's "Nothing in the core exports a VaultDB" (stale before).
 
 ## For the Coach
 
