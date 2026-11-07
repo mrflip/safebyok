@@ -1,7 +1,19 @@
+// fake-indexeddb installs IndexedDB's globals before the device store loads, for the banks browserOpts makes.
+import 'fake-indexeddb/auto'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
-import { Argon2idWebV1, argon2idDeriver, argon2idWebV1Deriver, checkSaltFits, parseKeyDeriverSpec } from '../src/browser'
+import { Argon2idWebV1, IdbDeviceDB, argon2idDeriver, argon2idWebV1Deriver, browserOpts, checkSaltFits, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
 import * as Front from '../src/index'
+import * as Phrases from '../src/helpers/phrases'
+import * as TH from './test-helpers'
+
+TH.useBankWorlds()
+
+/** A host's own strength checker, which finds every passphrase weak. */
+const mine = () => ({ strong: false, reason: 'Mine says no.' }) as const
+
+/** A fresh dbName, which no other test has touched. */
+const freshDbName = (): string => `test-${crypto.randomUUID()}`
 
 const CheapSpec = {
   algorithm:         'argon2id',
@@ -70,7 +82,53 @@ describe("safebyok/browser", () => {
   })
 
   it("is not on the front door", () => {
-    expect(Front).to.not.have.property('argon2idWebV1Deriver')
-    expect(Front).to.not.have.property('argon2idDeriver')
+    for (const exportname of ['argon2idWebV1Deriver', 'argon2idDeriver', 'idbDeviceDB', 'zxcvbnStrengthChecker', 'browserOpts']) {
+      expect(Front).to.not.have.property(exportname)
+    }
+  })
+})
+
+describe("browserOpts", () => {
+  it("answers a frozen bag of the Argon2id deriver, a device store in IndexedDB and the zxcvbn checker", () => {
+    const bag = browserOpts({ dbName: freshDbName() })
+    expect(Object.isFrozen(bag)).to.be.true
+    expect(bag).to.have.all.keys('keyDeriver', 'deviceDB', 'strengthChecker')
+    expect(bag.keyDeriver).to.eq(argon2idWebV1Deriver)
+    expect(bag.deviceDB).to.be.an.instanceOf(IdbDeviceDB)
+    expect(bag.strengthChecker).to.eq(zxcvbnStrengthChecker)
+  })
+
+  it("answers the same bag for the same dbName, so it is safe to call during render", () => {
+    const dbName = freshDbName()
+    expect(browserOpts({ dbName })).to.eq(browserOpts({ dbName }))
+    expect(browserOpts()).to.eq(browserOpts({}))
+    expect(browserOpts()).to.eq(browserOpts({ dbName: 'safebyok' }))
+  })
+
+  it("answers another device store for another dbName, the deriver and checker shared", () => {
+    const [one, other] = [browserOpts({ dbName: freshDbName() }), browserOpts({ dbName: freshDbName() })]
+    expect(one.deviceDB).to.not.eq(other.deviceDB)
+    expect(one.keyDeriver).to.eq(other.keyDeriver)
+    expect(one.strengthChecker).to.eq(other.strengthChecker)
+  })
+
+  it("refuses a dbName that is not non-empty text, and an option it does not take", () => {
+    TH.expectSyncRefusal(() => browserOpts({ dbName: '' }), 'bad_option')
+    TH.expectSyncRefusal(() => browserOpts({ dbName: 3 } as never), 'bad_option')
+    TH.expectSyncRefusal(() => browserOpts({ dbname: 'acme' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => browserOpts('acme' as never), 'bad_option')
+  })
+
+  it("makes a bank whose vault is created under the zxcvbn checker and kept in IndexedDB", async () => {
+    const { bank, vault } = await TH.makeBankWithVault(TH.makeBankWorld(), { ...browserOpts({ dbName: freshDbName() }), keyDeriver: TH.testDeriver })
+    expect(vault.isUnlocked).to.be.true
+    expect(await bank.strengthChecker('password1234', vault.scope)).to.deep.equal({ strong: false, reason: Phrases.PassphraseGuessable })
+    expect(await bank.deviceDB.listLeases()).to.have.lengthOf(1)
+  })
+
+  it("gives way to a field passed after the spread", async () => {
+    const bank = TH.makeBankWorld().bankOn({ ...browserOpts({ dbName: freshDbName() }), keyDeriver: TH.testDeriver, strengthChecker: mine })
+    await bank.hello()
+    expect(await bank.strengthChecker('mauve lantern quietly orbits', TH.scopeOf('u1'))).to.deep.equal({ strong: false, reason: 'Mine says no.' })
   })
 })
