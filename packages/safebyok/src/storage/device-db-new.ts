@@ -5,7 +5,8 @@ import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
-import { type VaultScope, isPlainBag, vaultScope } from '../shapes/shapes-core'
+import * as CX from '../shapes/shapes-core'
+import { type VaultScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
@@ -76,7 +77,7 @@ export abstract class DeviceDB {
   /** Deletes whatever row stands at this vault scope, damaged or not, with no `vault_tok` to match. */
   async delRawLease(scope: VaultScope): Promise<void> {
     try {
-      const checked = vaultScope.parse(scope)
+      const checked = CX.vaultScope.parse(scope)
       await this.doDelRawLease(checked)
     } catch (err) { throw refusalOf(err, 'delRawLease') }
   }
