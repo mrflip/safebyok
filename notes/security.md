@@ -2858,7 +2858,15 @@ added or folded into through the subagent, and no other entry changes.
   fields) in its document cache, though every vault query is `network-only` and never answered
   from it. A subscription's user is fixed when it starts (over a websocket, when the connection
   opened), so a session revoked meanwhile keeps hearing the vault's scope -- never a record --
-  until the subscription ends.
+  until the subscription ends. (amended 2026-11-07 (graphql_schema): `GraphQLVaultDB`'s watch no longer resubscribes when its stream ends, so a
+  subscription is never reopened under a user fixed at an earlier start. A stream ending by a closing result or an error is reported once as a
+  VaultError through the optional third parameter of `VaultDBVerbs.watch`, `onBadNews`, which the core's listings route to the bank's bad-news
+  channel (the host's `onBadNews`, else `logger.warn`); an `identity_revoked` notice ends the watch quietly, as before. The reported error carries
+  no server text: a GraphQL error is `unexpected_error` with no cause, a network error is the sanitized cause of the 2026-10-17 GraphQL entry
+  below, a closing result is `storage_unavailable` with the fixed phrase `WatchEnded` and meta `{ call: 'watch' }`. `tidyGone` and `tryTidyGone`
+  are now verbs of the public `VaultDBVerbs` and cross as the mutation `safebyokTidyGone(applabel, user_id)`, served behind the same `user_id` gate
+  as every other operation (`served(context, scope.user_id, ...)`): refused `identity_revoked`, without calling the vaultDB, unless it is the
+  signed-in user's bank.)
 * 2026-10-15: **a second implementation behind one label.** `safebyok-fastkey` runs Argon2id
   through `hash-wasm` (4.12.0, MIT, no dependencies; its Argon2 is C written for it after Go's
   `x/crypto/argon2`, compiled to WebAssembly and embedded in its JavaScript; widely used, but
@@ -2926,7 +2934,8 @@ added or folded into through the subagent, and no other entry changes.
   mind. **Sizes**: with names unbounded, the static 2 KiB allowance no longer bounds a
   box's other fields. It stays only as `Vault.make`'s plan for `maxBoxes` at the default
   checks; `putBox` now weighs each box with its scope as the UTF-8 bytes of its JSON and
-  refuses one over the adapter's `maxRecordBytes` (`box_too_large`), and each `putBox()`
+  refuses one over the adapter's `maxRecordBytes` (`box_too_large`) (amended 2026-11-07 (graphql_schema): `GraphQLVaultDB` accepts `maxRecordBytes` and enforces no
+  record size on the client; the server's own vaultDB holds and enforces the limit, and no field on the wire lets a browser raise it), and each `putBox()`
   refuses a box heavier than the one it replaces when the vault, each box counted at twice
   `maxWhisperBytes`, 512 bytes for its fixed-size fields and its measured names and sidecar, would
   pass `maxVaultBytes` (`vault_full`). The vault's total is reckoned from the snapshot's listing,
@@ -3670,7 +3679,11 @@ added or folded into through the subagent, and no other entry changes.
   (amended 2026-10-19: except a VaultError of kind `not_permitted` or `identity_revoked`, which crosses as it is)
   with a generic "the server's setup is wrong" message; its own message, which may name the host's
   setup or the env var names of secrets, is kept only server-side, as the non-enumerable `cause`
-  of the GraphQL error.
+  of the GraphQL error. (amended 2026-11-07 (graphql_schema): a failed request, urql's network error, refuses `storage_unavailable` with a
+  fresh Error as `cause` holding only the thrown error's name (`thrownName`), the HTTP status and a code such as `ECONNREFUSED`, kept only when a
+  word of capitals (`/^[A-Z][A-Z0-9_]{0,39}$/`): never urql's `CombinedError`, the network error's message or a response body, since urql makes a
+  non-JSON body or a `statusText` into that message and a body may quote the record sent (`networkTroubleOf`, `statusOf`, `codeOf`,
+  `graphql-vault-db.ts`). A GraphQL error stays `unexpected_error` with no cause.)
 * 2026-10-17 (thread 5b, store_base, G247): **the Convex component checks vault props update's
   `vault_id` and epoch.** The component's `putVaultProps` (`safebyok-convex/src/component/vaults.ts`)
   writes only when the new vault props keep the stored `vault_id` and its `unlock_epoch` is greater
