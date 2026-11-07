@@ -51,6 +51,16 @@ added or folded into through the subagent, and no other entry changes.
   until it closes (`notes/wontfix.md`). A lease row that fails its check is neither listed nor forgotten (`notes/wontfix.md`);
   `DeviceDB.listRawLeases()` returns every row unchecked.
 
+* 2026-11-07 (the Coach, branch `20261104-newdesign_plan`; a proposal to seal each revision's prior `revision_seq` and a hash of its ciphertext inside the
+  encrypted value, so devices could check a chain, was declined): **the new core detects storage that rolls a record back only within one session,
+  and does not chain a revision to its prior.** In `packages/safebyok/src/models/storable.ts`, `cmpRevisions` compares a fetched row against the revision the
+  instance holds: a lower `revision_seq` is policy `older` and is ignored, and the same seq under another `revision_tok` throws `oneRevisionTwoToks`. The
+  device record (`deviceRecord`, `shapes/shapes-storage.ts`) holds only applabel, user_id and device_id, no watermark, so after a reload an older copy is
+  taken as found. The Coach: there is no certainty the device is right and the server wrong, or the reverse; a device that writes on top of a row saw a
+  working state, storage saw one, and a record that deciphers was sealed by a device holding a working key. What holds: a box's AES-GCM context
+  (`boxStampOf`, `models/box.ts`) binds its sparse fields, `revision_tok` and `revision_seq` among them, so storage can replay a whole old row but cannot
+  pass an old ciphertext off under a new revision. The matching entry is the last in `notes/wontfix.md`, "storage that rolls a record back".
+
 * 2026-11-05 (whisper_fields, branch `20261105-whisper_fields`; amended 2026-11-06 (whisper_fields)): **`BoxFields.of(box).bind(path)` writes a whisper leaf's plaintext straight to a
   DOM element's `value`, and the lock clears the screen, not the memory.** In `packages/safebyok/src/dom/box-fields.ts` (the `safebyok/dom` entry; amended 2026-11-06 (whisper_fields): named `box.field(path)`, in `src/models/box.ts`, when this was written), the plaintext
   reaches no prop or state of the host's, so it is in the DOM and on the screen and not in React's dev tools: a small improvement over a value

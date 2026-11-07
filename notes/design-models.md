@@ -5,7 +5,6 @@ The seams of Box, Vault, Lease, Proving, Gate, Gating and Bank as they are meant
 Gone from the interface, so in no table: every `cleartexts` parameter (`ensureVault(bag, cleartexts)`, `ensureUnlocked(cleartexts)`, the gate verbs'), `takeUpLease`, `takeUpCachedLease`, `vaultListing.close`, `makeStaged` and the staged record, `UnlockAtBirth`, `BirthLockSeq`, `closeSeqs`, the lease mutex, the unlock join and the ensuring map, `hydrateAll`, `attemptPasskey` (an `attempt({ passkeyClear })`), `ensureFullAndTimely` and `buildCachedLease`.
 
 * 💪 sound (always true): all records are valid and mutually consistent: vault, box, listing, lease, gate, wayins, gatings
-* 🌀 misaligned: something is so wrong it's difficult to deliver a quality issue report
 * ⏳  timely: refresh age was within limit at some point between call and first seam; parents are also 😎 timely
 * 🎫 received: listing has memoized instance, sparse, full, or tombstoned
 * 🗂️ listing: factory and index of storables; holds their subscriptions, delivers vaultDB responses; to unlist is to remove from its list
@@ -22,8 +21,12 @@ Gone from the interface, so in no table: every `cleartexts` parameter (`ensureVa
 * 🪦 gone: locked, vacated, removed from VaultDB
 * 🔲 void: absent (no row)
 * 🛡️ no-throw: all errors caught;  `tryVerbNoun`  returns an Outcome<Noun>
-* 💣 ok=refused: oops
+* 🌀 misaligned: something is so wrong it's difficult to deliver a quality issue report
+* 💣 err=refused: oops
+* 🫱 ok=got
+* ⚠️ ok=expected:
 * 👌 ok=success (general)
+* 📗 ok=read
 * 👍 ok=modified: modification was successfully transactionally applied, no changes since last update
 * 💸 decrypted: whisper is authenticated against cached vault key, box key, vault, and its non-sidecar metadata
 * 🫆 encrypted: whisper cannot be decrypted without device and prohibitively difficult even with device.
@@ -33,6 +36,7 @@ Gone from the interface, so in no table: every `cleartexts` parameter (`ensureVa
 * 📣 subscribed: full records push on changes.
 * 1️⃣ one-at-a-time: overlapping callers wait on single request and share its result
 * 💾  saved
+* ❎ deleted
 * 🟰 no change
 * 📸 snapshot: frozen pojo with public props for subscribers
 * 🔑 wayin

@@ -14,13 +14,10 @@ each method carries a stripped one-liner, some marked `SLOPDOC:`.
 Contents:
 
 * **Here:** `#lead-with-the-job`, `#outcome-not-branches`, `#no-sibling-comparisons`, `#one-breath-contract`, `#one-sentence-headline`
-<<<<<<< HEAD
-=======
 * **Here, from the old tree** (`packages/safebyok-old/src` at `b7bacb68`; the Coach accepted or wrote each Gallant, 2026-11-05):
   `#three-questions`, `#name-the-act`, `#one-verb-one-fact`, `#option-values-get-a-list`, `#point-dont-redefine`,
   `#customer-first`, `#guard-names-its-predicates`, `#reason-goes-above`, `#facts-from-the-code`, and a second specimen each
   for `#a-helper-gets-a-phrase`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`
->>>>>>> 32d3abf71 (docs: Gallant/Goofus code examples)
 * **In `notes/gallant.md`, *Words*:** `#purpose-not-path`, `#purpose-not-machinery`; `#no-refusal-catalog` (`create`, `demandUnsealable`);
   `#say-what-to-do` (`vaultAt`); `#say-the-guarantee` (`extractWhisper`); `#a-helper-gets-a-phrase` (`#unseal`)
 
@@ -185,8 +182,6 @@ async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
  * the one stored, so a box held sparse is fetched first. */
 async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
 ```
-<<<<<<< HEAD
-=======
 
 ---
 
@@ -750,4 +745,3 @@ Says the proving "opens the gate it holds"; the body only compares visible heade
 /** True when `vaultRecord`'s wayin at this proving's slotlabel carries this proving's header. */
 ```
 
->>>>>>> 32d3abf71 (docs: Gallant/Goofus code examples)
