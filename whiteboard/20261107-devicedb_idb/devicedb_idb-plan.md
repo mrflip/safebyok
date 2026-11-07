@@ -296,6 +296,16 @@ open a fresh IndexedDB shelf, so the battery's twin is a second connection again
 * Network-error cause: "pick out what's easy to pick out from the top errors you expect, but at
   least error name". A fresh cause: the error's name plus the easy fields (HTTP status, code).
 
+*Review (second rework, high, fixed at 7053d9f7a):* reverted d4fe2c209 (bfb89bf76) and the
+security.md mention (efad98207); a watch ended by a refusal other than identity_revoked now tells
+that refusal, not WatchEnded (7053d9f7a); doc-block first lines (78c42f60a). The `onBadNews`
+deviation judged the simplest path. Left: ended watch stays ended (row); identity_revoked over the
+watch tells nothing (row); a GraphQL error on one notice ends the watch; no `meta.call` on a watch's
+network error; `thrownName` unchecked (host is not the threat model); `onBadNews` unvalidated, as
+`onNotice`; style findings for a documentarian. Thread 6 takes: a README sentence that `goodbye()`
+then `hello()` starts an ended watch again; the sonnet security.md check adds the 2026-10-15
+`maxBoxes` (~2912) and 2026-10-17 G285 (~3702) entries, which imply a host sets limits on the client.
+
 ## For the Coach
 
 * Nothing open beyond the doc.
