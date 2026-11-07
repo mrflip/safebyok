@@ -98,9 +98,9 @@ describe("PassphraseModal, unlocking a vault", () => {
 
 describe("PassphraseModal's footnote", () => {
   const FootnoteCases = [
-    [TH.building,  WeekMillis,  'Locks on this device in 7 days.',       'says when a vault built now locks'],
-    [TH.unlocking, WeekMillis,  'Locks again on this device in 7 days.', 'says when an unlock lapses'],
-    [TH.unlocking, ForeverMillis,  Messages.staysUnlocked,                  'says an endless lease stays unlocked'],
+    [TH.building,  WeekMillis,    "Locks on this device in 7 days.",       'says when a vault built now locks'],
+    [TH.unlocking, WeekMillis,    "Locks again on this device in 7 days.", 'says when an unlock lapses'],
+    [TH.unlocking, ForeverMillis, Messages.staysUnlocked,                  'says an endless lease stays unlocked'],
   ] as const
 
   for (const [raise, leaseMillis, footnote, blurb] of FootnoteCases) {
