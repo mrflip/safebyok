@@ -6,7 +6,7 @@
 * **Issued by:** the Coach (flip), in the vaultdb_cleanup session, after the vaultdb line merged
   (#565 at 495cc5d6e). Orchestrated from that session, which keeps this sprint's doc.
 * **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; bookmark rev 2).
-* **Status:** running 2026-11-07: #567, #568, #569 and #570 merged; #571 rebased on main by the Coach and squashed to 5 commits (4ceecca51); thread 6 (docblock_trim) building, cut from #571.
+* **Status:** 2026-11-07: #567-#570 merged; #571 filed (squashed, 4ceecca51); thread 6 (#580) flagged in review, waits on the Coach's G8 row.
 
 ## The Coach's request, verbatim
 
@@ -276,6 +276,17 @@ report, ~22 and ~29); and a `sonnet` subagent checks notes/security.md's older G
 itself, not relabeled unexpected_error by `deriveKeyBytes` (the Coach: "I'm happy to
 supervalidate it, but personally would leave it to the deriver"); and a test-only `_cheat_` way to
 open a fresh IndexedDB shelf, so the battery's twin is a second connection again (took the Rec).
+
+*Review (medium, raised for proving.ts; flagged at 8dfc3a47c):* fixed test titles (3c21c6187),
+`_cheat_forgetShelf`'s "For tests only:" (27641a862), security.md's stale box_stored/capacity and
+client-cap mentions (8dfc3a47c). Significant, the Coach's: `deriveKeyBytes` passes any VaultError
+from a host's deriver, where G8 promises every throw replaced (TOP row; Rec: amend G8). The thread
+waits, unfiled, in /workspace/byok-docblock_trim. *Rework once ruled (orchestrator's calls):* the
+G8 side as ruled; escape `-` and `|` in `Patterns.user_id`/`b64url` so each `source` works as an
+HTML `pattern` (v flag); one sentence back on `VaultDBVerbs.watch`: nothing may count on a notice
+arriving; the changeset names `_cheat_forgetShelf` on `safebyok/testing`; `makeTwin` asserts its
+twin holds a new connection. Left: dropped "each do* one atomic step" from base headers (the do*
+blocks keep "in one step"); mixed doc-block mood; the `!` in makeTwin, as `idbRowsOf` has.
 
 ### 4b. #571's second rework (the Coach, 2026-11-07, Open Matters)
 
