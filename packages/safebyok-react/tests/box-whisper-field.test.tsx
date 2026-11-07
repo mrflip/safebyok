@@ -26,7 +26,7 @@ const theField = () => screen.getByLabelText<HTMLInputElement>('Anthropic API ke
 const exposing = (box: Box) => act(async () => { await box.expose() })
 
 describe("BoxWhisperField", () => {
-  it("reads blank and read-only until the box is exposed, then shows the text at its path", async () => {
+  it("shows the text at its path once the box is exposed", async () => {
     const { box } = await boxOfWorld()
     render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
     expect(theField().value).to.eq('')
@@ -53,7 +53,7 @@ describe("BoxWhisperField", () => {
     expect(theField().getAttribute('spellcheck')).to.eq('false')
   })
 
-  it("shows the text while Show is pressed and hides it again, never veiling the box", async () => {
+  it("flips only what it displays at Show and Hide", async () => {
     const { box } = await boxOfWorld()
     render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
     await exposing(box)
@@ -67,6 +67,7 @@ describe("BoxWhisperField", () => {
   })
 
   it("stores an edit through its box's fields' save", async () => {
+    // BoxWhisperField @example 1
     const { box } = await boxOfWorld()
     render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
     await exposing(box)
@@ -75,7 +76,7 @@ describe("BoxWhisperField", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-ant-fake-edited', Credentials: { SessionToken: 'fake-session-token' } })
   })
 
-  it("blanks at a lock and comes back with the edit at an unlock", async () => {
+  it("keeps an edit through a lock", async () => {
     const { vault, box } = await boxOfWorld()
     render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
     await exposing(box)
@@ -110,7 +111,7 @@ describe("BoxWhisperField", () => {
   })
 
   describe("under StrictMode", () => {
-    it("shows a box exposed after it mounts, and unexposes it at unmount", async () => {
+    it("shows a box exposed after it mounts", async () => {
       const { box } = await boxOfWorld()
       const { unmount } = render(<StrictMode><BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" /></StrictMode>)
       await exposing(box)
