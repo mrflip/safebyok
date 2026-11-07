@@ -4,7 +4,7 @@ import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
-import { vaultScope } from '../../src/shapes/shapes-core'
+import { salt_b64, vaultScope } from '../../src/shapes/shapes-core'
 import { type ProvingWorld, FirstGateEpoch, type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
@@ -259,6 +259,24 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
     const keyDeriver: KeyDeriver = { key_deriver_label: 'test_other_v0', salt_bytes: 16, deriveKeyBytes }
     await TH.expectRefusal(PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf({ keyDeriver })), 'newer_format')
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+  })
+
+  // The record's check lets these through: a length no unpadded base64url has, and a last character with stray padding bits.
+  const UndecodedSaltCases = [
+    ['25 characters',                    'A'.repeat(25)],
+    ['41 characters',                    'A'.repeat(41)],
+    ['22 characters, stray padding bits', `${'A'.repeat(21)}B`],
+  ] as const
+
+  it.each(UndecodedSaltCases)("refuses a stored salt that will not decode, %s, as 'bad_record', quoting none of it and never asking the deriver", async (_what, salt) => {
+    const { gate } = await gateWithBoth()
+    const { passphrase_wayin } = gate.pickle()
+    const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
+    const keyDeriver: KeyDeriver = { key_deriver_label: passphrase_wayin.key_deriver_label, salt_bytes: 16, deriveKeyBytes }
+    const damaged = { stamp: WorldStamp, ...gate.pickle(), passphrase_wayin: { ...passphrase_wayin, salt_b64: salt_b64.parse(salt) } }
+    const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingWorldOf({ keyDeriver })), 'bad_record')
+    expect(TH.thrownText(err)).to.not.include(salt)
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 

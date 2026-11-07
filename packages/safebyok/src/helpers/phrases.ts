@@ -331,7 +331,7 @@ export const RecordOfOtherScope = "Storage answered with a record whose scope is
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, UndecodedSalt, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
 export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -353,6 +353,9 @@ export const OtherPrfSalt = "The passkey answered for a different salt than this
 
 /** Why a passphrase wayin made under another key deriver than the world's is not tried. */
 export const UnknownKeyDeriver = "This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made."
+
+/** Why a stored passphrase wayin whose salt is not base64url text of whole bytes is refused: its record is damaged. */
+export const UndecodedSalt = "This vault's stored passphrase salt is not valid base64url text: its record is damaged."
 
 /** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
 export const notKeyBytes = (count: number): string => `The keyDeriver handed back something other than ${String(count)} fresh key bytes.`
