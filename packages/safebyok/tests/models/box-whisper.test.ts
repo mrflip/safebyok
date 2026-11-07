@@ -1,7 +1,7 @@
 /** A Box's whisper: extractWhisper, the kept value through a lock, the bags, and what may be a whisper. The states are in box-whisper-states.test.ts. */
 
 import { describe, expect, it } from 'vitest'
-import { ENCRYPTED, LOCKED, VEILED, Whispered } from '../../src/helpers/consts'
+import { ENCRYPTED, LOCKED, VEILED, Whispered, brandOf } from '../../src/helpers/consts'
 import type { Whisper } from '../../src/shapes/shapes-core'
 import type { BoxWorld, Fetched } from '../../src/shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
@@ -113,7 +113,7 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
   for (const [bag, kind] of Bags) {
     it(`${kind} is frozen, carries the mark, and shows nothing as JSON`, () => {
       expect(Object.isFrozen(bag)).to.be.true
-      expect(Reflect.get(bag, Whispered)).to.eq(kind)
+      expect(brandOf(bag, Whispered)).to.eq(kind)
       expect(JSON.stringify(bag)).to.eq('{}')
     })
   }

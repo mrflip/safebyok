@@ -1,5 +1,6 @@
 /** The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts. */
 
+import { IsVaultError, brandOf } from '../helpers/consts'
 import type { Capacity } from '../shapes/shapes-storage'
 
 // == [Kinds and families]: refusalkindVals, Refusalkind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
@@ -170,6 +171,9 @@ export class VaultError extends Error {
     this.family = RefusalFamilyForKind[refusalkind]
     if (meta !== undefined) { this.meta = meta }
   }
+
+  /** Answers true, which marks a VaultError to {@link isVaultError}, from whichever copy of safebyok made it. */
+  get [IsVaultError](): true { return true }
 }
 // --
 
@@ -201,9 +205,9 @@ export const thrownNameOf = (thrown: unknown): string | null => (
 // == [Guards]: isVaultError, isCondition
 
 /** True when `err` is a VaultError, of `refusalkind` when one is given: the one test for a refusal.
- * It is an `instanceof` test. An error that only calls itself `VaultError` (one rebuilt from a
- * server's JSON, say) is not one. Nor is a VaultError from a second copy of safebyok loaded beside
- * this one, as an ESM and a CJS build side by side.
+ * A VaultError from a second copy of safebyok loaded beside this one (an ESM and a CJS build side
+ * by side) is one. An error that only calls itself `VaultError` (one rebuilt from a server's JSON,
+ * say) is not.
  *
  * @example
  *   try { await box.extractWhisper() } catch (err) {
@@ -211,7 +215,7 @@ export const thrownNameOf = (thrown: unknown): string | null => (
  *   }
  */
 export const isVaultError = (err: unknown, refusalkind?: Refusalkind): err is VaultError => (
-  err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
+  brandOf(err, IsVaultError) === true && (refusalkind === undefined || (err as VaultError).refusalkind === refusalkind)
 )
 
 /** True when `err` is a VaultError the app may show the user, or retry: a `condition` or `bad_news`.

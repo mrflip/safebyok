@@ -1,7 +1,7 @@
 /** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over real in-memory stores,
  * and every step asserts what its components render. */
 
-import { Whispered } from '../../src/helpers/consts'
+import { Whispered, brandOf } from '../../src/helpers/consts'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
@@ -66,7 +66,7 @@ const boxRow = ({ boxlabel, present, sidecar }: BoxSnapshot): string => `${boxla
 /** The store of the component that shows the whisper itself: `box.whisper` is its snapshot, as the box's snapshot never holds it. */
 const whisperStoreOf = (box: Box): Store<Whisper> => ({ subscribe: box.subscribe, getSnapshot: () => box.whisper })
 
-const whisperReveal = (whisper: Whisper): string => (Storable.isFUBag(whisper) ? whisper[Whispered] : JSON.stringify(whisper))
+const whisperReveal = (whisper: Whisper): string => (Storable.isFUBag(whisper) ? String(brandOf(whisper, Whispered)) : JSON.stringify(whisper))
 
 /** The host's dialog: it records what it was shown for, and attempts what the user types; typing nothing closes it. */
 const makeDialog = () => {

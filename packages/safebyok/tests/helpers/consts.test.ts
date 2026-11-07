@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, VaultsDBVersion, hasModelkind, isAdapterVaultDB, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
+import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, IsGuarded, VaultsDBVersion, brand, brandGuarded, brandOf, hasModelkind, isAdapterVaultDB, isDeviceDB, isGuarded, isVaultDB } from '../../src/helpers/consts'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { VaultDBVerbnames } from '../../src/storage/vault-db'
@@ -93,5 +93,71 @@ describe("isAdapterVaultDB", () => {
     expect(isAdapterVaultDB(Object.assign({}, vaultDB))).to.be.false
     expect(isAdapterVaultDB(new MemoryDeviceDB())).to.be.false
     expect(isAdapterVaultDB(null)).to.be.false
+  })
+})
+
+describe("brand and brandOf", () => {
+  const Mine = Symbol.for('@example/mine')
+
+  it("mark an object with a value its brandOf reads back", () => {
+    const marked = brand({ apiKey: 'sk-test-0000' }, Mine)
+    expect(brandOf(marked, Mine)).to.be.true
+    expect(brandOf(brand({}, Mine, 'blue'), Mine)).to.eq('blue')
+    expect(brandOf(brand(() => 3, Mine), Mine)).to.be.true
+  })
+
+  it("keep the mark out of keys, spreads and JSON", () => {
+    const bag = { apiKey: 'sk-test-0000' }
+    const marked = brand(bag, Mine)
+    expect(marked).to.eq(bag)
+    expect(Reflect.ownKeys({ ...marked })).to.deep.equal(['apiKey'])
+    expect(Object.keys(marked)).to.deep.equal(['apiKey'])
+    expect(JSON.stringify(marked)).to.eq('{"apiKey":"sk-test-0000"}')
+    expect(brandOf({ ...marked }, Mine)).to.be.undefined
+  })
+
+  it("keep the first mark through a write or another brand", () => {
+    const marked = brand({}, Mine, 'first') as Record<symbol, unknown>
+    expect(() => { marked[Mine] = 'second' }).to.throw(TypeError)
+    expect(() => brand(marked, Mine, 'second')).to.throw(TypeError)
+    expect(brandOf(marked, Mine)).to.eq('first')
+  })
+
+  it("read a brand a class's getter wears", () => {
+    class Worn { get [Mine](): string { return 'worn' } }
+    expect(brandOf(new Worn(), Mine)).to.eq('worn')
+  })
+
+  const UnmarkedCases = [
+    [null,                    'null'],
+    [undefined,               'undefined'],
+    [7,                       'a number'],
+    ["@example/mine",         "the brand's own description"],
+    [Mine,                    'the symbol itself'],
+    [{},                      'an unmarked object'],
+    [() => 3,                 'an unmarked function'],
+  ] as const
+  for (const [val, blurb] of UnmarkedCases) {
+    it(`find no brand on ${blurb}`, () => {
+      expect(brandOf(val, Mine)).to.be.undefined
+    })
+  }
+})
+
+describe("isGuarded", () => {
+  it("knows a guarded function or object from any copy of safebyok", () => {
+    expect(IsGuarded).to.eq(Symbol.for('@safebyok/guarded'))
+    expect(isGuarded(brandGuarded(() => 3))).to.be.true
+    expect(isGuarded(brandGuarded({ deriveKeyBytes: () => 3 }))).to.be.true
+    const GuardedBrand = Symbol.for('@safebyok/guarded')
+    expect(isGuarded(brand(() => 3, GuardedBrand))).to.be.true
+  })
+
+  it("refuses what wears no true guard's brand", () => {
+    expect(isGuarded(() => 3)).to.be.false
+    const guarded = brandGuarded({ deriveKeyBytes: () => 3 })
+    expect(isGuarded({ ...guarded })).to.be.false
+    expect(isGuarded(brand(() => 3, IsGuarded, 'yes'))).to.be.false
+    expect(isGuarded(null)).to.be.false
   })
 })

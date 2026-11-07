@@ -66,6 +66,7 @@ export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../re
 export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, storeFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
+export { IsVaultError, brand, brandOf } from '../helpers/consts'
 export type { RefusalFamily, RefusalFamilyForKind, RefusalMeta, Refusalkind, Thrown, VaultErrorOpts } from '../refusals/errors'
 export { outcomeOf, storageTroubleOf } from '../refusals/outcome'
 export type { BadOutcome, GoodOutcome, Outcome } from '../refusals/outcome'

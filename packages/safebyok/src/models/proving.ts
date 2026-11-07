@@ -1,6 +1,6 @@
 import { Checkers, consistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
-import { PassphraseKeyBytes, type PassphraseSaltBytes, brandGuarded } from '../helpers/consts'
+import { PassphraseKeyBytes, type Modelkind, type PassphraseSaltBytes, brandGuarded, hasModelkind } from '../helpers/consts'
 import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
@@ -18,7 +18,7 @@ import { Wayin, wayinCtxOf } from './wayin'
 // == [NOVEL and the checks]: NOVEL, RewrapUsage, CheckUsage, Checks
 
 /** Pass to {@link Proving.buildWayin} for a wayin over a vaultKey made new. */
-export const NOVEL: unique symbol = Symbol('NOVEL')
+export const NOVEL: unique symbol = Symbol.for('@safebyok/novel')
 
 /** What the vaultKey is unwrapped as, inside a proving: extractable only so it can be wrapped again, and dropped when the method ends. */
 const RewrapUsage = Object.freeze({ extractable: true, usage: ['wrapKey'] as const })
@@ -28,7 +28,7 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 
 /** Stays here: it names the class. */
 const Checks = Checkers('bad_option', ({ custom }) => ({
-  wayinSource: custom<Novel | Proving>((val) => val === NOVEL || val instanceof Proving, 'Expected NOVEL or a proving'),
+  wayinSource: custom<Novel | Proving>((val) => val === NOVEL || hasModelkind(val, 'proving'), 'Expected NOVEL or a proving'),
 }))
 // --
 
@@ -118,6 +118,9 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, vault_key_wayin_wrapped, ctx, CheckUsage), wrongProof))
   }
   // --
+
+  /** Answers 'proving', which marks this model to a check: {@link Modelkind}. */
+  get modelkind(): 'proving' { return 'proving' satisfies Modelkind }
 }
 
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {

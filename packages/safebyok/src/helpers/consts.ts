@@ -4,6 +4,7 @@ import type { BoxListing } from '../models/box-listing'
 import type { Gate } from '../models/gate'
 import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
+import type { Proving } from '../models/proving'
 import type { Vault } from '../models/vault'
 import type { VaultListing } from '../models/vault-listing'
 import type { Wayin } from '../models/wayin'
@@ -44,13 +45,28 @@ export const PassphraseKeyBytes = 32
 /** How many random bytes a passkey wayin's `prf_salt_b64` holds: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
 export const PasskeySaltBytes = 32
 
-/** The mark on what a box answers for a whisper it will not show: `box.whisper[Whispered]` says why.
- * It is `Symbol.for`, as two copies of this module, such as our ESM and CJS builds, would otherwise make two symbols. */
+// A brand is a `Symbol.for` key, so a second copy of safebyok (our ESM and CJS builds side by side, or one an adapter
+// bundles) wears and reads the same one, and a host may wear one on purpose. Non-enumerable, it stays out of a spread,
+// `Object.keys`, `JSON.stringify` and a log line.
+/** `obj`, wearing `Brand` as `val`, a fixed and hidden mark that {@link brandOf} reads back. */
+export const brand = <ObjT extends object>(obj: ObjT, Brand: symbol, val: unknown = true): ObjT => (
+  Object.defineProperty(obj, Brand, { value: val, enumerable: false, writable: false, configurable: false })
+)
+
+/** The value `val` wears as `Brand`, or undefined, for anything at all. */
+export const brandOf = (val: unknown, Brand: symbol): unknown => (
+  (typeof val === 'function' || (typeof val === 'object' && val !== null)) ? (val as Partial<Record<symbol, unknown>>)[Brand] : undefined
+)
+
+/** The mark on what a box answers for a whisper it will not show.
+ * Never read it: compare `box.whisper` with {@link ENCRYPTED}, {@link LOCKED} or {@link VEILED}, or ask `box.isShowing` or {@link isWhisperedBag}.
+ */
 export const Whispered: unique symbol = Symbol.for('@safebyok/whispered')
 
 /** What `box.whisper` answers for a whisper it will not show: a whisper to the type checker, carrying {@link Whispered}. */
 export type WhisperedBag = Whisper & { readonly [Whispered]: 'encrypted' | 'locked' | 'veiled' }
 
+// Literals, not `brand()`: the mark is an own enumerable key, so a spread or an assign carries it to the put that refuses it.
 /** What `box.whisper` answers for a whisper not exposed. */
 export const ENCRYPTED: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
 
@@ -61,18 +77,13 @@ export const LOCKED: WhisperedBag = Object.freeze({ [Whispered]: 'locked' })
 export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
-export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (val !== null) && Object.hasOwn(val, Whispered)
-
-/** True for an object that answers true to `tag`. */
-const answersTrueTo = <TagT extends symbol>(val: unknown, tag: TagT): val is Record<TagT, true> => (
-  typeof val === 'object' && val !== null && (val as Partial<Record<TagT, unknown>>)[tag] === true
-)
+export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (brandOf(val, Whispered) !== undefined)
 
 // A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
 // ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
 /** The model class each `modelkind` names: `ModelkindClasses['box']` is `Box`. */
 export type ModelkindClasses = {
-  bank: Bank, vault: Vault, box: Box, vault_listing: VaultListing, box_listing: BoxListing, gating: Gating, gate: Gate, wayin: Wayin, lease: Lease,
+  bank: Bank, vault: Vault, box: Box, vault_listing: VaultListing, box_listing: BoxListing, gating: Gating, gate: Gate, wayin: Wayin, lease: Lease, proving: Proving,
 }
 
 /** What each model's `modelkind` getter answers: `box.modelkind` is `'box'`. */
@@ -83,35 +94,32 @@ export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds:
   (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )
 
-// `Symbol.for`, as an adapter package may bundle a second copy of safebyok, whose stores must pass this one's checks.
 /** The tag a VaultDB answers true to, so a model can tell one from a duck. */
 export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
 
 /** True for a VaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsVaultDB}. */
-export const isVaultDB = (val: unknown): val is { [IsVaultDB]: true } => answersTrueTo(val, IsVaultDB)
+export const isVaultDB = (val: unknown): val is { [IsVaultDB]: true } => brandOf(val, IsVaultDB) === true
 
-// `Symbol.for`, for the same reason as IsVaultDB.
 /** The tag an AdapterVaultDB answers true to, and no client of one, as a GraphQLVaultDB is. */
 export const IsAdapterVaultDB: unique symbol = Symbol.for('@safebyok/adaptervaultdb')
 
 /** True for an AdapterVaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsAdapterVaultDB}. */
-export const isAdapterVaultDB = (val: unknown): val is { [IsAdapterVaultDB]: true } => answersTrueTo(val, IsAdapterVaultDB)
+export const isAdapterVaultDB = (val: unknown): val is { [IsAdapterVaultDB]: true } => brandOf(val, IsAdapterVaultDB) === true
 
-// `Symbol.for`, for the same reason as IsVaultDB.
 /** The tag a DeviceDB answers true to, so a model can tell one from a duck. */
 export const IsDeviceDB: unique symbol = Symbol.for('@safebyok/devicedb')
 
 /** True for a DeviceDB, made by whichever copy of safebyok: an object that answers true to {@link IsDeviceDB}. */
-export const isDeviceDB = (val: unknown): val is { [IsDeviceDB]: true } => answersTrueTo(val, IsDeviceDB)
+export const isDeviceDB = (val: unknown): val is { [IsDeviceDB]: true } => brandOf(val, IsDeviceDB) === true
 
 /** The tag a host's function answers true to once a bank has wrapped it, so a world can tell it from the bare one. */
-export const IsGuarded: unique symbol = Symbol('safebyok.guarded')
+export const IsGuarded: unique symbol = Symbol.for('@safebyok/guarded')
 
 /** True for a host's function as a bank wraps it: one that answers true to {@link IsGuarded}. */
-export const isGuarded = (val: unknown): boolean => (
-  (typeof val === 'function' || (typeof val === 'object' && val !== null)) && (val as { [IsGuarded]?: unknown })[IsGuarded] === true
-)
+export const isGuarded = (val: unknown): boolean => brandOf(val, IsGuarded) === true
 
-// A getter, never an own enumerable field, so the brand neither serializes nor rides along in a spread.
 /** `made`, frozen, answering true to {@link IsGuarded}. */
-export const brandGuarded = <MadeT extends object>(made: MadeT): MadeT => Object.freeze(Object.defineProperty(made, IsGuarded, { get: () => true }))
+export const brandGuarded = <MadeT extends object>(made: MadeT): MadeT => Object.freeze(brand(made, IsGuarded))
+
+/** The tag a VaultError answers true to, so `isVaultError` knows one from any copy of safebyok. */
+export const IsVaultError: unique symbol = Symbol.for('@safebyok/vaulterror')

@@ -1,4 +1,4 @@
-import type { Modelkind } from '../helpers/consts'
+import { type Modelkind, hasModelkind } from '../helpers/consts'
 import { Checkers } from '../helpers/validator'
 import { decorate, tattoo } from '../helpers/helpers'
 import { passkeyHeldAlready } from '../refusals/throwers'
@@ -7,7 +7,7 @@ import { Wayin } from './wayin'
 
 /** Stays here: it names the class. */
 const Checks = Checkers('bad_option', ({ obj, custom }) => {
-  const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
+  const wayin = custom<Wayin>((val) => hasModelkind(val, 'wayin'), 'Expected a Wayin')
   return { gateMakeArgs: obj({ passphraseWayin: wayin, passkeyWayin: wayin.nullable() }) }
 })
 
