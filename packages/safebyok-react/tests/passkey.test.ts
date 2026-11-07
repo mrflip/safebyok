@@ -163,7 +163,8 @@ describe("attemptOnce", () => {
 })
 
 describe("a passkey unlock, end to end", () => {
-  it("createPasskey's answer adds the vault's passkey, and askPasskey's opens the vault on another device, as their examples show", async () => {
+  it("opens the vault on another device with the passkey createPasskey made", async () => {
+    // createPasskey @example, askPasskey @example
     TH.installFakeAuthenticator()
     const world = TH.makeBankWorld()
     const { vault } = await TH.makeBankWithVault(world)
