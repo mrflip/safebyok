@@ -1,0 +1,348 @@
+# Sprint react_new: the plan
+
+* **Date:** 2026-11-07. **Mode:** YOLO (two-way calls made and recorded as Open Matters rows and in
+  the sprint's `human/` entry).
+* **Levels (defaults):** review `medium`; worker and reviewer at their agents' own model and
+  effort; style pass at `style-reviewer`'s pin (`sonnet`). At most **3** threads at once.
+* **Issued by:** the Coach (flip), in this session, after the design talk recorded in
+  [design.md](design.md).
+* **Sprint worktree:** `../byok-react_new`, branch `20261107-react_new`, from `origin/main` at
+  `495cc5d6e` (the vaultdb line merged).
+* **Status:** planned; thread 1 starting.
+
+## Read first
+
+Every worker has CLAUDE.md. Beyond it, by thread:
+
+* `notes/expose_improves_security.md`, whole (short): threads 4 to 8. It is the sketch of the three
+  ways to hold a whisper that flows 1, 2 and 3 implement.
+* `packages/safebyok/README.md`, *A host* and *Showing a whisper*: threads 2 to 8.
+* `packages/safebyok/tests/models/proof.test.ts`: a host driving a bank's whole life; consult by
+  `rg`, never read through. Threads 2 to 5.
+* [design.md](design.md), *1. Inventory* and *2. What the React layer needs*: threads 2 to 5.
+* [regressions.md](regressions.md): threads 4 to 8, which build on the first entry.
+
+## Ground rules
+
+* **Never consult `packages/safebyok-old/` for implementation or contract**, and never change it.
+  Old tests may suggest coverage. The old React and demo code is being replaced, not ported line by
+  line: keep what still serves, rewrite the rest.
+* **Don't change the core's whisper policies**: when `expose`, `unexpose`, `veil`, `unveil`,
+  `patchWhisper` and `putExposed` keep, drop, show or refuse. The files of `safebyok/dom`
+  (`packages/safebyok/src/dom/`) are ours to customize and improve. Any other core change is the
+  smallest additive export the thread needs.
+* **A race or a design flaw met in the core**: report it in the thread file's open matters, and move
+  on. It is not this sprint's to fix.
+* **The whisper is always an object.** The demo's Anthropic key is `{ apiKey }`.
+* **A box is made, or fetched, by spelling both options out**:
+  `vault.putBox({ boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })`, then
+  `box.expose()`.
+* **Nothing asks the user on its own.** `useVault` reads `bank.vaultAt` once `hello` is `ready` and
+  never calls `bank.ensureVault`, which launches `build_vault` for an unborn vault. Click handlers
+  call `bank.ensureVault` and then `vault.ensureUnlocked()` before any verb that needs the vault
+  unlocked, so each dialog opens on the user's gesture.
+* **No holder count.** A component that exposes a box unexposes it on unmount, and that hides the
+  whisper from every holder of the same Box: [regressions.md](regressions.md), first entry. The
+  Coach expects a different approach later, not a counter.
+* **The demo runs under `<StrictMode>`**: expose from a button after mount, never in an effect.
+* **Names.** The dev panels are `DevBoxInspector`, `DevVaultDBInspector`, `DevDeviceDBInspector`,
+  exported only from a new `safebyok-react/devmode` entry, so a host gets them only by importing it
+  by name. `VaultDB` and `DeviceDB` are spelled so, never `Db`.
+* **Dependencies** that `safebyok-old` used may be added without asking first. Name each one in the
+  thread file and the PR. Any other runtime dependency is proposed first (PROCESS.md,
+  *Dependencies*).
+* **The `devicedb_idb` line (#567 → #568 → #569 → #570) is in flight** on the core: DeviceDB verbs
+  become `stow`, `peek`, `forget`, `listLeases`, and `IdbDeviceDB` joins `safebyok/browser`. Until it
+  merges, touch no core file it changes beyond a re-export in `src/index.ts`:
+  `helpers/consts.ts`, `helpers/phrases.ts`, `refusals/errors.ts`, `shapes/*`, `storage/*`,
+  `models/bank.ts`, `models/lease.ts`, `models/vault.ts`.
+* **The demo's storage until thread 10:**
+  * `idbVaultDB` from `safebyok-indexeddb`, which is on the new core on main;
+  * `MemoryDeviceDB`, so every reload asks for the passphrase;
+  * a demo-local strength checker in `src/lib/`, marked DEMO JANK, of at least 12 characters;
+  * a `device_id` the demo mints once and keeps in `localStorage`.
+
+  Thread 10 replaces all of these with `browserOpts`. The fake auth's stores stay demo-local.
+* **The safebyok-react README** is 555 lines about the old API. Each thread rewrites the sections
+  for what it changes and deletes sections that describe what is gone. It never keeps a stale
+  section.
+* **Changesets**: every thread that changes a published package writes one (PROCESS.md,
+  *Changesets*). safebyok-react's surface changes wholesale; pre-1.0, nothing keeps a shim.
+
+## The Coach's request, verbatim
+
+> The code is nearing the end of a rewrite. You will cement one of the last big pieces, the
+> react_new part. [...] I would like to get react and the demo-react working. There are likely some
+> gaps to fill. You can, in notes/expose_improves_security.md, see a pencil sketch of two ways to use
+> the library:
+> 1. a slightly "higher" security one that never involve exposing secrets;
+> 2. the pure-react aw-ain't-that-cute demo friendly one: everything is handled for you, it's barely
+> more than 12 lines and some of those are closing braces
+> 3. the one where you've taken a bit more control over the forms themselves and are building off
+> managed input fields we provide
+>
+> Implement the knock-knock app, doing them in reverse order: 3, 2, 1
+>
+> The react library should export the following:
+> 1. an input usable to store a secret: it has all the no-password-manager tags, marked as a
+> password field, an eye to show and hide the text as entered (this is diffferent than
+> veiled/unveiled, we'll add that later).
+> 2. a component suitable for the "Account" hamburger, allowing you to lock your vault
+> 3. ... and so on: the rest of the facilities needed to make our demo app
+> 4. pull the inspection panels from the demo into safebyok-react. it should require importing
+> safebyok/devmode, and every component should have DevMode in the name. [...]
+>   - a dev mode VaultDb panel : simple sparse component to see the contents of the db and make
+>   calls against it. This is a bare-bones "database" view of the data
+>   - a dev mode whisper panel : simple sparse component showing the "client side": select a vault
+>   scope, select a box label, and exercise the commands against it, including put, lock, expose,
+>   etc. exposing the box "bob" in this panel should affect a box "bob" everywhere in the same page
+>   (i.e. they share a provider)
+
+Later rulings in the same session, verbatim where they bind the threads:
+
+> Call the two dashboard panels DevBackdoorBoxViewer and DevBackdoorVaultDB [...] Add as a thread:
+> resurrect safebyok/browser [...] Can you work around it for now? [the unborn vault] [...] May we
+> keep the unpleasant unmount behavior to start [...] You are approved to add any packages needed
+> without checking first -- make sure I know about it. Assume that the list of packages we'll need
+> is the same as for -old, and that `safebyok/browser` will export the same cohort of stuff [...]
+> my bad, I meant Requires importing safebyok-react/devmode -- you can only get the danger panels by
+> acknowledging what you are adding. yes to a lease browser as a dev mode panel.
+
+> pay extra and get the `vault.putBox({ boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent:
+> 'add' })` version [...] Let's call the panels DevBoxInspector, DevVaultDbInspector,
+> DevDeviceDbInspector [...] I want the demo to represent something that would (after removing the
+> inspectors) reasonably last all the way to production. I also want it to be easy to compare 3 and
+> 2. I also don't want to have complications of routes or tabs. So I think all three on one page is
+> OK and we'll iterate
+
+## The threads
+
+Waves: **1**, then **2**, then **3 and 4 side by side**. Then **5** (after restacking 3 and 4 into
+one line), then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging; **10** comes
+last.
+
+### 1. core_for_react
+
+> the rest of the facilities needed to make our demo app
+
+*Gloss.* The small, additive core exports safebyok-react needs, so later threads import rather
+than reach in:
+* the correctable refusal kinds (`correctablekindVals`, or an `isCorrectable(err)` beside
+  `isVaultError`);
+* the types `Gatingkind`, `LockState`, `BankStage`, `DamagedBox`, and the passkey wayin header type
+  `gating.passkeyHeader` carries;
+* `PasskeySaltBytes` / `PrfAnswerBytes`, `MinuteMillis`;
+* whatever the boundary needs to turn a foreign throw into a VaultError without quoting it (today's
+  `refusalFor`).
+
+Re-exports in `src/index.ts`, with tests in `tests/index.test.ts`; a changeset.
+* *Touches:* `packages/safebyok/src/index.ts`, its test. Nothing on the `devicedb_idb` line's list.
+* *Levels:* worker `sonnet`; review `low`.
+* *Depends on:* nothing. *Size:* small.
+* *Look-ahead:* threads 2 and 3 import these. Name the passkey header type as the core names it.
+
+### 2. react_port
+
+> I would like to get react and the demo-react working.
+
+*Gloss.* safebyok-react onto the new core:
+* Its peer dependency becomes `safebyok`.
+* `BankProvider`:
+  * one Bank per `user_id`, made in an effect;
+  * `bank.hello()` once made;
+  * `bank.sweep()` on unmount or a change of user;
+  * a `bank.autolock()` interval;
+  * the default `requestCleartext` renders `GatingModal`, still only while the user's gesture is in
+    hand;
+  * handlers written inline make no new bank, as today.
+* Hooks, each `useSyncExternalStore` over the model's `subscribe` / `getSnapshot`:
+  * `useBank`, `useBankSnapshot`;
+  * `useVault(vaultlabel)`, which never asks, and calls `vault.hello()` once for each vault it names;
+  * `useVaultSnapshot`.
+* `GatingModal`, as a map from gatingkind to dialog, with **`build_vault` and `unlock_vault`** (the
+  passphrase dialog) only.
+* `boundary.tsx`, `attempt-refusals.ts`, `messages.ts`, `when-shown.ts` and `WhisperField`, ported.
+* The remaining kinds and the passkey calls are thread 3's. Delete them here if they won't compile,
+  with their tests.
+* **The demo is parked:**
+  * it keeps the fake auth, a ported `SessionBar` (sign in and out) and `App` with the provider on
+    the ground rules' storage;
+  * `KnockKnock`, `VaultDashboard`, `WaysIn`, `PsstModal` and `inspection/` go, with their tests;
+  * later threads bring each back on the new API.
+  * This is a YOLO call; its row is in Open Matters.
+* *Touches:* all of `packages/safebyok-react/src` and `tests`, its README and `package.json`,
+  `.size-limit.json`'s `BankProvider` and `reactEverything` lines (`ignore` names `safebyok-old`),
+  `demos/safebyok-demo-react`.
+* *Depends on:* 1. *Size:* large. The old tests are thousands of lines on old behaviour: write new
+  tests in proportion rather than porting them case by case.
+* *Look-ahead:* thread 3 adds dialogs to `GatingModal`'s map and nothing else in the provider.
+  Thread 4 adds box hooks beside the vault hooks, so keep the hooks' file open to that. Thread 5's
+  account menu reads `useVaultSnapshot` and an unborn-vault state, so expose `unborn` plainly
+  (from the bank's snapshot, or the hook's answer).
+
+### 3. react_dialogs
+
+> 3. ... and so on: the rest of the facilities needed to make our demo app
+
+*Gloss.* The rest of the gatings in `GatingModal`:
+* `replace_passphrase`, `add_passkey`, `revoke_passkey`, `del_vault`;
+* `createPasskey` / `askPasskey` / `passkeysAvailable` on `gating.passkeyHeader` and the new
+  passkey answer;
+* `PasskeyUnlockButton` in the unlock dialog.
+
+In the demo, `WaysIn` comes back on `vault.replacePassphrasePrompt`, `addPasskeyPrompt` and
+`revokePasskeyPrompt`, and `SessionBar`'s *Delete account* on `vault.delVaultPrompt`.
+* *Touches:* `gating-modal.tsx`, `modal.tsx`, `passkey*.ts(x)` and their tests; demo `WaysIn`,
+  `SessionBar`; README sections.
+* *Depends on:* 2. Runs beside 4. *Size:* medium.
+* *Look-ahead:* thread 5 restacks it with 4 into one line; keep `src/index.ts` edits to whole lines.
+
+### 4. react_boxes
+
+> 1. an input usable to store a secret: it has all the no-password-manager tags, marked as a
+> password field, an eye to show and hide the text as entered (this is diffferent than
+> veiled/unveiled, we'll add that later).
+> 2. a component suitable for the "Account" hamburger, allowing you to lock your vault
+
+*Gloss.*
+* Box hooks:
+  * `useBoxes(vaultlabel)`, the box listing's snapshot;
+  * `useBox(vaultlabel, boxlabel)`, the Box the listing holds, so one Box per label across the page;
+  * `useBoxSnapshot(box)`;
+  * `useWhisper(box)`, live `box.whisper`.
+* Components:
+  * `BoxWhisperField`: an input bound through `BoxFields.of(box).bind(path)`, with
+    `WhisperFieldAttributes`, `type="password"` and the eye, which flips the input's type and never
+    calls `veil`;
+  * `VaultLockControl`, for an account menu: lock state, Lock (`vault.lock()`), Unlock
+    (`vault.ensureUnlocked()`, after `bank.ensureVault`);
+  * `CreateVaultButton`.
+* `safebyok/dom` may be improved where `BoxWhisperField` needs it. Its policies may not change.
+* *Touches:* new files in `packages/safebyok-react/src` and tests, `src/index.ts`, README;
+  maybe `packages/safebyok/src/dom/`.
+* *Levels:* review `high`: it puts whisper text into the DOM (`notes/guarantees.md`).
+* *Depends on:* 2. Runs beside 3. *Size:* medium.
+* *Look-ahead:* threads 5 to 8 build on these hooks. `DevBoxInspector` (8) uses `useBox` and so
+  shares the Box with every flow; regressions.md's first entry applies, and the hooks' doc blocks
+  say nothing of it beyond one line.
+
+### 5. demo_fields
+
+> Implement the knock-knock app, doing them in reverse order: 3, 2, 1
+
+*Gloss.* The demo stands up on the new core, and flow 3 comes first:
+* The ground rules' storage, and a demo-local `localStorage` store for the fake auth in place of
+  `safebyok-old`'s `domStore`.
+* The outage switch becomes a subclass of `IdbVaultDB`.
+* An account menu with `VaultLockControl`, kept in a form that could ship.
+* `KnockKnockFields`:
+  * `useBox('main', 'anthropic_api_key')` and `BoxWhisperField path="apiKey"`;
+  * Edit is `bank.ensureVault` → `vault.ensureUnlocked()` → `putBox(..., { ifPresent: 'get',
+    ifAbsent: 'add' })` → `box.expose()`;
+  * Save is `BoxFields.of(box).save()`;
+  * knock reads the key from the exposed whisper.
+* The page holds the three flows side by side, with no routes or tabs, and reads as an app that
+  could ship once the inspectors are removed. `lib/anthropic.ts` takes the key as text from
+  whichever flow calls it.
+* After this thread, nothing in the demo imports `safebyok-old`.
+* *Touches:* `demos/safebyok-demo-react` (`src/lib/*`, `App.tsx`, new components, tests).
+* *Depends on:* 3 and 4, restacked into one line first. *Size:* medium-large.
+* *Look-ahead:* threads 6 and 7 each add one sibling flow component beside `KnockKnockFields`;
+  thread 8 adds the dev panels below the app. Give each a slot in `App.tsx`.
+
+### 6. demo_exposed
+
+> 2. the pure-react aw-ain't-that-cute demo friendly one: everything is handled for you, it's barely
+> more than 12 lines and some of those are closing braces
+
+*Gloss.* `KnockKnockExposed`:
+* `useBox` + `useWhisper(box)`, a controlled input of `whisper.apiKey ?? ''`;
+* `box.patchWhisper({ apiKey })`, `box.putExposed()`;
+* `unexpose` on unmount; Edit exposes as in 5.
+
+The form's whisper handling aims at the note's twelve lines. Where safebyok-react could take more
+of it (a `useExposedWhisper`-style hook), propose it in open matters rather than build it.
+* *Levels:* worker `sonnet`.
+* *Depends on:* 5. *Size:* small.
+
+### 7. demo_sealed
+
+> 1. a slightly "higher" security one that never involve exposing secrets;
+
+*Gloss.* `KnockKnockSealed`:
+* `WhisperField` (free, uncontrolled) + `vault.putBox({ boxlabel, whisper: { apiKey } })` to save;
+* knock does `await box.extractWhisper()` inside its handler;
+* nothing is exposed.
+
+* *Levels:* worker `sonnet`; review `low`.
+* *Depends on:* 6. *Size:* small.
+
+### 8. dev_inspectors
+
+> pull the inspection panels from the demo into safebyok-react [...] you can only get the danger
+> panels by acknowledging what you are adding.
+
+*Gloss.* A `safebyok-react/devmode` entry (`package.json` `exports`, `tsdown.config.ts`), with:
+* **`DevVaultDBInspector`**, a bare database view over any VaultDB's public verbs: `listVaults`,
+  then `listBoxes` for each live vault, `watch` for changes. Raw `getVault`, `getBox`, `delBox` and
+  `tidyGone` buttons.
+* **`DevBoxInspector`**: pick a vaultlabel and a boxlabel, then `put`, `expose`, `unexpose`,
+  `veil`, `unveil`, `vault.lock()`, `ensureUnlocked`, `extractWhisper`, `delBox`. It goes through
+  `useBox`, so exposing "bob" here exposes "bob" everywhere on the page.
+
+The demo shows both below the app, behind its outage switch, and drops its old `inspection/`
+folder. `DevDeviceDBInspector` waits for thread 10, after the DeviceDB verbs are renamed.
+* *Touches:* `packages/safebyok-react` (new `src/devmode/`, `package.json`, `tsdown.config.ts`,
+  README, a size line of its own), demo `App.tsx`.
+* *Depends on:* 5. Runs beside 6 and 7. *Size:* medium.
+* *Look-ahead:* thread 10 adds `DevDeviceDBInspector` to the same entry.
+
+### 9. browser_batteries
+
+> Add as a thread: resurrect safebyok/browser [...] Assume that the list of packages we'll need is
+> the same as for -old, and that `safebyok/browser` will export the same cohort of stuff
+
+*Gloss.* `safebyok/browser` exports what the old one did:
+* `zxcvbnStrengthChecker`, with `MinPassphraseChars` and `MinZxcvbnScore`;
+* `idbDeviceDB` (from #569);
+* `browserOpts({ dbName }?)`, the frozen bag of `keyDeriver`, `deviceDB` and `strengthChecker`, the
+  same bag for the same `dbName`.
+
+More detail:
+* The zxcvbn dictionary loads as its own chunk at `hello()`, through the checker's `load`.
+* Dependencies: `@zxcvbn-ts/core` and `@zxcvbn-ts/language-common`.
+* `Bank.make` now requires a `device_id` the old bag had no part in: decide whether `browserOpts`
+  supplies one. It is sync and called in render, so it would come from `localStorage`. Either way,
+  record it as an open matter.
+* The core README's *Not done yet* and CUSTOMIZATION.md's checker section come back with it. The
+  `zxcvbnStrengthChecker` and `browserOpts` size lines point at `packages/safebyok/dist/browser.js`.
+* The prose on why these live in core is `notes/good_bank_opts_are_in_browser.md`, on the sprint
+  PR. Link it; don't restate it.
+* *Touches:* `packages/safebyok/src/browser.ts`, a new checker module, `package.json`, README,
+  CUSTOMIZATION.md, `.size-limit.json`.
+* *Depends on:* the `devicedb_idb` line (#567 → #568 → #569 → #570) on main. Cut from main once it
+  has merged. *Size:* medium.
+
+### 10. demo_browser
+
+> yes to a lease browser as a dev mode panel.
+
+*Gloss.* The demo moves to `...browserOpts({ dbName: Applabel })`:
+* `idbDeviceDB`, so a lease survives a reload;
+* zxcvbn in place of the demo-local checker;
+* `device_id` as thread 9 decides.
+
+`DevDeviceDBInspector` joins `safebyok-react/devmode`: the lease rows through the renamed DeviceDB
+verbs (`listLeases`, or `listRawLeases` for damaged rows too), each row with `forget`. The demo
+shows it beside the other two.
+* *Levels:* worker `sonnet`; review `low`.
+* *Depends on:* 9, 7 and 8, restacked into one line. *Size:* small-medium.
+
+## For the Coach
+
+* Threads 9 and 10 wait on the `devicedb_idb` line (`main → #567 → #568 → #569 → #570`) merging,
+  which waits on your restack. The other threads don't.
+* The base checkout's `whiteboard/20261107-react_new/` holds my pre-sprint drafts (`plan.md`,
+  `regressions.md`). This directory's copies (`design.md`, `regressions.md`) are current. I haven't
+  touched the base checkout's.
+* The sprint doc's Open Matters holds the questions still hanging.
