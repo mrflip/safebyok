@@ -63,10 +63,10 @@ const NotifySql = 'SELECT pg_notify($1, told) FROM unnest($2::text[]) AS told'
 
 // == [Notices]: vaultChannelOf, VaultPropFields, BoxPropFields, noticeTextOf, toldOf
 
-const userIdChecked = DB.Checker(({ user_id }) => user_id, 'bad_option')
+const vaultChannelOfInput = DB.Checker(({ user_id }) => user_id, 'bad_option')
 
 /** The channel the notices of `user_id`'s writes are sent on, which a `PostgresListen` you hand the vaultDB listens to. */
-export const vaultChannelOf = (user_id: string): string => channelOf(userIdChecked.parse(user_id, { where: 'vaultChannelOf' }))
+export const vaultChannelOf = (user_id: string): string => channelOf(vaultChannelOfInput.parse(user_id, { where: 'vaultChannelOf' }))
 
 // A user_id whose channel passes 63 bytes, Postgres's longest identifier, cannot be notified: a write under it that would send a notice refuses.
 const channelOf = (user_id: string): string => `safebyok_${user_id}`
