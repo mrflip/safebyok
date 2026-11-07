@@ -93,6 +93,13 @@ describe("CreateVaultButton", () => {
     })
   })
 
+  it("is disabled until the bank's hello lands", async () => {
+    render(<BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><CreateVaultButton vaultlabel="main" /></BankProvider>)
+    const button = screen.getByRole('button', { name: 'Create vault' })
+    expect(button.hasAttribute('disabled')).to.be.true
+    await waitFor(() => { expect(button.hasAttribute('disabled')).to.be.false })
+  })
+
   it("is disabled while nobody is signed in", () => {
     render(<BankProvider {...TH.providerPropsOf(TH.makeBankWorld(), { user_id: null })}><CreateVaultButton vaultlabel="main" /></BankProvider>)
     expect(screen.getByRole('button', { name: 'Create vault' }).hasAttribute('disabled')).to.be.true
