@@ -13,7 +13,8 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 23; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** filed 1 (#573), 2 (#574), 12 (#575), 3 (#577); 4 (#576) filing; then the restack of 4, 3, 12.
+* **Status:** filed 1 (#573), 2 (#574), 3 (#577), 4 (#576), 12 (#575). Thread 11 building from 3. Thread 5
+  waits on the Coach's `/restacker 573 574 576 577 575`.
 
 ## Read first
 
@@ -122,8 +123,8 @@ Later rulings in the same session, verbatim where they bind the threads:
 
 ## The threads
 
-Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **5** and **11** side by side (after
-restacking 3, 4 and 12 into one line), then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
+Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **11** (from 3), and **5** once the
+Coach restacks 4, 3 and 12 into one line, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
 **10** comes last.
 
 ### 1. core_for_react
@@ -277,6 +278,12 @@ thread 11.
     browser's activation window, so the gated dialog is declined unasked and nothing happens. Confirm
     only on the unborn path; for a present vault the passphrase dialog is the confirmation.
   * `App.tsx`'s `Page` calls `useSession(auth)` a second time; pass the session down.
+* Ride-alongs from thread 4's review (#576), in `packages/safebyok-react`:
+  * `useRevealToggle` (`reveal-toggle.tsx`) resets to hidden when its field hides. Today Show
+    survives a lock, veil or unexpose, so the next unlock writes the key into a `type="text"` field.
+    Never by remounting the input, which would unbind and unexpose.
+  * `VaultLockControl`'s Unlock calls `vault.tryEnsureUnlocked()` on the vault in hand rather than
+    `bank.tryEnsureVault`, so Unlock never creates a vault; only `CreateVaultButton` does.
 * *Touches:* `demos/safebyok-demo-react` (`src/lib/*`, `App.tsx`, new components, tests).
 * *Depends on:* 3, 4 and 12, restacked into one line first. *Size:* medium-large.
 * *Look-ahead:* threads 6 and 7 each add one sibling flow component beside `KnockKnockFields`;
@@ -387,16 +394,10 @@ shows it beside the other two.
   `WaysIn`; README.
 * Read the passkey gating kinds from the core (`add_passkey`, `revoke_passkey`), not from thread 3's
   thread file, which says `replace_passkey` in one line.
-* Ride-alongs, two lines each:
-  * Export `ReplacePassphraseModal` and `DelVaultModal` (thread 3).
-  * `useRevealToggle` (`reveal-toggle.tsx`) resets to hidden when its field hides. Today Show
-    survives a lock, veil or unexpose, so the next unlock writes the key into a `type="text"` field
-    (thread 4's review). Never by remounting the input, which would unbind and unexpose.
-  * `VaultLockControl`'s Unlock calls `vault.tryEnsureUnlocked()` on the vault in hand rather than
-    `bank.tryEnsureVault`, so Unlock never creates a vault; only `CreateVaultButton` does (thread 4's
-    review).
-* *Depends on:* 3, 4 and 12, restacked into one line (its ride-alongs touch thread 4's files). Cut
-  beside 5 from the line's top. *Size:* medium.
+* Ride-along: export `ReplacePassphraseModal` and `DelVaultModal` (thread 3).
+* *Depends on:* 3. *Orchestrator:* cut from thread 3's tip while the restack of 4, 3 and 12 waits on
+  the Coach (`/restacker` refuses agents from the base checkout); its two thread-4 ride-alongs moved
+  to thread 5. *Size:* medium.
 
 ### 12. provider_handlers
 
@@ -424,6 +425,9 @@ shows it beside the other two.
   redundancies; an `it.each` table in `'`. PR #575.
 
 ## For the Coach
+
+* **Run `/restacker 573 574 576 577 575`** (line `main → #573 → #574 → #576 → #577 → #575`). Thread 5
+  waits on it; the skill refuses agents from the base checkout.
 
 * Threads 9 and 10 wait on the `devicedb_idb` line (`main → #567 → #568 → #569 → #570`) merging,
   which waits on your restack. The other threads don't.
