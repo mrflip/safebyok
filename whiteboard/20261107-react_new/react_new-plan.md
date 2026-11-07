@@ -13,9 +13,8 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** wrapping up. Merged: 1, 2, 3, 4, 5 (#584), 9, 11, 12, 14. Filed: 13 (#583), 17 (#585),
-  15 (#586), 16 (#589), 18 (#593), 5's follow-up (#587), 6 (#588), 7 (#591), 8 (#590). Restacking into
-  main → #586 → #589 → #593 → #583 → #585 → #587 → #588 → #591 → #590 → #572.
+* **Status:** done 2026-11-07. The line to merge: main → #586 → #589 → #593 → #583 → #585 → #587 →
+  #588 → #591 → #590 → #572 (the top). See `human/20261107-sprint_react_new_done.md`.
 
 ## Read first
 
