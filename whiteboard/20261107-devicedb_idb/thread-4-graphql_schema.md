@@ -1,8 +1,9 @@
 # Thread 4: graphql_schema (2026-11-07)
 
 Branch `20261107-graphql_schema`, PR #571, stacked on #569 (thread 2, `20261107-idb_devicedb`). Status: **ready**,
-milestones 1-4 built. Justify green (with `SAFEBYOK_PG_URL` set): core 2,365, indexeddb 107 (2 skipped), postgres 123
-(1), convex 227, fastkey 49, graphql 228 (3), e2e 298 (4), react 326.
+milestones 1-4 built, reworked on the Coach's rulings of 2026-11-07 (`thread-4-graphql_schema-rulings.md`, read it
+first). Justify green (with `SAFEBYOK_PG_URL` set): core 2,367, indexeddb 107 (2 skipped), postgres 123 (1), convex
+227, fastkey 49, graphql 234 (3), e2e 298 (4), react 326, demo 230 (17).
 
 Authority: the Coach's rulings in `vaultdb_cleanup-plan.md` *8. graphql_schema* (on `origin/20261106-vaultdb_cleanup`)
 and `devicedb_idb-plan.md` *4. graphql_schema*. Milestones 1 to 3 in detail: `thread-4-graphql_schema-m1m2.md`.
@@ -69,9 +70,8 @@ and `devicedb_idb-plan.md` *4. graphql_schema*. Milestones 1 to 3 in detail: `th
   * Milestones 1-2: interface name `VaultDBVerbs`; tidyGone off the wire; refuse, don't strip; `unexpected_error`
     for wire failures; `_cheat_storeOf`; `SafebyokEpochMillis`; hand-rolled scalars; explicit null opts refused;
     type errors as GraphQL errors; no cause in host logs. Keep each.
-  * **Resubscribe delay**: built as planned, a fixed 1s behind `afterAPause`; or resubscribe at once, with no timer
-    (a one-line change).
-  * **`maxRecordBytes` off the client**: keep; or accept it and ignore it, sparing hosts a breaking change.
+  * Resubscribe, `maxRecordBytes`, tidyGone off the wire, and the network error's cause: ruled 2026-11-07, built
+    (`thread-4-graphql_schema-rulings.md`).
 
 ## Rework after the review at `high` (2026-11-07)
 
