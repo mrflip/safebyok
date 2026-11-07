@@ -13,9 +13,9 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** resumed 2026-11-07: the Coach merged #573 to #578; #579 is filed, open, on top of
-  them. Filed: 1, 2, 3, 4, 9, 11, 12. Running: 5 (on #579), 13 and 14 (on main). Waiting: 6, 7 and 8
-  on 5. Thread 10 folded into 5 and 8.
+* **Status:** running. Merged: 1, 2, 3, 4, 9, 11, 12, 14. Filing: 13 (a conflict with #581).
+  Reviewing: 5 (#584). Running: 15. Waiting: 6, 7, 8 on 5; 16 on 15 and 5; 17 on 13. Thread 10
+  folded into 5 and 8.
 
 ## Read first
 
@@ -509,6 +509,67 @@ shows it beside the other two.
   the passphrase in plain text (my call: a caveat about a secret, still one line). Left for the
   documentarian: `useWhenShown`'s `isShown` guidance, `useWhisper`'s "read it at each render",
   `ModalForm`'s class names.
+
+### 15. device_bank
+
+> What we want is something run right ahead of the bank that will get-or-create a device id, keyed by
+> the bank scope, using DeviceDB. call it bank and store { applabel, user_id, device_id }; it should be
+> a random uuid. It is supposed to be fed to the bank provider. Is this straightforward? The way of
+> doing it by bank itself was very janky.
+
+*Gloss.* *Orchestrator:* from an Open Matters ruling (2026-11-07). The core's half:
+* A `bank` row in the DeviceDB, `{ applabel, user_id, device_id }`, keyed by the bank scope
+  (`applabel`, `user_id`), with `device_id` a random UUID (`crypto.randomUUID()`).
+* A get-or-create verb beside the lease verbs in `storage/device-db-new.ts` (*Bank verbs*): `ensureBank({ applabel, user_id })`
+  answers the row, making it on first call; its `try` form, as the lease verbs have. Built in
+  `MemoryDeviceDB` and `IdbDeviceDB` (a new object store, so the versioned database name moves on,
+  as #570 does it; the changeset says a device forgets its remembered unlocks once), and in the
+  DeviceDB battery. Validated at the entrypoint (`Checkers`), refusals the lease verbs' way.
+* Two calls at once for the same scope answer the same `device_id` where the store makes that easy
+  (IndexedDB: one transaction); otherwise a race gets a row, not machinery.
+* VOCABULARY.md's *device record* line and the deviceDB lines say what is kept now. `notes/guarantees.md`
+  names these files: read its *The guarantees* section first (CLAUDE.md); a `device_id` is not secret.
+* Not in `Bank`: the Coach found doing it inside the bank janky. `Bank.make` still takes `device_id`.
+* *Levels:* review `high` (stored shape; files `notes/guarantees.md` names).
+* *Touches:* `packages/safebyok/src/storage/` (device-db-new, memory-device-db, idb-device-db, the
+  battery), shapes for the row, VOCABULARY.md, a changeset.
+* *Depends on:* nothing unmerged. Cut from `origin/main`. *Size:* medium.
+* *Look-ahead:* thread 16 calls `ensureBank` from `BankProvider`; thread 8's `DevDeviceDBInspector` may
+  list bank rows beside leases (a raw list verb, if the worker finds one natural).
+
+### 16. provider_once
+
+> yay simpler: one per applabel + user_id (you only mentioned user_id, it should be both
+
+*Gloss.* *Orchestrator:* from two Open Matters rulings (2026-11-07), both in `bank-provider.tsx`:
+* `BankProvider` makes its bank once per `applabel` + `user_id`. Every other prop is read when the
+  bank is made; a later change is ignored and warned of once through the bank's logger. The remake
+  bookkeeping goes: the prop-to-ref effects, the remember-the-last-props block, the long dependency
+  list, the has-handler tracking. *My call (a row):* handlers are read once too, no latest-handler
+  refs; a host wanting a fresh bank keys `<BankProvider>`.
+* Right before `Bank.make`, the provider calls `deviceDB.ensureBank({ applabel, user_id })` (thread
+  15) and makes the bank with that `device_id`. *My reading (a row):* the provider runs it, and the
+  `device_id` prop goes.
+* The demo stops minting a `device_id` in `localStorage`.
+* README: none (thread 14 cut it). Tests: what the provider does now; the remake tests go.
+* *Depends on:* 15, and 5 (the demo it edits): cut once both are on main, or restacked into a line.
+  *Size:* medium.
+
+### 17. passkey_unavailable
+
+> [The core has no "passkeys unavailable here" refusal. Rec: a core thread adds a
+> `passkey_unavailable` kind after the devicedb_idb line merges; the React side then switches to it.]
+> (proceed, the Coach took the Rec)
+
+*Gloss.* *Orchestrator:*
+* The core gains a refusal kind `passkey_unavailable` (`refusals/`, the shapes' kind list, its
+  phrase): the browser offers no WebAuthn, or the authenticator no PRF. Whether it is correctable
+  is the worker's to judge from how the other kinds sort, said in the PR.
+* safebyok-react's `passkey.ts` refuses it where it refuses `wrong_passkey` for those cases today;
+  `Messages` gets words for it; the passkey button and dialogs show them.
+* Ride-along from the Cleanup list (#573 review): hostile-input tests for
+  `HostErrorSanitizer.refusalFor` (`undefined`, a string, an object whose getters throw).
+* *Depends on:* 13 (#583, which reworks `passkey.ts`). Cut from its tip once filed. *Size:* small.
 
 ## For the Coach
 
