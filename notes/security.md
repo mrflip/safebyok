@@ -1646,8 +1646,8 @@ added or folded into through the subagent, and no other entry changes.
   key, so neither is offline-guessable, and it is what a `getBox` by the same signed-in user
   returns. What it changes: this is a refusal's `meta` now holding ciphertext of the winning box
   (never plaintext, never key material in the clear), and it crosses wires: GraphQL's
-  `extensions.meta.box_stored` (amended 2026-10-22 (wire_meta): no longer; over GraphQL it is the `box_stored` of
-  `safebyokPutBox`'s answer in the response `data`, see the 2026-10-22 wire_meta entry) and the Postgres route recipe's
+  `extensions.meta.box_stored` (amended 2026-10-22 (wire_meta): no longer; amended 2026-11-07 (docblock_trim): over GraphQL the winning box travels among the
+  `world` and `dbhas` of `safebyokPutBox`'s answer in the response `data`, see the 2026-10-22 wire_meta entry) and the Postgres route recipe's
   `refusal.box_stored`; the error's
   `cause` still never crosses. A host that logs or reports a whole `VaultError` including `meta`
   now logs that ciphertext. An audit of where refusal meta can leak (logs, error reporters, a host
@@ -2318,8 +2318,8 @@ added or folded into through the subagent, and no other entry changes.
   count and approximate size to the caller already authorized for that vault (the listing already
   shows the count). The base class validates the capacity (whole numbers; `Infinity` becomes
   `Number.MAX_SAFE_INTEGER`) and refuses a `vault_full` without a sound one as `corrupt_record`.
-  It crosses the GraphQL wire as `extensions.meta.capacity` (amended 2026-10-22 (wire_meta): no longer; it is the `capacity`
-  of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
+  It crosses the GraphQL wire as `extensions.meta.capacity` (amended 2026-10-22 (wire_meta): no longer; amended 2026-11-07 (docblock_trim): it is the `capacity`
+  of the `err.meta` of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
   README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
   write) or `capacity` (`vault_full`). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed`
@@ -2486,8 +2486,9 @@ added or folded into through the subagent, and no other entry changes.
   but the unlocked vaultKey stays in memory until the vault locks, expires or is closed. The
   README tells apps to close the vault on sign-out; nothing enforces it. *Superseded 2026-10-16*: a sign-out now locks the vault
   (`identity_revoked`, below).
-* 2026-10-15: a vault's box count is capped on the client (`maxBoxes`, `putBox()`
-  refusing `vault_full`), counted from the handle's last look at storage, so stores of new
+* 2026-10-15: a vault's box count is capped on the vaultDB the host's server hosts (`maxBoxes`, an option of that
+  vaultDB, never of the browser's `GraphQLVaultDB`, which takes `{ client }` alone; `putBox()`
+  refusing `vault_full`; amended 2026-11-07 (docblock_trim): not on the client), counted from the handle's last look at storage, so stores of new
   boxes running at once -- on several devices, or on one handle, since nothing serializes
   them -- can overshoot it. Neither local backend (`idbVaultDB`, `localVaultDB`) enforces a count
   or a size per vault; the Convex component does (next entry).
@@ -2843,7 +2844,8 @@ added or folded into through the subagent, and no other entry changes.
   records remain in the response body of a stale write (a stale update's `vault_props_stored` carries both
   wayins with salts and wrapped vaultKeys), to the signed-in owner of that vault only, since the VaultDB refuses
   any other user's scope; a host that logs response bodies would log them. The GraphQL wire keeps its shape
-  (see the 2026-10-22 wire_meta entry) and is unchanged. Coach's ruling 2026-10-22; code in
+  (see the 2026-10-22 wire_meta entry) and is unchanged (amended 2026-11-07 (docblock_trim): that wire was later replaced, and
+  no answer of it has this main `meta`; see that entry). Coach's ruling 2026-10-22; code in
   `packages/safebyok-postgres/README.md`, "The route recipe", run by
   `packages/safebyok-postgres/tests/route-recipe.test.ts`).
   Amended 2026-10-22 (bank): **a vault's birth writes, so the server's database role needs `SELECT`, `INSERT` and
