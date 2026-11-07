@@ -13,7 +13,7 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 2; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** thread 1 filed (#573); thread 2 building.
+* **Status:** thread 1 filed (#573); thread 2 in review (#574); thread 3 split, passkeys now thread 11.
 
 ## Read first
 
@@ -123,8 +123,8 @@ Later rulings in the same session, verbatim where they bind the threads:
 ## The threads
 
 Waves: **1**, then **2**, then **3 and 4 side by side**. Then **5** (after restacking 3 and 4 into
-one line), then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging; **10** comes
-last.
+one line) beside **11**, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
+**10** comes last.
 
 ### 1. core_for_react
 
@@ -190,18 +190,19 @@ Re-exports in `src/index.ts`, with tests in `tests/index.test.ts`; a changeset.
 
 > 3. ... and so on: the rest of the facilities needed to make our demo app
 
-*Gloss.* The rest of the gatings in `GatingModal`:
-* `replace_passphrase`, `add_passkey`, `revoke_passkey`, `del_vault`;
-* `createPasskey` / `askPasskey` / `passkeysAvailable` on `gating.passkeyHeader` and the new
-  passkey answer;
-* `PasskeyUnlockButton` in the unlock dialog.
-
-In the demo, `WaysIn` comes back on `vault.replacePassphrasePrompt`, `addPasskeyPrompt` and
-`revokePasskeyPrompt`, and `SessionBar`'s *Delete account* on `vault.delVaultPrompt`.
-* *Touches:* `gating-modal.tsx`, `modal.tsx`, `passkey*.ts(x)` and their tests; demo `WaysIn`,
+*Gloss.* *Orchestrator:* revised after thread 2 compacted three times; the passkey half moved to
+thread 11.
+* `GatingModal` gains `replace_passphrase` and `del_vault`.
+* In the demo:
+  * `WaysIn` comes back with *Change passphrase* on `vault.replacePassphrasePrompt`;
+  * `SessionBar` gets *Delete account* back, on `vault.delVaultPrompt`.
+* Ride-along: thread 2 stopped handing a non-function `onBadNews` (or `requestCleartext`) through
+  to `Bank.make` to be refused. Restore that, so misuse still reaches the error boundary.
+* *Touches:* `gating-modal.tsx`, `modal.tsx`, the passphrase dialog, their tests; demo `WaysIn`,
   `SessionBar`; README sections.
 * *Depends on:* 2. Runs beside 4. *Size:* medium.
-* *Look-ahead:* thread 5 restacks it with 4 into one line; keep `src/index.ts` edits to whole lines.
+* *Look-ahead:* thread 11 adds the passkey kinds the same way. Thread 5 restacks this thread with 4
+  into one line, so keep `src/index.ts` edits to whole lines.
 
 ### 4. react_boxes
 
@@ -342,7 +343,24 @@ More detail:
 verbs (`listLeases`, or `listRawLeases` for damaged rows too), each row with `forget`. The demo
 shows it beside the other two.
 * *Levels:* worker `sonnet`; review `low`.
-* *Depends on:* 9, 7 and 8, restacked into one line. *Size:* small-medium.
+* *Depends on:* 9, 7, 8 and 11, restacked into one line. *Size:* small-medium.
+
+### 11. react_passkeys
+
+> 3. ... and so on: the rest of the facilities needed to make our demo app
+
+*Gloss.* *Orchestrator:* split from thread 3.
+* `GatingModal` gains `add_passkey` and `revoke_passkey`.
+* `createPasskey`, `askPasskey` and `passkeysAvailable` are rebuilt on `gating.passkeyHeader`
+  (`WayinHeader | null`) and the new `PasskeyAnswer`, with `PrfAnswerBytes` from `safebyok`.
+* `PasskeyUnlockButton` joins the unlock dialog.
+* The demo's `WaysIn` gets back *Add / Replace fingerprint* (`vault.addPasskeyPrompt`) and *Remove
+  fingerprint* (`vault.revokePasskeyPrompt`).
+* Thread 2 deleted the old passkey files and the fake WebAuthn authenticator from the old test
+  helpers. They are in git at `b903c131c`, to restore and rebuild rather than port line by line.
+* *Touches:* `passkey.ts`, `passkey-unlock-button.tsx`, `gating-modal.tsx`, their tests; demo
+  `WaysIn`; README.
+* *Depends on:* 3. Runs beside 5. *Size:* medium.
 
 ## For the Coach
 

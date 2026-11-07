@@ -5,7 +5,7 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 
 ## Where things stand
 
-*Orchestrator:* thread 1 filed (#573); thread 2 building.
+*Orchestrator:* thread 1 filed (#573); thread 2 in review (#574).
 
 ## Facts every thread may need
 
@@ -39,3 +39,24 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
   refusal with `(correctablekindVals as readonly string[]).includes(err.refusalkind)`.
 * *Orchestrator:* `stage` is on `BankSnapshot` (`bank.snapshot.stage`), not on `Bank`.
   `gating.passkeyHeader` is `WayinHeader | null`.
+
+## From thread 2 (react_port, #574)
+
+* *Orchestrator:* **planning lesson:** thread 2 compacted three times before its first justify. A
+  port that rewrites a package plus its tests is a thread's whole budget. Thread 3 was split (passkeys
+  became thread 11); keep later threads to one feature.
+* *Orchestrator:* `useVault(vaultlabel)` answers `{ stage: 'waiting' | 'unborn' | 'present', vault }`.
+  A tombstoned vault reads as `unborn`. A hook reaches the bank through `useProvided(hookname)`. The
+  vaults it has called `hello()` on are kept in a WeakSet. The hooks live in
+  `packages/safebyok-react/src/hooks.ts`.
+* *Orchestrator:* `GatingModal`'s dialogs are the map `DialogForGatingkind` in `src/gating-modal.tsx`.
+  An unmapped kind gets `NoDialog`, which declines it.
+* *Orchestrator:* the provider runs `bank.autolock()` every minute. `allowStartOver` is gone.
+  Sign-out in the demo is `bank.lock()`.
+* *Orchestrator:* the core gained `ForeverMillis` in its exports.
+* *Orchestrator:* vitest resolves `safebyok` through its built dist, so react and demo tests need
+  `pnpm --filter safebyok build` first (`pretest` does it).
+* *Orchestrator:* the demo is a `SessionBar` (sign in, sign out) over `BankProvider`, with storage in
+  `demos/safebyok-demo-react/src/lib/stores.ts`. `lib/anthropic.ts` and the CSS of the removed
+  components are kept. The demo depends on `safebyok` and `safebyok-indexeddb`, and keeps
+  `safebyok-old` only for the fake auth's `StringStore` in `lib/`.
