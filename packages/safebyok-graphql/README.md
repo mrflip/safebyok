@@ -81,8 +81,11 @@ const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB: ne
 
 Your app's own Client serves: `GraphQLVaultDB` asks every query `network-only`, so a document
 cache in front of it changes nothing. `fetchSubscriptions: true` carries `watch` over server-sent
-events; a Client with a WebSocket exchange for subscriptions serves as well. A watch whose stream
-ends subscribes again after a pause, unless it ended refused as `identity_revoked`.
+events; a Client with a WebSocket exchange for subscriptions serves as well. Over fetch and server-sent
+events, a watch whose stream ends subscribes again after a pause, unless it ended refused as
+`identity_revoked`. Over a WebSocket exchange (urql's `subscriptionExchange` with graphql-ws), a stream
+that ends before its first result, or a graphql-ws error, sends no closing result, so the watch does
+not subscribe again there.
 
 ## Who reaches which bank
 
