@@ -142,7 +142,7 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPa
   if (answer === undefined) { throw noPrf() }
   const passkeyClear = answerOf(credential_id, saltBytes, answer)
   // A browser answers only for the credential it was offered; one that does not has nothing to unlock.
-  if (toB64(new Uint8Array(asked.rawId)) !== credential_id) { passkeyClear.prfBytes.fill(0); throw noPrf() }
+  if (toB64(new Uint8Array(asked.rawId)) !== credential_id) { passkeyClear.prfBytes.fill(0); throw new VaultError('passkey_unavailable', Messages.passkeyAskFailed) }
   return passkeyClear
 }
 

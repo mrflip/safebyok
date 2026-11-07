@@ -172,7 +172,7 @@ describe("askPasskey", () => {
     const otherCredential = { type: 'public-key', rawId: new Uint8Array(16).buffer, getClientExtensionResults: () => ({ prf: { results: { first: answer } } }) }
     vi.spyOn(navigator.credentials, 'get').mockResolvedValue(otherCredential as unknown as Credential)
     const asking = askPasskey(headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''))
-    expect(await refusalOf(asking)).to.include({ refusalkind: 'passkey_unavailable' })
+    expect(await refusalOf(asking)).to.include({ refusalkind: 'passkey_unavailable', message: Messages.passkeyAskFailed })
     expect(answer.every((byte) => byte === 0)).to.be.true
   })
 
