@@ -2,7 +2,8 @@ import { useRef } from 'react'
 import type { Gating } from 'safebyok'
 import { useRoundFor } from './boundary'
 import { Messages } from './messages'
-import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
+import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
+import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
 
 /** The passphrase dialog for a `build_vault` gating, which chooses the vault's first passphrase, or an `unlock_vault` one. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
@@ -26,16 +27,20 @@ export type PassphraseModalProps = {
   passphraseUsername?: string | undefined
   /** What to say beside the field as the user chooses a passphrase. Default: the bank's strength checker's reason. */
   passphraseAdvice?:   PassphraseAdvice | undefined
+  /** The relying party the vault's passkey was made under, if not the page's own domain. */
+  passkeyRpId?:        string | undefined
 }
 
 /** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
-const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
+const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passphraseAdvice, passkeyRpId }: PassphraseModalProps) => {
   const { gripe, setGripe, fail, attempt } = useAttempts('PassphraseModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
   const creating = gating.gatingkind === 'build_vault'
   // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
   const advice = useAdvice(passphraseAdvice, gating, creating, fail)
+  const passkeyGating = gating.gatingkind === 'unlock_vault' && offersPasskey(gating) ? gating : null
 
   const submit = () => {
     const typed = fieldRef.current?.value ?? ''
@@ -50,6 +55,13 @@ const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername,
     if (creating) { void advice.hear(typed) }
   }
 
+  /** What the passkey button says, which stays as the user types, till the next submit or press. */
+  const passkeyGripe = (text: string | null) => {
+    setGripe(text === null ? null : { text, fromPasskey: true })
+    // A passkey button that took itself away took the focus with it: back to the passphrase.
+    if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
+  }
+
   return (
     <ModalForm
       title={creating ? Messages.chooseTitle : Messages.unlockTitle}
@@ -58,15 +70,17 @@ const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername,
       gripe={gripe}
       gripeId={gripeId}
       footnote={leaseMillis === undefined ? undefined : unlockedFor(leaseMillis, creating)}
+      formRef={formRef}
       done={done}
       onSubmit={submit}
     >
+      {passkeyGating !== null && <PasskeyUnlockButton gating={passkeyGating} rpId={passkeyRpId} takesFocus onDone={done} onGripe={passkeyGripe} />}
       <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
       <PassphraseField
         ref={fieldRef}
         credential={creating ? 'new-password' : 'current-password'}
         fieldlabel={Messages.passphraseField}
-        takesFocus
+        takesFocus={passkeyGating === null}
         advice={creating ? advice.said : undefined}
         onChange={hearPassphrase}
       />

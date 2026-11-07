@@ -1,23 +1,24 @@
 import { useState } from 'react'
-import { useVault, useVaultSnapshot } from 'safebyok-react'
+import type { Outcome, Vault } from 'safebyok'
+import { passkeysAvailable, useVault, useVaultSnapshot } from 'safebyok-react'
 
-/** The main vault's ways in -- its passphrase, and its passkey if it has one -- and the button that changes the passphrase. */
+/** The main vault's ways in -- its passphrase, and its passkey if it has one -- and the buttons that change them. */
 export const WaysIn = () => {
   const { stage, vault } = useVault('main')
-  // Heard for its changes: a replaced passphrase is a new revision, and the gate is read anew.
+  // Heard for its changes: a replaced passphrase or a passkey added is a new revision, and the gate is read anew.
   useVaultSnapshot('main')
   const [gripe, setGripe] = useState<string | null>(null)
 
   if (stage !== 'present') { return null }
   const { passphrase_wayin, passkey_wayin } = vault.gate.toJSON()
 
-  const changePassphrase = async () => {
+  // Each button calls a vault verb, whose dialog the provider shows; the vault is left unlocked.
+  const prompt = async (verb: () => Promise<Outcome<Vault>>) => {
     setGripe(null)
-    // The provider's dialog asks for the passphrase in use and the next; the vault is left unlocked.
-    const replaced = await vault.tryReplacePassphrasePrompt()
-    if (replaced.ok) { return }
+    const prompted = await verb()
+    if (prompted.ok) { return }
     // A dialog the user cancelled, or a lock closed, has nothing to say.
-    const { refusalkind, message } = replaced.err
+    const { refusalkind, message } = prompted.err
     if (refusalkind !== 'declined' && refusalkind !== 'locked_while_asking') { setGripe(message) }
   }
 
@@ -34,7 +35,14 @@ export const WaysIn = () => {
       </ul>
       {gripe !== null && <p className="gripe">{gripe}</p>}
       <div className="row">
-        <button type="button" onClick={() => { void changePassphrase() }}>Change passphrase</button>
+        <button type="button" onClick={() => { void prompt(() => vault.tryReplacePassphrasePrompt()) }}>Change passphrase</button>
+        {/* The vault holds one passkey at most: to replace it, the user removes it and adds another. */}
+        {passkeysAvailable() && passkey_wayin === null && (
+          <button type="button" onClick={() => { void prompt(() => vault.tryAddPasskeyPrompt()) }}>Add fingerprint</button>
+        )}
+        {passkeysAvailable() && passkey_wayin !== null && (
+          <button type="button" onClick={() => { void prompt(() => vault.tryRevokePasskeyPrompt()) }}>Remove fingerprint</button>
+        )}
       </div>
     </section>
   )

@@ -101,7 +101,7 @@ export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer)
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   // A dialog gone meanwhile touches neither its state nor its host's onDone again. One hidden
   // meanwhile meets the outcome once it shows again.
-  const { whenShown } = useWhenShown()
+  const { whenShown, isShown } = useWhenShown()
   const fail = useCallback((err: unknown) => { setFailure({ err }) }, [])
   if (failure !== null) { throw forBoundary(failure.err, source) }
 
@@ -124,7 +124,7 @@ export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer)
     })
   }
 
-  return { gripe, setGripe, meet, fail, attempt, whenShown }
+  return { gripe, setGripe, meet, fail, attempt, whenShown, isShown }
 }
 
 /** What a {@link ModalForm} is handed. */

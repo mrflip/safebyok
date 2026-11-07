@@ -27,8 +27,12 @@ otherwise write itself.
   one dialog per `gatingkind`. The passphrase dialog, `PassphraseModal`, answers a `build_vault`
   gating (a first passphrase, typed twice) and an `unlock_vault` one; a `replace_passphrase`
   gating asks for the passphrase in use and a new one, typed twice, and leaves the vault
-  unlocked; a `del_vault` gating asks for the passphrase, and deletes the vault on every device.
-  For now a passkey's gating (`add_passkey`, `revoke_passkey`) is declined unasked. Unstyled markup under `modal-scrim` / `modal` class names
+  unlocked; an `add_passkey` gating asks for the passphrase, then the browser's passkey prompt,
+  and adds the passkey it makes; a `revoke_passkey` gating asks for the passphrase and removes
+  the passkey; a `del_vault` gating asks for the passphrase, and deletes the vault on every device.
+  For a vault holding a passkey, the unlock dialog offers "Use a passkey" first (*Fingerprint
+  unlock*, below). Each is exported on its own too: `PassphraseModal`, `ReplacePassphraseModal`,
+  `AddPasskeyModal`, `RevokePasskeyModal`, `DelVaultModal`. Unstyled markup under `modal-scrim` / `modal` class names
   for the host's stylesheet to dress. Handed the bank's `leaseMillis`, as the provider hands it,
   it says how long an unlock lasts on the device -- "Locks again on this device in 7 days", "in
   15 minutes", "Stays unlocked ... until you lock it" ("Locks on this device ..." while it
@@ -40,6 +44,9 @@ otherwise write itself.
   it; its error line is a live region a screen reader announces. Its passphrase fields are made
   for password managers, with a Show / Hide button and room for your advice beside a new one
   (*The passphrase field*, below).
+* `PasskeyUnlockButton`, `createPasskey`, `askPasskey`, `passkeysAvailable` -- the passkey's
+  button and the WebAuthn calls beneath the dialogs, for a dialog of your own (*Fingerprint
+  unlock*, below).
 * `WhisperField` -- the field a user types or pastes a whisper into, hidden as they type, with a
   Show / Hide button; password managers and autofill are turned away (*Entering a whisper*,
   below).
@@ -135,7 +142,8 @@ own session, and "refused" by `useBankSnapshot()`. A vault deleted reads as `unb
 Data calls never contain UI: a call that needs the user raises a gating, handed to the bank's
 `requestCleartext`, which the provider is unless you pass your own. So a click handler just calls
 `bank.ensureVault(...)`, then `vault.ensureUnlocked()`, and the dialog comes up on its own; so do
-`vault.replacePassphrasePrompt()` and `vault.delVaultPrompt()`, on a vault locked or not:
+`vault.replacePassphrasePrompt()`, `vault.addPasskeyPrompt()`, `vault.revokePasskeyPrompt()` and
+`vault.delVaultPrompt()`, on a vault locked or not:
 
 ```tsx
 const changePassphrase = async () => {
@@ -158,8 +166,9 @@ A dialog the user cancels refuses the call `declined`: nothing changed, and noth
   -- its `gatingkind`, `vaultlabel`, `attempt(...)`, `decline()` and `whenSettled` -- and which
   resolves once the dialog closes; a gating still open then is declined. It may render
   `GatingModal` itself, `<GatingModal gating={gating} onDone={close} />`, which answers
-  `'unlocked'`, `'deleted'` or `'declined'`, or `PassphraseModal` for a `build_vault` or
-  `unlock_vault` gating. `requestCleartext={null}` asks no one: each such
+  `'unlocked'`, `'deleted'` or `'declined'`, or the dialog for its kind on its own. Pass
+  `passkeyRpId` to either if your passkeys answer to a relying party other than the page's own
+  domain. `requestCleartext={null}` asks no one: each such
   call is declined.
 
 ## When an unlock fails
@@ -194,6 +203,60 @@ createRoot(rootElement, {
 
 A refused option is the exception: `BankProvider` throws it to your boundary at mount, where it
 fires on every load, before any user has typed anything.
+
+## Fingerprint unlock (passkeys)
+
+A vault may let the user in with one passkey -- a fingerprint, a face, a phone, a security key --
+beside its one passphrase. The core takes the passkey's answer as bytes and never calls WebAuthn;
+these helpers make the calls, through the WebAuthn PRF extension (passkeys and security keys
+alike: a security key's `hmac-secret` is what PRF runs on). The dialogs use them for you: a click
+handler calls `vault.addPasskeyPrompt()` or `vault.revokePasskeyPrompt()`, and the unlock dialog
+offers the passkey on its own. A dialog of your own uses them directly:
+
+```tsx
+import { askPasskey, attemptOnce, createPasskey, passkeysAvailable } from 'safebyok-react'
+
+// In your dialog for an add_passkey gating: make the passkey from the click, then attempt with the
+// passphrase as proof. attemptOnce zeroes the answer's bytes once the attempt settles.
+const made = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
+if (made !== null) { await attemptOnce(made, (passkeyClear) => gating.attempt({ passphraseClear, passkeyClear })) }
+
+// In your dialog for an unlock_vault gating: the browser asks the user to touch the vault's passkey.
+const asked = await askPasskey(gating.passkeyHeader)
+if (asked !== null) { await attemptOnce(asked, (passkeyClear) => gating.attempt({ passkeyClear })) }
+```
+
+* **Show the button only where it can work.** `passkeysAvailable()` says whether the browser
+  offers WebAuthn; whether its authenticator offers PRF is learned only by trying. A browser
+  without WebAuthn, an authenticator without PRF, or a browser that fails to ask refuses
+  `wrong_passkey` with words for the user -- to use the passphrase, or another device -- which a
+  dialog shows in place, as it does a passkey that did not unlock.
+* **One passkey at a time.** The core refuses `addPasskeyPrompt()` while the vault holds one; to
+  replace it, remove it, then add another. Replacing the passphrase keeps the passkey.
+* **A dismissed prompt resolves null**, from either helper: WebAuthn reports a dismissal, a timeout
+  and "that passkey is not on this device" alike, on purpose. A relying party the page cannot
+  claim refuses `bad_option`, a mistake you meet in development.
+* **The passkey is made before the attempt**, straight from the click, as WebAuthn wants. A
+  refused attempt -- a mistyped passphrase, say -- leaves that passkey on the authenticator, a way
+  into nothing: the next submit makes another, and the user may delete the first there. An
+  authenticator that answers PRF only when asked again (many do) asks for a second touch.
+* **The authenticator always checks the user.** Every call asks for `userVerification:
+  'required'`, so an authenticator answers only once the user has proved themselves to it -- a
+  fingerprint, a face, or the device's PIN -- never for a mere touch.
+* **These passkeys are not logins.** Each is a new credential under a random user handle, so it
+  never replaces a passkey your sign-in uses; its challenge is random and nothing on your server
+  checks it. If you pass `rp.id` to `createPasskey`, pass the same `rpId` to `askPasskey`, and
+  `passkeyRpId` to the dialogs: a passkey answers only under the relying party it was made for.
+* **An answer is tried at once, or never.** Its bytes open the vault as surely as the passphrase:
+  the dialogs hand each answer to one attempt and zero it, and zero untried one that comes back
+  while an `<Activity>` hides them.
+* **The button.** A dialog of your own can place `<PasskeyUnlockButton gating={gating}
+  onDone={close} onGripe={setGripe} />` beside its field (`takesFocus` to make it the first
+  choice). It renders only where `offersPasskey(gating)`; `onDone` hears `'unlocked'`, or
+  `'declined'` for a refusal that closes the dialog; `onGripe` hears null as each press begins,
+  each message to show in place, and the button's word when it takes itself away.
+* **A passkey unlocks; only the passphrase changes things.** Adding or removing a passkey, like
+  replacing the passphrase, takes the passphrase as proof, never a passkey's answer.
 
 ## The passphrase field
 
