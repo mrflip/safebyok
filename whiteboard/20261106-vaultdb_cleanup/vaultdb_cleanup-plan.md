@@ -1,0 +1,459 @@
+# Sprint vaultdb_cleanup: the plan
+
+* Date: 2026-11-06. Issued by: the Coach (flip). Mode: **YOLO**.
+* Default levels: review `medium`; worker and reviewer on their agents' own model and effort
+  (opus, inherited); style pass on `style-reviewer`'s pin (sonnet).
+* Threads at once: 3.
+* Sprint branch: `20261106-vaultdb_cleanup`, worktree `/workspace/byok-vaultdb_cleanup`.
+* **Status:** threads 1-6 filed: #555, #558, #561 (threads 4 and 5), #559, #560. Waiting on the
+  restack into main → #555 → #558 → #561 → #559 → #560 → #565 → #554, through /restacker; thread 7
+  (storage_door) is cut from its top. The Closer Look tab awaits the Coach's replies.
+  **On hold (the Coach, 2026-11-06): "Can you pause on the Postgres and graphql while I catch
+  up?"** Nothing on safebyok-postgres or safebyok-graphql starts (thread 8, thread 7's Postgres
+  and GraphQL parts, any flipped Postgres or GraphQL row) until the Coach lifts it. *Postgres,
+  in part (the Coach, later the same day):* CTE vs transaction is settled as built ("let's wrap
+  the thread up using your direction ... Handroll what you want"); notices keep whole rows ("fewer
+  sparse records ... ratchet down the capacity limits"), waiting on the sizing table; `pg_user` is
+  settled as built (no pg_user option). Later still: a channel per user from the raw user_id
+  (long user_ids fail; the listener never unlistens; both in TODO.md), and tailored notice
+  payloads (box notices as `[...vault props, ...box props]`, the core taking no world from them):
+  a rework on #561 is building both; the sizing table's payload section is redone from it.
+
+## The Coach's request, verbatim
+
+> safebyok/storage/vaultdb-new has some pretty weird constructs that I do not believe are
+> justified: #call trades 2 lines for seven at the cost of obscuring what is returned or thrown;
+> preparedOf wipes out any hope of debugging an error. replacing call and adapted for a
+> method-wide try/catch. You'd see similar lines repeated in each method, yes -- but this file
+> should be optimized for reading, not writing. I'd see the lines of the method, plain, without
+> bouncing around, without indirection.
+>
+> It then proceeds to inline things well handled by a typesafe function: delVault should
+> dispatch to #answerDelVaultGone, #answerDelVaultVoid, or #answerDelVaultRecord.
+>
+> checkedVaultLife has this: `if (stored?.vault_tok !== vault_tok)` to (?) detect that the line
+> is blank?
+>
+> movegate takes a closure instead of one natural function for the lines above (getting the
+> response) and several for the lines below (dispatching to an answer)
+>
+> This:
+>
+>     const stored = vaultRowOf(ante)
+>     if (stored?.am === 'a') {
+>
+> is a branch (on null) to dispatch, and a parseSafe into a different error type that can just
+> be done ahead of time by defining the checker you want.
+>
+>     const stored = vaultRowOf(ante)
+>     if (stored?.am === 'a') {
+>
+> is making a variable called storred out of the pre-existing state, and then branching on its
+> nullity last, forcing the ? paranoia
+>
+> putTermsOf just trades one option set used everywhere in the codebase for a different set of
+> lower clarity: provide adapters helper functions mayReplaceLive(opts) if that indirection is
+> truly superior to `(ifPresent === 'repl')`
+>
+> ---
+>
+> rewrite the vault-db-new file, and the in-memory adapter, to be in plain, readable typescript.
+> Review it against the notes/gallant files.
+> Prioritize the clarity of each method as it stands alone.
+> split code into functions where it's a narrative tailwind (#answerDelVaultGone,
+> #answerDelVaultVoid, #answerDelVaultRecord become type assertive and self-documenting), not
+> because it economizes file size.
+>
+> If it would be convenient to have multiple versions of checkers that are equivalent but give
+> different error messages, there are helpers for that.
+>
+> once those are clean and reviewed, port the other adapters. Do not adopt their doc strings,
+> which are rich in slop. you do not need to preserve a version that serves safebyok-old; this
+> is one of the last steps before decommissioning everything in packages/safebyok-old. You may
+> add whatever seems called for to the exports of any package. You do not need to maintain
+> backwards compatability in any way, this package has not been publicly released. No databases
+> will require migration, no format numbers need incrementing. You, above all, do not need to
+> throw the same messages, or refusal kinds, or error metadata that the current code did.
+
+## Read first
+
+* `notes/gallant.md`, these sections, by heading (`rg -n '^#' notes/gallant.md`): *One way in*,
+  *Sugar holds no logic*, *A wrapper needs a job*, *Use what you parsed*, *The impossible is one
+  line*, *Never hold a value you made up*, *A private helper gets a phrase*, *The best name is
+  its own doc*. Every thread; the Coach asked for review against them.
+* `notes/gallant-docblocks.md`: whole, before writing any doc block (it is short).
+* STYLE.md *Validation* (from its line 375): the `Checkers` / `Checker` / `objCheck` makers,
+  `refusingAs(kind)`, and `parse(val, { where, advice })`.
+* `packages/safebyok/src/storage/vault-db-new.ts` as thread 1 leaves it: the exemplar every port
+  follows.
+
+## Ground rules
+
+* **Plain over clever.** Each public verb reads top to bottom on its own: parse its inputs, call
+  the store inside one method-wide `try`/`catch`, dispatch on what came back to a named,
+  type-asserting private answer (`#answerDelVaultGone`, `#answerDelVaultVoid`,
+  `#answerDelVaultRecord`). Repeated lines across verbs are fine; a frame, thunk or closure that
+  hides what a verb returns or throws is not. No `#call`, `adapted`, `preparedOf`, `putTermsOf`,
+  or a closure handed to a shared driver (`#moveGate`'s `wayinOf`).
+* **The decision tree in front, the construction behind** (the Coach, mid-sprint, verbatim):
+  "helpers that bring clarity are highly encouraged -- weighed against any indirection they
+  carry. For example: I don't need or want to see the details of how a stale_write error is
+  prepared; call refuseStaleWrite with everything it needs, all good. I *do* want to understand
+  the branch paths. inline or in an error handler, put the decision tree in front, delegating to
+  action plans:
+  `if (this.isImproperlyWirbled(row) ) { throw improperlyWirbled(...) }`
+  `if (this.isZerkMismatched(row) && ifZerked = 'fail') { throw zerkMismatched(...) }`"
+  A verb's branches are a flat run of `if (predicate) { throw refusal(...) }` /
+  `return this.#answerX(...)` lines up front; a helper may hide how a refusal or answer is built,
+  never a branch the caller should see.
+* **Adapters triage their store's errors** (the Coach, 2026-11-06): "Adapters are encouraged to
+  catch and triage errors into VaultError subclasses, or to synthesize them based on what their
+  query returns." A port turns what its store throws, or what its query answers, into the
+  refusal that says what happened (`storageUnavailable`, `vaultFull`, a stale write...); the
+  base's method-wide catch is only the backstop. Thread 2's battery covers it where a store can
+  be made to fail.
+* **Exports are free** (the Coach): anything, large or small, may be exported from `safebyok` or
+  any package where it helps.
+* **Classify once, then branch on a non-null type.** A stored row is parsed by a checker that
+  says what it is (void, gone, live, or damaged) before any branch, so no branch tests
+  `stored?.am`. Build the checker variants you need with `refusingAs(kind)` or a `Checkers` call
+  rather than a `safeParse` followed by a throw of another kind.
+* **The store's terms are the package's options.** An adapter receives the `PutOpts`
+  (`prior`, `ifAbsent`, `ifPresent`) the caller gave, not a re-encoded `PutTerms`. Plain
+  `(ifPresent === 'repl')` in an adapter is fine; a helper is added only if it truly reads
+  better at every call site.
+* **No compatibility.** Nothing serves `safebyok-old`; no stored format is bumped; refusal
+  kinds, messages and `meta` may change freely. A changed refusal kind is still a changeset line.
+* **Doc blocks**: one line of purpose, written fresh. Never copy an old adapter's doc blocks or
+  comments; `SLOPDOC:` markers go, replaced by a first line or nothing.
+* **Never change `packages/safebyok-old/`.** Ports drop their dependency on it.
+* **The old code is no authority** (the Coach, mid-sprint). Neither `describeVaultDB` nor an old
+  adapter's behaviour says how the new VaultDB works; what `src/models` needs, and readability,
+  do. The old battery and adapters are references for coverage and for each store's mechanics.
+* **An `-old` copy is allowed, not expected** (the Coach's offer, 2026-11-06): where warranted,
+  an adapter's old code may move to a private `packages/safebyok-<x>-old` and the new be written
+  in `packages/safebyok-<x>`. *Coach (2026-11-06):* "it may be easier and better to make a
+  safebyok-idb-old package": thread 3 does, for the demo. The other ports take no `-old` copy
+  (only e2e consumes them, and e2e moves to the new contract).
+
+## Threads
+
+### 1. vaultdb_plain
+
+> rewrite the vault-db-new file, and the in-memory adapter, to be in plain, readable typescript.
+> Review it against the notes/gallant files. Prioritize the clarity of each method as it stands
+> alone. split code into functions where it's a narrative tailwind (#answerDelVaultGone,
+> #answerDelVaultVoid, #answerDelVaultRecord become type assertive and self-documenting), not
+> because it economizes file size. If it would be convenient to have multiple versions of
+> checkers that are equivalent but give different error messages, there are helpers for that.
+> *(and every item of the critique above)*
+
+*Gloss.* Touches `packages/safebyok/src/storage/vault-db-new.ts`, `memory-vault-db.ts`, likely
+`src/shapes/shapes-storage.ts` (row-classifying checkers), `src/refusals/throwers.ts`, and
+`tests/storage/vault-db-new*.test.ts`, `tests/test-helpers/storage-world.ts`. Callers in
+`src/models/` (listings) keep compiling. Each critique item is a checklist line in the thread
+file, ticked with where it landed. `PutTerms` goes; `do*` signatures take `PutOpts`/`DelOpts`.
+The `try*` twins and `answerOf` may stay if plain; the Coach did not name them, so judge by the
+same rule. **Levels:** review `high` (the exemplar for four ports; the reviewer checks it
+against the gallant sections above). **Depends on:** nothing; cut from `origin/main`.
+**Look-ahead:** the `do*` contract it settles is what threads 3-6 implement, so keep it the
+smallest a SQL, IndexedDB or Convex store can meet atomically; thread 2 turns its tests into a
+battery, so keep tests calling only the public verbs and `_cheat_*` backdoors through one
+helper. **Size:** M. No size line moves (the core is not measured).
+
+*Review:* `high`, fixed: the decision tree flattened to plain `if` lines up front in getVault,
+getBox, putVault, putBox and liveVaultOf (the Coach's directive); del-answer doc blocks made
+phrases; `PutOptsGiven` documented; the changeset names the gate race's new refusals;
+`#tombstoneBoxesOf` → `#tombstoneBoxes`; one style fix. Left: `#answerDel*Record` return
+`never` (kept: the Coach named it); `refusalOf` mutates; gateIssue's inline sentence, VOCABULARY.md:144
+and models-world's scripted `meta` (→ thread 2); compound first lines (→ an Open Matters row for
+a documentarian run); no gate-race test (→ thread 2's battery). Filing hit a conflict with main
+(#548, #549); a fresh worker resolves it. *Coach rulings (2026-11-06)* on its open matters: the wide catch stays, with
+adapters triaging; damaged_row for a later fmt, tidyGone ("for hosts to call"), the put acts,
+and the gate put's `ifAbsent: 'fail'` all kept.
+
+### 2. vaultdb_battery
+
+> once those are clean and reviewed, port the other adapters.  *(the battery and exports every
+> port needs; the orchestrator's split)*
+
+*Gloss.* The old adapters each run `describeVaultDB` from `safebyok-old/testing`. The new
+design gets a battery of its own: exported over the new `VaultDB` in the core's `./testing`
+entry, built from thread 1's tests and run over `MemoryVaultDB` in the core. *Orchestrator,
+from the Coach mid-sprint:* `describeVaultDB` is **no authority** on how the new VaultDB works;
+it serves the old code base. The battery tests what `src/models` needs and what thread 1's
+contract says, and consults the old battery only as a reference for coverage (which situations
+are worth a case). Export from `safebyok`
+(index, or a new `./storage` entry: the worker's call, recorded) what an adapter needs: `VaultDB`
+and the `do*` types, the storage shapes and checkers an adapter validates with, and the refusal
+throwers an adapter raises (`vaultFull`, `storageUnavailable`: *Orchestrator:* thread 1 renamed it). Damage rows the battery plants go
+through a hook the adapter supplies. *Orchestrator, from thread 1's review:* ride along here: a battery case where `delVault` lands
+between a gate verb's `doGetVault` and its `doPutVault` (expects `vault_gone`); gateIssue's
+`registered_at` sentence into phrases.ts; VOCABULARY.md:144 (`newer_format` for a newer fmt, now
+`damaged_row`) and `tests/test-helpers/models-world.ts`'s scripted `meta` (answers carry none).
+**Depends on:** 1. **Look-ahead:** threads 3, 4 and 6 run
+in parallel off this tip; anything they would each add to the core's exports belongs here.
+**Size:** M.
+
+*Review:* `medium`, fixed: every one of thread 1's 69 cases is in the battery; the cascade watch
+case now looks again after a while (async stores); VOCABULARY's **fmt** entry; one style fix.
+Left minor: same-named fixtures and checkers (*Orchestrator:* namespace imports, no rename);
+flags beside hooks; two ways to fail a store; chained titles; compound doc blocks; casts listed on
+the PR. *Orchestrator, YOLO, a rework before filing:* the failure case requires
+`storage_unavailable`; `onTestFinished(unwatch)`, unwatch safe twice; `objCheck` on the battery's
+opts; `vaultQuery`/`boxQuery` fixtures hoisted to `storage-world.ts`. Second review (`low`, sonnet):
+fixed, one doc-block and one title fix; left: `vaultQuery`/`boxQuery` not on the testing door
+(the ports add them if needed). Filed at edbceeae2.
+
+### 3. port_indexeddb
+
+> port the other adapters. Do not adopt their doc strings, which are rich in slop.
+
+*Gloss.* *Orchestrator, revised on the Coach's word (2026-11-06):* first, `git mv` today's
+`packages/safebyok-indexeddb` to a private, never-published `packages/safebyok-idb-old`
+(renamed in its package.json, still on `safebyok-old`), and point the demo
+(`demos/safebyok-demo-react/src/lib/stores.ts`, `persist-storage.ts`) at it: the demo keeps its
+IndexedDB store and inspector panel with an import change. Its own commit, so the move reads as
+a move. Then write `packages/safebyok-indexeddb` fresh on the new `VaultDB`, its tests on thread
+2's battery, its package.json off `safebyok-old`; the old copy is a reference for IndexedDB
+mechanics only, and none of its doc blocks come across. `ChangeBell` from `safebyok-old/idb` is
+not available to the new package: the watch uses what the core exports or plain
+`BroadcastChannel`. Size line `idbVaultDB` measures the new package, its `ignore` moving from
+`safebyok-old` to `safebyok`; it will likely move. `safebyok-idb-old` gets no size line and no
+changeset of its own (private). **Depends on:** 2. **Size:** M.
+
+*Review:* `medium`, fixed: a `null` `indexedDB` (switched off) now refuses as no IndexedDB, not
+"try again shortly"; test style. Left: storageFull without `meta.capacity` (→ restack);
+unguarded ring and no `unref` (kept); unchecked channel messages; doTidyGone clones rows (→ a
+ride-along); `SX` alias and adapter sentences (→ Open Matters rows); compound doc blocks.
+
+### 4. port_postgres
+
+> port the other adapters. Do not adopt their doc strings, which are rich in slop.
+
+*Gloss.* `packages/safebyok-postgres/src/*` (535-line `postgres-vault-db.ts`, `columns.ts`,
+`vault-tables.ts`) onto the new `VaultDB`; tests onto the battery over PGlite;
+`e2e/tests/postgres/*` onto the new contract. The table layout may change freely (no
+migrations). **Depends on:** 2. **Look-ahead:** thread 5's graphql tests run over postgres.
+**Size:** L; a worker that compacts twice splits e2e off.
+
+*Review:* `medium`, fixed: doTidyGone read vault rows before box lives (a reborn vault's live
+boxes could be deleted), now lives first; BoxLivesSql ordered (deadlock); `rollBack` naming;
+README: the listen recipe's 'error' listener, who can LISTEN. Left: watch order on the keys-only
+fallback; rows on a public NOTIFY channel (→ a TOP Open Matters row); copied isPutAllowed /
+isHeardIn (→ export after the ports); opts type; documentarian work. Pushed at b72a514b6 without
+file-thread (graphql red until thread 5 joins).
+
+*Rework (thread 4, on the Coach's channel and payload rulings):* a channel per user,
+`vaultChannelOf(user_id)` = `safebyok_` + user_id (a user_id past 54 characters fails, tested);
+the README recipe never UNLISTENs; box notices `[...vault props, ...box props]`, a vault notice its
+row; `Notice.world` may be null, the listing's one guard. Review `medium`, fixed: the recipe left a
+user deaf after a failed LISTEN; a test that missed the adapter; titles. Left: `vaultChannelOf`
+unchecked, the too-long refusal kind (→ Open Matters); `mash(email)` user_ids cannot write (TOP);
+the batched boxes notice unbuilt; e2e LISTEN timing; doc blocks. Filed at 1b1a203bd.
+
+### 5. port_graphql
+
+> port the other adapters. Do not adopt their doc strings, which are rich in slop.
+
+*Gloss.* `packages/safebyok-graphql/src/*`: the client `graphql-vault-db.ts`, the server
+`vault-resolvers.ts` and `vault-schema.ts`, `fields.ts`; the schema may change freely. **Depends
+on:** 4 (its devDependency on `safebyok-postgres`). **Size:** L. *Orchestrator, revised:* porting
+postgres turned graphql red, so this thread's commits join #561 (no PR of its own); see the
+progress document.
+
+*Review:* `high`, fixed: the relay's putVault takes `putOpts` on purpose (gate verbs replace a
+live row from the browser), now commented; all nine operations tested against another user's
+bank. Left: relay putVault skips the gate verbs' checks, revocation mid-subscription (→ Open
+Matters rows); no VaultDB brand (→ later); unbounded subscription buffer (kept). Filed in #561 at
+fb6d281d3, with thread 4.
+
+*Rework (thread 5, on the Coach's vacate question):* the GraphQL stream re-asks `userIdOf` at
+each notice and ends, its listener released, when the answer changes or throws. Second review
+`medium`, fixed: an `await` outside a `try`, chained titles. Left: a userIdOf blip silences a
+device, a mid-stream revocation ends without `identity_revoked` (→ Open Matters); the changeset's
+wording on a thrown VaultError; no test of `return()` during a pending re-ask. Filed at 0b27c1128.
+
+### 6. port_convex
+
+> port the other adapters. Do not adopt their doc strings, which are rich in slop.
+
+*Gloss.* `packages/safebyok-convex/src/*`: the client `convex-vault-db.ts`, the component
+(`component/vaults.ts`, `validators.ts`, `tallies.ts`, `schema.ts`), `server.ts`, `refusals.ts`,
+`testing.ts`; `e2e/tests/convex/*`. The component's functions are where the store's atomic
+steps live, so they implement the `do*` contract server-side. `_generated/` is regenerated, not
+hand-edited. **Depends on:** 2. **Size:** L; split component from client if the worker
+compacts twice.
+
+*Review (thread 6):* `high`, fixed: a NaN box cap from a modified client passed the component's
+8,000-box limit, now falls back to it (tested); a doc block's reason moved to a comment; titles and
+smushed tags. Left: whole-bank reads against Convex's 16 MiB limit and tombstones against its
+documents-read limit (→ Open Matters rows); the maxRecordBytes reserve and the watch's starting
+gap (→ follow-ups); copied isPutAllowed; chained titles. Filed at bdfe5aa9b.
+
+*Rework (thread 6, on the Coach's ruling):* box tombstones count toward the row cap. Second
+review `low`, fixed: chained titles, two non-null assertions. Left: `box_count`/`maxBoxes` now
+count rows (→ Open Matters). Filed at 00f11ba85.
+
+### 7. storage_door (after the restack)
+
+Three rulings from Open Matters, 2026-11-06, verbatim:
+
+> **What adapters call safebyok/storage.** Rec: one STYLE.md row naming it SX. *Coach:* "Can we
+> do DB? *X has become the validator star prefix"
+
+> **STYLE.md on where validators are exported.** Rec: a STYLE line saying the storage validators
+> live there. *Coach:* (took the Rec)
+
+> **Who owns an adapter's refusal sentences.** Rec: export the phrases adapters need from
+> safebyok/storage, so the wording stays in one place. *Coach:* (took the Rec)
+
+> **GraphQL's gate is user_id equality.** *Coach:* "There will never be shared banks, a bank's
+> scope is applabel userid"
+
+*Gloss.* `safebyok/storage`'s star import becomes `DB` in the core's tests and every adapter (one
+STYLE.md row in the import-alias table); STYLE.md *Validation* says the storage validators are
+exported from `safebyok/storage`; the phrases adapters write themselves (IndexedDB's five trouble
+sentences, any in Convex or Postgres) move to the core's Phrases and are exported there; strike
+any mention of shared banks or a `mayReach` predicate. Two `notes/wontfix.md` entries: Convex
+refuses a field name starting with `$` or holding non-ASCII at any depth of a record (its docs add
+empty and `_`-leading names, 16 levels of nesting, 1024 entries per object), and the GraphQL
+stream's best-effort stop (re-asked on each notice, so an idle stream stays open until its next
+change, and a `userIdOf` that does not look the session up live gives none).
+
+Two more from the Coach (2026-11-06, the pgClientOf row), verbatim:
+
+> The cap is specified as a best effort limit. Can you ask a haiku to find the places I've written
+> that up recently -- they may look in notes and whiteboard -- and have you put it in relevant
+> places
+
+> Adding a concurrency cap is no light change, can you also add to guidance where it cautions
+> against concurrency that a row lock where one wasn't needed before is also a last resort?
+
+So thread 7 also: says the box cap is best effort wherever the new code states or implies it is
+exact, in the words of the Gallant `maxBoxes` block (`notes/gallant-docblocks.md:463-466`): the
+Postgres, GraphQL, Convex and IndexedDB READMEs, `memory-vault-db.ts:70`, `refusals/errors.ts:46`,
+`graphql-vault-db.ts:31`, and the Postgres doc that gives the vault-row lock an exact cap as its
+reason (its real reason is compare-and-set). And it adds to CLAUDE.md's "Insert no retry logic,
+abort controllers or other whizbangs" sentence (*What the package promises*) that a lock where
+none was needed before is a last resort too.
+
+Salt caps (the Coach, 2026-11-06, in chat): asked "Have we tightened the cap on salt sizes: it
+should be only slightly larger than what we use now", then chose "32 bytes, both": `MaxSaltBytes`
+65,536 → 32 (`helpers/consts.ts`, the bound on a deriver spec's `salt_bytes`), and the stored
+`salt_b64` checked at no more than 32 bytes (`shapes-core.ts`, today only "not empty"). Today's
+deriver makes 16; the passkey salt is exactly 32 already. A changeset line: a host deriver spec
+asking for more than 32 salt bytes is refused at setup. Thread 9 (#565) left fastkey's "longest salt"
+test cases at 65,536 and 65,537 bytes; they follow the cap down to 32 and 33.
+
+Also (2026-11-06): the Coach on the Postgres channel, in chat, "host controls the device_id and is
+responsible for RLS. That should be written down": the Postgres README says the host owns the
+database roles, row-level security and who may LISTEN (the channel's naming is an open row).
+And `e2e/package.json` drops `safebyok-old` once the restacked line leaves no e2e import of it. And PROCESS.md, which still says the adapters peer on `safebyok-old`, says they
+peer on `safebyok` now. Touches every adapter package, so it is cut
+from the top of the restacked line, never before. **Depends on:** the restack. **Size:** S-M,
+mechanical; `sonnet` worker, `low` review.
+
+*Rulings, 2026-11-07 (Open Matters, proceed):* "A Convex vault full of tombstones needs a
+delVault": *Coach:* "publicize and accept": the Convex README and `notes/wontfix.md` say that once
+deleted boxes fill a vault's cap it refuses new box labels until the vault is deleted.
+"vaultChannelOf checks nothing it is given": took the Rec: check the user_id at the export
+(bad_option for an invalid one). **Carried into sprint devicedb_idb as its thread 3.**
+
+### 8. graphql_schema (after the restack)
+
+The Coach's ruling on Open Matters, 2026-11-06 (proceed), verbatim. The matter was "Rows cross
+GraphQL as one JSON value", Rec (orchestrator): "a typed schema, the sidecar a JSON scalar, times
+an EpochMillis scalar, plus the drift test, built in the same post-restack thread that retires
+relay". Coach:
+
+> There's no real cost to keeping those shapes in sync. Any change to the shape that would
+> disrupt the interface will be a breaking one anyway
+>
+> Against that, I lose graphql error handling, and
+>
+> Above all, it means I'm not using graphql like graphql. This isn't a wire format, it's a service
+> that any graphql client could use to retrieve sidecar data: although we currently don't offer a
+> schema on it one is conjectured.
+>
+> If I grant that there is a cost to code maintenance in the one case, but a benefit to the needs
+> of the customer, an improvement in error reporting, and adherence to the principle of writing
+> simple natural code according to each frameworks best practices, am I leaving important
+> considerations out? Earnest question
+
+and, after the orchestrator's answer:
+
+> are we stripping fields.? That's a mistake, everything should be nulled as it leaves the first
+> validator it hits
+>
+> Damaged rows should be JSON plain.
+>
+> It's not the case that refusals should be graphql errors. Think of it as the try interface, not
+> the throwing interface: it's a polo that carries an err field, not an Error object.
+
+*Gloss.* `packages/safebyok-graphql`: a typed schema for records, rows and answers; the sidecar a
+JSON scalar; times an `EpochMillis` scalar (safe integers past GraphQL's 32-bit `Int`); a damaged
+row as plain JSON. Each operation answers the try\* answer as a typed object carrying an `err`
+field (a plain object: kind and meta), never a GraphQL error; GraphQL's own errors are left to
+what GraphQL refuses itself. Absent fields: no stripping at the client's edge; a value leaving
+the first validator it meets carries null for an absent field, so check what that asks of the
+core's checkers and say so before changing them. One drift test walks the core's checkers against
+the schema's types. **Waits on the relay row** (Open Matters, "A public door to the store's raw
+steps"): if the Coach adopts serving the public verbs, this thread also retires `relay` and
+rewrites the client as its own class over an exported VaultDB interface, so safebyok-graphql is
+rewritten once. **Depends on:** the restack, and the relay ruling. **Size:** L; `high` review
+(it touches the refusal surface).
+
+*Consensus with the Coach, 2026-11-06, in chat.* The Coach: "the front schema will look very much
+like the answer types: { val meta world err ok act dbhas? damaged_rows? params? } in Box and Vault
+flavors, plus two listing types; the subscriptions with largely the same shape. JSON fields would
+be used for sidecar, damaged_rows, meta and err.meta but in general everything else looks like
+graphql. graphql errors on the browser side should be considered in the same light as if a
+malformed query were sent to postgres: an error, even a schema mismatch, doesn't indicate bad
+record or damaged record, it most like indicates a wire compatability issue". Agreed on the
+orchestrator's points: (1) times as an `EpochMillis` scalar; (2) the core's answer checkers accept
+null for an absent field (the Coach leans to strong per-verb-family types, not one umbrella type
+with nullable fields: not settled); "No slot can hold a damaged row except one named
+damaged_rows: [JSON!]!" (TODO.md, *Single-row damage moves to `damaged_rows`*); (3) live and
+tombstone rows as a union; (4) a browser-side GraphQL error is not `storage_unavailable` (it will
+not clear on retry): `unexpected_error` with its cause, or a kind of its own; (5) `err.meta` is
+built server-side from a fixed list of fields, never a spread of a refusal's meta, and no cause
+crosses; (6) an old client silently drops a newer server's optional field on a read-then-write
+(a sentence at 1.0); (7) `Tidied` is a type of its own, and a drift test checks the core's
+checkers against the schema.
+
+*Rulings, 2026-11-07 (Open Matters, proceed):* the relay row, Rec "adopt your proposal: the
+browser class implements an extracted VaultDB interface, each verb is one operation returning the
+whole try* answer, and relay is retired": *Coach:* "This is good, go for it". The gate verbs row:
+*Coach:* "graphql should expose exactly (and pretty much only) the front-end verbs that VaultDB
+does, including those three." (replacePassphrase, addPasskey, revokePasskey). "A stream revoked
+mid-way ends silently": took the Rec: end it with identity_revoked. So the GraphQL hold is lifted
+for this thread. **Carried into sprint devicedb_idb as its thread 4.**
+
+### 9. port_fastkey
+
+> do you have headroom to move safebyok-fastkey too?
+
+(the Coach, 2026-11-06, in chat.)
+
+*Gloss.* `packages/safebyok-fastkey` (87 lines of src: the WASM Argon2id deriver) imports
+`Argon2idWebV1`, `VaultError`, `checkSaltFits`, `parseKeyDeriverSpec` and the deriver types from
+`safebyok-old`, and its tests `safebyok-old/testing`. Move it onto the new core: export what it
+needs from `safebyok` (the deriver files exist in `packages/safebyok/src/deriver/`, unexported;
+exports are free), and from `safebyok/testing` what its tests need. Same bytes out as the core's
+pure-JS deriver, tested. Thread 7's 32-byte salt cap reaches this package through
+`parseKeyDeriverSpec`; it needs no change here. **Depends on:** nothing unmerged: cut from
+`origin/main`, joining the line at the restack (it touches `packages/safebyok/src/index.ts`, which
+#555/#558 may also touch). **Levels:** `sonnet` worker, `low` review. **Size:** S.
+
+*Review (thread 9):* `low`, fixed: doc-block first lines, an `@example` spreading the gone
+`browserOpts()`, a private helper's lost phrase. Left: narrated `@param`/`@returns` and the
+unstated cross-deriver guarantee, `parseKeyDeriverSpec`/`checkSaltFits` public without doc blocks
+(documentarian); the salt test cases and PROCESS.md's peers line (thread 7). Filed as #565.
+
+## For the Coach
+
+* ~~**The demo loses its IndexedDB vault store** when thread 3 lands.~~ *Coach (2026-11-06):*
+  "lgtm" to moving it onto the old core's `localVaultDB` over localStorage; then, in chat: "it may
+  be easier and better to make a safebyok-idb-old package". Thread 3 does that instead.
+* *Coach (2026-11-06)* on thread 2's split: "love it, yes".

@@ -125,6 +125,36 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 
 Wanted; each has a design question to settle first, named here.
 
+### Postgres notice channels: long user_ids fail, and the listener never unlistens
+
+The Coach (2026-11-06, the sprint's Open Matters and chat): "one channel per user, use the user_id,
+demonstrate the shapes of user_id that fail, with the listener never unlistening ... I do not want
+to change anything about how user_ids are handled. if the host hands us user_ids that are too long
+they will fail. We will repair this gap soon. TODO it, along with "listener doesn't unlisten" which
+are both big but acceptable gaps". Two gaps, both accepted for now:
+
+* **A long user_id fails.** safebyok-postgres sends each notice on a channel named from the
+  user_id, and a Postgres channel name is at most 63 bytes (`NAMEDATALEN` - 1). `pg_notify`
+  refuses a longer one, so every write for such a user fails; `LISTEN` quietly truncates it. The
+  adapter's tests show which user_ids fail (by byte length, multibyte characters counted in bytes).
+  The repair is to be decided: a hash, a host-given channel id, or a tighter user_id.
+* **The listener never unlistens.** The README's `listen` recipe runs `LISTEN` on a user's channel
+  when that user's first watch opens and never `UNLISTEN`s, so one connection holds a channel for
+  every user its server has watched since it connected. The repair is a count per channel, or
+  unlistening on a schedule.
+
+### Single-row damage moves to `damaged_rows`
+
+The Coach (2026-11-06, the sprint's Open Matters, on the GraphQL schema): "No slot can hold a
+damaged row except one named damaged_rows: [JSON!]!" ... "single row damage move to
+damaged_rows". Today `listVaults` and `listBoxes` put a row failing validation in
+`damaged_rows`, but a get, put or del meeting one refuses `damaged_row` with only
+`meta.fieldnames`. The move: every answer has `damaged_rows`, and a single damaged row travels
+there whole, as plain JSON. The question to settle first: whether meeting one is still a refusal
+(`damaged_row`, its row in `damaged_rows`), as CLAUDE.md's "a data-integrity failure met in a
+consistent state is reported by throwing" asks, or an ok answer carrying it. The orchestrator
+recommends keeping the refusal. The GraphQL schema (vaultdb_cleanup thread 8) is shaped around it.
+
 ### Which wayins a rotation keeps
 
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
