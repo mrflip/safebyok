@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useBank } from 'safebyok-react'
+import { useBank, useVault } from 'safebyok-react'
 import { useSession } from '../hooks/useSession'
 import type { Auth } from '../lib/auth'
 import { keepStorage } from '../lib/persist-storage'
@@ -8,11 +8,12 @@ import { keepStorage } from '../lib/persist-storage'
  * Typing a username signs you in (or up); there is no password, because
  * the demo's point is that the vault passphrase is a separate thing from signing in. Signing in
  * asks the browser to keep this site's storage, on the user's gesture. Signing out locks the
- * user's vaults on this device.
+ * user's vaults on this device; deleting the account deletes its vault first.
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
   const bank = useBank()
+  const { stage, vault } = useVault('main')
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
 
@@ -49,10 +50,30 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
     auth.signOut()
   }
 
+  const deleteAccount = async () => {
+    setGripe(null)
+    // Until the bank has heard from storage, nobody knows whether a vault is there to delete.
+    if (stage === 'waiting') { setGripe('Your vault is still loading: try again in a moment.'); return }
+    if (! globalThis.confirm('Delete this account and its vault? The secrets in it are gone for good.')) { return }
+    // The vault's dialog asks for the passphrase, which proves the deletion. A vault never born has
+    // nothing to delete: the account goes without it. Cancelled, the account stays, quietly.
+    if (stage === 'present') {
+      const deleted = await vault.tryDelVaultPrompt()
+      if (! deleted.ok) {
+        const { refusalkind, message } = deleted.err
+        if (refusalkind !== 'declined' && refusalkind !== 'locked_while_asking') { setGripe(message) }
+        return
+      }
+    }
+    await auth.deleteAccount()
+  }
+
   return (
     <div className="session-bar">
       <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.user_id})</code></span>
       <button onClick={signOut}>Sign out</button>
+      <button className="danger" onClick={() => { void deleteAccount() }}>Delete account</button>
+      {gripe !== null && <span className="gripe">{gripe}</span>}
     </div>
   )
 }

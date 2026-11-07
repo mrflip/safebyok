@@ -1,7 +1,7 @@
-/** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over stores in memory, to watch the vault beside it, to answer the passphrase dialog the provider raises, and to stand in for Anthropic. */
+/** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over stores in memory, to watch the vault beside it, to answer the dialogs the provider raises, and to stand in for Anthropic. */
 import type { ReactNode } from 'react'
-import { expect } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { expect, type MockInstance } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryDeviceDB } from 'safebyok'
 import { MemoryVaultDB } from 'safebyok/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
@@ -39,6 +39,27 @@ export const answerPassphraseDialog = async (passphrase = Passphrase) => {
   const form = field.closest('form')
   if (form === null) { throw new Error('the passphrase dialog has no form to submit') }
   fireEvent.submit(form)
+}
+
+/** Answers the dialog that replaces the passphrase once it shows: types `antePassphrase`, then `nextPassphrase` twice, and submits. */
+export const answerReplacementDialog = async (antePassphrase: string, nextPassphrase: string) => {
+  const field = await screen.findByPlaceholderText('current passphrase')
+  fireEvent.change(field, { target: { value: antePassphrase } })
+  fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: nextPassphrase } })
+  fireEvent.change(screen.getByPlaceholderText('confirm new passphrase'), { target: { value: nextPassphrase } })
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change passphrase' }))
+}
+
+/** Answers the dialog that deletes the vault once it shows: types `passphrase` and presses Delete vault. */
+export const answerDeletionDialog = async (passphrase = Passphrase) => {
+  fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete vault' }))
+}
+
+/** Waits, inside React's act, until each call `prompting` heard has settled and the handler that awaited it has heard. */
+export const settlePrompts = async <PromptT extends () => Promise<unknown>>(prompting: MockInstance<PromptT>) => {
+  // The handler awaited each promise before this does, so it hears the outcome first.
+  await act(async () => { await Promise.allSettled(prompting.mock.results.map((result): unknown => result.value)) })
 }
 
 /** One request a {@link fakeAnthropic} heard: where it went, the API key it carried (the SDK sends it as a bearer token), its body. */
@@ -84,13 +105,13 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
   return { fetchFn, seen }
 }
 
-/** The vault under 'main' as a page sees it, to render beside a component under test: its stage and lock state as `<stage> <lockState>` (`none` with no vault), and an Open button that builds or unlocks it, asking through the provider's dialog.
+/** The vault under 'main' as a page sees it, to render beside a component under test: its stage and lock state as `<stage> <lockState>` (`none` with no vault), an Open button that builds or unlocks it, asking through the provider's dialog, and a Lock button.
  *
  * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
 export const VaultProbe = () => {
   const bank = useBank()
-  const { stage } = useVault('main')
+  const { stage, vault } = useVault('main')
   const snapshot = useVaultSnapshot('main')
   const open = async () => {
     if (bank === null) { return }
@@ -101,6 +122,7 @@ export const VaultProbe = () => {
     <p>
       <span data-testid="vault">{`${stage} ${snapshot?.lockState ?? 'none'}`}</span>
       <button type="button" onClick={() => { void open() }}>Open</button>
+      <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
     </p>
   )
 }

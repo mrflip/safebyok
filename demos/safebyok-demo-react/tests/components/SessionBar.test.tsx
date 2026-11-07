@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Vault } from 'safebyok'
 import { memoryStore } from 'safebyok-old'
 import { SessionBar } from '../../src/components/SessionBar'
 import { createAuth } from '../../src/lib/auth'
@@ -16,6 +17,18 @@ const renderBar = () => {
 const signInAs = (userlabelText: string) => {
   fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: userlabelText } })
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+}
+
+afterEach(() => { vi.restoreAllMocks() })
+
+/** Signs in as margo, and builds and unlocks her vault through the provider's dialog. */
+const signInWithVault = async () => {
+  signInAs('margo')
+  await screen.findByText('margo')
+  await TH.expectProbe('unborn none')
+  fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+  await TH.answerPassphraseDialog()
+  await TH.expectProbe('present unlocked')
 }
 
 describe("SessionBar", () => {
@@ -69,5 +82,50 @@ describe("SessionBar", () => {
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
     await TH.expectProbe('present locked')
+  })
+
+  it("deletes the vault through the provider's dialog, then the account", async () => {
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    const { auth } = renderBar()
+    await signInWithVault()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await TH.answerDeletionDialog()
+    await screen.findByPlaceholderText('username')
+    expect(auth.getSnapshot()).to.be.null
+    await TH.expectProbe('unborn none')
+  })
+
+  it("deletes an account whose vault was never born, asking nothing", async () => {
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    const { auth } = renderBar()
+    signInAs('margo')
+    await screen.findByText('margo')
+    await TH.expectProbe('unborn none')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await screen.findByPlaceholderText('username')
+    expect(auth.getSnapshot()).to.be.null
+  })
+
+  it("keeps the account and the vault when the user cancels the dialog", async () => {
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    const { auth } = renderBar()
+    await signInWithVault()
+    const prompting = vi.spyOn(Vault.prototype, 'tryDelVaultPrompt')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    await TH.settlePrompts(prompting)
+    expect(auth.getSnapshot()?.userlabel).to.eq('margo')
+    expect(document.querySelector('.session-bar .gripe')).to.be.null
+    await TH.expectProbe('present unlocked')
+  })
+
+  it("asks nothing of the vault when the user does not confirm", async () => {
+    const confirm = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
+    const { auth } = renderBar()
+    await signInWithVault()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).to.be.null
+    expect(auth.getSnapshot()?.userlabel).to.eq('margo')
   })
 })

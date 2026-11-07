@@ -8,8 +8,9 @@ otherwise write itself.
   signs out or changes, or the provider unmounts. It asks the bank to lock each vault whose
   autolock has passed (`bank.autolock()`) once a minute. It is the bank's `requestCleartext`
   unless you pass one of your own: whenever a call needs the user -- `bank.ensureVault(...)` for
-  a vault not yet built, `vault.ensureUnlocked()` on a vault locked -- it shows the dialog for
-  that gating's kind, and the call waits on it (*Asking for the passphrase*, below).
+  a vault not yet built, `vault.ensureUnlocked()` on a vault locked,
+  `vault.replacePassphrasePrompt()`, `vault.delVaultPrompt()` -- it shows the dialog for that
+  gating's kind, and the call waits on it (*Asking for the passphrase*, below).
 * `useVault(vaultlabel)` -- where the user's vault under that label stands, and its Vault object:
   `{ stage: 'waiting' }` until the bank is ready, `{ stage: 'unborn' }` while the bank holds no
   live vault there, `{ stage: 'present', vault }` once it does. It never asks the user and never
@@ -23,14 +24,16 @@ otherwise write itself.
 * `useBankSnapshot()` -- the bank's live snapshot: its `stage` (`made`, `ready`, or `refused`
   with why, in `err`) and the vaults it lists; `null` while the provider holds no bank.
 * `GatingModal` -- the shipped `requestCleartext`'s dialog, handed one gating and answering it,
-  one dialog per `gatingkind`. For now the passphrase dialog, `PassphraseModal`, answers a
-  `build_vault` gating (a first passphrase, typed twice) and an `unlock_vault` one; a gating of
-  any other kind is declined unasked. Unstyled markup under `modal-scrim` / `modal` class names
+  one dialog per `gatingkind`. The passphrase dialog, `PassphraseModal`, answers a `build_vault`
+  gating (a first passphrase, typed twice) and an `unlock_vault` one; a `replace_passphrase`
+  gating asks for the passphrase in use and a new one, typed twice, and leaves the vault
+  unlocked; a `del_vault` gating asks for the passphrase, and deletes the vault on every device.
+  For now a passkey's gating (`add_passkey`, `revoke_passkey`) is declined unasked. Unstyled markup under `modal-scrim` / `modal` class names
   for the host's stylesheet to dress. Handed the bank's `leaseMillis`, as the provider hands it,
   it says how long an unlock lasts on the device -- "Locks again on this device in 7 days", "in
   15 minutes", "Stays unlocked ... until you lock it" ("Locks on this device ..." while it
-  creates the vault). A refusal the user can correct -- a wrong passphrase, a weak new one --
-  shows in the dialog in place, and the dialog asks again; a lock, a sweep or storage out of
+  creates the vault). A refusal the user can correct -- a wrong passphrase, a weak new one, a new
+  one that is the one in use -- shows in the dialog in place, and the dialog asks again; a lock, a sweep or storage out of
   reach closes it, answering `declined`; anything else (misuse, a bug) shows a calm "Something
   went wrong" with a Close button, and goes to React's error reporting, never to your page
   (*When an unlock fails*, below). It is a modal `dialog` named by its heading; Escape cancels
@@ -40,6 +43,13 @@ otherwise write itself.
 * `WhisperField` -- the field a user types or pastes a whisper into, hidden as they type, with a
   Show / Hide button; password managers and autofill are turned away (*Entering a whisper*,
   below).
+* `useBoxes(vaultlabel)`, `useBox(vaultlabel, boxlabel)`, `useBoxSnapshot(box)` and
+  `useWhisper(box)` -- the boxes a vault lists, one Box, its live snapshot, and the whisper it
+  shows (*A vault's boxes*, below).
+* `BoxWhisperField` -- a field bound to one leaf of a box's whisper, which never passes through
+  React (*A box's whisper field*, below).
+* `VaultLockControl` and `CreateVaultButton` -- the lock state and a Lock or Unlock button for an
+  account menu, and the button that creates a vault (*The account menu*, below).
 
 ## Install
 
@@ -124,29 +134,42 @@ own session, and "refused" by `useBankSnapshot()`. A vault deleted reads as `unb
 
 Data calls never contain UI: a call that needs the user raises a gating, handed to the bank's
 `requestCleartext`, which the provider is unless you pass your own. So a click handler just calls
-`bank.ensureVault(...)`, then `vault.ensureUnlocked()`, and the dialog comes up on its own.
+`bank.ensureVault(...)`, then `vault.ensureUnlocked()`, and the dialog comes up on its own; so do
+`vault.replacePassphrasePrompt()` and `vault.delVaultPrompt()`, on a vault locked or not:
+
+```tsx
+const changePassphrase = async () => {
+  const replaced = await vault.tryReplacePassphrasePrompt()   // the vault is unlocked once it is ok
+  if (! replaced.ok && replaced.err.refusalkind !== 'declined') { setGripe(replaced.err.message) }
+}
+```
+
+A dialog the user cancels refuses the call `declined`: nothing changed, and nothing needs saying.
 
 * **One dialog at a time.** A bank opens one gating at a time; a call that would open a second
   while one is open is refused `already_asking`.
 * **A lock closes it.** A `vault.lock()`, the autolock, a sign-out, another user, a changed option
-  or the provider unmounting settles the gating, and the dialog closes, answering `declined`.
+  or the provider unmounting settles the gating, and the dialog closes, answering `declined`. The
+  deletion dialog alone stays open through a lock, which does not stop a deletion.
 * **Only at the user's word.** The dialog shows only while the user's gesture is in hand
   (`navigator.userActivation`, where the browser has it): a call a timer or a background sync
   makes is declined unasked.
 * **Your own dialog**: pass `requestCleartext={(gating) => ...}`, which the bank hands a gating
   -- its `gatingkind`, `vaultlabel`, `attempt(...)`, `decline()` and `whenSettled` -- and which
   resolves once the dialog closes; a gating still open then is declined. It may render
-  `GatingModal` itself, `<GatingModal gating={gating} onDone={close} />`, or `PassphraseModal`
-  for a `build_vault` or `unlock_vault` gating. `requestCleartext={null}` asks no one: each such
+  `GatingModal` itself, `<GatingModal gating={gating} onDone={close} />`, which answers
+  `'unlocked'`, `'deleted'` or `'declined'`, or `PassphraseModal` for a `build_vault` or
+  `unlock_vault` gating. `requestCleartext={null}` asks no one: each such
   call is declined.
 
 ## When an unlock fails
 
-**The user sees what they can mend.** A wrong passphrase, or a new passphrase too easy to guess
-(`weak_passphrase`): each shows in the dialog in the core's own calm words, and the gating stays
+**The user sees what they can mend.** A wrong passphrase, a new passphrase too easy to guess
+(`weak_passphrase`), or a new one that is the one in use (`same_passphrase`): each shows in the dialog in the core's own calm words, and the gating stays
 open for the user to try again or cancel. These are the core's `correctablekindVals`; nothing
 tries again for the user. A weak passphrase's message is the reason the bank's
-`strengthChecker` gave; the user hears the same reason before pressing Create, as advice (below).
+`strengthChecker` gave; the user hears the same reason before pressing Create or Change
+passphrase, as advice (below).
 
 **The rest closes the dialog.** Storage out of reach, a lock that won, a vault gone, or a refusal
 the dialog cannot mend closes it, answering `declined`; the call that asked hears that refusal.
@@ -177,10 +200,11 @@ fires on every load, before any user has typed anything.
 The dialog's passphrase field is built to be the field a password manager handles best, so a user
 can keep a long, generated passphrase without remembering it: a real `<form>`, `type="password"`,
 `autocomplete="new-password"` while it creates the vault (the manager offers to generate one, and
-to save it once the dialog closes) and `autocomplete="current-password"` while it unlocks (the
-manager offers the one it saved). Beside it, a hidden field with `autocomplete="username"` names
+to save it once the dialog closes) and `autocomplete="current-password"` while it unlocks or
+deletes the vault (the manager offers the one it saved). The dialog that replaces the passphrase
+has one of each: the passphrase in use, then the new one, which the manager saves in its place. Beside it, a hidden field with `autocomplete="username"` names
 what the manager files the passphrase under: by default the user and the vault, `u1 (main
-vault)`. Name it yourself with `passphraseUsername`, on `BankProvider` or `PassphraseModal` --
+vault)`. Name it yourself with `passphraseUsername`, on `BankProvider`, `GatingModal` or `PassphraseModal` --
 but never the user's sign-in name alone: the vault passphrase is not their sign-in password, and a
 manager that saw a new password for their sign-in name would offer to overwrite the one they log
 in with.
@@ -193,7 +217,7 @@ It has a Show / Hide button (`aria-pressed`), flipping the field between `passwo
 and is never capitalized, corrected or spell-checked, shown or hidden. Like `WhisperField`, it is
 uncontrolled: React never writes the passphrase into the page.
 
-**Typed twice when new.** A new passphrase, the vault's first, is
+**Typed twice when new.** A new passphrase, the vault's first or the one that replaces it, is
 typed again in a confirmation field below it, also `autocomplete="new-password"`, so that a
 manager that generates one fills both. A typo would otherwise become the vault's passphrase,
 and once this device's unlock ends, nobody
@@ -201,17 +225,18 @@ could open the vault. A submit whose two differ is refused in place, before any 
 anything is stored: "The new passphrase and its confirmation don't match: type the same one in
 both." The confirmation field is then marked `aria-invalid` and described by that message
 (`aria-describedby`), until the user types again. The two are compared only at the submit; the
-confirmation field is uncontrolled too, and the advice never hears it. The unlock form asks once.
+confirmation field is uncontrolled too, and the advice never hears it. The unlock and deletion
+forms ask once.
 
 **Advice while choosing.** By default the dialog says the reason the bank's strength checker
-gives (`gating.checkStrength`) as the user chooses a weak first passphrase, and nothing once the
+gives (`gating.checkStrength`) as the user chooses a weak new passphrase, and nothing once the
 checker admits it, so they hear why before
 pressing Create. Pass `passphraseAdvice`, a function of what has
 been typed, to say something of your own instead (the checker then goes unasked until Create); what
 it answers shows beside the field as the user chooses a passphrase: tied to the field by
 `aria-describedby`, announced politely (`role="status"`), only the answer to the latest text kept.
-It answers a sentence, or null for nothing to say, and may answer through a promise. It is never
-asked while unlocking, and it is advice, not a gate: the user may still create the vault, and what
+It answers a sentence, or null for nothing to say, and may answer through a promise. It hears
+only a new passphrase: never the one typed to unlock, delete, or prove the one in use, and it is advice, not a gate: the user may still create the vault, and what
 the vault itself refuses shows as any refusal does. Say what helps -- length, and how guessable
 the passphrase is -- rather than rules of composition: NIST SP 800-63B advises against requiring
 capitals, digits or symbols, which make passphrases harder to remember and no harder to guess.
@@ -293,6 +318,94 @@ passphrase dialog are uncontrolled for that reason; a field of your own should b
 `mask(whisper)` (from `safebyok/utils`) where the user only needs to tell keys apart; read a
 whisper into state only when the user asks to see or edit it, and drop it (set the state back)
 when they hide it, save, or navigate away.
+
+## A vault's boxes
+
+The box hooks read what the vault's box listing holds, and never ask the user or fetch:
+
+* `useBoxes(vaultlabel)` -- the snapshots of the boxes present in the vault, live; `null` while
+  the vault is not `present`.
+* `useBox(vaultlabel, boxlabel)` -- the Box under that label, `null` until the listing holds it
+  present (and again once it is deleted). Every component asking for a label gets the same Box,
+  so a whisper exposed in one place shows wherever that box is read.
+* `useBoxSnapshot(box)` -- the box's live snapshot (`exposed`, `veiled`, its revision), or `null`
+  for no box.
+* `useWhisper(box)` -- `box.whisper`, live: the whisper while it shows, and a bag with no fields
+  while it does not (not exposed, the vault locked, or the box veiled) or there is no box. Read
+  it at each render; a reference you keep outlives a lock.
+
+Each takes `null`, so a component can call it before the box is listed. Make or fetch a box, and
+expose it, from a click: `expose` and `put` refuse while the vault is locked, so unlock first.
+
+```tsx
+const ApiKeyPanel = () => {
+  const { vault } = useVault('main')
+  const box = useBox('main', 'anthropic_api_key')
+  const whisper = useWhisper(box)
+  const open = async () => {
+    if (! vault) { return }
+    await vault.ensureUnlocked()                                  // asks for the passphrase if locked
+    const made = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })
+    await made.expose()
+  }
+  return box?.isShowing
+    ? <p>Key ends in {String(whisper.apiKey ?? '').slice(-4)}</p>
+    : <button onClick={() => { open().catch(showRefusal) }}>Show key</button>
+}
+```
+
+`ifPresent: 'get'` answers a stored box as it is, writing nothing; `ifAbsent: 'add'` stores a new
+one, its whisper empty. Unexposing (`box.unexpose()`) hides the whisper from every component that
+reads the same box.
+
+## A box's whisper field
+
+`BoxWhisperField` binds an input to the text at a dotted `path` in a box's whisper, through
+`BoxFields.of(box).bind(path)` from `safebyok/dom`. The value goes between the box and the element
+directly: never through React's props or state, nor into the element's `value` attribute. It is a
+`type="password"` field carrying `WhisperFieldAttributes`, with a Show / Hide button that changes
+only what the field displays (the box stays as it is: this is not `box.veil()`). It is blank and
+read-only while the whisper will not show, and an edit made before a lock comes back at the
+unlock. It takes no `ref`, `name`, `value` or `onChange`: unnamed, a form submitted natively
+sends none of it.
+
+```tsx
+import { BoxFields } from 'safebyok/dom'
+import { BoxWhisperField, useBox, useBoxSnapshot, useVault } from 'safebyok-react'
+
+const ApiKeyEditor = () => {
+  const { vault } = useVault('main')
+  const box = useBox('main', 'anthropic_api_key')
+  const snapshot = useBoxSnapshot(box)
+  if (! vault || ! box) { return null }
+  const edit = async () => { await vault.ensureUnlocked(); await box.expose() }
+  return (
+    <>
+      <BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />
+      {snapshot?.exposed
+        ? <button onClick={() => { void BoxFields.of(box).trySave().then(showOutcome) }}>Save</button>
+        : <button onClick={() => { edit().catch(showRefusal) }}>Edit</button>}
+    </>
+  )
+}
+```
+
+`showOutcome` and `showRefusal` are yours to write. Nothing is stored until
+`BoxFields.of(box).save()`. When the last field bound to a box unmounts,
+the box unexposes. So expose from a click after the field mounts, never in an effect or before:
+under `StrictMode`, React's rehearsal unmounts the field once, and that unexposes a box exposed
+earlier.
+
+## The account menu
+
+`<VaultLockControl vaultlabel="main" />` shows whether the vault is locked, with a Lock button
+(`vault.lock()`) or an Unlock button (`bank.ensureVault`, then `vault.ensureUnlocked()`, which
+shows the passphrase dialog). While the vault is unborn it renders `<CreateVaultButton
+vaultlabel="main" />`, which builds the vault from the click (`bank.ensureVault`, asking for a new
+passphrase); while the bank is not ready it renders nothing. A user declining the dialog is no
+news; any other refusal goes to the bank's `onBadNews`. Both are unstyled, under the
+`vault-lock-control` and `create-vault-button` class names, and the control carries
+`data-lock-state`. Their words are in `src/messages.ts`.
 
 ## Development
 
