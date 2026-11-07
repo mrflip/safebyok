@@ -228,6 +228,15 @@ describe("the box hooks", () => {
     expect(shownOfBox('boxes')).to.eq('')
   })
 
+  it("read none for a box whose vault is deleted elsewhere", async () => {
+    const { world, vault } = await boxWorld()
+    render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(shownOfBox('box')).to.eq('revision 0, sealed') })
+    await vault.delVaultPrompt()
+    await waitFor(() => { expect(shownOfBox('box')).to.eq('none') })
+    expect(shownOfBox('boxes')).to.eq('none')
+  })
+
   it("read a bag with no fields and no snapshot for no box", () => {
     render(<NoBox />)
     expect(screen.getByText('0 encrypted true')).to.exist
