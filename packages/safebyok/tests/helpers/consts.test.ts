@@ -81,15 +81,15 @@ describe("isAdapterVaultDB", () => {
   it("tells an adapter's store from a client of one, which wears only the VaultDB's brand", () => {
     const vaultDB = new MemoryVaultDB()
     const client = { [Symbol.for('@safebyok/vaultdb')]: true }
-    expect([isVaultDB(vaultDB), isAdapterVaultDB(vaultDB)]).to.eql([true, true])
-    expect([isVaultDB(client), isAdapterVaultDB(client)]).to.eql([true, false])
+    expect([isVaultDB(vaultDB), isAdapterVaultDB(vaultDB)]).to.deep.equal([true, true])
+    expect([isVaultDB(client), isAdapterVaultDB(client)]).to.deep.equal([true, false])
     expect(isAdapterVaultDB({ [Symbol.for('@safebyok/adaptervaultdb')]: true })).to.be.true
   })
 
   it("refuses a plain object answering every verb, and a copy of a store's own fields", () => {
     const vaultDB = new MemoryVaultDB()
     const verbs = Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
-    expect([isVaultDB(verbs), isAdapterVaultDB(verbs)]).to.eql([false, false])
+    expect([isVaultDB(verbs), isAdapterVaultDB(verbs)]).to.deep.equal([false, false])
     expect(isAdapterVaultDB(Object.assign({}, vaultDB))).to.be.false
     expect(isAdapterVaultDB(new MemoryDeviceDB())).to.be.false
     expect(isAdapterVaultDB(null)).to.be.false
