@@ -93,7 +93,7 @@ describe("lease.cache() and lease.tryCache()", () => {
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 
-  it("throws what tryCacheLease refuses, and leaves the lease in force; tryCache answers it as a bad Outcome", async () => {
+  it("throws what tryCacheLease refuses, leaving the lease in force", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     friend.tryCacheLease.mockResolvedValue(bad(new VaultError('unexpected_error', 'the disk is full')))
