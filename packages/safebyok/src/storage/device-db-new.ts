@@ -1,4 +1,4 @@
-/** The deviceDB: what the models cache on this device, a lease for each vault. A subclass writes the `do*` calls. */
+/** The deviceDB: what the models cache on this device, a lease for each vault. */
 
 import { IsDeviceDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
@@ -10,7 +10,7 @@ import { type VaultScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
-/** The base a host's device store extends, writing the `do*` calls. */
+/** The base a host's device store extends, writing only the generic `do*` calls, each one atomic step. */
 export abstract class DeviceDB {
   // == [Brand]: IsDeviceDB
 
