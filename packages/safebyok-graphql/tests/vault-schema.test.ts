@@ -76,7 +76,7 @@ const shapeDriftOf = (shape: CheckShape, fieldedTypes: readonly FieldedType[], p
     gqlnames.every((gqlname) => fieldnames.includes(gqlname)) && fieldnames.every((fieldname) => gqlnames.includes(fieldname) || optional.has(fieldname))
   )
   const fielded = fieldedTypes.find((each) => fits(Object.keys(each.getFields())))
-  if (!fielded) {
+  if (! fielded) {
     const offered = fieldedTypes.map((each) => `${each.name} {${Object.keys(each.getFields()).join(' ')}}`)
     return [`${path}: the check's {${fieldnames.join(' ')}} matches none of ${offered.join(', ')}`]
   }
@@ -87,7 +87,7 @@ const shapeDriftOf = (shape: CheckShape, fieldedTypes: readonly FieldedType[], p
 /** `schema`'s root field `fieldname`, of Query, Mutation or Subscription. */
 const rootFieldOf = (schema: GraphQLSchema, fieldname: string): GraphQLField<unknown, unknown> => {
   const field = rootFieldsOf(schema).find((each) => each.name === fieldname)
-  if (!field) { throw new Error(`the schema has no root field ${fieldname}`) }
+  if (! field) { throw new Error(`the schema has no root field ${fieldname}`) }
   return field
 }
 
@@ -102,7 +102,7 @@ const schemaDriftOf = (schema: GraphQLSchema): string[] => [
   ...AnswerChecks.flatMap(([fieldname, check]) => driftOf(check, rootFieldOf(schema, fieldname).type, fieldname)),
   ...InputChecks.flatMap(([fieldname, argname, check]) => {
     const arg = rootFieldOf(schema, fieldname).args.find((each) => each.name === argname)
-    if (!arg) { throw new Error(`the schema's ${fieldname} takes no ${argname}`) }
+    if (! arg) { throw new Error(`the schema's ${fieldname} takes no ${argname}`) }
     return driftOf(check, arg.type, `${fieldname}(${argname})`)
   }),
 ]
