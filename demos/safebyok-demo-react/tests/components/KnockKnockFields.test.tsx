@@ -101,7 +101,7 @@ describe("KnockKnockFields", () => {
     await knockAs('Banana')
     await TH.answerPassphraseDialog()
     await screen.findByText('Save your Anthropic API key first.')
-    expect(anthropic.seen).to.have.length(0)
+    expect(anthropic.seen).to.have.lengthOf(0)
   })
 
   it("asks who's there before it knocks", async () => {
