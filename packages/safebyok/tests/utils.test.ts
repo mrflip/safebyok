@@ -6,9 +6,9 @@ import * as PX from '../src/shapes/primitives'
 
 const MashCases = [
   // mash @example
-  ["abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", 'answers the SHA-256 of the text as hex'],
-  ["",    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 'answers the SHA-256 of the empty text'],
-  ["é",   "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c", 'hashes the UTF-8 bytes of the text'],
+  ["abc", "ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0", 'answers the SHA-256 of the text as unpadded base64url'],
+  ["",    "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU", 'answers the SHA-256 of the empty text'],
+  ["é",   "SplVfkAzw1Od4utlRyAXytX5VX96BiWgnxw_biumnEw", 'hashes the UTF-8 bytes of the text'],
 ] as const
 
 describe("the utils entry point", () => {
@@ -35,8 +35,10 @@ describe("mash", () => {
     it(blurb, async () => { expect(await mash(text)).to.eq(digest) })
   }
 
-  it("answers 64 lowercase hex characters", async () => {
-    expect(await mash('ada@example.com')).to.match(/^[0-9a-f]{64}$/)
+  it("answers 43 characters of unpadded base64url, the bytes toB64 writes", async () => {
+    const mashed = await mash('ada@example.com')
+    expect(mashed).to.match(/^[\w-]{43}$/)
+    expect(utils.fromB64(mashed)).to.have.lengthOf(32)
   })
 
   it("answers alike for equal text and apart for different text", async () => {
