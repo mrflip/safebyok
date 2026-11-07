@@ -195,11 +195,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  /** Hold `lease` as this vault's, and stow it on this device. */
+  /** Hold `lease` as this vault's, and cache it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
     this.demandEnabled()
     this.#lease = lease
-    await lease.stowAsStowCan()
+    await lease.cacheAsCacheCan()
     this.settle()
   }
 
@@ -246,7 +246,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       leaseMillis,
       lock:            () => { this.lock() },
       tryPeekLease:    () => deviceDB.tryPeek(asked),
-      tryStowLease:    (record) => deviceDB.tryStow(record),
+      tryCacheLease:   (record) => deviceDB.tryStow(record),
       tryForgetLease:  () => deviceDB.tryForget(asked),
       tellBadNews:     (badnews) => { this.world.tellBadNews(badnews) },
     }

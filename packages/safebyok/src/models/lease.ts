@@ -31,7 +31,7 @@ export class Lease implements LeaseStamp {
   /** The stamp of the vault this lease is of, parsed once: what every ctx under it binds. */
   readonly #vaultStamp: VaultStamp
 
-  /** True where this lease came from the cache, so stowing it has nothing to do. */
+  /** True where this lease came from the cache, so caching it has nothing to do. */
   readonly #isFromCache: boolean
 
   get #leaseStamp(): LeaseStamp { return leaseStamp.parse(this) }
@@ -63,7 +63,7 @@ export class Lease implements LeaseStamp {
     }
     if (peeked.val === null) { return null }
     const checked = leaseRecord.safeParse(peeked.val)
-    // The damaged row stands until the next lease is stowed over it.
+    // The damaged row stands until the next lease is cached over it.
     if (! checked.success) {
       friend.tellBadNews([damagedLease()])
       return null
@@ -76,7 +76,7 @@ export class Lease implements LeaseStamp {
     return new Lease(friend, checked.data, true)
   }
 
-  /** A new lease under a fresh leaseKey. The vault holds it, and stows it. */
+  /** A new lease under a fresh leaseKey. */
   static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate_epoch, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
     const held     = vaultStamp.parse(friend)
@@ -87,26 +87,27 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Stowing]: stow, tryStow, stowAsStowCan
+  // == [Caching]: cache, tryCache, cacheAsCacheCan
 
-  /** Stow this lease in the deviceDB; one built from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
-  async stow(): Promise<void> {
+  /** Caches this lease on this device. */
+  async cache(): Promise<void> {
     if (this.#isFromCache) { return }
-    valOf(await this.#friend.tryStowLease(this.#demandRecord()))
+    valOf(await this.#friend.tryCacheLease(this.#demandRecord()))
   }
 
-  tryStow(): Promise<Outcome<void>> { return outcomeOf(() => this.stow()) }
+  tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
 
-  /** Stow this lease if it can. A refusal is bad news: it costs the next session a proof, not this one its lease. */
-  async stowAsStowCan(): Promise<void> {
-    const stowed = await this.tryStow()
-    if (! stowed.ok) { this.#friend.tellBadNews([stowed.err]) }
+  // A refusal costs the next session a proof, not this one its lease.
+  /** Caches this lease if it can, telling the host of a refusal as bad news. */
+  async cacheAsCacheCan(): Promise<void> {
+    const cached = await this.tryCache()
+    if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
   }
   // --
 
   // == [Ending one]: vacate, tryVacate, forget, tryForget, evict
 
-  /** Drop the keys and forget the stowed record, so this device is locked. */
+  /** Drop the keys and forget the cached record, so this device is locked. */
   async vacate(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
@@ -115,14 +116,14 @@ export class Lease implements LeaseStamp {
 
   tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
 
-  /** Forget the stowed record with no lease held to {@link vacate}: one may stand from an earlier session. */
+  /** Forget the cached record with no lease held to {@link vacate}: one may stand from an earlier session. */
   static async forget(friend: LeaseFriend): Promise<void> {
     valOf(await leaseFriend.parse(friend).tryForgetLease())
   }
 
   static tryForget(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.forget(friend)) }
 
-  /** Drop the keys, leaving the stowed record for the next session. */
+  /** Drop the keys, leaving the cached record for the next session. */
   evict(): void { this.#record = null }
   // --
 
@@ -209,7 +210,7 @@ export class Lease implements LeaseStamp {
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
 const isPastAutolock = ({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean => nowMillis() - proved_at > leaseMillis
 
-/** Forget a stowed record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
+/** Forget a cached record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
 const forgetOutdated = async (friend: LeaseFriend): Promise<void> => {
   const del = await friend.tryForgetLease()
   if (! del.ok) { friend.logger.warn("This device's lease could not be erased: the next lease is written over it.", { call: 'Lease.buildFromCache', refusalkind: del.err.refusalkind }) }

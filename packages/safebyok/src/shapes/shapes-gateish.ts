@@ -240,9 +240,9 @@ export const leaseFriend = objCheck(({ fn }) => ({
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
-  /** Stow a lease's record on this device, in place of any it held. */
-  tryStowLease:    fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
-  /** Forget the lease this device has stowed. */
+  /** Cache a lease's record on this device, in place of any it held. */
+  tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
+  /** Forget the lease this device has cached. */
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),

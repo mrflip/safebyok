@@ -20,7 +20,7 @@ const WhisperText = '{"val":"sk-test-0000"}'
 const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseFriend, lease: Lease }> => {
   const friend = fakeLeaseFriendOf()
   const lease = await makeGrantedLease(friend, opts)
-  await lease.stow()
+  await lease.cache()
   return { friend, lease }
 }
 
@@ -33,10 +33,10 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
     expect(Object.keys(record.vault_key_lease_wrapped)).to.have.members(['cipher_iv_b64', 'ciphertext_b64'])
   })
 
-  it("stows nothing of itself: a lease is stowed by tryStow", async () => {
+  it("caches nothing of itself: a lease is cached by tryCache", async () => {
     const friend = fakeLeaseFriendOf()
     await makeGrantedLease(friend)
-    expect(friend.tryStowLease).not.toHaveBeenCalled()
+    expect(friend.tryCacheLease).not.toHaveBeenCalled()
     expect(friend.cached).to.be.null
   })
 
@@ -76,29 +76,29 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
   }
 })
 
-describe("lease.stow() and lease.tryStow()", () => {
-  it("puts the record through tryStowLease", async () => {
+describe("lease.cache() and lease.tryCache()", () => {
+  it("puts the record through tryCacheLease", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
-    await lease.stow()
-    expect(friend.tryStowLease).toHaveBeenCalledTimes(1)
+    await lease.cache()
+    expect(friend.tryCacheLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.deep.include(Stamped)
   })
 
   it("has nothing to do for a lease built from the cache", async () => {
     const { friend } = await grantedWorld()
-    friend.tryStowLease.mockClear()
+    friend.tryCacheLease.mockClear()
     const cached = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
-    await cached!.stow()
-    expect(friend.tryStowLease).not.toHaveBeenCalled()
+    await cached!.cache()
+    expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 
-  it("throws what tryStowLease refuses, and leaves the lease in force; tryStow answers it as a bad Outcome", async () => {
+  it("throws what tryCacheLease refuses, and leaves the lease in force; tryCache answers it as a bad Outcome", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
-    friend.tryStowLease.mockResolvedValue(bad(new VaultError('unexpected_error', 'the disk is full')))
-    await TH.expectRefusal(lease.stow())
-    await TH.expectBad(lease.tryStow())
+    friend.tryCacheLease.mockResolvedValue(bad(new VaultError('unexpected_error', 'the disk is full')))
+    await TH.expectRefusal(lease.cache())
+    await TH.expectBad(lease.tryCache())
     expect(lease.isPresent).to.be.true
     await lease.sealWith(WhisperText, sealStampOf('b1'))
   })
@@ -107,7 +107,7 @@ describe("lease.stow() and lease.tryStow()", () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     lease.evict()
-    await TH.expectBad(lease.tryStow(), 'vault_locked')
+    await TH.expectBad(lease.tryCache(), 'vault_locked')
     expect(friend.cached).to.be.null
   })
 })
@@ -166,7 +166,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   it("finds nothing past an autolock of ForeverMillis, a host's Infinity: a lease cached long ago is in force", async () => {
     const friend = fakeLeaseFriendOf({ leaseMillis: ForeverMillis })
     const lease = await makeGrantedLease(friend)
-    await lease.stow()
+    await lease.cache()
     vi.setSystemTime(T0 + (400 * 24 * 60 * 60_000))
     const got = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
     expect(got?.isPresent).to.be.true
@@ -199,7 +199,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     it(`forgets a cached lease of ${blurb}: it answers null and its row is forgotten, so the vault asks for a proof`, async () => {
       const elsewhere = fakeLeaseFriendOf(stamp)
       const lease = await makeGrantedLease(elsewhere)
-      await lease.stow()
+      await lease.cache()
       const friend = fakeLeaseFriendOf()
       friend.cached = elsewhere.cached
       expect(await Lease.buildFromCache(friend, gate_epoch)).to.be.null
@@ -245,7 +245,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
 })
 
 describe("lease.vacate(), lease.evict() and isPresent", () => {
-  it("vacate forgets the stowed record and leaves the lease forgotten and out of force", async () => {
+  it("vacate forgets the cached record and leaves the lease forgotten and out of force", async () => {
     const { friend, lease } = await grantedWorld()
     await lease.vacate()
     expect(friend.tryForgetLease).toHaveBeenCalledTimes(1)
