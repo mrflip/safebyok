@@ -92,8 +92,8 @@ export const VaultErrorExpected = "Expected a VaultError"
 /** A passphrase handed over as anything but text. */
 export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
 
-/** A passphrase wayin's salt that is not base64url text of at most `maxBytes` bytes. */
-export const passphraseSaltShape = (maxBytes: number): string => `A passphrase salt is base64url text of at most ${String(maxBytes)} bytes`
+/** A passphrase wayin's salt that is not base64url text of `minBytes` to `maxBytes` bytes. */
+export const passphraseSaltShape = (minBytes: number, maxBytes: number): string => `A passphrase salt is base64url text of ${String(minBytes)} to ${String(maxBytes)} bytes`
 // --
 
 // == [Passkeys]: PasskeyAnswerUsed, prfSaltNotFresh

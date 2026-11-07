@@ -332,7 +332,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
   })
 
   it("takes any label and salt length a host chooses that fits the interface", async () => {
-    const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf', salt_bytes: 1 })
+    const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf', salt_bytes: 20 })
     const proving = await novelPassphrase({ ...provingWorldOf(), keyDeriver: guarded })
     const wayin = await proving.buildWayin(NOVEL)
     expect(wayin.toJSON()).to.include({ key_deriver_label: 'my_own_kdf' })
@@ -341,6 +341,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
   const Misfits = [
     [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 16 },                                         'a deriver with no deriveKeyBytes'],
     [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 0, deriveKeyBytes: () => Promise.resolve() },  'a deriver asking for no salt'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 15, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt under 16 bytes'],
     [{ salt_bytes: 16, deriveKeyBytes: () => Promise.resolve() },                                  'a deriver with no label'],
     [() => undefined,                                                                              'a bare function'],
   ] as const

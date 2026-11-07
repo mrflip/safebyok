@@ -24,6 +24,10 @@ export const MinuteMillis = 60_000
 /** The span from {@link FarPast} to {@link FarFuture}, in milliseconds: the longest that runs between two instants the package accepts. */
 export const ForeverMillis = FarFuture - FarPast
 
+// The default deriver's 16, the fewest any deriver of the package has made.
+/** The fewest bytes a passphraseSalt holds, and the fewest a key deriver asks for. */
+export const MinSaltBytes = 16
+
 // Twice the default deriver's 16, and as many as a passkey's prfSalt.
 /** The most bytes a passphraseSalt holds, and the most a key deriver's spec asks for. */
 export const MaxSaltBytes = 32
