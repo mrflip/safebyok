@@ -229,8 +229,19 @@ appropriate" (no change).
   build their 8-byte spec past the check.
 * `Patterns.b64url` in the core, and `salt_b64` checked as
   `str.min(22).max(43).regex(Patterns.b64url)`, replacing thread 2's computed regex.
-* Ride-alongs if the Coach flips them (rows on Open Matters): one clause in G4 naming the
-  damaged-row wontfix; one IndexedDB shelf per `dbName`, as the old core kept.
+* **Rework after review** (the Coach, 2026-11-07, Open Matters, proceed):
+  - On "A salt of an impossible length reads, then throws raw at unlock" (Rec: guard the one
+    decode at unlock so it refuses bad_record): "the key deriver or prover should do the later
+    check". So the deriver or `PassphraseProving` refuses `bad_record` for a `salt_b64` that will
+    not decode, rather than throwing @scure/base's raw Error.
+  - On "The guarantee that lock() erases a lease has an unnamed exception" (Rec: one clause in G4
+    pointing at notes/wontfix.md): "yes. do we offer a delRawLease for a host to call back with?
+    Add one if not". So the G4 clause, and DeviceDB gains `delRawLease(scope)` / `tryDelRawLease`,
+    deleting whatever row stands at a scope, unchecked, through a new hook both stores implement,
+    with a battery case (a damaged row found by `listRawLeases` is gone after `delRawLease`).
+  - On "Each IdbDeviceDB opens a connection of its own" (Rec: one shelf per dbName, as the old core
+    kept): took the Rec, after asking how many there are (as many as the host constructs, usually
+    one per Bank).
 * TODO.md: the demo's move to the new core must not run the old and new device stores under one
   `dbName` (the new one wipes the old's live database).
 * Changesets: unreleased, no back-compat; old databases are wiped.
