@@ -1,4 +1,4 @@
-import { useEffect, type ComponentType } from 'react'
+import { useEffect, useRef, type ComponentType } from 'react'
 import type { AnyGating, Gating, Gatingkind } from 'safebyok'
 import type { DialogAnswer, PassphraseAdvice } from './modal'
 import { PassphraseModal } from './passphrase-modal'
@@ -28,7 +28,13 @@ const DialogForGatingkind: { [KindT in Gatingkind]?: ComponentType<KindModalProp
 
 /** What stands in for a gatingkind with no dialog yet: it answers 'declined' as it mounts. */
 const NoDialog = ({ onDone }: Pick<GatingModalProps, 'onDone'>) => {
-  useEffect(() => { onDone('declined') }, [onDone])
+  // An onDone written inline is new at each render, and is still told only once.
+  const answered = useRef(false)
+  useEffect(() => {
+    if (answered.current) { return }
+    answered.current = true
+    onDone('declined')
+  }, [onDone])
   return null
 }
 
