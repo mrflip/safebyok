@@ -106,9 +106,9 @@ describe("createPasskey", () => {
   })
 
   it("refuses, in words a dialog shows, an authenticator without PRF and a browser without WebAuthn", async () => {
-    expect(await refusalOf(createPasskey(TH.PasskeyMaking))).to.include({ refusalkind: 'wrong_passkey', message: Messages.noWebAuthn })
+    expect(await refusalOf(createPasskey(TH.PasskeyMaking))).to.include({ refusalkind: 'passkey_unavailable', message: Messages.noWebAuthn })
     TH.installFakeAuthenticator({ prf: false })
-    expect(await refusalOf(createPasskey(TH.PasskeyMaking))).to.include({ refusalkind: 'wrong_passkey', message: Messages.noPrf })
+    expect(await refusalOf(createPasskey(TH.PasskeyMaking))).to.include({ refusalkind: 'passkey_unavailable', message: Messages.noPrf })
   })
 
   it("resolves null when the user dismisses the prompt, at either step", async () => {
@@ -126,7 +126,7 @@ describe("createPasskey", () => {
     expect(await refusalOf(createPasskey(TH.PasskeyMaking))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
     authenticator.refuseNext('UnknownError')
     const failed = await refusalOf(createPasskey(TH.PasskeyMaking))
-    expect(failed).to.include({ refusalkind: 'wrong_passkey', message: Messages.passkeyAskFailed })
+    expect(failed).to.include({ refusalkind: 'passkey_unavailable', message: Messages.passkeyAskFailed })
     expect(failed.cause).to.be.instanceOf(DOMException)
   })
 })
@@ -172,13 +172,13 @@ describe("askPasskey", () => {
     const otherCredential = { type: 'public-key', rawId: new Uint8Array(16).buffer, getClientExtensionResults: () => ({ prf: { results: { first: answer } } }) }
     vi.spyOn(navigator.credentials, 'get').mockResolvedValue(otherCredential as unknown as Credential)
     const asking = askPasskey(headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''))
-    expect(await refusalOf(asking)).to.include({ refusalkind: 'wrong_passkey' })
+    expect(await refusalOf(asking)).to.include({ refusalkind: 'passkey_unavailable' })
     expect(answer.every((byte) => byte === 0)).to.be.true
   })
 
   it("refuses, in words a dialog shows, in a browser without WebAuthn", async () => {
     const asking = askPasskey(headerOf('AAAA', 'AAAA'))
-    expect(await refusalOf(asking)).to.include({ refusalkind: 'wrong_passkey', message: Messages.noWebAuthn })
+    expect(await refusalOf(asking)).to.include({ refusalkind: 'passkey_unavailable', message: Messages.noWebAuthn })
   })
 })
 

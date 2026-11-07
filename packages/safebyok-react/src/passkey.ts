@@ -12,9 +12,8 @@ import { Messages } from './messages'
 // only after the user's fingerprint, face or PIN: every call asks for user verification, since an
 // authenticator answers differently without it.
 //
-// The core has no refusalkind for "no passkey answer to be had here" (the browser has no WebAuthn,
-// the authenticator no PRF, or the browser failed); these refuse `wrong_passkey`, which a dialog
-// shows in place, as it does a passkey that did not unlock.
+// Where no passkey answer is to be had (the browser has no WebAuthn, the authenticator no PRF, or
+// the browser failed to ask), these refuse `passkey_unavailable`, which a dialog shows in place.
 
 /** True for base64url text, as a passkey's salt is stored. */
 const isB64 = (text: string): boolean => {
@@ -191,11 +190,11 @@ const optional = <FieldT extends string, ValT>(field: FieldT, val: ValT | undefi
 
 /** Refuse in a browser without WebAuthn. */
 const demandWebAuthn = () => {
-  if (! passkeysAvailable()) { throw new VaultError('wrong_passkey', Messages.noWebAuthn) }
+  if (! passkeysAvailable()) { throw new VaultError('passkey_unavailable', Messages.noWebAuthn) }
 }
 
 /** The refusal for an authenticator that gives no PRF answer. */
-const noPrf = () => new VaultError('wrong_passkey', Messages.noPrf)
+const noPrf = () => new VaultError('passkey_unavailable', Messages.noPrf)
 
 /** The credential a WebAuthn call resolves with, or null when the user dismissed it. */
 const askAuthenticator = async (call: () => Promise<Credential | null>): Promise<PublicKeyCredential | null> => {
@@ -208,7 +207,7 @@ const askAuthenticator = async (call: () => Promise<Credential | null>): Promise
     if (err instanceof DOMException && err.name === 'SecurityError') {
       throw new VaultError('bad_option', "The browser refused the passkey's relying party: its id must be this page's domain, or one it belongs to.", { cause: err })
     }
-    throw new VaultError('wrong_passkey', Messages.passkeyAskFailed, { cause: err })
+    throw new VaultError('passkey_unavailable', Messages.passkeyAskFailed, { cause: err })
   }
   return credential === null ? null : credential as PublicKeyCredential
 }
