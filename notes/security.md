@@ -313,19 +313,19 @@ added or folded into through the subagent, and no other entry changes.
   (4) `vaultRecordHeldBy(vault)` (reading through the Symbol-keyed `vault[provingTools]`; amended 2026-10-27 (proving_tidy), it read through a private `toolsOf` WeakMap lookup) is exported from `src/proving.ts` for tests, as `leaseRecordOf` is from `src/lease.ts`: it hands back the vault
   record a Vault object holds, gate and wrapped vaultKeys included. No entry point exports it and nothing in `src/` calls it.
 * 2026-10-26 (restyle sprint, thread 10, branch `20261026-reads`, PR [#281](https://github.com/mrflip/safebyok/pull/281)): **a VaultDB's read hooks answer
-  `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every answer, a server's included.**
+  `{ vault, boxes, damagedBoxes }`; the package judges damage in `splitStoredBoxes`, and the base class re-checks every read (amended 2026-11-07 (graphql_schema): a browser's `GraphQLVaultDB` checks what a server sends with the core's answer checkers instead).**
   (1) `doGetVault` and `doEnsureVault` hand up the vault record exactly as stored and the box rows split by the exported `splitStoredBoxes`, so an
   adapter adds one line and never judges (amended 2026-10-27 (tidy): `StoredVault.vault` (amended 2026-10-28 (db_hooks): named `VaultReadResponse` when this was written) is typed `unknown`, as `StoredBox.box` is, so an
   adapter hands rows up uncast; the base class checks them as before). A box whose record fails its strict check, or names another boxlabel than the row it is filed under, is a
   `BoxDamaged` `{ boxlabel, revision_tok, damage }`, listed apart from the sound boxes and never among them. `damage` is `newer_format` for a record
   naming a `format` this version neither writes nor wrote before, `damaged` otherwise. Nothing else of a damaged record is kept or shown (its revision
   only when it holds one as text).
-  (2) The base class checks every read again, including what a server relays to a browser (GraphQL, a Postgres route). Each sound box is judged again
+  (2) The base class checks every read again, for a store that runs in the same process (amended 2026-11-07 (graphql_schema): it no longer covers what a server sends to a browser; the browser's `GraphQLVaultDB` checks every answer with the core's strict answer checkers, `AX`, from `safebyok/storage`, and fails as `unexpected_error` on anything out of step). Each sound box is judged again
   exactly as the split judges a row; one that fails is listed damaged under its own boxlabel. A server's word that a box is damaged is taken, but
-  each damaged entry is parsed strictly (boxlabel a label, `damage` one of the two values, revision a non-empty string or null, no other field), and an
+  each damaged entry is parsed strictly (boxlabel a label (amended 2026-11-07 (graphql_schema): the answer checkers' `damagedVault` and `damagedBox` accept any string label, so a row listed under a label that fails the label check is still carried), `damage` one of the two values, revision a non-empty string or null, no other field), and an
   entry that fails refuses the whole read as `corrupt_record`. The worst a lying server does with that word is offer the user to delete or overwrite a
   box it could delete or overwrite anyway. The vault record is still refused `damaged_vault` when it names another scope than asked.
-  (3) The GraphQL browser adapter rebuilds each relayed record from its own fields, dropping GraphQL's `__typename`, before the strict parse.
+  (3) The GraphQL browser adapter drops GraphQL's `__typename` before the strict parse (amended 2026-11-07 (graphql_schema): by explicit paths only, the selection's own and the typed fields each selection names (gate, wayins, ciphered fields, listing rows, `req_params.prior`, `err`), never inside a box's sidecar, a damaged row or a refusal's meta, which are carried whole as JSON; it then parses with the core's answer checkers; it used to rebuild each relayed record from its own fields).
   (4) Names: a stale vault-record update's refusal now carries what is stored as `meta.vault_stored` (was `meta.vault_props_stored`), and `putVaultProps` is
   `putVaultRecord`; older entries that use the old names refer to these.
 * 2026-10-26 (thread cipher_ctx, branch `20261026-cipher_ctx`): **every ctx is now `cipherCtx(stamp, purpose, header)`: it binds the
