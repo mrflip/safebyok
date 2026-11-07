@@ -5,7 +5,7 @@
   pass at `style-reviewer`'s pin. Two threads, stacked, so one runs at a time.
 * **Issued by:** the Coach (flip), in the vaultdb_cleanup session, after the vaultdb line merged
   (#565 at 495cc5d6e). Orchestrated from that session, which keeps this sprint's doc.
-* **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; bookmark rev 2).
+* **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; Closer Look tab a7859c65-9b47, body d20a7781-cfd6 (read at 8dfc3a47c, worktree /workspace/byok-closerlook3); bookmark rev 2).
 * **Status:** 2026-11-07: #567-#570 merged; #571 filed (squashed, 4ceecca51); thread 6 (#580) flagged in review, waits on the Coach's G8 row.
 
 ## The Coach's request, verbatim
