@@ -41,6 +41,16 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 2, branch `20261107-idb_devicedb`): **`IdbDeviceDB` keeps each lease row in IndexedDB with
+  its `lease_key` a non-extractable CryptoKey held by structured clone, and deletes every older device database unread.** In
+  `packages/safebyok/src/storage/idb-device-db.ts` (exported from `safebyok/browser`), the database `${dbName}:device-v1` has one object store keyed
+  `[applabel, user_id, vaultlabel]`. The row holds the vaultKey only as `vault_key_lease_wrapped` under `lease_key`, which is never exported as bytes,
+  so same-origin script can read the row and use the handle to `unwrapKey`, as with the earlier store. Each call is one transaction; `forget` reads
+  the row and deletes it in one readwrite transaction only when its `vault_tok` matches. On its first call the store deletes `${dbName}:device_db` and
+  every `${dbName}:device-v<N>` below the current version without reading them; a tab of an older build holding one open blocks that delete
+  until it closes (`notes/wontfix.md`). A lease row that fails its check is neither listed nor forgotten (`notes/wontfix.md`);
+  `DeviceDB.listRawLeases()` returns every row unchecked.
+
 * 2026-11-05 (whisper_fields, branch `20261105-whisper_fields`; amended 2026-11-06 (whisper_fields)): **`BoxFields.of(box).bind(path)` writes a whisper leaf's plaintext straight to a
   DOM element's `value`, and the lock clears the screen, not the memory.** In `packages/safebyok/src/dom/box-fields.ts` (the `safebyok/dom` entry; amended 2026-11-06 (whisper_fields): named `box.field(path)`, in `src/models/box.ts`, when this was written), the plaintext
   reaches no prop or state of the host's, so it is in the DOM and on the screen and not in React's dev tools: a small improvement over a value
@@ -436,7 +446,10 @@ added or folded into through the subagent, and no other entry changes.
   `PassphraseProving.seal` parses the passphrase it is handed (`passphraseCleartext`; anything not text is refused `bad_option`,
   quoting nothing) and passes on only the parsed value. A host's `KeyDeriver.deriveKeyBytes` still takes a plain string. The
   cleartext check accepts a blank passphrase; whether a blank one is wrong is the gating's to say, as before.
-  (4) A salt's check in the record stays its shape only (non-empty text). Its length and base64url form are still judged per wayin
+  (4) A salt's check in the record stays its shape only (non-empty text) (amended 2026-11-07 (devicedb_idb): a passphrase wayin's `salt_b64` is now accepted as 22 to 43
+  base64url characters, `^[A-Za-z0-9_-]{22,43}$`, 16 to 32 bytes unpadded, judged by its characters and length only, with no decode; a record whose salt fails that is
+  `bad_record`, and a passkey's `prf_salt_b64` stays non-empty text. A key deriver's spec must ask for 16 to 32 `salt_bytes` (`MinSaltBytes` = 16, `src/helpers/consts.ts`), and fewer is refused at
+  setup; the default Argon2id deriver makes 16. The Argon2id spec in `src/deriver/shapes.ts` still allows a minimum of 8 (`MinArgon2SaltBytes`), so a deriver of 8 is refused by the Bank; a passphrase's salt is no longer judged per wayin, as the rest of this item says). Its length and base64url form are still judged per wayin
   (`isDamaged`, `checkedPassphraseHeader`, `checkFreshSalt` (amended 2026-10-27 (validator_ducks): now `freshPasskeyAnswer.parse`, `src/shapes/vault.ts` (amended 2026-10-28 (validator_names): `src/proving.ts` when this was written), run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses)), so a salt of the wrong length or not base64url leaves that wayin
   `damaged_wayin` while the vault's other wayin still opens, where checking it in the record would make the whole vault record damaged.
   (5) `vault_tok` and `revision_tok` stay plain strings, since a host's storage adapter handles them. Their check refuses an empty one
