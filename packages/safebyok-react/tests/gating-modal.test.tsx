@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { Bank } from 'safebyok'
+import type { AnyGating, Bank } from 'safebyok'
 import { GatingModal } from '../src/gating-modal'
 import type { DialogAnswer } from '../src/modal'
 import { Messages } from '../src/messages'
@@ -8,33 +8,44 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The gating `raise` opens, shown in a GatingModal whose answers the test reads. */
-const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, built: boolean) => {
+/** What the vault is before the gating is raised: absent, built, or built and holding a passkey. */
+type Before = 'absent' | 'built' | 'passkeyed'
+
+/** The gating `raise` opens, shown in a GatingModal (as `shown` makes it out to be) whose answers the test reads. */
+const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, before: Before, shown = (gating: AnyGating) => gating) => {
   const world = TH.makeBankWorld()
-  if (built) { await TH.makeBankWithVault(world) }
+  if (before !== 'absent') {
+    const { vault } = await TH.makeBankWithVault(world)
+    if (before === 'passkeyed') { await TH.addPasskeyTo(world, vault) }
+  }
   const held = await TH.heldGatingOf(world, raise)
   const answers: DialogAnswer[] = []
-  render(<GatingModal gating={held.gating} onDone={(answer) => { answers.push(answer); held.close() }} />)
+  render(<GatingModal gating={shown(held.gating)} onDone={(answer) => { answers.push(answer); held.close() }} />)
   return { ...held, answers }
 }
 
+/** `gating`, made out to be of a gatingkind this package has no dialog for, as one a newer core raises. */
+const forged = (gating: AnyGating): AnyGating => Object.create(gating, { gatingkind: { value: 'forged_kind' } }) as AnyGating
+
 describe("GatingModal", () => {
   const DialogCases = [
-    [TH.building,  false, Messages.chooseTitle,   'shows the passphrase dialog, choosing, for a build_vault gating'],
-    [TH.unlocking, true,  Messages.unlockTitle,   'shows the passphrase dialog, unlocking, for an unlock_vault gating'],
-    [TH.replacing, true,  Messages.changeTitle,   'shows the dialog that replaces the passphrase for a replace_passphrase gating'],
-    [TH.deleting,  true,  Messages.delVaultTitle, 'shows the dialog that deletes the vault for a del_vault gating'],
+    [TH.building,        'absent',    Messages.chooseTitle,        'shows the passphrase dialog, choosing, for a build_vault gating'],
+    [TH.unlocking,       'built',     Messages.unlockTitle,        'shows the passphrase dialog, unlocking, for an unlock_vault gating'],
+    [TH.replacing,       'built',     Messages.changeTitle,        'shows the dialog that replaces the passphrase for a replace_passphrase gating'],
+    [TH.addingPasskey,   'built',     Messages.addPasskeyTitle,    'shows the dialog that adds a passkey for an add_passkey gating'],
+    [TH.revokingPasskey, 'passkeyed', Messages.revokePasskeyTitle, 'shows the dialog that removes the passkey for a revoke_passkey gating'],
+    [TH.deleting,        'built',     Messages.delVaultTitle,      'shows the dialog that deletes the vault for a del_vault gating'],
   ] as const
 
-  for (const [raise, built, title, blurb] of DialogCases) {
+  for (const [raise, before, title, blurb] of DialogCases) {
     it(blurb, async () => {
-      await shownFor(raise, built)
+      await shownFor(raise, before)
       expect(screen.getByText(title)).to.exist
     })
   }
 
   it("answers declined at once for a gatingkind with no dialog, and the gating is declined", async () => {
-    const { raising, answers } = await shownFor(TH.addingPasskey, true)
+    const { raising, answers } = await shownFor(TH.unlocking, 'built', forged)
     await waitFor(() => { expect(answers).to.deep.equal(['declined']) })
     expect(screen.queryByRole('dialog')).to.be.null
     expect(await raising).to.include({ ok: false })
@@ -43,9 +54,9 @@ describe("GatingModal", () => {
   it("answers once for a gatingkind with no dialog, though its onDone is new at each render", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const held = await TH.heldGatingOf(world, TH.addingPasskey)
+    const held = await TH.heldGatingOf(world, TH.unlocking)
     const answers: DialogAnswer[] = []
-    const ui = () => <GatingModal gating={held.gating} onDone={(answer) => { answers.push(answer) }} />
+    const ui = () => <GatingModal gating={forged(held.gating)} onDone={(answer) => { answers.push(answer) }} />
     const { rerender } = render(ui())
     rerender(ui())
     rerender(ui())

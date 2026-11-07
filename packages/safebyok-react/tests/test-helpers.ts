@@ -3,11 +3,12 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
-import { onTestFinished } from 'vitest'
-import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gatingkind, type Outcome, type RequestCleartext } from 'safebyok'
-import { VaultScopeGiven, anyStrengthChecker, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
+import { onTestFinished, vi } from 'vitest'
+import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
+import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import type { BankProviderProps } from '../src/bank-provider'
 import type { PassphraseGating } from '../src/passphrase-modal'
+import { fromB64, toB64 } from 'safebyok/utils'
 
 export * from 'safebyok/testing'
 export * from './test-helpers-react'
@@ -77,7 +78,24 @@ export const withoutGesture = () => {
 }
 // --
 
-// == [Held gatings]: heldGatingOf, building, unlocking, replacing, deleting, addingPasskey, passphraseGatingOf, gatingOfKind
+// == [Held gatings]: addPasskeyTo, heldGatingOf, building, unlocking, replacing, deleting, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind
+
+/** Add a passkey to `vault`, a vault of `world`'s own bank, as its user would at the dialog: `passkeyClear`, or the passkey `passkeyOf('laptop')` makes.
+ *
+ * @example await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))  // one the fake authenticator holds
+ */
+export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?: PasskeyAnswer | null) => {
+  const {typing} = world.dialog
+  world.dialog.typing = { passphraseClear: Passphrase, passkeyClear: passkeyClear ?? await passkeyOf('laptop') }
+  try {
+    await vault.addPasskeyPrompt()
+  } finally {
+    world.dialog.typing = typing
+  }
+}
+
+/** What a test hands `createPasskey`: a relying party and a user, as a host would name them. */
+export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vault)', displayName: 'u1' } }
 
 /** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, held open until it settles or the test calls `close`, as a host's requestCleartext holds it while its dialog shows; and `raising`, the outcome of `raise`.
  *
@@ -127,6 +145,12 @@ export const addingPasskey = async (bank: Bank) => {
   return vault.tryAddPasskeyPrompt()
 }
 
+/** What opens a `revoke_passkey` gating on a bank whose vault is built and holds a passkey. */
+export const revokingPasskey = async (bank: Bank) => {
+  const vault = await bank.ensureVault(VaultScopeGiven)
+  return vault.tryRevokePasskeyPrompt()
+}
+
 /** `gating`, which the test knows to be of `gatingkind`. */
 export const gatingOfKind = <KindT extends Gatingkind>(gating: AnyGating, gatingkind: KindT): Extract<AnyGating, { gatingkind: KindT }> => {
   const isOfKind = (some: AnyGating): some is Extract<AnyGating, { gatingkind: KindT }> => some.gatingkind === gatingkind
@@ -141,7 +165,7 @@ export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
 }
 // --
 
-// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitDeletion
+// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitDeletion, submitPasskeyAdd, submitPasskeyRevoke
 
 /** Types the passphrase in the dialog and presses Unlock. */
 export const submitPassphrase = (passphrase: string) => {
@@ -169,4 +193,114 @@ export const submitDeletion = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Delete vault'))
 }
+
+/** Types the passphrase in the add-passkey dialog and presses Add passkey. */
+export const submitPasskeyAdd = (passphrase: string) => {
+  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(screen.getByText('Add passkey'))
+}
+
+/** Types the passphrase in the remove-passkey dialog and presses Remove passkey. */
+export const submitPasskeyRevoke = (passphrase: string) => {
+  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(screen.getByText('Remove passkey'))
+}
+// --
+
+// == [Fake authenticator]: installFakeAuthenticator, FakeAuthenticatorOpts
+
+/** How the fake authenticator behaves: whether it offers PRF at all, and whether it answers as it makes a passkey. */
+export type FakeAuthenticatorOpts = { prf?: boolean, prfAtCreate?: boolean }
+
+/** A WebAuthn authenticator for one test, as `navigator.credentials` and `PublicKeyCredential`: same passkey and salt, same answer.
+ *
+ * @example const authenticator = TH.installFakeAuthenticator()
+ * @example const authenticator = TH.installFakeAuthenticator({ prfAtCreate: false })  // answers only when asked again
+ * @example const authenticator = TH.installFakeAuthenticator({ prf: false })         // no PRF extension
+ */
+export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
+  const offersPrf = opts.prf ?? true
+  const prfAtCreate = opts.prfAtCreate ?? true
+  const secrets = new Map<string, Uint8Array<ArrayBuffer>>()
+  const calls = { create: [] as CredentialCreationOptions[], get: [] as CredentialRequestOptions[] }
+  const handed: Uint8Array[] = []
+  let refusal: string | null = null
+  let holding: Promise<unknown> | null = null
+
+  // Each call refuses as told, or waits as told, before it answers.
+  const asTold = async () => {
+    const [errname, waiting] = [refusal, holding]
+    refusal = null
+    holding = null
+    if (waiting !== null) { await waiting }
+    if (errname !== null) { throw new DOMException('The fake authenticator refused, as told.', errname) }
+  }
+  /** A credential as the fake hands it back: what the helpers read of a PublicKeyCredential. */
+  type FakeCredential = { type: 'public-key', id: string, rawId: ArrayBuffer, getClientExtensionResults: () => AuthenticationExtensionsClientOutputs }
+  // `prf` is what the PRF extension answers: null for none, and its answer over `salt`, if given.
+  const credentialOf = async (credential_id: string, prf: { enabled?: true, salt: BufferSource | undefined } | null): Promise<FakeCredential> => {
+    const answered: AuthenticationExtensionsPRFOutputs = { ...(prf?.enabled && { enabled: true }) }
+    if (prf?.salt !== undefined) {
+      const first = new Uint8Array(await prfOf(secrets.get(credential_id)!, prf.salt))
+      handed.push(first)
+      answered.results = { first }
+    }
+    const extensions = prf === null ? {} : { prf: answered }
+    return { type: 'public-key', id: credential_id, rawId: (fromB64(credential_id) as Uint8Array<ArrayBuffer>).buffer, getClientExtensionResults: () => extensions }
+  }
+
+  const create = async (options: CredentialCreationOptions): Promise<FakeCredential> => {
+    calls.create.push(options)
+    await asTold()
+    const credential_id = toB64(crypto.getRandomValues(new Uint8Array(16)))
+    secrets.set(credential_id, crypto.getRandomValues(new Uint8Array(32)))
+    if (! offersPrf) { return credentialOf(credential_id, null) }
+    return credentialOf(credential_id, { enabled: true, salt: prfAtCreate ? options.publicKey?.extensions?.prf?.eval?.first : undefined })
+  }
+
+  const get = async (options: CredentialRequestOptions): Promise<FakeCredential> => {
+    calls.get.push(options)
+    await asTold()
+    const offered = (options.publicKey?.allowCredentials ?? []).map((descriptor) => b64Of(descriptor.id))
+    const credential_id = offered.find((candidate) => secrets.has(candidate))
+    if (credential_id === undefined) { throw new DOMException('None of these passkeys is here.', 'NotAllowedError') }
+    if (! offersPrf) { return credentialOf(credential_id, null) }
+    const prf = options.publicKey?.extensions?.prf
+    return credentialOf(credential_id, { salt: prf?.evalByCredential?.[credential_id]?.first ?? prf?.eval?.first })
+  }
+
+  vi.stubGlobal('PublicKeyCredential', FakePublicKeyCredential)
+  Object.defineProperty(navigator, 'credentials', { value: { create, get }, configurable: true })
+  onTestFinished(() => {
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(navigator, 'credentials')
+  })
+  return {
+    calls,
+    /** The credential ids (base64url) of every passkey the fake holds. */
+    credentialIds: () => [...secrets.keys()],
+    /** Every PRF answer the fake handed out, as the bytes it handed: what its caller should have zeroed once copied. */
+    answersHanded: () => [...handed],
+    /** Make the next call throw a DOMException named `errname`: `NotAllowedError` is a dismissal. */
+    refuseNext:    (errname: string) => { refusal = errname },
+    /** Make the next call wait for `waiting` before it answers, as a user slow to touch the sensor. */
+    holdNext:      (waiting: Promise<unknown>) => { holding = waiting },
+  }
+}
+
+/** Stands in for the browser's PublicKeyCredential, whose presence says the browser offers WebAuthn. */
+class FakePublicKeyCredential {
+  readonly type = 'public-key'
+}
+
+/** HMAC-SHA256 of `saltBytes` under `secretBytes`: the fake's PRF, as hmac-secret's is in spirit. */
+const prfOf = async (secretBytes: Uint8Array<ArrayBuffer>, saltBytes: BufferSource): Promise<ArrayBuffer> => {
+  const hmacKey = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  return await crypto.subtle.sign('HMAC', hmacKey, saltBytes)
+}
+
+/** `source`'s bytes as base64url, whichever kind of buffer it is. */
+const b64Of = (source: BufferSource): string => (
+  toB64(ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source))
+)
 // --
