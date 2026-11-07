@@ -1,6 +1,6 @@
 # Thread 2: react_port (2026-11-07)
 
-Branch `20261107-react_port`, PR #TBD, stacked on #573. Justify: green -- safebyok-react 10 files,
+Branch `20261107-react_port`, PR #574, stacked on #573. Justify: green -- safebyok-react 10 files,
 96 tests; the demo 8 files, 36 tests; every other package as before; size budgets within.
 
 * **Built**
