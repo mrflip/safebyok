@@ -42,9 +42,7 @@ Hand it to the core wherever a `VaultDB` is asked for.
   `vault_full`; a transaction aborted, a database closed under the page, storage the browser
   withholds, or no IndexedDB at all, with kind `storage_unavailable`. Either carries IndexedDB's
   own error as its `cause`.
-* **No box cap of its own.** The origin's quota bounds the whole database. The `maxBoxes` a vault is opened
-  with is a best-effort cap, checked by the vault against the boxes it last read: exact at moderate write
-  rates, and two tabs putting at once may each take the last place.
+* **No limits of its own.** The origin's quota bounds the whole database.
 
 ## What is stored
 
