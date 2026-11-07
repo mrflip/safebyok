@@ -55,7 +55,8 @@ export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   return made
 }
 
-/** Forgets the page's shelf of the database `dbname`, so the next `versionedShelfOf` of it opens a connection of its own. */
+// A test's backdoor, reached from `safebyok/testing` and never from `safebyok/storage`.
+/** For tests only: the next {@link versionedShelfOf} of the database `dbname` opens a connection of its own. */
 export const _cheat_forgetShelf = (dbname: string): void => { shelves.delete(dbname) }
 
 /** True for the name of a database of `spec`'s stem at an older version. */

@@ -2,6 +2,7 @@
 
 // fake-indexeddb installs IndexedDB's globals before the shelf loads: real transactions, with no browser.
 import 'fake-indexeddb/auto'
+import type { UseStore } from 'idb-keyval'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { _cheat_forgetShelf, versionedShelfOf, type VersionedShelfSpec } from '../../src/storage/idb-shelf'
@@ -32,7 +33,8 @@ describe("versionedShelfOf(spec)", () => {
     const shelf = versionedShelfOf(spec)
     _cheat_forgetShelf(`${spec.dbName}:device-v001-001-001`)
     const fresh = versionedShelfOf(spec)
-    expect(fresh).to.not.eq(shelf)
+    const connectionOf = async (made: UseStore): Promise<IDBDatabase> => await inOneStep(made, 'readonly', (store) => store.transaction.db)
+    expect(await connectionOf(fresh)).to.not.eq(await connectionOf(shelf))
     await inOneStep(shelf, 'readwrite', (store) => { store.put({ wrapped: 'one' }, 'key') })
     expect(await inOneStep(fresh, 'readonly', (store) => rowAt(store, 'key'))).to.deep.equal({ wrapped: 'one' })
   })

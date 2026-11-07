@@ -11,7 +11,7 @@ import { type BankScope, type VaultScope, isPlainBag } from '../shapes/shapes-co
 import * as SX from '../shapes/shapes-storage'
 import type { BankRow, LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
-/** The base a host's device store extends, writing the `do*` calls. */
+/** The base a host's device store extends, writing only the generic `do*` calls, each one atomic step. */
 export abstract class DeviceDB {
   // == [Brand]: IsDeviceDB
 
