@@ -2,7 +2,7 @@
 
 Read this if you file or rework thread 6. Branch `20261107-docblock_trim`; **PR #580 was merged at
 a0af95a9d (10:26) before the first rework's commits landed**, so the first rework's commits and these sit
-on the branch unmerged and go up as a new PR (see *For the Coach*). Justify green: safebyok 2417
+on the branch unmerged, filed as [#592](https://github.com/mrflip/safebyok/pull/592) (see *For the Coach*). Justify green: safebyok 2417
 tests, fastkey 43, every package passing; lint 0 errors, 376 warnings (378 before).
 
 * **Built** (commits dd6b84301, 151484678 and the docs commit after them)
@@ -54,7 +54,7 @@ tests, fastkey 43, every package passing; lint 0 errors, 376 warnings (378 befor
     the shapes file needs it); dropping `salt_bytes` from `KeyDeriver` (the Coach may; not now).
 
 * **For the Coach**
-  - PR #580 is merged; the first rework's twelve commits and these need a new PR from this branch.
+  - PR #580 is merged; the first rework's twelve commits and these are filed as #592, from this branch.
     The branch is 71 commits behind `origin/main`; main's `browser.ts` and `browser.test.ts` touch the
     lines this removes `checkSaltFits` from, so `file-thread` will likely stop at exit 3 (small
     conflicts, plain to resolve).
