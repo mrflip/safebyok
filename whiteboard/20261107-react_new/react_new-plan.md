@@ -13,9 +13,8 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** running. Merged: 1, 2, 3, 4, 9, 11, 12, 14. Filing: 13 (a conflict with #581).
-  Reviewing: 5 (#584). Running: 15. Waiting: 6, 7, 8 on 5; 16 on 15 and 5; 17 on 13. Thread 10
-  folded into 5 and 8.
+* **Status:** running. Merged: 1, 2, 3, 4, 9, 11, 12, 14. Filed: 13 (#583). Reviewing: 5 (#584).
+  Building: 15, 17 (on #583). Waiting: 6, 7, 8 on 5; 16 on 15 and 5. Thread 10 folded into 5 and 8.
 
 ## Read first
 

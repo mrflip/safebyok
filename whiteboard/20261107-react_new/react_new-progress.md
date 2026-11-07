@@ -6,8 +6,7 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 ## Where things stand
 
 *Orchestrator:* the Coach merged #573 to #578 (2026-11-07); #579 (thread 9) is filed and open,
-stacked on them, so threads 1 to 4, 11 and 12 are on main. Running: 5 (from #579), 13 and 14 (from
-main). Thread 10 is folded into 5 (the demo on `browserOpts`) and 8 (`DevDeviceDBInspector`).
+stacked on them, so threads 1 to 4, 11 and 12 are on main. Since then #579 and #581 merged too; 13 filed as #583 (after a doc-block conflict with #581). Thread 10 is folded into 5 (the demo on `browserOpts`) and 8 (`DevDeviceDBInspector`).
 
 ## Facts every thread may need
 
@@ -138,3 +137,13 @@ main). Thread 10 is folded into 5 (the demo on `browserOpts`) and 8 (`DevDeviceD
   `Checkers` reaches safebyok-react through `safebyok/storage`. The passkey button uses
   `aria-disabled`. `BankProvider` takes `passkeyRpId`. `AddPasskeyModal` refuses an empty passphrase
   with `Messages.passphraseFirst` before any WebAuthn call.
+
+## Rulings of 2026-11-07, second batch
+
+* *Orchestrator:* a device id is get-or-created in the DeviceDB, keyed by bank scope, as a `bank` row
+  `{ applabel, user_id, device_id }` (thread 15, core: `deviceDB.ensureBank`), and `BankProvider`
+  calls it right before `Bank.make` (thread 16; my reading, a row). The demo's localStorage
+  `device_id` goes then.
+* *Orchestrator:* `BankProvider` makes one bank per `applabel` + `user_id`, every prop read once, a
+  later change warned of once (thread 16; handlers too, my call, a row).
+* *Orchestrator:* the core gains `passkey_unavailable` (thread 17).
