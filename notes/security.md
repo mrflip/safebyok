@@ -1936,6 +1936,16 @@ added or folded into through the subagent, and no other entry changes.
   over `{ slotlabel }`, rather than over a current wayin's header, mints a fresh header: for a passphrase, the vault's
   key deriver label, a fresh random salt (the deriver's `salt_bytes`), this device's `device_id` and `registered_at` =
   the vault's clock now; for a passkey, the answer's `credential_id` and PRF salt, `device_id` and `registered_at`.
+  Amended 2026-11-07 (device_bank, sprint react_new, thread 15, branch `20261107-device_bank`): **the new core's `DeviceDB` mints the `device_id` per bank scope,
+  not per vault, through `ensureBank`.** `DeviceDB.ensureBank({ applabel, user_id })` (`packages/safebyok/src/storage/device-db-new.ts`) answers the device's bank row
+  `{ applabel, user_id, device_id }` and mints `device_id` on the first call with `crypto.randomUUID()` (through `randomId`, `helpers/crypto.ts`); the host
+  (`BankProvider`, a later thread) hands that `device_id` to `Bank.make`, and each wayin carries it in the clear, visible in storage. It is random because an id drawn
+  from anything about the device or the user would link what the vault does not; a fresh UUID per bank scope links only the wayins one device built under one bank
+  scope. The bank row is not secret and holds no key material: it is outside the eight secret values of `notes/guarantees.md`, and G7's closed set is unchanged.
+  `IdbDeviceDB` keeps bank rows in a separate IndexedDB database, `${dbName}:bank-v001-001-001`, not in the lease database `${dbName}:device-v001-001-001`, so the
+  lease rows (which hold the `lease_key` handle) and the bank rows never share an object store. A stored bank row that fails its check (`SX.bankRow`) is replaced with
+  a freshly minted one, inside the same transaction; the device then goes by a new `device_id`, which only changes what later wayins carry. Device-store failures in
+  the new verbs pass through `storeFailed` as every `DeviceDB` verb's do (name only, no message or cause), G8 unchanged.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
   `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to `safebyok-vault-v3`,
   `safebyok-box-v6` and `safebyok-mark-v3` (amended 2026-10-19 (put_wayin): this said "today's" of `safebyok-vault-v3`; the vault props' format is now `safebyok-vault-v5`, as follows); the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day and on to `safebyok-vault-v5` (slots), so a stored `safebyok-vault-v3` or `-v4` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
