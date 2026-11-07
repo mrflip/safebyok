@@ -443,7 +443,7 @@ export abstract class VaultDB implements VaultDBVerbs {
   protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
   /** Stores `tombstone` over the live or damaged box row at `opts.prior`, under a vault live at its `vault_tok`. */
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
-  /** Removes the box rows of vaults that are void, tombstoned or reborn, and count those left in the bank. */
+  /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
   /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */
   protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }
