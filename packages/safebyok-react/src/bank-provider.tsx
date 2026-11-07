@@ -45,6 +45,8 @@ export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'reques
   passphraseUsername?: string | undefined
   /** What to say beside the field as the user chooses a passphrase. */
   passphraseAdvice?:   PassphraseAdvice | undefined
+  /** The relying party the vault's passkey is made and asked under, if not the page's own domain. */
+  passkeyRpId?:        string | undefined
   children:            ReactNode
 }
 
@@ -57,7 +59,7 @@ const fixedPropsOf = (props: BankProviderProps) => {
 
 /** Make the signed-in user's bank, once per `applabel` and `user_id`, say hello, and hand it down to the hooks. */
 export const BankProvider = (props: BankProviderProps) => {
-  const { applabel, user_id, passphraseUsername, passphraseAdvice, children } = props
+  const { applabel, user_id, passphraseUsername, passphraseAdvice, passkeyRpId, children } = props
   /** One showing of the dialog: which one, the gating it answers, and how it closes. */
   type Showing = { round: number, gating: AnyGating, close: () => void }
   /** The props the provider reads only as it makes its bank. */
@@ -119,7 +121,7 @@ export const BankProvider = (props: BankProviderProps) => {
   useEffect(() => {
     if (user_id === null) { return }
     const making = latestProps.current
-    const { requestCleartext, onBadNews, onPanic, passphraseUsername: _username, passphraseAdvice: _advice, children: _children, user_id: _user_id, applabel: _applabel, ...passedOpts } = making
+    const { requestCleartext, onBadNews, onPanic, passphraseUsername: _username, passphraseAdvice: _advice, passkeyRpId: _rpId, children: _children, user_id: _user_id, applabel: _applabel, ...passedOpts } = making
     // Once swept, the bank tells and asks no one: the handler now may be the next user's.
     const kept = { held: true }
     // A handler dropped since the making falls back to the one the bank was made with, so a bank made
@@ -206,6 +208,7 @@ export const BankProvider = (props: BankProviderProps) => {
           leaseMillis={provided.bank?.leaseMillis}
           passphraseUsername={passphraseUsername}
           passphraseAdvice={passphraseAdvice}
+          passkeyRpId={passkeyRpId}
           onDone={() => { endShowing(showing) }}
         />
       )}
