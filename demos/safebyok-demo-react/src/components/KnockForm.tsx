@@ -3,7 +3,7 @@ import { isVaultError } from 'safebyok'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 import { isQuietRefusal } from '../lib/refusals'
 
-/** What a KnockForm is handed: how its flow fetches the API key at each knock, null where none is saved; and whether the flow can yet. */
+/** What a KnockForm is handed: how its flow extracts the saved API key at each knock, null where none is saved; and whether the flow can yet. */
 export type KnockFormProps = { extractApiKey: () => Promise<string | null>, isReady: boolean }
 
 /** The knock-knock half of a flow: who's there, a Knock button, and Claude's punchline, told with the key the flow hands over. */
