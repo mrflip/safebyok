@@ -23,11 +23,26 @@ const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
   return vaultDB
 }
 
+/** The connection a store makes its transactions on, caught as it lists a bank. */
+const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
+  const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
+  try {
+    await vaultDB.listVaults(TH.bankScope)
+    return transaction.mock.contexts[0]
+  } finally {
+    transaction.mockRestore()
+  }
+}
+
+// The twin's connection is compared, not its shelf: a forgotten shelf whose name drifted would share the page's connection unseen.
 /** A second store over the same database, on a connection of its own, as another tab holds. */
-const makeTwin = (vaultDB: IdbVaultDB): IdbVaultDB => {
+const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
   const dbName = dbNameOf.get(vaultDB)!
   TH._cheat_forgetShelf(`${dbName}:vaults-v${DB.VaultsDBVersion}`)
-  return new IdbVaultDB({ dbName })
+  const twin = new IdbVaultDB({ dbName })
+  const [ours, theirs] = [await connectionOf(vaultDB), await connectionOf(twin)]
+  expect(theirs, 'the twin on a connection of its own').to.be.instanceOf(IDBDatabase).and.not.eq(ours)
+  return twin
 }
 
 /** The backdoor to a store's rows, through a connection of its own to the store's database. */
@@ -102,7 +117,8 @@ describe("IdbVaultDB's databases", () => {
     const other = makeVaultDB()
     await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     const { val: otherListed } = await other.listVaults(TH.bankScope)
-    const { val: twinListed } = await makeTwin(vaultDB).listVaults(TH.bankScope)
+    const twin = await makeTwin(vaultDB)
+    const { val: twinListed } = await twin.listVaults(TH.bankScope)
     expect(otherListed.vaults).to.be.empty
     expect(twinListed.vaults).to.have.lengthOf(1)
   })
@@ -125,7 +141,8 @@ describe("IdbVaultDB's databases", () => {
     const vaultDB = makeVaultDB()
     const notices: unknown[] = []
     const unwatch = vaultDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
-    await makeTwin(vaultDB).putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    const twin = await makeTwin(vaultDB)
+    await twin.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     await TH.eventually(() => notices.length > 0)
     expect(notices).to.have.lengthOf(1)
     unwatch()
