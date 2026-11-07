@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import { PostgresVaultDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import { GraphQLVaultDB, VaultOperations } from '../src/index'
@@ -36,7 +36,7 @@ const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request)
 }
 
 /** The README's browser half: a GraphQLVaultDB over an urql Client that posts to the route, and subscribes over it too. */
-const browserVaultDB = (fetcher: typeof fetch, opts: SX.VaultDBOpts = {}) => new GraphQLVaultDB({ ...opts, client: new Client({
+const browserVaultDB = (fetcher: typeof fetch, opts: DB.VaultDBOpts = {}) => new GraphQLVaultDB({ ...opts, client: new Client({
   url:                'https://app.example.test/api/graphql',
   exchanges:          [fetchExchange],
   fetchSubscriptions: true,
@@ -66,7 +66,7 @@ const overTheNetwork = (request: Request, response: Response): Response => {
 }
 
 /** A browser whose fetch reaches `route` in-process, signed in as `signedInAs` says of each operation's variables. */
-const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown>) => string | null, opts: SX.VaultDBOpts = {}) => (
+const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown>) => string | null, opts: DB.VaultDBOpts = {}) => (
   browserVaultDB(async (url, init) => {
     const request = new Request(url, init)
     const user_id = signedInAs(await variablesOf(request.clone()))
@@ -90,7 +90,7 @@ const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
 const routes = new WeakMap<GraphQLVaultDB, Route>()
 
 /** A fresh browser over emptied tables, through its own route. */
-const makeVaultDB = async (opts: SX.VaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
+const makeVaultDB = async (opts: DB.VaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
   await TH.emptyTables()
   const route = vaultRoute(await TH.serverOver((maxBoxes === undefined) ? {} : { maxBoxes }), byHeader)
   const vaultDB = browserFor(route, signedInAsAsked, opts)
@@ -112,7 +112,7 @@ describe("the README's Yoga recipe", () => {
     await TH.emptyTables()
     const route = vaultRoute(await TH.serverOver(), byHeader)
     const intruder = browserFor(route, () => 'u2')
-    await TH.expectRefusal(intruder.putVault(TH.vaultAt(), { prior: SX.VoidRevision }), 'identity_revoked')
+    await TH.expectRefusal(intruder.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), 'identity_revoked')
     await TH.expectRefusal(browserFor(route, () => null).listVaults(TH.bankScope), 'identity_revoked')
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })

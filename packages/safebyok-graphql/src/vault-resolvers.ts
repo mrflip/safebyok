@@ -1,14 +1,14 @@
 import { GraphQLError } from 'graphql'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 
 // == [Types]: VaultResolversOpts, VaultFieldArgs, VaultFieldResolver, VaultResolvers
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
   /** The VaultDB every request is served from, such as a `PostgresVaultDB`. */
-  vaultDB:  SX.VaultDB
+  vaultDB:  DB.VaultDB
   /** The user_id your own auth signed this request in as, or null when signed out. */
-  userIdOf: (context: ContextT) => SX.Awaitable<string | null>
+  userIdOf: (context: ContextT) => DB.Awaitable<string | null>
 }
 
 /** A root field's arguments, as GraphQL coerced them: unchecked until the VaultDB checks them. */
@@ -43,8 +43,8 @@ export type VaultResolvers<ContextT> = {
   }
   Subscription: {
     safebyokHeard: {
-      subscribe: (parent: unknown, args: VaultFieldArgs, context: ContextT) => Promise<AsyncIterableIterator<SX.Heard>>
-      resolve:   (heard: SX.Heard) => SX.Heard
+      subscribe: (parent: unknown, args: VaultFieldArgs, context: ContextT) => Promise<AsyncIterableIterator<DB.Heard>>
+      resolve:   (heard: DB.Heard) => DB.Heard
     }
   }
 }
@@ -52,8 +52,8 @@ export type VaultResolvers<ContextT> = {
 
 // == [Resolvers]: vaultResolvers
 
-const vaultResolversOpts = SX.objCheck(({ custom, fn }) => ({
-  vaultDB:  custom<SX.VaultDB>((candidate) => candidate instanceof SX.VaultDB, 'Expected a VaultDB from safebyok/storage'),
+const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
+  vaultDB:  custom<DB.VaultDB>((candidate) => candidate instanceof DB.VaultDB, 'Expected a VaultDB from safebyok/storage'),
   userIdOf: fn<VaultResolversOpts<unknown>['userIdOf']>(),
 }), 'bad_option')
 
@@ -63,7 +63,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   const { relay } = vaultDB
 
   /** What `call` answers, once the request is shown signed in as `user_id`; its refusal otherwise, as the wire carries one. */
-  const served = async <ValT>(context: ContextT, user_id: unknown, call: () => SX.Awaitable<ValT>): Promise<ValT> => {
+  const served = async <ValT>(context: ContextT, user_id: unknown, call: () => DB.Awaitable<ValT>): Promise<ValT> => {
     try {
       demandSignedInAs(await userIdOf(context), user_id)
       return await call()
@@ -98,14 +98,12 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
 
 // == [Helpers]: isSignedInAs, demandSignedInAs, userIdIn, crossing, extensionsOf, heardOf
 
-const NotSignedInAs = "This request is not signed in as the user whose vaults it asks for."
-
 /** Whether the request is signed in, and as the user it asks for. */
 const isSignedInAs = (signedIn: string | null, asked: unknown): boolean => (signedIn !== null && asked === signedIn)
 
 /** Refuses unless the request is signed in, and as the user it asks for. */
 const demandSignedInAs = (signedIn: string | null, asked: unknown): void => {
-  if (! isSignedInAs(signedIn, asked)) { throw new SX.VaultError('identity_revoked', NotSignedInAs) }
+  if (! isSignedInAs(signedIn, asked)) { throw DB.identityRevoked() }
 }
 
 /** The user_id a record or tombstone names, before it is checked. */
@@ -114,7 +112,7 @@ const userIdIn = (bag: unknown): unknown => ((typeof bag === 'object' && bag !==
 /** A refusal as the wire carries it: its message, and in `extensions` its kind and what a caller reads of its meta, never its cause. */
 const crossing = (thrown: unknown): GraphQLError => {
   // A VaultError is the relay's refusal, or the gate's; anything else was thrown by the host's userIdOf.
-  const refusal = SX.isVaultError(thrown) ? thrown : SX.unexpectedError(thrown)
+  const refusal = DB.isVaultError(thrown) ? thrown : DB.unexpectedError(thrown)
   const crossed = new GraphQLError(refusal.message, { extensions: extensionsOf(refusal) })
   // The refusal rides along for the server's logs as an unenumerable `cause`, which no GraphQL
   // server sends. Never the constructor's `originalError`: Yoga masks an error whose original is
@@ -124,9 +122,9 @@ const crossing = (thrown: unknown): GraphQLError => {
 }
 
 /** A refusal's kind, with the room it reports and the fields it names, as the browser's VaultDB rebuilds them. */
-const extensionsOf = ({ refusalkind, meta }: SX.VaultError): Record<string, unknown> => {
+const extensionsOf = ({ refusalkind, meta }: DB.VaultError): Record<string, unknown> => {
   // Checked for the wire: a limit of Infinity, which JSON cannot carry, becomes the largest safe integer.
-  const capacity = SX.capacity.safeParse(meta?.capacity)
+  const capacity = DB.capacity.safeParse(meta?.capacity)
   return {
     kind: refusalkind,
     ...(capacity.success && { capacity: capacity.data }),
@@ -135,12 +133,12 @@ const extensionsOf = ({ refusalkind, meta }: SX.VaultError): Record<string, unkn
 }
 
 /** What the relay's watch hears of `scope`, while `stillSignedIn` answers true, as a subscription resolver answers it; ending it stops the watch. */
-const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs, stillSignedIn: () => Promise<boolean>): AsyncIterableIterator<SX.Heard> => {
+const heardOf = (relay: DB.VaultDBRelay, scope: VaultFieldArgs, stillSignedIn: () => Promise<boolean>): AsyncIterableIterator<DB.Heard> => {
   // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
   // `next`, which for a quiet bank is forever, so a subscriber gone while it waited would keep the
   // watch open. A reader's `cancel` ends the pending read at once.
   let unwatch = noUnwatching
-  const heards = new ReadableStream<SX.Heard>({
+  const heards = new ReadableStream<DB.Heard>({
     start: (controller) => {
       unwatch = relay.watch(scope, (heard) => {
         // None once the stream has closed; every one before, however many wait to be read.
@@ -154,9 +152,9 @@ const heardOf = (relay: SX.VaultDBRelay, scope: VaultFieldArgs, stillSignedIn: (
     await reader.cancel()
     return { done: true, value: undefined }
   }
-  const iterator: AsyncIterableIterator<SX.Heard> = {
+  const iterator: AsyncIterableIterator<DB.Heard> = {
     next: async () => {
-      const heard = await reader.read() as IteratorResult<SX.Heard>
+      const heard = await reader.read() as IteratorResult<DB.Heard>
       if (heard.done) { return heard }
       // Asked again at each notice, so a session revoked since it subscribed hears no more of its bank;
       // a stillSignedIn that throws ends the watch too, and its error crosses as any other refusal.

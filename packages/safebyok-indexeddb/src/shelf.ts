@@ -1,7 +1,7 @@
 /** The shelf: the one object store of an IdbVaultDB's database, where each vault row and box row is filed under an array scopepath. */
 
 import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type { BankScope, BoxQuery, VaultError, VaultQuery, VaultScope } from 'safebyok/storage'
 
 // == [Scopepaths]: VaultScopepath, BoxScopepath, vaultScopepathOf, boxScopepathOf, vaultlabelOf, boxPlaceOf, vaultsRangeOf, lifeRangeOf, bankBoxesRangeOf
@@ -95,7 +95,7 @@ const workOrAbandon = async <ValT>(store: IDBObjectStore, work: (store: IDBObjec
 /** Null once `transaction` commits, or the error it aborted with. */
 const abortOf = (transaction: IDBTransaction): Promise<Error | null> => new Promise((resolve) => {
   transaction.addEventListener('complete', () => { resolve(null) })
-  transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(TransactionAborted, 'AbortError')) })
+  transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(DB.TransactionAborted, 'AbortError')) })
 })
 
 /** Aborts `transaction`, so that no request it holds commits; one already finished refuses, and has nothing to undo. */
@@ -108,24 +108,18 @@ const abandon = (transaction: IDBTransaction): void => {
 }
 // --
 
-// == [Trouble]: troubleOf, and what each says
-
-const NoIndexedDB = "This context has no IndexedDB, so the vault has nowhere to keep its rows: run it in a browser that offers IndexedDB."
-const TransactionAborted = "An IndexedDB transaction was aborted before it committed, and wrote nothing: try again."
-const DatabaseClosed = "The vault's IndexedDB database was closed under it, by the browser or another tab upgrading it: reload the page."
-const StorageWithheld = "The browser withholds IndexedDB from this page (site data blocked, or a private window that keeps none), so the vault has nowhere to keep its rows."
-const IndexedDBFailed = "IndexedDB failed while the vault was reading or writing its rows: try again shortly. IndexedDB's own error is this error's cause."
+// == [Trouble]: troubleOf
 
 /** The refusal that says what went wrong in IndexedDB. */
 const troubleOf = (err: unknown): VaultError => {
-  if (SX.isVaultError(err)) { return err }
+  if (DB.isVaultError(err)) { return err }
   // A browser with IndexedDB switched off may hold the global as null rather than leave it out.
-  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return SX.storageUnavailable(err, NoIndexedDB) }
+  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return DB.storageUnavailable(err, DB.NoBrowserStore) }
   const errname = (err instanceof Error) ? err.name : null
-  if (errname === 'QuotaExceededError') { return SX.storageFull(err) }
-  if (errname === 'AbortError') { return SX.storageUnavailable(err, TransactionAborted) }
-  if (errname === 'InvalidStateError') { return SX.storageUnavailable(err, DatabaseClosed) }
-  if (errname === 'SecurityError') { return SX.storageUnavailable(err, StorageWithheld) }
-  return SX.storageUnavailable(err, IndexedDBFailed)
+  if (errname === 'QuotaExceededError') { return DB.storageFull(err) }
+  if (errname === 'AbortError') { return DB.storageUnavailable(err, DB.TransactionAborted) }
+  if (errname === 'InvalidStateError') { return DB.storageUnavailable(err, DB.DatabaseClosed) }
+  if (errname === 'SecurityError') { return DB.storageUnavailable(err, DB.StorageWithheld) }
+  return DB.storageUnavailable(err, DB.BrowserStoreFailed)
 }
 // --

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import * as TH from '../test-helpers'
 import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
 import type { Life, Tally } from '../../src/component/tallies'
@@ -12,12 +12,12 @@ import type { Life, Tally } from '../../src/component/tallies'
 type Backend = ReturnType<typeof TH.componentTest>
 
 const api = TH.rootApi
-const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const vault = TH.vaultAt()
 const life1: Life = { ...TH.vaultScope, vault_tok: 'life1' }
 
 /** The options of a put replacing the row `ante`. */
-const over = (ante: SX.Revision) => ({ prior: SX.revisionOf(ante), ifAbsent: 'fail', ifPresent: 'repl' }) as const
+const over = (ante: DB.Revision) => ({ prior: DB.revisionOf(ante), ifAbsent: 'fail', ifPresent: 'repl' }) as const
 
 /** The box `boxlabel` at `revision_seq`, in life1 unless `extra` says otherwise, its whisper's ciphertext `cipherBytes` long. */
 const boxOf = (boxlabel: string, { revision_seq = 0, cipherBytes = 3, ...extra }: { revision_seq?: number, cipherBytes?: number, vault_tok?: string, user_id?: string } = {}) => (
@@ -56,7 +56,7 @@ const talliedLives = (backend: Backend) => backend.run(async ({ db }) => {
 })
 
 /** Box rows stored straight into their lives, untallied, as a component that kept no tallies left them. */
-const plantBoxes = (backend: Backend, boxes: (SX.BoxRecord | SX.BoxTombstone)[]) => backend.run(async ({ db }) => {
+const plantBoxes = (backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[]) => backend.run(async ({ db }) => {
   await Promise.all(boxes.map((box) => {
     const { applabel, user_id, vaultlabel, vault_tok, boxlabel } = box
     return db.insert('safebyok_boxes', { applabel, user_id, vaultlabel, vault_tok, boxlabel, box })
@@ -128,8 +128,8 @@ describe("a life's tally", () => {
       () => backend.mutation(api.putBox, { record: boxOf('anthropic', { revision_seq: 1, cipherBytes: 5000 }), opts: over(boxOf('anthropic')) }),
       () => backend.mutation(api.putBox, { record: boxOf('openai'), opts: birth }),
       () => backend.mutation(api.putBox, { record: boxOf('anthropic', { revision_seq: 2 }), opts: over(boxOf('anthropic', { revision_seq: 1 })) }),
-      () => backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('anthropic', { revision_seq: 2 })), opts: { prior: SX.revisionOf(boxOf('anthropic', { revision_seq: 2 })) } }),
-      () => backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('never')), opts: { prior: SX.revisionOf(boxOf('never')) } }),
+      () => backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('anthropic', { revision_seq: 2 })), opts: { prior: DB.revisionOf(boxOf('anthropic', { revision_seq: 2 })) } }),
+      () => backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('never')), opts: { prior: DB.revisionOf(boxOf('never')) } }),
     ]
     const counts = []
     for (const step of steps) {
@@ -145,7 +145,7 @@ describe("a life's tally", () => {
     const backend = await withVault()
     const boxes = Array.from({ length: 12 }, (_slot, ii) => boxOf(`box_${String(ii)}`))
     await Promise.all(boxes.map((box) => backend.mutation(api.putBox, { record: box, opts: birth })))
-    await Promise.all(boxes.slice(0, 5).map((box) => backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: SX.revisionOf(box) } })))
+    await Promise.all(boxes.slice(0, 5).map((box) => backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: DB.revisionOf(box) } })))
     expect(await keptTally(backend)).to.deep.equal(await weighedTally(backend))
     expect(await keptTally(backend)).to.have.property('box_count', 12)
   })
@@ -154,10 +154,10 @@ describe("a life's tally", () => {
     const backend = await withVault()
     await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth })
     const tombstone = TH.vaultTombstoneOf(vault)
-    await backend.mutation(api.delVault, { tombstone, opts: { prior: SX.revisionOf(vault) } })
+    await backend.mutation(api.delVault, { tombstone, opts: { prior: DB.revisionOf(vault) } })
     expect(await talliedLives(backend)).to.deep.equal([])
     //
-    await backend.mutation(api.putVault, { record: TH.vaultAt(2, 'life2'), opts: { ...birth, prior: SX.revisionOf(tombstone) } })
+    await backend.mutation(api.putVault, { record: TH.vaultAt(2, 'life2'), opts: { ...birth, prior: DB.revisionOf(tombstone) } })
     await backend.mutation(api.putBox, { record: boxOf('openai', { vault_tok: 'life2' }), opts: birth })
     const life2 = { ...life1, vault_tok: 'life2' }
     expect(await keptTally(backend, life2)).to.deep.equal(await weighedTally(backend, life2))
@@ -190,7 +190,7 @@ describe("a life's tally", () => {
   it("is not counted by a del, which never reads the whole life", async () => {
     const backend = await withVault()
     await plantBoxes(backend, [boxOf('anthropic'), boxOf('openai')])
-    await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('anthropic')), opts: { prior: SX.revisionOf(boxOf('anthropic')) } })
+    await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('anthropic')), opts: { prior: DB.revisionOf(boxOf('anthropic')) } })
     expect(await keptTally(backend)).to.be.null
     await backend.mutation(api.putBox, { record: boxOf('github'), opts: birth })
     expect(await keptTally(backend)).to.deep.equal(await weighedTally(backend))
@@ -223,7 +223,7 @@ describe("putBox's count cap", () => {
     for (const boxlabel of ['anthropic', 'openai', 'github']) {
       const box = boxOf(boxlabel)
       expect(await backend.mutation(api.putBox, { record: box, opts: birth, maxBoxes: 3 })).to.deep.include({ landed: true })
-      expect(await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: SX.revisionOf(box) } })).to.deep.include({ landed: true })
+      expect(await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: DB.revisionOf(box) } })).to.deep.include({ landed: true })
     }
     const { box_bytes: used } = await weighedTally(backend)
     expect(await backend.mutation(api.putBox, { record: boxOf('gitlab'), opts: birth, maxBoxes: 3 })).to.deep.equal({ capacity: { boxes: { used: 3, max: 3 }, bytes: { used, max: MaxVaultBoxBytes } } })
@@ -234,7 +234,7 @@ describe("putBox's count cap", () => {
     const tombstone = TH.boxTombstoneOf(boxOf('anthropic'))
     await plantBoxes(backend, [tombstone, TH.boxTombstoneOf(boxOf('openai'))])
     const reborn = boxOf('anthropic', { revision_seq: tombstone.revision_seq + 1 })
-    expect(await backend.mutation(api.putBox, { record: reborn, opts: { ...birth, prior: SX.revisionOf(tombstone) }, maxBoxes: 2 })).to.deep.include({ landed: true })
+    expect(await backend.mutation(api.putBox, { record: reborn, opts: { ...birth, prior: DB.revisionOf(tombstone) }, maxBoxes: 2 })).to.deep.include({ landed: true })
     expect(await keptTally(backend)).to.deep.equal(await weighedTally(backend))
     expect(await keptTally(backend)).to.have.property('box_count', 2)
   })
@@ -244,8 +244,8 @@ describe("putBox's count cap", () => {
     await plantBoxes(backend, [TH.boxTombstoneOf(boxOf('anthropic'))])
     expect(await backend.mutation(api.putBox, { record: boxOf('openai'), opts: birth, maxBoxes: 1 })).to.have.property('capacity')
     const tombstone = TH.vaultTombstoneOf(vault)
-    await backend.mutation(api.delVault, { tombstone, opts: { prior: SX.revisionOf(vault) } })
-    await backend.mutation(api.putVault, { record: TH.vaultAt(2, 'life2'), opts: { ...birth, prior: SX.revisionOf(tombstone) } })
+    await backend.mutation(api.delVault, { tombstone, opts: { prior: DB.revisionOf(vault) } })
+    await backend.mutation(api.putVault, { record: TH.vaultAt(2, 'life2'), opts: { ...birth, prior: DB.revisionOf(tombstone) } })
     expect(await backend.mutation(api.putBox, { record: boxOf('openai', { vault_tok: 'life2' }), opts: birth, maxBoxes: 1 })).to.deep.include({ landed: true })
     expect(await backend.mutation(api.tidyGone, { scope: TH.bankScope })).to.deep.equal({ totalCount: 1 })
   })
@@ -287,9 +287,9 @@ describe("putBox's weight limit", () => {
     await expect(backend.query(api.listBoxes, { asked: life1 })).rejects.toThrow(/read/i)
     expect(await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth })).to.deep.equal({ capacity: capacityOf(null, MaxVaultBoxes) })
     for (const heavy of heavies) {
-      expect(await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(heavy), opts: { prior: SX.revisionOf(heavy) } })).to.deep.include({ landed: true })
+      expect(await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(heavy), opts: { prior: DB.revisionOf(heavy) } })).to.deep.include({ landed: true })
     }
-    expect(await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: SX.revisionOf(vault) } })).to.deep.include({ landed: true })
+    expect(await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: DB.revisionOf(vault) } })).to.deep.include({ landed: true })
   })
 })
 
@@ -303,16 +303,16 @@ const listWatchDel = async (backend: Backend) => {
   const listed = await listedBoxlabels(backend)
   const { boxes } = await backend.query(api.watchRows, { scope: TH.vaultScope })
   const vaultRow = await backend.query(api.getVault, { scope: TH.vaultScope })
-  const { landed } = await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vaultRow as SX.VaultRecord), opts: { prior: SX.revisionOf(vaultRow as SX.VaultRecord) } })
+  const { landed } = await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vaultRow as DB.VaultRecord), opts: { prior: DB.revisionOf(vaultRow as DB.VaultRecord) } })
   const { boxes: afterDel } = await backend.query(api.listBoxes, { asked: life1 })
-  const liveCount = afterDel.filter(({ box }) => SX.isLiveRow(box)).length
+  const liveCount = afterDel.filter(({ box }) => DB.isLiveRow(box)).length
   return { listedCount: listed.length, watchedCount: boxes.length, landed, liveCount }
 }
 
 /** A vault record as heavy as a Convex document may be, near enough. */
 const wholeDocumentVault = () => {
   const padding = 1_048_576 - getDocumentSize({ ...TH.vaultScope, vault }) - 64
-  const passphrase_wayin = { ...TH.passphraseWayin, salt_b64: TH.passphraseWayin.salt_b64 + 'c'.repeat(padding) }
+  const passphrase_wayin = { ...TH.passphraseWayin, key_deriver_label: TH.passphraseWayin.key_deriver_label + 'c'.repeat(padding) }
   return TH.vaultAt(0, 'life1', { gate: { ...vault.gate, passphrase_wayin } })
 }
 

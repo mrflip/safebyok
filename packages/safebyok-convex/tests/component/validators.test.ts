@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import * as TH from '../test-helpers'
 
 // The component's validators are converted from the core's checkers: these cases hold the
@@ -8,7 +8,7 @@ import * as TH from '../test-helpers'
 type Backend = ReturnType<typeof TH.componentTest>
 
 const api = TH.rootApi
-const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const vault = TH.vaultAt()
 const box = TH.boxAt()
 
@@ -32,8 +32,8 @@ describe("the component's validators, against what the core writes", () => {
     const backend = await withVault()
     await backend.mutation(api.putBox, { record: box, opts: birth })
     expect(await storedRows(backend)).to.deep.equal({ vaults: [vault], boxes: [box], tallies: 1 })
-    await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: SX.revisionOf(box) } })
-    await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: SX.revisionOf(vault) } })
+    await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: DB.revisionOf(box) } })
+    await backend.mutation(api.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: DB.revisionOf(vault) } })
     expect(await storedRows(backend)).to.deep.equal({ vaults: [TH.vaultTombstoneOf(vault)], boxes: [TH.boxTombstoneOf(box)], tallies: 0 })
   })
 

@@ -69,8 +69,9 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
   `ConvexReactClient` you give `ConvexProvider`, so the vault shares its socket and its signed-in
   user. `safebyok-convex` imports nothing of React's.
 * **`api`** is `api.safebyok`, the functions above.
-* **`maxBoxes`**, optional, caps the box rows in one vault, deleted boxes' tombstones among them,
-  under the component's own limit; a put past it refuses as `vault_full`.
+* **`maxBoxes`**, optional, is a best-effort cap on the box rows in one vault, deleted boxes' tombstones
+  among them, under the component's own limit: a put past it refuses as `vault_full`. It is exact at
+  moderate write rates; a strict cap would take concurrency machinery this package does not add.
 * **`maxRecordBytes`**, optional, as every vaultDB takes it, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the vault once the Convex client is authenticated (in React, once
@@ -109,8 +110,9 @@ tables first (on the dashboard's Data page, pick the `safebyok` component).
 leaves its tombstone in its row, which counts toward both limits as a live box does; a box put
 again under the same boxlabel takes that row back. A put that would take a vault past either limit
 and leave it larger refuses as `vault_full`; a replacement no heavier, and every delete, always
-lands. A vault filled with tombstones is emptied only by deleting it: its next life starts with
-none, and `tidyGone` removes the old life's rows.
+lands. **Once deleted boxes fill a vault's cap, it refuses new box labels until the vault is
+deleted.** Deleting it is the only way to empty it: its next life starts with none, and `tidyGone`
+removes the old life's rows.
 
 ## Testing your own functions
 

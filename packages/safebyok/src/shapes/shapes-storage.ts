@@ -171,7 +171,8 @@ export const vaultDBOpts = objCheck(({ num }) => ({
 /** The check of a memory vaultDB's options, refusing 'bad_option'. */
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({
   ...vaultDBOpts.shape,
-  /** The most live boxes one vault may hold; no limit by default. */
+  // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
+  /** A soft cap on the live boxes one vault holds; no limit by default. */
   maxBoxes: uint.optional(),
 }), 'bad_option')
 

@@ -24,8 +24,8 @@ export const MinuteMillis = 60_000
 /** The span from {@link FarPast} to {@link FarFuture}, in milliseconds: the longest that runs between two instants the package accepts. */
 export const ForeverMillis = FarFuture - FarPast
 
-/** The most bytes `crypto.getRandomValues` hands out at once, and so the longest passphraseSalt. */
-export const MaxSaltBytes = 65_536
+/** The most bytes a passphraseSalt holds, and the most a key deriver's spec asks for: twice the deriver's 16, as many as a passkey's. */
+export const MaxSaltBytes = 32
 
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
 export const PassphraseKeyBytes = 32

@@ -41,7 +41,7 @@ export const refusalkindVals = [
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
-  'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
+  'vault_full',          // a new box in a vault already holding its maxBoxes (a best-effort cap), or a write storage has no room for
   'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, argon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
   'damaged_box',         // a box's whisper would not open under the vault's lease, or opened to no whisper this package knows

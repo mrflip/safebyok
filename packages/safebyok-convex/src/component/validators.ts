@@ -3,7 +3,7 @@
 import { zodOutputToConvex, zodToConvex } from 'convex-helpers/server/zod4'
 import { v } from 'convex/values'
 import type { Validator } from 'convex/values'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 
 // Convex takes only its own validators for a function's arguments and answers. What Convex has no
 // check for (a label's pattern, a time's range) converts to the looser check it has: the core
@@ -12,19 +12,19 @@ import * as SX from 'safebyok/storage'
 // == [Scopes]: bankScope, vaultScope, vaultQuery, boxQuery, watchScope
 
 /** One user's vaults in one app. */
-export const bankScope = zodToConvex(SX.bankScope)
+export const bankScope = zodToConvex(DB.bankScope)
 
 /** One vault, by its labels. */
-export const vaultScope = zodToConvex(SX.vaultScope)
+export const vaultScope = zodToConvex(DB.vaultScope)
 
 /** One life of one vault. */
-export const vaultQuery = zodToConvex(SX.vaultQuery)
+export const vaultQuery = zodToConvex(DB.vaultQuery)
 
 /** One box of one life of one vault. */
-export const boxQuery = zodToConvex(SX.boxQuery)
+export const boxQuery = zodToConvex(DB.boxQuery)
 
 /** A bank, or one vault of it, for a watch. */
-export const watchScope = zodToConvex(SX.watchScope)
+export const watchScope = zodToConvex(DB.watchScope)
 // --
 
 // == [Records and options]: vaultRecord, vaultTombstone, boxRecord, boxTombstone, putOptsGiven, delOpts, capacity
@@ -33,25 +33,25 @@ export const watchScope = zodToConvex(SX.watchScope)
 // declaration file cannot name, and for a box recurses into its sidecar past TypeScript's depth.
 
 /** A live vault row as the core writes it. */
-export const vaultRecord: Validator<SX.VaultRecord, 'required', string> = zodToConvex(SX.vaultRecord)
+export const vaultRecord: Validator<DB.VaultRecord, 'required', string> = zodToConvex(DB.vaultRecord)
 
 /** A vault's tombstone as the core writes it. */
-export const vaultTombstone = zodToConvex(SX.vaultTombstone)
+export const vaultTombstone = zodToConvex(DB.vaultTombstone)
 
 /** A live box row as the core writes it. */
-export const boxRecord = zodToConvex(SX.boxRecord) as unknown as Validator<SX.BoxRecord, 'required', string>
+export const boxRecord = zodToConvex(DB.boxRecord) as unknown as Validator<DB.BoxRecord, 'required', string>
 
 /** A box's tombstone as the core writes it. */
-export const boxTombstone = zodToConvex(SX.boxTombstone)
+export const boxTombstone = zodToConvex(DB.boxTombstone)
 
 /** A put's options, their defaults filled in. */
-export const putOptsGiven = zodOutputToConvex(SX.putOpts)
+export const putOptsGiven = zodOutputToConvex(DB.putOpts)
 
 /** A del's options. */
-export const delOpts = zodToConvex(SX.delOpts)
+export const delOpts = zodToConvex(DB.delOpts)
 
 /** How full a vault is, by boxes and by bytes. */
-export const capacity = zodOutputToConvex(SX.capacity)
+export const capacity = zodOutputToConvex(DB.capacity)
 // --
 
 // == [Answers]: rowOfVault, rowOfBox, boxesFetched, boxFetched, landing, boxLanding, putBoxAnswer, tidied, rowsWatched

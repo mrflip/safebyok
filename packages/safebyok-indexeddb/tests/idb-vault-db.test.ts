@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as TH from 'safebyok/testing'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import { IdbVaultDB, idbVaultDB } from '../src/idb-vault-db'
 import type { IdbVaultDBOpts } from '../src/idb-vault-db'
 import { boxPlaceOf, boxScopepathOf, filedIn, inOneStep, lifeRangeOf, rowAt, shelfOf, vaultScopepathOf } from '../src/shelf'
@@ -67,7 +67,7 @@ describe("IdbVaultDB's options", () => {
 
   it("refuses a dbName, a maxRecordBytes or a field it cannot use", () => {
     for (const opts of [{ dbName: '' }, { dbName: 7 }, { maxRecordBytes: -1 }, { dbname: 'mine' }]) {
-      expect(() => new IdbVaultDB(opts as never)).to.throw(SX.VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => new IdbVaultDB(opts as never)).to.throw(DB.VaultError).with.property('refusalkind', 'bad_option')
     }
   })
 })
@@ -76,7 +76,7 @@ describe("IdbVaultDB's databases", () => {
   it("keeps the rows of each dbName apart", async () => {
     const vaultDB = makeVaultDB()
     const other = makeVaultDB()
-    await vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     const { val: otherListed } = await other.listVaults(TH.bankScope)
     const { val: twinListed } = await makeTwin(vaultDB).listVaults(TH.bankScope)
     expect(otherListed.vaults).to.be.empty
@@ -86,9 +86,9 @@ describe("IdbVaultDB's databases", () => {
   it("keeps apart the rows of users whose ids share a beginning", async () => {
     const vaultDB = makeVaultDB()
     const longer = { ...TH.bankScope, user_id: `${TH.bankScope.user_id}0` }
-    await vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
-    await vaultDB.putVault(TH.vaultAt(0, 'life1', longer), { prior: SX.VoidRevision })
-    await vaultDB.putBox(TH.boxAt(0, 'life1', longer), { prior: SX.VoidRevision })
+    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await vaultDB.putVault(TH.vaultAt(0, 'life1', longer), { prior: DB.VoidRevision })
+    await vaultDB.putBox(TH.boxAt(0, 'life1', longer), { prior: DB.VoidRevision })
     const { val: listed } = await vaultDB.listVaults(TH.bankScope)
     const { val: boxesListed } = await vaultDB.listBoxes({ ...TH.vaultScope, vault_tok: 'life1' })
     const { val: tidied } = await vaultDB.tidyGone(TH.bankScope)
@@ -101,7 +101,7 @@ describe("IdbVaultDB's databases", () => {
     const vaultDB = makeVaultDB()
     const notices: unknown[] = []
     const unwatch = vaultDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
-    await makeTwin(vaultDB).putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    await makeTwin(vaultDB).putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     await TH.eventually(() => notices.length > 0)
     expect(notices).to.have.lengthOf(1)
     unwatch()
@@ -120,7 +120,7 @@ describe("IdbVaultDB's refusals", () => {
     it(blurb, async () => {
       const vaultDB = makeVaultDB()
       vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => { throw new DOMException('IndexedDB says no.', errname) })
-      const refusal = await TH.expectRefusal(vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision }), refusalkind)
+      const refusal = await TH.expectRefusal(vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), refusalkind)
       expect(refusal.message).to.match(said)
       expect(refusal.cause).to.have.property('name', errname)
     })
@@ -132,7 +132,7 @@ describe("IdbVaultDB's refusals", () => {
       this.transaction.abort()
       return undefined as never
     })
-    await TH.expectRefusal(vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision }), 'storage_unavailable')
+    await TH.expectRefusal(vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), 'storage_unavailable')
     expect(await idbRowsOf(vaultDB).vaultRowOf(TH.vaultScope)).to.be.null
   })
 

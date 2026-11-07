@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConvexReactClient } from 'convex/react'
 import type { Boxscope, Notice, VaultScope } from 'safebyok/storage'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import { ConvexVaultDB } from 'safebyok-convex'
 import type { ConvexVaultDBOpts } from 'safebyok-convex'
 import { fakeDeployment } from 'safebyok-convex/testing'
@@ -118,7 +118,7 @@ const hostedVaultDB = (subject: string | null) => {
   return { deployment, vaultDB: new ConvexVaultDB({ client: connectReact(deployment, subject), api: deployment.api.safebyok }) }
 }
 
-const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 
 describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => {
   it("serves the user signed in", async () => {

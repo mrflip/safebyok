@@ -1,7 +1,7 @@
 /** safebyok's vaultDB in this browser's IndexedDB, each generic call one IndexedDB transaction. */
 
 import type { UseStore } from 'idb-keyval'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type {
   BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven,
   RowOfVault, Tidied, VaultDBOpts, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope,
@@ -13,7 +13,7 @@ import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, inOneStep, lifeR
 /** What an IdbVaultDB is made with: the VaultDB's own options, and `dbName`, the name its database is made under ('safebyok' if left out). */
 export type IdbVaultDBOpts = VaultDBOpts & { dbName?: string | undefined }
 
-const idbVaultDBOpts = SX.objCheck(({ str }) => ({ ...SX.vaultDBOpts.shape, dbName: str.min(1).optional() }), 'bad_option')
+const idbVaultDBOpts = DB.objCheck(({ str }) => ({ ...DB.vaultDBOpts.shape, dbName: str.min(1).optional() }), 'bad_option')
 // --
 
 // == [Helpers]: Rung, isPutAllowed, isHeardBy
@@ -23,7 +23,7 @@ type Rung = { scope: VaultScope, heard: Heard }
 
 /** True when a put under `opts` may land over `ante`, the row it would replace. */
 const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
+  DB.isRowAt(ante, prior) && (DB.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
 )
 
 /** True when a watch on `watched` hears a write under `scope`. */
@@ -33,7 +33,7 @@ const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
 // --
 
 /** A vaultDB that keeps a vault's rows, ciphertext and unencrypted fields, in this browser's IndexedDB; a watch hears every tab's writes. */
-export class IdbVaultDB extends SX.VaultDB {
+export class IdbVaultDB extends DB.VaultDB {
   // == [Props]: #shelf, #bellname
 
   readonly #shelf: UseStore
@@ -89,7 +89,7 @@ export class IdbVaultDB extends SX.VaultDB {
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
     const landing = await inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([rowAt(store, vaultScopepathOf(record)), rowAt(store, boxScopepathOf(record))])
-      const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
+      const landed = DB.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
       if (landed) { store.put(record, boxScopepathOf(record)) }
       return { landed, ante, vault }
     })
@@ -100,9 +100,9 @@ export class IdbVaultDB extends SX.VaultDB {
   protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Landing> {
     const { landing, rungs } = await inOneStep(this.#shelf, 'readwrite', async (store) => {
       const ante = await rowAt(store, vaultScopepathOf(tombstone))
-      const isOurs = SX.isLiveRowUnder(ante, tombstone.vault_tok)
-      const isDamaged = (ante !== null) && (! SX.vaultRow.safeParse(ante).success)
-      const landed = (isOurs && SX.isRowAt(ante, prior)) || SX.isDamagedVaultAt(ante, tombstone, prior)
+      const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
+      const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
+      const landed = (isOurs && DB.isRowAt(ante, prior)) || DB.isDamagedVaultAt(ante, tombstone, prior)
       // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
       if ((! landed) && (isOurs || isDamaged)) { return { landing: { landed, ante }, rungs: [] } }
       if (landed) { store.put(tombstone, vaultScopepathOf(tombstone)) }
@@ -110,7 +110,7 @@ export class IdbVaultDB extends SX.VaultDB {
       const rungs: Rung[] = landed ? [{ scope: tombstone, heard: { vault } }] : []
       const boxes = await filedIn(store, lifeRangeOf(tombstone))
       for (const { scopepath, row } of boxes) {
-        const boxTombstone = SX.boxTombstoneOf(row, tombstone.written_at)
+        const boxTombstone = DB.boxTombstoneOf(row, tombstone.written_at)
         if (boxTombstone === null) { continue }
         store.put(boxTombstone, scopepath)
         rungs.push({ scope: tombstone, heard: { vault, box: boxTombstone } })
@@ -124,8 +124,8 @@ export class IdbVaultDB extends SX.VaultDB {
   protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
     const landing = await inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([rowAt(store, vaultScopepathOf(tombstone)), rowAt(store, boxScopepathOf(tombstone))])
-      const isDeletable = (SX.isLiveRow(ante) && SX.isRowAt(ante, prior)) || SX.isDamagedBoxAt(ante, tombstone, prior)
-      const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+      const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
+      const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
       if (landed) { store.put(tombstone, boxScopepathOf(tombstone)) }
       return { landed, ante, vault }
     })
@@ -140,7 +140,7 @@ export class IdbVaultDB extends SX.VaultDB {
       let totalCount = 0
       for (const { scopepath } of boxes) {
         const { vaultlabel, vault_tok } = boxPlaceOf(scopepath)
-        if (SX.isLifeOver(vaultOfLabel.get(vaultlabel) ?? null, vault_tok)) { store.delete(scopepath) } else { totalCount += 1 }
+        if (DB.isLifeOver(vaultOfLabel.get(vaultlabel) ?? null, vault_tok)) { store.delete(scopepath) } else { totalCount += 1 }
       }
       return { totalCount }
     })

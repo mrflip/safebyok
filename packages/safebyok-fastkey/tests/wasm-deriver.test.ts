@@ -93,7 +93,7 @@ const SameBytesCases = [
   [{ memory_kib: 8, parallelism: 1, iterations: 1 },     "correct horse battery staple",  "Argon2id's least memory and one pass"],
   [{ memory_kib: 1024, parallelism: 8 },                 "correct horse battery staple",  'eight lanes'],
   [{ salt_bytes: 8 },                                    "correct horse battery staple",  "Argon2id's shortest salt"],
-  [{ salt_bytes: 65_536 },                               "correct horse battery staple",  'the longest salt the platform hands out'],
+  [{ salt_bytes: 32 },                                   "correct horse battery staple",  'the longest salt a spec may ask for'],
   [{},                                                   "pässwörd mit Umlaut und 🔑",    'a passphrase past ASCII, encoded as UTF-8'],
   [{},                                                   "word ".repeat(40),              'a passphrase longer than one BLAKE2b block'],
   [{},                                                   " ",                             'a passphrase of one space, which a deriver takes as it is'],
@@ -182,7 +182,7 @@ describe("argon2idWasmDeriver", () => {
 // same refusals, word for word, rather than restating the bounds.
 const UnworkableSpecs = [
   [{ salt_bytes: 7 },                     'a salt under 8 bytes'],
-  [{ salt_bytes: 65_537 },                'a salt longer than getRandomValues hands out at once'],
+  [{ salt_bytes: 33 },                    'a salt longer than 32 bytes'],
   [{ memory_kib: 64, parallelism: 9 },    'under 8 KiB for each of nine lanes'],
   [{ memory_kib: 1_048_577 },             'more than 1 GiB'],
   [{ iterations: 0 },                     'no passes over memory'],
@@ -207,7 +207,7 @@ describe("argon2idWasmDeriver's bounds", () => {
   })
 
   it("allows the largest of each bound", () => {
-    const lavish = { ...CheapSpec, memory_kib: 1_048_576, iterations: (2 ** 32) - 1, parallelism: 131_072, salt_bytes: 65_536 }
+    const lavish = { ...CheapSpec, memory_kib: 1_048_576, iterations: (2 ** 32) - 1, parallelism: 131_072, salt_bytes: 32 }
     expect(specOf(argon2idWasmDeriver(lavish))).to.deep.equal(lavish)
   })
 })
