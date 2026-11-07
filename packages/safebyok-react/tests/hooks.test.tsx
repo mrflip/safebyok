@@ -167,7 +167,7 @@ const boxWorld = async () => {
 describe("the box hooks", () => {
   beforeEach(() => { seenBoxes.length = 0 })
 
-  it("read none until the vault is present, then the boxes it lists", async () => {
+  it("read the boxes a present vault lists", async () => {
     const { world } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
     expect(shownOfBox('boxes')).to.eq('none')
@@ -176,7 +176,7 @@ describe("the box hooks", () => {
     expect(shownOfBox('box')).to.eq('revision 0, sealed')
   })
 
-  it("read none for a box not listed, then the box made from a click, exposed and blank", async () => {
+  it("read the box a click makes", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
@@ -207,7 +207,7 @@ describe("the box hooks", () => {
     expect(await stored?.extractWhisper()).to.deep.equal({ apiKey: 'sk-ant-fake-stored' })
   })
 
-  it("read the whisper as a bag while it will not show: sealed, then locked, and shown again at an unlock", async () => {
+  it("read the whisper as a bag while it will not show", async () => {
     const { world } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
     await waitFor(() => { expect(shownOfBox('whisper')).to.eq('- encrypted') })
