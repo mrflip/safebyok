@@ -6,7 +6,7 @@
 * **Issued by:** the Coach (flip), in the vaultdb_cleanup session, after the vaultdb line merged
   (#565 at 495cc5d6e). Orchestrated from that session, which keeps this sprint's doc.
 * **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; bookmark rev 2).
-* **Status:** paused 2026-11-07: threads 1 (#567), 3 (#568), 2 (#569), 5 (#570) and 4 (#571) filed; #570 and #571 are siblings on #569. Thread 6 waits on the restack `main -> #567 -> #568 -> #569 -> #570 -> #571 -> #566` (the Coach runs /restacker).
+* **Status:** running 2026-11-07: #567, #568, #569 and #570 merged; #571 rebased on main by the Coach and squashed to 5 commits (4ceecca51); thread 6 (docblock_trim) building, cut from #571.
 
 ## The Coach's request, verbatim
 
