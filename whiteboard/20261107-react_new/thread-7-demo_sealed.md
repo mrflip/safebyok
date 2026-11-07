@@ -1,6 +1,6 @@
 # Thread 7: demo, sealed key (2026-11-07)
 
-Branch `20261107-demo_sealed`, PR (see below), stacked on [#588](https://github.com/mrflip/safebyok/pull/588). Justify: green; the demo 98 passed (20 new), every other package unchanged.
+Branch `20261107-demo_sealed`, PR [#591](https://github.com/mrflip/safebyok/pull/591), stacked on [#588](https://github.com/mrflip/safebyok/pull/588). Justify: green; the demo 98 passed (20 new), every other package unchanged.
 
 * **Built**:
   * **`KnockKnockSealed`** (`demos/safebyok-demo-react/src/components/KnockKnockSealed.tsx`), flow 1: an uncontrolled `WhisperField` in a `<form>`; submit reads `FormData` `whisper_text`, then `bank.ensureVault` -> `vault.ensureUnlocked()` -> `vault.putBox({ boxlabel, whisper: { apiKey } }, { ifAbsent: 'add', ifPresent: 'repl' })`, then `form.reset()` clears the field. No `expose`, no `useWhisper`. `useBox` answers only presence ("No key saved yet." / "A key is saved."). The knock is `extractSavedApiKey(vault, SealedApiKeyBoxlabel)`.
