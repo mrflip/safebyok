@@ -133,3 +133,7 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-07 (devicedb_idb, the device database's wipe): **a tab holding an old device database open keeps it.** `IdbDeviceDB`
   deletes the databases of an older version unread on its first call, and a tab of an older release still holding one open blocks
   that delete; the database goes once that tab closes and a later page load deletes it again.
+* 2026-11-07 (the Coach, on a proposal to chain each revision to its prior): **storage that rolls a record back.** Nothing detects it beyond one session,
+  and nothing chains a revision to its prior. The Coach: there is no certainty the device is right and the server wrong or vice versa; a device
+  that writes on top saw a working state, storage saw one, and a record that deciphers was sealed under a working key. Today a fetch below
+  the revision held is ignored as `older`; after a reload the older copy is taken as found.

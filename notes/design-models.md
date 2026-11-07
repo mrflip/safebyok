@@ -1,11 +1,10 @@
 # Interface
 
-The seams of Box, Vault, Lease, Proving, Gate, Gating and Bank as they are meant to be: `whiteboard/20261102-newdesign/newdesign-proof.md`, in the conventions of `newdesign-vaultdb.md` (atoms first; entrypoints under Public). `lock`, `sweep` and `vacate` exist on each thing down the chain, a no-op where there is nothing to do. The device caches only leases and the device record, not vault or box records, and no refresh timer runs. useWhisper is postponed, not gone. The goal: when lock is called, nothing crosses it.
+The seams of Box, Vault, Lease, Proving, Gate, Gating and Bank as they are meant to be: `notes/design-proof.md`, in the conventions of `notes/design-vaultdb.md` (atoms first; entrypoints under Public). `lock`, `sweep` and `vacate` exist on each thing down the chain, a no-op where there is nothing to do. The device caches only leases and the device record, not vault or box records, and no refresh timer runs. useWhisper is postponed, not gone. The goal: when lock is called, nothing crosses it.
 
 Gone from the interface, so in no table: every `cleartexts` parameter (`ensureVault(bag, cleartexts)`, `ensureUnlocked(cleartexts)`, the gate verbs'), `takeUpLease`, `takeUpCachedLease`, `vaultListing.close`, `makeStaged` and the staged record, `UnlockAtBirth`, `BirthLockSeq`, `closeSeqs`, the lease mutex, the unlock join and the ensuring map, `hydrateAll`, `attemptPasskey` (an `attempt({ passkeyClear })`), `ensureFullAndTimely` and `buildCachedLease`.
 
 * 💪 sound (always true): all records are valid and mutually consistent: vault, box, listing, lease, gate, wayins, gatings
-* 🌀 misaligned: something is so wrong it's difficult to deliver a quality issue report
 * ⏳  timely: refresh age was within limit at some point between call and first seam; parents are also 😎 timely
 * 🎫 received: listing has memoized instance, sparse, full, or tombstoned
 * 🗂️ listing: factory and index of storables; holds their subscriptions, delivers vaultDB responses; to unlist is to remove from its list
@@ -22,8 +21,12 @@ Gone from the interface, so in no table: every `cleartexts` parameter (`ensureVa
 * 🪦 gone: locked, vacated, removed from VaultDB
 * 🔲 void: absent (no row)
 * 🛡️ no-throw: all errors caught;  `tryVerbNoun`  returns an Outcome<Noun>
-* 💣 ok=refused: oops
+* 🌀 misaligned: something is so wrong it's difficult to deliver a quality issue report
+* 💣 err=refused: oops
+* 🫱 ok=got
+* ⚠️ ok=expected:
 * 👌 ok=success (general)
+* 📗 ok=read
 * 👍 ok=modified: modification was successfully transactionally applied, no changes since last update
 * 💸 decrypted: whisper is authenticated against cached vault key, box key, vault, and its non-sidecar metadata
 * 🫆 encrypted: whisper cannot be decrypted without device and prohibitively difficult even with device.
@@ -33,6 +36,7 @@ Gone from the interface, so in no table: every `cleartexts` parameter (`ensureVa
 * 📣 subscribed: full records push on changes.
 * 1️⃣ one-at-a-time: overlapping callers wait on single request and share its result
 * 💾  saved
+* ❎ deleted
 * 🟰 no change
 * 📸 snapshot: frozen pojo with public props for subscribers
 * 🔑 wayin
@@ -60,8 +64,8 @@ What a call can fail with before its own row is reached. Each table below shows 
 | `lease.attach` on a 🫥 vault       | disabled                                   | 💣   | `demandReadyToAttach` throws; the lease vacated, no cache call. A row the sweep left goes too, costing a passphrase next session |
 | every 🎬 call, while locked        | `vault_locked`                             | 💣   | the guard throws; nothing sealed or unsealed                                                                                     |
 | every ⏳ call                      | its refresh's                              | 💣   | a refresh's refusal passes up; nothing changed                                                                                   |
-| every call into the VaultDB        | `vault_{gone/empty/full}`, `box_too_large` | 💣   | passed up, as`newdesign-vaultdb.md` VPA7 has them                                                                                |
-| every call into the VaultDB        | truth is broken or inaccessible (§2)      | 🌀   | passed up, as`newdesign-vaultdb.md` VPA7 has them                                                                                |
+| every call into the VaultDB        | `vault_{gone/empty/full}`, `box_too_large` | 💣   | passed up, as `notes/design-vaultdb.md` VPA7 has them                                                                            |
+| every call into the VaultDB        | truth is broken or inaccessible (§2)      | 🌀   | passed up, as `notes/design-vaultdb.md` VPA7 has them                                                                            |
 | every call into the VaultDB        | `identity_revoked`                         | 💣   | bank.vacate, then passed up                                                                                                      |
 | host functions with cleartext(§1) | its throw                                  | 💣   | replaced by a refusal naming no secret, its error never kept as a cause (guarantee G8)                                           |
 | every export                       | `invalid_input`                            | 🌀   | validated at the entrypoint, before any work                                                                                     |
@@ -346,7 +350,7 @@ The entrypoints, parked as they are: not yet in the columns above.
 
 Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
 
-* **Doc blocks:** "listing every refusal possible is foolish, wastes tokens and metastasizes". Stripped to `SLOPDOC` lines; the methods that would not go in a line are in `sus-paranoiacs.md`, the stripped text in `unrace-docblocks.md`.
+* **Doc blocks:** "listing every refusal possible is foolish, wastes tokens and metastasizes". Stripped to `SLOPDOC` lines; the methods that would not go in a line are in `whiteboard/20261102-newdesign/sus-paranoiacs.md`, the stripped text in `whiteboard/20261102-newdesign/docblocks-slop.md`.
 * **Fate:** `fateOver` and `SlotFate`, one record judged in three layers with `reconcileCentral` and `receive`. "the fate code is going to get out of control".
 * **Reflective installs:** `tattoo`, `adorn`, `decorate`. "only part of that is purposeful".
 * **Fire-and-forget:** two `void` async IIFEs and four `void` calls, on error paths. "invesrigate after sprint not good".
