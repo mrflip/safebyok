@@ -122,6 +122,19 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
     expect(await dbNamesNow()).to.include(`${dbName}:device-v001-001-001`)
   })
 
+  it("deletes the old core's device database and the first version's by name, in a browser that cannot list its databases", async () => {
+    const dbName = freshDbName()
+    const oldnames = [`${dbName}:device_db`, `${dbName}:device-v1`]
+    await plantClosedDB(oldnames[0]!, 'records')
+    await plantClosedDB(oldnames[1]!, 'leases')
+    vi.spyOn(indexedDB, 'databases').mockImplementationOnce(() => { throw new TypeError("indexedDB.databases is not a function") })
+    await makeDeviceDB(dbName).listLeases()
+    await vi.waitFor(async () => {
+      const dbnames = await dbNamesNow()
+      expect(dbnames.filter((dbname) => oldnames.includes(dbname))).to.deep.equal([])
+    })
+  })
+
   it("leaves a newer version's database, as an updated tab of the page made it", async () => {
     const dbName = freshDbName()
     const newername = `${dbName}:device-v001-002-000`

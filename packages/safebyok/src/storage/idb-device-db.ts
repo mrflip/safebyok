@@ -32,7 +32,7 @@ const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseS
 
 /** The shelf of the device database of `dbName`, whose first transaction deletes the old core's and every older version's. */
 const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
-  dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`],
+  dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
 })
 // --
 

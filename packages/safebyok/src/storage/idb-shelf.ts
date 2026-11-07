@@ -14,7 +14,7 @@ export interface VersionedShelfSpec {
   version:   string
   /** The one object store of the database. */
   storename: string
-  /** The names, whole, of the databases of this kind from before it carried a version. */
+  /** The names, whole, of the databases of this kind from before its three-part version. */
   oldnames:  string[]
 }
 
@@ -34,22 +34,23 @@ export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   }
 }
 
-/** True for the name of a database of `spec`'s kind that is older than its version: unversioned, in an earlier pattern, or lower. */
+/** True for the name of a database of `spec`'s stem whose version is older than its own: in an earlier pattern, or lower. */
 const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
-  if (spec.oldnames.includes(dbname)) { return true }
   const stemmed = `${spec.dbName}:${spec.dbstem}-v`
   if (! dbname.startsWith(stemmed)) { return false }
   const version = dbname.slice(stemmed.length)
   return (! VersionPattern.test(version)) || (version < spec.version)
 }
 
-// The wipe is hygiene, so a browser that cannot list its databases leaves them for the next page load rather than failing the vault.
-/** Starts the deletion of every database now in the browser that {@link isOlderDBName} names. */
+// The old names are deleted by name, as not every browser lists its databases. The wipe is hygiene, so a browser that cannot list
+// them keeps its older versioned ones rather than failing the vault.
+/** Starts the deletion of each of `spec`'s old names, and of every database now in the browser that {@link isOlderDBName} names. */
 const wipeOlderDBs = async (spec: VersionedShelfSpec): Promise<void> => {
   try {
+    for (const oldname of spec.oldnames) { indexedDB.deleteDatabase(oldname) }
     const listed = await indexedDB.databases()
     for (const { name: dbname } of listed) {
-      if ((dbname !== undefined) && isOlderDBName(spec, dbname)) { indexedDB.deleteDatabase(dbname) }
+      if ((dbname !== undefined) && (! spec.oldnames.includes(dbname)) && isOlderDBName(spec, dbname)) { indexedDB.deleteDatabase(dbname) }
     }
   } catch {
     // no IndexedDB, or none that lists its databases
