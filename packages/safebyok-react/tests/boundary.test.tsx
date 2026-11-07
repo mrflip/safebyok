@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
-import { VaultError } from 'safebyok-old'
+import { VaultError } from 'safebyok'
 import { Boundary, forBoundary, useRoundFor } from '../src/boundary'
 import * as TH from './test-helpers'
 
@@ -99,7 +99,7 @@ describe("forBoundary", () => {
 
   it("hands back a VaultError with no cause as itself", () => {
     const misuse = new VaultError('bad_option', 'A bad option.', { meta })
-    expect(forBoundary(misuse, 'PasskeyUnlockButton')).to.equal(misuse)
+    expect(forBoundary(misuse, 'PassphraseModal')).to.equal(misuse)
   })
 
   const ForeignCases = [
@@ -117,10 +117,9 @@ describe("forBoundary", () => {
     })
   }
 
-  it("names the component a foreign throw came from, and where to look: the dialog's functions, or the passkey prompt", () => {
-    const fromDialog = forBoundary(new TypeError('fell over'), 'PassphraseModal').message
-    const fromButton = forBoundary(new TypeError('fell over'), 'PasskeyUnlockButton').message
-    expect(fromDialog).to.include("safebyok-react's PassphraseModal").and.to.include('the functions the app handed the dialog')
-    expect(fromButton).to.include("safebyok-react's PasskeyUnlockButton").and.to.include('askPasskey').and.to.not.include('handed the dialog')
+  it("names the component a foreign throw came from, and the functions to look at", () => {
+    for (const source of ['PassphraseModal', 'GatingModal'] as const) {
+      expect(forBoundary(new TypeError('fell over'), source).message).to.include(`safebyok-react's ${source}`).and.to.include('the functions the app handed the dialog')
+    }
   })
 })

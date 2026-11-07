@@ -1,42 +1,59 @@
+import { MemoryDeviceDB, type StrengthChecker } from 'safebyok'
+import { argon2idWebV1Deriver } from 'safebyok/browser'
+import { idbVaultDB } from 'safebyok-indexeddb'
 import { domStore, memoryStore, type StringStore } from 'safebyok-old'
-import { inspectIdbDeviceDB } from 'safebyok-old/idb'
-import { idbVaultDB, inspectIdbVaultDB } from 'safebyok-idb-old'
-import { OutageVaultDB, makeOutage } from './outage'
 
 /**
- * DEMO JANK: concrete storage wiring. The vault's records live in this browser's IndexedDB,
- * through the real adapters, safebyok-idb-old's vault store and safebyok/idb's device store:
+ * DEMO JANK: concrete storage wiring.
  *
- *  * the `vault_db` shelf stands in for the remote database a backend would hold -- rows of
- *    ciphertext that never open without your passphrase
- *  * the `device_db` shelf is genuinely device-local, exactly as it would be in production: the
- *    lease, around a key handle that cannot leave this browser. Its store comes with
- *    the browser's defaults, `browserOpts({ dbName: Applabel })`, which App.tsx spreads into the
- *    provider
+ *  * the vault's rows live in this browser's IndexedDB, through safebyok-indexeddb: they stand
+ *    in for the remote database a backend would hold -- ciphertext that never opens without your
+ *    passphrase
+ *  * the device's leases live in memory, so a reload locks every vault again; a real app keeps
+ *    them in a device store that outlives the page
+ *  * the device's id is a random UUID kept in localStorage
+ *  * the strength checker refuses only a passphrase under 12 characters; a real app judges
+ *    strength properly (CUSTOMIZATION.md)
  *
  * The fake auth keeps its scaffolding rows in localStorage: accounts beside the pretend backend,
- * the session standing in for a cookie. The inspectors at the bottom of the page render every
- * shelf raw, so you can watch what lands where, and the backend's panel has an outage switch to
- * show what the app does when storage cannot be reached. A real app replaces vaultDB with a
- * Convex (or REST) adapter and keeps the browser's defaults exactly as they are.
+ * the session standing in for a cookie. A real app replaces vaultDB with a Convex (or REST)
+ * adapter.
  */
 
 export const Applabel = 'safebyok_demo'
 
 const storage = typeof localStorage === 'undefined' ? null : localStorage
 
-/** The fake auth's account rows: pretend-backend scaffolding, beside the real vault shelf. */
+/** The fake auth's account rows: pretend-backend scaffolding, beside the vault's rows. */
 export const dbStore: StringStore = storage === null ? memoryStore() : domStore(storage, 'safebyok-demo:db:')
 
 /** The fake auth's session: stands in for a cookie; never leaves the browser. */
 export const deviceStore: StringStore = storage === null ? memoryStore() : domStore(storage, 'safebyok-demo:device:')
 
-/** The pretend backend's outage switch, flipped from its inspection panel. */
-export const outage = makeOutage()
+/** The vault's storage: this browser's IndexedDB. */
+export const vaultDB = idbVaultDB({ dbName: Applabel })
 
-/** The vault's storage: IndexedDB, behind the pretend outage switch. */
-export const vaultDB = new OutageVaultDB(idbVaultDB({ dbName: Applabel }), outage)
+/** The device's leases: in memory, for this page's life. */
+export const deviceDB = new MemoryDeviceDB()
 
-/** Raw windows onto the two IndexedDB shelves, for the inspection panels. */
-export const vaultDbInspector = inspectIdbVaultDB({ dbName: Applabel })
-export const deviceDbInspector = inspectIdbDeviceDB({ dbName: Applabel })
+/** What makes a key from a passphrase: the browser's Argon2id. */
+export const keyDeriver = argon2idWebV1Deriver
+
+const DeviceIdKey = 'safebyok-demo:device_id'
+
+/** This browser's id, made once and kept in localStorage. */
+const deviceIdOf = (): string => {
+  const kept = storage?.getItem(DeviceIdKey)
+  if (kept !== null && kept !== undefined) { return kept }
+  const made = crypto.randomUUID()
+  storage?.setItem(DeviceIdKey, made)
+  return made
+}
+
+/** This browser's id, as the bank is told it. */
+export const device_id = deviceIdOf()
+
+/** Every passphrase of 12 characters or more is strong enough. */
+export const strengthChecker: StrengthChecker = (passphrase) => (
+  passphrase.length >= 12 ? { strong: true } : { strong: false, reason: 'Choose a passphrase of at least 12 characters: a few words together make a strong one.' }
+)

@@ -1,13 +1,7 @@
-/**
- * Every word safebyok-react shows a user, in one place: the copy of the passphrase dialog and of
- * each dialog for a change to the ways in or a deletion, the passkey button's, the whisper
- * field's, and the calm messages of the refusals a passkey unlock may meet. A sentence with a part that varies is one frame, a function of that part, so that each reads
- * whole and a translation may reorder it. English, for now: the one locale is {@link Locale}.
- * What the developer reads (a misuse refusal, a logger's warning) stays beside the code that says
- * it.
- */
+// Every word safebyok-react shows a user, in one place, each sentence with a varying part one
+// frame, so a translation may reorder it. What the developer reads stays beside the code that says it.
 
-import type { GatingKind } from 'safebyok-old'
+import type { Gatingkind } from 'safebyok'
 
 /** The locale the dialog formats its relative times in, and the language of every message here. */
 export const Locale = 'en'
@@ -57,12 +51,6 @@ export const Messages = {
   delVaultBlurb:      'Every secret in this vault is deleted for good, on every device, and cannot be recovered. Enter your vault passphrase to delete it.',
   delVaultButton:     'Delete vault',
 
-  // Starting over, for a user who has forgotten the passphrase
-  startOverButton:   'Forgot it? Start a new vault',
-  startOverQuestion: 'Remove this vault and start a new one? Every secret in it is lost for good, on every device, and you will enter them again.',
-  startOverConfirm:  'Remove and start over',
-  startOverBack:     'Keep it',
-
   // What the dialog says once something not the user's to mend went wrong
   troubleTitle:      'Something went wrong',
   /** What the dialog could not do: `doing` is one of {@link Doing}'s phrases, such as 'unlock your vault'. */
@@ -84,11 +72,11 @@ export const Messages = {
 } as const
 
 /** What each kind of gating's dialog was doing, as `Messages.troubleWord` says it could not. */
-export const Doing: Record<GatingKind, string> = {
-  initialize_gate:   'unlock your vault',
-  unlock_vault:      'unlock your vault',
-  change_passphrase: 'change your passphrase',
-  put_passkey:       'add the passkey',
-  del_passkey:       'remove the passkey',
-  del_vault:         'delete your vault',
+export const Doing: Record<Gatingkind, string> = {
+  build_vault:        'create your vault',
+  unlock_vault:       'unlock your vault',
+  replace_passphrase: 'change your passphrase',
+  add_passkey:        'add the passkey',
+  revoke_passkey:     'remove the passkey',
+  del_vault:          'delete your vault',
 }

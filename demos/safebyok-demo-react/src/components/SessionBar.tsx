@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useVault } from 'safebyok-react'
+import { useBank } from 'safebyok-react'
 import { useSession } from '../hooks/useSession'
 import type { Auth } from '../lib/auth'
 import { keepStorage } from '../lib/persist-storage'
@@ -8,11 +8,11 @@ import { keepStorage } from '../lib/persist-storage'
  * The app's sign-in strip. Typing a username signs you in (or up); there is no password, because
  * the demo's point is that the vault passphrase is a separate thing from signing in. Signing in
  * asks the browser to keep this site's storage, on the user's gesture. Signing out locks the
- * vault: the lease on this device ends with the session.
+ * user's vaults on this device.
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
-  const vault = useVault('main')
+  const bank = useBank()
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
 
@@ -44,36 +44,15 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
     )
   }
 
-  const signOut = async () => {
-    await vault?.lock()
+  const signOut = () => {
+    bank?.lock()
     auth.signOut()
-  }
-
-  const deleteAccount = async () => {
-    if (! globalThis.confirm('Delete this account and remove its vault? The stored boxes are gone for good.')) { return }
-    setGripe(null)
-    // The vault's dialog asks for the passphrase, which proves the deletion. The vault deleted
-    // stays gone: nothing asks for it again, so no new one is stored under the account as it goes.
-    // A vault with no passphrase yet holds no boxes, and has nothing to prove the deletion with
-    // (absent_vault): the account goes without it. Cancelled, the account stays, quietly; any
-    // other refusal keeps the account, and says why.
-    if (vault !== null) {
-      const deleted = await vault.tryDel()
-      if (! deleted.ok) {
-        const { refusalkind, message } = deleted.err
-        if (refusalkind === 'vault_locked') { return }
-        if (refusalkind !== 'absent_vault') { setGripe(message); return }
-      }
-    }
-    await auth.deleteAccount()
   }
 
   return (
     <div className="session-bar">
       <span>Signed in as <strong>{session.userlabel}</strong> <code className="quiet">({session.user_id})</code></span>
-      <button onClick={() => { void signOut() }}>Sign out</button>
-      <button className="danger" onClick={() => { void deleteAccount() }}>Delete account</button>
-      {gripe !== null && <span className="gripe">{gripe}</span>}
+      <button onClick={signOut}>Sign out</button>
     </div>
   )
 }
