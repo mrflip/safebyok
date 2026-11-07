@@ -5,7 +5,7 @@
  * one publishes. A cheap key deriver, shape-valid records whose ciphertext is fake, a live lease,
  * the package's clock to set by hand, small timing, interception and tampering aids, a logger that keeps what it hears and one that says
  * only warnings and errors, and checks that a call refuses and that what it threw quotes nothing it
- * shouldn't, and a world of banks over one in-memory vaultDB, each device with its own deviceDB, where a dialog types the passphrase a test sets. The battery every VaultDB runs, and the scopes and rows it is built from. For tests only, and under vitest: the deriver is worthless against a brute-forcer.
+ * shouldn't, and a world of banks over one in-memory vaultDB, each device with its own deviceDB, where a dialog types the passphrase a test sets. The battery every VaultDB runs, and the scopes and rows it is built from, and the battery every DeviceDB runs. For tests only, and under vitest: the deriver is worthless against a brute-forcer.
  */
 export { _cheat_clock, _cheat_clockReset } from '../src/helpers/clock'
 export { testDeriver, anyStrengthChecker, fakeCiphered, scopeOf, wayinOf, passkeyOf, tweakB64 } from './test-helpers/builders'
@@ -19,6 +19,8 @@ export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad,
 export type { ExpectingGood } from './test-helpers/refusals'
 export { describeVaultDBBattery } from './test-helpers/vault-db-battery'
 export type { VaultDBBatteryOpts, VaultDBRowCheats } from './test-helpers/vault-db-battery'
+export { describeDeviceDBBattery } from './test-helpers/device-db-battery'
+export type { DeviceDBBatteryOpts, DeviceDBRowCheats } from './test-helpers/device-db-battery'
 export { bankScope, vaultScope, boxscope, vaultQuery, boxQuery, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf } from './test-helpers/storage-world'
 export { makeBankWorld, makeBankWithVault, useBankWorlds, VaultScopeGiven } from './test-helpers/bank-world'
 export type { BankWorld } from './test-helpers/bank-world'

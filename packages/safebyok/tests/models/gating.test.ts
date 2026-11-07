@@ -51,7 +51,7 @@ const lockedVault = async (born = makeBornVault()) => {
   world.fakeBank.requestCleartext = dialog.requestCleartext
   world.vault.lock()
   await vi.waitFor(() => { expect(world.deviceDB.cachedNow()).to.be.null }, { interval: 1 })
-  world.deviceDB.tryCache.mockClear()
+  world.deviceDB.tryStow.mockClear()
   return { ...world, ...dialog }
 }
 
@@ -74,7 +74,7 @@ describe("a birth through a gating", () => {
     expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
     expect(storedNow()).to.include({ am: 'a', vault_tok: vault.vault_tok, revision_seq: 0 })
     expect(storedNow()?.gate.passkey_wayin).to.be.null
-    expect(deviceDB.tryCache).toHaveBeenCalledTimes(1)
+    expect(deviceDB.tryStow).toHaveBeenCalledTimes(1)
   })
 
   it("makes the passkey's wayin beside the passphrase's, and spends the answer", async () => {
@@ -129,7 +129,7 @@ describe("a birth through a gating", () => {
     await launched
     expect(listing.things).to.have.lengthOf(0)
     expect(storedNow()).to.be.null
-    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 
   it("leaves the vault stored and held, locked, where the lease is refused past the put, and the passphrase opens it next", async () => {
@@ -142,7 +142,7 @@ describe("a birth through a gating", () => {
     expect(storedNow()).to.include({ am: 'a' })
     const vault = listing.at(Dna)!
     expect(vault.isLocked).to.be.true
-    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.tryStow).not.toHaveBeenCalled()
     const unlocking = vault.ensureUnlocked()
     const asking = await gatingAt<'unlock_vault'>(1)
     await TH.expectGood(asking.attempt({ passphraseClear }))
@@ -160,7 +160,7 @@ describe("a birth through a gating", () => {
     expect(await launched).to.equal(vault)
     expect(vault.vault_tok).to.eq(theirs.vault_tok)
     expect(vault.isLocked).to.be.true
-    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 
   it("attaches no lease to another life that overtook the put's own answer", async () => {
@@ -179,7 +179,7 @@ describe("a birth through a gating", () => {
     expect(await launched).to.equal(vault)
     expect(vault.vault_tok).to.eq(theirs.vault_tok)
     expect(vault.isLocked).to.be.true
-    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 
   it("refuses a vault present in the slot, showing no dialog", async () => {
@@ -412,7 +412,7 @@ describe("a lock and a gating", () => {
     await unlocking
     await TH.expectBad(gating.attempt({ passphraseClear }))
     expect(vault.isUnlocked).to.be.false
-    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 
   it("past the enter key turns nothing back: a wrong passphrase crossed by a lock settles as itself, with no re-entry", async () => {

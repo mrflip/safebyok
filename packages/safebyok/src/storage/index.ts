@@ -34,7 +34,7 @@ export type { Capacity, DelOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOp
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'
-export { leaseQuery, leaseDated, leaseRow, cutoff } from '../shapes/shapes-storage'
+export { leaseQuery, leaseDated, leaseRow } from '../shapes/shapes-storage'
 export type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 // --
 

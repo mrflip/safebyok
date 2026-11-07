@@ -177,7 +177,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
     const held = this.#lease
     this.#lease = null
-    const vacating = held?.tryVacate() ?? Lease.tryUncache(this.#leaseFriend())
+    const vacating = held?.tryVacate() ?? Lease.tryForget(this.#leaseFriend())
     this.settle()
     const vacated = await vacating
     if (! vacated.ok) { await onRefused(vacated.err) }
@@ -195,11 +195,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  /** Hold `lease` as this vault's, and cache it on this device. */
+  /** Hold `lease` as this vault's, and stow it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
     this.demandEnabled()
     this.#lease = lease
-    await lease.cacheAsCacheCan()
+    await lease.stowAsStowCan()
     this.settle()
   }
 
@@ -246,8 +246,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       leaseMillis,
       lock:            () => { this.lock() },
       tryPeekLease:    () => deviceDB.tryPeek(asked),
-      tryCacheLease:   (record) => deviceDB.tryCache(record),
-      tryUncacheLease: () => deviceDB.tryVacate(asked),
+      tryStowLease:    (record) => deviceDB.tryStow(record),
+      tryForgetLease:  () => deviceDB.tryForget(asked),
       tellBadNews:     (badnews) => { this.world.tellBadNews(badnews) },
     }
   }

@@ -43,7 +43,7 @@ not as a settled ruling, and check it against the current design before relying 
   call before making the next.
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused erase of a cached lease is not
   retried.** `Lease.buildFromCache` meeting a row of another epoch erases the deviceDB's record
-  once (`tryUncacheLease`); a refusal is warned of and left. The record is unusable either way, and
+  once (`tryForgetLease`); a refusal is warned of and left. The record is unusable either way, and
   the next grant writes over it. A `lock()`'s own refused erase is told as a panic (`vault.#panic`).
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **no autolock timer past the Trigger's cap.**
   A lease whose `autolock_at` lies more than `MaxTimerMillis` (about 24.5 days) away arms no
@@ -51,7 +51,7 @@ not as a settled ruling, and check it against the current design before relying 
   `vault_locked`, once the clock passes its `autolock_at`.
 * 2026-10-31 (the Coach, newvault sprint): **a lease's `vacate()` whose device erase is refused
   is not retried.** `vacate()` drops the lease's keys and record, then erases the deviceDB's record
-  once (`tryUncacheLease`); a refusal is thrown from `vacate()`, and a second `vacate()` on the same
+  once (`tryForgetLease`); a refusal is thrown from `vacate()`, and a second `vacate()` on the same
   lease erases nothing, as it already dropped its record. The entry on a refused erase of a cached
   lease covers the refused erase on `Lease.buildFromCache`; this one covers `vacate()` itself. The deviceDB is
   a cache, and the next session asks for the passphrase. Pinned by

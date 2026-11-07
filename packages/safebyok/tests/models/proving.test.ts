@@ -551,14 +551,14 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf()))
   })
 
-  it("grants a lease of the proving's vault, uncached, recording the proving's epoch, when it was proved, and how", async () => {
+  it("grants a lease of the proving's vault, not yet stowed, recording the proving's epoch, when it was proved, and how", async () => {
     const { gate, answerOf } = await gateWithBoth(2)
     const friend = fakeLeaseFriendOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(friend)
     expect(lease.toJSON()).to.deep.include({ ...WorldStamp, gate_epoch: gate.gate_epoch, proved_at: T0, wayinkind: 'passkey' })
     expect(lease.isPresent).to.be.true
-    expect(friend.tryCacheLease).not.toHaveBeenCalled()
+    expect(friend.tryStowLease).not.toHaveBeenCalled()
   })
 
   it("records the epoch passed, for the gate a change lands", async () => {
@@ -598,11 +598,11 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     await TH.expectRefusal(proving.buildLease(friend as never))
   })
 
-  it("refuses a gate_epoch its check refuses, and a friend with no tryCacheLease", async () => {
+  it("refuses a gate_epoch its check refuses, and a friend with no tryStowLease", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
     await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), 0))
-    await TH.expectRefusal(proving.buildLease({ ...fakeLeaseFriendOf(), tryCacheLease: undefined } as never))
+    await TH.expectRefusal(proving.buildLease({ ...fakeLeaseFriendOf(), tryStowLease: undefined } as never))
   })
 })
 

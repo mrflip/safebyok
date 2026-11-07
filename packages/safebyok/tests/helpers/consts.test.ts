@@ -60,7 +60,7 @@ describe("isVaultDB and isDeviceDB", () => {
 
   it("refuse a duck, the other store, and a copy of a store's own fields, which leaves the brand behind", () => {
     const vaultDB = new MemoryVaultDB()
-    expect(isDeviceDB({ tryPeek: () => null, tryCache: () => null, tryVacate: () => null })).to.be.false
+    expect(isDeviceDB({ tryPeek: () => null, tryStow: () => null, tryForget: () => null })).to.be.false
     expect(isVaultDB(Object.assign({}, vaultDB))).to.be.false
     expect(isVaultDB(new MemoryDeviceDB())).to.be.false
     expect(isDeviceDB(vaultDB)).to.be.false

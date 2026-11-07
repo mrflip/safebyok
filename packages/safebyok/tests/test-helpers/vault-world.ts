@@ -103,8 +103,8 @@ const makeDeviceDB = () => {
   return {
     memoryDB,
     peek:      vi.spyOn(memoryDB, 'peek'),
-    tryCache:  vi.spyOn(memoryDB, 'tryCache'),
-    tryVacate: vi.spyOn(memoryDB, 'tryVacate'),
+    tryStow:   vi.spyOn(memoryDB, 'tryStow'),
+    tryForget: vi.spyOn(memoryDB, 'tryForget'),
     cachedNow: (): unknown => [...rows.values()][0] ?? null,
     layCached: (record: unknown) => { rows.set([...rows.keys()][0] ?? 'no-row', record) },
   }

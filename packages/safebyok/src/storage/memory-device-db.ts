@@ -21,9 +21,9 @@ export class MemoryDeviceDB extends DeviceDB {
   _cheat_leaseRows(): Map<string, unknown> { return this.#leaserows } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doCache, doPeek, doVacate, doLeasesProvedBefore
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases
 
-  protected doCache(row: LeaseRow): void {
+  protected doStow(row: LeaseRow): void {
     this.#leaserows.set(leaseCkeyOf(row), structuredClone(row))
   }
 
@@ -31,14 +31,13 @@ export class MemoryDeviceDB extends DeviceDB {
     return structuredClone(this.#leaserows.get(leaseCkeyOf(scope)) ?? null)
   }
 
-  protected doVacate(asked: LeaseQuery): void {
+  protected doForget(asked: LeaseQuery): void {
     const stored = SX.leaseRow.safeParse(this.#leaserows.get(leaseCkeyOf(asked)))
     if (stored.success && (stored.data.vault_tok === asked.vault_tok)) { this.#leaserows.delete(leaseCkeyOf(asked)) }
   }
 
-  protected doLeasesProvedBefore(cutoff: number): unknown[] {
-    const rows = [...this.#leaserows.values()].flatMap((row) => { const parsed = SX.leaseRow.safeParse(row); return (parsed.success && parsed.data.proved_at < cutoff) ? [parsed.data] : [] })
-    return rows.toSorted((one, other) => one.proved_at - other.proved_at)
+  protected doListLeases(): unknown[] {
+    return [...this.#leaserows.values()]
   }
   // --
 }
