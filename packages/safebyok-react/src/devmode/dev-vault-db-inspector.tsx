@@ -56,7 +56,7 @@ const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDBVerbs, scope: BankS
         <button type="button" onClick={relist}>Refresh</button>
         <button type="button" onClick={() => { void callThenRelist('tidyGone', async () => jsonOf(await vaultDB.tidyGone(scope))) }}>tidyGone</button>
       </div>
-      {trouble !== null && <p role="alert">{`listVaults refused: ${trouble}`}</p>}
+      {trouble !== null && <p role="alert">{`listVaults or listBoxes refused: ${trouble}`}</p>}
       {rows === null
         ? <p className="quiet">Listing…</p>
         : (
