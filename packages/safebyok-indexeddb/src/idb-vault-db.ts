@@ -6,7 +6,7 @@ import type {
   BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven,
   RowOfVault, Tidied, VaultDBOpts, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope,
 } from 'safebyok/storage'
-import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, inOneStep, lifeRangeOf, rowAt, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './shelf'
+import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './shelf'
 
 // == [Options]: IdbVaultDBOpts, idbVaultDBOpts
 
@@ -53,31 +53,31 @@ export class IdbVaultDB extends DB.VaultDB {
   // == [Protected, the generic calls of VaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
-    const filed = await inOneStep(this.#shelf, 'readonly', (store) => filedIn(store, vaultsRangeOf(scope)))
+    const filed = await DB.inOneStep(this.#shelf, 'readonly', (store) => filedIn(store, vaultsRangeOf(scope)))
     return filed.map(({ scopepath, row }) => ({ vaultlabel: vaultlabelOf(scopepath), vault: row }))
   }
 
   protected async doGetVault(scope: VaultScope): Promise<unknown> {
-    return await inOneStep(this.#shelf, 'readonly', (store) => rowAt(store, vaultScopepathOf(scope)))
+    return await DB.inOneStep(this.#shelf, 'readonly', (store) => DB.rowAt(store, vaultScopepathOf(scope)))
   }
 
   protected async doListBoxes(asked: VaultQuery): Promise<BoxesFetched> {
-    return await inOneStep(this.#shelf, 'readonly', async (store) => {
-      const [vault, filed] = await Promise.all([rowAt(store, vaultScopepathOf(asked)), filedIn(store, lifeRangeOf(asked))])
+    return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
+      const [vault, filed] = await Promise.all([DB.rowAt(store, vaultScopepathOf(asked)), filedIn(store, lifeRangeOf(asked))])
       return { vault, boxes: filed.map(({ scopepath, row }) => ({ boxlabel: boxPlaceOf(scopepath).boxlabel, box: row })) }
     })
   }
 
   protected async doGetBox(asked: BoxQuery): Promise<BoxFetched> {
-    return await inOneStep(this.#shelf, 'readonly', async (store) => {
-      const [vault, box] = await Promise.all([rowAt(store, vaultScopepathOf(asked)), rowAt(store, boxScopepathOf(asked))])
+    return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
+      const [vault, box] = await Promise.all([DB.rowAt(store, vaultScopepathOf(asked)), DB.rowAt(store, boxScopepathOf(asked))])
       return { vault, box }
     })
   }
 
   protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Landing> {
-    const landing = await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const ante = await rowAt(store, vaultScopepathOf(record))
+    const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const ante = await DB.rowAt(store, vaultScopepathOf(record))
       const landed = isPutAllowed(ante, opts)
       if (landed) { store.put(record, vaultScopepathOf(record)) }
       return { landed, ante }
@@ -87,8 +87,8 @@ export class IdbVaultDB extends DB.VaultDB {
   }
 
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
-    const landing = await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [vault, ante] = await Promise.all([rowAt(store, vaultScopepathOf(record)), rowAt(store, boxScopepathOf(record))])
+    const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(record)), DB.rowAt(store, boxScopepathOf(record))])
       const landed = DB.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
       if (landed) { store.put(record, boxScopepathOf(record)) }
       return { landed, ante, vault }
@@ -98,8 +98,8 @@ export class IdbVaultDB extends DB.VaultDB {
   }
 
   protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Landing> {
-    const { landing, rungs } = await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const ante = await rowAt(store, vaultScopepathOf(tombstone))
+    const { landing, rungs } = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const ante = await DB.rowAt(store, vaultScopepathOf(tombstone))
       const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
       const landed = (isOurs && DB.isRowAt(ante, prior)) || DB.isDamagedVaultAt(ante, tombstone, prior)
@@ -122,8 +122,8 @@ export class IdbVaultDB extends DB.VaultDB {
   }
 
   protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
-    const landing = await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [vault, ante] = await Promise.all([rowAt(store, vaultScopepathOf(tombstone)), rowAt(store, boxScopepathOf(tombstone))])
+    const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(tombstone)), DB.rowAt(store, boxScopepathOf(tombstone))])
       const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
       const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
       if (landed) { store.put(tombstone, boxScopepathOf(tombstone)) }
@@ -134,7 +134,7 @@ export class IdbVaultDB extends DB.VaultDB {
   }
 
   protected async doTidyGone(scope: BankScope): Promise<Tidied> {
-    return await inOneStep(this.#shelf, 'readwrite', async (store) => {
+    return await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vaults, boxes] = await Promise.all([filedIn(store, vaultsRangeOf(scope)), filedIn(store, bankBoxesRangeOf(scope))])
       const vaultOfLabel = new Map(vaults.map(({ scopepath, row }) => [vaultlabelOf(scopepath), row]))
       let totalCount = 0

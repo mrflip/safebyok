@@ -220,11 +220,36 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
       })
     })
 
+    describe("listRawLeases()", () => {
+      it("answers every row stowed, its lease_key handle among its fields", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        const [raw, ...more] = await expectGood(deviceDB.tryListRawLeases())
+        expect(more).to.deep.equal([])
+        expect(raw).to.include({ ...asked, proved_at: T0, wrapped: 'opaque' })
+        expect(raw?.['lease_key']).to.be.instanceOf(CryptoKey)
+      })
+
+      it.skipIf(noRows)("answers a stored row that fails its check, which listLeases leaves out", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('damaged'), { proved_at: 5 })
+        expect(await deviceDB.listRawLeases()).to.deep.include({ proved_at: 5 })
+        const found = await deviceDB.listLeases()
+        expect(found.map((row) => row.vaultlabel)).to.deep.equal(['main'])
+      })
+
+      it("answers an empty list for an empty store", async () => {
+        const deviceDB = await fresh()
+        expect(await deviceDB.listRawLeases()).to.deep.equal([])
+      })
+    })
+
     describe("a store whose storage fails", () => {
       it.skipIf(_cheat_failNextCall === undefined)("refuses each verb", async () => {
         const deviceDB = await fresh()
         const row = await leaseRowOf()
-        const verbs = [() => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases()]
+        const verbs = [() => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases()]
         for (const verb of verbs) {
           await failNextCall(deviceDB)
           await expectBad(verb(), 'storage_unavailable')

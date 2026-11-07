@@ -63,8 +63,8 @@ copy it:
 * **Do each `do*` in one transaction of your store**, reading the vault row beside the rows it
   writes, and answer what it found (`ante`, and `vault` for a box) with whether it landed.
   `src/idb-vault-db.ts` decides each with the predicates `safebyok/storage` exports.
-* **Triage your store's failures into refusals** where you catch them (`src/shelf.ts`,
-  `troubleOf`); anything else you throw becomes `storage_unavailable`.
+* **Triage your store's failures into refusals** where you catch them (`inOneStep` from
+  `safebyok/storage` does it for IndexedDB); anything else you throw becomes `storage_unavailable`.
 * **Prove it with the battery**: `describeVaultDBBattery` from `safebyok/testing` runs every
   call against a fresh store, given a backdoor to its rows (`tests/idb-vault-db.test.ts`).
 

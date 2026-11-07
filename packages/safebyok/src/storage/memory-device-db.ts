@@ -8,7 +8,7 @@ import type { LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
 const leaseCkeyOf = ({ applabel, user_id, vaultlabel }: VaultScope): string => ckeyOf(applabel, user_id, vaultlabel)
 
-/** A device store that keeps its rows in memory, gone when the page closes: for tests, and for an app that caches no lease across loads. */
+/** A device store that keeps its rows in memory, for the page's life. */
 export class MemoryDeviceDB extends DeviceDB {
   // == [Props]: #leaserows
 

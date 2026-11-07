@@ -7,7 +7,7 @@ import * as TH from 'safebyok/testing'
 import * as DB from 'safebyok/storage'
 import { IdbVaultDB, idbVaultDB } from '../src/idb-vault-db'
 import type { IdbVaultDBOpts } from '../src/idb-vault-db'
-import { boxPlaceOf, boxScopepathOf, filedIn, inOneStep, lifeRangeOf, rowAt, shelfOf, vaultScopepathOf } from '../src/shelf'
+import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultScopepathOf } from '../src/shelf'
 
 // == [World]: makeVaultDB, idbRowsOf, failNextCall
 
@@ -29,11 +29,11 @@ const makeTwin = (vaultDB: IdbVaultDB): IdbVaultDB => new IdbVaultDB({ dbName: d
 const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
   const shelf = shelfOf(dbNameOf.get(vaultDB)!)
   return {
-    plantVaultRow: async (scope, row) => { await inOneStep(shelf, 'readwrite', (store) => { store.put(row, vaultScopepathOf(scope)) }) },
-    plantBoxRow:   async (scope, vault_tok, row) => { await inOneStep(shelf, 'readwrite', (store) => { store.put(row, boxScopepathOf({ ...scope, vault_tok })) }) },
-    vaultRowOf:    async (scope) => await inOneStep(shelf, 'readonly', (store) => rowAt(store, vaultScopepathOf(scope))),
+    plantVaultRow: async (scope, row) => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, vaultScopepathOf(scope)) }) },
+    plantBoxRow:   async (scope, vault_tok, row) => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, boxScopepathOf({ ...scope, vault_tok })) }) },
+    vaultRowOf:    async (scope) => await DB.inOneStep(shelf, 'readonly', (store) => DB.rowAt(store, vaultScopepathOf(scope))),
     boxRowsOf:     async (scope, vault_tok) => {
-      const filed = await inOneStep(shelf, 'readonly', (store) => filedIn(store, lifeRangeOf({ ...scope, vault_tok })))
+      const filed = await DB.inOneStep(shelf, 'readonly', (store) => filedIn(store, lifeRangeOf({ ...scope, vault_tok })))
       return new Map(filed.map(({ scopepath, row }) => [boxPlaceOf(scopepath).boxlabel, row]))
     },
   }

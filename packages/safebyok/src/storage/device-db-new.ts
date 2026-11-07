@@ -5,7 +5,7 @@ import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
-import type { VaultScope } from '../shapes/shapes-core'
+import { type VaultScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
@@ -18,9 +18,9 @@ export abstract class DeviceDB {
   get [IsDeviceDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
   // --
 
-  // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases
+  // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases
 
-  /** Stows the lease row for its vault, in place of any before. */
+  /** Stows the lease row of its vault. */
   async stow(row: LeaseRow): Promise<void> {
     try {
       const leaseRow = SX.leaseRow.parse(row)
@@ -30,7 +30,7 @@ export abstract class DeviceDB {
 
   tryStow(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.stow(row)) }
 
-  /** The row stowed for this vault under this `vault_tok`, or null: a row of another `vault_tok`, or one failing its check, is no row. */
+  /** The row stowed for this vault under this `vault_tok`, or null. */
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
     try {
       const leaseQuery = SX.leaseQuery.parse(asked)
@@ -42,7 +42,7 @@ export abstract class DeviceDB {
   tryPeek(asked: LeaseQuery): Promise<Outcome<LeaseRow | null>> { return outcomeOf(() => this.peek(asked)) }
 
   // `peek` checks the `vault_tok` here in the base; `forget` leaves it to the store, whose check must be one atomic step with its delete.
-  /** Erases the row stowed for this vault under this `vault_tok`; none is a no-op, and a row of another `vault_tok` stays. */
+  /** Erases the row stowed for this vault under this `vault_tok`. */
   async forget(asked: LeaseQuery): Promise<void> {
     try {
       const leaseQuery = SX.leaseQuery.parse(asked)
@@ -52,7 +52,7 @@ export abstract class DeviceDB {
 
   tryForget(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.forget(asked)) }
 
-  /** Every lease stowed on this device, of any vault, oldest first, as scope, `vault_tok` and `proved_at` only. */
+  /** Every lease stowed on this device, oldest first. */
   async listLeases(): Promise<LeaseDated[]> {
     try {
       const rows = await this.doListLeases()
@@ -62,6 +62,16 @@ export abstract class DeviceDB {
   }
 
   tryListLeases(): Promise<Outcome<LeaseDated[]>> { return outcomeOf(() => this.listLeases()) }
+
+  /** Every lease row stored on this device as a bag, unchecked, damaged rows among them. */
+  async listRawLeases(): Promise<Record<string, unknown>[]> {
+    try {
+      const rows = await this.doListLeases()
+      return rows.filter((row) => isPlainBag(row))
+    } catch (err) { throw refusalOf(err, 'listRawLeases') }
+  }
+
+  tryListRawLeases(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawLeases()) }
   // --
 
   // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases

@@ -1,8 +1,7 @@
 /** The shelf: the one object store of an IdbVaultDB's database, where each vault row and box row is filed under an array scopepath. */
 
 import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
-import * as DB from 'safebyok/storage'
-import type { BankScope, BoxQuery, VaultError, VaultQuery, VaultScope } from 'safebyok/storage'
+import type { BankScope, BoxQuery, VaultQuery, VaultScope } from 'safebyok/storage'
 
 // == [Scopepaths]: VaultScopepath, BoxScopepath, vaultScopepathOf, boxScopepathOf, vaultlabelOf, boxPlaceOf, vaultsRangeOf, lifeRangeOf, bankBoxesRangeOf
 
@@ -45,15 +44,10 @@ export const lifeRangeOf = ({ applabel, user_id, vaultlabel, vault_tok }: VaultQ
 export const bankBoxesRangeOf = ({ applabel, user_id }: BankScope): IDBKeyRange => rangeUnder(['box', applabel, user_id])
 // --
 
-// == [The database]: shelfOf, rowAt, filedIn, Filed, inOneStep, workOrAbandon, abortOf, abandon
+// == [The database]: shelfOf, filedIn, Filed
 
 /** The shelf of the database `dbName`, opened on its first transaction. */
 export const shelfOf = (dbName: string): UseStore => createStore(`${dbName}:vaults`, 'rows')
-
-/** The row filed at `scopepath`, or null for none. */
-export const rowAt = async (store: IDBObjectStore, scopepath: IDBValidKey): Promise<unknown> => (
-  (await promisifyRequest<unknown>(store.get(scopepath))) ?? null
-)
 
 /** A row as the shelf files it: its scopepath, and the row as stored. */
 export type Filed = { scopepath: IDBValidKey, row: unknown }
@@ -62,64 +56,5 @@ export type Filed = { scopepath: IDBValidKey, row: unknown }
 export const filedIn = async (store: IDBObjectStore, range: IDBKeyRange): Promise<Filed[]> => {
   const [scopepaths, rows] = await Promise.all([promisifyRequest(store.getAllKeys(range)), promisifyRequest<unknown[]>(store.getAll(range))])
   return scopepaths.map((scopepath, idx) => ({ scopepath, row: rows[idx] }))
-}
-
-/** What `work` returns, in one transaction on `shelf` that has committed, or the refusal saying what IndexedDB did instead. */
-export const inOneStep = async <ValT>(shelf: UseStore, txMode: IDBTransactionMode, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> => {
-  try {
-    return await shelf(txMode, async (store) => {
-      const ended = abortOf(store.transaction)
-      const val = await workOrAbandon(store, work)
-      const aborted = await ended
-      if (aborted !== null) { throw aborted }
-      return val
-    })
-  } catch (err) {
-    throw troubleOf(err)
-  }
-}
-
-// Every request `work` makes is awaited on the transaction's own requests alone: awaiting anything
-// else (a timer, a fetch, WebCrypto) lets IndexedDB commit the transaction midway.
-
-/** What `work` returns; if it throws instead, the transaction is aborted, so that none of its writes commit. */
-const workOrAbandon = async <ValT>(store: IDBObjectStore, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> => {
-  try {
-    return await work(store)
-  } catch (err) {
-    abandon(store.transaction)
-    throw err
-  }
-}
-
-/** Null once `transaction` commits, or the error it aborted with. */
-const abortOf = (transaction: IDBTransaction): Promise<Error | null> => new Promise((resolve) => {
-  transaction.addEventListener('complete', () => { resolve(null) })
-  transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(DB.TransactionAborted, 'AbortError')) })
-})
-
-/** Aborts `transaction`, so that no request it holds commits; one already finished refuses, and has nothing to undo. */
-const abandon = (transaction: IDBTransaction): void => {
-  try {
-    transaction.abort()
-  } catch {
-    // already committed or aborted
-  }
-}
-// --
-
-// == [Trouble]: troubleOf
-
-/** The refusal that says what went wrong in IndexedDB. */
-const troubleOf = (err: unknown): VaultError => {
-  if (DB.isVaultError(err)) { return err }
-  // A browser with IndexedDB switched off may hold the global as null rather than leave it out.
-  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return DB.storageUnavailable(err, DB.NoBrowserStore) }
-  const errname = (err instanceof Error) ? err.name : null
-  if (errname === 'QuotaExceededError') { return DB.storageFull(err) }
-  if (errname === 'AbortError') { return DB.storageUnavailable(err, DB.TransactionAborted) }
-  if (errname === 'InvalidStateError') { return DB.storageUnavailable(err, DB.DatabaseClosed) }
-  if (errname === 'SecurityError') { return DB.storageUnavailable(err, DB.StorageWithheld) }
-  return DB.storageUnavailable(err, DB.BrowserStoreFailed)
 }
 // --

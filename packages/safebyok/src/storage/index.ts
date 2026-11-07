@@ -1,5 +1,5 @@
 // Kept off the front door (`safebyok`) so a host's autocomplete never meets the adapter's contract, and an adapter's imports name one door.
-/** `safebyok/storage`: what a storage adapter is written against: the VaultDB and DeviceDB it extends, the rows it stores, and the refusals it raises. */
+/** `safebyok/storage`: what a storage adapter is written against: the VaultDB and DeviceDB it extends, the rows it stores, the IndexedDB transaction, and the refusals it raises. */
 
 // == [The stores]: VaultDB, DeviceDB, and the two in memory
 export { VaultDB } from './vault-db-new'
@@ -10,6 +10,10 @@ export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
 export type { Awaitable } from '../helpers/helpers'
 export { ckeyOf } from '../helpers/helpers'
+// --
+
+// == [IndexedDB]: the one transaction an IndexedDB store takes per call, and the row at a scopepath within it
+export { inOneStep, rowAt } from './idb-transaction'
 // --
 
 // == [The rows]: sentinels, scopes, records, options and the helpers that read a row
