@@ -11,9 +11,9 @@
 * **Sprint PR:** #572 (draft).
 * **Sprint doc:** https://claude.ai/artifact/UN5fpxiLeEaLHjpFgBiHg9 (doc
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
-  matters table mnx96vk4741.393, bookmark rev 16; Cleanup body 6cb5c40d-1cc7; Progress body
+  matters table mnx96vk4741.393, bookmark rev 23; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** threads 1 (#573) filed; 2 (#574) reviewed, filing; next 3, 4 and 12 side by side.
+* **Status:** filed 1 (#573), 2 (#574), 12 (#575); in review 3 (#577), 4 (#576).
 
 ## Read first
 
@@ -389,6 +389,11 @@ shows it beside the other two.
 * *Levels:* worker `sonnet`; review `medium` (a lease that survived its erase is what `onPanic`
   hears).
 * *Depends on:* 2. Runs beside 3 and 4. *Size:* small.
+* *Review:* `medium`, fixed. The remake warning no longer fires falsely when a host makes `vaultDB` or
+  `deviceDB` anew for each user; three test titles trimmed. The let-go panic was traced through the
+  core: a swept vault's `vacate()` is a no-op, so throwing to the platform is what the core does with
+  no handler. Left, minor: `misusedHandler`'s doc block; `null` hidden by its cast; small
+  redundancies; an `it.each` table in `'`. PR #575.
 
 ## For the Coach
 
