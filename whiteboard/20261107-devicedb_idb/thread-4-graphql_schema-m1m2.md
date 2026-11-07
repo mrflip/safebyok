@@ -1,4 +1,4 @@
-# Thread 4: what milestones 1 and 2 built, in detail (2026-11-07)
+# Thread 4: what milestones 1 to 3 built, in detail (2026-11-07)
 
 For whoever reworks the core's `VaultDBVerbs`, the answer checks, the schema or the resolvers; the thread file
 `thread-4-graphql_schema.md` has the summary.
@@ -33,3 +33,28 @@ For whoever reworks the core's `VaultDBVerbs`, the answer checks, the schema or 
   * **Tests** (`tests/vault-resolvers.test.ts`, 15): each verb's answer deep-equals the store's own `try*` answer once
     through JSON and the core's AX; the gate on all 11 operations; refusals with their meta and no cause; the watch,
     revoked mid-way; the schema's root fields, every document validated, the time scalar.
+
+## Milestone 3: GraphQLVaultDB
+
+* **Built, milestone 3** (`b43fbf15d`, `4e686715e`):
+  * **`GraphQLVaultDB`** (`src/graphql-vault-db.ts`) is a class implementing `VaultDBVerbs`, no longer extending
+    `VaultDB`. Each `try*` verb parses its inputs with the core's own checks (so its refusals match a store's:
+    `bad_scope`, `bad_option`, fieldnames), sends `VaultOperations`' document (queries `network-only`), drops
+    `__typename` by path, and parses with the AX checker. A refusal gets `{call, req_params}` in its meta, as the
+    base class's do. The plain verbs are `goodAnswerOf(await this.tryX())`.
+  * **Errors**: a CombinedError with a `networkError` is `storage_unavailable`; one with GraphQL errors, or data
+    missing the field, is `unexpected_error` (`SchemaNotServed`), the CombinedError its cause.
+  * **`__typename`**: `dropTypename(bag, nested)` drops a selection's own and recurses only into the fields each
+    selection names (gate, wayins, ciphered fields, listing rows, `req_params.prior`, `err`). Never into a sidecar,
+    `damaged_rows` or `meta`. A test round-trips a sidecar holding `__typename`.
+  * **Watch**: heeds each result whose `data` differs from the one before (fetch's closing result repeats it);
+    when a result has `hasNext: false` and the watch is neither stopped nor revoked, resubscribes after
+    `afterAPause` (a private helper, `ResubscribeMillis = 1000`). `identity_revoked` ends it for good.
+  * **`VaultOperations`** exported from `src/vault-operations.ts`; the old copy, `answers` and `refusalSent` deleted.
+  * **Core**: `IsVaultDB` exported from `safebyok/storage`, since an outside implementer needs the brand.
+    `damagedVault`/`damagedBox` take any string label: a damaged row may be listed under a label failing the check.
+    That was a milestone 1 bug that un-skipping the battery found. It has a test in `shapes-answers.test.ts`.
+  * **Tests**: both batteries run end to end over GraphQL (in-process executeExchange, and the yoga recipe over
+    fetch), with `_cheat_storeOf` naming the server's PostgresVaultDB. New: the sidecar case; a GraphQL error; a
+    foreign schema; a refusal before sending; the watch's resubscribe, revoke and stop (a fake client and fake timers).
+  * **Changesets** brought up to date: the client line, `maxRecordBytes` breaking, the `IsVaultDB` export, damaged labels.
