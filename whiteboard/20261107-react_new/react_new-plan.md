@@ -552,7 +552,8 @@ below are mine as the React developer, on their merits.
   (my call as the React developer, a row): reading them once would hand hosts the stale-closure bug
   with inline handlers. The bank's having a handler or not is fixed when it is made.
 * Right before `Bank.make`, the provider calls `deviceDB.ensureBank({ applabel, user_id })` (thread
-  15) and makes the bank with that `device_id`; the `device_id` prop goes (my call as the React
+  15) and makes the bank with that `device_id`; `BankProvider`'s `device_id` React prop goes, while
+  `Bank.make` still takes `device_id` and the bank still holds it (my call as the React
   developer, a row: the call is async, the provider already owns making the bank per scope and its
   `waiting` stage covers the wait, and a host-side helper would make every host write an effect, a
   loading state and StrictMode care). `ensureBank` refuses `bad_scope` or `storage_unavailable`:
