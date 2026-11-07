@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // fake-indexeddb installs an indexedDB global before the demo's stores open their shelves.
 import 'fake-indexeddb/auto'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/App'
 import { vaultDB } from '../src/lib/stores'
@@ -34,6 +34,7 @@ describe("App", () => {
     TH.signInAs('margo')
     await screen.findByText('margo')
     expect(screen.getByRole('heading', { name: 'Knock-knock, with managed fields' })).to.not.be.null
+    expect(screen.getByRole('heading', { name: 'Knock-knock, with an exposed whisper' })).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')
     expect(screen.queryByText('margo')).to.be.null
@@ -42,7 +43,8 @@ describe("App", () => {
   it("says the backend is off while the outage switch is", async () => {
     render(<App />)
     TH.signInAs('margo')
-    const adding = await screen.findByRole<HTMLButtonElement>('button', { name: 'Add key' })
+    const flow = within(await screen.findByRole('region', { name: 'Knock-knock, with managed fields' }))
+    const adding = await flow.findByRole<HTMLButtonElement>('button', { name: 'Add key' })
     await waitFor(() => { expect(adding.disabled).to.be.false })
     const backend = screen.getByRole<HTMLInputElement>('checkbox', { name: 'Backend online' })
     fireEvent.click(backend)
@@ -51,8 +53,8 @@ describe("App", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText(/backend is switched off/)
     fireEvent.click(backend)
-    fireEvent.click(screen.getByRole('button', { name: 'Add key' }))
+    fireEvent.click(flow.getByRole('button', { name: 'Add key' }))
     await TH.answerPassphraseDialog()
-    await screen.findByRole('button', { name: 'Save' })
+    await flow.findByRole('button', { name: 'Save' })
   })
 })

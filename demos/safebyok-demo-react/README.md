@@ -38,6 +38,10 @@ through [src/lib/anthropic.ts](src/lib/anthropic.ts):
   the key sits in a field that `safebyok/dom` fills and saves, so it never passes through React.
   *Add key* builds and unlocks the vault as needed and shows the field; *Save* stores it; *Done*
   hides it again.
+* **With an exposed whisper** ([src/components/KnockKnockExposed.tsx](src/components/KnockKnockExposed.tsx)):
+  an ordinary controlled field over `useWhisper(box)`; typing is `box.patchWhisper`, *Save* is
+  `box.putExposed`, and leaving the page is `box.unexpose`. Both flows share one Box, so *Add key*
+  or *Edit key* in either shows the key in both, and *Done* hides it in both.
 
 The aside, *Behind the scenes*, is for developers: its *Backend online* switch
 ([src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts)) takes the vaultDB offline, so every

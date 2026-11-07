@@ -1,26 +1,16 @@
-import { useId, useState, useSyncExternalStore } from 'react'
-import type { Box } from 'safebyok'
+import { useId, useState } from 'react'
 import { BoxFields } from 'safebyok/dom'
 import { BoxWhisperField, useBank, useBox, useVault } from 'safebyok-react'
+import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
+import { ApiKeyBoxlabel, ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
-
-const Vaultlabel = 'main'
-const Boxlabel = 'anthropic_api_key'
-
-const unsubscribeFromNothing = () => { /* nothing was heard */ }
-const subscribeToNothing = () => unsubscribeFromNothing
-
-/** Whether `box` shows its whisper, read live; false for no box. */
-const useIsShowing = (box: Box | null): boolean => (
-  useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.isShowing ?? false)
-)
 
 /** The knock-knock machine with its API key in a field safebyok fills and reads, so the key never passes through React. */
 export const KnockKnockFields = () => {
   const bank = useBank()
-  const { stage, vault } = useVault(Vaultlabel)
-  const box = useBox(Vaultlabel, Boxlabel)
+  const { stage, vault } = useVault(ApiKeyVaultlabel)
+  const box = useBox(ApiKeyVaultlabel, ApiKeyBoxlabel)
   const isShowing = useIsShowing(box)
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
@@ -39,31 +29,13 @@ export const KnockKnockFields = () => {
   }
 
   // Each dialog opens on the click: building the vault, unlocking it.
-  const edit = () => perform(async () => {
-    if (bank === null) { return }
-    const vault = await bank.ensureVault({ vaultlabel: Vaultlabel })
-    await vault.ensureUnlocked()
-    const editing = await vault.putBox({ boxlabel: Boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })
-    // Exposed before a lock, it holds what was typed: an unlock alone brings the edit back.
-    if (! editing.snapshot.exposed) { await editing.expose() }
-  })
+  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank) } })
 
   const save = () => perform(async () => {
     if (box === null) { return }
     await BoxFields.of(box).save()
     setIsSaved(true)
   })
-
-  // What the knock reads is the whisper as saved, never an edit still in the field, and it leaves the field as it was.
-  // The vault in hand, never bank.ensureVault: a knock with no vault builds none.
-  const extractApiKey = async (): Promise<string | null> => {
-    if (vault === null) { return null }
-    await vault.ensureUnlocked()
-    const stored = await vault.getBox(Boxlabel, { ifAbsent: 'nil' })
-    if (stored === null) { return null }
-    const { apiKey } = await stored.extractWhisper()
-    return ((typeof apiKey === 'string') && (apiKey !== '')) ? apiKey : null
-  }
 
   const done = () => perform(() => box?.unexpose())
 
@@ -89,7 +61,7 @@ export const KnockKnockFields = () => {
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm extractApiKey={extractApiKey} isReady={isReady} />
+      <KnockForm extractApiKey={() => extractSavedApiKey(vault)} isReady={isReady} />
     </section>
   )
 }
