@@ -13,3 +13,4 @@ The GraphQL schema is typed, and `GraphQLVaultDB` is a client of it checked by t
 * Breaking: the schema is rewritten, and `safebyokTidyGone` and `safebyokHeard` are gone.
 * Breaking: `VaultFieldArgs` holds each root field's typed arguments, keyed by the field's name.
 * Breaking: `GraphQLVaultDB` no longer extends `VaultDB`, and takes `{ client }` alone, refusing `maxRecordBytes` as `bad_option`: a record's size is the server's store to cap.
+* Breaking: the `graphql` peer range is `^17.0.0`. The scalars use graphql 17's coercion hooks, which graphql 16 ignores, so on 16 the time scalar would check nothing.
