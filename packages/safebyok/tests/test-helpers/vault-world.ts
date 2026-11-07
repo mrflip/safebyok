@@ -105,8 +105,11 @@ const makeDeviceDB = () => {
     peek:      vi.spyOn(memoryDB, 'peek'),
     tryStow:   vi.spyOn(memoryDB, 'tryStow'),
     tryForget: vi.spyOn(memoryDB, 'tryForget'),
-    cachedNow: (): unknown => [...rows.values()][0] ?? null,
-    layCached: (record: unknown) => { rows.set([...rows.keys()][0] ?? 'no-row', record) },
+    cachedNow: (): unknown => [...rows.values()][0]?.row ?? null,
+    layCached: (record: unknown) => {
+      const [ckey, filed] = [...rows][0] ?? ['no-row', { scopepath: ['no', 'row', 'here'] }]
+      rows.set(ckey, { scopepath: filed.scopepath, row: record })
+    },
   }
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>

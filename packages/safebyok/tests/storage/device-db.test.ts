@@ -31,7 +31,7 @@ describe("a deviceDB whose store throws", () => {
       ['peek',       await TH.expectBad(deviceDB.tryPeek(asked), 'storage_unavailable')],
       ['forget',     await TH.expectBad(deviceDB.tryForget(asked), 'storage_unavailable')],
       ['listLeases', await TH.expectBad(deviceDB.tryListLeases(), 'storage_unavailable')],
-      ['delRawLease', await TH.expectBad(deviceDB.tryDelRawLease(asked), 'storage_unavailable')],
+      ['delRawLease', await TH.expectBad(deviceDB.tryDelRawLease(['acme', 'u1', 'main']), 'storage_unavailable')],
       ['ensureBank', await TH.expectBad(deviceDB.tryEnsureBank(asked), 'storage_unavailable')],
       ['listRawBanks', await TH.expectBad(deviceDB.tryListRawBanks(), 'storage_unavailable')],
     ] as const

@@ -44,8 +44,8 @@ export type { AdapterVaultDBOpts, Capacity, DelOpts, IfAbsentOpts, MemoryVaultDB
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'
-export { leaseQuery, leaseDated, leaseRow, bankRow } from '../shapes/shapes-storage'
-export type { BankRow, LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+export { leaseQuery, leaseDated, leaseRow, leaseScopepath, bankRow } from '../shapes/shapes-storage'
+export type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 // --
 
 // == [Answers off a wire]: the checks a client of a vaultDB parses each answer with, an absent field arriving as null
