@@ -50,7 +50,8 @@ export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'reques
 /** The props the provider reads only as it makes its bank, as `props` has them; a handler counts only as there or not. */
 const fixedPropsOf = (props: BankProviderProps) => {
   const { vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = props
-  return { vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews: typeof onBadNews === 'function', onPanic: typeof onPanic === 'function' }
+  // `satisfies` fails the build if a Bank.make option is ever added and not compared here.
+  return { vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews: typeof onBadNews === 'function', onPanic: typeof onPanic === 'function' } satisfies Record<keyof Omit<BankOpts, 'applabel' | 'user_id' | 'device_id' | 'requestCleartext'>, unknown>
 }
 
 /** Make the signed-in user's bank, once per `applabel` and `user_id`, say hello, and hand it down to the hooks. */
