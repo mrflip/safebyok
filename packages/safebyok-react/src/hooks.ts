@@ -57,7 +57,7 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 }
 // --
 
-// == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useWhisper, NoBoxBag
+// == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useBoxIsShowing, useWhisper, NoBoxBag
 
 /** The snapshots of the boxes in the signed-in user's vault under `vaultlabel`, or null while it is not `present`. */
 export const useBoxes = (vaultlabel: string): readonly BoxSnapshot[] | null => {
@@ -81,6 +81,11 @@ export const useBox = (vaultlabel: string, boxlabel: string): Box | null => {
 /** The live snapshot of `box`, or null for no box. */
 export const useBoxSnapshot = (box: Box | null): BoxSnapshot | null => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, box?.getSnapshot ?? getNothing, getNothing)
+)
+
+/** Whether `box` shows its whisper, read live; false for no box. */
+export const useBoxIsShowing = (box: Box | null): boolean => (
+  useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.isShowing ?? false, () => false)
 )
 
 // Symbol.for, so the core's own check of a bag knows this one.
