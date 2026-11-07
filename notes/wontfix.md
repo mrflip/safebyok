@@ -43,7 +43,7 @@ not as a settled ruling, and check it against the current design before relying 
   call before making the next.
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused erase of a cached lease is not
   retried.** `Lease.buildFromCache` meeting a row of another epoch erases the deviceDB's record
-  once (`tryUncacheLease`); a refusal is warned of and left. The record is unusable either way, and
+  once (`tryForgetLease`); a refusal is warned of and left. The record is unusable either way, and
   the next grant writes over it. A `lock()`'s own refused erase is told as a panic (`vault.#panic`).
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **no autolock timer past the Trigger's cap.**
   A lease whose `autolock_at` lies more than `MaxTimerMillis` (about 24.5 days) away arms no
@@ -51,7 +51,7 @@ not as a settled ruling, and check it against the current design before relying 
   `vault_locked`, once the clock passes its `autolock_at`.
 * 2026-10-31 (the Coach, newvault sprint): **a lease's `vacate()` whose device erase is refused
   is not retried.** `vacate()` drops the lease's keys and record, then erases the deviceDB's record
-  once (`tryUncacheLease`); a refusal is thrown from `vacate()`, and a second `vacate()` on the same
+  once (`tryForgetLease`); a refusal is thrown from `vacate()`, and a second `vacate()` on the same
   lease erases nothing, as it already dropped its record. The entry on a refused erase of a cached
   lease covers the refused erase on `Lease.buildFromCache`; this one covers `vacate()` itself. The deviceDB is
   a cache, and the next session asks for the passphrase. Pinned by
@@ -114,3 +114,22 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-06 (a review of #505, the Coach: "add the row"): **two copies of `safebyok/dom` in one page.** `BoxFields.of` keeps one `BoxFields` per box
   in a module-level map, one per copy of the module. A page that loads `safebyok/dom` both as ESM and as CommonJS gives a box two `BoxFields`,
   each with its own fields and its own last unbind, so the box unexposes when either copy's last field unbinds.
+* 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, the Convex field-name row): **Convex refuses a field name that starts with `$` or holds a
+  non-ASCII character, at any depth of a record.** A sidecar or a record's own field named so is refused by Convex, and the call fails as
+  `storage_unavailable`. Convex's docs add other names it will not take: empty, or starting with `_`; nesting past 16 levels; more than 1024
+  entries in one object. The core does not check for any of these before the call.
+* 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, the GraphQL stream row): **the GraphQL stream stops on a best-effort basis.** The server's
+  resolvers ask `userIdOf` again on each notice, so an idle stream stays open until its next change, and a `userIdOf` that does not look the
+  session up live (a cached or decoded token) gives no stop at all.
+* 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, "A Convex vault full of tombstones needs a delVault": "publicize and accept"): **a Convex
+  vault whose deleted boxes fill its cap refuses new box labels until the vault is deleted.** A deleted box leaves its tombstone, which counts
+  toward the vault's box cap as a live box does; only a put under a label already held takes a tombstone's row back. The Convex README says so.
+* 2026-11-07 (the Coach, devicedb_idb, on a damaged lease row outliving a vacate: "I predict trouble when multiple tabs have the
+  same lease. Mark anything like this wontfix. We will in future have tabs notify but store independently, how I don't know."):
+  **a lease row that fails its check is neither listed nor forgotten.** `DeviceDB.listLeases` leaves it out and `DeviceDB.forget`
+  leaves it standing, as it holds no `vault_tok` to match, so a vacate or a `bank.autolock` never erases it; it stays until a later
+  stow over its scope; `DeviceDB.listRawLeases` shows it, and a host deletes it with `DeviceDB.delRawLease`. Also: **tabs sharing one device store's leases are undefined.** Every tab of an origin opens the same
+  `IdbDeviceDB` database, so one tab's stow, forget or vacate lands under another's lease unannounced.
+* 2026-11-07 (devicedb_idb, the device database's wipe): **a tab holding an old device database open keeps it.** `IdbDeviceDB`
+  deletes the databases of an older version unread on its first call, and a tab of an older release still holding one open blocks
+  that delete; the database goes once that tab closes and a later page load deletes it again.

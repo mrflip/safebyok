@@ -87,10 +87,13 @@ export const ListingExpected = "Expected a Listing"
 export const VaultErrorExpected = "Expected a VaultError"
 // --
 
-// == [Passphrases]: PassphraseNotText
+// == [Passphrases]: PassphraseNotText, passphraseSaltShape
 
 /** A passphrase handed over as anything but text. */
 export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
+
+/** A passphrase wayin's salt that is not base64url text of `minBytes` to `maxBytes` bytes. */
+export const passphraseSaltShape = (minBytes: number, maxBytes: number): string => `A passphrase salt is base64url text of ${String(minBytes)} to ${String(maxBytes)} bytes`
 // --
 
 // == [Passkeys]: PasskeyAnswerUsed, prfSaltNotFresh
@@ -328,7 +331,7 @@ export const RecordOfOtherScope = "Storage answered with a record whose scope is
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, UndecodedSalt, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
 export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -350,6 +353,9 @@ export const OtherPrfSalt = "The passkey answered for a different salt than this
 
 /** Why a passphrase wayin made under another key deriver than the world's is not tried. */
 export const UnknownKeyDeriver = "This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made."
+
+/** Why a stored passphrase wayin whose salt is not base64url text of whole bytes is refused: its record is damaged. */
+export const UndecodedSalt = "This vault's stored passphrase salt is not valid base64url text: its record is damaged."
 
 /** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
 export const notKeyBytes = (count: number): string => `The keyDeriver handed back something other than ${String(count)} fresh key bytes.`
@@ -531,11 +537,29 @@ export const storeFailed = (call: string, named: string): string => `This device
 export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
 // --
 
-// == [Refusals: storage backends]: storageFailed, IdentityRevoked
+// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed
 
 /** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
 export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
 
 /** A storage backend that no longer serves the user the call names. */
 export const IdentityRevoked = "The vault's storage no longer serves this user: they signed out, or another user signed in. Open the vault again for the user signed in."
+
+/** A context with no browser store (IndexedDB) at all. */
+export const NoBrowserStore = "This context has no IndexedDB, so the vault has nowhere to keep its rows: run it in a browser that offers IndexedDB."
+
+/** A browser store's transaction aborted before it committed. */
+export const TransactionAborted = "An IndexedDB transaction was aborted before it committed, and wrote nothing: try again."
+
+/** A browser store's database closed under the vault. */
+export const DatabaseClosed = "The vault's IndexedDB database was closed under it, by the browser or another tab upgrading it: reload the page."
+
+/** A browser store the page is not allowed to use. */
+export const StorageWithheld = "The browser withholds IndexedDB from this page (site data blocked, or a private window that keeps none), so the vault has nowhere to keep its rows."
+
+/** A browser store failing in a way none of the others names. */
+export const BrowserStoreFailed = "IndexedDB failed while the vault was reading or writing its rows: try again shortly. IndexedDB's own error is this error's cause."
+
+/** A GraphQL server whose answer lacks the field asked for. */
+export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?"
 // --

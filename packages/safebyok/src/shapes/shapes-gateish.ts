@@ -242,8 +242,8 @@ export const leaseFriend = objCheck(({ fn }) => ({
   tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
   /** Cache a lease's record on this device, in place of any it held. */
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
-  /** Drop the lease this device has cached. */
-  tryUncacheLease: fn<() => Promise<Outcome<void>>>(),
+  /** Forget the lease this device has cached. */
+  tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })

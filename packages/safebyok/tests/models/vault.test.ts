@@ -72,7 +72,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
 
   it("refuses a deviceDB that is a duck of one, and a host's bare function or logger where the bank holds it guarded", () => {
     const { fakeBank, opts } = makeVaultWorld()
-    const duck = { tryPeek: vi.fn(), tryCache: vi.fn(), tryVacate: vi.fn() }
+    const duck = { tryPeek: vi.fn(), tryStow: vi.fn(), tryForget: vi.fn() }
     const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))
     expect(err.message).to.include(Phrases.DeviceDBExpected)
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, panic: vi.fn() as never }, opts))
@@ -86,20 +86,20 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
   it("grants the vault whose stamp the proving is of a lease, caching nothing of itself", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving(vault)
-    deviceDB.tryCache.mockClear()
+    deviceDB.tryStow.mockClear()
     const lease = await proving.buildLease(friend)
     expect(lease.isPresent).to.be.true
-    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.tryStow).not.toHaveBeenCalled()
     lease.evict()
   })
 
   it("refuses a vault of another stamp, before any key is touched", async () => {
     const { deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
-    deviceDB.tryCache.mockClear()
+    deviceDB.tryStow.mockClear()
     const err = await TH.expectRefusal(proving.buildLease(friend))
     expect(err.message).to.eq(Phrases.LeaseOfOtherVault)
-    expect(deviceDB.tryCache).not.toHaveBeenCalled()
+    expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 })
 
@@ -107,10 +107,10 @@ describe("the friend a vault hands its leases", () => {
   it("calls the deviceDB under the vault's own scope", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
     await friend.tryPeekLease()
-    await friend.tryUncacheLease()
+    await friend.tryForgetLease()
     const asked = { ...vault.scope, vault_tok: vault.vault_tok }
     expect(deviceDB.peek).toHaveBeenCalledWith(asked)
-    expect(deviceDB.tryVacate).toHaveBeenCalledWith(asked)
+    expect(deviceDB.tryForget).toHaveBeenCalledWith(asked)
   })
 })
 

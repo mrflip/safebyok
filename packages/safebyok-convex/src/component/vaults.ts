@@ -1,4 +1,4 @@
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type { PutOptsGiven, VaultScope, WatchScope } from 'safebyok/storage'
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
@@ -86,7 +86,7 @@ export const putBox = mutation({
     const life = lifeOf(record)
     const anteDoc = await findBoxDoc(ctx.db, life, record.boxlabel)
     const ante = anteDoc?.box ?? null
-    const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
+    const landed = DB.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
     if (! landed) { return { landed, ante, vault } }
     // Convex passes NaN as a number, and Math.min would carry it past the limit: no box count exceeds NaN.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
@@ -111,9 +111,9 @@ export const delVault = mutation({
   handler: async (ctx, { tombstone, opts: { prior } }) => {
     const anteDoc = await findVaultDoc(ctx.db, tombstone)
     const ante = anteDoc?.vault ?? null
-    const isOurs = SX.isLiveRowUnder(ante, tombstone.vault_tok)
-    const isDamaged = (ante !== null) && (! SX.vaultRow.safeParse(ante).success)
-    const landed = (isOurs && SX.isRowAt(ante, prior)) || SX.isDamagedVaultAt(ante, tombstone, prior)
+    const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
+    const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
+    const landed = (isOurs && DB.isRowAt(ante, prior)) || DB.isDamagedVaultAt(ante, tombstone, prior)
     // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
     if ((! landed) && (isOurs || isDamaged)) { return { landed, ante } }
     if (landed) { await storeVaultDoc(ctx.db, anteDoc, tombstone) }
@@ -132,8 +132,8 @@ export const delBox = mutation({
     const life = lifeOf(tombstone)
     const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
     const ante = anteDoc?.box ?? null
-    const isDeletable = (SX.isLiveRow(ante) && SX.isRowAt(ante, prior)) || SX.isDamagedBoxAt(ante, tombstone, prior)
-    const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+    const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
+    const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
     if (landed) {
       const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
       await storeBoxDoc(ctx.db, anteDoc, boxDoc)
@@ -154,7 +154,7 @@ export const tidyGone = mutation({
   handler: async (ctx, { scope }) => {
     const vaultDocs = await listVaultDocs(ctx.db, scope)
     const vaultsBylabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
-    const isOver = ({ vaultlabel, vault_tok }: Life) => SX.isLifeOver(vaultsBylabel.get(vaultlabel) ?? null, vault_tok)
+    const isOver = ({ vaultlabel, vault_tok }: Life) => DB.isLifeOver(vaultsBylabel.get(vaultlabel) ?? null, vault_tok)
     const boxDocs = await listBoxDocs(ctx.db, scope)
     const tallyDocs = await listTallyDocs(ctx.db, scope)
     const overBoxDocs = boxDocs.filter((boxDoc) => isOver(boxDoc))
@@ -185,7 +185,7 @@ export const watchRows = query({
 
 /** True when a put under `opts` may land over `ante`, the row it would replace. */
 const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
+  DB.isRowAt(ante, prior) && (DB.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
 )
 
 /** The life a record is filed under. */
@@ -206,7 +206,7 @@ const findBoxDoc = async (db: DatabaseReader, { applabel, user_id, vaultlabel, v
 )
 
 /** Store `vault` in place of `anteDoc`, or as a new document. */
-const storeVaultDoc = async (db: DatabaseWriter, anteDoc: VaultDoc | null, vault: SX.VaultRecord | SX.VaultTombstone): Promise<void> => {
+const storeVaultDoc = async (db: DatabaseWriter, anteDoc: VaultDoc | null, vault: DB.VaultRecord | DB.VaultTombstone): Promise<void> => {
   const { applabel, user_id, vaultlabel } = vault
   if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { applabel, user_id, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault }) }
 }
@@ -220,7 +220,7 @@ const storeBoxDoc = async (db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: B
 const tombstoneBoxes = async (db: DatabaseWriter, life: Life, written_at: number): Promise<void> => {
   const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(db, life).collect()
   await Promise.all(boxDocs.map(async (boxDoc) => {
-    const boxTombstone = SX.boxTombstoneOf(boxDoc.box, written_at)
+    const boxTombstone = DB.boxTombstoneOf(boxDoc.box, written_at)
     if (boxTombstone !== null) { await db.patch('safebyok_boxes', boxDoc._id, { box: boxTombstone }) }
   }))
   await Tallies.drop(db, life)

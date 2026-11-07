@@ -8,17 +8,23 @@ import type * as Z from 'zod'
 import { FarFuture, FarPast } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 
-// == [Labels]: MaxLabelChars, LabelPattern, label, MaxUserIdChars, UserIdPattern, user_id
+// == [Patterns and labels]: Patterns, MaxLabelChars, label, MaxUserIdChars, user_id
+
+/** The patterns text is matched against: a `source` suits an HTML input's `pattern` attribute, and none has a repeated group, so each refuses text of millions of characters without throwing.
+ *
+ * @example <input pattern={Patterns.label.source} maxLength={MaxLabelChars} />
+ */
+export const Patterns = Object.freeze({
+  /** Base64url text without padding: the letters, the digits, `-` and `_`. */
+  b64url:  /^[A-Za-z0-9_-]+$/,
+  /** A label: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two characters at least. */
+  label:   /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/,
+  /** A user_id: ASCII letters and digits and `-_.~:@+|%`, never dots alone. */
+  user_id: /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/,
+})
 
 /** The most characters a label holds. */
 export const MaxLabelChars = 40
-
-/** The pattern a label matches, two characters at least: its `source` suits an HTML input's `pattern` attribute.
- * It has no repeated group, so it refuses text of millions of characters without throwing.
- *
- * @example <input pattern={LabelPattern.source} maxLength={MaxLabelChars} />
- */
-export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
 
 /** An applabel, a vaultlabel or a boxlabel: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two to {@link MaxLabelChars} characters.
  * Check a label a user types with `safeParse` before handing it to the vault, which refuses one
@@ -28,13 +34,10 @@ export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
  * @example label.safeParse('0__b_').success               // false three ways: a digit first, '__' inside, '_' last
  * @example label.safeParse('0__b_').error?.issues.length  // 1: one sentence names every rule, so show it whole
  */
-export const label = str().max(MaxLabelChars, Phrases.labelTooLong(MaxLabelChars)).regex(LabelPattern, Phrases.LabelShape)
+export const label = str().max(MaxLabelChars, Phrases.labelTooLong(MaxLabelChars)).regex(Patterns.label, Phrases.LabelShape)
 
 /** The most characters a user_id holds. */
 export const MaxUserIdChars = 100
-
-/** The characters a user_id is made of, ASCII letters and digits and `-_.~:@+|%`, and never dots alone. Its `source` suits an HTML input's `pattern`. */
-export const UserIdPattern = /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/
 
 /** A user_id: 1 to {@link MaxUserIdChars} of ASCII letters, digits and `-_.~:@+|%`, never dots alone, opaque, compared byte for byte.
  * Those cover an email address and the common identity providers' ids; percent-encode (RFC 3986)
@@ -44,7 +47,7 @@ export const UserIdPattern = /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/
  * @example user_id.safeParse('auth0|5f7c8ec7').success      // true
  * @example user_id.safeParse('a/b').success                 // false: percent-encode it, 'a%2Fb'
  */
-export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true }).max(MaxUserIdChars, Phrases.userIdTooLong(MaxUserIdChars)).regex(UserIdPattern, Phrases.UserIdChars)
+export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true }).max(MaxUserIdChars, Phrases.userIdTooLong(MaxUserIdChars)).regex(Patterns.user_id, Phrases.UserIdChars)
 // --
 
 // == [Instants]: epochMillis, EpochMillis

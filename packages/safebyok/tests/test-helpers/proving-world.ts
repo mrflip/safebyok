@@ -50,7 +50,7 @@ export type FakeLeaseFriend = LeaseFriend & {
   lock:            Mock<() => void>
   tryPeekLease:    Mock<LeaseFriend['tryPeekLease']>
   tryCacheLease:   Mock<LeaseFriend['tryCacheLease']>
-  tryUncacheLease: Mock<LeaseFriend['tryUncacheLease']>
+  tryForgetLease:  Mock<LeaseFriend['tryForgetLease']>
   tellBadNews:     Mock<LeaseFriend['tellBadNews']>
   /** The record the slot holds, null for none. Set it to seed one, whatever it is. */
   cached:          unknown
@@ -75,7 +75,7 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
       friend.cached = record
       return Promise.resolve(good(record))
     }),
-    tryUncacheLease: vi.fn(() => {
+    tryForgetLease:  vi.fn(() => {
       friend.cached = null
       return Promise.resolve(good(undefined))
     }),

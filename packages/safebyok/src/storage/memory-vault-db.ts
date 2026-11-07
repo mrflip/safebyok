@@ -69,7 +69,8 @@ export class MemoryVaultDB extends VaultDB {
     this.#tell(record, { vault, box: row })
   }
 
-  /** Demands room in the vault for a new live box, under its `maxBoxes`. */
+  // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
+  /** Demands room in the vault for a new live box, under its soft cap `maxBoxes`. */
   #demandRoom(boxrows: Map<string, unknown>, ante: unknown): void {
     if (SX.isLiveRow(ante)) { return }
     const used = [...boxrows.values()].filter((box) => SX.isLiveRow(box)).length

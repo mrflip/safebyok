@@ -1,7 +1,7 @@
 /** SafebyokComponent: the host's functions serve each call to the user it names, and to no one else. */
 
 import { describe, expect, it } from 'vitest'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import { SafebyokComponent } from '../src/server'
 import * as TH from './test-helpers'
 
@@ -13,7 +13,7 @@ type Caller = ReturnType<Backend['withIdentity']>
 const vault = TH.vaultAt()
 const box = TH.boxAt()
 const otherBox = TH.boxAt(0, vault.vault_tok, { boxlabel: 'other' })
-const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const vaultQuery = { ...TH.vaultScope, vault_tok: vault.vault_tok }
 
 /** A backend where u1 has a vault and one box in it, written as u1. */
@@ -33,8 +33,8 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['getBox',     (caller) => caller.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })],
   ['putVault',   (caller) => caller.mutation(api.safebyok.putVault, { record: vault, opts: birth })],
   ['putBox',     (caller) => caller.mutation(api.safebyok.putBox, { record: otherBox, opts: birth })],
-  ['delBox',     (caller) => caller.mutation(api.safebyok.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: SX.revisionOf(box) } })],
-  ['delVault',   (caller) => caller.mutation(api.safebyok.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: SX.revisionOf(vault) } })],
+  ['delBox',     (caller) => caller.mutation(api.safebyok.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: DB.revisionOf(box) } })],
+  ['delVault',   (caller) => caller.mutation(api.safebyok.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: DB.revisionOf(vault) } })],
   ['tidyGone',   (caller) => caller.mutation(api.safebyok.tidyGone, { scope: TH.bankScope })],
   ['watchRows',  (caller) => caller.query(api.safebyok.watchRows, { scope: TH.bankScope })],
 ]

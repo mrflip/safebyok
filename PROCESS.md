@@ -139,8 +139,9 @@ dependency, so a `VaultError` is one class across them, and joins the `fixed` gr
 `.changeset/config.json` (a test refuses a public package left out). `safebyok-indexeddb`'s
 README is written as the template for a storage adapter.
 
-`safebyok-old` is the exception: the old design, private, kept until the adapters and the demo move
-to the new core. Until then they peer on it, not on `safebyok`.
+`safebyok-old` is the exception: the old design, private, kept until the demo and `safebyok-react`
+move to the new core. Until then they, and `safebyok-idb-old`, peer on it; the storage adapters and
+`safebyok-fastkey` peer on `safebyok`.
 
 ## Releases
 

@@ -57,11 +57,15 @@ is a bug.
   | `VX`  | `src/shapes/shapes-vaultish.ts`                 |
   | `KX`  | `src/deriver/shapes.ts`                         |
   | `CVX` | safebyok-convex's `src/component/validators.ts` |
+  | `DB`  | `safebyok/storage`, the adapters' door          |
 
   Not the Startcase name above, which would collide with `Box`, `Vault` and `KeyDeriverSpec`.
   Outside the core, the main entry exports each validator by name and holds no namespace of
   them: a file that reaches many star-imports it as `Safebyok` (`import * as Safebyok from
-  'safebyok'`, then `Safebyok.vaultRecord`). With the validator out of the file's scope, a local
+  'safebyok'`, then `Safebyok.vaultRecord`). The storage validators (scopes, queries, records,
+  rows, options) are exported from `safebyok/storage` instead, which an adapter and its tests
+  star-import as `DB` (`DB.vaultRow`, `DB.putOpts`): `X` is the prefix of a validator module
+  of our own, and `DB` is a door. With the validator out of the file's scope, a local
   or parameter keeps its VOCABULARY.md name: `Box.seal(vault, props, whisper)`, a mock's
   `vaultRecord`.
 * **The core's `src/shapes/` holds the validators a module exports**, one module to a concern,

@@ -1,7 +1,7 @@
 import { Checkers, consistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { PassphraseKeyBytes, brandGuarded } from '../helpers/consts'
-import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
+import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
 import { outcomeOf, valOf } from '../refusals/outcome'
@@ -11,7 +11,7 @@ import * as CX from '../shapes/shapes-core'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs } from '../shapes/shapes-gateish'
-import { keyDeriverLoadFailed, keyDeriverThrew, leaseOfOtherVault, noPasskeyWayin, notKeyBytes, otherPasskey, otherPrfSalt, provingOfOtherVault, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
+import { keyDeriverLoadFailed, keyDeriverThrew, leaseOfOtherVault, noPasskeyWayin, notKeyBytes, otherPasskey, otherPrfSalt, provingOfOtherVault, undecodedSalt, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
 import { Lease } from './lease'
 import { Wayin, wayinCtxOf } from './wayin'
 
@@ -138,7 +138,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const { gate: { stamp, gate_epoch, passphrase_wayin }, passphraseClear: typed } = passphraseStoredArgs.parse({ gate, passphraseClear, world })
     const { vault_key_wayin_wrapped: _wrapped, ...header } = passphrase_wayin
     if (header.key_deriver_label !== world.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
-    const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
+    const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, saltBytesOf(header.salt_b64))
     const proving = new PassphraseProving(stamp, gate_epoch, header, passphraseKey, new Wayin(passphrase_wayin))
     await proving.checkOpens(wrongPassphrase)
     return proving
@@ -228,7 +228,7 @@ const deriveKeyBytes = async (hostDeriver: KeyDeriver, passphrase: GX.Passphrase
 }
 // --
 
-// == [Key bytes]: isSharedMemory, isSafelyAllZero, passphraseKeyOf
+// == [Key bytes]: isSharedMemory, isSafelyAllZero, saltBytesOf, passphraseKeyOf
 
 const isSharedMemory = (view: ArrayBufferView): boolean => Object.prototype.toString.call(view.buffer) === '[object SharedArrayBuffer]'
 
@@ -244,6 +244,13 @@ const isSafelyAllZero = (bytes: Uint8Array): boolean => {
     seen |= bytes[ii]
   }
   return seen === 0
+}
+
+// The record's check settles the salt's characters and length, but not whether they decode: a length no unpadded base64url has, or stray bits in the last character.
+const saltBytesOf = (salt_b64: string): Uint8Array => {
+  const saltBytes = fromB64OrNull(salt_b64)
+  if (saltBytes === null) { throw undecodedSalt() }
+  return saltBytes
 }
 
 const passphraseKeyOf = async (keyDeriver: GuardedKeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<CryptoKey> => {

@@ -101,7 +101,8 @@ operations it knows.
 
 A refusal crosses as a GraphQLError with its message and `extensions: { kind }`, with `capacity`
 for `vault_full` and `fieldnames` where it names fields, and the browser throws it again as that
-VaultError. **Nothing else of an error crosses.** A driver's message, or anything your `userIdOf`
+VaultError. The box cap is the `maxBoxes` of the vaultDB behind your resolvers, a best-effort
+limit: exact at moderate write rates, never a strict one. **Nothing else of an error crosses.** A driver's message, or anything your `userIdOf`
 throws, stays on the server as the GraphQLError's `cause`, for your logs; the browser hears
 `storage_unavailable` or `unexpected_error`. A network failure, or an error the resolvers did not
 send, is `storage_unavailable` in the browser.

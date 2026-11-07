@@ -48,10 +48,12 @@ it names are the old design's (`putWayin`, `getWhisper`): for calls, trust the t
 
 ```ts
 import { Bank } from 'safebyok'
+import { idbDeviceDB } from 'safebyok/browser'
 
 const bank = Bank.make({
   applabel: 'acme', user_id: session.user_id,
-  vaultDB, deviceDB, keyDeriver, strengthChecker, // none has an export yet: see below
+  vaultDB, keyDeriver, strengthChecker, // see below
+  deviceDB: idbDeviceDB(),
   requestCleartext: async (gating) => {
     if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
     while (gating.isOpen) { // a wrong passphrase leaves it open
@@ -165,8 +167,8 @@ merges deeply, and an array replaces.
 
 **A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
 `Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
-`safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. Nothing exports a `VaultDB`, a `DeviceDB`, a real key deriver or
-strength checker; the only stores are in-memory ones the tests reach in for.
+`safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers and
+`idbDeviceDB`, the device store in IndexedDB. Nothing in the core exports a `VaultDB` or a strength checker.
 
 ## Next
 

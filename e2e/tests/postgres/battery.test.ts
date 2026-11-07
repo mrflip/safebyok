@@ -2,7 +2,7 @@
 /** The VaultDB battery over a real Postgres through `pg`, each store a pool and a listener of its own, and its watch heard across servers. */
 
 import { expect, it, onTestFinished, vi } from 'vitest'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type { Notice } from 'safebyok/storage'
 import type { PostgresVaultDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
@@ -16,7 +16,7 @@ const remembered = (vaultDB: PostgresVaultDB, opts: TH.StoreOpts): PostgresVault
   return vaultDB
 }
 
-const watching = (vaultDB: PostgresVaultDB, scope: SX.WatchScope = TH.vaultScope): Notice[] => {
+const watching = (vaultDB: PostgresVaultDB, scope: DB.WatchScope = TH.vaultScope): Notice[] => {
   const notices: Notice[] = []
   const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
   onTestFinished(unwatch)
@@ -39,8 +39,8 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     const vault = TH.vaultAt()
     const box = TH.boxAt(0, 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
 
-    await other.putVault(vault, { prior: SX.VoidRevision })
-    await other.putBox(box, { prior: SX.VoidRevision })
+    await other.putVault(vault, { prior: DB.VoidRevision })
+    await other.putBox(box, { prior: DB.VoidRevision })
 
     await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
     expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
@@ -53,7 +53,7 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     await TH.aWhile()  // a watch's first LISTEN races the writes made just after it
     const vault = TH.vaultAt(0, 'life1', { user_id })
     const other = await TH.storeOver(db)
-    await other.putVault(vault, { prior: SX.VoidRevision })
+    await other.putVault(vault, { prior: DB.VoidRevision })
     await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
   })
 })

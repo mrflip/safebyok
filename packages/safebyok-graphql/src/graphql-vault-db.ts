@@ -1,5 +1,5 @@
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type { BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfVault, Tidied, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 
 // == [Operations]: VaultOperations
@@ -43,7 +43,7 @@ export const VaultOperations = {
 
 // An answer of the wrong shape is a server serving some other schema, or none: the rows inside it
 // are left unknown, for the base class to check as it checks every store's.
-const answers = SX.Checkers('record_conflict', ({ obj, arr, str, unk, bool, uint }) => {
+const answers = DB.Checkers('record_conflict', ({ obj, arr, str, unk, bool, uint }) => {
   const rowsOfVault  = arr(obj({ vaultlabel: str, vault: unk }))
   const boxesFetched = obj({ vault: unk, boxes: arr(obj({ boxlabel: str, box: unk })) })
   const boxFetched   = obj({ vault: unk, box: unk })
@@ -55,9 +55,9 @@ const answers = SX.Checkers('record_conflict', ({ obj, arr, str, unk, bool, uint
 })
 
 /** A refusal as the server's resolvers send one in a GraphQL error's `extensions`. */
-const refusalSent = SX.objCheck(({ oneof, arr, str }) => ({
-  kind:       oneof(SX.refusalkindVals),
-  capacity:   SX.capacity.optional(),
+const refusalSent = DB.objCheck(({ oneof, arr, str }) => ({
+  kind:       oneof(DB.refusalkindVals),
+  capacity:   DB.capacity.optional(),
   fieldnames: arr(str).optional(),
 }), { refusalkind: 'record_conflict', extras: 'strip' })
 // --
@@ -68,7 +68,7 @@ const refusalSent = SX.objCheck(({ oneof, arr, str }) => ({
 export type GraphQLVaultClient = Pick<Client, 'query' | 'mutation' | 'subscription'>
 
 /** What a {@link GraphQLVaultDB} is made with: your app's urql Client, pointed at a server serving `vaultResolvers`. */
-export type GraphQLVaultDBOpts = SX.VaultDBOpts & { client: GraphQLVaultClient }
+export type GraphQLVaultDBOpts = DB.VaultDBOpts & { client: GraphQLVaultClient }
 
 const isGraphQLVaultClient = (candidate: unknown): candidate is GraphQLVaultClient => (
   (typeof candidate === 'object') && (candidate !== null)
@@ -78,13 +78,13 @@ const isGraphQLVaultClient = (candidate: unknown): candidate is GraphQLVaultClie
 )
 
 // `custom` hands back the very client given, so its methods keep their `this`.
-const graphQLVaultDBOpts = SX.objCheck(({ custom }) => ({
-  ...SX.vaultDBOpts.shape,
+const graphQLVaultDBOpts = DB.objCheck(({ custom }) => ({
+  ...DB.vaultDBOpts.shape,
   client: custom<GraphQLVaultClient>(isGraphQLVaultClient, 'Expected an urql Client, with query, mutation and subscription functions'),
 }), 'bad_option')
 
 /** A vaultDB in the browser whose storage is your GraphQL server: `new GraphQLVaultDB({ client })`. */
-export class GraphQLVaultDB extends SX.VaultDB {
+export class GraphQLVaultDB extends DB.VaultDB {
   // == [Props]: #client
 
   readonly #client: GraphQLVaultClient
@@ -169,20 +169,20 @@ const fieldOf = (result: OperationResult, field: string): unknown => {
   if (result.error !== undefined) { throw refusalOf(result.error) }
   const data = result.data as Record<string, unknown> | null | undefined
   if ((data === null) || (data === undefined) || ! Object.hasOwn(data, field)) {
-    throw new SX.VaultError('record_conflict', "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?")
+    throw new DB.VaultError('record_conflict', DB.SchemaNotServed)
   }
   return data[field]
 }
 
 /** The refusal a failed operation stands for: the one the server's resolvers sent, or else `storage_unavailable`, urql's error its cause. */
-const refusalOf = (err: CombinedError): SX.VaultError => {
+const refusalOf = (err: CombinedError): DB.VaultError => {
   for (const { message, extensions } of err.graphQLErrors) {
     const sent = refusalSent.safeParse(extensions)
     if (sent.success) {
       const { kind, capacity, fieldnames } = sent.data
-      return new SX.VaultError(kind, message, { meta: { ...(capacity && { capacity }), ...(fieldnames && { fieldnames }) }, cause: err })
+      return new DB.VaultError(kind, message, { meta: { ...(capacity && { capacity }), ...(fieldnames && { fieldnames }) }, cause: err })
     }
   }
-  return SX.storageUnavailable(err)
+  return DB.storageUnavailable(err)
 }
 // --

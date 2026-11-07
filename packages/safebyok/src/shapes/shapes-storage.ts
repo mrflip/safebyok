@@ -1,7 +1,7 @@
 /** What the vaultDB and the deviceDB store and take, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
-import { Checker, Checkers, objCheck } from '../helpers/validator'
+import { Checkers, objCheck } from '../helpers/validator'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
@@ -171,7 +171,8 @@ export const vaultDBOpts = objCheck(({ num }) => ({
 /** The check of a memory vaultDB's options, refusing 'bad_option'. */
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({
   ...vaultDBOpts.shape,
-  /** The most live boxes one vault may hold; no limit by default. */
+  // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
+  /** A soft cap on the live boxes one vault holds; no limit by default. */
   maxBoxes: uint.optional(),
 }), 'bad_option')
 
@@ -303,7 +304,7 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, cutoff, LeaseQuery, LeaseDated, LeaseRow
+// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
 export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis }) => {
@@ -311,10 +312,8 @@ export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ ep
   return { leaseQuery: vaultQuery, leaseDated, leaseRow: leaseDated.loose() }
 })
 
-export const cutoff = Checker(({ epochMillis }) => epochMillis, 'bad_option')
-
 export type LeaseQuery   = Z.infer<typeof leaseQuery>
-/** A cached lease as the deviceDB dates it: its query and its `proved_at`. */
+/** A stowed lease as the deviceDB dates it: its query and its `proved_at`. */
 export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
 // --

@@ -62,7 +62,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const { vault, deviceDB } = await makeBornVault()
     expect(vault.isUnlocked).to.be.true
     expect(vault.lockState()).to.eq('unlocked')
-    expect(deviceDB.tryCache).toHaveBeenCalledOnce()
+    expect(deviceDB.tryStow).toHaveBeenCalledOnce()
     expect(deviceDB.cachedNow()).to.deep.include({ gate_epoch: vault.gate.gate_epoch, wayinkind: 'passphrase' })
     expect(await vault.ensureUnlocked()).to.equal(vault)
     expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
@@ -89,8 +89,8 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
-    expect(deviceDB.tryVacate).toHaveBeenCalledOnce()
-    expect(deviceDB.tryCache).toHaveBeenCalledTimes(2)
+    expect(deviceDB.tryForget).toHaveBeenCalledOnce()
+    expect(deviceDB.tryStow).toHaveBeenCalledTimes(2)
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
@@ -172,7 +172,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     const { vault, deviceDB } = await makeBornVault()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    const cached = TH.holdNextAnswer(deviceDB.memoryDB, 'tryCache')
+    const cached = TH.holdNextAnswer(deviceDB.memoryDB, 'tryStow')
     const unlocking = unlockTyping(vault, byPassphrase(Passphrase))
     await cached.reached
     expect(vault.isUnlocked).to.be.true
@@ -189,7 +189,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     const record = demandStored()
     const listing = new VaultListing(hearingBadNews(fakeBank, onBadNews), opts)
     const vault = await listing.build(record)
-    deviceDB.tryCache.mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the disk is full')))
+    deviceDB.tryStow.mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the disk is full')))
     vault.lock()
     await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
@@ -219,7 +219,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
 
-  it("takes up no lease cached under an older gate, and uncaches it: asking for the proof", async () => {
+  it("takes up no lease cached under an older gate, and forgets it: asking for the proof", async () => {
     const { vault, demandStored, anotherSession, deviceDB } = await makeBornVault()
     vault.lock()
     await unlockTyping(vault, byPassphrase(Passphrase))
@@ -269,7 +269,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     await TH.expectRefusal(again.sealStampedString('sk-test', Stamp), 'damaged_lease')
     expect(again.isLocked).to.be.true
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    expect(deviceDB.tryVacate).toHaveBeenCalledOnce()
+    expect(deviceDB.tryForget).toHaveBeenCalledOnce()
   })
 
   it("tells a row that is no lease as bad news and asks for the proof, leaving it to be cached over", async () => {

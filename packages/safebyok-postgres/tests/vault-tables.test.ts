@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import { VaultTablesSql } from '../src/index'
 import * as TH from './test-helpers'
 
@@ -34,7 +34,7 @@ describe("VaultTablesSql", () => {
 
   it("is safe to run again, keeping the rows already stored", async () => {
     const vaultDB = await TH.makeVaultDB()
-    await vaultDB.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     const db = await TH.database()
     await db.exec(VaultTablesSql)
     expect(await vaultDB.getVault(TH.vaultScope)).to.deep.include({ act: 'got', val: TH.vaultAt() })

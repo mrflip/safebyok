@@ -48,7 +48,7 @@ without the wrap's brand (`isGuarded`, `helpers/consts.ts`). `keyDeriver` is wra
 of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), the `askUser` a gating calls, which
 answers false for a throw and drops it, for `Gating.#askHost` to refuse as `requestCleartextThrew`. `onPanic`, which
 hears a refusal and no secret, is wrapped there too, by `guardOnPanic`. The `DeviceDB` (`storage/device-db-new.ts`, `storage/memory-device-db.ts`) stores the leaseKey
-opaque, and what a store throws is replaced at `storeFailed` (`refusals/throwers.ts`, by `DeviceDB`'s `adapted`),
+opaque, and what a store throws is replaced at `storeFailed` (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb),
 which keeps nothing of it (G8).
 
 ## The construction
@@ -92,9 +92,10 @@ Three layers hold key material, and the words for each matter.
   `crypto.ts` is the only module that calls `crypto.subtle`.
 * **IndexedDB** keeps a `CryptoKey` by structured clone: the handle survives a page load, its
   material still inside the browser, never as bytes JavaScript sees. The one key safebyok stores
-  this way is the leaseKey (`lease.cache`, through a `DeviceDB`'s `cache`). The core ships no IndexedDB `DeviceDB`
-  of its own: its `MemoryDeviceDB` (`storage/memory-device-db.ts`) keeps the row by `structuredClone` in a Map
-  for the page's life, and `safebyok-idb-old` runs on the old core. No other key is ever written anywhere: not to
+  this way is the leaseKey (`lease.cache`, through a `DeviceDB`'s `stow`). The core's `IdbDeviceDB`
+  (`storage/idb-device-db.ts`, on `safebyok/browser`) rests the lease row, its `lease_key` handle among it, in
+  the database `${dbName}:device-v001-001-001` by IndexedDB's structured clone, never as bytes; its `MemoryDeviceDB`
+  (`storage/memory-device-db.ts`) keeps the row by `structuredClone` in a Map for the page's life. No other key is ever written anywhere: not to
   IndexedDB, not to the host's VaultDB, which receives only ciphertext and visible fields. The
   wayinKey (the strong key) in particular lives only as a handle in a `Proving`, for one gating,
   and is never persisted.
@@ -187,16 +188,18 @@ only as `box_key_wrapped`.
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `Lease.buildGranted`, called by
 `Proving.buildLease`, from the vault's `#unlockByProof` and `#renewLease`. Carried, as the `lease_key` of a
 `LeaseRecord`: `Lease.#record`, the Lease the vault holds in `#lease` (`#attachLease`) → `lease.cacheAsCacheCan` →
-`lease.cache` → the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.cache`
-(`storage/device-db-new.ts`; `MemoryDeviceDB`'s `structuredClone` into a Map); read back, from
+`lease.cache` → the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
+(`storage/device-db-new.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
+`structuredClone` into a Map); read back, from
 `vault.ensureUnlocked`, by `Lease.buildFromCache` (`tryPeekLease` → `DeviceDB.peek`), which checks the row with
 `leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.vacate`, at a sweep
 (`sweepContents`), when the lease proves damaged (`Lease.#vaultKey`), and when a lock crosses a renewal. Erased
-from the store by `DeviceDB.vacate`: through `lease.vacate` or `Lease.uncache` (`tryUncacheLease`) from the
-vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `uncacheForgotten`, in
+from the store by `DeviceDB.forget`: through `lease.vacate` or `Lease.forget` (`tryForgetLease`) from the
+vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `forgetOutdated`, in
 `Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `bank.vacate`
-(`#eraseOwnLeases`). `bank.autolock` erases a row by `vault.lock()`. The Bank's scan, `DeviceDB.leasesProvedBefore`,
-answers rows without one, as only `peek` answers a `lease_key`. Neither the Vault nor the Bank holds a record.
+(`#eraseOwnLeases`). `bank.autolock` erases a row by `vault.lock()`. The Bank's scan, `DeviceDB.listLeases`,
+answers rows without one. Only `peek` and `listRawLeases`, which no Vault or Bank calls, answer a `lease_key`, to
+whoever holds the deviceDB (G9). Neither the Vault nor the Bank holds a record.
 Operates: `Lease.#vaultKey` (`unwrapKeyUnder`) alone.
 
 **whisper.** Naked: the host → `vault.putBox`, `box.put`, `box.putExposed`, `vault.boxListing.create`, and
@@ -261,11 +264,11 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `models
 
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `Lease.buildGranted`; `Lease.#record` in memory, for the lease's life;
-and the `lease_key` of a `LeaseRow` cached by `lease.cache` through a `DeviceDB`'s `cache` (the core's
-`MemoryDeviceDB` keeps it by `structuredClone`; an IndexedDB store, by structured clone) and read back by
+and the `lease_key` of a `LeaseRow` cached by `lease.cache` through a `DeviceDB`'s `stow` (the core's
+`IdbDeviceDB` keeps it by IndexedDB's structured clone, its `MemoryDeviceDB` by `structuredClone`) and read back by
 `Lease.buildFromCache` (`DeviceDB.peek`). A lease is dropped from memory at `lock()`, at a sweep, at a vacate, at a
 tombstone, and when it proves damaged (`Lease.#vaultKey`), and its row is erased at `lock()`, at a vacate and at a
-tombstone, among the sites the leaseKey's access chain names. No lease is dropped at a time, and **autolock is a best-effort reminder process, not a
+tombstone, among the sites the leaseKey's access chain names, **save one exception**: a lease row that fails its check is neither listed by `listLeases` nor forgotten by `forget`, and stays until a later `stow` over its scope or a host's `delRawLease` (notes/wontfix.md). No lease is dropped at a time, and **autolock is a best-effort reminder process, not a
 guarantee**: a lease held in a page stays held until something locks it. Two things answer to the autolock duration, against a row cached on
 this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` erases it. `Lease.buildFromCache`, at the
 door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.buildFromCache` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the device's clock, as `Date.now()` reads it: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
@@ -336,7 +339,7 @@ already proved). A proving's key, a grant or a wayin is made inside the gating's
 from `putBox`, `box.put`, `putExposed`, `vault.boxListing.create` or the public `vault.sealStampedString`. From the
 `try*` forms of the first four, `outcomeOf` makes it an `unexpected_error` with the DOMException as its `cause`. Either way it keeps no secret: a WebCrypto
 error carries a name and a message, never key material. A device-store failure's cause never crosses to the host: `storeFailed`
-(`refusals/throwers.ts`, by `DeviceDB`'s `adapted`) keeps neither what the store threw nor its message,
+(`refusals/throwers.ts`, from the catch in each `DeviceDB` verb) keeps neither what the store threw nor its message,
 only its `name`, as a `DeviceDB` is handed every lease record and the logger hands a condition to the
 host whole (`tests/storage/device-db-new.test.ts`, *a deviceDB whose store throws*). `unexpectedError` keeps a foreign throw
 as `cause` only where the thrower heard no secret. The invariant at the one catch that ends each

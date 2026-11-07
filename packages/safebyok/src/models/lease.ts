@@ -50,7 +50,7 @@ export class Lease implements LeaseStamp {
     Object.freeze(this)
   }
 
-  /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is uncached;
+  /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is forgotten;
    * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
    * A store that refuses, or a row that will not read, is bad news and null, the row left standing.
    */
@@ -69,14 +69,14 @@ export class Lease implements LeaseStamp {
       return null
     }
     if (checked.data.gate_epoch !== epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
-      await uncacheForgotten(friend)
+      await forgetOutdated(friend)
       return null
     }
     if (isPastAutolock(checked.data, friend)) { return null }
     return new Lease(friend, checked.data, true)
   }
 
-  /** A new lease under a fresh leaseKey. The vault holds it, and caches it. */
+  /** A new lease under a fresh leaseKey. */
   static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate_epoch, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
     const held     = vaultStamp.parse(friend)
@@ -89,7 +89,7 @@ export class Lease implements LeaseStamp {
 
   // == [Caching]: cache, tryCache, cacheAsCacheCan
 
-  /** Put this lease in the deviceDB's cache; one built from the cache has nothing to do. A refusal costs the next session a proof, not this one its lease. */
+  /** Caches this lease on this device. */
   async cache(): Promise<void> {
     if (this.#isFromCache) { return }
     valOf(await this.#friend.tryCacheLease(this.#demandRecord()))
@@ -97,30 +97,31 @@ export class Lease implements LeaseStamp {
 
   tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
 
-  /** Cache this lease if it can. A refusal is bad news: it costs the next session a proof, not this one its lease. */
+  // A refusal costs the next session a proof, not this one its lease.
+  /** Caches this lease if it can, telling the host of a refusal as bad news. */
   async cacheAsCacheCan(): Promise<void> {
     const cached = await this.tryCache()
     if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
   }
   // --
 
-  // == [Ending one]: vacate, tryVacate, uncache, tryUncache, evict
+  // == [Ending one]: vacate, tryVacate, forget, tryForget, evict
 
-  /** Drop the keys and uncache the record, so this device is locked. */
+  /** Drop the keys and forget the cached record, so this device is locked. */
   async vacate(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
-    valOf(await this.#friend.tryUncacheLease())
+    valOf(await this.#friend.tryForgetLease())
   }
 
   tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
 
-  /** Uncache the record with no lease held to {@link vacate}: one may stand from an earlier session. */
-  static async uncache(friend: LeaseFriend): Promise<void> {
-    valOf(await leaseFriend.parse(friend).tryUncacheLease())
+  /** Forget the cached record with no lease held to {@link vacate}: one may stand from an earlier session. */
+  static async forget(friend: LeaseFriend): Promise<void> {
+    valOf(await leaseFriend.parse(friend).tryForgetLease())
   }
 
-  static tryUncache(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.uncache(friend)) }
+  static tryForget(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.forget(friend)) }
 
   /** Drop the keys, leaving the cached record for the next session. */
   evict(): void { this.#record = null }
@@ -180,7 +181,7 @@ export class Lease implements LeaseStamp {
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
     const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), damagedLease)
     if (! opened.ok) {
-      // Locking drops the vault's lease and uncaches by scope; this one is evicted too, should the vault hold another.
+      // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault hold another.
       this.#friend.lock()
       this.evict()
     }
@@ -204,14 +205,14 @@ export class Lease implements LeaseStamp {
   get modelkind(): 'lease' { return 'lease' satisfies Modelkind }
 }
 
-// == [Judging the cached record]: isPastAutolock, uncacheForgotten
+// == [Judging the cached record]: isPastAutolock, forgetOutdated
 
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
 const isPastAutolock = ({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean => nowMillis() - proved_at > leaseMillis
 
-/** Uncache a record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
-const uncacheForgotten = async (friend: LeaseFriend): Promise<void> => {
-  const del = await friend.tryUncacheLease()
+/** Forget a cached record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
+const forgetOutdated = async (friend: LeaseFriend): Promise<void> => {
+  const del = await friend.tryForgetLease()
   if (! del.ok) { friend.logger.warn("This device's lease could not be erased: the next lease is written over it.", { call: 'Lease.buildFromCache', refusalkind: del.err.refusalkind }) }
 }
 // --

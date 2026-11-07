@@ -2,12 +2,16 @@
 
 import type * as Z from 'zod'
 import { never, record, uuid } from 'zod'
-import { MaxSaltBytes, PasskeySaltBytes, isWhisperedBag } from '../helpers/consts'
+import { MaxSaltBytes, MinSaltBytes, PasskeySaltBytes, isWhisperedBag } from '../helpers/consts'
 import { fromB64OrNull } from '../helpers/crypto'
 import type { VaultLogger } from '../helpers/logger'
 import * as Phrases from '../helpers/phrases'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { KeyDeriver } from '../deriver/basederiver'
+import { Patterns } from './primitives'
+
+/** The sentence a passphrase salt's refusal says. */
+const SaltShape = Phrases.passphraseSaltShape(MinSaltBytes, MaxSaltBytes)
 
 // == [Ciphered]: ciphered, Ciphered
 
@@ -26,9 +30,9 @@ export { epochMillis, type EpochMillis } from './primitives'
 /** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` quotes none of it.
  * A token is plain text, as a host's adapter may write one by hand. A device's id is a UUID. A key deriver's label
  * and a passkey's credential id are plain text, not empty. A salt or a ciphered field is
- * branded for its role, since nothing but safebyok makes one. A salt's check is its shape, text
- * that is not empty. Its length is judged where its wayin is, so a salt of the wrong length is a
- * damaged wayin while the vault's other wayin still opens.
+ * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
+ * {@link MinSaltBytes} to {@link MaxSaltBytes} bytes, judged by its characters and length; a passkey's is text, not empty, and its length is judged where its
+ * wayin is, so a salt of the wrong length is a damaged wayin while the vault's other wayin still opens.
  */
 export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1, Phrases.TokenMissing),
@@ -37,7 +41,8 @@ export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, c
   device_id:               uuid(Phrases.DeviceIdShape),
   key_deriver_label:       str.min(1),
   credential_id:           str.min(1),
-  salt_b64:                str.min(1).brand<'PassphraseSalt'>(),
+  // Unpadded base64url spends four characters on three bytes: 16 bytes are 22 characters, and 32 are 43.
+  salt_b64:                str.min(22, SaltShape).max(43, SaltShape).regex(Patterns.b64url, SaltShape).brand<'PassphraseSalt'>(),
   prf_salt_b64:            str.min(1).brand<'PrfSalt'>(),
   whisper_ciphered:        ciphered.brand<'WhisperCiphered'>(),
   box_key_wrapped:         ciphered.brand<'BoxKeyWrapped'>(),
@@ -173,7 +178,7 @@ export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 export const keyDeriverShape = Checker(({ obj, fn, str, int }) => obj({
   algorithm:         str.optional(),
   key_deriver_label,
-  salt_bytes:        int.gte(1).lte(MaxSaltBytes),
+  salt_bytes:        int.gte(MinSaltBytes).lte(MaxSaltBytes),
   deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
   load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
 }, Phrases.KeyDeriverShape), 'bad_option')

@@ -399,7 +399,7 @@ describe("'identity_revoked' and bad news", () => {
     expect(warn.mock.calls).to.have.length(1)
     const [cached] = world.leaseRows() as [{ gate_epoch: number }]
     vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce(TH.good({ ...cached, gate_epoch: cached.gate_epoch + 1 } as never))
-    vi.spyOn(world.deviceDB, 'tryVacate').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the store is down')))
+    vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the store is down')))
     const page = world.bankOn({ logger })
     await page.hello()
     const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()

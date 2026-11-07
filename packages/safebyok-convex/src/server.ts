@@ -3,7 +3,7 @@
 import { mutationGeneric, queryGeneric } from 'convex/server'
 import type { FunctionReference, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type { ComponentApi } from './component-api'
 import * as CVX from './component/validators'
 import * as Phrases from './phrases'
@@ -156,8 +156,8 @@ export type SafebyokApi = {
 // == [Checks]: componentCheck, safebyokApiOpts
 
 /** The check of what {@link SafebyokComponent} wraps: an object, as `components.safebyok` is, and not the undefined a missing install leaves. */
-const componentCheck = SX.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_option')
+const componentCheck = DB.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_option')
 
 /** The check of {@link SafebyokComponent.api}'s options. */
-const safebyokApiOpts = SX.objCheck(({ fn }) => ({ getUserId: fn<GetUserId>() }), 'bad_option')
+const safebyokApiOpts = DB.objCheck(({ fn }) => ({ getUserId: fn<GetUserId>() }), 'bad_option')
 // --

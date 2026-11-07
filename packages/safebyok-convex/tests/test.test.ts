@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { defineTestApp } from 'convex-test'
 import { defineSchema } from 'convex/server'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import { register } from '../src/test'
 import * as TH from './test-helpers'
 
 const vault = TH.vaultAt()
-const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 
 describe("register", () => {
   it("installs the component under the name a host gave it, and hands back its functions", async () => {

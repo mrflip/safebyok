@@ -1,6 +1,6 @@
 /** A PostgresClient made of a pg Pool, which runs a transaction on one connection it checks out. */
 
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type { PostgresClient, PostgresQueryable } from './postgres-vault-db'
 
 // == [The pool]: PgPool, PgPoolClient, pgPool
@@ -17,7 +17,7 @@ const isPgPool = (candidate: unknown): candidate is PgPool => (
   && ('connect' in candidate) && (typeof candidate.connect === 'function')
 )
 
-const pgPool = SX.Checker(({ custom }) => custom<PgPool>(isPgPool, 'Expected a pg Pool, with query and connect functions'), 'bad_option')
+const pgPool = DB.Checker(({ custom }) => custom<PgPool>(isPgPool, 'Expected a pg Pool, with query and connect functions'), 'bad_option')
 // --
 
 /** Rolls back `conn`'s transaction, answering false when even that failed. */

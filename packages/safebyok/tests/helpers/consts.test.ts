@@ -1,8 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { FarFuture, FarPast, ForeverMillis, hasModelkind, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
+import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, VaultsDBVersion, hasModelkind, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
+
+describe("DeviceDBVersion and VaultsDBVersion", () => {
+  it("are three zero-padded parts, so that database names sort as their versions do", () => {
+    expect(DeviceDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
+    expect(VaultsDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
+  })
+})
 
 describe("FarFuture", () => {
   it("is the microsecond epochalypse: the last millisecond whose epoch microseconds are a safe integer", () => {
@@ -60,7 +67,7 @@ describe("isVaultDB and isDeviceDB", () => {
 
   it("refuse a duck, the other store, and a copy of a store's own fields, which leaves the brand behind", () => {
     const vaultDB = new MemoryVaultDB()
-    expect(isDeviceDB({ tryPeek: () => null, tryCache: () => null, tryVacate: () => null })).to.be.false
+    expect(isDeviceDB({ tryPeek: () => null, tryStow: () => null, tryForget: () => null })).to.be.false
     expect(isVaultDB(Object.assign({}, vaultDB))).to.be.false
     expect(isVaultDB(new MemoryDeviceDB())).to.be.false
     expect(isDeviceDB(vaultDB)).to.be.false

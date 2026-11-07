@@ -52,7 +52,7 @@ describe("A lock that lands while an unlock proves", () => {
     }
     await vault.ensureUnlocked()
     expect(vault.isUnlocked).to.be.true
-    expect(deviceDB.tryCache).toHaveBeenCalledTimes(2)
+    expect(deviceDB.tryStow).toHaveBeenCalledTimes(2)
     vault.lock()
     expect(vault.isUnlocked).to.be.false
   })
@@ -142,12 +142,12 @@ describe("A gate change after its record is stored", () => {
 
   it("a lock crossing the renewal drops the new lease with no second erase, which could take a later lease's row", async () => {
     const { vault, deviceDB } = await makeBornVault()
-    deviceDB.tryVacate.mockClear()
+    deviceDB.tryForget.mockClear()
     crossingGrant(() => { vault.lock() })
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
     expect(vault.isUnlocked).to.be.false
     expect(deviceDB.cachedNow()).to.be.null
-    expect(deviceDB.tryVacate).toHaveBeenCalledOnce()
+    expect(deviceDB.tryForget).toHaveBeenCalledOnce()
   })
 
   it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is dropped unattached, and demandAttachable is never met", async () => {
@@ -181,13 +181,13 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("a refused tryCache during replacePassphrasePrompt resolves, unlocked, and tells onBadNews", async () => {
+  it("a refused tryStow during replacePassphrasePrompt resolves, unlocked, and tells onBadNews", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
     const vault = await new VaultListing(hearingBadNews(fakeBank, onBadNews), opts).build(demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
     const refusal = new VaultError('storage_unavailable', "the disk is full")
-    deviceDB.tryCache.mockResolvedValueOnce(TH.bad(refusal))
+    deviceDB.tryStow.mockResolvedValueOnce(TH.bad(refusal))
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
     expect(vault.isUnlocked).to.be.true
     expect(onBadNews.mock.calls).to.deep.equal([[refusal]])

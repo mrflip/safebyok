@@ -88,7 +88,7 @@ describe("a tombstone over a live vault", () => {
     const listing = new VaultListing(hearingBadNews(fakeBank, onBadNews), opts)
     const vault = await listing.build(demandStored())
     const refusal = new VaultError('storage_unavailable', 'the disk is full')
-    deviceDB.tryVacate.mockResolvedValueOnce(TH.bad(refusal))
+    deviceDB.tryForget.mockResolvedValueOnce(TH.bad(refusal))
     restoreRow(tombstoneOver(demandStored()))
     await listing.fetch(Dna, { ifAbsent: 'nil' })
     await erased()
@@ -355,7 +355,7 @@ describe("lock() with an erase that throws synchronously", () => {
   it("reads locked, does not throw, and panics", async () => {
     const onPanic = vi.fn()
     const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onPanic })
-    deviceDB.tryVacate.mockImplementationOnce(() => { throw new Error('the duck is broken') })
+    deviceDB.tryForget.mockImplementationOnce(() => { throw new Error('the duck is broken') })
     expect(() => vault.lock()).to.not.throw()
     expect(vault.isLocked).to.be.true
     await erased()

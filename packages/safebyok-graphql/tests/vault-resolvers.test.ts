@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { buildSchema, graphql, isObjectType, parse, subscribe, validate } from 'graphql'
 import type { ExecutionResult, GraphQLSchema } from 'graphql'
 import { makeExecutableSchema } from '@graphql-tools/schema'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import { PostgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import { VaultOperations } from '../src/index'
@@ -50,7 +50,7 @@ describe("vaultResolvers", () => {
       const browser = TH.browserOver(schema, signing)
       await TH.expectRefusal(browser.listVaults(TH.bankScope), 'identity_revoked')
       await TH.expectRefusal(browser.getVault(TH.vaultScope), 'identity_revoked')
-      await TH.expectRefusal(browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision }), 'identity_revoked')
+      await TH.expectRefusal(browser.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), 'identity_revoked')
       await TH.expectRefusal(browser.tidyGone(TH.bankScope), 'identity_revoked')
     }
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
@@ -60,7 +60,7 @@ describe("vaultResolvers", () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const record = TH.vaultAt()
     const box = TH.boxAt()
-    const opts = { prior: SX.VoidRevision }
+    const opts = { prior: DB.VoidRevision }
     const sent: [string, Record<string, unknown>][] = [
       [VaultOperations.listVaults, TH.bankScope],
       [VaultOperations.getVault, TH.vaultScope],
@@ -81,7 +81,7 @@ describe("vaultResolvers", () => {
   it("serves a request signed in as the user it asks for", async () => {
     await TH.emptyTables()
     const browser = TH.browserOver(TH.schemaOver(await TH.serverOver()), TH.signedInAs('u1'))
-    await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    await browser.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.deep.eq(TH.vaultAt())
   })
 
@@ -94,9 +94,9 @@ describe("vaultResolvers", () => {
   it("hears on while the session that subscribed stays signed in as its user", async () => {
     await TH.emptyTables()
     const { listening, heard, browser } = await watchedServer()
-    await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    await browser.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     expect(await heard.next()).to.have.property('done', false)
-    await browser.putBox(TH.boxAt(), { prior: SX.VoidRevision })
+    await browser.putBox(TH.boxAt(), { prior: DB.VoidRevision })
     expect(await heard.next()).to.have.property('done', false)
     expect(listening.size).to.eq(1)
     await heard.return(undefined)
@@ -107,10 +107,10 @@ describe("vaultResolvers", () => {
     for (const revoked of ['u2', null]) {
       await TH.emptyTables()
       const { listening, session, heard, browser } = await watchedServer()
-      await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+      await browser.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
       expect(await heard.next()).to.have.property('done', false)
       session.user_id = revoked
-      await browser.putBox(TH.boxAt(), { prior: SX.VoidRevision })
+      await browser.putBox(TH.boxAt(), { prior: DB.VoidRevision })
       expect(await heard.next()).to.deep.eq({ done: true, value: undefined })
       await vi.waitFor(() => { expect(listening.size).to.eq(0) })
       await heard.return(undefined)
@@ -121,7 +121,7 @@ describe("vaultResolvers", () => {
     await TH.emptyTables()
     const { listening, session, heard, browser } = await watchedServer()
     Object.defineProperty(session, 'user_id', { get: () => { throw new Error('session store s3cr3t-host is down') } })
-    await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
+    await browser.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     let ended: unknown = null
     try { await heard.next() } catch (err) { ended = err }
     expect(ended).to.have.nested.property('extensions.kind', 'unexpected_error')
@@ -151,9 +151,9 @@ describe("vaultResolvers", () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver({ maxRecordBytes: 200 }))
     const browser = TH.browserOver(schema)
-    await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
-    await TH.expectRefusal(browser.putBox(TH.boxAt(), { prior: SX.VoidRevision }), 'box_too_large')
-    const malformed = await served(schema, VaultOperations.putVault, { record: { ...TH.vaultAt(), user_id: 'u1', am: 'q' }, opts: { prior: SX.VoidRevision } })
+    await browser.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await TH.expectRefusal(browser.putBox(TH.boxAt(), { prior: DB.VoidRevision }), 'box_too_large')
+    const malformed = await served(schema, VaultOperations.putVault, { record: { ...TH.vaultAt(), user_id: 'u1', am: 'q' }, opts: { prior: DB.VoidRevision } })
     expect(malformed).to.have.nested.property('errors[0].extensions.kind', 'bad_option')
   })
 
@@ -161,10 +161,10 @@ describe("vaultResolvers", () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver({ maxBoxes: 1 }))
     const browser = TH.browserOver(schema)
-    await browser.putVault(TH.vaultAt(), { prior: SX.VoidRevision })
-    await browser.putBox(TH.boxAt(), { prior: SX.VoidRevision })
+    await browser.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await browser.putBox(TH.boxAt(), { prior: DB.VoidRevision })
     const second = TH.boxAt(0, 'life1', { boxlabel: 'anthropic', box_tok: 'box2' })
-    const full = await TH.expectBad(browser.tryPutBox(second, { prior: SX.VoidRevision }), 'vault_full')
+    const full = await TH.expectBad(browser.tryPutBox(second, { prior: DB.VoidRevision }), 'vault_full')
     expect(full.meta?.capacity).to.deep.eq({ boxes: { used: 1, max: 1 }, bytes: { used: 0, max: Number.MAX_SAFE_INTEGER } })
   })
 

@@ -4,7 +4,7 @@ import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
-import { vaultScope } from '../../src/shapes/shapes-core'
+import { salt_b64, vaultScope } from '../../src/shapes/shapes-core'
 import { type ProvingWorld, FirstGateEpoch, type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
@@ -262,6 +262,24 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 
+  // The record's check lets these through: a length no unpadded base64url has, and a last character with stray padding bits.
+  const UndecodedSaltCases = [
+    ['25 characters',                     "A".repeat(25)],
+    ['41 characters',                     "A".repeat(41)],
+    ['22 characters, stray padding bits', `${"A".repeat(21)}B`],
+  ] as const
+
+  it.each(UndecodedSaltCases)("refuses a stored salt that will not decode, %s", async (_what, salt) => {
+    const { gate } = await gateWithBoth()
+    const { passphrase_wayin } = gate.pickle()
+    const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
+    const keyDeriver: KeyDeriver = { key_deriver_label: passphrase_wayin.key_deriver_label, salt_bytes: 16, deriveKeyBytes }
+    const damaged = { stamp: WorldStamp, ...gate.pickle(), passphrase_wayin: { ...passphrase_wayin, salt_b64: salt_b64.parse(salt) } }
+    const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingWorldOf({ keyDeriver })), 'bad_record')
+    expect(TH.thrownText(err)).to.not.include(salt)
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+  })
+
   it("does not ask the strengthChecker: a passphrase already in use is proved, not judged", async () => {
     const { gate } = await gateWithBoth()
     const strengthChecker = vi.fn(() => ({ strong: false as const, reason: 'too short' }))
@@ -332,7 +350,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
   })
 
   it("takes any label and salt length a host chooses that fits the interface", async () => {
-    const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf', salt_bytes: 1 })
+    const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf', salt_bytes: 20 })
     const proving = await novelPassphrase({ ...provingWorldOf(), keyDeriver: guarded })
     const wayin = await proving.buildWayin(NOVEL)
     expect(wayin.toJSON()).to.include({ key_deriver_label: 'my_own_kdf' })
@@ -341,6 +359,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
   const Misfits = [
     [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 16 },                                         'a deriver with no deriveKeyBytes'],
     [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 0, deriveKeyBytes: () => Promise.resolve() },  'a deriver asking for no salt'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 15, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt under 16 bytes'],
     [{ salt_bytes: 16, deriveKeyBytes: () => Promise.resolve() },                                  'a deriver with no label'],
     [() => undefined,                                                                              'a bare function'],
   ] as const
@@ -551,7 +570,7 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf()))
   })
 
-  it("grants a lease of the proving's vault, uncached, recording the proving's epoch, when it was proved, and how", async () => {
+  it("grants a lease of the proving's vault, not yet cached, recording the proving's epoch, when it was proved, and how", async () => {
     const { gate, answerOf } = await gateWithBoth(2)
     const friend = fakeLeaseFriendOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())

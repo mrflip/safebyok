@@ -47,7 +47,9 @@ const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool) })
 * **`listen`**, optional, is how `watch` hears writes made by other servers and devices; see
   below. Without it, a watch hears nothing, and a device learns of another's writes when it next
   reads.
-* **`maxBoxes`**, optional, caps the live boxes in one vault; a put past it refuses as `vault_full`.
+* **`maxBoxes`**, optional, is a best-effort cap on the live boxes in one vault: a put past it refuses as
+  `vault_full`. It is exact at moderate write rates; a strict cap would take concurrency machinery this
+  package does not add.
 * **`maxRecordBytes`**, optional, as every vaultDB takes it.
 
 `PostgresVaultDB` stores what it is handed under the scope it is handed. **Your route decides who
@@ -129,7 +131,7 @@ connect can LISTEN on any user's channel and hear the rows each write stores.
 connect and LISTEN: this package grants nothing and creates no role or policy.
 
 Every write locks its vault's row first (`SELECT ... FOR UPDATE`), so writes under one vault take
-turns, and the checks a write makes before it lands read rows no other write can change meanwhile.
+turns, and a compare-and-set checks the revision of the row it replaces as stored at that moment.
 
 ## On Supabase
 

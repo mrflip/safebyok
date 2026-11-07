@@ -24,8 +24,20 @@ export const MinuteMillis = 60_000
 /** The span from {@link FarPast} to {@link FarFuture}, in milliseconds: the longest that runs between two instants the package accepts. */
 export const ForeverMillis = FarFuture - FarPast
 
-/** The most bytes `crypto.getRandomValues` hands out at once, and so the longest passphraseSalt. */
-export const MaxSaltBytes = 65_536
+// A name carrying it marks a stored layout: raise a version when its layout changes, and every older database is deleted unread. Three zero-padded parts, so that names sort as versions do.
+/** The layout version in the name of the device database, `${dbName}:device-v001-001-001`. */
+export const DeviceDBVersion = '001-001-001'
+
+/** The layout version in the name of the IndexedDB vault database, `${dbName}:vaults-v001-001-001`. */
+export const VaultsDBVersion = '001-001-001'
+
+// The default deriver's 16, the fewest any deriver of the package has made.
+/** The fewest bytes a passphraseSalt holds, and the fewest a key deriver asks for. */
+export const MinSaltBytes = 16
+
+// Twice the default deriver's 16, and as many as a passkey's prfSalt.
+/** The most bytes a passphraseSalt holds, and the most a key deriver's spec asks for. */
+export const MaxSaltBytes = 32
 
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
 export const PassphraseKeyBytes = 32

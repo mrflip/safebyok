@@ -2,10 +2,11 @@
 
 import { IsDeviceDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
-import { isVaultError } from '../refusals/errors'
+import { type VaultError, isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
-import type { VaultScope } from '../shapes/shapes-core'
+import * as CX from '../shapes/shapes-core'
+import { type VaultScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
@@ -18,59 +19,87 @@ export abstract class DeviceDB {
   get [IsDeviceDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
   // --
 
-  // == [Lease verbs]: cache, tryCache, peek, tryPeek, vacate, tryVacate, leasesProvedBefore, tryLeasesProvedBefore
+  // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases, delRawLease, tryDelRawLease
 
-  /** Caches the lease row for its vault, in place of any before. */
-  async cache(row: LeaseRow): Promise<void> {
-    const leaseRow = SX.leaseRow.parse(row)
-    await adapted('cache', () => this.doCache(leaseRow))
+  /** Stows the lease row of its vault. */
+  async stow(row: LeaseRow): Promise<void> {
+    try {
+      const leaseRow = SX.leaseRow.parse(row)
+      await this.doStow(leaseRow)
+    } catch (err) { throw refusalOf(err, 'stow') }
   }
 
-  tryCache(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.cache(row)) }
+  tryStow(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.stow(row)) }
 
-  /** The row cached for this vault under this `vault_tok`, or null: a row of another `vault_tok`, or one failing its check, is no row. */
+  /** The row stowed for this vault under this `vault_tok`, or null. */
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
-    const leaseQuery = SX.leaseQuery.parse(asked)
-    const stored = await adapted('peek', () => this.doPeek(leaseQuery))
-    const parsed = SX.leaseRow.safeParse(stored)
-    return (parsed.success && parsed.data.vault_tok === leaseQuery.vault_tok) ? parsed.data : null
+    try {
+      const leaseQuery = SX.leaseQuery.parse(asked)
+      const parsed = SX.leaseRow.safeParse(await this.doPeek(leaseQuery))
+      return (parsed.success && parsed.data.vault_tok === leaseQuery.vault_tok) ? parsed.data : null
+    } catch (err) { throw refusalOf(err, 'peek') }
   }
 
   tryPeek(asked: LeaseQuery): Promise<Outcome<LeaseRow | null>> { return outcomeOf(() => this.peek(asked)) }
 
-  /** Erases the row cached for this vault under this `vault_tok`; none is a no-op, and a row of another `vault_tok` stays. */
-  async vacate(asked: LeaseQuery): Promise<void> {
-    const leaseQuery = SX.leaseQuery.parse(asked)
-    await adapted('vacate', () => this.doVacate(leaseQuery))
+  // `peek` checks the `vault_tok` here in the base; `forget` leaves it to the store, whose check must be one atomic step with its delete.
+  /** Erases the row stowed for this vault under this `vault_tok`. */
+  async forget(asked: LeaseQuery): Promise<void> {
+    try {
+      const leaseQuery = SX.leaseQuery.parse(asked)
+      await this.doForget(leaseQuery)
+    } catch (err) { throw refusalOf(err, 'forget') }
   }
 
-  tryVacate(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.vacate(asked)) }
+  tryForget(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.forget(asked)) }
 
-  /** The cached leases, of any vault, proved before `cutoff`, oldest first, as scope, `vault_tok` and `proved_at` only. */
-  async leasesProvedBefore(cutoff: number): Promise<LeaseDated[]> {
-    const before = SX.cutoff.parse(cutoff)
-    const rows = await adapted('leasesProvedBefore', () => this.doLeasesProvedBefore(before))
-    return rows.flatMap((row) => { const parsed = SX.leaseDated.safeParse(row); return parsed.success ? [parsed.data] : [] })
+  /** Every lease stowed on this device, oldest first. */
+  async listLeases(): Promise<LeaseDated[]> {
+    try {
+      const rows = await this.doListLeases()
+      const leases = rows.flatMap((row) => { const parsed = SX.leaseDated.safeParse(row); return parsed.success ? [parsed.data] : [] })
+      return leases.toSorted((one, other) => one.proved_at - other.proved_at)
+    } catch (err) { throw refusalOf(err, 'listLeases') }
   }
 
-  tryLeasesProvedBefore(cutoff: number): Promise<Outcome<LeaseDated[]>> { return outcomeOf(() => this.leasesProvedBefore(cutoff)) }
+  tryListLeases(): Promise<Outcome<LeaseDated[]>> { return outcomeOf(() => this.listLeases()) }
+
+  /** Every lease row stored on this device as a bag, unchecked, damaged rows among them. */
+  async listRawLeases(): Promise<Record<string, unknown>[]> {
+    try {
+      const rows = await this.doListLeases()
+      return rows.filter((row) => isPlainBag(row))
+    } catch (err) { throw refusalOf(err, 'listRawLeases') }
+  }
+
+  tryListRawLeases(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawLeases()) }
+
+  /** Deletes whatever row stands at this vault scope, damaged or not, with no `vault_tok` to match. */
+  async delRawLease(scope: VaultScope): Promise<void> {
+    try {
+      const checked = CX.vaultScope.parse(scope)
+      await this.doDelRawLease(checked)
+    } catch (err) { throw refusalOf(err, 'delRawLease') }
+  }
+
+  tryDelRawLease(scope: VaultScope): Promise<Outcome<void>> { return outcomeOf(() => this.delRawLease(scope)) }
   // --
 
-  // == [Protected, for a subclass to write]: doCache, doPeek, doVacate, doLeasesProvedBefore
+  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doDelRawLease
 
-  // A store starts each call's work in the order called, or a `vacate` made after a `cache` may not erase it.
+  // A store starts each call's work in the order called, or a `forget` made after a `stow` may not erase it.
   /** Stores `row` as the lease of its vault scope, over any row there. */
-  protected abstract doCache(row: LeaseRow): Awaitable<void>
+  protected abstract doStow(row: LeaseRow): Awaitable<void>
   /** The row stored at this vault scope, whatever its `vault_tok`, or null. */
   protected abstract doPeek(scope: VaultScope): Awaitable<unknown>
   /** Removes the row at this vault scope when it holds this `vault_tok`, in one step. */
-  protected abstract doVacate(asked: LeaseQuery): Awaitable<void>
-  /** Every row whose `proved_at` is under `cutoff`, oldest first: an index range scan. */
-  protected abstract doLeasesProvedBefore(cutoff: number): Awaitable<unknown[]>
+  protected abstract doForget(asked: LeaseQuery): Awaitable<void>
+  /** Every lease row stored, in any order. */
+  protected abstract doListLeases(): Awaitable<unknown[]>
+  /** Removes whatever row is stored at this vault scope, in one step. */
+  protected abstract doDelRawLease(scope: VaultScope): Awaitable<void>
   // --
 }
 
-/** A store call: what it throws that is no refusal of its own is `storage_unavailable`, naming the verb. */
-const adapted = async <ValT>(call: string, thunk: () => Awaitable<ValT>): Promise<ValT> => {
-  try { return await thunk() } catch (err) { throw (isVaultError(err) ? err : Refuse.storeFailed(call, err)) }
-}
+/** What a verb's body threw, as its refusal: a refusal as it came, anything else `storage_unavailable` naming the verb. */
+const refusalOf = (thrown: unknown, call: string): VaultError => (isVaultError(thrown) ? thrown : Refuse.storeFailed(call, thrown))

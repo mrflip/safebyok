@@ -25,7 +25,7 @@ const vaultDB = idbVaultDB({ dbName: 'acme' })
 
 Hand it to the core wherever a `VaultDB` is asked for.
 
-* **`dbName`** names the database, default `'safebyok'`; the rows go in `<dbName>:vaults`. Two
+* **`dbName`** names the database, default `'safebyok'`; the rows go in `<dbName>:vaults-v001-001-001`, and a vault database of an older name is deleted unread. Two
   stores made with one `dbName`, in one tab or two, share the rows.
 * **`maxRecordBytes`** is the VaultDB's own: the largest box record a `putBox` takes.
 * An option it cannot use refuses with kind `bad_option`.
@@ -63,8 +63,8 @@ copy it:
 * **Do each `do*` in one transaction of your store**, reading the vault row beside the rows it
   writes, and answer what it found (`ante`, and `vault` for a box) with whether it landed.
   `src/idb-vault-db.ts` decides each with the predicates `safebyok/storage` exports.
-* **Triage your store's failures into refusals** where you catch them (`src/shelf.ts`,
-  `troubleOf`); anything else you throw becomes `storage_unavailable`.
+* **Triage your store's failures into refusals** where you catch them (`inOneStep` from
+  `safebyok/storage` does it for IndexedDB); anything else you throw becomes `storage_unavailable`.
 * **Prove it with the battery**: `describeVaultDBBattery` from `safebyok/testing` runs every
   call against a fresh store, given a backdoor to its rows (`tests/idb-vault-db.test.ts`).
 

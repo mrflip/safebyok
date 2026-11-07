@@ -1,5 +1,5 @@
 // Kept off the front door (`safebyok`) so a host's autocomplete never meets the adapter's contract, and an adapter's imports name one door.
-/** `safebyok/storage`: what a storage adapter is written against: the VaultDB and DeviceDB it extends, the rows it stores, and the refusals it raises. */
+/** `safebyok/storage`: what a storage adapter is written against: the VaultDB and DeviceDB it extends, the rows it stores, the IndexedDB transaction, and the refusals it raises. */
 
 // == [The stores]: VaultDB, DeviceDB, and the two in memory
 export { VaultDB } from './vault-db-new'
@@ -10,6 +10,13 @@ export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
 export type { Awaitable } from '../helpers/helpers'
 export { ckeyOf } from '../helpers/helpers'
+// --
+
+// == [IndexedDB]: the one transaction an IndexedDB store takes per call, the row at a scopepath within it, and the versioned shelf
+export { inOneStep, rowAt } from './idb-transaction'
+export { versionedShelfOf } from './idb-shelf'
+export type { VersionedShelfSpec } from './idb-shelf'
+export { VaultsDBVersion } from '../helpers/consts'
 // --
 
 // == [The rows]: sentinels, scopes, records, options and the helpers that read a row
@@ -34,7 +41,7 @@ export type { Capacity, DelOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOp
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'
-export { leaseQuery, leaseDated, leaseRow, cutoff } from '../shapes/shapes-storage'
+export { leaseQuery, leaseDated, leaseRow } from '../shapes/shapes-storage'
 export type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 // --
 
@@ -51,4 +58,8 @@ export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
 export type { RefusalMeta, Refusalkind, Thrown, VaultErrorOpts } from '../refusals/errors'
 export { outcomeOf, storageTroubleOf } from '../refusals/outcome'
 export type { BadOutcome, GoodOutcome, Outcome } from '../refusals/outcome'
+// --
+
+// == [The phrases]: the sentences an adapter's own refusals say, kept with the core's so the wording is reviewed in one place
+export { NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed } from '../helpers/phrases'
 // --

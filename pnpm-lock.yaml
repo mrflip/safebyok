@@ -395,9 +395,6 @@ importers:
       safebyok-convex:
         specifier: workspace:*
         version: link:../packages/safebyok-convex
-      safebyok-old:
-        specifier: workspace:*
-        version: link:../packages/safebyok-old
       safebyok-postgres:
         specifier: workspace:*
         version: link:../packages/safebyok-postgres
@@ -422,6 +419,9 @@ importers:
       es-toolkit:
         specifier: ^1.53.0
         version: 1.53.0
+      idb-keyval:
+        specifier: ^6.3.0
+        version: 6.3.0
       safe-stable-stringify:
         specifier: ^3.0.0
         version: 3.0.0
@@ -468,6 +468,9 @@ importers:
       eslint-plugin-unicorn:
         specifier: ^79.0.0
         version: 79.0.0(eslint@10.13.0)(typescript@6.0.3)
+      fake-indexeddb:
+        specifier: ^6.2.6
+        version: 6.2.6
       publint:
         specifier: ^0.3.25
         version: 0.3.25

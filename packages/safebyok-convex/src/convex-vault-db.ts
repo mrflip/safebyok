@@ -3,7 +3,7 @@
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import type { BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfVault, Tidied, VaultDBOpts, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { isSafebyokErrorData } from './refusals'
@@ -44,7 +44,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
   client: ConvexVaultClient
   /** The safebyok functions the app serves, `api.safebyok`. */
   api: SafebyokApi
-  /** The most box rows a vault holds, live or tombstoned, under the component's own limit. */
+  /** A soft cap on the box rows a vault holds, live or tombstoned, under the component's own limit. */
   maxBoxes?: number | undefined
 }
 
@@ -59,7 +59,7 @@ type RowsWatched = {
 // == [The vaultDB]: ConvexVaultDB
 
 /** A VaultDB whose rows live in the host's Convex deployment, reached through the app's Convex client. */
-export class ConvexVaultDB extends SX.VaultDB {
+export class ConvexVaultDB extends DB.VaultDB {
   // == [Props]: #client, #api, #maxBoxes
 
   readonly #client: ConvexVaultClient
@@ -104,7 +104,7 @@ export class ConvexVaultDB extends SX.VaultDB {
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
     const args = (this.#maxBoxes === undefined) ? { record, opts } : { record, opts, maxBoxes: this.#maxBoxes }
     const answer = await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, args))
-    if ('capacity' in answer) { throw SX.vaultFull(answer.capacity) }
+    if ('capacity' in answer) { throw DB.vaultFull(answer.capacity) }
     return answer
   }
 
@@ -183,21 +183,21 @@ const reaching = async <ValT>(callname: string, call: () => Promise<ValT>): Prom
 // Convex's own error text may quote the call's arguments on a dev deployment, so nothing of it is
 // carried: only the wrapper's refusal is read, by its data.
 const refusalOf = (callname: string, thrown: unknown): VaultError => {
-  if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return SX.identityRevoked() }
-  return SX.storageFailed(callname, thrown)
+  if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return DB.identityRevoked() }
+  return DB.storageFailed(callname, thrown)
 }
 
 /** What changed from `seen` to `rows`: each vault row that differs, then each box row, with the vault row it stands under. */
 // Both answers come from Convex's own serializer, so a row unchanged says itself the same way twice.
 const changesOf = (seen: RowsWatched, rows: RowsWatched): Heard[] => {
   const seenVaults = new Map(seen.vaults.map(({ vaultlabel, vault }) => [vaultlabel, JSON.stringify(vault)]))
-  const seenBoxes = new Map(seen.boxes.map(({ vaultlabel, vault_tok, boxlabel, box }) => [SX.ckeyOf(vaultlabel, vault_tok, boxlabel), JSON.stringify(box)]))
+  const seenBoxes = new Map(seen.boxes.map(({ vaultlabel, vault_tok, boxlabel, box }) => [DB.ckeyOf(vaultlabel, vault_tok, boxlabel), JSON.stringify(box)]))
   const vaultOf = new Map(rows.vaults.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
   const vaultsHeard = rows.vaults
     .filter(({ vaultlabel, vault }) => seenVaults.get(vaultlabel) !== JSON.stringify(vault))
     .map(({ vault }) => ({ vault }))
   const boxesHeard = rows.boxes
-    .filter(({ vaultlabel, vault_tok, boxlabel, box }) => seenBoxes.get(SX.ckeyOf(vaultlabel, vault_tok, boxlabel)) !== JSON.stringify(box))
+    .filter(({ vaultlabel, vault_tok, boxlabel, box }) => seenBoxes.get(DB.ckeyOf(vaultlabel, vault_tok, boxlabel)) !== JSON.stringify(box))
     .map(({ vaultlabel, box }) => ({ vault: vaultOf.get(vaultlabel) ?? null, box }))
   return [...vaultsHeard, ...boxesHeard]
 }
@@ -239,8 +239,8 @@ const isSafebyokApi = (candidate: unknown): candidate is SafebyokApi => {
 }
 
 /** The check of a {@link ConvexVaultDB}'s options. */
-const convexVaultDBOpts = SX.objCheck(({ custom, uint }) => ({
-  ...SX.vaultDBOpts.shape,
+const convexVaultDBOpts = DB.objCheck(({ custom, uint }) => ({
+  ...DB.vaultDBOpts.shape,
   client:   custom<ConvexVaultClient>(isConvexClient, Phrases.ClientExpected),
   api:      custom<SafebyokApi>(isSafebyokApi, Phrases.ApiExpected),
   maxBoxes: uint.optional(),

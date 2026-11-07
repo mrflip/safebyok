@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { version as convexVersion } from 'convex'
 import { ConvexClient } from 'convex/browser'
-import * as SX from 'safebyok/storage'
+import * as DB from 'safebyok/storage'
 import * as TH from './test-helpers'
 import { fakeDeployment } from '../src/testing'
 import type { FakeDeploymentOpts } from '../src/testing'
@@ -14,7 +14,7 @@ const deploy = (opts?: FakeDeploymentOpts) => {
 }
 
 const vault = TH.vaultAt()
-const birth = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
+const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const putVaultArgs = { record: vault, opts: birth }
 const vaultAsked = { scope: TH.vaultScope }
 const watchRowsArgs = { scope: TH.bankScope }

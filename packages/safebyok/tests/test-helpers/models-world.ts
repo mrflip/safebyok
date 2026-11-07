@@ -56,7 +56,7 @@ export const worldVaultRow = (): VaultRecord => ({
   written_at:    T0,
   gate:          {
     gate_epoch:       1,
-    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdA' as CX.PassphraseSalt, device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
+    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA' as CX.PassphraseSalt, device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
     passkey_wayin:    null,
   },
 })
