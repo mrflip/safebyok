@@ -37,7 +37,7 @@ export class MemoryDeviceDB extends DeviceDB {
   }
 
   protected doListLeases(): unknown[] {
-    return [...this.#leaserows.values()]
+    return [...this.#leaserows.values()].map((row) => structuredClone(row))
   }
   // --
 }

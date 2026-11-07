@@ -239,6 +239,15 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(found.map((row) => row.vaultlabel)).to.deep.equal(['main'])
       })
 
+      it("hands back a copy of each row stowed", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        const [raw] = await deviceDB.listRawLeases()
+        raw!['vault_tok'] = 'tok_changed'
+        const again = await deviceDB.peek(asked)
+        expect(again?.vault_tok).to.eq(asked.vault_tok)
+      })
+
       it("answers an empty list for an empty store", async () => {
         const deviceDB = await fresh()
         expect(await deviceDB.listRawLeases()).to.deep.equal([])
