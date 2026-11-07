@@ -446,12 +446,13 @@ added or folded into through the subagent, and no other entry changes.
   `PassphraseProving.seal` parses the passphrase it is handed (`passphraseCleartext`; anything not text is refused `bad_option`,
   quoting nothing) and passes on only the parsed value. A host's `KeyDeriver.deriveKeyBytes` still takes a plain string. The
   cleartext check accepts a blank passphrase; whether a blank one is wrong is the gating's to say, as before.
-  (4) A salt's check in the record stays its shape only (non-empty text) (amended 2026-11-07 (devicedb_idb): a passphrase wayin's `salt_b64` is now accepted as 22 to 43
-  base64url characters, `^[A-Za-z0-9_-]{22,43}$`, 16 to 32 bytes unpadded, judged by its characters and length only, with no decode; a record whose salt fails that is
-  `bad_record`, and a passkey's `prf_salt_b64` stays non-empty text. A key deriver's spec must ask for 16 to 32 `salt_bytes` (`MinSaltBytes` = 16, `src/helpers/consts.ts`), and fewer is refused at
-  setup; the default Argon2id deriver makes 16. The Argon2id spec in `src/deriver/shapes.ts` still allows a minimum of 8 (`MinArgon2SaltBytes`), so a deriver of 8 is refused by the Bank; a passphrase's salt is no longer judged per wayin, as the rest of this item says). Its length and base64url form are still judged per wayin
+  (4) A salt's check in the record stays its shape only (non-empty text). Its length and base64url form are still judged per wayin
   (`isDamaged`, `checkedPassphraseHeader`, `checkFreshSalt` (amended 2026-10-27 (validator_ducks): now `freshPasskeyAnswer.parse`, `src/shapes/vault.ts` (amended 2026-10-28 (validator_names): `src/proving.ts` when this was written), run inside `PasskeyProving.seal`'s try, so the PRF bytes are zeroed when it refuses)), so a salt of the wrong length or not base64url leaves that wayin
   `damaged_wayin` while the vault's other wayin still opens, where checking it in the record would make the whole vault record damaged.
+  Amended 2026-11-07 (devicedb_idb): a passphrase wayin's `salt_b64` is now checked in the record, as 22 to 43 base64url characters
+  (`^[A-Za-z0-9_-]{22,43}$`, 16 to 32 bytes unpadded) by its text alone, with no decode, and a record whose salt fails is `bad_record`; a passkey's `prf_salt_b64`
+  stays non-empty text, judged per wayin as above. A key deriver's spec must ask for 16 to 32 `salt_bytes` (`MinSaltBytes` = 16, `src/helpers/consts.ts`), and fewer is refused at
+  setup; the default Argon2id deriver makes 16. The Argon2id spec in `src/deriver/shapes.ts` still allows a minimum of 8 (`MinArgon2SaltBytes`), so a deriver of 8 is refused by the Bank.
   (5) `vault_tok` and `revision_tok` stay plain strings, since a host's storage adapter handles them. Their check refuses an empty one
   with its own sentence ("A token is minted by safebyok, so it can't be empty"), quoting nothing.
 * 2026-10-26 (zod_classic, branch `20261026-zod_classic`, stacked on PR [#273](https://github.com/mrflip/safebyok/pull/273)): **stored records parse
