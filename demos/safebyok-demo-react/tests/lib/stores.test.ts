@@ -12,7 +12,7 @@ describe("the demo's stores", () => {
   })
 
   it("takes a passphrase of 12 characters or more, and refuses a shorter one, saying why", async () => {
-    expect(await strengthChecker('twelve chars', Scope)).to.eql({ strong: true })
+    expect(await strengthChecker('twelve chars', Scope)).to.deep.equal({ strong: true })
     expect(await strengthChecker('eleven char', Scope)).to.include({ strong: false })
   })
 })
