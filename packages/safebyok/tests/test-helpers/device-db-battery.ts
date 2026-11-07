@@ -254,11 +254,48 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
       })
     })
 
+    describe("delRawLease(scope)", () => {
+      it.skipIf(noRows)("deletes a stored row that fails its check, which listRawLeases showed", async () => {
+        const deviceDB = await fresh()
+        const damagedScope = vaultScopeOf('damaged')
+        await deviceDB.stow(await leaseRowOf())
+        await rowsOf(deviceDB).plantLeaseRow(damagedScope, { proved_at: 5 })
+        expect(await deviceDB.listRawLeases()).to.deep.include({ proved_at: 5 })
+        await deviceDB.delRawLease(damagedScope)
+        expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
+        expect(await deviceDB.peek(asked)).to.not.be.null
+      })
+
+      it("deletes a lease row whatever its vault_tok", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        await deviceDB.delRawLease(vaultScope)
+        expect(await deviceDB.peek(asked)).to.be.null
+        expect(await deviceDB.listRawLeases()).to.deep.equal([])
+      })
+
+      it("is a no-op where nothing stands", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        const absent = vaultScopeOf('absent')
+        await deviceDB.delRawLease(absent)
+        const deleted = await deviceDB.tryDelRawLease(absent)
+        expect(deleted.ok).to.be.true
+        expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
+      })
+
+      it("refuses a malformed scope", async () => {
+        const deviceDB = await fresh()
+        await expectRefusal(deviceDB.delRawLease({ ...vaultScope, vaultlabel: 'No Good!' }))
+        await expectBad(deviceDB.tryDelRawLease({ ...vaultScope, applabel: '' }))
+      })
+    })
+
     describe("a store whose storage fails", () => {
       it.skipIf(_cheat_failNextCall === undefined)("refuses each verb", async () => {
         const deviceDB = await fresh()
         const row = await leaseRowOf()
-        const verbs = [() => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases()]
+        const verbs = [() => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryDelRawLease(asked)]
         for (const verb of verbs) {
           await failNextCall(deviceDB)
           await expectBad(verb(), 'storage_unavailable')

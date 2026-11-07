@@ -5,7 +5,7 @@ import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
-import { type VaultScope, isPlainBag } from '../shapes/shapes-core'
+import { type VaultScope, isPlainBag, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
@@ -18,7 +18,7 @@ export abstract class DeviceDB {
   get [IsDeviceDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
   // --
 
-  // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases
+  // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases, delRawLease, tryDelRawLease
 
   /** Stows the lease row of its vault. */
   async stow(row: LeaseRow): Promise<void> {
@@ -72,9 +72,19 @@ export abstract class DeviceDB {
   }
 
   tryListRawLeases(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawLeases()) }
+
+  /** Deletes whatever row stands at this vault scope, damaged or not, with no `vault_tok` to match. */
+  async delRawLease(scope: VaultScope): Promise<void> {
+    try {
+      const checked = vaultScope.parse(scope)
+      await this.doDelRawLease(checked)
+    } catch (err) { throw refusalOf(err, 'delRawLease') }
+  }
+
+  tryDelRawLease(scope: VaultScope): Promise<Outcome<void>> { return outcomeOf(() => this.delRawLease(scope)) }
   // --
 
-  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases
+  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doDelRawLease
 
   // A store starts each call's work in the order called, or a `forget` made after a `stow` may not erase it.
   /** Stores `row` as the lease of its vault scope, over any row there. */
@@ -85,6 +95,8 @@ export abstract class DeviceDB {
   protected abstract doForget(asked: LeaseQuery): Awaitable<void>
   /** Every lease row stored, in any order. */
   protected abstract doListLeases(): Awaitable<unknown[]>
+  /** Removes whatever row is stored at this vault scope, in one step. */
+  protected abstract doDelRawLease(scope: VaultScope): Awaitable<void>
   // --
 }
 

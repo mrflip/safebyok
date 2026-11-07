@@ -21,7 +21,7 @@ export class MemoryDeviceDB extends DeviceDB {
   _cheat_leaseRows(): Map<string, unknown> { return this.#leaserows } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease
 
   protected doStow(row: LeaseRow): void {
     this.#leaserows.set(leaseCkeyOf(row), structuredClone(row))
@@ -38,6 +38,10 @@ export class MemoryDeviceDB extends DeviceDB {
 
   protected doListLeases(): unknown[] {
     return [...this.#leaserows.values()].map((row) => structuredClone(row))
+  }
+
+  protected doDelRawLease(scope: VaultScope): void {
+    this.#leaserows.delete(leaseCkeyOf(scope))
   }
   // --
 }

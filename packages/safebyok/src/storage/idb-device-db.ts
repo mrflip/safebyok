@@ -52,7 +52,7 @@ export class IdbDeviceDB extends DeviceDB {
   }
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease
 
   protected async doStow(row: LeaseRow): Promise<void> {
     await inOneStep(this.#shelf, 'readwrite', (store) => { store.put(row, leaseScopepathOf(row)) })
@@ -71,6 +71,10 @@ export class IdbDeviceDB extends DeviceDB {
 
   protected async doListLeases(): Promise<unknown[]> {
     return await inOneStep(this.#shelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll()))
+  }
+
+  protected async doDelRawLease(scope: VaultScope): Promise<void> {
+    await inOneStep(this.#shelf, 'readwrite', (store) => { store.delete(leaseScopepathOf(scope)) })
   }
   // --
 }

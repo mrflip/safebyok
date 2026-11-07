@@ -16,6 +16,7 @@ class BrokenDeviceDB extends DeviceDB {
   protected doPeek(): never { throw this.thrown }
   protected doForget(): never { throw this.thrown }
   protected doListLeases(): never { throw this.thrown }
+  protected doDelRawLease(): never { throw this.thrown }
 }
 
 describe("a deviceDB whose store throws", () => {
@@ -28,6 +29,7 @@ describe("a deviceDB whose store throws", () => {
       ['peek',       await TH.expectBad(deviceDB.tryPeek(asked), 'storage_unavailable')],
       ['forget',     await TH.expectBad(deviceDB.tryForget(asked), 'storage_unavailable')],
       ['listLeases', await TH.expectBad(deviceDB.tryListLeases(), 'storage_unavailable')],
+      ['delRawLease', await TH.expectBad(deviceDB.tryDelRawLease(asked), 'storage_unavailable')],
     ] as const
     for (const [verb, err] of refused) {
       expect(err.message).to.include(verb)
