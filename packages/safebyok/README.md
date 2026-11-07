@@ -80,6 +80,10 @@ Easy to get wrong:
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
 * `bank.vacate()` is sign-out: it erases this device's leases and leaves the vaultDB alone.
+* **When the signed-in user changes, vacate the bank and make another.** A bank and everything it
+  hands out keep the `user_id` they were made with for life; safebyok never moves them to a new
+  one, and does not notice the change for you. On sign-out, or a sign-in as someone else, call
+  `bank.vacate()`, then `Bank.make` for the new user.
 
 ## Showing a whisper
 
