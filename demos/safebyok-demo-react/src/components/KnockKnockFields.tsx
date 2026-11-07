@@ -19,7 +19,7 @@ const useIsShowing = (box: Box | null): boolean => (
 /** The knock-knock machine with its API key in a field safebyok fills and reads, so the key never passes through React. */
 export const KnockKnockFields = () => {
   const bank = useBank()
-  const { stage } = useVault(Vaultlabel)
+  const { stage, vault } = useVault(Vaultlabel)
   const box = useBox(Vaultlabel, Boxlabel)
   const isShowing = useIsShowing(box)
   const fieldId = useId()
@@ -55,9 +55,9 @@ export const KnockKnockFields = () => {
   })
 
   // What the knock reads is the whisper as saved, not an edit still in the field.
+  // The vault in hand, never bank.ensureVault: a knock with no vault builds none.
   const apiKeyOf = async (): Promise<string | null> => {
-    if (bank === null) { return null }
-    const vault = await bank.ensureVault({ vaultlabel: Vaultlabel })
+    if (vault === null) { return null }
     await vault.ensureUnlocked()
     const stored = await vault.getBox(Boxlabel, { ifAbsent: 'nil' })
     if (stored === null) { return null }

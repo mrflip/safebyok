@@ -99,9 +99,9 @@ describe("KnockKnockFields", () => {
     vi.stubGlobal('fetch', anthropic.fetchFn)
     renderFlow()
     await knockAs('Banana')
-    await TH.answerPassphraseDialog()
     await screen.findByText('Save your Anthropic API key first.')
     expect(anthropic.seen).to.have.lengthOf(0)
+    await TH.expectProbe('unborn none')
   })
 
   it("asks who's there before it knocks", async () => {
