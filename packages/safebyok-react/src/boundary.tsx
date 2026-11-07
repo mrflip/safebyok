@@ -32,12 +32,15 @@ export const useRoundFor = (thing: object): number => {
 }
 
 /** The safebyok-react component a {@link forBoundary} report comes from, which its message names. */
-export type BoundarySource = 'PassphraseModal' | 'GatingModal'
+export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'DelVaultModal'
+
+const LeftOut = "It is left out of this report, as it may quote what the user typed"
 
 /** Where to look, by the component, for an error that was not the vault's own. */
 const LookFor: Record<BoundarySource, string> = {
-  PassphraseModal:     "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice.",
-  GatingModal:         "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice.",
+  PassphraseModal:        `${LeftOut}: check the functions the app handed the dialog, such as passphraseAdvice.`,
+  ReplacePassphraseModal: `${LeftOut}: check the functions the app handed the dialog, such as passphraseAdvice.`,
+  DelVaultModal:          `${LeftOut}.`,
 }
 
 /** What a component throws in render for its {@link Boundary} in place of `err`, so what React reports carries nothing the user typed. */

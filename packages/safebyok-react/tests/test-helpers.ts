@@ -4,7 +4,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished } from 'vitest'
-import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Outcome, type RequestCleartext } from 'safebyok'
+import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gatingkind, type Outcome, type RequestCleartext } from 'safebyok'
 import { VaultScopeGiven, anyStrengthChecker, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import type { BankProviderProps } from '../src/bank-provider'
 import type { PassphraseGating } from '../src/passphrase-modal'
@@ -77,7 +77,7 @@ export const withoutGesture = () => {
 }
 // --
 
-// == [Held gatings]: heldGatingOf, building, unlocking, passphraseGatingOf
+// == [Held gatings]: heldGatingOf, building, unlocking, replacing, deleting, addingPasskey, passphraseGatingOf, gatingOfKind
 
 /** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, held open until it settles or the test calls `close`, as a host's requestCleartext holds it while its dialog shows; and `raising`, the outcome of `raise`.
  *
@@ -109,6 +109,31 @@ export const unlocking = async (bank: Bank) => {
   return vault.tryEnsureUnlocked()
 }
 
+/** What opens a `replace_passphrase` gating on a bank whose vault is built, locked or not. */
+export const replacing = async (bank: Bank) => {
+  const vault = await bank.ensureVault(VaultScopeGiven)
+  return vault.tryReplacePassphrasePrompt()
+}
+
+/** What opens a `del_vault` gating on a bank whose vault is built, locked or not. */
+export const deleting = async (bank: Bank) => {
+  const vault = await bank.ensureVault(VaultScopeGiven)
+  return vault.tryDelVaultPrompt()
+}
+
+/** What opens an `add_passkey` gating on a bank whose vault is built and holds no passkey. */
+export const addingPasskey = async (bank: Bank) => {
+  const vault = await bank.ensureVault(VaultScopeGiven)
+  return vault.tryAddPasskeyPrompt()
+}
+
+/** `gating`, which the test knows to be of `gatingkind`. */
+export const gatingOfKind = <KindT extends Gatingkind>(gating: AnyGating, gatingkind: KindT): Extract<AnyGating, { gatingkind: KindT }> => {
+  const isOfKind = (some: AnyGating): some is Extract<AnyGating, { gatingkind: KindT }> => some.gatingkind === gatingkind
+  if (isOfKind(gating)) { return gating }
+  throw new Error(`not a ${gatingkind} gating: ${gating.gatingkind}`)
+}
+
 /** `gating`, which the test knows to be a `build_vault` or `unlock_vault` one. */
 export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
   if (gating.gatingkind === 'build_vault' || gating.gatingkind === 'unlock_vault') { return gating }
@@ -116,7 +141,7 @@ export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
 }
 // --
 
-// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase
+// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitDeletion
 
 /** Types the passphrase in the dialog and presses Unlock. */
 export const submitPassphrase = (passphrase: string) => {
@@ -129,5 +154,18 @@ export const submitNewPassphrase = (passphrase: string, confirming: string = pas
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.change(screen.getByPlaceholderText('confirm vault passphrase'), { target: { value: confirming } })
   fireEvent.click(screen.getByText('Create vault'))
+}
+/** Types the passphrase in use, a new one and its confirmation, `confirming` if given, and presses Change passphrase. */
+export const submitReplacement = (antePassphrase: string, nextPassphrase: string, confirming: string = nextPassphrase) => {
+  fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: antePassphrase } })
+  fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: nextPassphrase } })
+  fireEvent.change(screen.getByPlaceholderText('confirm new passphrase'), { target: { value: confirming } })
+  fireEvent.click(screen.getByText('Change passphrase'))
+}
+
+/** Types the passphrase in the deletion dialog and presses Delete vault. */
+export const submitDeletion = (passphrase: string) => {
+  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(screen.getByText('Delete vault'))
 }
 // --

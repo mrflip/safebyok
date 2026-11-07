@@ -1,9 +1,11 @@
 import { useEffect, useRef, type ComponentType } from 'react'
 import type { AnyGating, Gating, Gatingkind } from 'safebyok'
+import { DelVaultModal } from './del-vault-modal'
 import type { DialogAnswer, PassphraseAdvice } from './modal'
 import { PassphraseModal } from './passphrase-modal'
+import { ReplacePassphraseModal } from './replace-passphrase-modal'
 
-/** What GatingModal is handed: any gating, and the passphrase dialog's other props. */
+/** What GatingModal is handed: any gating, and the props its dialogs share. */
 export type GatingModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              AnyGating
@@ -13,7 +15,7 @@ export type GatingModalProps = {
   leaseMillis?:        number | undefined
   /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase. Default: the bank's strength checker's reason. */
+  /** What to say beside the field as the user chooses a new passphrase. Default: the bank's strength checker's reason. */
   passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
@@ -22,8 +24,10 @@ type KindModalProps<KindT extends Gatingkind> = Omit<GatingModalProps, 'gating'>
 
 /** The dialog for each gatingkind that has one. */
 const DialogForGatingkind: { [KindT in Gatingkind]?: ComponentType<KindModalProps<KindT>> } = {
-  build_vault:  PassphraseModal,
-  unlock_vault: PassphraseModal,
+  build_vault:        PassphraseModal,
+  unlock_vault:       PassphraseModal,
+  replace_passphrase: ReplacePassphraseModal,
+  del_vault:          DelVaultModal,
 }
 
 /** What stands in for a gatingkind with no dialog yet: it answers 'declined' as it mounts. */
