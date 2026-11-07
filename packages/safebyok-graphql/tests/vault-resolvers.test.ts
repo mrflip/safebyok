@@ -211,7 +211,7 @@ describe("vaultResolvers' watch", () => {
     await TH.emptyTables()
     const { listening, schema } = await watchedServer()
     const { stream } = await watching(schema, { user_id: 'u1' })
-    expect(listening.size).to.eq(1)
+    await vi.waitFor(() => { expect(listening.size).to.eq(1) })
     await stream.return(undefined)
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
   })
