@@ -1,5 +1,7 @@
 # Sprint react_new: paused for a restack
 
+**Resumed 2026-11-07**: the Coach merged #573 to #578 (no restack was needed; #579 already stood on them). See the plan's status line.
+
 Paused 2026-11-07. Every remaining thread waits on one restack, which the `/restacker` skill
 won't run for an agent: the base checkout's copy still sets `disable-model-invocation`, though
 main dropped it in #536.
