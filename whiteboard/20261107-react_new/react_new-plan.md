@@ -604,11 +604,20 @@ below are mine as the React developer, on their merits.
 * *Levels:* worker default; review `low`; style pass `opus` (naming and vocabulary).
 * *Touches:* packages safebyok, safebyok-indexeddb, -postgres, -convex, -graphql, -react if it names
   them, the demo, e2e, docs.
-* *Depends on:* nothing unmerged. Cut from `origin/main` when a slot frees ("at your leisure").
+* *Depends on:* 15 (the device-db rename). Cut when a slot frees ("at your leisure") and 15 has filed.
   Thread 8 (`DevVaultDBInspector`) and 16 meet these names: whichever lands later follows them.
   *Size:* medium (wide but mechanical).
-* *Open:* `storage/device-db-new.ts` has the same `-new` suffix; thread 15 is in it now. A row asks
-  whether 18 renames it too, after 15.
+* **Brands** (the Coach in chat, 2026-11-07): "isVaultDB should check a brand (getter, as bank and
+  vault do it) on all the classes (graphql and adapter and children); isVaultDBAdapter should check a
+  brand that's just on the adapter and children". So: `isVaultDB` (`helpers/consts.ts`) checks the
+  `IsVaultDB` getter brand, which `AdapterVaultDB` and `GraphqlVaultDB` (and so every child) answer
+  true to (they do today: keep it so). A new getter brand, answered only by `AdapterVaultDB` and its
+  children, with its own guard: *Orchestrator:* spelled `IsAdapterVaultDB` / `isAdapterVaultDB`, to
+  match the class (the Coach said `isVaultDBAdapter`; I told them, and they may flip it). Where the
+  shapes check a store by its verbs today (`isVaultDBVerbs`, `brandedVaultDB`), the worker sees
+  whether the brand check is what is wanted there, and says so in the PR.
+* `storage/device-db-new.ts` → `device-db.ts` too (the Coach, 2026-11-07), with every import. Thread
+  15 (#586) is in that file: cut 18 after 15 files, from its tip or from main once #586 merges.
 
 ## For the Coach
 
