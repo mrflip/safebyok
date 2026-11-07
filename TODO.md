@@ -399,6 +399,13 @@ checks it in the base, and `forget` leaves the check to the store, one atomic st
 delete. A key that also held the `vault_tok` would make `forget` a delete at a key, with no check
 to run. The design question: which fields the key holds, and what it ameliorates beyond that.
 
+### The demo's move to the new core must not share a `dbName` with the old
+
+The new core's device store wipes, unread, every older database of its `dbName`, and `${dbName}:device_db`
+is the old core's live one. A demo that runs the old and the new device store under one `dbName` would
+have the new store delete the old one's database from under it: give the new core a `dbName` of its own
+(or finish the move in one step) when the demo moves over.
+
 ## Potential Optimizations
 
 ### A storage read begun before a create can undo it
