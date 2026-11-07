@@ -88,6 +88,7 @@ describe("vaultResolvers", () => {
       [VaultOperations.revokePasskey, { params: gateParamsOf(record, { passkey_wayin: null }) }, DB.revokePasskeyAnswer],
       [VaultOperations.delBox, { tombstone: TH.boxTombstoneOf(box), opts }, DB.delBoxAnswer],
       [VaultOperations.delVault, { tombstone: TH.vaultTombstoneOf(record), opts }, DB.delVaultAnswer],
+      [VaultOperations.tidyGone, TH.bankScope, DB.tidyGoneAnswer],
     ]
     for (const user_id of ['u2', null]) {
       for (const [source, variableValues, answerCheck] of asked) {
@@ -128,6 +129,8 @@ describe("vaultResolvers", () => {
     const vault = revoked.val as DB.VaultRecord
     const goneVault = DB.delVaultAnswer.parse(await sent(schema, VaultOperations.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: DB.revisionOf(vault) } }))
     expect(goneVault).to.deep.include({ ok: true, val: TH.vaultTombstoneOf(vault) })
+    const tidied = DB.tidyGoneAnswer.parse(await sent(schema, VaultOperations.tidyGone, TH.bankScope))
+    expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0 }, world: TH.bankScope })
   })
 
   it("takes the store's default for an option left out", async () => {
@@ -263,7 +266,7 @@ describe("VaultSchemaSdl", () => {
   it("builds alone, every root field it adds named safebyok...", () => {
     const rootFields = [schema.getQueryType(), schema.getMutationType(), schema.getSubscriptionType()]
       .flatMap((root) => (isObjectType(root) ? Object.keys(root.getFields()) : []))
-    expect(rootFields).to.have.lengthOf(12)
+    expect(rootFields).to.have.lengthOf(13)
     for (const fieldname of rootFields) { expect(fieldname).to.match(/^safebyok[A-Z]/) }
   })
 

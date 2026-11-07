@@ -4,9 +4,9 @@
 
 A vaultDB's verbs are an interface of their own, so a client of a store can stand where the store does. Nothing here reads what an older release wrote or sent.
 
-* `VaultDBVerbs` (`safebyok`, `safebyok/storage`) names the verbs a model calls, plain and `try*`, and `VaultDBVerbnames` lists them. The abstract `VaultDB` implements it; `tidyGone` stays on the store alone.
+* `VaultDBVerbs` (`safebyok`, `safebyok/storage`) names the verbs a model calls, plain and `try*`, and `VaultDBVerbnames` lists them. The abstract `VaultDB` implements it, `tidyGone` and `tryTidyGone` among its verbs, so a client of a store offers them too.
 * `BankOpts.vaultDB` and the listing models take a `VaultDBVerbs`. The check of it now asks for each verb as a function as well as the brand, and refuses, as `bad_option`, a branded object missing one.
-* `safebyok/storage` exports the checks a client parses a vaultDB's answers with off a wire, where an absent field arrives as null: one per verb (`listVaultsAnswer` to `delBoxAnswer`), `crossedNotice` for a watch, and `crossedErr`, `crossedReqParams`, `damagedVault` and `damagedBox`. Each parses to the answer the verb returns, its refusal a `VaultError` again; a field it does not know, or a damaged row outside `damaged_rows`, is `unexpected_error`.
+* `safebyok/storage` exports the checks a client parses a vaultDB's answers with off a wire, where an absent field arrives as null: one per verb (`listVaultsAnswer` to `delBoxAnswer`, and `tidyGoneAnswer`), `crossedNotice` for a watch, and `crossedErr`, `crossedReqParams`, `damagedVault` and `damagedBox`. Each parses to the answer the verb returns, its refusal a `VaultError` again; a field it does not know, or a damaged row outside `damaged_rows`, is `unexpected_error`.
 * `fetchFailed` (`safebyok/storage`) is the sentence a client of a GraphQL server says a failed request in.
 * `ListAct` names the acts of a listing, and `IsVaultDB` (`safebyok/storage`) is the brand a vaultDB of your own answers true to.
 * A damaged row crossing a wire keeps the label it is stored under, though that label fails a label's check.

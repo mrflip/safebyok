@@ -123,6 +123,7 @@ const AnswerChecks = [
   ['safebyokRevokePasskey',     DB.revokePasskeyAnswer],
   ['safebyokDelBox',            DB.delBoxAnswer],
   ['safebyokDelVault',          DB.delVaultAnswer],
+  ['safebyokTidyGone',          DB.tidyGoneAnswer],
   ['safebyokWatch',             DB.crossedNotice],
 ] as const
 

@@ -153,7 +153,7 @@ export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
   return twin
 }
 
-/** The PostgresVaultDB behind a browser's store, for the battery's races and its `tidyGone`. */
+/** The PostgresVaultDB behind a browser's store, for the battery's races. */
 export const storeOf = (vaultDB: GraphQLVaultDB): VaultDB => serverOf(vaultDB).store
 // --
 

@@ -52,7 +52,7 @@ const boxAnswer = `fragment SafebyokBoxAnswerFields on SafebyokBoxAnswer {
 const vaultAnswerFragments = [vaultAnswer, vaultRow, gate, ciphered, reqParams, err].join('\n')
 const boxAnswerFragments = [boxAnswer, row, boxRow, vaultRow, gate, ciphered, reqParams, err].join('\n')
 
-/** The operation documents a client of `safebyok-graphql/server` sends, one per front verb and one for the watch. */
+/** The operation documents a client of `safebyok-graphql/server` sends, one per verb and one for the watch. */
 export const VaultOperations = {
   listVaults: `query SafebyokListVaults($applabel: String!, $user_id: String!) {
   safebyokListVaults(applabel: $applabel, user_id: $user_id) {
@@ -121,6 +121,17 @@ ${boxAnswerFragments}`,
   safebyokDelVault(tombstone: $tombstone, opts: $opts) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
+
+  tidyGone: `mutation SafebyokTidyGone($applabel: String!, $user_id: String!) {
+  safebyokTidyGone(applabel: $applabel, user_id: $user_id) {
+    ok act
+    val { totalCount }
+    world { applabel user_id }
+    req_params { ...SafebyokReqParamsFields }
+    err { ...SafebyokErrFields }
+  }
+}
+${[reqParams, err].join('\n')}`,
 
   watch: `subscription SafebyokWatch($applabel: String!, $user_id: String!, $vaultlabel: String) {
   safebyokWatch(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel) {

@@ -4,7 +4,7 @@ import * as DB from 'safebyok/storage'
 import type {
   AddPasskeyParams, Answer, BankListed, BankScope, BoxesListed, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelAct, DelOpts, GoodAnswer, GotAct,
   IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, RevokePasskeyParams, VaultDBVerbs, VaultQuery,
-  VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope,
+  Tidied, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope,
 } from 'safebyok/storage'
 import { VaultOperations } from './vault-operations'
 
@@ -157,7 +157,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
   }
   // --
 
-  // == [Dels]: delBox, tryDelBox, delVault, tryDelVault
+  // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
   /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> { return goodAnswerOf(await this.tryDelBox(tombstone, opts)) }
@@ -176,6 +176,16 @@ export class GraphQLVaultDB implements VaultDBVerbs {
     return await answerOf('delVault', DB.reqParamsOf({ ...tombstone, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.delVault, 'safebyokDelVault', { tombstone: DB.vaultTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
       return DB.delVaultAnswer.parse(rowAnswerOf(answer))
+    })
+  }
+
+  /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
+  async tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> { return goodAnswerOf(await this.tryTidyGone(scope)) }
+
+  async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> {
+    return await answerOf('tidyGone', DB.reqParamsOf(scope), async () => {
+      const answer = await this.#told(VaultOperations.tidyGone, 'safebyokTidyGone', DB.bankScope.parse(scope))
+      return DB.tidyGoneAnswer.parse(tidiedAnswerOf(answer))
     })
   }
   // --
@@ -302,7 +312,7 @@ const afterAPause = (resubscribe: () => void): () => void => {
 const noop = (): void => undefined
 // --
 
-// == [Typenames]: Drop, dropTypename, wayinOf, gateOf, rowOf, rowsOf, listedOf, answerDrop, rowAnswerOf, listedAnswerOf
+// == [Typenames]: Drop, dropTypename, wayinOf, gateOf, rowOf, rowsOf, listedOf, answerDrop, rowAnswerOf, listedAnswerOf, tidiedAnswerOf
 
 // An exchange such as urql's cacheExchange adds `__typename` to each selection a document makes. It is dropped
 // selection by selection, never by a deep strip: a sidecar, a meta or a damaged row may hold a `__typename` of its own.
@@ -339,4 +349,5 @@ const answerDrop = (valDrop: Drop): Drop => (val) => dropTypename(val, { val: va
 
 const rowAnswerOf = answerDrop(rowOf)
 const listedAnswerOf = answerDrop(listedOf)
+const tidiedAnswerOf = answerDrop(dropTypename)
 // --

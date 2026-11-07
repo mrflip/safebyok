@@ -42,6 +42,7 @@ describe("AX's answer checks", () => {
       [AX.delBoxAnswer,     await vaultDB.tryDelBox(boxTombstoneOf(boxAt(1)), { prior: SX.revisionOf(boxAt(1)) })],
       [AX.putVaultAnswer,   await vaultDB.tryPutVault(vaultAt(0, 'life2', { vaultlabel: 'second' }), { prior: SX.VoidRevision })],
       [AX.delVaultAnswer,   await vaultDB.tryDelVault(vaultTombstoneOf(vaultAt()), { prior: SX.revisionOf(vaultAt()) })],
+      [AX.tidyGoneAnswer,   await vaultDB.tryTidyGone(bankScope)],
     ] as const
     for (const [check, answer] of answers) {
       expect(answer.ok, answer.ok ? "" : `${answer.act}: ${answer.err.message}`).to.be.true

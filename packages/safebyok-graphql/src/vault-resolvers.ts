@@ -24,6 +24,7 @@ export type VaultFieldArgs = {
   safebyokRevokePasskey:     { params: DB.RevokePasskeyParams }
   safebyokDelBox:            { tombstone: DB.BoxTombstone, opts: DB.DelOpts }
   safebyokDelVault:          { tombstone: DB.VaultTombstone, opts: DB.DelOpts }
+  safebyokTidyGone:          DB.BankScope
   safebyokWatch:             DB.BankScope & { vaultlabel?: string | null }
 }
 
@@ -73,6 +74,7 @@ export type VaultResolvers<ContextT> = {
     safebyokRevokePasskey:     VaultFieldResolver<ContextT, 'safebyokRevokePasskey'>
     safebyokDelBox:            VaultFieldResolver<ContextT, 'safebyokDelBox'>
     safebyokDelVault:          VaultFieldResolver<ContextT, 'safebyokDelVault'>
+    safebyokTidyGone:          VaultFieldResolver<ContextT, 'safebyokTidyGone'>
   }
   Subscription: {
     safebyokWatch: {
@@ -156,6 +158,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokRevokePasskey:     async (_parent, { params }, context) => await served(context, params.user_id, params, async () => await vaultDB.tryRevokePasskey(params)),
       safebyokDelBox:            async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelBox(tombstone, opts)),
       safebyokDelVault:          async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelVault(tombstone, opts)),
+      safebyokTidyGone:          async (_parent, scope, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),
     },
     Subscription: {
       safebyokWatch: {

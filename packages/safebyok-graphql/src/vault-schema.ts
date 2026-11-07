@@ -1,6 +1,6 @@
 import { refusalkindVals } from 'safebyok/storage'
 
-// Each operation is one of a vaultDB's front verbs, and answers what its `try*` form answers, as a
+// Each operation is one of a vaultDB's verbs, and answers what its `try*` form answers, as a
 // typed object whose refusal is its `err` field: a GraphQL error is left to what GraphQL itself
 // refuses, a wire out of step. Scopes are arguments of their own on a get, so a host's logs and
 // allowlists see whose bank each one reaches. A sidecar, a damaged row and a refusal's meta are
@@ -42,7 +42,7 @@ const answerFields = `
   req_params: SafebyokReqParams!
   err:        SafebyokErr`
 
-/** The SDL of the GraphQL schema a vaultDB's front verbs cross by, every name in it prefixed `safebyok` to sit beside your own. */
+/** The SDL of the GraphQL schema a vaultDB's verbs cross by, every name in it prefixed `safebyok` to sit beside your own. */
 export const VaultSchemaSdl = `"""A JSON value carried whole: a box's sidecar, a damaged row, or a refusal's meta."""
 scalar SafebyokJson
 
@@ -202,6 +202,17 @@ type SafebyokBoxAnswer {${answerFields}
   dbhas:      SafebyokRow
 }
 
+"""A bank tidied: the box rows left in it."""
+type SafebyokTidied {
+  totalCount: Int!
+}
+
+"""What tidyGone answers: its val and the bank, or its err."""
+type SafebyokTidiedAnswer {${answerFields}
+  val:        SafebyokTidied
+  world:      SafebyokBankScope
+}
+
 """A row that changed and its vault row, or the err that ends the watch."""
 type SafebyokNotice {
   ok:    Boolean!
@@ -331,6 +342,7 @@ type Mutation {
   safebyokRevokePasskey(params: SafebyokRevokePasskeyInput!): SafebyokVaultAnswer!
   safebyokDelBox(tombstone: SafebyokBoxTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokBoxAnswer!
   safebyokDelVault(tombstone: SafebyokVaultTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokVaultAnswer!
+  safebyokTidyGone(applabel: String!, user_id: String!): SafebyokTidiedAnswer!
 }
 
 type Subscription {

@@ -40,7 +40,7 @@ export type VaultDBBatteryOpts<DBT extends VaultDBVerbs = VaultDBVerbs> = {
   makeCappedVaultDB?: (maxBoxes: number) => Awaitable<DBT>
   /** Makes the store's next call to its storage fail as its storage would; without it, that case is skipped. */
   _cheat_failNextCall?: (vaultDB: DBT) => Awaitable<void>
-  /** The store behind a client, where the battery slips a rival write in and calls `tidyGone`; without it, the store is `vaultDB` itself. */
+  /** The store behind a client, where the battery slips a rival write in; without it, the store is `vaultDB` itself. */
   _cheat_storeOf?: (vaultDB: DBT) => VaultDB
   /** False for a store whose watch hears nothing; its cases are then skipped. */
   watches?: boolean

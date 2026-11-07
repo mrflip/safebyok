@@ -48,7 +48,7 @@ export type CrossedErr = Z.output<typeof crossedErr>
 export type CrossedReqParams = Z.output<typeof crossedReqParams>
 // --
 
-// == [Answers]: listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, crossedNotice
+// == [Answers]: listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice
 
 /** The answer a verb returns, made from the one that crossed: its request's metadata as the core holds it, and its refusal a VaultError again. */
 const answerOfCrossed = <ValT, ActT extends string, WorldT>(crossed: Crossed<ValT, ActT, WorldT>): Answer<ValT, ActT, WorldT> => {
@@ -77,8 +77,8 @@ const vaultErrorOfCrossed = ({ refusalkind, message, meta }: CrossedErr, answere
 
 export const {
   listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer,
-  listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, crossedNotice,
-} = Checkers('unexpected_error', ({ obj, arr, str, lit, oneof, union, discrim }) => {
+  listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice,
+} = Checkers('unexpected_error', ({ obj, arr, str, uint, lit, oneof, union, discrim }) => {
   /** What makes the check of one verb's answer: its `val`, its acts, and its `world` and `dbhas`, good or refused. */
   type AnswerParts<ValT extends Z.ZodType, ActsT extends readonly [string, ...string[]], WorldT extends Z.ZodType> = {
     val: ValT, acts: ActsT, world: WorldT, badWorld: Z.ZodType, dbhas: Z.ZodType,
@@ -94,6 +94,7 @@ export const {
   const boxish    = { world: SX.vaultRecord, badWorld: SX.vaultRow, dbhas: union([SX.vaultRow, SX.boxRow]) }
   const bankListed  = obj({ vaults: arr(SX.vaultRow), damaged_rows: arr(damagedVault) }).strict()
   const boxesListed = obj({ boxes: arr(SX.boxSparse.strict()), damaged_rows: arr(damagedBox) }).strict()
+  const tidied      = obj({ totalCount: uint }).strict()
 
   const crossedNotice = discrim('ok', [
     obj({ ok: lit(true), act: oneof(['got', 'gone']), val: union([SX.vaultRow, SX.boxRow]), world: SX.vaultRow.nullable().default(null), err: lit(null).default(null) }).strict(),
@@ -115,6 +116,7 @@ export const {
     getBoxAnswer:            answerCheck({ val: SX.boxRecord.nullable(), acts: EX.gotActVals, ...boxish }),
     putBoxAnswer:            answerCheck({ val: SX.boxRow, acts: EX.putActVals, ...boxish }),
     delBoxAnswer:            answerCheck({ val: SX.boxTombstone, acts: EX.delActVals, ...boxish }),
+    tidyGoneAnswer:          answerCheck({ val: tidied, acts: ['tidied'], world: CX.bankScope, badWorld: lit(null), dbhas: lit(null) }),
     crossedNotice,
   }
 })

@@ -106,6 +106,10 @@ one. On sign-out, or a sign-in as someone else, call `bank.vacate()` and make a 
 `Bank.make` for the new user. The resolvers refuse the old bank's calls as `identity_revoked`, and
 that is all they do about it.
 
+`tidyGone`, which removes the box rows of deleted vaults and counts those left, is an operation like
+the rest, behind the same gate: a host calls `tidyGone({ applabel, user_id })` on its
+`GraphQLVaultDB`, and the vaultDB behind your resolvers tidies the signed-in user's bank.
+
 The vaultDB the resolvers call checks what it is sent, as the browser's vaultDB checks it before
 sending, so a caller that skips those checks, or is not a browser at all, is refused the same.
 

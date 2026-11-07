@@ -97,6 +97,9 @@ export interface VaultDBVerbs {
   /** Deletes a vault at `prior`, its live row or the damaged row `damaged_rows` lists, with the boxes of its life. */
   delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>>
   tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>>
+  /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
+  tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
+  tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>>
   /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. Nothing may count on a notice arriving. */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void
 }
@@ -106,7 +109,7 @@ export const VaultDBVerbnames = [
   'listVaults', 'tryListVaults', 'getVault', 'tryGetVault', 'listBoxes', 'tryListBoxes', 'getBox', 'tryGetBox',
   'putVault', 'tryPutVault', 'putBox', 'tryPutBox',
   'replacePassphrase', 'tryReplacePassphrase', 'addPasskey', 'tryAddPasskey', 'revokePasskey', 'tryRevokePasskey',
-  'delBox', 'tryDelBox', 'delVault', 'tryDelVault', 'watch',
+  'delBox', 'tryDelBox', 'delVault', 'tryDelVault', 'tidyGone', 'tryTidyGone', 'watch',
 ] as const satisfies readonly (keyof VaultDBVerbs)[]
 
 true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<keyof VaultDBVerbs, typeof IsVaultDB>>
@@ -396,7 +399,7 @@ export abstract class VaultDB implements VaultDBVerbs {
     } catch (err) { throw refusalOf(err, 'tidyGone', req_params) }
   }
 
-  async tryTidyGone(scope: BankScope) { return answerOf(() => this.tidyGone(scope)) }
+  async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> { return answerOf(() => this.tidyGone(scope)) }
   // --
 
   // == [Watch]: watch

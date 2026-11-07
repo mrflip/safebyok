@@ -7,7 +7,7 @@ import type { VaultDBVerbs } from '../../src/storage/vault-db-new'
 import type { BatteryWorld } from './vault-db-battery'
 
 /** Registers the dels' and tidyGone's cases over `world`. */
-export const describeDels = ({ storeWith, rowsOf, storeOf }: BatteryWorld): void => {
+export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
   /** The box row `openai` under the life `vault_tok` of the vault, as stored. */
   const storedBoxOf = async (vaultDB: VaultDBVerbs, vault_tok = 'life1'): Promise<unknown> => {
     const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, vault_tok)
@@ -126,17 +126,17 @@ export const describeDels = ({ storeWith, rowsOf, storeOf }: BatteryWorld): void
       const { vaultDB, vault } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'oldlife', boxAt(0, 'oldlife'))
       await rowsOf(vaultDB).plantBoxRow({ ...boxscope, vaultlabel: 'never' }, 'lost', 'whatever')
-      expect(await storeOf(vaultDB).tidyGone(bankScope)).to.deep.include({ act: 'tidied', val: { totalCount: 1 }, world: bankScope })
+      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ act: 'tidied', val: { totalCount: 1 }, world: bankScope })
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'oldlife')).to.have.property('size', 0)
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
-      expect(await storeOf(vaultDB).tidyGone(bankScope)).to.deep.include({ val: { totalCount: 0 } })
+      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 0 } })
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 0)
     })
 
     it("keeps the boxes under a vault row past reading, as it may yet be read", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { garbage: true })
-      expect(await storeOf(vaultDB).tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })
+      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })
   })
