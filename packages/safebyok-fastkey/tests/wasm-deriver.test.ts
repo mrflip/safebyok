@@ -1,3 +1,4 @@
+import { argon2id } from 'hash-wasm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type Bank, type BankOpts, VaultError, isVaultError } from 'safebyok'
 import { Argon2idWebV1, argon2idDeriver, argon2idWebV1Deriver, type KeyDeriver, type KeyDeriverSpec } from 'safebyok/browser'
@@ -63,25 +64,23 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
 })
 
 // Argon2id's own test vector, from its reference implementation (phc-winner-argon2's test.c:
-// version 0x13, 2 passes, 64 MiB, one lane, "password" and "somesalt"): both derivers must hit it,
-// so neither can agree with the other by sharing a mistake.
+// version 0x13, 2 passes, 64 MiB, one lane, "password" and "somesalt"). Its salt is 8 bytes, under the
+// 16 a keyDeriverSpec asks, so hash-wasm is asked directly with the vector's parameters; the core's
+// own tests hold noble to the same vector, so neither implementation can agree with the other by
+// sharing a mistake.
 describe("Argon2id's reference test vector", () => {
-  const ReferenceSpec: KeyDeriverSpec = { ...Argon2idWebV1, key_deriver_label: 'reference_vector', iterations: 2, salt_bytes: 8 }
   const ReferenceHex = '09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7'
 
-  it("is what the WebAssembly deriver derives", { timeout: 60_000 }, async () => {
-    const derived = await argon2idWasmDeriver(ReferenceSpec).deriveKeyBytes('password', new TextEncoder().encode('somesalt'))
-    expect(hexOf(derived)).to.eq(ReferenceHex)
-  })
-
-  it("is what the core's deriver derives", { timeout: 60_000 }, async () => {
-    const derived = await argon2idDeriver(ReferenceSpec).deriveKeyBytes('password', new TextEncoder().encode('somesalt'))
+  it("is what hash-wasm derives", { timeout: 60_000 }, async () => {
+    const derived = await argon2id({
+      password: 'password', salt: new TextEncoder().encode('somesalt'), iterations: 2, parallelism: 1, memorySize: 65_536, hashLength: 32, outputType: 'binary',
+    })
     expect(hexOf(derived)).to.eq(ReferenceHex)
   })
 })
 
 // Cheap specs, each pressing on a place two implementations could part: memory not a multiple of
-// four lanes' worth, several lanes, the shortest and longest salts, and passphrases past ASCII and
+// four lanes' worth, several lanes, the longest salt, and passphrases past ASCII and
 // past one BLAKE2b block.
 const SameBytesCases = [
   // regular usage:
@@ -92,7 +91,6 @@ const SameBytesCases = [
   [{ memory_kib: 37, parallelism: 2, iterations: 1 },    "correct horse battery staple",  'an odd memory, two lanes and a single pass'],
   [{ memory_kib: 8, parallelism: 1, iterations: 1 },     "correct horse battery staple",  "Argon2id's least memory and one pass"],
   [{ memory_kib: 1024, parallelism: 8 },                 "correct horse battery staple",  'eight lanes'],
-  [{ salt_bytes: 8 },                                    "correct horse battery staple",  "Argon2id's shortest salt"],
   [{ salt_bytes: 32 },                                   "correct horse battery staple",  'the longest salt a spec may ask for'],
   [{},                                                   "pässwörd mit Umlaut und 🔑",    'a passphrase past ASCII, encoded as UTF-8'],
   [{},                                                   "word ".repeat(40),              'a passphrase longer than one BLAKE2b block'],
@@ -181,7 +179,7 @@ describe("argon2idWasmDeriver", () => {
 // The core's parseKeyDeriverSpec is what both factories check with: these hold the two to the
 // same refusals, word for word, rather than restating the bounds.
 const UnworkableSpecs = [
-  [{ salt_bytes: 7 },                     'a salt under 8 bytes'],
+  [{ salt_bytes: 15 },                    'a salt under 16 bytes'],
   [{ salt_bytes: 33 },                    'a salt longer than 32 bytes'],
   [{ memory_kib: 64, parallelism: 9 },    'under 8 KiB for each of nine lanes'],
   [{ memory_kib: 1_048_577 },             'more than 1 GiB'],

@@ -1,11 +1,10 @@
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'
-import { MaxSaltBytes, PassphraseKeyBytes } from '../helpers/consts'
+import { MaxSaltBytes, MinSaltBytes, PassphraseKeyBytes } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 
-// == [Bounds]: MinArgon2SaltBytes, MaxMemoryKib, MinMemoryKibPerLane, Uint32Bound, ReservedLabelPrefix, TestLabelPrefix
+// == [Bounds]: MaxMemoryKib, MinMemoryKibPerLane, Uint32Bound, ReservedLabelPrefix, TestLabelPrefix
 
-const MinArgon2SaltBytes  = 8
 const MaxMemoryKib        = 1_048_576
 const MinMemoryKibPerLane = 8
 const Uint32Bound         = 2 ** 32
@@ -24,7 +23,7 @@ export const { keyDeriverSpec } = Checkers('bad_option', ({ obj, str, int, lit }
     memory_kib:        int.gte(MinMemoryKibPerLane).lte(MaxMemoryKib),
     iterations:        int.gte(1).lt(Uint32Bound),
     parallelism:       int.gte(1),
-    salt_bytes:        int.gte(MinArgon2SaltBytes).lte(MaxSaltBytes),
+    salt_bytes:        int.gte(MinSaltBytes).lte(MaxSaltBytes),
     output_bytes:      lit(PassphraseKeyBytes),
   }, Phrases.KeyDeriverSpecShape).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { error: Phrases.memoryPerLane(MinMemoryKibPerLane), path: ['memory_kib'] }),
 }))
