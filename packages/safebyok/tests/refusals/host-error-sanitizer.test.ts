@@ -41,6 +41,21 @@ describe("HostErrorSanitizer.refusalFor", () => {
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
+  const HostileCases = [
+    [undefined,                     'stands in for undefined thrown'],
+    ["sk-ant-fake-thrown-string",   'stands in for a bare string thrown, quoting none of it'],
+    [{ get message(): string { return quotingTrap() }, get name(): string { return quotingTrap() } }, 'stands in for an object whose getters throw, reading none of them'],
+  ] as const
+
+  for (const [foreign, blurb] of HostileCases) {
+    it(blurb, () => {
+      const refusal = HostErrorSanitizer.refusalFor(foreign, 'unexpected_error', 'The checker threw.')
+      expect(refusal).to.include({ refusalkind: 'unexpected_error', message: 'The checker threw.' })
+      expect(refusal.cause).to.be.undefined
+      expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
+    })
+  }
+
   it("stands in for a key deriver's throw quoting the passphrase", async () => {
     const keyDeriver = { deriveKeyBytes: (passphrase: string) => Promise.reject(new TypeError(`cannot derive ${passphrase}`)) }
     const deriveOrRefuse = async (passphrase: string) => {
