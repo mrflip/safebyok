@@ -107,6 +107,13 @@ describe("BankProvider's bank", () => {
     expect(reported[0]).to.include({ refusalkind: 'storage_unavailable' })
   })
 
+  it("throws a deviceDB that is no DeviceDB to the nearest error boundary", async () => {
+    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB: { ensureBank: vi.fn() } as unknown as MemoryDeviceDB })
+    const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
+    await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
+    expect(reported[0]).to.include({ refusalkind: 'bad_option' })
+  })
+
   it("throws an option Bank.make does not take to the nearest error boundary", async () => {
     const props = { ...TH.providerPropsOf(TH.makeBankWorld()), leaseHours: 3 } as Props
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Bank, MinuteMillis, type AnyGating, type BadNewsHandler, type BankOpts, type PanicHandler, type RequestCleartext, type Vault } from 'safebyok'
+import { brandedDeviceDB } from 'safebyok/storage'
 import { GatingModal } from './gating-modal'
 import type { PassphraseAdvice } from './modal'
 
@@ -146,7 +147,8 @@ export const BankProvider = (props: BankProviderProps) => {
     // A refusal from the deviceDB or Bank.make is thrown from the next render to the error boundary.
     const makeBank = async () => {
       try {
-        const { device_id } = await making.deviceDB.ensureBank({ applabel, user_id })
+        const deviceDB = brandedDeviceDB.parse(making.deviceDB, { where: 'deviceDB' })
+        const { device_id } = await deviceDB.ensureBank({ applabel, user_id })
         // Swept while the deviceDB answered: a sign-out, a new user, or StrictMode's second effect.
         if (! kept.held) { return }
         // Each prop Bank.make does not take is handed on as it came, for Bank.make to refuse.
