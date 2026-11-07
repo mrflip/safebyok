@@ -85,7 +85,7 @@ describe("VaultDB", () => {
       const heavy = boxAt(0, 'life1', { sidecar: { note: 'x'.repeat(3000) } })
       await expect(vaultDB.relay.putBox(heavy, { prior: SX.VoidRevision })).rejects.toSatisfy((err) => isVaultError(err, 'box_too_large'))
       await expect(vaultDB.relay.putBox(boxAt(1), { prior: SX.VoidRevision })).rejects.toSatisfy((err) => isVaultError(err, 'bad_option'))
-      await expect(vaultDB.relay.getVault({ ...vaultScope, vaultlabel: 'no way' })).rejects.toSatisfy((err) => isVaultError(err, 'bad_option'))
+      await expect(vaultDB.relay.getVault({ ...vaultScope, vaultlabel: 'no way' })).rejects.toSatisfy((err) => isVaultError(err, 'bad_scope'))
       expect(() => vaultDB.relay.watch({ ...bankScope, user_id: '' }, () => undefined)).to.throw(VaultError)
       expect(await vaultDB.relay.listBoxes({ ...vaultScope, vault_tok: 'life1' })).to.deep.equal({ vault: vaultAt(), boxes: [] })
     })
