@@ -13,9 +13,9 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** filed 1 (#573), 2 (#574), 3 (#577), 4 (#576), 12 (#575), 11 (#578). Thread 9 in review (#579) from
-  main (the devicedb_idb line merged at de4943bd6). Threads 5 and 13 wait on the Coach's
-  `/restacker 573 574 576 577 575 578`, which also brings the line onto the new main.
+* **Status:** **paused** 2026-11-07 for the Coach's `/restacker 573 574 576 577 575 578`
+  (`human/20261107-sprint_react_new_paused.md`). Filed: 1 (#573), 2 (#574), 3 (#577), 4 (#576),
+  12 (#575), 11 (#578), 9 (#579). Waiting: 5 and 13 on the restack; then 6, 7, 8; 10 last.
 
 ## Read first
 
@@ -363,6 +363,12 @@ More detail:
   CUSTOMIZATION.md, `.size-limit.json`.
 * *Depends on:* the `devicedb_idb` line, merged at `de4943bd6`. *Orchestrator:* cut from main there.
   *Size:* medium.
+* *Review:* `medium`, fixed. The checker threw without `Intl.Segmenter` (Hermes, browsers before
+  2024), so no vault could be built there; it now counts code points, with a test. Nothing on the
+  main entry's import path reaches zxcvbn. `browserOpts` supplies no `device_id` (row for the Coach).
+  Left: zxcvbn core loads at import, not lazily; scope names matched whole (both on Cleanup); one
+  reason for every weak passphrase; `idbDeviceDBOpts` lives outside `shapes/`; null-input cases; doc
+  blocks and titles. PR #579.
 
 ### 10. demo_browser
 

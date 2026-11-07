@@ -5,7 +5,7 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 
 ## Where things stand
 
-*Orchestrator:* thread 1 filed (#573); thread 2 reviewed, filing (#574); next 3, 4 and 12.
+*Orchestrator:* paused for the Coach's `/restacker 573 574 576 577 575 578`; filed 1, 2, 3, 4, 9, 11, 12.
 
 ## Facts every thread may need
 
@@ -103,3 +103,9 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 * *Orchestrator:* `browserOpts` supplies **no `device_id`**: a host (the demo) keeps passing its own.
 * *Orchestrator:* a check made before the dictionary loads triggers the load. A failed load answers
   weak with a "check your connection" reason, never throws.
+* *Orchestrator:* thread 9's review: the checker now counts code points where `Intl.Segmenter` is
+  missing (Hermes, older browsers). Nothing on the main entry's path reaches zxcvbn.
+* *Orchestrator:* **for thread 5 and later**: the line will sit on main `de4943bd6` after the
+  restack. The DeviceDB verbs there are `stow`, `peek`, `forget`, `listLeases` and `listRawLeases`.
+  `idbDeviceDB` is in `safebyok/browser` (#569), and `browserOpts` arrives with #579, which is not in
+  the line for 5 and 13 (it joins at thread 10).
