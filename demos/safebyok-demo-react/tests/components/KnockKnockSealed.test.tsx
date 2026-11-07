@@ -56,7 +56,7 @@ const storedBoxRows = (vaultDB: MemoryVaultDB) => {
 }
 
 describe("KnockKnockSealed", () => {
-  it("shows the field, and no key saved, before any Save", async () => {
+  it("shows no key saved before any Save", async () => {
     renderFlow()
     const field = await apiKeyField()
     expect(field.value).to.eq('')
@@ -89,7 +89,7 @@ describe("KnockKnockSealed", () => {
     await TH.expectProbe('present unlocked')
   })
 
-  it("asks for a key on a Save with nothing typed, and builds no vault", async () => {
+  it("asks for a key on a Save with nothing typed", async () => {
     renderFlow()
     await apiKeyField()
     await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled).to.be.false })
@@ -149,7 +149,7 @@ describe("KnockKnockSealed", () => {
     await TH.expectProbe('unborn none')
   })
 
-  it("stays quiet when the user cancels the dialog, and keeps what was typed", async () => {
+  it("stays quiet when the user cancels the dialog", async () => {
     renderFlow()
     const ensureVaultSpy = vi.spyOn(Bank.prototype, 'ensureVault')
     const field = await typeAndSave(FakeApiKey)
