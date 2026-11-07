@@ -6,7 +6,7 @@
 * **Issued by:** the Coach (flip), in the vaultdb_cleanup session, after the vaultdb line merged
   (#565 at 495cc5d6e). Orchestrated from that session, which keeps this sprint's doc.
 * **Sprint doc:** https://claude.ai/artifact/3qMSEQH3GzntNHvP5GnmXF (doc 16f29261-f869-4306-8e3f-0835488a0882; State enum 09b04c79-a30a; Open Matters body cac87088-f7d9, matters table mkdddhqd5bk.252; Cleanup body 5120dd02-4bc2; Progress body a81cd5bc-baaf; Resolved body 8f975549-eb13; Closer Look tab a7859c65-9b47, body d20a7781-cfd6 (read at 8dfc3a47c, worktree /workspace/byok-closerlook3); bookmark rev 2).
-* **Status:** 2026-11-07: #567-#570 merged; #571 filed (squashed, 4ceecca51); thread 6 (#580) flagged in review, waits on the Coach's G8 row.
+* **Status:** 2026-11-07: #567-#571 and #580 merged; #592 (thread 6's reworks) filed at c25f4a14a; thread 7 (brands) building, stacked on #592.
 
 ## The Coach's request, verbatim
 
@@ -332,6 +332,30 @@ network error; `thrownName` unchecked (host is not the threat model); `onBadNews
 `onNotice`; style findings for a documentarian. Thread 6 takes: a README sentence that `goodbye()`
 then `hello()` starts an ended watch again; the sonnet security.md check adds the 2026-10-15
 `maxBoxes` (~2912) and 2026-10-17 G285 (~3702) entries, which imply a host sets limits on the client.
+
+### 7. brands (the Coach, 2026-11-07, in chat)
+
+> we should be doing brands as Symbol.for not symbol(), attached with define property or a conventional getter in a class
+> definition. This puts it entirely out of range of coincidence, being a symbol key, and empowers the customer to brand and
+> object without hassle when they have reasons to. It doesn't appear as chaff in spreads or logs, and doesn't have split brain
+> esm drama. [...] please repair the things with objections: instanceof, weakmap, etc.
+>
+> brand(obj, Brand, val=true). Nothing accesses the brand directly, only via helper. Sentinels are ALLCAP, symbol keys are
+> UpperCamel.
+>
+> Leave logger alone. Make the other changes including letting the whisper be non enumerable. Can you take out the thing that
+> tells people to read that variable and say don't read it, use the provided attributes (isStorable, is veiled, etc). Go ahead
+> with the plan, thanks!
+
+*Orchestrator:* the trigger was the ESM/CJS dual-package hazard: `isVaultError` is an `instanceof` test, so with both builds
+loaded an adapter's refusals reach the host as `unexpected_error`. The `Symbol.for` brands already survive two copies; what
+does not is `instanceof` (VaultError, Wayin, Proving), `Symbol()` (`IsGuarded`, `NOVEL`). Touches `helpers/consts.ts`,
+`refusals/errors.ts`, `models/{gate,proving}.ts`, safebyok-react's `hooks.ts`, STYLE.md's brand rule, notes/guarantees.md and
+notes/security.md (sonnet). **Levels:** review `high` (guarantees). **Depends on:** #592 (consts.ts); meets #593's rename
+(react_new) at the restack. **Size:** M.
+*Held:* the Whispered bags stay enumerable, because the guarantee that a copy of a bag refuses at a put rides on it; raised
+with the Coach. The logger is left alone (the Coach). No `box.isVeiled` exists; the doc points at `box.isShowing`,
+`isWhisperedBag` and the ALLCAP sentinels.
 
 ## For the Coach
 
