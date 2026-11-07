@@ -13,7 +13,7 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 23; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** filed 1 (#573), 2 (#574), 12 (#575); in review 3 (#577), 4 (#576).
+* **Status:** filed 1 (#573), 2 (#574), 12 (#575), 3 (#577); 4 (#576) filing; then the restack of 4, 3, 12.
 
 ## Read first
 
@@ -122,8 +122,8 @@ Later rulings in the same session, verbatim where they bind the threads:
 
 ## The threads
 
-Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **5** (after restacking 3, 4 and 12
-into one line) beside **11**, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
+Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **5** and **11** side by side (after
+restacking 3, 4 and 12 into one line), then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
 **10** comes last.
 
 ### 1. core_for_react
@@ -211,6 +211,12 @@ thread 11.
 * *Depends on:* 2. Runs beside 4. *Size:* medium.
 * *Look-ahead:* thread 11 adds the passkey kinds the same way. Thread 5 restacks this thread with 4
   into one line, so keep `src/index.ts` edits to whole lines.
+* *Review:* `medium`, fixed. The demo's cancel tests await the prompt's own promise instead of
+  sleeping 20ms; *Delete account* refuses while the vault is `waiting` before it asks to confirm; one
+  style fix. Left: `confirm()` before the gesture-gated delete dialog can outlast the browser's
+  activation window, so a slow OK silently does nothing (fix rides in thread 5); a quiet `declined`
+  also hides "asked no one" (a row for the Coach); a duplicate `useSession` in `App.tsx` (thread 5);
+  duplicated `LookFor` strings and CSS; doc-block and test-title shape for the documentarian. PR #577.
 
 ### 4. react_boxes
 
@@ -240,6 +246,12 @@ thread 11.
 * *Look-ahead:* threads 5 to 8 build on these hooks. `DevBoxInspector` (8) uses `useBox` and so
   shares the Box with every flow; regressions.md's first entry applies, and the hooks' doc blocks
   say nothing of it beyond one line.
+* *Review:* `high`, fixed. `CreateVaultButton` stays disabled until the bank is `ready`; seven test
+  titles trimmed; a new test that `useBox` and `useBoxes` read none after the vault's tombstone. The
+  DOM paths were checked by hand: no whisper in state, props or attributes. Left: Show survives a
+  hide (thread 11); Unlock through `bank.tryEnsureVault` can open a build dialog for a vault deleted
+  elsewhere (thread 11 uses the vault in hand); `useBoxes` can't say "not listed yet" (a row for the
+  Coach); no double-click guard (recorded only); doc-block shape; test helper names. PR #576.
 
 ### 5. demo_fields
 
@@ -260,6 +272,11 @@ thread 11.
   could ship once the inspectors are removed. `lib/anthropic.ts` takes the key as text from
   whichever flow calls it.
 * After this thread, nothing in the demo imports `safebyok-old`.
+* Ride-alongs from thread 3's review (#577):
+  * *Delete account* calls `confirm()` before `vault.tryDelVaultPrompt()`, and a slow OK outlasts the
+    browser's activation window, so the gated dialog is declined unasked and nothing happens. Confirm
+    only on the unborn path; for a present vault the passphrase dialog is the confirmation.
+  * `App.tsx`'s `Page` calls `useSession(auth)` a second time; pass the session down.
 * *Touches:* `demos/safebyok-demo-react` (`src/lib/*`, `App.tsx`, new components, tests).
 * *Depends on:* 3, 4 and 12, restacked into one line first. *Size:* medium-large.
 * *Look-ahead:* threads 6 and 7 each add one sibling flow component beside `KnockKnockFields`;
@@ -368,7 +385,18 @@ shows it beside the other two.
   helpers. They are in git at `b903c131c`, to restore and rebuild rather than port line by line.
 * *Touches:* `passkey.ts`, `passkey-unlock-button.tsx`, `gating-modal.tsx`, their tests; demo
   `WaysIn`; README.
-* *Depends on:* 3. Runs beside 5. *Size:* medium.
+* Read the passkey gating kinds from the core (`add_passkey`, `revoke_passkey`), not from thread 3's
+  thread file, which says `replace_passkey` in one line.
+* Ride-alongs, two lines each:
+  * Export `ReplacePassphraseModal` and `DelVaultModal` (thread 3).
+  * `useRevealToggle` (`reveal-toggle.tsx`) resets to hidden when its field hides. Today Show
+    survives a lock, veil or unexpose, so the next unlock writes the key into a `type="text"` field
+    (thread 4's review). Never by remounting the input, which would unbind and unexpose.
+  * `VaultLockControl`'s Unlock calls `vault.tryEnsureUnlocked()` on the vault in hand rather than
+    `bank.tryEnsureVault`, so Unlock never creates a vault; only `CreateVaultButton` does (thread 4's
+    review).
+* *Depends on:* 3, 4 and 12, restacked into one line (its ride-alongs touch thread 4's files). Cut
+  beside 5 from the line's top. *Size:* medium.
 
 ### 12. provider_handlers
 
