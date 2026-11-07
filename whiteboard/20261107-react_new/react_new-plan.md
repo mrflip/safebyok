@@ -14,8 +14,8 @@
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
 * **Status:** running. Merged: 1, 2, 3, 4, 5 (#584), 9, 11, 12, 14. Filed, open: 13 (#583), 17
-  (#585), 15 (#586), 5's follow-up (#587), 6 (#588), 8 (#590). Reviewing: 16's rework (#589).
-  Building: 7 (on #588). Waiting: 18, to be cut from #589's tip. Thread 10 folded into 5 and 8.
+  (#585), 15 (#586), 5's follow-up (#587), 6 (#588), 16 (#589), 8 (#590), 7 (#591). Building: 18 (on
+  #589). Then wrap-up. Thread 10 folded into 5 and 8.
 
 ## Read first
 
@@ -332,6 +332,10 @@ of it (a `useExposedWhisper`-style hook), propose it in open matters rather than
 
 * *Levels:* worker `sonnet`; review `low`.
 * *Depends on:* 6. *Size:* small.
+* *Review:* low, fixed (#591): three test titles. Confirmed: the key is never in React state or
+  exposed (read once from `FormData`, then `form.reset()`). Ride-along done: direct tests for the
+  shared key helpers over a real in-memory Bank. Not done: the demo's `useIsShowing` → `useBoxIsShowing`
+  (needs #590 under it; at the restack or later).
 
 ### 8. dev_inspectors
 
