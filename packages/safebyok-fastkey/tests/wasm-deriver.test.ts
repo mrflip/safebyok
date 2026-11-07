@@ -33,6 +33,9 @@ const hexOf = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex')
 /** A whisper, stored on one device and read on another; an obvious fake. */
 const FakeWhisper = { apiKey: 'sk-fake-0000-not-a-real-key' }
 
+/** What Argon2id gives for 'correct horse battery staple' and `saltOf(16)` at the supplied spec's cost. */
+const SavedHex = 'efb4ef4c091ec9dacc4f1284c439742b414394599ffe4bbefc4dc300e4a4301b'
+
 TH.useBankWorlds()
 
 // The heart of the package: the same spec, passphrase and salt make the same bytes here as in the
@@ -51,6 +54,13 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
     const nobleBytes = await argon2idWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltBytes)
     expect(wasmBytes).to.have.lengthOf(32)
     expect([...wasmBytes]).to.deep.equal([...nobleBytes])
+  })
+
+  // The value was taken from hash-wasm's argon2id called directly (and agrees with noble's argon2idAsync), over the spec's
+  // memorySize 65_536, 3 iterations, 1 lane and 32 bytes, for the passphrase and saltOf(16) below; the core's browser.test.ts holds its deriver to it too.
+  it("derives the saved value for one fixed passphrase and salt, at the supplied spec's cost", { timeout: 60_000 }, async () => {
+    const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
+    expect(hexOf(wasmBytes)).to.eq(SavedHex)
   })
 
   it("derives 32 deterministic bytes, and a different salt lands somewhere else entirely", { timeout: 60_000 }, async () => {
