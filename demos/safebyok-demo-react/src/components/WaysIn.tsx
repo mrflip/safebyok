@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Outcome, Vault } from 'safebyok'
 import { passkeysAvailable, useVault, useVaultSnapshot } from 'safebyok-react'
+import { isQuietRefusal } from '../lib/refusals'
 
 /** The main vault's ways in -- its passphrase, and its passkey if it has one -- and the buttons that change them. */
 export const WaysIn = () => {
@@ -17,9 +18,7 @@ export const WaysIn = () => {
     setGripe(null)
     const prompted = await verb()
     if (prompted.ok) { return }
-    // A dialog the user cancelled, or a lock closed, has nothing to say.
-    const { refusalkind, message } = prompted.err
-    if (refusalkind !== 'declined' && refusalkind !== 'locked_while_asking') { setGripe(message) }
+    if (! isQuietRefusal(prompted.err)) { setGripe(prompted.err.message) }
   }
 
   return (

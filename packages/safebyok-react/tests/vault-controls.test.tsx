@@ -1,11 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { MinuteMillis, type RequestCleartext, type VaultError } from 'safebyok'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Bank, MinuteMillis, type RequestCleartext, type VaultError } from 'safebyok'
 import { BankProvider } from '../src/bank-provider'
 import { CreateVaultButton, VaultLockControl } from '../src/vault-controls'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
+
+afterEach(() => { vi.restoreAllMocks() })
 
 /** A requestCleartext that types the test's passphrase into every dialog, and the gatingkinds it was asked for. */
 const typingPassphrase = () => {
@@ -48,6 +50,18 @@ describe("VaultLockControl", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     await waitFor(() => { expect(lockWords()).to.eq('Vault locked') })
     expect(screen.getByText('Vault locked').parentElement?.dataset['lockState']).to.eq('locked')
+  })
+
+  it("unlocks the vault in hand, never asking the bank to ensure one", async () => {
+    const world = TH.makeBankWorld()
+    await TH.makeBankWithVault(world)
+    const ensuring = vi.spyOn(Bank.prototype, 'ensureVault')
+    const { requestCleartext } = typingPassphrase()
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext })}><VaultLockControl vaultlabel="main" /></BankProvider>)
+    await waitFor(() => { expect(lockWords()).to.eq('Vault locked') })
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    await waitFor(() => { expect(lockWords()).to.eq('Vault unlocked') })
+    expect(ensuring).not.toHaveBeenCalled()
   })
 
   it("stays locked, and tells nobody, when the user declines the dialog", async () => {

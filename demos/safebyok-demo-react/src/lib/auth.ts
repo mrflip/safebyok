@@ -1,4 +1,4 @@
-import { epochMillis, label, wallClock, type Clock, type StringStore } from 'safebyok-old'
+import type { StringStore } from './local-store'
 
 /**
  * SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex
@@ -30,16 +30,15 @@ export type Auth = {
  * passphrase is deliberately a separate thing from signing in.
  *
  * @param opts - `applabel`, namespacing the rows; `dbStore` and `deviceStore`, where they live;
- *   and `clock`, which stamps a new account's `registered_at` (default: the wall clock). Its
- *   reading is checked as the vault checks a host's clock: epoch milliseconds from 1981 to 2255,
- *   rounded down; any other refuses the sign-in that would stamp it.
+ *   and `clock`, which stamps a new account's `registered_at` in epoch milliseconds, rounded down
+ *   (default: the wall clock).
  *
  * @example
  *   const auth = createAuth({ applabel: 'acme', dbStore, deviceStore })
  *   const session = await auth.signIn('margo')  // { user_id: 'user_3f...', userlabel: 'margo' }
  */
-export const createAuth = (opts: { applabel: string, dbStore: StringStore, deviceStore: StringStore, clock?: Clock | undefined }): Auth => {
-  const { applabel, dbStore, deviceStore, clock = wallClock } = opts
+export const createAuth = (opts: { applabel: string, dbStore: StringStore, deviceStore: StringStore, clock?: AuthClock | undefined }): Auth => {
+  const { applabel, dbStore, deviceStore, clock = WallClock } = opts
   const accountCkey = (userlabel: string) => `account:${applabel}:${userlabel}`
   const sessionCkey = `session:${applabel}`
 
@@ -50,11 +49,8 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     registered_at: number
   }
 
-  /** A new account for `userlabel`, stamped with the clock's reading; null when that is no time the vault would accept. */
-  const newAccount = (userlabel: string): Account | null => {
-    const reading = epochMillis.safeParse(Math.floor(clock.now()))
-    return reading.success ? { user_id: randomId(), userlabel, registered_at: reading.data } : null
-  }
+  /** A new account for `userlabel`, stamped with the clock's reading. */
+  const newAccount = (userlabel: string): Account => ({ user_id: randomId(), userlabel, registered_at: Math.floor(clock.now()) })
 
   let session: Session | null = getSession()
   const listeners = new Set<() => void>()
@@ -82,16 +78,12 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     },
 
     signIn: (userlabel) => {
-      const checked = label.safeParse(userlabel)
-      if (! checked.success) {
+      if (! isUserlabel(userlabel)) {
         return Promise.reject(new Error('A username is 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter.'))
       }
-      const ckey = accountCkey(checked.data)
+      const ckey = accountCkey(userlabel)
       const existing = dbStore.get(ckey)
-      const account = existing === null ? newAccount(checked.data) : JSON.parse(existing) as Account
-      if (account === null) {
-        return Promise.reject(new Error("The demo's clock read no time between 1981 and 2255, in epoch milliseconds: check what it was handed."))
-      }
+      const account = existing === null ? newAccount(userlabel) : JSON.parse(existing) as Account
       if (existing === null) { dbStore.put(ckey, JSON.stringify(account)) }
       session = { user_id: account.user_id, userlabel: account.userlabel }
       deviceStore.put(sessionCkey, JSON.stringify(session))
@@ -115,6 +107,16 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
     },
   }
 }
+
+/** What the fake auth stamps a new account's time with: epoch milliseconds. */
+export type AuthClock = { now: () => number }
+
+const WallClock: AuthClock = { now: () => Date.now() }
+
+/** True for a username the demo takes: 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter. */
+const isUserlabel = (userlabel: string): boolean => (
+  (userlabel.length >= 2) && (userlabel.length <= 40) && /^[a-z][\da-z]*(?:_[\da-z]+)*$/.test(userlabel)
+)
 
 /** Opaque id from the platform CSPRNG: sixteen hex characters under a `user_` prefix. */
 const randomId = (): string => {
