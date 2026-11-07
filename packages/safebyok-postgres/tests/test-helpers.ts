@@ -2,7 +2,7 @@
 
 import { afterAll, beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
-import type { Boxscope, VaultDBOpts, VaultScope } from 'safebyok/storage'
+import type { AdapterVaultDBOpts, Boxscope, VaultScope } from 'safebyok/storage'
 import * as TH from 'safebyok/testing'
 import { PostgresVaultDB, VaultTablesSql, vaultChannelOf } from '../src/index'
 import type { PostgresClient, PostgresListen, PostgresVaultDBOpts } from '../src/index'
@@ -93,7 +93,7 @@ export const storeOver = async (opts: StoreOpts = {}): Promise<PostgresVaultDB> 
 }
 
 /** A fresh store over emptied tables. */
-export const makeVaultDB = async (opts?: VaultDBOpts & { maxBoxes?: number }): Promise<PostgresVaultDB> => {
+export const makeVaultDB = async (opts?: AdapterVaultDBOpts & { maxBoxes?: number }): Promise<PostgresVaultDB> => {
   await emptyTables()
   return await storeOver(opts)
 }

@@ -13,19 +13,8 @@ export const Applabel = 'safebyok_demo'
 /** The vault's storage: this browser's IndexedDB, behind the demo's outage switch. */
 export const vaultDB = new OutageVaultDB({ dbName: Applabel })
 
-const DeviceIdCkey = 'safebyok-demo:device_id'
-
-/** This browser's device_id: a UUID made on the first visit and kept in localStorage. */
-export const deviceIdOf = (storage: Storage = localStorage): string => {
-  const kept = storage.getItem(DeviceIdCkey)
-  if (kept !== null) { return kept }
-  const made = crypto.randomUUID()
-  storage.setItem(DeviceIdCkey, made)
-  return made
-}
-
-/** What the provider makes each user's bank with, but the user: the browser's batteries, this browser's device_id, and the vaultDB. */
-export const bankOpts = { ...browserOpts({ dbName: Applabel }), applabel: Applabel, device_id: deviceIdOf(), vaultDB }
+/** What the provider makes each user's bank with, but the user: the browser's batteries and the vaultDB. */
+export const bankOpts = { ...browserOpts({ dbName: Applabel }), applabel: Applabel, vaultDB }
 
 /** The fake auth's account rows: pretend-backend scaffolding, beside the vault's rows. */
 export const dbStore: StringStore = localStore('safebyok-demo:db:')

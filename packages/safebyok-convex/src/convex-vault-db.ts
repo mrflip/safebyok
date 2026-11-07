@@ -4,7 +4,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok/storage'
-import type { BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfVault, Tidied, VaultDBOpts, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
+import type { AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
@@ -39,7 +39,7 @@ export type ConvexReactWatchingClient = ConvexCalls & {
 export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
 
 /** What a {@link ConvexVaultDB} is made with. */
-export type ConvexVaultDBOpts = VaultDBOpts & {
+export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
   /** The app's Convex client. */
   client: ConvexVaultClient
   /** The safebyok functions the app serves, `api.safebyok`. */
@@ -59,7 +59,7 @@ type RowsWatched = {
 // == [The vaultDB]: ConvexVaultDB
 
 /** A VaultDB whose rows live in the host's Convex deployment, reached through the app's Convex client. */
-export class ConvexVaultDB extends DB.VaultDB {
+export class ConvexVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #client, #api, #maxBoxes
 
   readonly #client: ConvexVaultClient
@@ -78,7 +78,7 @@ export class ConvexVaultDB extends DB.VaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of VaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
     return await reaching('doListVaults', () => this.#client.query(this.#api.listVaults, { scope }))
@@ -240,7 +240,7 @@ const isSafebyokApi = (candidate: unknown): candidate is SafebyokApi => {
 
 /** The check of a {@link ConvexVaultDB}'s options. */
 const convexVaultDBOpts = DB.objCheck(({ custom, uint }) => ({
-  ...DB.vaultDBOpts.shape,
+  ...DB.adapterVaultDBOpts.shape,
   client:   custom<ConvexVaultClient>(isConvexClient, Phrases.ClientExpected),
   api:      custom<SafebyokApi>(isSafebyokApi, Phrases.ApiExpected),
   maxBoxes: uint.optional(),

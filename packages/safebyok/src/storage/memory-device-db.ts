@@ -1,27 +1,31 @@
 /** The deviceDB in memory. */
 
 import { ckeyOf } from '../helpers/helpers'
-import { DeviceDB } from './device-db-new'
-import type { VaultScope } from '../shapes/shapes-core'
+import { DeviceDB } from './device-db'
+import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+import type { BankRow, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
 const leaseCkeyOf = ({ applabel, user_id, vaultlabel }: VaultScope): string => ckeyOf(applabel, user_id, vaultlabel)
+const bankCkeyOf = ({ applabel, user_id }: BankScope): string => ckeyOf(applabel, user_id)
 
 /** A device store that keeps its rows in memory, for the page's life. */
 export class MemoryDeviceDB extends DeviceDB {
-  // == [Props]: #leaserows
+  // == [Props]: #leaserows, #bankrows
 
   readonly #leaserows = new Map<string, unknown>()
+  readonly #bankrows = new Map<string, unknown>()
   // --
 
-  // == [Rows]: _cheat_leaseRows
+  // == [Rows]: _cheat_leaseRows, _cheat_bankRows
 
   /** For tests: the map of lease rows, by scope. */
   _cheat_leaseRows(): Map<string, unknown> { return this.#leaserows } // eslint-disable-line unicorn/prefer-private-class-fields
+  /** For tests: the map of bank rows, by bank scope. */
+  _cheat_bankRows(): Map<string, unknown> { return this.#bankrows } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doListBanks
 
   protected doStow(row: LeaseRow): void {
     this.#leaserows.set(leaseCkeyOf(row), structuredClone(row))
@@ -42,6 +46,17 @@ export class MemoryDeviceDB extends DeviceDB {
 
   protected doDelRawLease(scope: VaultScope): void {
     this.#leaserows.delete(leaseCkeyOf(scope))
+  }
+
+  protected doEnsureBank(made: BankRow): unknown {
+    const stored = this.#bankrows.get(bankCkeyOf(made))
+    if (SX.bankRow.safeParse(stored).success) { return structuredClone(stored) }
+    this.#bankrows.set(bankCkeyOf(made), structuredClone(made))
+    return structuredClone(made)
+  }
+
+  protected doListBanks(): unknown[] {
+    return [...this.#bankrows.values()].map((row) => structuredClone(row))
   }
   // --
 }

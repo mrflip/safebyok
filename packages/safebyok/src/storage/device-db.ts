@@ -1,14 +1,15 @@
-/** The deviceDB: what the models cache on this device, a lease for each vault. A subclass writes the `do*` calls. */
+/** The deviceDB: what the models cache on this device, a lease for each vault and a bank row for each bank. A subclass writes the `do*` calls. */
 
 import { IsDeviceDB } from '../helpers/consts'
+import { randomId } from '../helpers/crypto'
 import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
 import * as CX from '../shapes/shapes-core'
-import { type VaultScope, isPlainBag } from '../shapes/shapes-core'
+import { type BankScope, type VaultScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+import type { BankRow, LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
 
 /** The base a host's device store extends, writing the `do*` calls. */
 export abstract class DeviceDB {
@@ -16,7 +17,7 @@ export abstract class DeviceDB {
 
   // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
   /** True: the brand a model knows a deviceDB by, from whichever copy of safebyok. */
-  get [IsDeviceDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
+  get [IsDeviceDB](): true { return true }
   // --
 
   // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases, delRawLease, tryDelRawLease
@@ -85,7 +86,31 @@ export abstract class DeviceDB {
   tryDelRawLease(scope: VaultScope): Promise<Outcome<void>> { return outcomeOf(() => this.delRawLease(scope)) }
   // --
 
-  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doDelRawLease
+  // == [Bank verbs]: ensureBank, tryEnsureBank, listRawBanks, tryListRawBanks
+
+  /** The bank row of this bank scope, made with a fresh random `device_id` on the first call. */
+  async ensureBank(scope: BankScope): Promise<BankRow> {
+    try {
+      const { applabel, user_id } = CX.bankScope.parse(scope)
+      const made = SX.bankRow.parse({ applabel, user_id, device_id: randomId() })
+      return SX.bankRow.parse(await this.doEnsureBank(made))
+    } catch (err) { throw refusalOf(err, 'ensureBank') }
+  }
+
+  tryEnsureBank(scope: BankScope): Promise<Outcome<BankRow>> { return outcomeOf(() => this.ensureBank(scope)) }
+
+  /** Every bank row stored on this device as a bag, unchecked, damaged rows among them. */
+  async listRawBanks(): Promise<Record<string, unknown>[]> {
+    try {
+      const rows = await this.doListBanks()
+      return rows.filter((row) => isPlainBag(row))
+    } catch (err) { throw refusalOf(err, 'listRawBanks') }
+  }
+
+  tryListRawBanks(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawBanks()) }
+  // --
+
+  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doListBanks
 
   // A store starts each call's work in the order called, or a `forget` made after a `stow` may not erase it.
   /** Stores `row` as the lease of its vault scope, over any row there. */
@@ -98,6 +123,10 @@ export abstract class DeviceDB {
   protected abstract doListLeases(): Awaitable<unknown[]>
   /** Removes whatever row is stored at this vault scope, in one step. */
   protected abstract doDelRawLease(scope: VaultScope): Awaitable<void>
+  /** The bank row stored at `made`'s bank scope where it passes its check, else `made`, stored over it, in one step. */
+  protected abstract doEnsureBank(made: BankRow): Awaitable<unknown>
+  /** Every bank row stored, in any order. */
+  protected abstract doListBanks(): Awaitable<unknown[]>
   // --
 }
 

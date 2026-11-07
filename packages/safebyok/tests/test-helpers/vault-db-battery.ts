@@ -6,8 +6,8 @@ import { _cheat_clock, _cheat_clockReset } from '../../src/helpers/clock'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { Awaitable } from '../../src/helpers/helpers'
 import type { Boxscope, VaultScope } from '../../src/shapes/shapes-core'
-import type { VaultDBOpts } from '../../src/shapes/shapes-storage'
-import type { VaultDB, VaultDBVerbs } from '../../src/storage/vault-db-new'
+import type { AdapterVaultDBOpts } from '../../src/shapes/shapes-storage'
+import type { AdapterVaultDB, VaultDB } from '../../src/storage/vault-db'
 import { Now, vaultAt, boxAt } from './storage-world'
 import { describeGets } from './vault-db-battery-gets'
 import { describePuts } from './vault-db-battery-puts'
@@ -29,19 +29,19 @@ export type VaultDBRowCheats = {
 }
 
 /** What a store hands {@link describeVaultDBBattery}: how to make one, and the backdoor to its rows. */
-export type VaultDBBatteryOpts<DBT extends VaultDBVerbs = VaultDBVerbs> = {
-  /** A fresh, empty store, passing `opts` to VaultDB's constructor. */
-  makeVaultDB: (opts?: VaultDBOpts) => Awaitable<DBT>
+export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
+  /** A fresh, empty store, passing `opts` to AdapterVaultDB's constructor. */
+  makeVaultDB: (opts?: AdapterVaultDBOpts) => Awaitable<DBT>
   /** The backdoor to a store's raw rows. */
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
   /** A second store over the same rows, as another device holds; without it, the races run over one store. */
-  makeTwin?: (vaultDB: DBT) => Awaitable<VaultDBVerbs>
+  makeTwin?: (vaultDB: DBT) => Awaitable<VaultDB>
   /** A fresh, empty store holding at most `maxBoxes` live boxes to a vault; without it, the cases of a cap are skipped. */
   makeCappedVaultDB?: (maxBoxes: number) => Awaitable<DBT>
   /** Makes the store's next call to its storage fail as its storage would; without it, that case is skipped. */
   _cheat_failNextCall?: (vaultDB: DBT) => Awaitable<void>
   /** The store behind a client, where the battery slips a rival write in; without it, the store is `vaultDB` itself. */
-  _cheat_storeOf?: (vaultDB: DBT) => VaultDB
+  _cheat_storeOf?: (vaultDB: DBT) => AdapterVaultDB
   /** False for a store whose watch hears nothing; its cases are then skipped. */
   watches?: boolean
   /** False for a store whose box notices come without their vault row, which a watch then hears with a null world. */
@@ -65,18 +65,18 @@ const batteryOpts = objCheck(({ fn, bool }) => ({
 
 /** What each part of the battery is handed: stores made fresh, and the hooks, over any store the world made. */
 export type BatteryWorld = {
-  fresh:                (opts?: VaultDBOpts) => Promise<VaultDBVerbs>
-  storeWith:            (opts?: { box?: boolean }) => Promise<{ vaultDB: VaultDBVerbs, vault: ReturnType<typeof vaultAt>, box: ReturnType<typeof boxAt> }>
-  rowsOf:               (vaultDB: VaultDBVerbs) => VaultDBRowCheats
-  twinOf:               (vaultDB: VaultDBVerbs) => Promise<VaultDBVerbs>
+  fresh:                (opts?: AdapterVaultDBOpts) => Promise<VaultDB>
+  storeWith:            (opts?: { box?: boolean }) => Promise<{ vaultDB: VaultDB, vault: ReturnType<typeof vaultAt>, box: ReturnType<typeof boxAt> }>
+  rowsOf:               (vaultDB: VaultDB) => VaultDBRowCheats
+  twinOf:               (vaultDB: VaultDB) => Promise<VaultDB>
   /** The store behind `vaultDB`, or `vaultDB` itself. */
-  storeOf:              (vaultDB: VaultDBVerbs) => VaultDB
+  storeOf:              (vaultDB: VaultDB) => AdapterVaultDB
   /** Whether the store gave {@link VaultDBBatteryOpts.makeCappedVaultDB}; without it, `makeCapped` throws. */
   hasCap:               boolean
-  makeCapped:           (maxBoxes: number) => Promise<VaultDBVerbs>
+  makeCapped:           (maxBoxes: number) => Promise<VaultDB>
   /** Whether the store gave {@link VaultDBBatteryOpts._cheat_failNextCall}; without it, `failNextCall` throws. */
   canFail:              boolean
-  failNextCall:         (vaultDB: VaultDBVerbs) => Promise<void>
+  failNextCall:         (vaultDB: VaultDB) => Promise<void>
   watches:              boolean
   boxNoticesCarryVault: boolean
 }
@@ -85,10 +85,10 @@ export type BatteryWorld = {
 const notGiven = (hookname: string) => (): never => { throw new TypeError(`The store gave the battery no ${hookname}.`) }
 
 // Every store a world's hooks are handed is one its own factories made, so the narrowing to DBT holds;
-// a world given no `_cheat_storeOf` was handed VaultDBs.
-const worldOf = <DBT extends VaultDBVerbs>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
+// a world given no `_cheat_storeOf` was handed AdapterVaultDBs.
+const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
   const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, _cheat_failNextCall, _cheat_storeOf, watches = true, boxNoticesCarryVault = true } = opts
-  const fresh = async (dbOpts?: VaultDBOpts): Promise<VaultDBVerbs> => await makeVaultDB(dbOpts)
+  const fresh = async (dbOpts?: AdapterVaultDBOpts): Promise<VaultDB> => await makeVaultDB(dbOpts)
   const storeWith = async ({ box: withBox = false } = {}) => {
     const vaultDB = await fresh()
     const vault = vaultAt()
@@ -102,7 +102,7 @@ const worldOf = <DBT extends VaultDBVerbs>(opts: VaultDBBatteryOpts<DBT>): Batte
     storeWith,
     rowsOf:       (vaultDB) => _cheat_rowsOf(vaultDB as DBT),
     twinOf:       async (vaultDB) => (makeTwin ? await makeTwin(vaultDB as DBT) : vaultDB),
-    storeOf:      (vaultDB) => (_cheat_storeOf ? _cheat_storeOf(vaultDB as DBT) : vaultDB as VaultDB),
+    storeOf:      (vaultDB) => (_cheat_storeOf ? _cheat_storeOf(vaultDB as DBT) : vaultDB as AdapterVaultDB),
     hasCap:       makeCappedVaultDB !== undefined,
     makeCapped:   makeCappedVaultDB ? async (maxBoxes) => await makeCappedVaultDB(maxBoxes) : notGiven('makeCappedVaultDB'),
     canFail:      _cheat_failNextCall !== undefined,
@@ -117,7 +117,7 @@ const worldOf = <DBT extends VaultDBVerbs>(opts: VaultDBBatteryOpts<DBT>): Batte
 
 // The opts are checked before anything registers, so a store missing a hook fails here, not inside each case.
 /** Registers the cases every VaultDB must pass, under `label`. */
-export const describeVaultDBBattery = <DBT extends VaultDBVerbs>(label: string, opts: VaultDBBatteryOpts<DBT>): void => {
+export const describeVaultDBBattery = <DBT extends VaultDB>(label: string, opts: VaultDBBatteryOpts<DBT>): void => {
   batteryOpts.parse(opts, { where: `describeVaultDBBattery("${label}")` })
   const world = worldOf(opts)
   describe(label, () => {

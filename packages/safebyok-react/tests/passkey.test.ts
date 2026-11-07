@@ -31,6 +31,42 @@ describe("passkeysAvailable", () => {
   })
 })
 
+const Making = TH.PasskeyMaking
+
+const SloppyMakingCases = [
+  // the bag itself:
+  [undefined,                                                        'no options at all'],
+  ["Acme",                                                           'a string in place of the options'],
+  [{ ...Making, rpId: "example.com" },                               "a field the options do not take, as askPasskey's rpId"],
+  // the relying party and the user:
+  [{ ...Making, rp: undefined },                                     'no relying party'],
+  [{ ...Making, rp: { name: "" } },                                  'a relying party with a blank name'],
+  [{ ...Making, rp: { name: "Acme", id: 42 } },                      'a relying party id that is no string'],
+  [{ ...Making, rp: { name: "Acme", domain: "example.com" } },       'a misspelt relying party id'],
+  [{ ...Making, user: { name: "u1" } },                              'a user without a displayName'],
+  [{ ...Making, user: { ...Making.user, id: "u1" } },                "the host's own user id, which would replace its sign-in passkey"],
+  // the timeout:
+  [{ ...Making, timeout: "30s" },                                    'a timeout in words'],
+  [{ ...Making, timeout: -1 },                                       'a negative timeout'],
+  [{ ...Making, timeout: 1.5 },                                      'a fractional timeout'],
+] as const
+
+describe("createPasskey's options", () => {
+  for (const [given, blurb] of SloppyMakingCases) {
+    it(`refuses ${blurb}, before the browser is asked`, async () => {
+      const authenticator = TH.installFakeAuthenticator()
+      expect(await refusalOf(createPasskey(given as never))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+      expect(authenticator.calls.create).to.have.lengthOf(0)
+    })
+  }
+
+  it("takes a relying party id and a timeout left undefined as left out", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    expect(await createPasskey({ rp: { name: 'Acme', id: undefined }, user: Making.user, timeout: undefined })).to.not.be.null
+    expect(authenticator.calls.create[0]?.publicKey).to.not.have.property('timeout')
+  })
+})
+
 describe("createPasskey", () => {
   it("makes a passkey and hands back its answer over a fresh salt", async () => {
     const authenticator = TH.installFakeAuthenticator()
@@ -143,6 +179,68 @@ describe("askPasskey", () => {
   it("refuses, in words a dialog shows, in a browser without WebAuthn", async () => {
     const asking = askPasskey(headerOf('AAAA', 'AAAA'))
     expect(await refusalOf(asking)).to.include({ refusalkind: 'wrong_passkey', message: Messages.noWebAuthn })
+  })
+})
+
+const SloppyAskingCases = [
+  // the header:
+  [undefined,                                       {},                        'no header at all'],
+  [{ wayinkind: "passkey" },                        {},                        'a passkey header without its credential id or salt'],
+  [{ wayinkind: "passkey", credential_id: "AAAA" }, {},                        'a passkey header without its salt'],
+  [{ wayinkind: "sms" },                            {},                        'a header of no wayinkind there is'],
+  [() => null,                                      {},                        'a function in place of the header'],
+  // the options:
+  [null,                                            null,                      'null options'],
+  [null,                                            { rpid: "example.com" },   'a misspelt rpId'],
+  [null,                                            { rpId: "" },              'a blank rpId'],
+  [null,                                            { timeout: 0 },            'a timeout of nothing'],
+] as const
+
+describe("askPasskey's header and options", () => {
+  for (const [header, opts, blurb] of SloppyAskingCases) {
+    it(`refuses ${blurb}, before the browser is asked`, async () => {
+      const authenticator = TH.installFakeAuthenticator()
+      expect(await refusalOf(askPasskey(header as never, opts as never))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+      expect(authenticator.calls.get).to.have.lengthOf(0)
+    })
+  }
+
+  // No vault the core read holds such a salt: it came from the host.
+  it("refuses a salt that is not base64url", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    const refused = await refusalOf(askPasskey(headerOf('AAAA', 'not base64url!')))
+    expect(refused).to.include({ refusalkind: 'bad_option' })
+    expect(refused.message).to.include('prf_salt_b64')
+    expect(authenticator.calls.get).to.have.lengthOf(0)
+  })
+
+  it("refuses a passphrase header as a vault with no passkey", async () => {
+    TH.installFakeAuthenticator()
+    const refused = await refusalOf(askPasskey({ wayinkind: 'passphrase', key_deriver_label: 'argon2id' } as never))
+    expect(refused).to.include({ refusalkind: 'absent_wayin' })
+  })
+})
+
+describe("attemptOnce's answer", () => {
+  it("refuses an answer without bytes, never calling the attempt", async () => {
+    const attempt = vi.fn(() => Promise.resolve(true))
+    for (const passkey of [null, {}, { credential_id: 'AAAA', prfBytes: [1, 2, 3] }]) {
+      expect(await refusalOf(attemptOnce(passkey as never, attempt))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+    }
+    expect(attempt).not.toHaveBeenCalled()
+  })
+
+  it("zeroes the answer's bytes when it refuses an attempt that is no function", async () => {
+    const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: crypto.getRandomValues(new Uint8Array(PrfAnswerBytes)) }
+    expect(await refusalOf(attemptOnce(passkey, 'attempt' as never))).to.include({ refusalkind: 'bad_option' })
+    expect(passkey.prfBytes.every((byte) => byte === 0)).to.be.true
+  })
+
+  it("quotes none of a malformed answer in its refusal", async () => {
+    const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: 'sentinel-not-a-secret' }
+    const refused = await refusalOf(attemptOnce(passkey as never, () => Promise.resolve(true)))
+    expect(refused.message).to.not.include('sentinel')
+    expect(JSON.stringify(refused)).to.not.include('sentinel')
   })
 })
 

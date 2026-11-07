@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { makeLeaseKey } from '../../src/helpers/crypto'
-import { DeviceDB } from '../../src/storage/device-db-new'
+import { DeviceDB } from '../../src/storage/device-db'
 import * as TH from '../test-helpers'
 
 const asked = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'tok_one' }
@@ -17,6 +17,8 @@ class BrokenDeviceDB extends DeviceDB {
   protected doForget(): never { throw this.thrown }
   protected doListLeases(): never { throw this.thrown }
   protected doDelRawLease(): never { throw this.thrown }
+  protected doEnsureBank(): unknown { throw this.thrown }
+  protected doListBanks(): never { throw this.thrown }
 }
 
 describe("a deviceDB whose store throws", () => {
@@ -30,6 +32,8 @@ describe("a deviceDB whose store throws", () => {
       ['forget',     await TH.expectBad(deviceDB.tryForget(asked), 'storage_unavailable')],
       ['listLeases', await TH.expectBad(deviceDB.tryListLeases(), 'storage_unavailable')],
       ['delRawLease', await TH.expectBad(deviceDB.tryDelRawLease(asked), 'storage_unavailable')],
+      ['ensureBank', await TH.expectBad(deviceDB.tryEnsureBank(asked), 'storage_unavailable')],
+      ['listRawBanks', await TH.expectBad(deviceDB.tryListRawBanks(), 'storage_unavailable')],
     ] as const
     for (const [verb, err] of refused) {
       expect(err.message).to.include(verb)
@@ -43,5 +47,14 @@ describe("a deviceDB whose store throws", () => {
     const refusal = new VaultError('storage_unavailable', 'This browser does not let the app keep anything on this device.')
     const err = await TH.expectBad(new BrokenDeviceDB(refusal).tryPeek(asked), 'storage_unavailable')
     expect(err).to.eq(refusal)
+  })
+})
+
+describe("a deviceDB whose store answers a bank row that fails its check", () => {
+  it("refuses ensureBank", async () => {
+    class GarbledDeviceDB extends BrokenDeviceDB {
+      protected override doEnsureBank(): unknown { return { applabel: 'acme', user_id: 'u1', device_id: 'not-a-uuid' } }
+    }
+    await TH.expectBad(new GarbledDeviceDB(null).tryEnsureBank(asked), 'bad_record')
   })
 })
