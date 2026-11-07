@@ -20,6 +20,19 @@ Branch `20261107-idb_versions`, PR #570, stacked on #569 (thread 2's `20261107-i
   * TODO.md (Soonish): the demo must not run the old and new device store under one `dbName`.
   * Changeset `.changeset/20261107-idb_versions.md` (minor: safebyok, safebyok-indexeddb, safebyok-fastkey).
   * Stale names fixed: the indexeddb README (`<dbName>:vaults-v001-001-001`) and the device database's name in `notes/guarantees.md` (a name only, no clause added).
+* **Rework (the Coach's rulings of 2026-11-07)**, one commit each, in this order
+  * Salt that will not decode: `PassphraseProving.buildStored` decodes the stored `salt_b64` through `saltBytesOf` (`models/proving.ts`),
+    which refuses `bad_record` (`undecodedSalt`, `Phrases.UndecodedSalt`, no salt text) where `fromB64OrNull` answers null; tests for 25 and 41
+    characters and a 22-character salt with stray padding bits, in `tests/models/proving.test.ts`. The record check is unchanged (the Coach: the prover does the later check).
+  * `DeviceDB.delRawLease(scope)` and `tryDelRawLease` (vault scope checked at entry), through the new hook `doDelRawLease`, in the memory and IDB stores
+    (one transaction); battery cases (a planted damaged row listed, then gone; a no-op where nothing stands; a bad scope); G4 in `notes/guarantees.md`
+    names the exception and `notes/wontfix.md` names `delRawLease` as the host's way out.
+  * `versionedShelfOf` keeps one shelf per database name in a module Map, so the wipe and the connection happen once per page per database (the first
+    spec to ask fixes the `oldnames`); it checks its spec on entry (`objCheck`, `bad_option`: non-empty names, `version` three zero-padded parts);
+    `tests/storage/idb-shelf.test.ts`; a `//` comment says a later version format takes a new stem, as unreadable names are deleted.
+  * `Patterns` moved to `shapes/primitives.ts` as `{ b64url, label, user_id }`; `LabelPattern` and `UserIdPattern` are gone (neither was exported from an entry point); VOCABULARY.md names follow.
+  * A saved Argon2id value: `efb4ef4c...4301b` for 'correct horse battery staple' and `saltOf(16)` at the supplied spec's cost, taken from hash-wasm called
+    directly (noble agrees), checked through the core's `argon2idWebV1Deriver` (`tests/browser.test.ts`) and fastkey's `argon2idWasmWebV1Deriver`.
 * **Decisions taken**
   * `Patterns` did not exist in the core (only `LabelPattern` and `UserIdPattern`, flat, in `shapes/primitives.ts`); I made `Patterns` a frozen object in `helpers/consts.ts` with `b64url` alone. The other two stay where they are.
   * `MinArgon2SaltBytes` lived in the core's `deriver/shapes.ts`, not fastkey; it was removed in favour of `MinSaltBytes`.
@@ -31,4 +44,4 @@ Branch `20261107-idb_versions`, PR #570, stacked on #569 (thread 2's `20261107-i
   * The demo's `safebyok_demo:device_db` is the old core's live database; the new device store would wipe it (the TODO row).
   * `indexedDB.databases()` is the only way to find "any older version" now that versions are strings; fake-indexeddb supports it, as do the evergreen browsers.
 * **For the Coach**
-  * Two open rows stay open, untouched: a G4 clause in `notes/guarantees.md`, and one IndexedDB shelf per `dbName`.
+  * The two rows that stayed open (a G4 clause, one shelf per `dbName`) are done, as are the four others ruled on 2026-11-07 (see Rework).
