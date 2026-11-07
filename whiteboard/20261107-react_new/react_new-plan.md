@@ -613,8 +613,8 @@ below are mine as the React developer, on their merits.
   brand that's just on the adapter and children". So: `isVaultDB` (`helpers/consts.ts`) checks the
   `IsVaultDB` getter brand, which `AdapterVaultDB` and `GraphqlVaultDB` (and so every child) answer
   true to (they do today: keep it so). A new getter brand, answered only by `AdapterVaultDB` and its
-  children, with its own guard: *Orchestrator:* spelled `IsAdapterVaultDB` / `isAdapterVaultDB`, to
-  match the class (the Coach said `isVaultDBAdapter`; I told them, and they may flip it). Where the
+  children, with its own guard: `IsAdapterVaultDB` / `isAdapterVaultDB` (the Coach, 2026-11-07: the
+  consistent order is ThingVaultDB). Where the
   shapes check a store by its verbs today (`isVaultDBVerbs`, `brandedVaultDB`), the worker sees
   whether the brand check is what is wanted there, and says so in the PR.
 * `storage/device-db-new.ts` → `device-db.ts` too (the Coach, 2026-11-07), with every import. Thread
