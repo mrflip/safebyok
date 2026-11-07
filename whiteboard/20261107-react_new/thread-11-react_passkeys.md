@@ -1,6 +1,6 @@
 # Thread 11: react_passkeys (2026-11-07)
 
-Branch `20261107-react_passkeys`, PR #TBD, stacked on #577 (thread 3, react_dialogs). Justify:
+Branch `20261107-react_passkeys`, PR #578 (base main), stacked on #577 (thread 3, react_dialogs). Justify:
 green; safebyok-react 151 tests, demo 47, the rest unchanged.
 
 * **Built**
