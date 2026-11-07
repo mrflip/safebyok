@@ -40,6 +40,8 @@ export const Messages = {
   addPasskeyTitle:    'Add a passkey',
   addPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',
   addPasskeyButton:   'Add passkey',
+  /** Said at an add-passkey submit with the passphrase field empty: the browser is not asked. */
+  passphraseFirst:    'Enter your vault passphrase first: the passkey is added only once it is proven.',
   revokePasskeyTitle:  'Remove your passkey',
   revokePasskeyBlurb:  'Enter your vault passphrase to remove the passkey. You will unlock with the passphrase alone, on every device.',
   revokePasskeyButton: 'Remove passkey',

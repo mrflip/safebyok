@@ -1,4 +1,5 @@
 import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok'
+import { Checkers } from 'safebyok/storage'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { Messages } from './messages'
 
@@ -14,6 +15,38 @@ import { Messages } from './messages'
 // The core has no refusalkind for "no passkey answer to be had here" (the browser has no WebAuthn,
 // the authenticator no PRF, or the browser failed); these refuse `wrong_passkey`, which a dialog
 // shows in place, as it does a passkey that did not unlock.
+
+/** True for base64url text, as a passkey's salt is stored. */
+const isB64 = (text: string): boolean => {
+  try {
+    fromB64(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// A passkey header's salt is judged here, as the core judged it as it read the vault; its credential
+// id the core judged only as text, so one that is not base64url is a damaged record (credentialBytesOf).
+const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, bytes, fn }) => {
+  const timeout = int.positive().optional()
+  const named = str.min(1)
+  const passphraseHeader = obj({ wayinkind: lit('passphrase') })
+  const passkeyHeader = obj({ wayinkind: lit('passkey'), credential_id: named, prf_salt_b64: named.refine(isB64, 'Expected base64url text') })
+  return {
+    createPasskeyOpts: obj({
+      rp:   obj({ name: named, id: named.optional() }).strict(),
+      user: obj({ name: named, displayName: str }).strict(),
+      timeout,
+    }).strict(),
+    askPasskeyInput: obj({
+      passkeyHeader: discrim('wayinkind', [passphraseHeader, passkeyHeader]).nullable(),
+      opts:          obj({ rpId: named.optional(), timeout }).strict(),
+    }),
+    // Only what attemptOnce itself touches: the attempt judges the rest of the answer.
+    attemptOnceInput: obj({ passkey: obj({ prfBytes: bytes() }), attempt: fn() }),
+  }
+})
 
 /** True when this browser offers WebAuthn at all: whether to show a passkey button. */
 export const passkeysAvailable = (): boolean => (
@@ -42,7 +75,8 @@ export type AskPasskeyOpts = {
  *   const passkeyClear = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
  *   if (passkeyClear !== null) { await gating.attempt({ passphraseClear, passkeyClear }) }   // null: dismissed
  */
-export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
+export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
+  const opts = PasskeyChecks.createPasskeyOpts.parse(given, { where: "In createPasskey's options" })
   demandWebAuthn()
   const prfSaltBytes = crypto.getRandomValues(new Uint8Array(PasskeySaltBytes))
   const created = await askAuthenticator(() => navigator.credentials.create({
@@ -86,12 +120,13 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
  *   const passkeyClear = await askPasskey(gating.passkeyHeader)
  *   if (passkeyClear !== null) { await gating.attempt({ passkeyClear }) }
  */
-export const askPasskey = async (passkeyHeader: WayinHeader | null, opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
+export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
+  const { passkeyHeader: header, opts } = PasskeyChecks.askPasskeyInput.parse({ passkeyHeader, opts: given }, { where: "In askPasskey's arguments" })
   demandWebAuthn()
-  if (passkeyHeader?.wayinkind !== 'passkey') { throw new VaultError('absent_wayin', Messages.noPasskeyToAsk) }
-  const { credential_id } = passkeyHeader
+  if (header?.wayinkind !== 'passkey') { throw new VaultError('absent_wayin', Messages.noPasskeyToAsk) }
+  const { credential_id } = header
   const credentialBytes = credentialBytesOf(credential_id)
-  const saltBytes = fromB64(passkeyHeader.prf_salt_b64) as Uint8Array<ArrayBuffer>
+  const saltBytes = fromB64(header.prf_salt_b64) as Uint8Array<ArrayBuffer>
   const asked = await askAuthenticator(() => navigator.credentials.get({
     publicKey: {
       challenge:        crypto.getRandomValues(new Uint8Array(32)),
@@ -113,6 +148,7 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, opts: AskPas
 
 /** Hand `passkey` to `attempt`, then zero its bytes whatever the attempt did. */
 export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
+  PasskeyChecks.attemptOnceInput.parse({ passkey, attempt }, { where: "In attemptOnce's arguments" })
   try {
     return await attempt(passkey)
   } finally {

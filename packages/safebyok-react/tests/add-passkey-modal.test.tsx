@@ -53,6 +53,18 @@ describe("AddPasskeyModal", () => {
     expect(passkeyHeld(bank)).to.equal(authenticator.credentialIds()[1])
   })
 
+  it("asks for the passphrase before the browser makes a passkey it could not add, and adds one once it is typed", async () => {
+    const { gating, answers, authenticator } = await shownFor()
+    fireEvent.click(screen.getByText(Messages.addPasskeyButton))
+    await screen.findByText(Messages.passphraseFirst)
+    expect(authenticator.calls.create).to.have.lengthOf(0)
+    expect(gating.isOpen).to.be.true
+    expect(document.activeElement).to.equal(screen.getByPlaceholderText('vault passphrase'))
+    TH.submitPasskeyAdd(TH.Passphrase)
+    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
+    expect(authenticator.calls.create).to.have.lengthOf(1)
+  })
+
   it("does nothing when the user dismisses the browser's prompt: the gating stays open", async () => {
     const { gating, answers, authenticator } = await shownFor()
     const attempts = vi.spyOn(Gating.prototype, 'attempt')

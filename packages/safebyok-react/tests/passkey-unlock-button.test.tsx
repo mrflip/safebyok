@@ -28,6 +28,9 @@ const buttonFor = (gating: Gating<'unlock_vault'>, extra: { takesFocus?: boolean
   return { ...TH.renderReporting(ui), ui, answers, gripes }
 }
 
+/** The button's aria-disabled, 'true' while the browser asks. */
+const asking = () => screen.getByText(Messages.passkeyButton).getAttribute('aria-disabled')
+
 /** A refusal for the gating's attempt to answer with, as the core would. */
 const refusingAttempts = (err: unknown) => vi.spyOn(Gating.prototype, 'attempt').mockResolvedValue({ ok: false, err } as never)
 
@@ -56,9 +59,28 @@ describe("PasskeyUnlockButton", () => {
     const { answers, gripes } = buttonFor(gating)
     authenticator.refuseNext('NotAllowedError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await waitFor(() => { expect(screen.getByText(Messages.passkeyButton)).to.have.property('disabled', false) })
+    await waitFor(() => { expect(asking()).to.eq('false') })
     expect(gripes).to.deep.equal([null])
     expect(answers).to.deep.equal([])
+  })
+
+  it("stays focusable while the browser asks, so the dialog still hears Escape, and asks once however often it is pressed", async () => {
+    const { gating, authenticator } = await passkeyedUnlock()
+    buttonFor(gating, { takesFocus: true })
+    const button = screen.getByText(Messages.passkeyButton)
+    const touching = TH.held()
+    authenticator.holdNext(touching.promise)
+    authenticator.refuseNext('NotAllowedError')
+    fireEvent.click(button)
+    await waitFor(() => { expect(asking()).to.eq('true') })
+    // jsdom keeps the focus on a disabled button, as browsers do not: that it is not disabled is the check.
+    expect(button).to.have.property('disabled', false)
+    fireEvent.click(button)
+    expect(document.activeElement).to.equal(button)
+    await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
+    await waitFor(() => { expect(asking()).to.eq('false') })
+    expect(document.activeElement).to.equal(button)
+    expect(authenticator.calls.get).to.have.lengthOf(1)
   })
 
   it("takes the focus when asked to, as a dialog's first choice", async () => {
@@ -83,7 +105,7 @@ describe("PasskeyUnlockButton", () => {
     const { answers, gripes } = buttonFor(gating)
     refusingAttempts(new VaultError('attempt_in_flight', 'busy'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await waitFor(() => { expect(screen.getByText(Messages.passkeyButton)).to.have.property('disabled', false) })
+    await waitFor(() => { expect(asking()).to.eq('false') })
     expect(answers).to.deep.equal([])
     expect(gripes).to.deep.equal([null])
   })
@@ -111,7 +133,7 @@ describe("PasskeyUnlockButton", () => {
     await waitFor(() => { expect(authenticator.answersHanded()).to.have.lengthOf(2) })
     expect(attempts).not.toHaveBeenCalled()
     rerender(TH.inActivity('visible', ui))
-    await waitFor(() => { expect(screen.getByText(Messages.passkeyButton)).to.have.property('disabled', false) })
+    await waitFor(() => { expect(asking()).to.eq('false') })
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })

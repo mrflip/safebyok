@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Bank, MemoryDeviceDB, MinuteMillis, VaultError, type AnyGating } from 'safebyok'
 import { BankProvider, type BankProviderProps } from '../src/bank-provider'
 import { Messages } from '../src/messages'
+import { createPasskey } from '../src/passkey'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -359,6 +360,19 @@ describe("BankProvider's dialog", () => {
     rerender({ ...props, user_id: null })
     await waitFor(() => { expect(dialogShown()).to.be.false })
     expect(shown('bank')).to.eq('none')
+  })
+
+  it("asks the vault's passkey under the relying party it was handed", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    const world = TH.makeBankWorld()
+    const { vault } = await TH.makeBankWithVault(world)
+    await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))
+    provided({ passkeyRpId: 'example.com' }, world)
+    await waitFor(() => { expect(shown('vault')).to.eq('present locked') })
+    fireEvent.click(screen.getByText('Open'))
+    fireEvent.click(await screen.findByText(Messages.passkeyButton))
+    await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
+    expect(authenticator.calls.get.at(-1)?.publicKey).to.include({ rpId: 'example.com' })
   })
 
   it("hands each gating to the host's requestCleartext in place of its own dialog", async () => {

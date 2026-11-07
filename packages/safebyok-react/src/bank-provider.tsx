@@ -45,6 +45,8 @@ export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'reques
   passphraseUsername?: string | undefined
   /** What to say beside the field as the user chooses a passphrase. */
   passphraseAdvice?:   PassphraseAdvice | undefined
+  /** The relying party the vault's passkey is made and asked under, if not the page's own domain. */
+  passkeyRpId?:        string | undefined
   children:            ReactNode
 }
 
@@ -57,7 +59,7 @@ const fixedPropsOf = (props: BankProviderProps) => {
 
 /** Make the signed-in user's bank, once per `applabel` and `user_id`, say hello, and hand it down to the hooks. */
 export const BankProvider = (props: BankProviderProps) => {
-  const { applabel, user_id, passphraseUsername, passphraseAdvice, children } = props
+  const { applabel, user_id, passphraseUsername, passphraseAdvice, passkeyRpId, children } = props
   /** One showing of the dialog: which one, the gating it answers, and how it closes. */
   type Showing = { round: number, gating: AnyGating, close: () => void }
   /** The props the provider reads only as it makes its bank. */
@@ -206,6 +208,7 @@ export const BankProvider = (props: BankProviderProps) => {
           leaseMillis={provided.bank?.leaseMillis}
           passphraseUsername={passphraseUsername}
           passphraseAdvice={passphraseAdvice}
+          passkeyRpId={passkeyRpId}
           onDone={() => { endShowing(showing) }}
         />
       )}
