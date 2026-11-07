@@ -63,3 +63,33 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 * *Orchestrator:* thread 2's review (#574) found the provider's handler props wanting: inline
   `onPanic` remakes the bank, non-function `onBadNews` / `requestCleartext` are no longer refused,
   and the remake warning is gone. All three are thread 12's.
+
+## From threads 3, 4 and 12 (#577, #576, #575), before their reviews
+
+* *Orchestrator:* thread 3: `GatingModal` maps `replace_passphrase` → `ReplacePassphraseModal`
+  (answers 'unlocked') and `del_vault` → `DelVaultModal` (answers 'deleted', and stays open through a
+  `bank.lock()`, as a lock does not stop a delete). A lock while asking refuses
+  `locked_while_asking`, not `vault_locked`. The demo stays quiet for that and for `declined`.
+  `BadOutcome.err` is already a VaultError: compare `err.refusalkind`, since `! isVaultError(err, kind)`
+  narrows to `never`.
+* *Orchestrator:* **for thread 11:**
+  * `NoDialog`'s tests in `gating-modal.test.tsx` aim at `add_passkey` (`TH.addingPasskey`); once
+    thread 11 maps that kind, aim them at something still unmapped, or at a forged kind.
+  * `useAttempts` no longer returns `isShown`: re-add it, or call `useWhenShown` directly.
+  * The passkey `Messages` strings were kept.
+  * Export `ReplacePassphraseModal` and `DelVaultModal` beside the passkey exports (whole lines in
+    `src/index.ts`).
+* *Orchestrator:* thread 4: hooks in `src/hooks.ts` (*Box hooks*):
+  * `useBoxes(vaultlabel)` answers null while the vault is not present.
+  * `useBox(vaultlabel, boxlabel)` answers the Box only while it is present.
+  * `useWhisper(null)` answers a frozen encrypted bag.
+  * `BoxWhisperField` (`src/box-whisper-field.tsx`) is read-only while `! box.isShowing`, takes no
+    `ref` or `onChange`, has no `name`, and needs a stable `path`: changing it unbinds, and unexposes
+    a box's only field.
+  * `VaultLockControl` and `CreateVaultButton` are in `src/vault-controls.tsx`; Unlock is
+    `bank.tryEnsureVault` then `tryEnsureUnlocked`.
+  * Three words were added at the end of `Messages` (`vaultLocked`, `vaultUnlocked`, `lockButton`). Thread
+    3 also edited `messages.ts`: expect a trivial conflict at the restack.
+* *Orchestrator:* thread 12: a non-function handler is refused `bad_option` again. `onPanic` is held
+  in a ref, and a host's having one or not is what remakes the bank. The remake warning is said once
+  through `bank.logger`.
