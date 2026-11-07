@@ -1,4 +1,4 @@
-/** The AdapterVaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and the duck a model takes for one. */
+/** The AdapterVaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and the duck a model takes for a VaultDB. */
 
 import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
