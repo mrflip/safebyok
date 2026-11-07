@@ -136,12 +136,20 @@ pattern."
   imports them through `safebyok/storage` and keeps only its scopepaths and ranges). `troubleOf`'s
   sentences name the store they speak for (vault or device). Check the current `idb-keyval`
   release before pinning (PROCESS.md, *Dependencies*).
-* **A damaged lease row outlives a vacate** (#567 review; Open Matters, TOP, the orchestrator's
-  Rec pending): `forget` deletes only a row that passes its check, and `listLeases` leaves damaged
-  rows out, so a damaged row with a live `lease_key` survives an `identity_revoked` vacate
-  (against G4). Unless the Coach rules otherwise, fix it in the base: `forget` also erases a row at
-  its scope that fails its check, the Bank's sweep reaches damaged rows too, and the battery gains
-  a case, so both stores inherit it.
+* **A damaged lease row outlives a vacate: wontfix** (the Coach, 2026-11-07): "I predict trouble
+  when multiple tabs have the same lease. Mark anything like this wontfix. We will in future have
+  tabs notify but store independently, how I don't know." So no fix: a `notes/wontfix.md` entry
+  saying a lease row that fails its check is neither listed nor forgotten (it stays until a later
+  stow over its scope), and that tabs sharing one device store's lease are undefined, the Coach's
+  future direction quoted.
+* **Ride-along: strip the slop doc blocks** (the Coach: "just strip the blocks, I don't want the
+  documentarian to rewrite slop"): the renamed verbs' doc blocks in `device-db-new.ts`,
+  `memory-device-db.ts` and `models/lease.ts` (and the new store's) are one line of purpose; cut
+  what reads the body aloud or adds a second fact. No documentarian.
+* **Ride-along: salt_b64 by string length** (the Coach: "This is not necessary. Just check the
+  string length"): thread 3 decodes `salt_b64` to cap it at 32 bytes; replace that with a string
+  length check, `min(1).max(43)` (unpadded base64url of 32 bytes is at most 43 characters), the
+  decode removed; the changeset line follows.
 * **Ride-along (the Coach, 2026-11-07, on "Lease's stowAsStowCan reads oddly"):** "yeah you've
   talked me into having it be .cache, not .stow, or at least that one method should remain. Your
   call to have .hold, .holdFoo and cacheAsCacheCan, or .cache, .cacheFoo and cacheAsCacheCan".
