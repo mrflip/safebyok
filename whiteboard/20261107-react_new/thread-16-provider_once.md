@@ -1,6 +1,6 @@
 # Thread 16: BankProvider makes its bank once per scope (2026-11-07)
 
-Branch `20261107-provider_once`, PR #PR, stacked on [#586](https://github.com/mrflip/safebyok/pull/586) (thread 15,
+Branch `20261107-provider_once`, PR [#589](https://github.com/mrflip/safebyok/pull/589), stacked on [#586](https://github.com/mrflip/safebyok/pull/586) (thread 15,
 `deviceDB.ensureBank`). Justify: green (safebyok-react 200 tests, demo 60, every package green, size budgets met;
 `BankProvider` 6.41 kB of 9.4 kB).
 
