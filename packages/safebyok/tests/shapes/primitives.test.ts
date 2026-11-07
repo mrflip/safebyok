@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Zod from 'zod'
-import { LabelPattern, MaxLabelChars, MaxUserIdChars, UserIdPattern } from '../../src/shapes/primitives'
+import { MaxLabelChars, MaxUserIdChars, Patterns } from '../../src/shapes/primitives'
 import * as PX from '../../src/shapes/primitives'
 import { FarFuture, FarPast } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
@@ -57,23 +57,23 @@ describe("label", () => {
   it("answers for text of millions of characters, refusing it by its length", () => {
     const vast = 'n'.repeat(12_000_000)
     expect(JSON.stringify(PX.label.safeParse(vast).error?.issues.map((issue) => issue.message))).to.include('at most 40 characters')
-    expect(LabelPattern.test(vast)).to.be.true
-    expect(LabelPattern.test(`${vast}__`)).to.be.false
+    expect(Patterns.label.test(vast)).to.be.true
+    expect(Patterns.label.test(`${vast}__`)).to.be.false
   })
 })
 
-describe("MaxLabelChars and LabelPattern", () => {
+describe("MaxLabelChars and Patterns.label", () => {
   it("are the bounds label checks: forty characters, and the pattern alone", () => {
     expect(MaxLabelChars).to.eq(40)
     const withinLength = LabelCases.filter(([candidate]) => candidate.length <= MaxLabelChars)
     for (const [candidate, expected] of withinLength) {
-      expect(LabelPattern.test(candidate), candidate).to.eq(expected)
+      expect(Patterns.label.test(candidate), candidate).to.eq(expected)
     }
   })
 
-  // LabelPattern @example
+  // Patterns.label @example
   it("gives a form's input its pattern and length", () => {
-    const input = { pattern: LabelPattern.source, maxLength: MaxLabelChars }
+    const input = { pattern: Patterns.label.source, maxLength: MaxLabelChars }
     expect(new RegExp(input.pattern).test('anthropic_api_key')).to.be.true
     expect(new RegExp(input.pattern).test('Anthropic')).to.be.false
   })
@@ -143,17 +143,17 @@ describe("user_id", () => {
   })
 })
 
-describe("UserIdPattern", () => {
+describe("Patterns.user_id", () => {
   it("is the pattern user_id checks", () => {
-    expect(UserIdPattern.test('auth0|5f7c8ec7c33c6c004bbafe82')).to.be.true
+    expect(Patterns.user_id.test('auth0|5f7c8ec7c33c6c004bbafe82')).to.be.true
     const withinLength = UserIdCases.filter(([candidate]) => candidate.length > 0 && candidate.length <= MaxUserIdChars)
     for (const [candidate, expected] of withinLength) {
-      expect(UserIdPattern.test(candidate), candidate).to.eq(expected)
+      expect(Patterns.user_id.test(candidate), candidate).to.eq(expected)
     }
   })
 
   it("answers for millions of dots at once, refusing them", () => {
-    expect(UserIdPattern.test('.'.repeat(12_000_000))).to.be.false
+    expect(Patterns.user_id.test('.'.repeat(12_000_000))).to.be.false
   })
 })
 
@@ -213,5 +213,12 @@ describe("epochMillis", () => {
     expect(PX.epochMillis.safeParse(1_792_022_400_000_000).success).to.be.false
     expect(PX.epochMillis.safeParse(1_792_022_400_000.5).success).to.be.false
     expect(PX.epochMillis.safeParse(Infinity).success).to.be.false
+  })
+})
+
+describe("Patterns.b64url", () => {
+  it("matches unpadded base64url text, and nothing with padding, a standard-base64 character or a space", () => {
+    expect(Patterns.b64url.test('Zm9v-_9A')).to.be.true
+    for (const text of ['', 'Zm9v=', 'Zm+v', 'Zm/v', 'Zm 9v', 'Zm9v\n']) { expect(Patterns.b64url.test(text), JSON.stringify(text)).to.be.false }
   })
 })

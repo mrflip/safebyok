@@ -126,7 +126,7 @@ format. Say "stamp" for the bound fields, never "the binding" or "the authentics
 
 How a vault is addressed, what the storage layer holds, and when. A label (`label`) is lowercase
 words of letters and digits joined by single underscores, such as `anthropic_api_key`. It starts
-with a letter, and runs 2 to 40 characters (`LabelPattern`, `MaxLabelChars`). The name rules are
+with a letter, and runs 2 to 40 characters (`Patterns.label`, `MaxLabelChars`). The name rules are
 the package's own. A host never checks a name by a rule of its own: it percent-encodes (RFC 3986)
 a name outside them.
 
@@ -135,7 +135,7 @@ a name outside them.
 | **applabel**                    | Your app's own label, so several apps can share one backend without colliding. It is stored as `applabel`.                                                                  |
 | **vaultlabel**                  | The label of one of a user's vaults, such as `main`. It is stored as `vaultlabel`.                                                                                          |
 | **boxlabel**                    | The label of a box within its vault: what you pass to `putBox`, `getBox`, `fetchBox`, `delBox` and `tryDelDamagedBox`. It is stored as `boxlabel`.                          |
-| **user_id**                     | The signed-in user's stable, opaque id from your own auth. It is the one name in a scope that is not a label: 1 to 100 ASCII letters, digits and `-_.~:@+\|%`, never dots alone (`UserIdPattern`, `MaxUserIdChars`). It is never an email or a handle, which can change. It is spelled `user_id` everywhere, in an option, a prop and storage alike. |
+| **user_id**                     | The signed-in user's stable, opaque id from your own auth. It is the one name in a scope that is not a label: 1 to 100 ASCII letters, digits and `-_.~:@+\|%`, never dots alone (`Patterns.user_id`, `MaxUserIdChars`). It is never an email or a handle, which can change. It is spelled `user_id` everywhere, in an option, a prop and storage alike. |
 | **scope**                       | An applabel, a user_id and a vaultlabel together: it names one vault (`VaultScope`).                                                                                         |
 | **visible**                     | Said of a stored field that is both unencrypted and authenticated. A visible field is in a stamp, or a wayin's header, that a ctx binds. A change to it in storage makes the record refuse to unseal or unwrap. Anyone who can read the database can read it. Visible fields are the vault's stamp (its scope, `vault_tok` and `registered_at`), every sparse field of a box and its sidecar, and each wayin's header. A wayin's header is its `wayinkind`, `key_deriver_label` or `credential_id`, salt, `device_id` and `registered_at`. Every field of a box or a wayin is visible but the encrypted ones. A visible field is never secret. Say "visible" only of a field that is authenticated. Say "visible in storage" where a sentence could be read as screen visibility. |
 | **unencrypted**                 | Said of a stored field that is not encrypted, and nothing more: it may be authenticated or it may not. The vault record's `fmt`, revision fields, `written_at`, `am` and `gate_epoch` are unencrypted. No wayin's ctx binds them. Whether its gate holds a passkey wayin is unencrypted too. Say "unencrypted" in a record-general or backend-general sentence ("ciphertext and unencrypted fields"). Say "visible" of a field known to be authenticated. |

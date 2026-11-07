@@ -2,12 +2,13 @@
 
 import type * as Z from 'zod'
 import { never, record, uuid } from 'zod'
-import { MaxSaltBytes, MinSaltBytes, PasskeySaltBytes, Patterns, isWhisperedBag } from '../helpers/consts'
+import { MaxSaltBytes, MinSaltBytes, PasskeySaltBytes, isWhisperedBag } from '../helpers/consts'
 import { fromB64OrNull } from '../helpers/crypto'
 import type { VaultLogger } from '../helpers/logger'
 import * as Phrases from '../helpers/phrases'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { KeyDeriver } from '../deriver/basederiver'
+import { Patterns } from './primitives'
 
 /** The sentence a passphrase salt's refusal says. */
 const SaltShape = Phrases.passphraseSaltShape(MinSaltBytes, MaxSaltBytes)

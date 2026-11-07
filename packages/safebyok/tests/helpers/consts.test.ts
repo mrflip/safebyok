@@ -1,15 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, Patterns, VaultsDBVersion, hasModelkind, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
+import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, VaultsDBVersion, hasModelkind, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
-
-describe("Patterns.b64url", () => {
-  it("matches unpadded base64url text, and nothing with padding, a standard-base64 character or a space", () => {
-    expect(Patterns.b64url.test('Zm9v-_9A')).to.be.true
-    for (const text of ['', 'Zm9v=', 'Zm+v', 'Zm/v', 'Zm 9v', 'Zm9v\n']) { expect(Patterns.b64url.test(text), JSON.stringify(text)).to.be.false }
-  })
-})
 
 describe("DeviceDBVersion and VaultsDBVersion", () => {
   it("are three zero-padded parts, so that database names sort as their versions do", () => {
