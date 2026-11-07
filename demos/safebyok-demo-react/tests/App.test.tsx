@@ -35,6 +35,7 @@ describe("App", () => {
     await screen.findByText('margo')
     expect(screen.getByRole('heading', { name: 'Knock-knock, with managed fields' })).to.not.be.null
     expect(screen.getByRole('heading', { name: 'Knock-knock, with an exposed whisper' })).to.not.be.null
+    expect(screen.getByRole('heading', { name: 'Knock-knock, with a sealed key' })).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')
     expect(screen.queryByText('margo')).to.be.null

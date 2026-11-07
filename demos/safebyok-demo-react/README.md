@@ -41,6 +41,10 @@ ways compare side by side, and each knocking with its own key through [src/lib/a
 * **With an exposed whisper** ([src/components/KnockKnockExposed.tsx](src/components/KnockKnockExposed.tsx)):
   an ordinary controlled field over `useWhisper(box)`; typing is `box.patchWhisper`, *Save* is
   `box.putExposed`, and leaving the page is `box.unexpose`.
+* **With a sealed key** ([src/components/KnockKnockSealed.tsx](src/components/KnockKnockSealed.tsx)):
+  the key is never exposed. An uncontrolled `WhisperField` takes it, *Save* is `vault.putBox`
+  (building and unlocking the vault as needed) and clears the field, and only a knock reads it
+  back, with `box.extractWhisper`.
 
 The aside, *Behind the scenes*, is for developers: its *Backend online* switch
 ([src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts)) takes the vaultDB offline, so every
