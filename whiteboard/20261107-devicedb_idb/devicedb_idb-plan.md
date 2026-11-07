@@ -271,7 +271,26 @@ after both file and are restacked into a line, as it touches their files).
 correct G10 in `notes/guarantees.md`, which says no entry point exports the Argon2id derivers
 (`safebyok/browser` exports both); TODO.md's two lines that still speak of relaying (thread 4's
 report, ~22 and ~29); and a `sonnet` subagent checks notes/security.md's older GraphQL entries
-(2026-10-22 wire_meta, 2026-10-15) against the new wire, per the file's header.
+(2026-10-22 wire_meta, 2026-10-15) against the new wire, per the file's header. From the Coach's
+2026-11-07 rulings: the deriver's own refusal for a salt that does not fit passes through as
+itself, not relabeled unexpected_error by `deriveKeyBytes` (the Coach: "I'm happy to
+supervalidate it, but personally would leave it to the deriver"); and a test-only `_cheat_` way to
+open a fresh IndexedDB shelf, so the battery's twin is a second connection again (took the Rec).
+
+### 4b. #571's second rework (the Coach, 2026-11-07, Open Matters)
+
+* tidyGone: "by \"front-end\" I should better have said \"public interface\" -- tidyGone is one of
+  the customer-facing verbs, even if it's not user-facing per se". tidyGone joins VaultDBVerbs and
+  the schema (a Tidied type).
+* Resubscribe: "Issue bad news -- the dev should know -- but don't handle it. We will after
+  getting 1.0 out or right before offer an in-memory task queue that will allow safely requesting
+  an action from the critical path". No resubscribe, no timer; a stream that ends tells the host
+  through the core's bad-news channel.
+* maxRecordBytes: "if the backend will accept it, send it along but in no ways enforce it. We set
+  it to a very low value, much below Postgres' limit, and a customer may well want to raise that".
+  The client accepts it and enforces no record size; no wire field raises a server's limit.
+* Network-error cause: "pick out what's easy to pick out from the top errors you expect, but at
+  least error name". A fresh cause: the error's name plus the easy fields (HTTP status, code).
 
 ## For the Coach
 
