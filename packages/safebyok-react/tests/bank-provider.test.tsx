@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Bank, MinuteMillis, type AnyGating } from 'safebyok'
+import { Bank, MemoryDeviceDB, MinuteMillis, VaultError, type AnyGating } from 'safebyok'
 import { BankProvider, type BankProviderProps } from '../src/bank-provider'
 import { Messages } from '../src/messages'
 import * as TH from './test-helpers'
@@ -70,6 +70,107 @@ describe("BankProvider's bank", () => {
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     expect(screen.getByText(/^caught: /)).to.exist
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
+  })
+})
+
+/** A provider over a vault another device built, unlocked from its dialog, with the deviceDB the provider's bank keeps its lease in. */
+const unlockedProvided = async (overrides: Partial<Props> = {}) => {
+  const world = TH.makeBankWorld()
+  await TH.makeBankWithVault(world)
+  const deviceDB = new MemoryDeviceDB()
+  const made = provided({ deviceDB, ...overrides }, world)
+  await waitFor(() => { expect(shown('vault')).to.eq('present locked') })
+  fireEvent.click(screen.getByText('Open'))
+  await waitFor(() => { expect(screen.queryByText(Messages.unlockTitle)).to.not.be.null })
+  TH.submitPassphrase(TH.Passphrase)
+  await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
+  return { ...made, deviceDB }
+}
+
+describe("BankProvider's handlers", () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  const Refusal = new VaultError('storage_unavailable', 'the disk is full')
+  const refuseErase = (deviceDB: MemoryDeviceDB) => vi.spyOn(deviceDB, 'tryVacate').mockResolvedValue(TH.bad(Refusal))
+
+  it.each([
+    ['onBadNews', { onBadNews: 'not a function' }],
+    ['onPanic', { onPanic: 'not a function' }],
+    ['requestCleartext', { requestCleartext: 'not a function' }],
+  ])("throws %s given as no function to the nearest error boundary", (_name, misuse) => {
+    const props = { ...TH.providerPropsOf(TH.makeBankWorld()), ...misuse } as unknown as Props
+    const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
+    expect(screen.getByText(/^caught: /)).to.exist
+    expect(reported[0]).to.include({ refusalkind: 'bad_option' })
+  })
+
+  it("makes no new bank for an onPanic written inline at each render, and tells the last render's", async () => {
+    vi.stubGlobal('reportError', vi.fn())
+    const first = vi.fn()
+    const last = vi.fn()
+    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: first })
+    rerender({ ...props, onPanic: () => undefined })
+    rerender({ ...props, onPanic: last })
+    refuseErase(deviceDB)
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(last).toHaveBeenCalledWith(Refusal) })
+    expect(first).not.toHaveBeenCalled()
+    expect(TH.seenBanks).to.have.lengthOf(1)
+    expect(shown('vault')).to.eq('present locked')
+  })
+
+  it("leaves a vault whose lease survived its erase to be vacated when the host has no onPanic, as the core does", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const { deviceDB } = await unlockedProvided()
+    refuseErase(deviceDB)
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
+    await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
+  })
+
+  it("tells the next user's onPanic nothing of a panic from the bank it let go; the platform hears it", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const next = vi.fn()
+    const erasing = TH.held<ReturnType<typeof TH.bad>>()
+    const previous = vi.fn()
+    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: previous })
+    vi.spyOn(deviceDB, 'tryVacate').mockReturnValue(erasing.promise)
+    fireEvent.click(screen.getByText('Lock'))
+    rerender({ ...props, user_id: 'u2', onPanic: next })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    erasing.resolve(TH.bad(Refusal))
+    await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
+    expect(previous).not.toHaveBeenCalled()
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it("says once, through the logger, that a prop which remakes the bank changed identity between renders", async () => {
+    const heard = [TH.spyLogger(), TH.spyLogger(), TH.spyLogger()]
+    const [first, second, third] = heard
+    const { props, rerender } = provided({ logger: first?.logger })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, logger: second?.logger })
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(2) })
+    rerender({ ...props, logger: third?.logger })
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(3) })
+    expect(first?.calls).to.deep.equal([])
+    expect(second?.calls.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'BankProvider', props: ['logger'] }]])
+    expect(second?.calls[0]?.message).to.match(/^BankProvider made its bank anew, letting its vaults go, because its logger changed identity between renders/)
+    expect(third?.calls).to.deep.equal([])
+  })
+
+  it("names each prop that changed, and says nothing for a change of user alone", async () => {
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, user_id: 'u2' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    expect(spy.calls).to.deep.equal([])
+    rerender({ ...props, user_id: 'u2', keyDeriver: { ...props.keyDeriver }, deviceDB: new MemoryDeviceDB() })
+    await waitFor(() => { expect(spy.calls).to.have.lengthOf(1) })
+    expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['keyDeriver', 'deviceDB'] })
   })
 })
 
