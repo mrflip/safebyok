@@ -3,8 +3,7 @@ import { argon2idWebV1Deriver } from 'safebyok/browser'
 import { idbVaultDB } from 'safebyok-indexeddb'
 import { domStore, memoryStore, type StringStore } from 'safebyok-old'
 
-/**
- * DEMO JANK: concrete storage wiring.
+/** DEMO JANK: concrete storage wiring.
  *
  *  * the vault's rows live in this browser's IndexedDB, through safebyok-indexeddb: they stand
  *    in for the remote database a backend would hold -- ciphertext that never opens without your

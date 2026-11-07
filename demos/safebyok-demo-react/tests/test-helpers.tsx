@@ -1,8 +1,4 @@
-/**
- * The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the
- * means to render a component inside a BankProvider over stores in memory, to watch the vault
- * beside it, to answer the passphrase dialog the provider raises, and to stand in for Anthropic.
- */
+/** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over stores in memory, to watch the vault beside it, to answer the passphrase dialog the provider raises, and to stand in for Anthropic. */
 import type { ReactNode } from 'react'
 import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -17,9 +13,7 @@ export * from 'safebyok/testing'
 /** The device_id of the provider's bank in these tests. */
 export const DeviceId = '00000000-0000-4000-8000-0000000000d1'
 
-/**
- * `ui` inside a BankProvider signed in as `user_id`, over a fresh vaultDB in memory, deriving
- * through the cheap test deriver; and that `vaultDB`.
+/** `ui` inside a BankProvider signed in as `user_id`, over a fresh vaultDB in memory, deriving through the cheap test deriver; and that `vaultDB`.
  *
  * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
@@ -90,10 +84,7 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
   return { fetchFn, seen }
 }
 
-/**
- * The vault under 'main' as a page sees it, to render beside a component under test: its stage and
- * lock state as `<stage> <lockState>` (`none` with no vault), and an Open button that builds or
- * unlocks it, asking through the provider's dialog.
+/** The vault under 'main' as a page sees it, to render beside a component under test: its stage and lock state as `<stage> <lockState>` (`none` with no vault), and an Open button that builds or unlocks it, asking through the provider's dialog.
  *
  * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */

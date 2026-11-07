@@ -19,9 +19,7 @@ export const inActivity = (mode: 'visible' | 'hidden', shown: ReactNode) => <Act
 /** The banks a {@link ShowsVault} has seen, in the order it saw them, each once. */
 export const seenBanks: Bank[] = []
 
-/**
- * What the hooks say of the bank and of the vault under `vaultlabel`, as text, with the buttons a
- * host's page would have: Open builds or unlocks the vault from a click, Lock locks it.
+/** What the hooks say of the bank and of the vault under `vaultlabel`, as text, with the buttons a host's page would have: Open builds or unlocks the vault from a click, Lock locks it.
  *
  * @example
  *   render(<BankProvider {...props}><TH.ShowsVault /></BankProvider>)

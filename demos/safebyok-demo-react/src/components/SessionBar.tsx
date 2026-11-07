@@ -4,8 +4,8 @@ import { useSession } from '../hooks/useSession'
 import type { Auth } from '../lib/auth'
 import { keepStorage } from '../lib/persist-storage'
 
-/**
- * The app's sign-in strip. Typing a username signs you in (or up); there is no password, because
+/** The app's sign-in strip.
+ * Typing a username signs you in (or up); there is no password, because
  * the demo's point is that the vault passphrase is a separate thing from signing in. Signing in
  * asks the browser to keep this site's storage, on the user's gesture. Signing out locks the
  * user's vaults on this device.
