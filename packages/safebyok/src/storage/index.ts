@@ -1,5 +1,5 @@
 // Kept off the front door (`safebyok`) so a host's autocomplete never meets the adapter's contract, and an adapter's imports name one door.
-/** `safebyok/storage`: what a storage adapter is written against: the VaultDB and DeviceDB it extends, the rows it stores, the IndexedDB transaction, and the refusals it raises. */
+/** `safebyok/storage`: what a storage adapter is written against, the VaultDB and the DeviceDB. */
 
 // == [The stores]: VaultDB, DeviceDB, and the two in memory
 export { VaultDB } from './vault-db-new'

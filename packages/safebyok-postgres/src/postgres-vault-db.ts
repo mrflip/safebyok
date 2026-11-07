@@ -1,20 +1,20 @@
-/** The vaultDB over Postgres: two tables of jsonb rows, each generic call one statement or one transaction. */
+/** The vaultDB over Postgres. */
 
 import * as DB from 'safebyok/storage'
 import type { Awaitable, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultDBOpts, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
 
-/** A pool or connection that runs one parameterized statement and hands back its rows: pg's Pool, PGlite, or a transaction of either. */
+/** A pool or connection that runs one parameterized statement and hands back its rows. */
 export type PostgresQueryable = { query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }> }
 
-/** A {@link PostgresQueryable} that also runs `work` as one transaction, committed once `work` resolves: a PGlite, or `pgClientOf(pool)`. */
+/** A {@link PostgresQueryable} that also runs `work` as one transaction: a PGlite, or `pgClientOf(pool)`. */
 export type PostgresClient = PostgresQueryable & { transaction: <ValT>(work: (tx: PostgresQueryable) => Promise<ValT>) => Promise<ValT> }
 
 /** Calls `onNotify` with the text of each notification sent on `channel`, and answers how to stop. */
 export type PostgresListen = (channel: string, onNotify: (text: string) => void) => Awaitable<() => unknown>
 
-/** What a PostgresVaultDB is made with: the client it stores rows through, and the listen its watch hears other devices' writes by. */
+/** What a PostgresVaultDB is made with: the client it stores rows through, and the listen its watch hears by. */
 export type PostgresVaultDBOpts = Readonly<VaultDBOpts & { client: PostgresClient, listen?: PostgresListen, maxBoxes?: number }>
 
 const isPostgresClient = (candidate: unknown): candidate is PostgresClient => (
@@ -65,7 +65,7 @@ const NotifySql = 'SELECT pg_notify($1, told) FROM unnest($2::text[]) AS told'
 
 const vaultChannelOfInput = DB.Checker(({ user_id }) => user_id, 'bad_option')
 
-/** The channel the notices of `user_id`'s writes are sent on, which a `PostgresListen` you hand the vaultDB listens to. */
+/** The channel the notices of `user_id`'s writes are sent on, which a `PostgresListen` listens to. */
 export const vaultChannelOf = (user_id: string): string => channelOf(vaultChannelOfInput.parse(user_id, { where: 'vaultChannelOf' }))
 
 // A user_id whose channel passes 63 bytes, Postgres's longest identifier, cannot be notified: a write under it that would send a notice refuses.
@@ -82,7 +82,7 @@ const CipheredFields: ReadonlySet<string> = new Set(['box_key_wrapped', 'whisper
 // Postgres refuses a notification of 8000 bytes or more.
 const NoticeMaxBytes = 7999
 
-/** What a notice tells its listeners: where the write landed, and the rows as stored when they fit in a notification. */
+/** What a notice tells its listeners: where the write landed, and the rows where they fit. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
 
 const toldWhere = DB.objCheck(({ applabel, user_id, vaultlabel, str }) => ({
@@ -96,7 +96,7 @@ const noticeTextOf = (vault: VaultRow, box?: BoxRow): string => {
   return JSON.stringify((box === undefined) ? vaultPropsOf(vault) : [...vaultPropsOf(vault), box.boxlabel])
 }
 
-/** The {@link Told} in a notification's text, read as {@link noticeTextOf} writes it, or null for text no write of ours sent. */
+/** The {@link Told} in a notification's text, or null for text no write of ours sent. */
 const toldOf = (text: string): Told | null => {
   const sent = jsonOrNull(text)
   if (! Array.isArray(sent)) {
@@ -149,7 +149,7 @@ const isHeardIn = (scope: WatchScope, told: Told): boolean => (
 
 // == [Refusals]: refusalOf, causeOf, codeOf
 
-/** The refusal a throw stands for: a VaultError as it came, a missing table or privilege a fault in setup, anything else the database out of reach. */
+/** The refusal a throw stands for: a VaultError as it came, a setup fault, or the database out of reach. */
 const refusalOf = (thrown: unknown): VaultError => {
   if (DB.isVaultError(thrown)) { return thrown }
   if (codeOf(thrown)?.startsWith('42')) { return DB.unexpectedError(causeOf(thrown)) }
@@ -174,7 +174,7 @@ const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGive
 
 const firstOf = (rows: unknown[], column: string): unknown => ((rows[0] as Record<string, unknown> | undefined)?.[column] ?? null)
 
-/** A vaultDB in your Postgres, through the client you already have: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
+/** A vaultDB in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
 export class PostgresVaultDB extends DB.VaultDB {
   // == [Props]: #client, #listen, #maxBoxes
 
@@ -344,7 +344,7 @@ export class PostgresVaultDB extends DB.VaultDB {
 
   // == [Hearing]: #heardOrNull
 
-  /** The rows `told` carries, or for a notice that came without them, the rows as they stand now; null when those cannot be read. */
+  /** The rows `told` carries, or the rows as they stand now where it carries none; null when unreadable. */
   async #heardOrNull({ heard, vault_tok, boxlabel, ...scope }: Told): Promise<Heard | null> {
     if (heard !== undefined) { return heard }
     try {
@@ -359,7 +359,7 @@ export class PostgresVaultDB extends DB.VaultDB {
 
 // == [Listening]: listenOrNull, unlistenOnceListening
 
-/** Starts `listen` at once, answering how to stop, or null when it failed: a watch that hears nothing is all a watch promises. */
+/** Start `listen`, answering how to stop it, or null when it failed. */
 const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (text: string) => void): Promise<(() => unknown) | null> => {
   try {
     return await listen(channel, onNotify)
@@ -396,7 +396,7 @@ const lockedVaultRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaul
   firstOf(await rowsFrom(tx, LockVaultSql, [applabel, user_id, vaultlabel]), 'vault')
 )
 
-/** Stores `row` as the vault row over `ante`, answering false when there was none and another device's birth landed first. */
+/** Store `row` over `ante`, answering false where `ante` is null and another device's birth landed first. */
 const storeVaultRow = async (tx: PostgresQueryable, row: VaultRecord | VaultTombstone, ante: unknown): Promise<boolean> => {
   const params = [row.applabel, row.user_id, row.vaultlabel, JSON.stringify(row)]
   if (ante !== null) { await tx.query(StoreVaultSql, params); return true }

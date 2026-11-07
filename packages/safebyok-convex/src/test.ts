@@ -11,7 +11,7 @@ export const modules = import.meta.glob('./component/**/*.ts')
 /** The component's schema, for `convex-test`. */
 export { default as schema } from './component/schema'
 
-/** Installs the safebyok component in a `convex-test` instance and answers it as the host references it, `components.safebyok`.
+/** Install the safebyok component in a `convex-test` instance, answering it as `components.safebyok`.
  *
  * @example
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })

@@ -1,4 +1,4 @@
-/** The vaultDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code. */
+/** The vaultDB in memory. */
 
 import { type BoxesFetched, type BoxFetched, type BoxLanding, type Heard, type Landing, type RowOfVault, type Tidied, VaultDB } from './vault-db-new'
 import { ckeyOf } from '../helpers/helpers'
@@ -88,7 +88,8 @@ export class MemoryVaultDB extends VaultDB {
     }
   }
 
-  /** Each heeder hears on a later tick, so that nothing it does touches the transaction that told it. */
+  // Each heeder hears on a later tick, so that nothing it does touches the transaction that told it.
+  /** Tell each heeder of `scope` what was `heard`. */
   #tell(scope: VaultScope, heard: Heard): void {
     for (const { scope: heardScope, hear } of this.#heeders) {
       const isHeard = (heardScope.applabel === scope.applabel) && (heardScope.user_id === scope.user_id) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)

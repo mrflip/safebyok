@@ -1,4 +1,4 @@
-/** The refusals the host's wrapper throws as a `ConvexError`, for the client to read back as the VaultError of the same kind. */
+/** The refusals the host's wrapper throws as a `ConvexError`, which the client reads back as a VaultError. */
 
 /** Each `kind` a `ConvexError` from the wrapper carries. */
 export const safebyokErrorKindVals = ['identity_revoked'] as const

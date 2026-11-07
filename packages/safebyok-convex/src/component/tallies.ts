@@ -73,7 +73,7 @@ export const reckon = async (db: DatabaseReader, life: Life): Promise<Reckoning>
   return { kept: null, tally }
 }
 
-/** True when a put growing the life by `growth` would leave it past `maxBoxes` or the byte limit, and larger by that measure. */
+/** True when a put growing the life by `growth` would pass `maxBoxes` or the byte limit. */
 export const refuses = (tally: Tally | null, growth: Tally, maxBoxes: number): boolean => {
   if (tally === null) { return (growth.box_count > 0) || (growth.box_bytes > 0) }
   const after = plus(tally, growth)

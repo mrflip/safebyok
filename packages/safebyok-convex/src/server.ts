@@ -1,4 +1,4 @@
-/** The safebyok functions a host serves from its own `convex/`, each refusing a caller who is not the user its call names. */
+/** The safebyok functions a host serves from its own `convex/`. */
 
 import { mutationGeneric, queryGeneric } from 'convex/server'
 import type { FunctionReference, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
@@ -15,7 +15,7 @@ export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 
 // == [Options]: GetUserId, SafebyokApiOpts
 
-/** The user signed in to the call, as the vault scopes them: null, undefined or empty for no one.
+/** The `user_id` signed in to the call, or null, undefined or empty for no one.
  *
  * @example async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null
  */
@@ -31,12 +31,14 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
 
 // == [The wrapper]: SafebyokComponent, SafebyokApi
 
-/** The installed safebyok component, wrapped to serve its functions to the host's signed-in users.
+/** The installed safebyok component, wrapped to serve its functions to signed-in users.
  *
  * @example
  *   // convex/safebyok.ts
  *   export const { listVaults, getVault, listBoxes, getBox, putVault, putBox, delVault, delBox, tidyGone, watchRows } =
- *     new SafebyokComponent(components.safebyok).api({ getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null })
+ *     new SafebyokComponent(components.safebyok).api({
+ *       getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
+ *     })
  */
 export class SafebyokComponent {
   readonly #component: ComponentApi
@@ -145,7 +147,7 @@ export class SafebyokComponent {
   }
 }
 
-/** The host's safebyok functions as its clients reference them, `api.safebyok`, once re-exported from `convex/safebyok.ts`. */
+/** The host's safebyok functions as its clients reference them, `api.safebyok`. */
 export type SafebyokApi = {
   [Fnname in keyof ComponentApi['vaults']]: ComponentApi['vaults'][Fnname] extends FunctionReference<infer Fnkind, infer _Visibility, infer ArgsT, infer ReturnT>
     ? FunctionReference<Fnkind, 'public', ArgsT, ReturnT>
@@ -155,7 +157,7 @@ export type SafebyokApi = {
 
 // == [Checks]: componentCheck, safebyokApiOpts
 
-/** The check of what {@link SafebyokComponent} wraps: an object, as `components.safebyok` is, and not the undefined a missing install leaves. */
+/** The check of what {@link SafebyokComponent} wraps: the installed component, not undefined. */
 const componentCheck = DB.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_option')
 
 /** The check of {@link SafebyokComponent.api}'s options. */

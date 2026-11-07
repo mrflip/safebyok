@@ -10,7 +10,7 @@ import { Checkers } from 'safebyok/storage'
 // arrival order, every watched query reruns after each mutation, each socket is signed in as one
 // user from the start, and there is no reconnecting, ping or action. Its clients drop what they
 // `log`, and send `warn` and `error` to the console unless handed a logger.
-/** A Convex deployment in memory, running `host` under convex-test, that real Convex clients reach over a fake WebSocket. */
+/** A Convex deployment in memory, running `host` under convex-test, reached by Convex clients over a fake WebSocket. */
 export const fakeDeployment = <Host extends FakeHost>(host: Host, opts: FakeDeploymentOpts = {}): FakeDeployment<Host> => new FakeDeployment(host, opts)
 
 /** What the clients of a {@link FakeDeployment} are given for `logger`: what they log, and where. */
@@ -37,7 +37,7 @@ export type FakeBackend = {
   withIdentity: (identity: { subject: string }) => FakeBackend
 }
 
-/** What a Convex client's constructor is handed to reach the fake: pass them on as they come, `new ConvexReactClient(address, opts)`. */
+/** What a Convex client's constructor is handed to reach the fake: `new ConvexReactClient(address, opts)`. */
 export type FakeClientOpts = { webSocketConstructor: typeof WebSocket, unsavedChangesWarning: false, logger: ConvexLogger }
 
 /** The fake deployment's handle on one connected socket: the user it is signed in as, its watches. */
@@ -116,7 +116,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return this.connectWith(subject, (address, opts) => new ConvexClient(address, opts))
   }
 
-  /** A client `make` constructs, such as a `ConvexReactClient`, on this deployment, signed in as `subject` or no one, and closed with the rest. */
+  /** A client made by `make`, such as a `ConvexReactClient`, on this deployment, signed in as `subject` or no one. */
   connectWith<Client extends { close: () => Promise<void> }>(subject: string | null, make: (address: string, opts: FakeClientOpts) => Client): Client {
     const client = make(FakeAddress, { webSocketConstructor: this.socketsFor(subject), unsavedChangesWarning: false, logger: this.logger })
     this.clients.push(client)
@@ -128,7 +128,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return this.backendAs(subject) as ReturnType<Host['createTest']>
   }
 
-  /** Runs `change` on the backend in turn with the clients' calls, then pushes each watched query that now answers differently. */
+  /** Run `change` on the backend, then push each watched query that now answers differently. */
   async arrange<T>(change: (backend: ReturnType<Host['createTest']>) => Promise<T>): Promise<T> {
     const answer = await this.enqueue(async () => {
       const changed = await change(this.backend as ReturnType<Host['createTest']>)
@@ -146,7 +146,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return Array.from(this.sessions.values(), (session) => Array.from(session.watched.values(), (watch) => watch.udfPath)).flat()
   }
 
-  /** Signs every connected socket out, as a client's `clearAuth` would, and pushes each watched query that now answers differently. */
+  /** Sign every connected socket out, then push each watched query that now answers differently. */
   signOut(): void {
     void this.enqueue(async () => {
       for (const session of this.sessions.values()) { session.subject = null }
@@ -154,7 +154,7 @@ export class FakeDeployment<Host extends FakeHost> {
     })
   }
 
-  /** Closes every client made here, so none keeps a timer running past its test; a second call closes nothing twice. */
+  /** Close every client made here. */
   async close(): Promise<void> {
     await Promise.all(this.clients.splice(0).map((client) => client.close()))
   }
@@ -291,7 +291,7 @@ type SocketLine = {
   hungUp(socket: FakeSocket): void
 }
 
-/** Just enough of a WebSocket for a Convex client: it opens at once, and delivers the deployment's replies later, as a network would. */
+/** Just enough of a WebSocket for a Convex client: it opens at once and delivers replies later. */
 class FakeSocket {
   onopen:    ((event: object) => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null

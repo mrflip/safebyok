@@ -1,4 +1,4 @@
-/** One IndexedDB transaction, as the core's and an adapter's IndexedDB stores both take one: committed, or the refusal saying why not. */
+/** One IndexedDB transaction: committed, or the refusal saying why not. */
 
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as Phrases from '../helpers/phrases'
@@ -8,7 +8,7 @@ import { storageFull, storageUnavailable } from '../refusals/throwers'
 
 // == [The transaction]: inOneStep, workOrAbandon, abortOf, abandon, rowAt
 
-/** What `work` returns, in one transaction on `shelf` that has committed, or the refusal saying what IndexedDB did instead. */
+/** What `work` returns, once its transaction on `shelf` has committed. */
 export const inOneStep = async <ValT>(shelf: UseStore, txMode: IDBTransactionMode, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> => {
   try {
     return await shelf(txMode, async (store) => {
@@ -26,7 +26,7 @@ export const inOneStep = async <ValT>(shelf: UseStore, txMode: IDBTransactionMod
 // Every request `work` makes is awaited on the transaction's own requests alone: awaiting anything
 // else (a timer, a fetch, WebCrypto) lets IndexedDB commit the transaction midway.
 
-/** What `work` returns; if it throws instead, the transaction is aborted, so that none of its writes commit. */
+/** What `work` returns on `store`; if it throws, the transaction aborts. */
 const workOrAbandon = async <ValT>(store: IDBObjectStore, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> => {
   try {
     return await work(store)
@@ -42,7 +42,7 @@ const abortOf = (transaction: IDBTransaction): Promise<Error | null> => new Prom
   transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(Phrases.TransactionAborted, 'AbortError')) })
 })
 
-/** Aborts `transaction`, so that no request it holds commits; one already finished refuses, and has nothing to undo. */
+/** Abort `transaction`, where it has not already finished. */
 const abandon = (transaction: IDBTransaction): void => {
   try {
     transaction.abort()

@@ -76,7 +76,7 @@ export const putVault = mutation({
   },
 })
 
-/** Store a box row where its life is the vault's live one and `opts` allow it, answering the landing, or the capacity of a full vault. */
+/** Store a box row under the vault's live life as `opts` allow, answering the landing. */
 export const putBox = mutation({
   args:    CVX.putBoxArgs,
   returns: CVX.putBoxAnswer,
@@ -104,7 +104,7 @@ export const putBox = mutation({
 
 // == [Dels]: delVault, delBox
 
-/** Store a vault's tombstone over its live or damaged row at `opts.prior`, tombstoning the boxes of its life, answering the landing. */
+/** Store a vault's tombstone over its live or damaged row at `opts.prior`, answering the landing. */
 export const delVault = mutation({
   args:    CVX.delVaultArgs,
   returns: CVX.landing,
@@ -122,7 +122,7 @@ export const delVault = mutation({
   },
 })
 
-/** Store a box's tombstone over its live or damaged row at `opts.prior`, in the vault's live life, answering the landing. */
+/** Store a box's tombstone over its live or damaged row at `opts.prior`, answering the landing. */
 export const delBox = mutation({
   args:    CVX.delBoxArgs,
   returns: CVX.boxLanding,
