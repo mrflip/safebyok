@@ -1,6 +1,6 @@
 # Thread 15: the deviceDB's bank row (2026-11-07)
 
-Branch `20261107-device_bank`, PR (see below), cut from `origin/main` at c3a38219e. Justify: green (safebyok 2468 tests,
+Branch `20261107-device_bank`, PR [#586](https://github.com/mrflip/safebyok/pull/586), cut from `origin/main` at c3a38219e. Justify: green (safebyok 2468 tests,
 every package green, size budgets met).
 
 * **Built**:
@@ -51,7 +51,7 @@ every package green, size budgets met).
     though its point (`Bank` mints nothing, `device_id` a required `Bank.make` option) stands. Left whole (gallant is the
     Coach's, for reviewers).
 
-* **For the Coach**: the database deviation above; the gallant clause.
+* **For the Coach**: the database deviation above; the gallant clause. One new `eslint-disable-line unicorn/prefer-private-class-fields` on `MemoryDeviceDB._cheat_bankRows`, as on `_cheat_leaseRows`.
 
 * **For thread 16**: `const { device_id } = await deviceDB.ensureBank({ applabel, user_id })`, then `Bank.make({ ...,
   device_id })`. It refuses `bad_scope` for a bad scope, `storage_unavailable` for a failing store.
