@@ -74,14 +74,17 @@ export const BankProvider = ({ user_id, requestCleartext, passphraseUsername, pa
   }, [])
 
   // The provider's own requestCleartext: the dialog for the gating's kind, shown only while the
-  // user's gesture is in hand. A bank opens one gating at a time.
+  // user's gesture is in hand. A bank opens one gating at a time, but the last one's dialog may
+  // not have answered yet: it is ended here, so its ask resolves rather than waiting on a dialog
+  // that will never mount again.
   const askByDialog = useCallback((gating: AnyGating) => new Promise<void>((close) => {
     if (! hasUserGesture()) { close(); return }
+    if (showingRef.current !== null) { endShowing(showingRef.current) }
     showingRounds.current += 1
     const next = { round: showingRounds.current, gating, close: () => { close() } }
     showingRef.current = next
     setShowing(next)
-  }), [])
+  }), [endShowing])
 
   // The host's requestCleartext as of the last commit, held as onBadNews is.
   const hostAskerRef = useRef(requestCleartext)
