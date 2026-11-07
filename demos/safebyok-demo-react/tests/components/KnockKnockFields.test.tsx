@@ -4,6 +4,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
 import type { MemoryVaultDB } from 'safebyok/storage'
+import { useBox } from 'safebyok-react'
 import { KnockKnockFields } from '../../src/components/KnockKnockFields'
 import * as TH from '../test-helpers'
 
@@ -12,6 +13,12 @@ const Punchline = 'Banana who? Banana split, gotta run!'
 
 /** The flow beside the vault probe, in a bank for `u1`. */
 const renderFlow = () => TH.renderInBank(<><KnockKnockFields /><TH.VaultProbe /></>)
+
+/** A Veil button for the box under the flow, which nothing on the page offers. */
+const BoxVeiler = () => {
+  const box = useBox('main', 'anthropic_api_key')
+  return <button type="button" onClick={() => { box?.veil() }}>Veil</button>
+}
 
 /** The API key field, once a box backs it. */
 const apiKeyField = async () => await screen.findByLabelText<HTMLInputElement>('Anthropic API key')
@@ -84,11 +91,45 @@ describe("KnockKnockFields", () => {
     await waitFor(() => { expect(field.value).to.eq(FakeApiKey) })
   })
 
+  it("clears Saved. on Done", async () => {
+    renderFlow()
+    const field = await saveKey()
+    fireEvent.change(field, { target: { value: 'sk-ant-unsaved-edit' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await screen.findByRole('button', { name: 'Edit key' })
+    expect(screen.queryByText('Saved.')).to.be.null
+  })
+
   it("knocks with the saved key, and shows Claude's punchline", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     renderFlow()
     await saveKey()
+    await knockAs('Banana')
+    await screen.findByText(Punchline)
+    expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
+  })
+
+  it("knocks with the saved key after an unsaved edit and a lock", async () => {
+    const anthropic = TH.fakeAnthropic(200, Punchline)
+    vi.stubGlobal('fetch', anthropic.fetchFn)
+    renderFlow()
+    const field = await saveKey()
+    fireEvent.change(field, { target: { value: 'sk-ant-unsaved-edit' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
+    await TH.expectProbe('present locked')
+    await knockAs('Banana')
+    await TH.answerPassphraseDialog()
+    await screen.findByText(Punchline)
+    expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
+  })
+
+  it("knocks with the saved key while the box is veiled", async () => {
+    const anthropic = TH.fakeAnthropic(200, Punchline)
+    vi.stubGlobal('fetch', anthropic.fetchFn)
+    TH.renderInBank(<><KnockKnockFields /><BoxVeiler /><TH.VaultProbe /></>)
+    await saveKey()
+    fireEvent.click(screen.getByRole('button', { name: 'Veil' }))
     await knockAs('Banana')
     await screen.findByText(Punchline)
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
