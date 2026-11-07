@@ -46,7 +46,7 @@ const deviceShelfOf = (dbName: string): UseStore => {
 /** The name of every device database of `dbName` older than this version: the old core's, and each earlier version's. */
 const oldDeviceDBNamesOf = (dbName: string): string[] => [
   `${dbName}:device_db`,
-  ...Array.from({ length: DeviceDBVersion }, (_, ii) => `${dbName}:device-v${String(ii)}`),
+  ...Array.from({ length: DeviceDBVersion }, (_slot, ii) => `${dbName}:device-v${String(ii)}`),
 ]
 // --
 
