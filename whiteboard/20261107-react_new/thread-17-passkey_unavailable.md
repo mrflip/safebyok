@@ -1,6 +1,6 @@
 # Thread 17: passkey_unavailable (2026-11-07)
 
-Branch `20261107-passkey_unavailable`, PR #PRNUM, stacked on #583 (thread 13, `20261107-react_tidy`).
+Branch `20261107-passkey_unavailable`, PR #585, stacked on #583 (thread 13, `20261107-react_tidy`).
 Justify: green (safebyok 2447 tests, safebyok-react 225; every package green).
 
 * **Built**:
