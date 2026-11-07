@@ -27,3 +27,29 @@ Every package is marked `sideEffects: false`, so an `import 'pkg/entry'` used on
 tree-shaken. The Dev*Inspector panels are gated by being exported only from `safebyok-react/devmode`,
 which a host must import by name, so nothing relies on a bare import. Any future "import this to
 turn it on" needs a real export, or a `sideEffects` exception for that file.
+
+## No start-over for a forgotten passphrase
+
+The old dialog took `allowStartOver`, meant to let a user who forgot the passphrase begin a new
+vault. The new gating has no start-over, so thread 2 dropped the prop, and threads 3 and 11 did not
+bring it back. *Orchestrator:* the Coach took the Rec (2026-11-07): decide later whether it returns,
+likely as delete-and-rebuild behind a warning.
+
+A host sees: a user who forgot the passphrase, with no passkey, deletes the vault (Delete account)
+and starts again.
+
+## Autolock runs on a one-minute timer
+
+The core sets no timers, so `BankProvider` calls `bank.autolock()` every minute. *Orchestrator:* the
+Coach (2026-11-07): autolock is meant to work on the scale of weeks, and a timer is not the right
+solution; left as it is for now.
+
+A host sees: nothing different today; the mechanism is expected to change.
+
+## No "Replace fingerprint"
+
+The core refuses to add a passkey while the vault holds one, so the demo offers Add or Remove, never
+Replace; the old demo had Replace. *Orchestrator:* accepted (the Coach, 2026-11-07): Replace is
+Remove then Add.
+
+A host sees: a user who wants a new passkey removes the old one first.
