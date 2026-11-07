@@ -69,6 +69,7 @@ const vaultChannelOfInput = DB.Checker(({ user_id }) => user_id, 'bad_option')
 export const vaultChannelOf = (user_id: string): string => channelOf(vaultChannelOfInput.parse(user_id, { where: 'vaultChannelOf' }))
 
 // A user_id whose channel passes 63 bytes, Postgres's longest identifier, cannot be notified: a write under it that would send a notice refuses.
+/** The channel the notices of `user_id`'s writes are sent on. */
 const channelOf = (user_id: string): string => `safebyok_${user_id}`
 
 // A vault's notice is its row as stored. A box's is one JSON array, [...vault props, ...box props], in the order of these lists:
