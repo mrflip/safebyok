@@ -5,8 +5,12 @@ import { defineConfig } from 'tsdown'
 // consumer would and fail the build on anything they find). `safebyok` and `react` are peers, so
 // they stay external and the host's single copy of each is the one the binding uses. Its entry also
 // gains the core's `@safebyok/source` condition, for the workspace's tsconfigs.
+//
+// `safebyok-react/devmode` is its own entry, so the inspection panels, which show raw rows and
+// whispers, reach only a host that names them, and never ride in on the front door.
 export default defineConfig({
-  entry:      ['src/index.ts'],
+  entry:      ['src/index.ts', 'src/devmode/index.ts'],
+  root:       'src',
   format:     ['esm', 'cjs'],
   // The binding is React components and hooks, so unlike the core it is for browsers (and the
   // frameworks that render on them) only.
