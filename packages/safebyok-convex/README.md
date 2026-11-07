@@ -114,6 +114,12 @@ lands. **Once deleted boxes fill a vault's cap, it refuses new box labels until 
 deleted.** Deleting it is the only way to empty it: its next life starts with none, and `tidyGone`
 removes the old life's rows.
 
+**How big a bank can be.** The limit above is per vault; a bank is every vault of one user in one
+app, and `tidyGone` and the bank-wide `watch` each read all of the bank's rows in one Convex
+transaction, whose read is capped at 16 MiB. A bank whose vaults together pass that makes `tidyGone`
+throw and its watch go quiet. The package does not scope the read; keep a user's vaults, deleted
+boxes included, well under it.
+
 ## Testing your own functions
 
 `safebyok-convex/test` installs the component into a

@@ -41,6 +41,16 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
     Postgres tests stay in `packages/safebyok-postgres`, over a PGlite. To run one more suite on the
     server, add it to the list.
 
+* [tests/graphql/](tests/graphql) -- `safebyok-graphql`'s README recipe, both halves, over real
+  sockets: `GraphQLVaultDB` over an urql Client posting to Yoga servers on ports of their own, each
+  hosting a `PostgresVaultDB` over the real Postgres above. It runs where the Postgres tests do,
+  `graphql` in `OnRealPostgres`.
+  * [graphql-vault-db.test.ts](tests/graphql/graphql-vault-db.test.ts) -- the `VaultDB` battery
+    through the network, a browser of one server hearing what a browser of another stores, a
+    watch the browser stops ending the server's listen, and the user_id gate.
+  * [test-helpers.ts](tests/graphql/test-helpers.ts) -- the servers and the browsers, over the
+    Postgres directory's databases and stores.
+
 The packages are read as a consumer reads them: through their built `dist/`, which the `test`
 script builds first, except `safebyok-convex/test`, which ships as source.
 

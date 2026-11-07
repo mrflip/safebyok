@@ -1,4 +1,4 @@
-/** The deviceDB in this browser's IndexedDB: each generic call one transaction, the leaseKey kept as a handle by structured clone. */
+/** The deviceDB in this browser's IndexedDB. */
 
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'
@@ -30,7 +30,7 @@ type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
 /** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
 
-/** The shelf of the device database of `dbName`, whose first transaction deletes the old core's and every older version's. */
+/** The shelf of the device database of `dbName`. */
 const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
 })

@@ -1,4 +1,4 @@
-/** safebyok's vaultDB in this browser's IndexedDB, each generic call one IndexedDB transaction. */
+/** safebyok's vaultDB in this browser's IndexedDB. */
 
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
@@ -10,7 +10,7 @@ import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, she
 
 // == [Options]: IdbVaultDBOpts, idbVaultDBOpts
 
-/** What an IdbVaultDB is made with: the VaultDB's own options, and `dbName`, the name its database is made under ('safebyok' if left out). */
+/** What an IdbVaultDB is made with: the VaultDB's options, and `dbName` ('safebyok' if left out). */
 export type IdbVaultDBOpts = VaultDBOpts & { dbName?: string | undefined }
 
 const idbVaultDBOpts = DB.objCheck(({ str }) => ({ ...DB.vaultDBOpts.shape, dbName: str.min(1).optional() }), 'bad_option')
@@ -32,7 +32,7 @@ const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
 )
 // --
 
-/** A vaultDB that keeps a vault's rows, ciphertext and unencrypted fields, in this browser's IndexedDB; a watch hears every tab's writes. */
+/** A vaultDB in this browser's IndexedDB, whose watch hears every tab's writes. */
 export class IdbVaultDB extends DB.VaultDB {
   // == [Props]: #shelf, #bellname
 
@@ -167,5 +167,5 @@ export class IdbVaultDB extends DB.VaultDB {
   // --
 }
 
-/** A vaultDB in this browser's IndexedDB, for an app with no backend; give two the same `dbName` and they share one database. */
+/** A vaultDB in this browser's IndexedDB, for an app with no backend. */
 export const idbVaultDB = (opts?: IdbVaultDBOpts): IdbVaultDB => new IdbVaultDB(opts)

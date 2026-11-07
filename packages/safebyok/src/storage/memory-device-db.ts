@@ -1,4 +1,4 @@
-/** The deviceDB in memory: one JavaScript step is one transaction, so each generic call is atomic by being straight code, and starts its work before its caller can await. */
+/** The deviceDB in memory. */
 
 import { ckeyOf } from '../helpers/helpers'
 import { DeviceDB } from './device-db-new'

@@ -1,4 +1,4 @@
-/** Convex validators for the component's arguments and answers, each record's converted from the core's checker of the same name. */
+/** Convex validators for the component's arguments and answers, converted from the core's checkers. */
 
 import { zodOutputToConvex, zodToConvex } from 'convex-helpers/server/zod4'
 import { v } from 'convex/values'

@@ -1,6 +1,7 @@
 import { readdirSync } from 'node:fs'
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import * as Zod from 'zod'
+import * as AX from '../../src/shapes/shapes-answers'
 import * as PX from '../../src/shapes/primitives'
 import * as KX from '../../src/deriver/shapes'
 import * as CX from '../../src/shapes/shapes-core'
@@ -475,7 +476,7 @@ describe("Kit", () => {
 // == [The values sweep]: ShapeModules, ExportedCheckers, Marker, MarkedInputs, shapesOf, partsOf, refusalTextOf
 
 /** Every module of the package's shapes, each star-imported: its exports made in a `Checkers`, `Checker` or `objCheck` call are swept below. */
-const ShapeModules = { PX, KX, CX, EX, GX, SX, UX, VX }
+const ShapeModules = { AX, PX, KX, CX, EX, GX, SX, UX, VX }
 
 /** Each checker a shapes module exports, by `<module>.<name>`: a schema whose `parse` refuses with a VaultError, as `refusingAs` tells one. */
 const ExportedCheckers = Object.fromEntries(Object.entries(ShapeModules).flatMap(([modname, mod]) => (

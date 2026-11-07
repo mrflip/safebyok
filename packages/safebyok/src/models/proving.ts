@@ -218,11 +218,13 @@ export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
   return brandGuarded<GuardedKeyDeriver>({ key_deriver_label, salt_bytes, deriveKeyBytes: (passphrase, saltBytes) => deriveKeyBytes(hostDeriver, passphrase, saltBytes), load })
 }
 
-// The key deriver hears the passphrase here (guarantees.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
+// The key deriver hears the passphrase here (guarantees.md, G1 and G8): what else it throws may quote it, so it is replaced, not kept as a cause.
+// A VaultError it throws passes as it came, as the deriver's own refusal of a salt that does not fit does: the deriver's to word.
 const deriveKeyBytes = async (hostDeriver: KeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> => {
   try {
     return await hostDeriver.deriveKeyBytes(passphrase, saltBytes)
-  } catch {
+  } catch (err) {
+    if (isVaultError(err)) { throw err }
     throw keyDeriverThrew()
   }
 }

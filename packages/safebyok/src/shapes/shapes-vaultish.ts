@@ -13,7 +13,7 @@ import type { Listing } from '../models/listing'
 import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db-new'
-import type { Answer, VaultDB } from '../storage/vault-db-new'
+import { type Answer, type VaultDBVerbs, VaultDBVerbnames } from '../storage/vault-db-new'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
@@ -130,7 +130,7 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
 
-// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, brandedVaultDB, listingOpts
+// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, isVaultDBVerbs, brandedVaultDB, listingOpts
 
 /** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
 export const listingWorld = objCheck(({ fn }) => ({ lockState: fn(), ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
@@ -140,13 +140,18 @@ export type ListingWorld = Pick<Bank | Vault, 'lockState' | 'ensureTimely' | 'ta
 
 /** The options a listing is made with, after its world. */
 export type ListingOpts = {
-  vaultDB:               VaultDB
+  vaultDB:               VaultDBVerbs
   /** The refresh horizon of each thing the listing makes: how long after its last refresh the record in hand stays timely. */
   maxMillisSinceRefresh: number
 }
 
-/** The check of a vaultDB as a model is handed one, by its brand: an instance of a class extending VaultDB, from whichever copy of safebyok. */
-export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_option')
+/** True for a branded vaultDB answering each of {@link VaultDBVerbnames} with a function. */
+const isVaultDBVerbs = (val: unknown): val is VaultDBVerbs => (
+  isVaultDB(val) && VaultDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
+)
+
+/** The check of a vaultDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
+export const brandedVaultDB = Checker(({ custom }) => custom<VaultDBVerbs>(isVaultDBVerbs, Phrases.VaultDBExpected), 'bad_option')
 
 /** The check of a listing's options. Checks only. */
 export const listingOpts = objCheck(() => ({
@@ -343,7 +348,7 @@ export interface BankOpts {
   /** Your id for this device, a random UUID you keep per device. */
   device_id:            string
   /** The store the vaults are synchronized through, from a storage adapter. */
-  vaultDB:              VaultDB
+  vaultDB:              VaultDBVerbs
   /** The store on this device that caches each vault's lease. */
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */

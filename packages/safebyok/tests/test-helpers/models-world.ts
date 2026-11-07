@@ -109,7 +109,7 @@ export type Scripted<CallT> = BoxAnswer | ((call: CallT) => unknown)
 export type BoxAnswer = ListingAnswer<BoxRecord, BoxSparse>
 
 /** A watch the listing started: the callback it gave, and whether it is still live. */
-export type ModelsWatch = { onNotice: (notice: Notice) => void, active: boolean }
+export type ModelsWatch = { onNotice: (notice: Notice) => void, onBadNews: ((news: VaultError) => void) | undefined, active: boolean }
 // --
 
 // == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
@@ -241,8 +241,8 @@ export class TestableVaultDB extends MemoryVaultDB {
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelBox']>>) : super.tryDelBox(tombstone, opts)
   }
 
-  override watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
-    const watch: ModelsWatch = { onNotice, active: true }
+  override watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void {
+    const watch: ModelsWatch = { onNotice, onBadNews, active: true }
     this.#calls.push({ verb: 'watch', onNotice })
     this.#watches.push(watch)
     const unwatch = super.watch(scope, onNotice)

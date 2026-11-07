@@ -98,15 +98,15 @@ export const signedInAs = (user_id: string | null): Signing => () => ({ user_id 
 
 /** Signs each operation in as the user it asks for, so the server's gate stays on and lets the battery's users through. */
 export const signedInAsAsked: Signing = ({ variables }) => {
-  const { user_id, record, tombstone } = variables as { user_id?: string, record?: { user_id?: string }, tombstone?: { user_id?: string } }
-  return { user_id: user_id ?? record?.user_id ?? tombstone?.user_id ?? null }
+  const { user_id, record, tombstone, params } = variables as { user_id?: string } & Partial<Record<'record' | 'tombstone' | 'params', { user_id?: string }>>
+  return { user_id: user_id ?? record?.user_id ?? tombstone?.user_id ?? params?.user_id ?? null }
 }
 
 /** A GraphQLVaultDB whose next query or mutation can be made to fail as a dropped connection does. */
 export type FlakyVaultDB = GraphQLVaultDB & { failNext: () => void }
 
 /** A GraphQLVaultDB over its own urql Client, run in-process against `schema`, with urql's document cache in front, as an app's Client has. */
-export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAsAsked, opts: VaultDBOpts = {}): FlakyVaultDB => {
+export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAsAsked): FlakyVaultDB => {
   let isFailing = false
   const flaky = mapExchange({
     onResult: (result) => {
@@ -119,31 +119,41 @@ export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAs
     url:       'https://app.example.test/api/graphql',
     exchanges: [cacheExchange, flaky, executeExchange({ schema, context: signing })],
   })
-  return Object.assign(new GraphQLVaultDB({ ...opts, client }), { failNext: () => { isFailing = true } })
+  return Object.assign(new GraphQLVaultDB({ client }), { failNext: () => { isFailing = true } })
 }
 // --
 
-// == [The battery's stores]: makeVaultDB, makeTwin
+// == [The battery's stores]: makeVaultDB, makeTwin, storeOf
 
-const schemasOf = new WeakMap<GraphQLVaultDB, GraphQLSchema>()
-const optsOf = new WeakMap<GraphQLVaultDB, VaultDBOpts>()
+const serversOf = new WeakMap<GraphQLVaultDB, { schema: GraphQLSchema, store: PostgresVaultDB }>()
 
-/** A fresh browser's store over emptied tables, its server holding at most `maxBoxes` boxes to a vault. */
+/** A fresh browser's store over emptied tables, its server's store made with `opts` and at most `maxBoxes` boxes to a vault. */
 export const makeVaultDB = async (opts: VaultDBOpts = {}, maxBoxes?: number): Promise<FlakyVaultDB> => {
   await emptyTables()
-  const schema = schemaOver(await serverOver((maxBoxes === undefined) ? {} : { maxBoxes }))
-  const vaultDB = browserOver(schema, signedInAsAsked, opts)
-  schemasOf.set(vaultDB, schema)
-  optsOf.set(vaultDB, opts)
+  const store = await serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
+  const schema = schemaOver(store)
+  const vaultDB = browserOver(schema)
+  serversOf.set(vaultDB, { schema, store })
   return vaultDB
+}
+
+/** The server a store makeVaultDB made talks to. */
+const serverOf = (vaultDB: GraphQLVaultDB): { schema: GraphQLSchema, store: PostgresVaultDB } => {
+  const server = serversOf.get(vaultDB)
+  if (server === undefined) { throw new Error('This takes a store makeVaultDB or makeTwin made') }
+  return server
 }
 
 /** A second browser's store over the same server, as another device holds. */
 export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
-  const schema = schemasOf.get(vaultDB)
-  if (schema === undefined) { throw new Error('makeTwin takes a store makeVaultDB made') }
-  return browserOver(schema, signedInAsAsked, optsOf.get(vaultDB))
+  const server = serverOf(vaultDB)
+  const twin = browserOver(server.schema)
+  serversOf.set(twin, server)
+  return twin
 }
+
+/** The PostgresVaultDB behind a browser's store, for the battery's races. */
+export const storeOf = (vaultDB: GraphQLVaultDB): VaultDB => serverOf(vaultDB).store
 // --
 
 // == [Rows]: sql, rowsOf

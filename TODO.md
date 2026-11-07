@@ -19,14 +19,13 @@ What every adapter author and reviewer should have in front of them, and not los
 DeviceDB intelligently handles versioning of cached objects on LWW among records with same version
 
 * **The vaultDB closest to the database owns validation and consistency.** The Coach, 2026-10-22
-  (the primitives sprint, on keeping both the checked `getVault` / `ensureVault` and the relaying
-  `getVaultRecords` / `ensureVaultRecords` pairs): "the vaultdb closest to the database should
+  (the primitives sprint, on keeping both a checked and an unchecked form of each get): "the vaultdb closest to the database should
   handle validation and consistency checks. I don't mind if graphql does checks as well. But
   every vaultDB relies on the consistency guarantees of its backing store -- in the case that
   you're a facade on another vaultDB this is particularly easy." Today the base class checks every
-  record each verb hands up, whichever layer it is: a facade (`safebyok-graphql`'s client, the
-  Postgres route recipe's, the demo's outage adapter) re-checks what its inner VaultDB already
-  checked, and the records pair relays it unchecked to be checked again in the browser. Settle
+  record each verb hands up, whichever layer it is: a facade (`GraphQLVaultDB`, the demo's outage
+  adapter) re-checks what the vaultDB behind it already checked; the GraphQL server calls the hosted
+  vaultDB's `try*` verbs, and its client checks the answers again in the browser. Settle
   where the one check lives (the adapter next to the storage, with the others trusting it), and
   strip the rest, once the stores' verbs have settled.
 
@@ -111,11 +110,9 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   (`bank.clearCachedVault` is that clear), never delete it from the vaultDB, which needs the
   passphrase (`vault.del()`).
 
-* **After the restyle (#273 to #283): three later changes.** Each changes a signature or a
+* **After the restyle (#273 to #283): two later changes.** Each changes a signature or a
   refusal, so each waited for its own PR. `Box.seal` still takes the two epochs from its caller,
-  unchecked; reading them from the vault's own record drops the argument. The server's
-  `getVaultRecords` and `getVault` now answer alike, and could fold into `getVault` and
-  `ensureVault`. A `damaged_wayin` refusal's meta and a Wayin's JSON still carry the older wayin
+  unchecked; reading them from the vault's own record drops the argument. A `damaged_wayin` refusal's meta and a Wayin's JSON still carry the older wayin
   summary with `vault_tok`, where the snapshot shows each way in as its sparse shape.
 * **The names' byte-size refusals are unreachable.** Since the restyle (#273) names are short
   labels, so their share of the vault's byte check and of `box_too_large` cannot be reached from

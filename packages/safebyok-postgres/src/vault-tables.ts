@@ -1,4 +1,4 @@
-/** The SQL that makes safebyok's two tables, run once as a migration or at your server's start: `await pool.query(VaultTablesSql)`. */
+/** The SQL that makes safebyok's two tables: `await pool.query(VaultTablesSql)`. */
 export const VaultTablesSql = `-- safebyok-postgres: the two tables safebyok stores its rows in. For Postgres 14 or later.
 -- Safe to run again: it creates only what is missing.
 --

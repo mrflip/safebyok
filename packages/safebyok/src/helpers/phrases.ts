@@ -65,8 +65,8 @@ export const GuardedExpected = "Expected a host's function as Bank.make wraps it
 /** A host's bare logger, or anything else, where a bank's world holds its logger as the bank guards it. */
 export const GuardedLoggerExpected = "Expected a logger as Bank.make guards it"
 
-/** Anything but an instance of a class extending safebyok's VaultDB, where a vaultDB is asked. */
-export const VaultDBExpected = "Expected a VaultDB: an instance of a class extending safebyok's VaultDB"
+/** Anything but a vaultDB branded by safebyok and answering each of its verbs, where a vaultDB is asked. */
+export const VaultDBExpected = "Expected a VaultDB: a store or client branded by safebyok's VaultDB, answering each of its verbs"
 
 /** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
@@ -537,7 +537,7 @@ export const storeFailed = (call: string, named: string): string => `This device
 export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
 // --
 
-// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed
+// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed, WatchEnded
 
 /** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
 export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
@@ -562,4 +562,13 @@ export const BrowserStoreFailed = "IndexedDB failed while the vault was reading 
 
 /** A GraphQL server whose answer lacks the field asked for. */
 export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?"
+
+/** A request to a GraphQL server that failed, named by what it threw, its HTTP status and its code, where each is known. */
+export const fetchFailed = (thrownName: string, status: number | null, code: string | null): string => {
+  const said = [thrownName, ...((status === null) ? [] : [`HTTP ${String(status)}`]), ...((code === null) ? [] : [code])]
+  return `A request to the GraphQL server failed: ${said.join(', ')}.`
+}
+
+/** A watch's stream that the GraphQL server ended. */
+export const WatchEnded = "The GraphQL server ended a watch's stream, so changes to its rows go unheard until the watch is started again."
 // --

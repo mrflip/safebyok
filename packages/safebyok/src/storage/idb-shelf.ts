@@ -1,4 +1,4 @@
-/** The versioned shelf: an IndexedDB store's one object store, in a database whose name carries a layout version, with every older database of its kind deleted. */
+/** The versioned shelf: an IndexedDB store's one object store, in a database named for its layout version. */
 
 import { createStore, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'
@@ -35,7 +35,7 @@ const versionedShelfSpec = objCheck(({ str, arr }) => ({
 /** The shelf of each database this page has made one for, by the database's name. */
 const shelves = new Map<string, UseStore>()
 
-/** The page's one shelf of the database `dbName:dbstem-v<version>`, whose first transaction deletes every older database of its kind. */
+/** The page's one shelf of the database `dbName:dbstem-v<version>`. */
 export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   const checked = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
   const dbname = `${checked.dbName}:${checked.dbstem}-v${checked.version}`
@@ -55,7 +55,10 @@ export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   return made
 }
 
-/** True for the name of a database of `spec`'s stem whose version is older than its own: in an earlier pattern, or lower. */
+/** Forgets the page's shelf of the database `dbname`, so the next `versionedShelfOf` of it opens a connection of its own. */
+export const _cheat_forgetShelf = (dbname: string): void => { shelves.delete(dbname) }
+
+/** True for the name of a database of `spec`'s stem at an older version. */
 const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
   const stemmed = `${spec.dbName}:${spec.dbstem}-v`
   if (! dbname.startsWith(stemmed)) { return false }
@@ -66,7 +69,7 @@ const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
 
 // The old names are deleted by name, as not every browser lists its databases. The wipe is hygiene, so a browser that cannot list
 // them keeps its older versioned ones rather than failing the vault.
-/** Starts the deletion of each of `spec`'s old names, and of every database now in the browser that {@link isOlderDBName} names. */
+/** Start the deletion of each of `spec`'s old databases. */
 const wipeOlderDBs = async (spec: VersionedShelfSpec): Promise<void> => {
   try {
     for (const oldname of spec.oldnames) { indexedDB.deleteDatabase(oldname) }

@@ -57,6 +57,14 @@ describe("Listing's pipeline: what every answer takes", () => {
       await expect(listing.hello()).rejects.toThrow(/could not be reached/)
     })
 
+    it("tells as bad news the end the store's watch reports", async () => {
+      const listing = boxListingOf(held.mw)
+      const ended = new VaultError('storage_unavailable', "The stream ended.")
+      await listing.hello()
+      held.mw.watches[0]?.onBadNews?.(ended)
+      expect(held.mw.badnews).to.deep.equal([ended])
+    })
+
     it("starts one watch however often it is called", async () => {
       const listing = boxListingOf(held.mw)
       await listing.hello()

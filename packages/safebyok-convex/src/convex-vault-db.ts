@@ -1,4 +1,4 @@
-/** The vaultDB over Convex: each generic call is one query or mutation of the safebyok functions the host serves. */
+/** The vaultDB over Convex. */
 
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
@@ -187,7 +187,7 @@ const refusalOf = (callname: string, thrown: unknown): VaultError => {
   return DB.storageFailed(callname, thrown)
 }
 
-/** What changed from `seen` to `rows`: each vault row that differs, then each box row, with the vault row it stands under. */
+/** The vault rows and box rows that differ between `seen` and `rows`. */
 // Both answers come from Convex's own serializer, so a row unchanged says itself the same way twice.
 const changesOf = (seen: RowsWatched, rows: RowsWatched): Heard[] => {
   const seenVaults = new Map(seen.vaults.map(({ vaultlabel, vault }) => [vaultlabel, JSON.stringify(vault)]))

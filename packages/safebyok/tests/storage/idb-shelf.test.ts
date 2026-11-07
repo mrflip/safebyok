@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { versionedShelfOf, type VersionedShelfSpec } from '../../src/storage/idb-shelf'
+import { _cheat_forgetShelf, versionedShelfOf, type VersionedShelfSpec } from '../../src/storage/idb-shelf'
 import { inOneStep, rowAt } from '../../src/storage/idb-transaction'
 
 /** A spec over a dbName no other test has touched. */
@@ -25,6 +25,16 @@ describe("versionedShelfOf(spec)", () => {
   it("answers the one shelf for a database, however often it is asked", () => {
     const spec = specOf()
     expect(versionedShelfOf(spec)).to.eq(versionedShelfOf({ ...spec }))
+  })
+
+  it("answers a shelf on a connection of its own once the page has forgotten the database's", async () => {
+    const spec = specOf()
+    const shelf = versionedShelfOf(spec)
+    _cheat_forgetShelf(`${spec.dbName}:device-v001-001-001`)
+    const fresh = versionedShelfOf(spec)
+    expect(fresh).to.not.eq(shelf)
+    await inOneStep(shelf, 'readwrite', (store) => { store.put({ wrapped: 'one' }, 'key') })
+    expect(await inOneStep(fresh, 'readonly', (store) => rowAt(store, 'key'))).to.deep.equal({ wrapped: 'one' })
   })
 
   it("answers a shelf of its own for each dbName, stem and version", () => {
