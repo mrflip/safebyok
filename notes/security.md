@@ -807,7 +807,7 @@ added or folded into through the subagent, and no other entry changes.
   `delLease` or a newer `putLease` made after the read is never undone by that read's late discard (an undone lock
   would leave a lease the user locked). `packages/safebyok/src/idb.ts`, `device-db.ts`.
   Amended 2026-10-27 (device_db_class): **one conditional discard now serves both records and both stores,
-  and `DeviceDB` is an abstract base class, as `VaultDB` is, not an interface.** The base class parses every lease and device record a store hands
+  and `DeviceDB` is an abstract base class, as `AdapterVaultDB` is, not an interface.** The base class parses every lease and device record a store hands
   back (`leaseRecord`, `deviceRecord`; amended 2026-10-28 (validator_names): `LeaseRecord` and `DeviceRecord` when this was written); one that fails reads as none and is discarded through the store's `doDelUnparsed(scopepath, isSound)`
   hook, which deletes the row only if `isSound` is still false of it as read inside the same transaction. `memoryDeviceDB`, `idbDeviceDB` and a
   host's own `DeviceDB` discard alike. The base class files each row under its Scopepath and calls the store's `do*` hook before awaiting anything,
@@ -959,7 +959,7 @@ added or folded into through the subagent, and no other entry changes.
   checker is a contract to answer.** (1) `putWayin` proves with the current passphrase only (a passkey's
   answer as the proof is refused `bad_option`), as `changePassphrase` and `addPasskey` did. A new
   passphrase as text replaces the passphrase (amended 2026-10-21 (wayin_rules): and removes the
-  passkey, writing vault props with `passkey: null`; amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; in `src/models/` `replacePassphrasePrompt` leaves the passkey wayin alone, and the vaultDB refuses one carrying a `passkey_wayin` (`storage/vault-db-new.ts`), so a passkey added under the old passphrase no
+  passkey, writing vault props with `passkey: null`; amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; in `src/models/` `replacePassphrasePrompt` leaves the passkey wayin alone, and the vaultDB refuses one carrying a `passkey_wayin` (`storage/vault-db.ts`), so a passkey added under the old passphrase no
   longer opens the current vault props; the user adds a passkey again by proving the new passphrase;
   removal, not revocation: a copy of older vault props still opens with it, as before); a passkey's
   answer (`PasskeyAnswer`) puts the passkey, replacing any. The passkey is now made by the host before the call and its answer handed in, so a
@@ -1157,12 +1157,12 @@ added or folded into through the subagent, and no other entry changes.
   `del-damaged-vault.ts`, is the vault's guard on a host's own `DeviceDB`: a throw, or a bad Outcome
   whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
   `bad_option` (amended 2026-10-27 (device_db_class): `deviceTroubleAsConditions` and its `guarded` Outcome-shape check are gone, and `deviceOutcomeOf` is off the package's exports; amended 2026-10-27 (retire_standing): it is still a module-private helper of `src/device-db.ts`, which the `DeviceDB` verbs call; amended 2026-10-28 (store_trynames): `deviceOutcomeOf` is gone, the throwing verbs map through `storeAnswer` and `deviceTrouble`.
-  `DeviceDB` (`src/device-db.ts`) is an abstract base class, as `VaultDB` is, and its public `try` verbs (`tryGetLease`, `tryPutLease`, `tryDelLease`,
+  `DeviceDB` (`src/device-db.ts`) is an abstract base class, as `AdapterVaultDB` is, and its public `try` verbs (`tryGetLease`, `tryPutLease`, `tryDelLease`,
   `tryGetDeviceRecord`, `tryRaiseDeviceRecord`, `tryDelDeviceRecord`, `tryDelAll`) make each Outcome themselves (amended 2026-10-28 (store_trynames): each has a throwing form without the `try`, which makes the same `deviceTrouble` condition for a store's throw, so both forms give `VaultError`s; see the entry at the top): a throw from the store's `do*` hook becomes
   `deviceTrouble`'s condition, `storage_blocked` for a `SecurityError`, `QuotaExceededError` or `NotSupportedError` and otherwise
   `storage_unavailable`, naming no scope and quoting no record, and a `VaultError` passes as it came; a scopepath the base class cannot file a row
   under is refused `bad_scope` before the store sees the call. `parseDeviceDB` (`vault-opts.ts`) requires `instanceof DeviceDB` plus the verbs'
-  shape, as `parseVaultDB` does for `VaultDB`, so a host's own store extends the base class and no longer hands the vault a bare object).
+  shape, as `parseVaultDB` does for `AdapterVaultDB`, so a host's own store extends the base class and no longer hands the vault a bare object).
   Unchanged: every abort and outrun check from `a_sec` around the take-up and the grant
   (the take-up's AbortController -- amended 2026-10-23 (thread 9, gating): gone --, the grant standing a take-up down before it writes, an overtaken
   grant erasing its own lease) is where it was, in the vault. Amended 2026-10-21 (thread b_fixes):
@@ -1936,6 +1936,16 @@ added or folded into through the subagent, and no other entry changes.
   over `{ slotlabel }`, rather than over a current wayin's header, mints a fresh header: for a passphrase, the vault's
   key deriver label, a fresh random salt (the deriver's `salt_bytes`), this device's `device_id` and `registered_at` =
   the vault's clock now; for a passkey, the answer's `credential_id` and PRF salt, `device_id` and `registered_at`.
+  Amended 2026-11-07 (device_bank, sprint react_new, thread 15, branch `20261107-device_bank`): **the new core's `DeviceDB` mints the `device_id` per bank scope,
+  not per vault, through `ensureBank`.** `DeviceDB.ensureBank({ applabel, user_id })` (`packages/safebyok/src/storage/device-db.ts`) answers the device's bank row
+  `{ applabel, user_id, device_id }` and mints `device_id` on the first call with `crypto.randomUUID()` (through `randomId`, `helpers/crypto.ts`); the host
+  (`BankProvider`, a later thread) hands that `device_id` to `Bank.make`, and each wayin carries it in the clear, visible in storage. It is random because an id drawn
+  from anything about the device or the user would link what the vault does not; a fresh UUID per bank scope links only the wayins one device built under one bank
+  scope. The bank row is not secret and holds no key material: it is outside the eight secret values of `notes/guarantees.md`, and G7's closed set is unchanged.
+  `IdbDeviceDB` keeps bank rows in a separate IndexedDB database, `${dbName}:bank-v001-001-001`, not in the lease database `${dbName}:device-v001-001-001`, so the
+  lease rows (which hold the `lease_key` handle) and the bank rows never share an object store. A stored bank row that fails its check (`SX.bankRow`) is replaced with
+  a freshly minted one, inside the same transaction; the device then goes by a new `device_id`, which only changes what later wayins carry. Device-store failures in
+  the new verbs pass through `storeFailed` as every `DeviceDB` verb's do (name only, no message or cause), G8 unchanged.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
   `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to `safebyok-vault-v3`,
   `safebyok-box-v6` and `safebyok-mark-v3` (amended 2026-10-19 (put_wayin): this said "today's" of `safebyok-vault-v3`; the vault props' format is now `safebyok-vault-v5`, as follows); the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day and on to `safebyok-vault-v5` (slots), so a stored `safebyok-vault-v3` or `-v4` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
@@ -2357,7 +2367,7 @@ added or folded into through the subagent, and no other entry changes.
   checker is the exception, refused `unexpected_error` with no `cause`, `meta` or kind of what it threw,
   a throw as it reads the verdict's fields included; see the put_wayin entry); it is deliberately never logged and never
   reported to the platform, since the thrown value may quote secret material, and the cause still
-  reaches the caller (before, the raw throw propagated). In the `VaultDB` base
+  reaches the caller (before, the raw throw propagated). In the `AdapterVaultDB` base
   (`src/vault-db.ts`), a non-`VaultError` throw from the adapter's `do*` hook stays
   `storage_unavailable` (retryable), while a throw from the base's own checks becomes
   `unexpected_error` (not retryable). A `do*` hook that returns an `Outcome`-shaped value (a wrapper
@@ -2875,11 +2885,11 @@ added or folded into through the subagent, and no other entry changes.
   opened), so a session revoked meanwhile keeps hearing the vault's scope -- never a record --
   until the subscription ends. (amended 2026-11-07 (graphql_schema): `GraphQLVaultDB`'s watch no longer resubscribes when its stream ends, so a
   subscription is never reopened under a user fixed at an earlier start. A stream ending by a closing result or an error is reported once as a
-  VaultError through the optional third parameter of `VaultDBVerbs.watch`, `onBadNews`, which the core's listings route to the bank's bad-news
+  VaultError through the optional third parameter of `VaultDB.watch`, `onBadNews`, which the core's listings route to the bank's bad-news
   channel (the host's `onBadNews`, else `logger.warn`); an `identity_revoked` notice ends the watch quietly, as before. The reported error carries
   no server text: a GraphQL error is `unexpected_error` with no cause, a network error is the sanitized cause of the 2026-10-17 GraphQL entry
   below, a closing result is `storage_unavailable` with the fixed phrase `WatchEnded` and meta `{ call: 'watch' }`. `tidyGone` and `tryTidyGone`
-  are now verbs of the public `VaultDBVerbs` and cross as the mutation `safebyokTidyGone(applabel, user_id)`, served behind the same `user_id` gate
+  are now verbs of the public `VaultDB` and cross as the mutation `safebyokTidyGone(applabel, user_id)`, served behind the same `user_id` gate
   as every other operation (`served(context, scope.user_id, ...)`): refused `identity_revoked`, without calling the vaultDB, unless it is the
   signed-in user's bank.)
 * 2026-10-15: **a second implementation behind one label.** `safebyok-fastkey` runs Argon2id
@@ -2930,7 +2940,7 @@ added or folded into through the subagent, and no other entry changes.
   passes a large safe integer) as a best effort, inside the one statement that inserts a new
   box (see the 2026-10-16 entry below, which replaced a counter column and a row lock). The
   refusal's message names the limit, never a boxlabel or a record. Amended 2026-11-07 (docblock_trim): none of
-  the declaring or the `Vault.make` check survives. The core's `VaultDBOpts` is `maxRecordBytes` alone (no limit
+  the declaring or the `Vault.make` check survives. The core's `AdapterVaultDBOpts` is `maxRecordBytes` alone (no limit
   by default); `maxBoxes` is an option of the vaultDB that enforces it, a soft cap on a vault's live boxes
   (exact at moderate write rates, never strict): `MemoryVaultDB` and `PostgresVaultDB` default to `Infinity`
   and refuse a put of a new box past it as `vault_full`, `PostgresVaultDB` by counting the vault's live boxes in
@@ -3621,7 +3631,7 @@ added or folded into through the subagent, and no other entry changes.
   dev dependency of the private `safebyok-e2e` package, never a dependency of what we publish.
 * 2026-10-17 (thread 5b, store_base, [PR #139](https://github.com/mrflip/safebyok/pull/139); revised
   on branch 20261017-logger_contract): **host listener errors go to the platform's `reportError`
-  as they are, and to a logger.** The `VaultDB` base class (`vault-db.ts`, `subscribe`, which
+  as they are, and to a logger.** The `AdapterVaultDB` base class (`vault-db.ts`, `subscribe`, which
   already did both), `ChangeBell` (`change-bell.ts`) and the string stores (`string-store.ts`,
   listener bookkeeping) call each host listener so that what it throws, or a promise it returns
   that rejects, never escapes: it goes to a logger as an error and to `globalThis.reportError`
@@ -3644,7 +3654,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-17 (thread 5b, store_base; revised on branch 20261017-logger_contract): **an adapter's
   logger is fixed when it is made; `Vault.make`'s is not handed to it; the default logger is one
   page-wide object, which any code on the page can redirect.** A `VaultDB` is made with a logger
-  and keeps it from then on: every adapter hands the host's `VaultDBOpts` to `super(opts)`, and the
+  and keeps it from then on: every adapter hands the host's `AdapterVaultDBOpts` to `super(opts)`, and the
   base-class constructor runs `parseLogger(opts?.logger)` once, which answers `DefaultLogger` when
   the host gave none (`undefined`, `null` meaning "none", an options bag without one, or, from a
   JavaScript subclass, no argument at all) and refuses a non-logger as `bad_option`. The base class

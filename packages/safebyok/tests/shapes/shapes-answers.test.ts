@@ -5,7 +5,7 @@ import * as AX from '../../src/shapes/shapes-answers'
 import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { Answer } from '../../src/storage/vault-db-new'
+import type { Answer } from '../../src/storage/vault-db'
 import { bankScope, boxAt, boxscope, boxTombstoneOf, stale, vaultAt, vaultQuery, vaultScope, vaultTombstoneOf } from '../test-helpers/storage-world'
 
 // == [A wire]: crossed

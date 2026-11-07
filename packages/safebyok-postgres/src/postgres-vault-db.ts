@@ -1,7 +1,7 @@
 /** The vaultDB over Postgres. */
 
 import * as DB from 'safebyok/storage'
-import type { Awaitable, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultDBOpts, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
+import type { AdapterVaultDBOpts, Awaitable, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
 
@@ -15,7 +15,7 @@ export type PostgresClient = PostgresQueryable & { transaction: <ValT>(work: (tx
 export type PostgresListen = (channel: string, onNotify: (text: string) => void) => Awaitable<() => unknown>
 
 /** What a PostgresVaultDB is made with: the client it stores rows through, and the listen its watch hears by. */
-export type PostgresVaultDBOpts = Readonly<VaultDBOpts & { client: PostgresClient, listen?: PostgresListen, maxBoxes?: number }>
+export type PostgresVaultDBOpts = Readonly<AdapterVaultDBOpts & { client: PostgresClient, listen?: PostgresListen, maxBoxes?: number }>
 
 const isPostgresClient = (candidate: unknown): candidate is PostgresClient => (
   (typeof candidate === 'object') && (candidate !== null)
@@ -25,7 +25,7 @@ const isPostgresClient = (candidate: unknown): candidate is PostgresClient => (
 
 // `custom` and `fn` hand back the very client and listen given, so a driver's methods keep their `this`.
 const postgresVaultDBOpts = DB.objCheck(({ custom, fn, uint }) => ({
-  ...DB.vaultDBOpts.shape,
+  ...DB.adapterVaultDBOpts.shape,
   client:   custom<PostgresClient>(isPostgresClient, 'Expected a client with query and transaction functions'),
   listen:   fn<PostgresListen>().optional(),
   maxBoxes: uint.optional(),
@@ -175,7 +175,7 @@ const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGive
 const firstOf = (rows: unknown[], column: string): unknown => ((rows[0] as Record<string, unknown> | undefined)?.[column] ?? null)
 
 /** A vaultDB in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
-export class PostgresVaultDB extends DB.VaultDB {
+export class PostgresVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #client, #listen, #maxBoxes
 
   readonly #client: PostgresClient
@@ -186,8 +186,8 @@ export class PostgresVaultDB extends DB.VaultDB {
   // == [Construction]: constructor
 
   constructor(opts: PostgresVaultDBOpts) {
-    const { client, listen, maxBoxes = Infinity, ...vaultDBOpts } = postgresVaultDBOpts.parse(opts)
-    super(vaultDBOpts)
+    const { client, listen, maxBoxes = Infinity, ...adapterVaultDBOpts } = postgresVaultDBOpts.parse(opts)
+    super(adapterVaultDBOpts)
     this.#client = client
     this.#listen = listen
     this.#maxBoxes = maxBoxes
@@ -218,7 +218,7 @@ export class PostgresVaultDB extends DB.VaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of VaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected async doListVaults({ applabel, user_id }: BankScope): Promise<RowOfVault[]> {
     return await this.#query(ListVaultsSql, [applabel, user_id]) as RowOfVault[]
