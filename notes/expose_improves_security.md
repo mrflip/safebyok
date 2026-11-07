@@ -79,6 +79,24 @@ of the list above: it holds the value through a lock so edits survive, and ends 
 last field unbinds. Anything derived from the value and controlled components stay out, because the
 value never reaches React.
 
+**When a field lets go.** React tells a field it is leaving through the cleanup its `ref` function
+returns, and the box unexposes when its last field lets go. A field lets go in the same update that
+removes it, just before its elements are deleted, never later. A field covered by a loading
+placeholder (Suspense) or hidden with `<Activity>` lets go too, though React keeps its elements,
+hidden: the box unexposes, and is not exposed again when the content comes back. Swapping the last
+field for a new one (a change of its `key`) unexposes the box in between the old field and the new.
+In development, StrictMode rehearses each new `ref`, attaching it, cleaning it up and attaching it
+again, so a box exposed before its field first appears is unexposed by the rehearsal
+(`packages/safebyok-react/tests/box-whisper-field.test.tsx`, *under StrictMode*). While React
+prepares a new screen in the background (a transition), nothing lets go until it puts that screen in
+place. React's own pages:
+[the `ref` callback](https://react.dev/reference/react-dom/components/common#ref-callback),
+[StrictMode](https://react.dev/reference/react/StrictMode),
+[Suspense](https://react.dev/reference/react/Suspense) and
+[Activity](https://react.dev/reference/react/Activity), and the React 19.0.0
+[CHANGELOG](https://github.com/facebook/react/blob/main/CHANGELOG.md), under "Cleanup functions for
+refs" and "StrictMode will now double-invoke ref callback functions on initial mount".
+
 ## The form, without `expose` and with it
 
 Since the text in the field is in the clear anyway, the question becomes what code surrounds it.
