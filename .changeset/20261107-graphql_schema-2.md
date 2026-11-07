@@ -1,0 +1,5 @@
+---
+"safebyok-graphql": minor
+---
+
+The schema in `safebyok-graphql/server` is typed: one operation for each front verb of a vaultDB, and `safebyokWatch`. Each operation answers what the verb's `try*` form answers. A refusal is the answer's `err` field, never a GraphQL error: its refusalkind, its message, and a meta holding only capacity, fieldnames and call. Records, options and answers are typed fields. A sidecar, a damaged row and `err.meta` are `SafebyokJson`, and times are `SafebyokEpochMillis`. `safebyokTidyGone` and `safebyokHeard` are gone. `safebyokWatch` ends with an `identity_revoked` notice once its session is signed out, or signed in as another user. A refusal's cause no longer reaches the server's logs through the resolvers. `GraphQLVaultDB` does not speak the new schema yet.
