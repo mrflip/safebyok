@@ -155,6 +155,7 @@ export const submitNewPassphrase = (passphrase: string, confirming: string = pas
   fireEvent.change(screen.getByPlaceholderText('confirm vault passphrase'), { target: { value: confirming } })
   fireEvent.click(screen.getByText('Create vault'))
 }
+
 /** Types the passphrase in use, a new one and its confirmation, `confirming` if given, and presses Change passphrase. */
 export const submitReplacement = (antePassphrase: string, nextPassphrase: string, confirming: string = nextPassphrase) => {
   fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: antePassphrase } })
