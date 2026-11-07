@@ -2,14 +2,14 @@ import { useEffect, useId, useState } from 'react'
 import { useBank, useBox, useVault, useWhisper } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
-import { ApiKeyBoxlabel, ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
+import { ApiKeyVaultlabel, ExposedApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
 
 /** The knock-knock machine with its API key as an exposed whisper: safebyok keeps the working copy, the form just shows it. */
 export const KnockKnockExposed = () => {
   const bank = useBank()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
-  const box = useBox(ApiKeyVaultlabel, ApiKeyBoxlabel)
+  const box = useBox(ApiKeyVaultlabel, ExposedApiKeyBoxlabel)
   const { apiKey } = useWhisper(box)
   const isShowing = useIsShowing(box)
   const fieldId = useId()
@@ -31,7 +31,7 @@ export const KnockKnockExposed = () => {
     }
   }
 
-  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank) } })
+  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank, ExposedApiKeyBoxlabel) } })
   const save = () => perform(async () => { await box?.putExposed(); setIsSaved(true) })
   const done = () => perform(() => box?.unexpose())
 
@@ -63,7 +63,7 @@ export const KnockKnockExposed = () => {
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm extractApiKey={() => extractSavedApiKey(vault)} isReady={isReady} />
+      <KnockForm extractApiKey={() => extractSavedApiKey(vault, ExposedApiKeyBoxlabel)} isReady={isReady} />
     </section>
   )
 }

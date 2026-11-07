@@ -3,14 +3,14 @@ import { BoxFields } from 'safebyok/dom'
 import { BoxWhisperField, useBank, useBox, useVault } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
-import { ApiKeyBoxlabel, ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
+import { ApiKeyVaultlabel, FieldsApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
 
 /** The knock-knock machine with its API key in a field safebyok fills and reads, so the key never passes through React. */
 export const KnockKnockFields = () => {
   const bank = useBank()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
-  const box = useBox(ApiKeyVaultlabel, ApiKeyBoxlabel)
+  const box = useBox(ApiKeyVaultlabel, FieldsApiKeyBoxlabel)
   const isShowing = useIsShowing(box)
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
@@ -29,7 +29,7 @@ export const KnockKnockFields = () => {
   }
 
   // Each dialog opens on the click: building the vault, unlocking it.
-  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank) } })
+  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank, FieldsApiKeyBoxlabel) } })
 
   const save = () => perform(async () => {
     if (box === null) { return }
@@ -61,7 +61,7 @@ export const KnockKnockFields = () => {
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm extractApiKey={() => extractSavedApiKey(vault)} isReady={isReady} />
+      <KnockForm extractApiKey={() => extractSavedApiKey(vault, FieldsApiKeyBoxlabel)} isReady={isReady} />
     </section>
   )
 }

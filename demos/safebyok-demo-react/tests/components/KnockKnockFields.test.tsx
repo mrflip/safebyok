@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
 import type { MemoryVaultDB } from 'safebyok/storage'
 import { useBox } from 'safebyok-react'
+import { ApiKeyVaultlabel, FieldsApiKeyBoxlabel } from '../../src/lib/saved-api-key'
 import { KnockKnockFields } from '../../src/components/KnockKnockFields'
 import * as TH from '../test-helpers'
 
@@ -16,7 +17,7 @@ const renderFlow = () => TH.renderInBank(<><KnockKnockFields /><TH.VaultProbe />
 
 /** A Veil button for the box under the flow, which nothing on the page offers. */
 const BoxVeiler = () => {
-  const box = useBox('main', 'anthropic_api_key')
+  const box = useBox(ApiKeyVaultlabel, FieldsApiKeyBoxlabel)
   return <button type="button" onClick={() => { box?.veil() }}>Veil</button>
 }
 
@@ -76,7 +77,7 @@ describe("KnockKnockFields", () => {
     await saveKey()
     expect(document.body.outerHTML).to.not.contain(FakeApiKey)
     const boxrows = storedBoxRows(vaultDB)
-    expect([...boxrows.keys()]).to.deep.equal(['anthropic_api_key'])
+    expect([...boxrows.keys()]).to.deep.equal([FieldsApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
@@ -167,11 +168,11 @@ describe("KnockKnockFields", () => {
 
   it("says nothing when the user cancels the dialog, and builds no vault", async () => {
     renderFlow()
-    const prompting = vi.spyOn(Bank.prototype, 'ensureVault')
+    const ensureVaultSpy = vi.spyOn(Bank.prototype, 'ensureVault')
     fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await waitFor(() => { expect(prompting).toHaveBeenCalled() })
-    await act(async () => { await Promise.allSettled(prompting.mock.results.map((result): unknown => result.value)) })
+    await waitFor(() => { expect(ensureVaultSpy).toHaveBeenCalled() })
+    await act(async () => { await Promise.allSettled(ensureVaultSpy.mock.results.map((result): unknown => result.value)) })
     expect(document.querySelector('.knock-knock .gripe')).to.be.null
     expect(screen.getByRole('button', { name: 'Add key' })).to.not.be.null
     await TH.expectProbe('unborn none')

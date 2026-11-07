@@ -6,7 +6,7 @@ import { Bank } from 'safebyok'
 import type { MemoryVaultDB } from 'safebyok/storage'
 import { useBox } from 'safebyok-react'
 import { useIsShowing } from '../../src/hooks/useIsShowing'
-import { ApiKeyBoxlabel, ApiKeyVaultlabel } from '../../src/lib/saved-api-key'
+import { ApiKeyVaultlabel, ExposedApiKeyBoxlabel } from '../../src/lib/saved-api-key'
 import { KnockKnockExposed } from '../../src/components/KnockKnockExposed'
 import { KnockKnockFields } from '../../src/components/KnockKnockFields'
 import * as TH from '../test-helpers'
@@ -18,7 +18,7 @@ const Punchline = 'Banana who? Banana split, gotta run!'
 const renderFlow = () => TH.renderInBank(<><KnockKnockExposed /><TH.VaultProbe /></>)
 
 /** Shows whether the box under the flow shows its whisper, as `showing` or `hidden`. */
-const ShowingProbe = () => <span data-testid="showing">{useIsShowing(useBox(ApiKeyVaultlabel, ApiKeyBoxlabel)) ? 'showing' : 'hidden'}</span>
+const ShowingProbe = () => <span data-testid="showing">{useIsShowing(useBox(ApiKeyVaultlabel, ExposedApiKeyBoxlabel)) ? 'showing' : 'hidden'}</span>
 
 /** The flow with a button that unmounts it, beside the showing probe. */
 const Host = () => {
@@ -79,7 +79,7 @@ describe("KnockKnockExposed", () => {
     const { vaultDB } = renderFlow()
     await saveKey()
     const boxrows = storedBoxRows(vaultDB)
-    expect([...boxrows.keys()]).to.deep.equal([ApiKeyBoxlabel])
+    expect([...boxrows.keys()]).to.deep.equal([ExposedApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
@@ -160,23 +160,43 @@ describe("KnockKnockExposed", () => {
 
   it("stays quiet when the user cancels the dialog", async () => {
     renderFlow()
-    const prompting = vi.spyOn(Bank.prototype, 'ensureVault')
+    const ensureVaultSpy = vi.spyOn(Bank.prototype, 'ensureVault')
     fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await waitFor(() => { expect(prompting).toHaveBeenCalled() })
-    await act(async () => { await Promise.allSettled(prompting.mock.results.map((result): unknown => result.value)) })
+    await waitFor(() => { expect(ensureVaultSpy).toHaveBeenCalled() })
+    await act(async () => { await Promise.allSettled(ensureVaultSpy.mock.results.map((result): unknown => result.value)) })
     expect(document.querySelector('.knock-knock .gripe')).to.be.null
     await TH.expectProbe('unborn none')
   })
 
-  it("shows the same key in both flows once either one edits", async () => {
+  it("keeps a separate key in each flow", async () => {
+    const anthropic = TH.fakeAnthropic(200, Punchline)
+    vi.stubGlobal('fetch', anthropic.fetchFn)
     TH.renderInBank(<><KnockKnockFields /><KnockKnockExposed /><TH.VaultProbe /></>)
     const managedFlow = within(await screen.findByRole('region', { name: 'Knock-knock, with managed fields' }))
+    const exposedFlow = within(await screen.findByRole('region', { name: 'Knock-knock, with an exposed whisper' }))
     fireEvent.click(await managedFlow.findByRole('button', { name: 'Add key' }))
     await TH.answerPassphraseDialog()
-    await waitFor(() => { expect(screen.getAllByRole('button', { name: 'Save' })).to.have.lengthOf(2) })
-    const [managed, exposed] = screen.getAllByLabelText<HTMLInputElement>('Anthropic API key') as [HTMLInputElement, HTMLInputElement]
-    fireEvent.change(exposed, { target: { value: FakeApiKey } })
-    await waitFor(() => { expect(managed.value).to.eq(FakeApiKey) })
+    await managedFlow.findByRole('button', { name: 'Save' })
+    fireEvent.click(await exposedFlow.findByRole('button', { name: 'Add key' }))
+    await exposedFlow.findByRole('button', { name: 'Save' })
+    const managed = managedFlow.getByLabelText<HTMLInputElement>('Anthropic API key')
+    const exposed = exposedFlow.getByLabelText<HTMLInputElement>('Anthropic API key')
+    fireEvent.change(exposed, { target: { value: 'sk-ant-exposed-key' } })
+    expect(managed.value).to.eq('')
+    fireEvent.change(managed, { target: { value: 'sk-ant-managed-key' } })
+    expect(exposed.value).to.eq('sk-ant-exposed-key')
+    fireEvent.click(exposedFlow.getByRole('button', { name: 'Save' }))
+    await exposedFlow.findByText('Saved.')
+    expect(managed.value).to.eq('sk-ant-managed-key')
+    fireEvent.click(managedFlow.getByRole('button', { name: 'Save' }))
+    await managedFlow.findByText('Saved.')
+    for (const flow of [managedFlow, exposedFlow]) {
+      await waitFor(() => { expect(flow.getByRole<HTMLButtonElement>('button', { name: 'Knock' }).disabled).to.be.false })
+      fireEvent.change(flow.getByPlaceholderText('Banana'), { target: { value: 'Banana' } })
+      fireEvent.click(flow.getByRole('button', { name: 'Knock' }))
+      await waitFor(() => { expect(anthropic.seen).to.have.lengthOf(flow === managedFlow ? 1 : 2) })
+    }
+    expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal(['sk-ant-managed-key', 'sk-ant-exposed-key'])
   })
 })
