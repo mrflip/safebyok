@@ -87,14 +87,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** True where {@link whisper} shows the value: exposed, unlocked and unveiled; read live. */
   get isShowing(): boolean { return this.exposure === 'showing' }
 
-  /** True from {@link veil} until {@link unveil}, {@link expose} or {@link unexpose}, whatever the lock; read live. */
+  /** True while {@link veil} hides the whisper exposed, whatever the lock; read live. */
   get isVeiled(): boolean { return this.#isVeiled }
 
   /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
   override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
   // --
 
-  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, dropExposed, veil, unveil, patchWhisper, replaceExposed, unseal
+  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, #dropExposed, veil, unveil, patchWhisper, replaceExposed, unseal
 
   /** The timely stored whisper, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper> {
