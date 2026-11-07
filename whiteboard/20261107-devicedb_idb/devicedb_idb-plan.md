@@ -266,6 +266,10 @@ read makes tidyGone throw and the watch go quiet); the scoping is not built (*or
 reading:* the size limits adjusted after the sprint should make it unnecessary). **Levels:**
 `sonnet` worker, `low` review. **Size:** S-M, mechanical. **Depends on:** threads 4 and 5 (cut
 after both file and are restacked into a line, as it touches their files).
+*Ride-alongs (orchestrator's calls, Cleanup tab):* export `Patterns`, `MaxLabelChars` and
+`MaxUserIdChars` from `safebyok` (the Coach's "export patterns" and "be generous with exports");
+correct G10 in `notes/guarantees.md`, which says no entry point exports the Argon2id derivers
+(`safebyok/browser` exports both).
 
 ## For the Coach
 
