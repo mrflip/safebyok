@@ -1,4 +1,4 @@
-import type { AnyVariables, Client, OperationResult } from '@urql/core'
+import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import type {
@@ -223,7 +223,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 }
 // --
 
-// == [Answers]: answerOf, goodAnswerOf, fieldOf, heedNotice
+// == [Answers]: answerOf, goodAnswerOf, fieldOf, networkTroubleOf, statusOf, codeOf, heedNotice
 
 /** What `ask` answers, or a bad answer holding the refusal it threw. */
 const answerOf = async <ValT, ActT extends string, WorldT>(call: string, req_params: ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
@@ -241,7 +241,7 @@ const goodAnswerOf = <ValT, ActT extends string, WorldT>(answer: Answer<ValT, Ac
 
 /** The `fieldname` of an operation's answer, or the refusal a failed operation stands for. */
 const fieldOf = ({ error: err, data }: OperationResult<unknown>, fieldname: string): unknown => {
-  if (err?.networkError !== undefined) { throw DB.storageUnavailable(err) }
+  if (err?.networkError !== undefined) { throw networkTroubleOf(err) }
   // A GraphQL error is a client and server out of step, which no retry mends: never a condition of storage. It is
   // refused with no cause, so that no GraphQL error's server text crosses: a variable-coercion error can quote the
   // variable sent, which is the record.
@@ -249,6 +249,29 @@ const fieldOf = ({ error: err, data }: OperationResult<unknown>, fieldname: stri
     throw new DB.VaultError('unexpected_error', DB.SchemaNotServed)
   }
   return (data as Record<string, unknown>)[fieldname]
+}
+
+// A network error's message can be the response's body, which may quote the record sent, so the cause is made fresh
+// from the fields that cannot: the error's name, the HTTP status, and a code such as ECONNREFUSED.
+/** A failed request as `storage_unavailable`, its cause naming the error, the HTTP status and a code alone. */
+const networkTroubleOf = ({ networkError, response }: CombinedError): DB.VaultError => {
+  const thrownName = networkError?.name ?? 'Error'
+  const status = statusOf(response)
+  const code = codeOf(networkError) ?? codeOf(networkError?.cause)
+  const cause = Object.assign(new Error(DB.fetchFailed(thrownName, status, code)), { thrownName }, (status !== null) && { status }, (code !== null) && { code })
+  return DB.storageUnavailable(cause)
+}
+
+/** The HTTP status of the response a request failed on, or null. */
+const statusOf = (response: unknown): number | null => {
+  const status: unknown = (typeof response === 'object') && (response !== null) && ('status' in response) ? response.status : null
+  return Number.isSafeInteger(status) ? status as number : null
+}
+
+/** A code such as ECONNREFUSED that `thrown` holds, or null: only a word of capitals, which quotes nothing. */
+const codeOf = (thrown: unknown): string | null => {
+  const code: unknown = (typeof thrown === 'object') && (thrown !== null) && ('code' in thrown) ? thrown.code : null
+  return (typeof code === 'string') && /^[A-Z][A-Z0-9_]{0,39}$/.test(code) ? code : null
 }
 
 /** Hands `onNotice` the notice `result` carries, answering true for the notice that ends the watch for good. */

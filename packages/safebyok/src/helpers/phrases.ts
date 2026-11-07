@@ -534,7 +534,7 @@ export const storeFailed = (call: string, named: string): string => `This device
 export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
 // --
 
-// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed
+// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed
 
 /** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
 export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
@@ -559,4 +559,10 @@ export const BrowserStoreFailed = "IndexedDB failed while the vault was reading 
 
 /** A GraphQL server whose answer lacks the field asked for. */
 export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?"
+
+/** A request to a GraphQL server that failed, named by what it threw, its HTTP status and its code, where each is known. */
+export const fetchFailed = (thrownName: string, status: number | null, code: string | null): string => {
+  const said = [thrownName, ...((status === null) ? [] : [`HTTP ${String(status)}`]), ...((code === null) ? [] : [code])]
+  return `A request to the GraphQL server failed: ${said.join(', ')}.`
+}
 // --

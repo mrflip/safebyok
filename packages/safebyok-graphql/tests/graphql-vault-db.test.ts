@@ -83,6 +83,26 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'unexpected_error')
   })
 
+  it("refuses a failed request with a cause holding the error's name, HTTP status and code alone", async () => {
+    const networkError = new Error('{"whisper_ciphered":"the record sent"}', { cause: { code: 'ECONNRESET', detail: 'the record sent' } })
+    const combined = new CombinedError({ networkError, response: { status: 502, body: 'the record sent' } })
+    const { vaultDB } = fakeClient({ error: combined })
+    const { err } = await vaultDB.tryGetVault(TH.vaultScope)
+    expect(DB.isVaultError(err, 'storage_unavailable')).to.be.true
+    const cause = err?.cause as Error
+    expect(cause).not.to.be.instanceOf(CombinedError)
+    expect(cause).to.include({ thrownName: 'Error', status: 502, code: 'ECONNRESET', message: 'A request to the GraphQL server failed: Error, HTTP 502, ECONNRESET.' })
+    expect(cause.cause).to.be.undefined
+    expect(JSON.stringify([cause.message, cause.stack, Object.entries(cause)])).not.to.include('the record sent')
+  })
+
+  it("names only the error a request failed on, where it has no status or code", async () => {
+    const { vaultDB } = fakeClient({ error: new CombinedError({ networkError: new TypeError('Failed to fetch') }) })
+    const { err } = await vaultDB.tryGetVault(TH.vaultScope)
+    expect(err?.cause).to.deep.include({ thrownName: 'TypeError', message: 'A request to the GraphQL server failed: TypeError.' })
+    expect(err?.cause).not.to.have.any.keys('status', 'code')
+  })
+
   it("refuses a server serving some other schema", async () => {
     const { vaultDB } = fakeClient({ data: { somethingElse: 1 } })
     await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')

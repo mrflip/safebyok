@@ -67,5 +67,5 @@ export type { BadOutcome, GoodOutcome, Outcome } from '../refusals/outcome'
 // --
 
 // == [The phrases]: the sentences an adapter's own refusals say, kept with the core's so the wording is reviewed in one place
-export { NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed } from '../helpers/phrases'
+export { NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed } from '../helpers/phrases'
 // --
