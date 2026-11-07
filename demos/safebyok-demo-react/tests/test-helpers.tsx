@@ -1,6 +1,6 @@
 /** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over stores in memory, to watch the vault beside it, to answer the dialogs the provider raises, and to stand in for Anthropic. */
 import type { ReactNode } from 'react'
-import { expect } from 'vitest'
+import { expect, type MockInstance } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryDeviceDB } from 'safebyok'
 import { MemoryVaultDB } from 'safebyok/storage'
@@ -56,9 +56,10 @@ export const answerDeletionDialog = async (passphrase = Passphrase) => {
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete vault' }))
 }
 
-/** Waits a moment, inside React's act, for an ask the user cancelled to reach the click handler that made it. */
-export const settleAsks = async () => {
-  await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 20) }) })
+/** Waits, inside React's act, until each call `prompting` heard has settled and the handler that awaited it has heard. */
+export const settlePrompts = async <PromptT extends () => Promise<unknown>>(prompting: MockInstance<PromptT>) => {
+  // The handler awaited each promise before this does, so it hears the outcome first.
+  await act(async () => { await Promise.allSettled(prompting.mock.results.map((result): unknown => result.value)) })
 }
 
 /** One request a {@link fakeAnthropic} heard: where it went, the API key it carried (the SDK sends it as a bearer token), its body. */

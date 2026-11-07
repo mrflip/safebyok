@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Vault } from 'safebyok'
 import { memoryStore } from 'safebyok-old'
 import { SessionBar } from '../../src/components/SessionBar'
 import { createAuth } from '../../src/lib/auth'
@@ -109,9 +110,10 @@ describe("SessionBar", () => {
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     const { auth } = renderBar()
     await signInWithVault()
+    const prompting = vi.spyOn(Vault.prototype, 'tryDelVaultPrompt')
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await TH.settleAsks()
+    await TH.settlePrompts(prompting)
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
     expect(document.querySelector('.session-bar .gripe')).to.be.null
     await TH.expectProbe('present unlocked')
