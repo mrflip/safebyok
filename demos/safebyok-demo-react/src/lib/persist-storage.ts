@@ -1,8 +1,8 @@
 /**
- * Asks the browser not to evict this origin's storage under pressure, as `idbVaultDB`'s doc
- * block (safebyok-idb-old) says a host keeping its vaults in IndexedDB should. Resolves true
- * when storage is (or already was made) persistent, false when the browser declines or has no
- * such API: the vault works either way, so a refusal is never an error.
+ * Asks the browser not to evict this origin's storage under pressure, as a host keeping its
+ * vaults in IndexedDB should. Resolves true when storage is (or already was made) persistent,
+ * false when the browser declines or has no such API: the vault works either way, so a refusal
+ * is never an error.
  *
  * @example
  *   await keepStorage()  // true in a browser that grants it

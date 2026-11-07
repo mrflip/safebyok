@@ -2,7 +2,7 @@
   "name": "safebyok-demo-react",
   "private": true,
   "version": "0.0.0",
-  "description": "Single-page React playground for the safebyok interface: a stub vault, a fake sign-in, and an inspector showing what lands where. Never published.",
+  "description": "Single-page React playground for the safebyok interface: a fake sign-in over a vault in this browser's IndexedDB. Never published.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,8 @@
     "@anthropic-ai/sdk": "^1.3.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "safebyok-idb-old": "workspace:*",
+    "safebyok": "workspace:*",
+    "safebyok-indexeddb": "workspace:*",
     "safebyok-old": "workspace:*",
     "safebyok-react": "workspace:*"
   },
