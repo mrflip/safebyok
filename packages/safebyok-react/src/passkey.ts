@@ -44,7 +44,8 @@ const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, byt
       opts:          obj({ rpId: named.optional(), timeout }).strict(),
     }),
     // Only what attemptOnce itself touches: the attempt judges the rest of the answer.
-    attemptOnceInput: obj({ passkey: obj({ prfBytes: bytes() }), attempt: fn() }),
+    attemptOnceAnswer:  obj({ prfBytes: bytes() }),
+    attemptOnceAttempt: fn(),
   }
 })
 
@@ -148,8 +149,10 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPa
 
 /** Hand `passkey` to `attempt`, then zero its bytes whatever the attempt did. */
 export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
-  PasskeyChecks.attemptOnceInput.parse({ passkey, attempt }, { where: "In attemptOnce's arguments" })
+  PasskeyChecks.attemptOnceAnswer.parse(passkey, { where: "In attemptOnce's passkey" })
+  // Judged inside the try: an answer refused for its attempt is zeroed all the same.
   try {
+    PasskeyChecks.attemptOnceAttempt.parse(attempt, { where: "In attemptOnce's attempt" })
     return await attempt(passkey)
   } finally {
     passkey.prfBytes.fill(0)

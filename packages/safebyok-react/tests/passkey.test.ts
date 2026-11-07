@@ -229,9 +229,10 @@ describe("attemptOnce's answer", () => {
     expect(attempt).not.toHaveBeenCalled()
   })
 
-  it("refuses an attempt that is no function", async () => {
+  it("zeroes the answer's bytes when it refuses an attempt that is no function", async () => {
     const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: crypto.getRandomValues(new Uint8Array(PrfAnswerBytes)) }
     expect(await refusalOf(attemptOnce(passkey, 'attempt' as never))).to.include({ refusalkind: 'bad_option' })
+    expect(passkey.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
   it("quotes none of a malformed answer in its refusal", async () => {
