@@ -1,8 +1,10 @@
 /** The versioned shelf: an IndexedDB store's one object store, in a database whose name carries a layout version, with every older database of its kind deleted. */
 
 import { createStore, type UseStore } from 'idb-keyval'
+import type * as Z from 'zod'
+import { objCheck } from '../helpers/validator'
 
-// == [The versioned shelf]: VersionedShelfSpec, versionedShelfOf, isOlderDBName, wipeOlderDBs
+// == [The versioned shelf]: VersionedShelfSpec, VersionPattern, versionedShelfSpec, shelves, versionedShelfOf, isOlderDBName, wipeOlderDBs
 
 /** What names a versioned shelf: its host's `dbName`, which kind of database it is, and the layout version. */
 export interface VersionedShelfSpec {
@@ -21,18 +23,36 @@ export interface VersionedShelfSpec {
 /** A layout version: three zero-padded parts. */
 const VersionPattern = /^\d{3}-\d{3}-\d{3}$/
 
-/** The shelf of the database `dbName:dbstem-v<version>`, whose first transaction deletes every older database of its kind. */
+const versionedShelfSpec = objCheck(({ str, arr }) => ({
+  dbName:    str.min(1),
+  dbstem:    str.min(1),
+  version:   str.regex(VersionPattern),
+  storename: str.min(1),
+  oldnames:  arr(str.min(1)),
+}), 'bad_option')
+
+// A page's one shelf for each database: each connection a shelf holds open is never closed, and its wipe is run once.
+/** The shelf of each database this page has made one for, by the database's name. */
+const shelves = new Map<string, UseStore>()
+
+/** The page's one shelf of the database `dbName:dbstem-v<version>`, whose first transaction deletes every older database of its kind. */
 export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
-  const shelf = createStore(`${spec.dbName}:${spec.dbstem}-v${spec.version}`, spec.storename)
+  const checked = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
+  const dbname = `${checked.dbName}:${checked.dbstem}-v${checked.version}`
+  const kept = shelves.get(dbname)
+  if (kept !== undefined) { return kept }
+  const shelf = createStore(dbname, checked.storename)
   let isWiped = false
-  return async (txMode, callback) => {
+  const made: UseStore = async (txMode, callback) => {
     if (! isWiped) {
       isWiped = true
       // The old databases are deleted unread and never awaited: a tab still holding one open holds its delete back (notes/wontfix.md).
-      void wipeOlderDBs(spec)
+      void wipeOlderDBs(checked)
     }
     return await shelf(txMode, callback)
   }
+  shelves.set(dbname, made)
+  return made
 }
 
 /** True for the name of a database of `spec`'s stem whose version is older than its own: in an earlier pattern, or lower. */
@@ -40,6 +60,7 @@ const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
   const stemmed = `${spec.dbName}:${spec.dbstem}-v`
   if (! dbname.startsWith(stemmed)) { return false }
   const version = dbname.slice(stemmed.length)
+  // A name whose version this code cannot read is deleted, as is an older one: a later change of the version format takes a new stem.
   return (! VersionPattern.test(version)) || (version < spec.version)
 }
 
@@ -58,3 +79,5 @@ const wipeOlderDBs = async (spec: VersionedShelfSpec): Promise<void> => {
   }
 }
 // --
+
+true satisfies Z.core.util.AssertEqual<VersionedShelfSpec, Z.input<typeof versionedShelfSpec>>

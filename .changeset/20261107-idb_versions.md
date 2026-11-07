@@ -9,3 +9,5 @@ Each IndexedDB database now carries a layout version in its name, three zero-pad
 A passphrase wayin whose stored `salt_b64` passes that check but will not decode (a length no unpadded base64url has, or stray padding bits in its last character) now refuses a passphrase unlock as `bad_record`, not with a raw Error.
 
 `DeviceDB` gains `delRawLease(scope)` and `tryDelRawLease(scope)`, which delete whatever row stands at a vault scope, unchecked, so a host can clear a lease row that fails its check (neither `listLeases` lists it nor `forget` erases it); a `DeviceDB` subclass writes one more hook, `doDelRawLease(scope)`.
+
+`versionedShelfOf` now answers one shelf for each database name on a page, so a store made again under the same `dbName` (a hot reload, or several banks) shares one connection and the wipe of older databases runs once; it checks its spec on entry, refusing `bad_option` for an empty name or a `version` that is not three zero-padded parts.
