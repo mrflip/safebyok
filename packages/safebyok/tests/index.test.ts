@@ -43,6 +43,10 @@ describe("safebyok", () => {
     expectTypeOf<Front.PasskeyAnswer['prfBytes']>().toExtend<Uint8Array>()
   })
 
+  it("exports the longest autolock a bank keeps, which an endless autolockMinutes becomes", () => {
+    expect(Front.ForeverMillis).to.be.above(100 * 365 * 24 * 60 * Front.MinuteMillis)
+  })
+
   it("exports HostErrorSanitizer, whose refusalFor makes a VaultError that carries nothing of what was thrown", () => {
     const foreign = new Error('the passphrase was hunter2')
     const refusal = Front.HostErrorSanitizer.refusalFor(foreign, 'storage_unavailable', "The vault's storage failed: try again shortly.")
