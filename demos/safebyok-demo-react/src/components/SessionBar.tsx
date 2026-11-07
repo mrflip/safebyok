@@ -51,10 +51,10 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
   }
 
   const deleteAccount = async () => {
-    if (! globalThis.confirm('Delete this account and its vault? The secrets in it are gone for good.')) { return }
     setGripe(null)
     // Until the bank has heard from storage, nobody knows whether a vault is there to delete.
     if (stage === 'waiting') { setGripe('Your vault is still loading: try again in a moment.'); return }
+    if (! globalThis.confirm('Delete this account and its vault? The secrets in it are gone for good.')) { return }
     // The vault's dialog asks for the passphrase, which proves the deletion. A vault never born has
     // nothing to delete: the account goes without it. Cancelled, the account stays, quietly.
     if (stage === 'present') {
