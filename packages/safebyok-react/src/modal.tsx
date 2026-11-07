@@ -12,7 +12,7 @@ import { useWhenShown } from './when-shown'
 
 // == [Answer]: DialogAnswer, answerOf, useAnswerOnce, AnsweringOnce, DialogTrouble, cancelOnEscape
 
-/** How a dialog closed: 'unlocked' once an attempt that leaves the vault unlocked is ok, 'deleted' once a deletion is, 'declined' otherwise. */
+/** How a dialog closed: 'unlocked', 'deleted' or 'declined'. */
 export type DialogAnswer = 'unlocked' | 'deleted' | 'declined'
 
 /** The answer for `gating` settled with `outcome`. */
@@ -21,7 +21,7 @@ const answerOf = (gating: AnyGating, outcome: Outcome<Vault>): DialogAnswer => {
   return gating.gatingkind === 'del_vault' ? 'deleted' : 'unlocked'
 }
 
-/** The dialog's one answer to `gating`, calling `onDone` the first time only; the gating settling answers too, once the dialog shows. */
+/** The dialog's one answer to `gating`, calling `onDone` the first time only. */
 const useAnswerOnce = (gating: AnyGating, onDone: (answer: DialogAnswer) => void) => {
   const onDoneRef = useRef(onDone)
   useLayoutEffect(() => { onDoneRef.current = onDone })
@@ -41,7 +41,7 @@ const useAnswerOnce = (gating: AnyGating, onDone: (answer: DialogAnswer) => void
   return done
 }
 
-/** A dialog's one answer, kept above its boundary, so the notice shown once something went wrong closes as the form would. */
+/** A dialog's one answer, kept above its boundary. */
 export const AnsweringOnce = ({ gating, onDone, children }: {
   gating:   AnyGating
   onDone:   (answer: DialogAnswer) => void
@@ -62,7 +62,7 @@ const cancelOnEscape = (onDone: (answer: DialogAnswer) => void) => (evt: Keyboar
   onDone('declined')
 }
 
-/** What the dialog shows once something not the user's to mend went wrong inside it: what it could not do, and the way out. */
+/** What the dialog shows once something not the user's to mend went wrong inside it. */
 const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: DialogAnswer) => void }) => {
   const titleId = useId()
   const wordId = useId()
@@ -91,7 +91,7 @@ const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: Dial
 
 // == [Form]: Gripe, useAttempts, ModalForm, holdsFocus, unlockedFor
 
-/** What the dialog says to the user, whether it is about the passkey, and whether a new passphrase and its confirmation differ. */
+/** What a dialog's live region says, and whether it is about the passkey or a mismatch. */
 export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
 
 /** A form's state around its attempts: the gripe it shows, and what one submit's attempt does with its outcome. */
@@ -150,7 +150,7 @@ type ModalFormProps = {
   children:   ReactNode
 }
 
-/** A gating's form with a dialog's semantics, unstyled under the `modal-scrim` / `modal` / `quiet` / `gripe` class names. */
+/** A gating's form with a dialog's semantics, unstyled under `modal` class names. */
 export const ModalForm = ({ title, blurb, submitWord, gripe, gripeId, footnote, formRef, done, onSubmit, children }: ModalFormProps) => {
   const titleId = useId()
   const blurbId = useId()
@@ -205,7 +205,7 @@ const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
   return made
 }
 
-/** What a dialog promises about how long an unlock lasts, from the bank's `leaseMillis`: 'Locks again on this device in 7 days'. */
+/** What a dialog promises about how long an unlock lasts, from the bank's `leaseMillis`. */
 export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
   // Never compared for equality: the far future is anything within a minute of it.
   if (leaseMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
@@ -268,7 +268,7 @@ export const PassphraseField = ({ ref, credential, fieldlabel, takesFocus, advic
 /** The gripe for a new passphrase and a confirmation that differ. */
 const MismatchGripe: Gripe = { text: Messages.passphrasesDiffer, fromPasskey: false, mismatched: true }
 
-/** The confirmation of a new passphrase: its field's ref, the live region's id, and `differs(chosen)`, asked at a submit. */
+/** The confirmation of a new passphrase, and `differs(chosen)` to check it at a submit. */
 export const useConfirmation = (setGripe: (gripe: Gripe) => void) => {
   const ref = useRef<HTMLInputElement>(null)
   const gripeId = useId()
@@ -298,10 +298,10 @@ export const ConfirmField = ({ ref, gripeId, fieldlabel, gripe, onChange }: {
   />
 )
 
-/** What a host says of a passphrase as the user chooses it, or null for nothing; it hears the passphrase in plain text, so keep it on the device. */
+/** What a host says of a passphrase as the user chooses it, or null for nothing. */
 export type PassphraseAdvice = (passphrase: string) => string | null | Promise<string | null>
 
-/** The refusal for a host's `passphraseAdvice` that threw: it heard the passphrase, so nothing of what it threw goes on. */
+/** The refusal for a host's `passphraseAdvice` that threw, leaving out what it threw. */
 const adviceFailed = (thrown: unknown) => HostErrorSanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
 
 /** The bank's own advice: the reason its strength checker gives for a weak passphrase, and nothing for a strong one. */
@@ -310,7 +310,7 @@ const checkerAdvice = async (gating: AnyGating, typed: string): Promise<string |
   return verdict.strong ? null : verdict.reason
 }
 
-/** What the advice last said of the text typed so far, and `hear`, which asks it of a new text; only the latest answer is kept. */
+/** What the advice last said of the text typed so far, and `hear` to ask it of a new text. */
 export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating: AnyGating, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)

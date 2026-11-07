@@ -6,7 +6,7 @@ import { Messages } from './messages'
 import { askPasskey, attemptOnce, passkeysAvailable } from './passkey'
 import { useWhenShown } from './when-shown'
 
-/** A button that unlocks with the vault's passkey, rendered only when the gate holds one and the browser offers WebAuthn, so a dialog may place it unconditionally.
+/** A button that unlocks with the vault's passkey, shown only where a passkey can be used.
  *
  * @example <PasskeyUnlockButton gating={gating} onDone={close} onGripe={setGripe} />
  */
@@ -22,15 +22,15 @@ export type PasskeyUnlockButtonProps = {
   gating:      Gating<'unlock_vault'>
   /** Called once the gating is answered: 'unlocked', or 'declined' for a refusal that closes the dialog. */
   onDone:      (answer: 'unlocked' | 'declined') => void
-  /** What the button has to say: a calm message, or null when what it said last no longer stands. */
+  /** What the button has to say, or null once what it said last no longer stands. */
   onGripe:     (gripe: string | null) => void
   /** The relying party the passkey was made under, if not the page's own domain. */
   rpId?:       string | undefined
-  /** Whether the button takes the focus when it first shows: true where it is the dialog's first choice. */
+  /** Whether the button takes the focus when it first shows. */
   takesFocus?: boolean | undefined
 }
 
-/** True when the button shows for `gating`: the browser offers WebAuthn, and the gate held a passkey as the gating was raised. */
+/** True when the passkey button shows for `gating`. */
 export const offersPasskey = (gating: AnyGating): boolean => (
   passkeysAvailable() && gating.passkeyHeader?.wayinkind === 'passkey'
 )

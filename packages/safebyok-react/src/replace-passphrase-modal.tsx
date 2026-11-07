@@ -17,13 +17,13 @@ export type ReplacePassphraseModalProps = {
   gating:              Gating<'replace_passphrase'>
   /** Called once, with the dialog's answer: 'unlocked' once the passphrase is replaced, 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
+  /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the new passphrase's field as the user chooses it. Default: the bank's strength checker's reason. */
+  /** What to say beside the new passphrase's field as the user chooses it. */
   passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
-/** The dialog itself, inside ReplacePassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+/** The dialog itself, inside ReplacePassphraseModal's boundary. */
 const ReplacePassphraseForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice }: ReplacePassphraseModalProps) => {
   const { gripe, setGripe, fail, attempt } = useAttempts('ReplacePassphraseModal', done)
   const anteRef = useRef<HTMLInputElement>(null)

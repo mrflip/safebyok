@@ -17,11 +17,11 @@ export type DelVaultModalProps = {
   gating:              Gating<'del_vault'>
   /** Called once, with the dialog's answer: 'deleted' once the vault is deleted, 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
+  /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
 }
 
-/** The dialog itself, inside DelVaultModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+/** The dialog itself, inside DelVaultModal's boundary. */
 const DelVaultForm = ({ gating, onDone: done, passphraseUsername }: DelVaultModalProps) => {
   const { gripe, setGripe, attempt } = useAttempts('DelVaultModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)

@@ -5,7 +5,7 @@ import { Messages } from './messages'
 import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
 import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
 
-/** The passphrase dialog for a `build_vault` gating, which chooses the vault's first passphrase, or an `unlock_vault` one. */
+/** The passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
   <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
     {(done) => <PassphraseForm {...props} onDone={done} />}
@@ -21,11 +21,11 @@ export type PassphraseModalProps = {
   gating:              PassphraseGating
   /** Called once, with the dialog's answer: 'unlocked' once an attempt is ok, 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** The bank's `leaseMillis`, for the line that says how long an unlock lasts; left out, the dialog says nothing of it. */
+  /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
-  /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
+  /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase. Default: the bank's strength checker's reason. */
+  /** What to say beside the field as the user chooses a passphrase. */
   passphraseAdvice?:   PassphraseAdvice | undefined
   /** The relying party the vault's passkey was made under, if not the page's own domain. */
   passkeyRpId?:        string | undefined
@@ -49,7 +49,7 @@ const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername,
     void attempt(() => gating.attempt({ passphraseClear: typed }), 'unlocked')
   }
 
-  /** Each change to the field: a gripe about what was typed before goes, and, while choosing, the advice is asked anew. */
+  /** Each change to the field. */
   const hearPassphrase = (typed: string) => {
     setGripe((prev) => (prev?.fromPasskey === true ? prev : null))
     if (creating) { void advice.hear(typed) }

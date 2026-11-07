@@ -10,7 +10,7 @@ export type BoundaryProps = {
   children:  ReactNode
 }
 
-/** The error boundary a safebyok-react component keeps at its own edge, so nothing going wrong inside it reaches the host's page. */
+/** The error boundary a safebyok-react component keeps at its own edge. */
 export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
   override state = { caught: false }
 
@@ -21,7 +21,7 @@ export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
   override render() { return this.state.caught ? this.props.fallback : this.props.children }
 }
 
-/** A number that changes whenever `thing` does: the key for a component that serves one gating, so handed another it starts afresh. */
+/** A number that changes whenever `thing` does, to key a component that serves one gating. */
 export const useRoundFor = (thing: object): number => {
   const [served, setServed] = useState({ thing, round: 0 })
   if (served.thing === thing) { return served.round }
@@ -46,7 +46,7 @@ const LookFor: Record<BoundarySource, string> = {
   PasskeyUnlockButton:    `${LeftOut}.`,
 }
 
-/** What a component throws in render for its {@link Boundary} in place of `err`, so what React reports carries nothing the user typed. */
+/** What a component throws in render for its {@link Boundary} in place of `err`. */
 export const forBoundary = (err: unknown, source: BoundarySource): VaultError => {
   if (! isVaultError(err)) {
     return HostErrorSanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LookFor[source]}`)

@@ -17,11 +17,11 @@ export type RevokePasskeyModalProps = {
   gating:              Gating<'revoke_passkey'>
   /** Called once, with the dialog's answer: 'unlocked' once the passkey is removed, 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
+  /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
 }
 
-/** The dialog itself, inside RevokePasskeyModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+/** The dialog itself, inside RevokePasskeyModal's boundary. */
 const RevokePasskeyForm = ({ gating, onDone: done, passphraseUsername }: RevokePasskeyModalProps) => {
   const { gripe, setGripe, attempt } = useAttempts('RevokePasskeyModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)

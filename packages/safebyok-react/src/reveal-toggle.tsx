@@ -1,12 +1,7 @@
 import { useState } from 'react'
 
 /**
- * Whether a secret field shows what is typed, and the Show / Hide button that flips it: the
- * field's `type` is `password` while hidden, `text` while shown. Only the type changes, so a
- * field the browser holds the text of (an uncontrolled one) keeps what is typed either way.
- *
- * @returns `fieldType` for the input, and `button(fieldId)`, the button that controls it, with
- *   `aria-pressed` true while the text shows.
+ * A Show / Hide button for a secret field, and the `type` the field takes while shown or hidden.
  *
  * @example
  *   const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper)

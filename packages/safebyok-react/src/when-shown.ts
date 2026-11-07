@@ -1,20 +1,9 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 
-/** A function that calls `goOn` while the component is on the page, for an async handler to go on through after each await of its own.
- * It calls `goOn` at once while the component shows, and hands back a promise of what `goOn`
- * returns. While a Suspense boundary or an `<Activity>` hides the component, it calls `goOn` once
- * the component shows again, so the handler meets then what settled meanwhile. Once the component
- * has unmounted, it never calls `goOn`, and the promise never settles: the handler goes no
- * further, touching neither the component's state nor the callbacks its host handed it.
- * The component shows from the commit that mounts or reveals it, before React runs its passive
- * effects, so a handler the user sets off the moment it shows goes on. It stops showing in the
- * commit that hides or unmounts it.
- */
+/** A function that calls `goOn` while the component is on the page, for an async handler to go on through. */
 export type WhenShown = <ValT>(goOn: () => ValT) => Promise<Awaited<ValT>>
 
 /** The component's {@link WhenShown}, and `isShown`, whether it shows now.
- * Ask `isShown` before a step that holds a secret: such a step runs now or not at all, never
- * kept waiting for a component that may never show again. Both keep one identity across renders.
  *
  * @example
  *   const { whenShown } = useWhenShown()

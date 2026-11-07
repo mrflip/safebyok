@@ -18,7 +18,7 @@ export type AddPasskeyModalProps = {
   gating:              Gating<'add_passkey'>
   /** Called once, with the dialog's answer: 'unlocked' once the passkey is added, 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under, and the authenticator the passkey. Default: the user and the vault, as 'u1 (main vault)'. */
+  /** What a password manager files the passphrase under, and the authenticator the passkey. */
   passphraseUsername?: string | undefined
   /** The relying party the passkey is made under, if not the page's own domain. */
   passkeyRpId?:        string | undefined
