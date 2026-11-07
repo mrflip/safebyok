@@ -33,7 +33,7 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
     await call(verbname, work)
     relist()
   }
-  const listName = isRaw ? 'listRawLeases' : 'listLeases'
+  const listname = isRaw ? 'listRawLeases' : 'listLeases'
   return (
     <>
       <div className="row">
@@ -43,20 +43,20 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
           {' Include damaged rows'}
         </label>
       </div>
-      {trouble !== null && <p role="alert">{`${listName} refused: ${trouble}`}</p>}
+      {trouble !== null && <p role="alert">{`${listname} refused: ${trouble}`}</p>}
       {rows === null
         ? <p className="quiet">Listing…</p>
         : (
           <table>
-            <caption>{`Leases, as ${listName} answers them`}</caption>
+            <caption>{`Leases, as ${listname} answers them`}</caption>
             <thead>
               <tr>{LeaseColumns.map((fieldname) => <th key={fieldname}>{fieldname}</th>)}<th>other fields</th><th>verbs</th></tr>
             </thead>
             <tbody>
-              {rows.map((row, idx) => (
+              {rows.map((row, ii) => (
                 <LeaseRowLine
                   // A damaged row may lack the fields that would name it.
-                  key={`${String(row['vaultlabel'])}/${String(row['vault_tok'])}/${String(idx)}`}
+                  key={`${String(row['vaultlabel'])}/${String(row['vault_tok'])}/${String(ii)}`}
                   row={row}
                   onForget={(asked) => callThenRelist('forget', async () => { await deviceDB.forget(asked); return 'forgotten' })}
                   onDelRaw={isRaw ? (scope) => callThenRelist('delRawLease', async () => { await deviceDB.delRawLease(scope); return 'deleted' }) : null}
