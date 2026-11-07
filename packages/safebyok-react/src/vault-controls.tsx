@@ -2,7 +2,7 @@ import { isVaultError, type Bank, type Outcome } from 'safebyok'
 import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks'
 import { Messages } from './messages'
 
-/** The lock state of the signed-in user's vault under `vaultlabel`, with a Lock or Unlock button. */
+/** The lock state of the signed-in user's vault under `vaultlabel` with a Lock or Unlock button, or a Create vault button while it is unborn. */
 export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
   const { stage, vault } = useVault(vaultlabel)
