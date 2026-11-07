@@ -136,6 +136,19 @@ describe("KnockKnockFields", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
+  it("leaves a hidden field hidden at a knock", async () => {
+    const anthropic = TH.fakeAnthropic(200, Punchline)
+    vi.stubGlobal('fetch', anthropic.fetchFn)
+    renderFlow()
+    const field = await saveKey()
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await screen.findByRole('button', { name: 'Edit key' })
+    await knockAs('Banana')
+    await screen.findByText(Punchline)
+    expect(field.value).to.eq('')
+    expect(screen.queryByRole('button', { name: 'Save' })).to.be.null
+  })
+
   it("asks for the key at a knock before one is saved, sending nothing", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
