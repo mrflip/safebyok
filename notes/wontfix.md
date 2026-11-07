@@ -114,3 +114,13 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-06 (a review of #505, the Coach: "add the row"): **two copies of `safebyok/dom` in one page.** `BoxFields.of` keeps one `BoxFields` per box
   in a module-level map, one per copy of the module. A page that loads `safebyok/dom` both as ESM and as CommonJS gives a box two `BoxFields`,
   each with its own fields and its own last unbind, so the box unexposes when either copy's last field unbinds.
+* 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, the Convex field-name row): **Convex refuses a field name that starts with `$` or holds a
+  non-ASCII character, at any depth of a record.** A sidecar or a record's own field named so is refused by Convex, and the call fails as
+  `storage_unavailable`. Convex's docs add other names it will not take: empty, or starting with `_`; nesting past 16 levels; more than 1024
+  entries in one object. The core does not check for any of these before the call.
+* 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, the GraphQL stream row): **the GraphQL stream stops on a best-effort basis.** The server's
+  resolvers ask `userIdOf` again on each notice, so an idle stream stays open until its next change, and a `userIdOf` that does not look the
+  session up live (a cached or decoded token) gives no stop at all.
+* 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, "A Convex vault full of tombstones needs a delVault": "publicize and accept"): **a Convex
+  vault whose deleted boxes fill its cap refuses new box labels until the vault is deleted.** A deleted box leaves its tombstone, which counts
+  toward the vault's box cap as a live box does; only a put under a label already held takes a tombstone's row back. The Convex README says so.
