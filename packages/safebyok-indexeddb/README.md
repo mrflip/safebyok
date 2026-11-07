@@ -25,7 +25,7 @@ const vaultDB = idbVaultDB({ dbName: 'acme' })
 
 Hand it to the core wherever a `VaultDB` is asked for.
 
-* **`dbName`** names the database, default `'safebyok'`; the rows go in `<dbName>:vaults`. Two
+* **`dbName`** names the database, default `'safebyok'`; the rows go in `<dbName>:vaults-v001-001-001`, and a vault database of an older name is deleted unread. Two
   stores made with one `dbName`, in one tab or two, share the rows.
 * **`maxRecordBytes`** is the VaultDB's own: the largest box record a `putBox` takes.
 * An option it cannot use refuses with kind `bad_option`.
