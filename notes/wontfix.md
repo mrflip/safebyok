@@ -128,7 +128,7 @@ not as a settled ruling, and check it against the current design before relying 
   same lease. Mark anything like this wontfix. We will in future have tabs notify but store independently, how I don't know."):
   **a lease row that fails its check is neither listed nor forgotten.** `DeviceDB.listLeases` leaves it out and `DeviceDB.forget`
   leaves it standing, as it holds no `vault_tok` to match, so a vacate or a `bank.autolock` never erases it; it stays until a later
-  stow over its scope; `DeviceDB.listRawLeases` shows it, and a host deletes it with `DeviceDB.delRawLease`. Also: **tabs sharing one device store's leases are undefined.** Every tab of an origin opens the same
+  stow over its scope; `DeviceDB.listRawLeases` shows it beside its scopepath, and a host deletes it by that scopepath with `DeviceDB.delRawLease`. Also: **tabs sharing one device store's leases are undefined.** Every tab of an origin opens the same
   `IdbDeviceDB` database, so one tab's stow, forget or vacate lands under another's lease unannounced.
 * 2026-11-07 (devicedb_idb, the device database's wipe): **a tab holding an old device database open keeps it.** `IdbDeviceDB`
   deletes the databases of an older version unread on its first call, and a tab of an older release still holding one open blocks

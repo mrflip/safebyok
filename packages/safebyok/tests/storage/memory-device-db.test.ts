@@ -10,8 +10,8 @@ import * as TH from '../test-helpers'
 const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doDelRawLease'] as const
 
 const memoryRowsOf = (deviceDB: MemoryDeviceDB): TH.DeviceDBRowCheats => ({
-  plantLeaseRow: ({ applabel, user_id, vaultlabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(applabel, user_id, vaultlabel), row) },
-  leaseRowsOf:   () => [...deviceDB._cheat_leaseRows().values()],
+  plantLeaseRow: ({ applabel, user_id, vaultlabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(applabel, user_id, vaultlabel), { scopepath: [applabel, user_id, vaultlabel], row }) },
+  leaseRowsOf:   () => [...deviceDB._cheat_leaseRows().values()].map(({ row }) => row),
 })
 
 // Memory has no storage to fail, so the next call to it throws as a refused write would.

@@ -5,10 +5,9 @@ import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
-import * as CX from '../shapes/shapes-core'
-import { type VaultScope, isPlainBag } from '../shapes/shapes-core'
+import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+import type { LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 
 /** The base a host's device store extends, writing only the generic `do*` calls, each one atomic step. */
 export abstract class DeviceDB {
@@ -56,33 +55,32 @@ export abstract class DeviceDB {
   /** Every lease stowed on this device, oldest first. */
   async listLeases(): Promise<LeaseDated[]> {
     try {
-      const rows = await this.doListLeases()
-      const leases = rows.flatMap((row) => { const parsed = SX.leaseDated.safeParse(row); return parsed.success ? [parsed.data] : [] })
+      const filed = await this.doListLeases()
+      const leases = filed.flatMap(({ row }) => { const parsed = SX.leaseDated.safeParse(row); return parsed.success ? [parsed.data] : [] })
       return leases.toSorted((one, other) => one.proved_at - other.proved_at)
     } catch (err) { throw refusalOf(err, 'listLeases') }
   }
 
   tryListLeases(): Promise<Outcome<LeaseDated[]>> { return outcomeOf(() => this.listLeases()) }
 
-  /** Every lease row stored on this device as a bag, unchecked, damaged rows among them. */
-  async listRawLeases(): Promise<Record<string, unknown>[]> {
+  /** Every lease row on this device beside the scopepath it is filed under, unchecked, damaged rows among them. */
+  async listRawLeases(): Promise<RawLease[]> {
     try {
-      const rows = await this.doListLeases()
-      return rows.filter((row) => isPlainBag(row))
+      return await this.doListLeases()
     } catch (err) { throw refusalOf(err, 'listRawLeases') }
   }
 
-  tryListRawLeases(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawLeases()) }
+  tryListRawLeases(): Promise<Outcome<RawLease[]>> { return outcomeOf(() => this.listRawLeases()) }
 
-  /** Deletes whatever row stands at this vault scope, damaged or not, with no `vault_tok` to match. */
-  async delRawLease(scope: VaultScope): Promise<void> {
+  /** Deletes the row filed under a scopepath `listRawLeases` gave, damaged or not, with no `vault_tok` to match. */
+  async delRawLease(scopepath: LeaseScopepath): Promise<void> {
     try {
-      const checked = CX.vaultScope.parse(scope)
+      const checked = SX.leaseScopepath.parse(scopepath)
       await this.doDelRawLease(checked)
     } catch (err) { throw refusalOf(err, 'delRawLease') }
   }
 
-  tryDelRawLease(scope: VaultScope): Promise<Outcome<void>> { return outcomeOf(() => this.delRawLease(scope)) }
+  tryDelRawLease(scopepath: LeaseScopepath): Promise<Outcome<void>> { return outcomeOf(() => this.delRawLease(scopepath)) }
   // --
 
   // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doDelRawLease
@@ -94,10 +92,10 @@ export abstract class DeviceDB {
   protected abstract doPeek(scope: VaultScope): Awaitable<unknown>
   /** Removes the row at this vault scope when it holds this `vault_tok`, in one step. */
   protected abstract doForget(asked: LeaseQuery): Awaitable<void>
-  /** Every lease row stored, in any order. */
-  protected abstract doListLeases(): Awaitable<unknown[]>
-  /** Removes whatever row is stored at this vault scope, in one step. */
-  protected abstract doDelRawLease(scope: VaultScope): Awaitable<void>
+  /** Every lease row stored, each beside the scopepath it is filed under, in any order and in one step. */
+  protected abstract doListLeases(): Awaitable<RawLease[]>
+  /** Removes whatever row is filed under `scopepath`, in one step. */
+  protected abstract doDelRawLease(scopepath: LeaseScopepath): Awaitable<void>
   // --
 }
 

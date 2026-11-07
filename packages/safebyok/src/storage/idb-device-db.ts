@@ -5,7 +5,7 @@ import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+import type { LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 import { DeviceDBVersion } from '../helpers/consts'
 import { DeviceDB } from './device-db-new'
 import { versionedShelfOf } from './idb-shelf'
@@ -22,10 +22,7 @@ export interface IdbDeviceDBOpts {
 const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
-// == [The database]: LeaseScopepath, leaseScopepathOf, deviceShelfOf
-
-/** Where the shelf files a vault's lease row. */
-type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
+// == [The database]: leaseScopepathOf, deviceShelfOf
 
 /** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
@@ -69,12 +66,16 @@ export class IdbDeviceDB extends DeviceDB {
     })
   }
 
-  protected async doListLeases(): Promise<unknown[]> {
-    return await inOneStep(this.#shelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll()))
+  // The keys and the rows come in one transaction, in the same key order, so each row is paired with the key it is filed under.
+  protected async doListLeases(): Promise<RawLease[]> {
+    const [scopepaths, rows] = await inOneStep(this.#shelf, 'readonly', (store) => Promise.all([
+      promisifyRequest<IDBValidKey[]>(store.getAllKeys()), promisifyRequest<unknown[]>(store.getAll()),
+    ]))
+    return scopepaths.map((scopepath, idx) => ({ scopepath: scopepath as LeaseScopepath, row: rows[idx] }))
   }
 
-  protected async doDelRawLease(scope: VaultScope): Promise<void> {
-    await inOneStep(this.#shelf, 'readwrite', (store) => { store.delete(leaseScopepathOf(scope)) })
+  protected async doDelRawLease(scopepath: LeaseScopepath): Promise<void> {
+    await inOneStep(this.#shelf, 'readwrite', (store) => { store.delete(scopepath) })
   }
   // --
 }
