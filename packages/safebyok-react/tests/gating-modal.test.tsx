@@ -42,4 +42,18 @@ describe("GatingModal", () => {
     expect(screen.queryByRole('dialog')).to.be.null
     expect(await raising).to.include({ ok: false })
   })
+
+  it("answers once for a gatingkind with no dialog, though its onDone is new at each render", async () => {
+    const world = TH.makeBankWorld()
+    await TH.makeBankWithVault(world)
+    const held = await TH.heldGatingOf(world, deleting)
+    const answers: DialogAnswer[] = []
+    const ui = () => <GatingModal gating={held.gating} onDone={(answer) => { answers.push(answer) }} />
+    const { rerender } = render(ui())
+    rerender(ui())
+    rerender(ui())
+    held.close()
+    await held.raising
+    expect(answers).to.deep.equal(['declined'])
+  })
 })
