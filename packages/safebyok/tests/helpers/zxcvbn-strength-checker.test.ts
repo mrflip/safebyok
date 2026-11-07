@@ -15,7 +15,7 @@ const freshCheckerOverChunk = async () => {
   vi.doMock('@zxcvbn-ts/language-common', async (importOriginal) => {
     chunk.imports += 1
     if (chunk.failing) { throw new Error('the chunk did not load') }
-    return await importOriginal()
+    return importOriginal()
   })
   vi.resetModules()
   const { zxcvbnStrengthChecker: checker } = await import('../../src/helpers/zxcvbn-strength-checker')
@@ -23,7 +23,7 @@ const freshCheckerOverChunk = async () => {
 }
 
 /** The checker's verdict, as a promise whether it answers at once or later. */
-const judgedAsync = async (typed: string, vaultScope: VaultScope) => await zxcvbnStrengthChecker(typed, vaultScope)
+const judgedAsync = async (typed: string, vaultScope: VaultScope) => zxcvbnStrengthChecker(typed, vaultScope)
 
 afterEach(() => {
   vi.doUnmock('@zxcvbn-ts/language-common')
