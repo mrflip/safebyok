@@ -395,9 +395,6 @@ importers:
       safebyok-convex:
         specifier: workspace:*
         version: link:../packages/safebyok-convex
-      safebyok-old:
-        specifier: workspace:*
-        version: link:../packages/safebyok-old
       safebyok-postgres:
         specifier: workspace:*
         version: link:../packages/safebyok-postgres
