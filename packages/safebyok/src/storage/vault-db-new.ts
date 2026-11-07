@@ -1,5 +1,6 @@
 /** The vaultDB: the verbs the storables and listings call, and every invariant of them. A subclass writes only the generic `do*` calls, each one atomic step. */
 
+import type * as Z from 'zod'
 import { IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
@@ -9,10 +10,11 @@ import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '
 import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
+import type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
 import type { AddPasskeyParams, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultDBOpts, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
-// == [Answers]: GoodAnswer, BadAnswer, Answer, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
+// == [Answers]: GoodAnswer, BadAnswer, Answer, ListAct, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
 
 /** What a verb returns: its `val`, the `act` that says what happened, and the `world`, the vault row as read in the same step. */
 export type GoodAnswer<ValT, ActT extends string, WorldT = VaultRow> = GoodOutcome<ValT> & { req_params: ReqParams, act: ActT, world: WorldT, dbhas?: unknown }
@@ -22,9 +24,7 @@ export type BadAnswer = BadOutcome & { req_params: ReqParams, act: string, world
 
 export type Answer<ValT, ActT extends string, WorldT = VaultRow> = GoodAnswer<ValT, ActT, WorldT> | BadAnswer
 
-export type GotAct = 'got' | 'gotvoid' | 'gotgone'
-export type PutAct = 'born' | 'reborn' | 'replaced' | 'declined'
-export type DelAct = 'deleted' | 'gone' | 'void'
+export type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
 
 export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_rows: DamagedVault[] }
 export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
@@ -70,19 +70,74 @@ export type VaultDBRelay = {
   tidyGone:   (scope: unknown) => Promise<Tidied>
   watch:      (scope: unknown, hear: (heard: Heard) => void) => () => void
 }
+
+// --
+
+// == [What a model calls]: VaultDBVerbs, VaultDBVerbnames
+
+/** The verbs a model calls on a vaultDB, each with its `try*` form: what a store, or a client of one across a wire, offers. */
+export interface VaultDBVerbs {
+  /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
+  readonly [IsVaultDB]: true
+  /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
+  listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>>
+  tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>>
+  /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
+  getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>>
+  tryGetVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<Answer<VaultRecord | null, GotAct>>
+  /** The boxes under this `vault_tok`, sparse, its vault row as `world`; a row failing validation goes in `damaged_rows`. */
+  listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>>
+  tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>>
+  /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null. */
+  getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>>
+  tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<Answer<BoxRecord | null, GotAct>>
+  /** Stores a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
+  putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
+  tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>>
+  /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
+  putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>>
+  tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>>
+  /** Lays the new passphrase wayin on the vault row at this revision, leaving its passkey wayin as stored. */
+  replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>>
+  tryReplacePassphrase(params: ReplacePassphraseParams): Promise<Answer<VaultRecord, 'replaced'>>
+  /** Lays a passkey wayin on a vault row holding none. */
+  addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>>
+  tryAddPasskey(params: AddPasskeyParams): Promise<Answer<VaultRecord, 'added'>>
+  /** Takes the passkey wayin off the vault row; one holding none answers as stored. */
+  revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>>
+  tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>>
+  /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
+  delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>>
+  tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>>
+  /** Deletes a vault at `prior`, its live row or the damaged row `damaged_rows` lists, with the boxes of its life. */
+  delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>>
+  tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>>
+  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. Nothing may count on a notice arriving. */
+  watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void
+}
+
+/** The name of each verb of {@link VaultDBVerbs}, as a duck check asks a vaultDB to answer each with a function. */
+export const VaultDBVerbnames = [
+  'listVaults', 'tryListVaults', 'getVault', 'tryGetVault', 'listBoxes', 'tryListBoxes', 'getBox', 'tryGetBox',
+  'putVault', 'tryPutVault', 'putBox', 'tryPutBox',
+  'replacePassphrase', 'tryReplacePassphrase', 'addPasskey', 'tryAddPasskey', 'revokePasskey', 'tryRevokePasskey',
+  'delBox', 'tryDelBox', 'delVault', 'tryDelVault', 'watch',
+] as const satisfies readonly (keyof VaultDBVerbs)[]
+
+true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<keyof VaultDBVerbs, typeof IsVaultDB>>
 // --
 
 const noUnwatching = (): void => undefined
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
-export abstract class VaultDB {
+export abstract class VaultDB implements VaultDBVerbs {
   // == [Props]: #maxRecordBytes, IsVaultDB
 
   readonly #maxRecordBytes: number
 
   // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
   /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
-  get [IsVaultDB](): true { return true } // eslint-disable-line @typescript-eslint/class-literal-property-style
+  get [IsVaultDB](): true { return true }
   // --
 
   // == [Construction]: constructor
@@ -96,7 +151,7 @@ export abstract class VaultDB {
   // == [Gets]: listVaults, tryListVaults, getVault, tryGetVault, listBoxes, tryListBoxes, getBox, tryGetBox
 
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
-  async listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, 'got' | 'gotvoid', BankScope>> {
+  async listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>> {
     const req_params = SX.reqParamsOf(scope)
     try {
       const bankScope = CX.bankScope.parse(scope)
@@ -130,7 +185,7 @@ export abstract class VaultDB {
   async tryGetVault(scope: VaultScope, opts?: IfAbsentOpts) { return answerOf(() => this.getVault(scope, opts)) }
 
   /** The boxes under this `vault_tok`, sparse, its vault row as `world`; a row failing validation goes in `damaged_rows`. */
-  async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, 'got' | 'gotvoid'>> {
+  async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>> {
     const req_params = SX.reqParamsOf(asked)
     try {
       const vaultQuery = SX.vaultQuery.parse(asked)
@@ -359,23 +414,6 @@ export abstract class VaultDB {
   async tryTidyGone(scope: BankScope) { return answerOf(() => this.tidyGone(scope)) }
   // --
 
-  // == [Watch]: watch
-
-  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. Nothing may count on a notice arriving. */
-  watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
-    return this.doWatch(SX.watchScope.parse(scope), ({ vault, box }) => {
-      const world = (vault === undefined) ? null : SX.vaultRow.safeParse(vault)
-      if ((world !== null) && (! world.success)) { return }
-      if (box === undefined) {
-        if (world !== null) { onNotice({ act: (world.data.am === 'x') ? 'gone' : 'got', val: world.data, world: world.data }) }
-        return
-      }
-      const val = SX.boxRow.safeParse(box)
-      if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gone' : 'got', val: val.data, world: world?.data ?? null }) }
-    })
-  }
-  // --
-
   // == [Relay]: relay
 
   /** This store's generic calls, for a server relaying them: each refuses what its verb would refuse before storage is asked. */
@@ -416,6 +454,23 @@ export abstract class VaultDB {
       tidyGone: async (scope) => await relayed(() => this.doTidyGone(CX.bankScope.parse(scope))),
       watch:    (scope, hear) => this.doWatch(SX.watchScope.parse(scope), hear),
     }
+  }
+  // --
+
+  // == [Watch]: watch
+
+  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. Nothing may count on a notice arriving. */
+  watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
+    return this.doWatch(SX.watchScope.parse(scope), ({ vault, box }) => {
+      const world = (vault === undefined) ? null : SX.vaultRow.safeParse(vault)
+      if ((world !== null) && (! world.success)) { return }
+      if (box === undefined) {
+        if (world !== null) { onNotice({ act: (world.data.am === 'x') ? 'gone' : 'got', val: world.data, world: world.data }) }
+        return
+      }
+      const val = SX.boxRow.safeParse(box)
+      if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gone' : 'got', val: val.data, world: world?.data ?? null }) }
+    })
   }
   // --
 

@@ -4,7 +4,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
-import type { Notice, VaultDB } from '../../src/storage/vault-db-new'
+import type { Notice, VaultDB, VaultDBVerbs } from '../../src/storage/vault-db-new'
 import { bankScope, vaultScope, boxscope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, priorOf, vaultQuery, boxQuery } from './storage-world'
 import { aWhile, beforeNextCall } from './timing'
 import { gateParamsOf } from './vault-db-battery-puts'
@@ -24,7 +24,7 @@ const slipInFront = (vaultDB: VaultDB, meanwhile: () => Promise<unknown>): void 
 }
 
 /** A watch on `vaultDB` at `scope`, closed when the test ends, and the notices it has heard so far. */
-const watching = (vaultDB: VaultDB, scope: WatchScope) => {
+const watching = (vaultDB: VaultDBVerbs, scope: WatchScope) => {
   const notices: Notice[] = []
   const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
   onTestFinished(unwatch)
@@ -32,7 +32,7 @@ const watching = (vaultDB: VaultDB, scope: WatchScope) => {
 }
 
 /** Registers the races', notices' and failure's cases over `world`. */
-export const describeRaces = ({ fresh, storeWith, rowsOf, twinOf, hasCap, makeCapped, canFail, failNextCall, watches, boxNoticesCarryVault }: BatteryWorld): void => {
+export const describeRaces = ({ fresh, storeWith, rowsOf, twinOf, storeOf, hasCap, makeCapped, canFail, failNextCall, watches, boxNoticesCarryVault }: BatteryWorld): void => {
   describe("two devices at once", () => {
     it("two births of one vault settle on one life, the other declined with it", async () => {
       const vaultDB = await fresh()
@@ -114,7 +114,7 @@ export const describeRaces = ({ fresh, storeWith, rowsOf, twinOf, hasCap, makeCa
     it("refuses as gone when the vault was deleted", async () => {
       const { vaultDB, vault } = await storeWith()
       const twin = await twinOf(vaultDB)
-      slipInFront(vaultDB, async () => await twin.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) }))
+      slipInFront(storeOf(vaultDB), async () => await twin.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) }))
       expect(await vaultDB.tryAddPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
     })
 
@@ -122,7 +122,7 @@ export const describeRaces = ({ fresh, storeWith, rowsOf, twinOf, hasCap, makeCa
       const { vaultDB, vault } = await storeWith()
       const twin = await twinOf(vaultDB)
       const tombstone = vaultTombstoneOf(vault)
-      slipInFront(vaultDB, async () => {
+      slipInFront(storeOf(vaultDB), async () => {
         await twin.delVault(tombstone, { prior: priorOf(vault) })
         await twin.putVault(vaultAt(2, 'life2'), { prior: priorOf(tombstone) })
       })

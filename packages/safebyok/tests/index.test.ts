@@ -5,7 +5,8 @@ import * as Front from '../src/index'
 
 describe("safebyok", () => {
   it("exports each type its exported signatures name", () => {
-    expectTypeOf<Front.BankOpts['vaultDB']>().toEqualTypeOf<Front.VaultDB>()
+    expectTypeOf<Front.BankOpts['vaultDB']>().toEqualTypeOf<Front.VaultDBVerbs>()
+    expectTypeOf<Front.VaultDB>().toExtend<Front.BankOpts['vaultDB']>()
     expectTypeOf<Front.BankOpts['deviceDB']>().toEqualTypeOf<Front.DeviceDB>()
     expectTypeOf<Front.BankOpts['keyDeriver']>().toEqualTypeOf<Front.KeyDeriver>()
     expectTypeOf<Front.BankOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()

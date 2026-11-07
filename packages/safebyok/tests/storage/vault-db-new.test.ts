@@ -1,10 +1,15 @@
-/** The VaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and its relay. */
+/** The VaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, its relay, and the duck a model takes for one. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
+import { brandedVaultDB } from '../../src/shapes/shapes-vaultish'
+import { VaultDBVerbnames } from '../../src/storage/vault-db-new'
 import { bankScope, boxAt, boxQuery, boxscope, vaultAt, vaultScope } from '../test-helpers/storage-world'
+
+/** Each verb of `vaultDB`, bound, as a client of it would answer them. */
+const verbsOf = (vaultDB: MemoryVaultDB): Record<string, unknown> => Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
 
 const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
   try { await thunk() } catch (err) { return err }
@@ -105,6 +110,24 @@ describe("VaultDB", () => {
       await vaultDB.relay.putVault(vault, { prior: SX.VoidRevision })
       await vi.waitFor(() => { expect(heard).to.deep.equal([{ vault }]) })
       unwatch()
+    })
+  })
+
+  describe("the duck a model takes for one", () => {
+    const brand = { [Symbol.for('@safebyok/vaultdb')]: true }
+
+    it("takes a store, or a client of one that wears the brand and answers every verb", () => {
+      const vaultDB = new MemoryVaultDB()
+      expect(brandedVaultDB.parse(vaultDB)).to.eq(vaultDB)
+      const client = { ...brand, ...verbsOf(vaultDB) }
+      expect(brandedVaultDB.parse(client)).to.eq(client)
+    })
+
+    it("refuses a brand without the verbs, the verbs without a brand, or a verb that is no function", () => {
+      const verbs = verbsOf(new MemoryVaultDB())
+      expect(() => brandedVaultDB.parse(brand)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => brandedVaultDB.parse(verbs)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => brandedVaultDB.parse({ ...brand, ...verbs, watch: 'soon' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
     })
   })
 })

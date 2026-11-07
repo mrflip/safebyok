@@ -66,7 +66,7 @@ export const GuardedExpected = "Expected a host's function as Bank.make wraps it
 export const GuardedLoggerExpected = "Expected a logger as Bank.make guards it"
 
 /** Anything but an instance of a class extending safebyok's VaultDB, where a vaultDB is asked. */
-export const VaultDBExpected = "Expected a VaultDB: an instance of a class extending safebyok's VaultDB"
+export const VaultDBExpected = "Expected a VaultDB: a store or client branded by safebyok's VaultDB, answering each of its verbs"
 
 /** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"

@@ -3,8 +3,9 @@
 
 // == [The stores]: VaultDB, DeviceDB, and the two in memory
 export { VaultDB } from './vault-db-new'
-export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, Notice, PutAct, Tidied } from './vault-db-new'
-export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, RowOfVault, VaultDBRelay } from './vault-db-new'
+export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied, VaultDBRelay } from './vault-db-new'
+export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, RowOfVault, VaultDBVerbs } from './vault-db-new'
+export { VaultDBVerbnames } from './vault-db-new'
 export { DeviceDB } from './device-db-new'
 export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
@@ -40,6 +41,13 @@ export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isT
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'
 export { leaseQuery, leaseDated, leaseRow } from '../shapes/shapes-storage'
 export type { LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+// --
+
+// == [Answers off a wire]: the checks a client of a vaultDB parses each answer with, an absent field arriving as null
+export { crossedErr, crossedReqParams, damagedVault, damagedBox, crossedNotice } from '../shapes/shapes-answers'
+export { listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer } from '../shapes/shapes-answers'
+export { listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer } from '../shapes/shapes-answers'
+export type { CrossedErr, CrossedReqParams } from '../shapes/shapes-answers'
 // --
 
 // == [Validators]: the makers an adapter checks its own options and rows with
