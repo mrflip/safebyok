@@ -13,3 +13,12 @@ orchestrator; workers look things up here and write in their own thread files.
   `abortOf`, `workOrAbandon`, `troubleOf`).
 * *Orchestrator:* the old device store is `packages/safebyok-old/src/idb.ts`, a reference for the
   old database name (`${dbName}:device_db`, store `records`) only. Never change it.
+
+## Planning lessons
+
+* *Orchestrator:* thread 4 (graphql_schema, L) outgrew one context: its first worker compacted
+  twice before finishing milestone 1 (the core). Fresh workers, one milestone each, finished 2, 3
+  and 4. An L thread with a core change plus a server plus a client is three threads; hand each
+  milestone to its own worker from the start.
+* *Orchestrator:* rulings arrived continuously mid-thread; SendMessage to a live worker carried
+  them (threads 2 and 5) without a restart.

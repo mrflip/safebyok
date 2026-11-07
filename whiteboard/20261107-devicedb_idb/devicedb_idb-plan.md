@@ -269,7 +269,9 @@ after both file and are restacked into a line, as it touches their files).
 *Ride-alongs (orchestrator's calls, Cleanup tab):* export `Patterns`, `MaxLabelChars` and
 `MaxUserIdChars` from `safebyok` (the Coach's "export patterns" and "be generous with exports");
 correct G10 in `notes/guarantees.md`, which says no entry point exports the Argon2id derivers
-(`safebyok/browser` exports both).
+(`safebyok/browser` exports both); TODO.md's two lines that still speak of relaying (thread 4's
+report, ~22 and ~29); and a `sonnet` subagent checks notes/security.md's older GraphQL entries
+(2026-10-22 wire_meta, 2026-10-15) against the new wire, per the file's header.
 
 ## For the Coach
 
