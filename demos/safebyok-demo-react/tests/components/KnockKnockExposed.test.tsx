@@ -6,6 +6,7 @@ import { Bank } from 'safebyok'
 import type { MemoryVaultDB } from 'safebyok/storage'
 import { useBox } from 'safebyok-react'
 import { useIsShowing } from '../../src/hooks/useIsShowing'
+import { ApiKeyBoxlabel, ApiKeyVaultlabel } from '../../src/lib/saved-api-key'
 import { KnockKnockExposed } from '../../src/components/KnockKnockExposed'
 import { KnockKnockFields } from '../../src/components/KnockKnockFields'
 import * as TH from '../test-helpers'
@@ -17,7 +18,7 @@ const Punchline = 'Banana who? Banana split, gotta run!'
 const renderFlow = () => TH.renderInBank(<><KnockKnockExposed /><TH.VaultProbe /></>)
 
 /** Shows whether the box under the flow shows its whisper, as `showing` or `hidden`. */
-const ShowingProbe = () => <span data-testid="showing">{useIsShowing(useBox('main', 'anthropic_api_key')) ? 'showing' : 'hidden'}</span>
+const ShowingProbe = () => <span data-testid="showing">{useIsShowing(useBox(ApiKeyVaultlabel, ApiKeyBoxlabel)) ? 'showing' : 'hidden'}</span>
 
 /** The flow with a button that unmounts it, beside the showing probe. */
 const Host = () => {
@@ -52,10 +53,10 @@ const knock = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The rows `vaultDB` holds for the box under 'main', by boxlabel. */
+/** The rows `vaultDB` holds for the box under the key's vaultlabel, by boxlabel. */
 const storedBoxRows = (vaultDB: MemoryVaultDB) => {
-  const vaultrow = vaultDB._cheat_vaultRowsOf({ applabel: 'acme', user_id: 'u1' }).get('main') as { vault_tok: string }
-  return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }, vaultrow.vault_tok)
+  const vaultrow = vaultDB._cheat_vaultRowsOf({ applabel: 'acme', user_id: 'u1' }).get(ApiKeyVaultlabel) as { vault_tok: string }
+  return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)
 }
 
 describe("KnockKnockExposed", () => {
@@ -78,7 +79,7 @@ describe("KnockKnockExposed", () => {
     const { vaultDB } = renderFlow()
     await saveKey()
     const boxrows = storedBoxRows(vaultDB)
-    expect([...boxrows.keys()]).to.deep.equal(['anthropic_api_key'])
+    expect([...boxrows.keys()]).to.deep.equal([ApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
