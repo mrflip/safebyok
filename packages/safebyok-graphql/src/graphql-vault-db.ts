@@ -17,8 +17,6 @@ export type GraphQLVaultClient = Pick<Client, 'query' | 'mutation' | 'subscripti
 export interface GraphQLVaultDBOpts {
   /** Your app's urql Client, pointed at a server serving `vaultResolvers`. */
   client: GraphQLVaultClient
-  /** Taken as a VaultDB takes it, and never enforced here: the server's store holds a record's limit. */
-  maxRecordBytes?: number | undefined
 }
 
 const isGraphQLVaultClient = (candidate: unknown): candidate is GraphQLVaultClient => (
@@ -31,7 +29,6 @@ const isGraphQLVaultClient = (candidate: unknown): candidate is GraphQLVaultClie
 // `custom` hands back the very client given, so its methods keep their `this`.
 const graphQLVaultDBOpts = DB.objCheck(({ custom }) => ({
   client: custom<GraphQLVaultClient>(isGraphQLVaultClient, 'Expected an urql Client, with query, mutation and subscription functions'),
-  ...DB.vaultDBOpts.shape,
 }), 'bad_option')
 
 true satisfies Z.core.util.AssertEqual<GraphQLVaultDBOpts, Z.input<typeof graphQLVaultDBOpts>>

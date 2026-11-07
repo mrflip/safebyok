@@ -12,5 +12,5 @@ The GraphQL schema is typed, and `GraphQLVaultDB` is a client of it checked by t
 * The README says what a host must do when the signed-in user changes: vacate the bank and make another. A bank never follows a change of user_id.
 * Breaking: the schema is rewritten, and `safebyokHeard` is gone.
 * Breaking: `VaultFieldArgs` holds each root field's typed arguments, keyed by the field's name.
-* Breaking: `GraphQLVaultDB` no longer extends `VaultDB`. It takes `maxRecordBytes` as a vaultDB does but enforces no record size: the server's store holds that limit, and no field on the wire lets a browser raise it.
+* Breaking: `GraphQLVaultDB` no longer extends `VaultDB`, and takes `{ client }` alone, refusing `maxRecordBytes` as `bad_option`: limits are set on the vaultDB your server hosts and hands to `vaultResolvers`.
 * Breaking: the `graphql` peer range is `^17.0.0`. The scalars use graphql 17's coercion hooks, which graphql 16 ignores, so on 16 the time scalar would check nothing.

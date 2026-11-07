@@ -8,9 +8,8 @@ safebyok's vaultDB over [GraphQL](https://graphql.org), in two halves:
   own), and answers what that verb answers, for the signed-in user's bank alone.
 * **In the browser**, `safebyok-graphql`: **`new GraphQLVaultDB({ client })`**, the vaultDB over
   your app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Bank.make`.
-  Limits such as `maxBoxes` and `maxRecordBytes` belong to the vaultDB on your server, which
-  enforces them. `GraphQLVaultDB` takes `maxRecordBytes` as any vaultDB does, but enforces no
-  record size of its own, so raising the server's limit is all a larger record needs.
+  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordBytes` are set on the vaultDB
+  your server hosts and hands to `vaultResolvers`; the browser half sets none.
 
 **Deploy the two halves together.** The browser half sends the documents the server half's schema
 serves, and checks each answer against its own copy of safebyok, refusing as `unexpected_error`

@@ -72,15 +72,8 @@ const revokedNotice = { safebyokWatch: { ok: false, act: 'identity_revoked', val
 describe("GraphQLVaultDB's constructor", () => {
   it("refuses a client it cannot use, or an option it does not take", () => {
     const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] })
-    const unusable = [{}, { client: { query: () => client } }, { client: 'urql' }, { client, maxBoxes: 3 }, { client, maxRecordBytes: 0 }]
+    const unusable = [{}, { client: { query: () => client } }, { client: 'urql' }, { client, maxRecordBytes: 0 }]
     for (const opts of unusable) { TH.expectSyncRefusal(() => new GraphQLVaultDB(opts as never), 'bad_option') }
-  })
-
-  it("sends a box over its own maxRecordBytes on to the server", async () => {
-    const store = await TH.makeVaultDB()
-    const vaultDB = TH.browserOver(TH.schemaOver(TH.storeOf(store)), TH.signedInAsAsked, { maxRecordBytes: 16 })
-    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
-    expect(await vaultDB.putBox(TH.boxAt(), { prior: DB.VoidRevision })).to.deep.include({ ok: true, act: 'born' })
   })
 })
 

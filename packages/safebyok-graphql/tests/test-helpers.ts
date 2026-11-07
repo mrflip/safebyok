@@ -12,7 +12,6 @@ import * as TH from 'safebyok/testing'
 import { PostgresVaultDB, VaultTablesSql, vaultChannelOf } from 'safebyok-postgres'
 import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 import { GraphQLVaultDB } from '../src/index'
-import type { GraphQLVaultDBOpts } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -107,7 +106,7 @@ export const signedInAsAsked: Signing = ({ variables }) => {
 export type FlakyVaultDB = GraphQLVaultDB & { failNext: () => void }
 
 /** A GraphQLVaultDB over its own urql Client, run in-process against `schema`, with urql's document cache in front, as an app's Client has. */
-export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAsAsked, dbOpts: Omit<GraphQLVaultDBOpts, 'client'> = {}): FlakyVaultDB => {
+export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAsAsked): FlakyVaultDB => {
   let isFailing = false
   const flaky = mapExchange({
     onResult: (result) => {
@@ -120,7 +119,7 @@ export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAs
     url:       'https://app.example.test/api/graphql',
     exchanges: [cacheExchange, flaky, executeExchange({ schema, context: signing })],
   })
-  return Object.assign(new GraphQLVaultDB({ ...dbOpts, client }), { failNext: () => { isFailing = true } })
+  return Object.assign(new GraphQLVaultDB({ client }), { failNext: () => { isFailing = true } })
 }
 // --
 
