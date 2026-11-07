@@ -242,7 +242,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
   })
 
   it("refuses 'vault_locked' while the vault is locked, listing and sealing nothing", async () => {
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.create({ ...dna(), whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
     expect(listing.snapshot).to.deep.equal([])
@@ -250,7 +250,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
   })
 
   it("builds of a record while the vault is locked", async () => {
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     const box = await boxListingOf(held.mw).build(fullBoxRecord())
     expect(box.revision_seq).to.eq(1)
   })

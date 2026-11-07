@@ -26,7 +26,7 @@ describe("bank.autolock", () => {
     world.advance(AutolockMillis + 1)
     await bank.autolock()
     expect(vault.isLocked).to.be.true
-    expect(bank.snapshot.vaults[0]?.lockState).to.eq('locked')
+    expect(bank.snapshot.vaults[0]?.isLocked).to.be.true
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 

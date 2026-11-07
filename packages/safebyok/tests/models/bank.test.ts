@@ -240,12 +240,12 @@ describe("bank.ensureVault", () => {
     expect(vault).to.include({ ...BankScopeGiven, ...VaultScopeGiven })
     expect(vault.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
-    expect(bank.snapshot.vaults[0]?.lockState).to.eq('unlocked')
+    expect(bank.snapshot.vaults[0]?.isLocked).to.be.false
     const seen = vi.fn()
     bank.subscribe(seen)
     vault.lock()
     expect(seen).toHaveBeenCalled()
-    expect(bank.snapshot.vaults[0]?.lockState).to.eq('locked')
+    expect(bank.snapshot.vaults[0]?.isLocked).to.be.true
     expect(await bank.ensureVault(VaultScopeGiven)).to.equal(vault)
     expect(vault.isLocked).to.be.true
   })

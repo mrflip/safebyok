@@ -6,7 +6,7 @@ import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import * as CX from '../shapes/shapes-core'
 import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
-import type { LockState, BoxExposure } from '../shapes/shapes-enums'
+import type { BoxExposure } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
@@ -75,7 +75,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // Taken in the order `whisper` picks its bag.
   /** Where the whisper stands, read live: `showing`, or why `whisper` hides it.
-   * `locked` means the whisper is exposed but hidden while the vault is locked; it is not the vault's lock, for which ask {@link lockState} (an unexposed box in a locked vault answers `unexposed`).
+   * `locked` means the whisper is exposed but hidden while the vault is locked; it is not the vault's lock, for which ask {@link isLocked} (an unexposed box in a locked vault answers `unexposed`).
    */
   get exposure(): BoxExposure {
     if (this.#exposed === null) { return 'unexposed' }
@@ -92,12 +92,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
   override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
-  // --
-
-  // == [The vault's lock]: lockState
-
-  /** Whether the vault is locked, read live, as `vault.lockState()` is. */
-  lockState(): LockState { return this.listing.lockState() }
   // --
 
   // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, dropExposed, veil, unveil, patchWhisper, replaceExposed, unseal
@@ -279,10 +273,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       registered_at: this.registered_at,
       written_at:    this.written_at,
       sidecar:       this.sidecar,
-      full:          this.isFull,
-      present:       this.isPresent,
-      exposed:       this.#exposed !== null,
-      veiled:        this.#isVeiled,
+      isFull:        this.isFull,
+      isPresent:     this.isPresent,
+      isExposed:     this.#exposed !== null,
+      isVeiled:      this.#isVeiled,
     })
   }
   // --

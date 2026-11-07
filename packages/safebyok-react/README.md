@@ -19,11 +19,11 @@ import { BoxFields } from 'safebyok/dom'
 
 function ApiKeyField({ box }) {
   const fields = BoxFields.of(box)
-  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
+  const { isExposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
   return (
     <>
       <input ref={fields.bind('apiKey')} type="password" autoComplete="off" spellCheck={false} />
-      {exposed
+      {isExposed
         ? <button onClick={() => fields.trySave().then(showOutcome)}>Save</button>
         : <button onClick={() => box.expose().catch(showRefusal)}>Show</button>}
     </>

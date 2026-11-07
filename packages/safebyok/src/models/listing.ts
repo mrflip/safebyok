@@ -4,7 +4,7 @@ import { verifyConsistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { VaultError, isVaultError } from '../refusals/errors'
 import type { GoodAnswer, Notice as VaultDBNotice, VaultDB } from '../storage/vault-db'
-import type { IfAbsent, LockState } from '../shapes/shapes-enums'
+import type { IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
@@ -67,9 +67,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Its world]: lockState, ensureTimelyWorld
+  // == [Its world]: isLocked, ensureTimelyWorld
 
-  lockState(): LockState { return this.world.lockState() }
+  get isLocked(): boolean { return this.world.isLocked }
 
   /** The world refreshed within `maxMillis`, by default its own horizon. */
   async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(VX.maxMillis.parse(maxMillis)) }

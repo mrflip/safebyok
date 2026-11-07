@@ -62,7 +62,7 @@ describe("BoxWhisperField", () => {
     expect(theField().value).to.eq(StoredKey)
     fireEvent.click(screen.getByRole('button', { name: 'Hide' }))
     expect(theField().type).to.eq('password')
-    expect(box.snapshot.veiled).to.be.false
+    expect(box.snapshot.isVeiled).to.be.false
     expect(box.isShowing).to.be.true
   })
 
@@ -113,7 +113,7 @@ describe("BoxWhisperField", () => {
     expect(theField()).to.eq(field)
     expect(field.type).to.eq('password')
     expect(field.value).to.eq(StoredKey)
-    expect(box.snapshot.exposed).to.be.true
+    expect(box.snapshot.isExposed).to.be.true
   })
 
   describe("keeps the whisper out of React and the page's markup", () => {
@@ -145,7 +145,7 @@ describe("BoxWhisperField", () => {
       await exposing(box)
       expect(theField().value).to.eq(StoredKey)
       unmount()
-      expect(box.snapshot.exposed).to.be.false
+      expect(box.snapshot.isExposed).to.be.false
     })
 
     // The rehearsal unmount unbinds the last field, and BoxFields keeps no count of who else shows the box.
@@ -153,7 +153,7 @@ describe("BoxWhisperField", () => {
       const { box } = await boxOfWorld()
       await box.expose()
       render(<StrictMode><BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" /></StrictMode>)
-      expect(box.snapshot.exposed).to.be.false
+      expect(box.snapshot.isExposed).to.be.false
       expect(theField().value).to.eq('')
     })
 
@@ -162,7 +162,7 @@ describe("BoxWhisperField", () => {
       const { rerender } = render(<StrictMode><BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" /></StrictMode>)
       await exposing(box)
       rerender(<StrictMode><BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" placeholder="sk-ant-…" /></StrictMode>)
-      expect(box.snapshot.exposed).to.be.true
+      expect(box.snapshot.isExposed).to.be.true
       expect(theField().value).to.eq(StoredKey)
     })
   })

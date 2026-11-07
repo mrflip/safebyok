@@ -127,7 +127,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
   const fakeBank: FakeBank = {
-    lockState:    () => 'unlocked',
+    isLocked:     false,
     ensureTimely: () => Promise.resolve(),
     takeWorld:    nothing,
     tellBadNews:  nothing,
@@ -230,7 +230,7 @@ export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: str
 export const boxWorldOf = (vault: Vault): BoxWorld => ({
   scope:        vault.scope,
   vault_tok:    vault.vault_tok,
-  lockState:    () => vault.lockState(),
+  get isLocked() { return vault.isLocked },
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
   tellBadNews:  (badnews) => { vault.tellBadNews(badnews) },

@@ -197,7 +197,7 @@ describe("box.put(patch): a patch naming a half", () => {
 
   it("refuses before its guards: a patch naming neither refuses while the vault is locked, too", async () => {
     const box = await builtOf(fullBoxRecord())
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     await TH.expectRefusal(box.put({}))
   })
 
@@ -227,7 +227,7 @@ describe("box.put(patch): a patch naming a half", () => {
 describe("box.put checks its patch before it asks the lock", () => {
   it("refuses a patch that names neither half before it looks at the lock", async () => {
     const box = await builtOf(fullBoxRecord())
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     await TH.expectRefusal(box.put({}))
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })

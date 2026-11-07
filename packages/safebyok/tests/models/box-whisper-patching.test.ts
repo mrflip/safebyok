@@ -9,7 +9,7 @@ import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '.
 const held = useModelsWorld()
 
 const Stored = { apiKey: 'sk-test-0000', org: { name: 'acme', seats: 3 }, tags: ['a', 'b'] }
-const lock = () => { held.mw.setLockState('locked') }
+const lock = () => { held.mw.setLocked(true) }
 
 /** A box storing {@link Stored}, not exposed. */
 const unexposedOf = async (): Promise<TestableBox> => {
@@ -81,7 +81,7 @@ describe("box.patchWhisper", () => {
     expect(box.patchWhisper({ apiKey: 'sk-patched' }).whisper).to.eq(LOCKED)
     expect(told).toHaveBeenCalledOnce()
     expect(tryPutBox).not.toHaveBeenCalled()
-    held.mw.setLockState('unlocked')
+    held.mw.setLocked(false)
     expect(box.whisper).to.deep.include({ apiKey: 'sk-patched' })
   })
 
@@ -138,7 +138,7 @@ describe("the identity useSyncExternalStore reads", () => {
     expect(box.whisper).to.eq(box.whisper)
     lock()
     expect(box.whisper).to.eq(box.whisper)
-    held.mw.setLockState('unlocked')
+    held.mw.setLocked(false)
     box.unveil()
     expect(box.whisper).to.eq(box.whisper)
     box.unexpose()

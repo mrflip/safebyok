@@ -61,7 +61,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   it("is born unlocked, under the lease its passphrase proving grants and the deviceDB caches; ensureUnlocked answers the vault and asks nothing", async () => {
     const { vault, deviceDB } = await makeBornVault()
     expect(vault.isUnlocked).to.be.true
-    expect(vault.lockState()).to.eq('unlocked')
+    expect(vault.isLocked).to.be.false
     expect(deviceDB.tryStow).toHaveBeenCalledOnce()
     expect(deviceDB.cachedNow()).to.deep.include({ gate_epoch: vault.gate.gate_epoch, wayinkind: 'passphrase' })
     expect(await vault.ensureUnlocked()).to.equal(vault)
@@ -79,7 +79,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     expect(vault.lock()).to.equal(vault)
     expect(vault.isLocked).to.be.true
-    expect(vault.lockState()).to.eq('locked')
+    expect(vault.isLocked).to.be.true
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'vault_locked')
     await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'vault_locked')
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -99,10 +99,10 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     vault.becomeNotifiable()
     const listener = vi.fn()
     vault.subscribe(listener)
-    expect(vault.getSnapshot().lockState).to.eq('unlocked')
+    expect(vault.getSnapshot().isLocked).to.be.false
     vault.lock()
     expect(listener).toHaveBeenCalledOnce()
-    expect(vault.getSnapshot().lockState).to.eq('locked')
+    expect(vault.getSnapshot().isLocked).to.be.true
   })
 
   it("unlocks a vault held sparse by proof, its full record fetched for the gate", async () => {

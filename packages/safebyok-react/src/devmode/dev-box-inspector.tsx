@@ -69,8 +69,8 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   const whisperText = useRef('')
   const [extracted, setExtracted] = useState<Whisper | null>(null)
   // An extracted whisper goes when the vault locks, as React adjusts state to a prop, in render.
-  const lockState = vaultSnapshot?.lockState ?? 'locked'
-  if ((extracted !== null) && (lockState === 'locked')) { setExtracted(null) }
+  const isLocked = vaultSnapshot?.isLocked ?? true
+  if ((extracted !== null) && isLocked) { setExtracted(null) }
 
   /** `putBox` of `whisper` under the boxlabel picked, by `opts`, answering the box's snapshot. */
   const putting = async (whisper: Whisper, opts: BoxPutOpts = {}) => {
@@ -85,7 +85,7 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   return (
     <div className="dev-box-verbs">
       <p className="dev-status" data-testid="dev-box-status">
-        {`vault ${stage}, ${lockState}; box ${boxWordsOf(boxSnapshot)}; ${isShowing ? 'showing' : 'not showing'}`}
+        {`vault ${stage}, ${isLocked ? 'locked' : 'unlocked'}; box ${boxWordsOf(boxSnapshot)}; ${isShowing ? 'showing' : 'not showing'}`}
       </p>
       <div className="row">
         <button type="button" disabled={vault === null} onClick={() => { void call('ensureUnlocked', async () => { await vault?.ensureUnlocked(); return 'unlocked' }) }}>ensureUnlocked</button>
@@ -131,8 +131,8 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
 /** What the status line says of a box: its revision, whether exposed and veiled, or that none is listed. */
 const boxWordsOf = (snapshot: BoxSnapshot | null): string => {
   if (snapshot === null) { return 'not listed' }
-  const veiledWords = snapshot.veiled ? ', veiled' : ''
-  return `revision ${String(snapshot.revision_seq)}, ${snapshot.exposed ? 'exposed' : 'not exposed'}${veiledWords}`
+  const veiledWords = snapshot.isVeiled ? ', veiled' : ''
+  return `revision ${String(snapshot.revision_seq)}, ${snapshot.isExposed ? 'exposed' : 'not exposed'}${veiledWords}`
 }
 
 /** A whisper, behind its own Show button, or the word for why there is none to show. */

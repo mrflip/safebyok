@@ -25,7 +25,7 @@ const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord(
   return box.getSnapshot()
 }
 
-const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'full', 'present', 'exposed', 'veiled']
+const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'isFull', 'isPresent', 'isExposed', 'isVeiled']
 
 describe("Box own props", () => {
   it("are exactly the nine the base tattoos: the four of the scope, registered_at, vault_tok and the three revision props", async () => {
@@ -66,24 +66,24 @@ describe("Box sidecar, locked or not", () => {
   it("ENCRYPTED is the bag the whisper answers while unexposed, locked or not", async () => {
     const box = await boxOf()
     expect(box.whisper).to.eq(ENCRYPTED)
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(box.whisper).to.eq(ENCRYPTED)
   })
 
   it("answers itself, whether the vault is unlocked or locked", async () => {
     const box = await boxOf()
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
-    held.mw.setLockState('unlocked')
+    held.mw.setLocked(false)
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
   })
 
   it("is null where the record in hand is not full, locked or not", async () => {
     const sparse = await boxOf(held.mw.sparseBoxRecord({ boxlabel: 'b_sparse' }))
     const gone = await boxOf(held.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
-    for (const lockState of ['unlocked', 'locked'] as const) {
-      held.mw.setLockState(lockState)
+    for (const isLocked of [false, true]) {
+      held.mw.setLocked(isLocked)
       expect(sparse.sidecar).to.be.null
       expect(gone.sidecar).to.be.null
     }
@@ -94,7 +94,7 @@ describe("Box sidecar, locked or not", () => {
     const listener = vi.fn()
     box.subscribe(listener)
     const before = box.getSnapshot()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(box.getSnapshot()).to.eq(before)
     expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'a test box' })
@@ -106,8 +106,8 @@ describe("Box sidecar, locked or not", () => {
   it("tells an empty sidecar from an absent one in the snapshot, locked or not", async () => {
     const empty = await boxOf(fullBoxRecord({ sidecar: {} }))
     const sparse = await boxOf(held.mw.sparseBoxRecord({ boxlabel: 'b_sparse' }))
-    for (const lockState of ['unlocked', 'locked'] as const) {
-      held.mw.setLockState(lockState)
+    for (const isLocked of [false, true]) {
+      held.mw.setLocked(isLocked)
       expect(empty.getSnapshot().sidecar).to.deep.equal({})
       expect(sparse.getSnapshot().sidecar).to.be.null
     }
@@ -115,7 +115,7 @@ describe("Box sidecar, locked or not", () => {
 
   it("follows a receive of a record with another sidecar into the snapshot while locked, telling its listeners", async () => {
     const box = await boxOf()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     const before = box.getSnapshot()
     const listener = vi.fn()
     box.subscribe(listener)
@@ -129,8 +129,8 @@ describe("Box sidecar, locked or not", () => {
   it("is never on the sparse form or a tombstone, locked or not: those have no sidecar at all", async () => {
     const box = await boxOf()
     const gone = await boxOf(held.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
-    for (const lockState of ['unlocked', 'locked'] as const) {
-      held.mw.setLockState(lockState)
+    for (const isLocked of [false, true]) {
+      held.mw.setLocked(isLocked)
       for (const form of [box.sparse, box.toJSON(), gone.sparse, gone.toJSON(), gone._cheat_central]) {
         expect(form).to.not.have.property('sidecar')
       }
@@ -150,10 +150,10 @@ describe("Box snapshot", () => {
       registered_at: T0,
       written_at:    T0,
       sidecar:       { note: 'a test box' },
-      full:          true,
-      present:       true,
-      exposed:       false,
-      veiled:        false,
+      isFull:        true,
+      isPresent:     true,
+      isExposed:     false,
+      isVeiled:      false,
     })
     expect(Object.keys(box.getSnapshot())).to.have.members(SnapshotKeys)
   })
@@ -175,18 +175,18 @@ describe("Box snapshot", () => {
   describe("for a box in each state", () => {
     it("full: the sidecar of the record in hand, full and present", async () => {
       const snapshot = await snapshotOf()
-      expect(snapshot).to.include({ full: true, present: true, exposed: false })
+      expect(snapshot).to.include({ isFull: true, isPresent: true, isExposed: false })
       expect(snapshot.sidecar).to.deep.equal({ note: 'a test box' })
     })
 
     it("sparse: present and not full, the sidecar null", async () => {
       const snapshot = await snapshotOf(held.mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', written_at: T0 + 20 }))
-      expect(snapshot).to.include({ full: false, present: true, exposed: false, sidecar: null, revision_seq: 2, written_at: T0 + 20 })
+      expect(snapshot).to.include({ isFull: false, isPresent: true, isExposed: false, sidecar: null, revision_seq: 2, written_at: T0 + 20 })
     })
 
     it("gone: not present and not full, the sidecar null", async () => {
       const snapshot = await snapshotOf(held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
-      expect(snapshot).to.include({ full: false, present: false, exposed: false, sidecar: null, revision_seq: 2, revision_tok: 'rev-x2' })
+      expect(snapshot).to.include({ isFull: false, isPresent: false, isExposed: false, sidecar: null, revision_seq: 2, revision_tok: 'rev-x2' })
     })
 
     it("born from a dna: present, full, the sidecar empty, at revision 0 registered and written now", async () => {
@@ -199,10 +199,10 @@ describe("Box snapshot", () => {
         registered_at: T0 + 7000,
         written_at:    T0 + 7000,
         sidecar:       {},
-        full:          true,
-        present:       true,
-        exposed:       false,
-        veiled:        false,
+        isFull:        true,
+        isPresent:     true,
+        isExposed:     false,
+        isVeiled:      false,
       })
     })
 
@@ -210,7 +210,7 @@ describe("Box snapshot", () => {
       const box = await boxOf()
       held.mw.setNow(T0 + 500)
       await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
-      expect(box.getSnapshot()).to.deep.include({ sidecar: { note: 'edited' }, revision_seq: 2, written_at: T0 + 500, full: true, present: true })
+      expect(box.getSnapshot()).to.deep.include({ sidecar: { note: 'edited' }, revision_seq: 2, written_at: T0 + 500, isFull: true, isPresent: true })
     })
 
     it("exposed: follows the whisper the box keeps open", async () => {
@@ -220,11 +220,11 @@ describe("Box snapshot", () => {
       const listener = vi.fn()
       box.subscribe(listener)
       await box.expose()
-      expect(box.getSnapshot().exposed).to.be.true
+      expect(box.getSnapshot().isExposed).to.be.true
       expect(listener.mock.calls).to.have.lengthOf(1)
       expect(JSON.stringify(box.getSnapshot())).to.not.contain('sk-ant-fake-for-test')
       box.unexpose()
-      expect(box.getSnapshot().exposed).to.be.false
+      expect(box.getSnapshot().isExposed).to.be.false
       expect(listener.mock.calls).to.have.lengthOf(2)
     })
   })
@@ -359,7 +359,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   for (const [call, blurb] of BadArgCases) {
     it(`refuses ${blurb} while the vault is locked, calling nothing`, async () => {
       const box = await builtOf(fullBoxRecord())
-      held.mw.setLockState('locked')
+      held.mw.setLocked(true)
       held.mw.clearCalls()
       await TH.expectRefusal(call(box))
       expect(held.mw.calls).to.deep.equal([])
@@ -368,7 +368,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
 
   it("refuses put with a sidecar that fails its check while the vault is locked, putting nothing", async () => {
     const box = await builtOf(fullBoxRecord())
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     await TH.expectRefusal(box.put({ whisper, sidecar: [] as never }))
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
@@ -380,7 +380,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
 
   it("refuses a bag handed to put, naming whisper and saying it is no whisper", async () => {
     const box = await builtOf(fullBoxRecord())
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     held.mw.clearCalls()
     expect(box.whisper).to.eq(ENCRYPTED)
     for (const call of [() => box.put({ whisper: box.whisper, sidecar: {} }), () => box.put({ whisper: LOCKED, sidecar: {} })]) {

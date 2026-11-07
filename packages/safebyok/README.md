@@ -96,7 +96,7 @@ and a put of one refuses. To learn why it hides, ask `box.exposure`: `'unexposed
 `box.isVeiled` answer one question each, and `isWhisperedBag(val)` tells a bag from a whisper. Don't
 compare `box.whisper` with a bag or read its mark: a second copy of safebyok has bags of its own.
 `box.isVeiled` stays true behind a lock, where `box.exposure` is `'locked'`. A box's snapshot
-carries `exposed` and `veiled`, and its vault's snapshot the `lockState`. `box.veil()` and
+carries `isExposed` and `isVeiled`, and its vault's snapshot `isLocked`. `box.veil()` and
 `box.unveil()` hide it and show it again, and `box.unexpose()` drops the veil with the whisper; a
 lock hides it, and an unlock shows it again. `box.subscribe` hears of all of this. The lock is the vault's, on
 `vault.getSnapshot()`, not the box's.

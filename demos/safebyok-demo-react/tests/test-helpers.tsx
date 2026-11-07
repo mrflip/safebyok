@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react'
 import { expect, onTestFinished, vi, type MockInstance } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryDeviceDB } from 'safebyok'
+import { MemoryDeviceDB, type VaultSnapshot } from 'safebyok'
 import { MemoryVaultDB } from 'safebyok/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
 import { BankProvider, useBank, useVault, useVaultSnapshot } from 'safebyok-react'
@@ -162,7 +162,13 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
   return { fetchFn, seen }
 }
 
-/** The vault under 'main' as a page sees it, to render beside a component under test: its stage and lock state as `<stage> <lockState>` (`none` with no vault), an Open button that builds or unlocks it, asking through the provider's dialog, and a Lock button.
+/** `locked` or `unlocked` for a vault's snapshot, `none` for none. */
+export const lockWordOf = (snapshot: VaultSnapshot | null): string => {
+  if (snapshot === null) { return 'none' }
+  return snapshot.isLocked ? 'locked' : 'unlocked'
+}
+
+/** The vault under 'main' as a page sees it, to render beside a component under test: its stage and lock as `<stage> <locked|unlocked>` (`none` with no vault), an Open button that builds or unlocks it, asking through the provider's dialog, and a Lock button.
  *
  * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
@@ -177,14 +183,14 @@ export const VaultProbe = () => {
   }
   return (
     <p>
-      <span data-testid="vault">{`${stage} ${snapshot?.lockState ?? 'none'}`}</span>
+      <span data-testid="vault">{`${stage} ${lockWordOf(snapshot)}`}</span>
       <button type="button" onClick={() => { void open() }}>Open</button>
       <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
     </p>
   )
 }
 
-/** Waits until the {@link VaultProbe} shows `shown`, as `<stage> <lockState>`, failing if it never does. */
+/** Waits until the {@link VaultProbe} shows `shown`, as `<stage> <locked|unlocked>`, failing if it never does. */
 export const expectProbe = async (shown: string) => {
   await waitFor(() => { expect(screen.getByTestId('vault').textContent).to.eq(shown) })
 }

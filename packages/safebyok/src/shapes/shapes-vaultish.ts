@@ -133,10 +133,10 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 // == [The listing's world]: listingWorld, ListingWorld, ListingOpts, answersEachVerb, brandedVaultDB, listingOpts
 
 /** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
-export const listingWorld = objCheck(({ fn }) => ({ lockState: fn(), ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
+export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** The world a listing lives in, as far as the base reaches into it: the bank for vaults, the vault for boxes. */
-export type ListingWorld = Pick<Bank | Vault, 'lockState' | 'ensureTimely' | 'takeWorld' | 'tellBadNews'>
+export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'takeWorld' | 'tellBadNews'>
 
 /** The options a listing is made with, after its world. */
 export type ListingOpts = {
@@ -206,13 +206,13 @@ export interface BoxSnapshot extends Boxscope {
   /** Your app's data beside the whisper, never encrypted; null until the full record is fetched. */
   readonly sidecar:       Sidecar | null
   /** True when the full record is in hand, false for a box only listed or deleted. */
-  readonly full:          boolean
+  readonly isFull:        boolean
   /** True unless the box is deleted or damaged. */
-  readonly present:       boolean
+  readonly isPresent:     boolean
   /** True while the box keeps its whisper exposed. */
-  readonly exposed:       boolean
+  readonly isExposed:     boolean
   /** True while `box.veil()` hides the whisper exposed. */
-  readonly veiled:        boolean
+  readonly isVeiled:      boolean
 }
 
 // --
@@ -277,7 +277,7 @@ export type BoxWorld = Pick<Vault, keyof ListingWorld | 'scope' | 'vault_tok' | 
 
 // == [The vault's forms]: VaultSnapshot
 
-/** A vault as a host renders it: its scope, its life and revision, and whether it is unlocked. */
+/** A vault as a host renders it: its scope, its life and revision, and whether it is locked. */
 export interface VaultSnapshot extends VaultScope {
   /** The token of this life of the vault, new when the vault is made again for its scope. */
   readonly vault_tok:     string
@@ -290,9 +290,9 @@ export interface VaultSnapshot extends VaultScope {
   /** When the revision in hand was written; for a vault deleted, when it was deleted. */
   readonly written_at:    number
   /** True unless the vault is deleted or damaged. */
-  readonly present:       boolean
-  /** `unlocked` while this device holds a lease in force, else `locked`. */
-  readonly lockState:     EX.LockState
+  readonly isPresent:     boolean
+  /** True unless this device holds a lease in force. */
+  readonly isLocked:      boolean
 }
 
 // --

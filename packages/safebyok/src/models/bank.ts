@@ -9,7 +9,6 @@ import { DefaultStrengthChecker, type GuardedStrengthChecker, guardStrengthCheck
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
-import type { LockState } from '../shapes/shapes-enums'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
@@ -113,9 +112,10 @@ export class Bank {
   }
   // --
 
-  // == [The world of its vaults]: lockState, ensureTimely, takeWorld
+  // == [The world of its vaults]: isLocked, ensureTimely, takeWorld
 
-  lockState(): LockState { return 'unlocked' }
+  /** False: a bank has no lock, and each vault keeps its own. */
+  get isLocked(): boolean { return false }
 
   ensureTimely(): Promise<void> { return Promise.resolve() }
 

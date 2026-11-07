@@ -252,13 +252,13 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     const box = await listing.create(boxDnaOf(scope()))
     const [shown] = listing.snapshot
     expect(shown).to.eq(box.snapshot)
-    expect(shown).to.include({ boxlabel: 'anthropic_api_key', revision_seq: 0, present: true, full: true })
+    expect(shown).to.include({ boxlabel: 'anthropic_api_key', revision_seq: 0, isPresent: true, isFull: true })
   })
 
   it("shows a box sparse as its snapshot does: present, not full, no sidecar", async () => {
     const listing = boxListingOf(held.mw)
     await listing.build(sparseBoxRecord())
-    expect(listing.snapshot[0]).to.include({ present: true, full: false, sidecar: null })
+    expect(listing.snapshot[0]).to.include({ isPresent: true, isFull: false, sidecar: null })
   })
 
   it("follows the box through a put: the listing shows the sidecar `box.sidecar` now gives", async () => {
@@ -274,11 +274,11 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
   it("keeps its rows through a lock and an unlock, each the box's own snapshot still", async () => {
     const { listing, box } = await heldBox()
     const before = listing.getSnapshot()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(listing.getSnapshot()).to.eq(before)
     expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
-    expect(before[0]).to.not.have.property('lockState')
-    held.mw.setLockState('unlocked')
+    expect(before[0]).to.not.have.property('isLocked')
+    held.mw.setLocked(false)
     expect(listing.getSnapshot()).to.eq(before)
     expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
   })

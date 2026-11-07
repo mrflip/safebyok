@@ -281,7 +281,7 @@ describe("Storable snapshot and subscription", () => {
       expect(afterEdit).to.be.greaterThan(0)
       await box.del()
       expect(listener.mock.calls.length).to.be.greaterThan(afterEdit)
-      expect(box.getSnapshot().present).to.be.false
+      expect(box.getSnapshot().isPresent).to.be.false
     })
   })
 
@@ -326,13 +326,13 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   it("demandPuttable answers the patch as parsed while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
     const box = await builtBoxOf()
     expect(box.demandPuttable({ ...box.scope, sidecar: { note: 'sent' } })).to.deep.include({ sidecar: { note: 'sent' } })
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
   })
 
   it("demandPuttable refuses a bad patch first, whether locked or over a record not whole", async () => {
     const box = await boxListingOf(held.mw).build(sparseBoxRecord())
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     TH.expectSyncRefusal(() => box.demandPuttable({}))
     TH.expectSyncRefusal(() => box.demandPuttable({ ...Patch, boxlabel: 'openai_api_key' }))
   })
@@ -340,7 +340,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   it("demandPuttable refuses before the lock, and the lock before a record not whole", async () => {
     const box = await boxListingOf(held.mw).build(sparseBoxRecord())
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
     box.vacate()
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
@@ -365,7 +365,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
 
   it("ensurePuttable refreshes and demands nothing: it resolves while locked, where put refuses", async () => {
     const box = await builtBoxOf()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     await expect(box.ensurePuttable()).resolves.to.eq(box)
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
   })

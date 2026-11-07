@@ -88,7 +88,7 @@ describe("fields.bind: what an element shows", () => {
 
 describe("fields.bind: into hiding and back", () => {
   const HidingCases = [
-    ['a lock',  () => { held.mw.setLockState('locked') }, () => { held.mw.setLockState('unlocked') }],
+    ['a lock',  () => { held.mw.setLocked(true) }, () => { held.mw.setLocked(false) }],
     ['a veil',  (box: TestableBox) => { box.veil() }, (box: TestableBox) => { box.unveil() }],
   ] as const
   for (const [blurb, hide, show] of HidingCases) {
@@ -269,7 +269,7 @@ describe("fields.save", () => {
     const veiled = await TH.expectRefusal(BoxFields.of(box).save(), 'bad_option')
     expect(veiled.message).to.eq(Phrases.SavingVeiledFields)
     box.unveil()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     await TH.expectRefusal(BoxFields.of(box).save(), 'vault_locked')
   })
 
@@ -293,10 +293,10 @@ describe("fields.bind: the last unbind", () => {
     unbindFirst?.()
     expect(first.value).to.eq('')
     expect(second.value).to.eq('acme')
-    expect(box.getSnapshot().exposed).to.be.true
+    expect(box.getSnapshot().isExposed).to.be.true
     unbindSecond?.()
     expect(second.value).to.eq('')
-    expect(box.getSnapshot().exposed).to.be.false
+    expect(box.getSnapshot().isExposed).to.be.false
   })
 
   it("stops hearing, so that a lock writes to no element let go", async () => {
@@ -307,7 +307,7 @@ describe("fields.bind: the last unbind", () => {
     const unbind = BoxFields.of(box).bind('apiKey')(el)
     unbind?.()
     el.value = 'let go'
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(el.value).to.eq('let go')
   })
 
@@ -319,7 +319,7 @@ describe("fields.bind: the last unbind", () => {
     await box.expose()
     BoxFields.of(box).bind('apiKey')(el)
     expect(el.value).to.eq(Stored.apiKey)
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(el.value).to.eq('')
   })
 })

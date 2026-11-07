@@ -44,13 +44,6 @@ export const putIfAbsentVals = ['add', 'fail'] as const
 export type PutIfAbsent = typeof putIfAbsentVals[number]
 // --
 
-// == [The world]: lockStateVals, LockState
-
-/** Whether the world a storable lives in is `unlocked` or `locked`: for a box, its vault's lock. */
-export const lockStateVals = ['unlocked', 'locked'] as const
-export type LockState = typeof lockStateVals[number]
-// --
-
 // == [The whisper]: boxExposureVals, BoxExposure
 
 // A string, not a bag: each copy of safebyok freezes its own bags, so comparing `box.whisper` with one fails across copies.
