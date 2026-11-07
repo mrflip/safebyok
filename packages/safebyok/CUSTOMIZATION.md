@@ -45,18 +45,67 @@ Nothing is logged: the first passphrase anyone tries in development meets it. Th
 contract at its plainest: the core will not guess how strong a passphrase your users need, and a
 checker of length alone is no checker ('a' and eleven spaces is twelve characters).
 
-### Your own
+### The one safebyok ships
 
-safebyok ships no checker: a bank with none refuses every new passphrase, as above. Write one to
-the contract, or wrap a library that judges passphrases, such as zxcvbn (`@zxcvbn-ts/core`), and
-hand it to `Bank.make` beside the key deriver and your device store:
+`safebyok/browser` exports `zxcvbnStrengthChecker`, built on zxcvbn-ts (`@zxcvbn-ts/core`, over the
+common dictionary of `@zxcvbn-ts/language-common`):
+
+* A new passphrase needs `MinPassphraseChars` (12) characters, counted as a reader counts them, and
+  then a zxcvbn score of `MinZxcvbnScore` (3, of 0 to 4) or more. There are no composition rules:
+  it never asks for a digit, a capital or a symbol. A few words that don't usually go together
+  pass; a common password with a capital and a bang on the end does not.
+* The vault's own names (`applabel`, `user_id`, `vaultlabel`) are among the words it tries first.
+* Its reasons are its own, in English, and never quote the passphrase.
+* Its dictionary, most of its weight, is a chunk of its own, which its `load` fetches at the
+  bank's `hello()`, never at import. A dictionary that does not load fails the hello, and the next
+  hello tries again. Asked before its dictionary has loaded, it loads it first; if it cannot, it
+  answers weak, saying the passphrase could not be checked just now.
+
+`browserOpts()` hands it to `Bank.make` with the rest of what a browser app usually chooses:
+`argon2idWebV1Deriver` and an `idbDeviceDB` over the `dbName` you name. It answers the same frozen
+bag for the same `dbName`, so it is safe to call during render, and a field you pass after the
+spread wins. It supplies no `device_id`: keep your own, a `crypto.randomUUID()` per device.
 
 ```ts
 import { Bank } from 'safebyok'
-import { argon2idWebV1Deriver } from 'safebyok/browser'
+import { browserOpts } from 'safebyok/browser'
 
-const bank = Bank.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: myDeviceDB, strengthChecker: myStrengthChecker })
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), applabel: 'acme', user_id, device_id, vaultDB, requestCleartext })
 ```
+
+Why these live in `safebyok/browser` rather than as `Bank.make`'s defaults is
+`notes/good_bank_opts_are_in_browser.md`: an app that never imports them never ships them.
+
+### Wrapping it
+
+To add a rule of your own, or to put its reasons in your user's language, wrap it, and carry its
+`load` across so the bank still loads the dictionary at `hello()`:
+
+```ts
+import { Bank, type VaultScope } from 'safebyok'
+import { browserOpts, zxcvbnStrengthChecker } from 'safebyok/browser'
+
+const strengthChecker = Object.assign(async (typed: string, scope: VaultScope) => {
+  if (typed.toLowerCase().includes('acme')) { return { strong: false, reason: 'Leave our name out of it.' } }
+  return zxcvbnStrengthChecker(typed, scope)
+}, { load: zxcvbnStrengthChecker.load })
+
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, applabel: 'acme', user_id, device_id, vaultDB, requestCleartext })
+```
+
+### Leaving it out: your own
+
+Pass your own `strengthChecker` after the spread, and zxcvbn never runs. To keep it out of your
+bundle too, import the deriver and the device store by name rather than `browserOpts`:
+
+```ts
+import { Bank } from 'safebyok'
+import { argon2idWebV1Deriver, idbDeviceDB } from 'safebyok/browser'
+
+const bank = Bank.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB({ dbName: 'acme' }), strengthChecker: myStrengthChecker })
+```
+
+Write yours to the contract, or wrap another library that judges passphrases.
 
 A checker that needs a dictionary is useless without it: fetch it in `load`, with a dynamic
 `import()` as a chunk of its own, so that when the chunk does not load -- a dropped connection, a
@@ -81,8 +130,9 @@ blanks:
 > package's CUSTOMIZATION.md ("Pluggable Passphrase Strength Checker"): it answers a verdict for
 > every passphrase and never throws; the reason is shown to my
 > user, so it is calm, says what to do, and never quotes the passphrase; and it runs on the
-> device, keeping and sending nothing. Left out, every new passphrase is refused; safebyok ships
-> no checker of its own.
+> device, keeping and sending nothing. Left out, every new passphrase is refused. `safebyok/browser`
+> exports `zxcvbnStrengthChecker` (12 characters, then a zxcvbn score of 3 of 4), which its
+> `browserOpts()` includes.
 >
 > Please help me choose a passphrase strength checker and wire it in. What matters to me:
 >

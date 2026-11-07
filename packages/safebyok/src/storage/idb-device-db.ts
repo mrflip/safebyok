@@ -19,7 +19,8 @@ export interface IdbDeviceDBOpts {
   dbName?: string | undefined
 }
 
-const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
+/** The check of an IdbDeviceDB's options, and of `browserOpts`'s, which are the same. */
+export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
 // == [The database]: LeaseScopepath, leaseScopepathOf, deviceShelfOf
