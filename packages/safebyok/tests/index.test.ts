@@ -33,7 +33,7 @@ describe("safebyok", () => {
   })
 
   it("exports what a React host's gating dialogs branch on: the correctable refusal kinds and the types of a gating's state", () => {
-    expect(Front.correctablekindVals).to.deep.equal(['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'])
+    expect(Front.correctablekindVals).to.deep.equal(['wrong_passphrase', 'wrong_passkey', 'passkey_unavailable', 'weak_passphrase', 'same_passphrase'])
     expectTypeOf<(typeof Front.correctablekindVals)[number]>().toExtend<Front.Refusalkind>()
     expectTypeOf<Front.Gating['gatingkind']>().toEqualTypeOf<Front.Gatingkind>()
     expectTypeOf<Front.Gating['passkeyHeader']>().toEqualTypeOf<Front.WayinHeader | null>()

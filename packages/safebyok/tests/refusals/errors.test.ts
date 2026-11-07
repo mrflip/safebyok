@@ -103,6 +103,7 @@ const FamilyCases = [
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
+  ["passkey_unavailable", "condition", 'a browser or authenticator that cannot answer for a passkey asks for the passphrase, or another authenticator'],
   ["absent_box",          "condition", 'a box deleted elsewhere is a fact of syncing'],
   ["absent_vault",        "condition", 'a novel vault, asked for what only a gated one has, is set up by its first unlock'],
   ["absent_wayin",        "condition", 'a passkey removed on another device is a fact of syncing'],
