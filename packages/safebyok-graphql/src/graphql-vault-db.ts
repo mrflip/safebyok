@@ -57,7 +57,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 
   // == [Gets]: listVaults, tryListVaults, getVault, tryGetVault, listBoxes, tryListBoxes, getBox, tryGetBox
 
-  /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
+  /** The bank's vaults, live or deleted, with the rows past reading in `damaged_rows`. */
   async listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>> { return goodAnswerOf(await this.tryListVaults(scope)) }
 
   async tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>> {
@@ -67,7 +67,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
     })
   }
 
-  /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
+  /** The vault by scope alone, whatever its life. */
   async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>> { return goodAnswerOf(await this.tryGetVault(scope, opts)) }
 
   async tryGetVault(scope: VaultScope, opts: IfAbsentOpts = {}): Promise<Answer<VaultRecord | null, GotAct>> {
@@ -77,7 +77,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
     })
   }
 
-  /** The boxes under this `vault_tok`, sparse, its vault row as `world`; a row failing validation goes in `damaged_rows`. */
+  /** The boxes under this `vault_tok`, sparse, with the rows past reading in `damaged_rows`. */
   async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>> { return goodAnswerOf(await this.tryListBoxes(asked)) }
 
   async tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>> {
@@ -87,7 +87,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
     })
   }
 
-  /** The box under this `vault_tok`, its vault row as `world`. Over a void or gone box row, `ifAbsent: 'nil'` answers null. */
+  /** The box under this `vault_tok`, its vault row as `world`. */
   async getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>> { return goodAnswerOf(await this.tryGetBox(asked, opts)) }
 
   async tryGetBox(asked: BoxQuery, opts: IfAbsentOpts = {}): Promise<Answer<BoxRecord | null, GotAct>> {
@@ -100,7 +100,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Stores a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
+  /** Stores a vault's birth, or its rebirth over a tombstone. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> { return goodAnswerOf(await this.tryPutVault(record, opts)) }
 
   async tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>> {
@@ -143,7 +143,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
     })
   }
 
-  /** Takes the passkey wayin off the vault row; one holding none answers as stored. */
+  /** Takes the passkey wayin off the vault row. */
   async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> { return goodAnswerOf(await this.tryRevokePasskey(params)) }
 
   async tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>> {
@@ -179,7 +179,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 
   // == [Watch]: watch
 
-  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. Nothing may count on a notice arriving. */
+  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
     const { applabel, user_id, vaultlabel = null } = DB.watchScope.parse(scope)
     const variables = { applabel, user_id, vaultlabel }
@@ -222,7 +222,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 
 // == [Answers]: answerOf, goodAnswerOf, fieldOf, heedNotice
 
-/** What `ask` answers, or a bad answer holding the refusal it threw, `call` and `req_params` in its meta. */
+/** What `ask` answers, or a bad answer holding the refusal it threw. */
 const answerOf = async <ValT, ActT extends string, WorldT>(call: string, req_params: ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
   const outcome = await DB.outcomeOf(ask)
   if (outcome.ok) { return outcome.val }
@@ -236,7 +236,7 @@ const goodAnswerOf = <ValT, ActT extends string, WorldT>(answer: Answer<ValT, Ac
   return answer
 }
 
-/** The `fieldname` of an operation's answer: a failed fetch `storage_unavailable`, a GraphQL error `unexpected_error`. */
+/** The `fieldname` of an operation's answer, or the refusal a failed operation stands for. */
 const fieldOf = ({ error: err, data }: OperationResult<unknown>, fieldname: string): unknown => {
   if (err?.networkError !== undefined) { throw DB.storageUnavailable(err) }
   // A GraphQL error is a client and server out of step, which no retry mends: never a condition of storage.
@@ -246,7 +246,7 @@ const fieldOf = ({ error: err, data }: OperationResult<unknown>, fieldname: stri
   return (data as Record<string, unknown>)[fieldname]
 }
 
-/** Hands `onNotice` the notice `result` carries; true when it is `identity_revoked`, which ends the watch for good. */
+/** Hands `onNotice` the notice `result` carries, answering true for the notice that ends the watch for good. */
 const heedNotice = ({ error: err, data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): boolean => {
   // A notice is a hint to fetch again, so a failed one, or one of the wrong shape, is passed over.
   if ((err !== undefined) || (typeof data !== 'object') || (data === null)) { return false }
@@ -282,7 +282,7 @@ const noop = (): void => undefined
 /** How one selection drops its `__typename`. */
 type Drop = (val: unknown) => unknown
 
-/** `bag` without its `__typename`, each field of `nested` it holds passed through that field's own drop. */
+/** `bag` without `__typename`, in itself and in each field `nested` names. */
 const dropTypename = (bag: unknown, nested: Record<string, Drop> = {}): unknown => {
   if ((typeof bag !== 'object') || (bag === null) || Array.isArray(bag)) { return bag }
   const { __typename: _typename, ...fields } = bag as Record<string, unknown>

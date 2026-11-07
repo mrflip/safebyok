@@ -90,7 +90,7 @@ const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
   userIdOf: fn<VaultResolversOpts<unknown>['userIdOf']>(),
 }), 'bad_option')
 
-/** The resolvers for `VaultSchemaSdl`, each root field one of the vaultDB's front verbs, for the user the request is signed in as alone. */
+/** The resolvers for `VaultSchemaSdl`, serving each request its signed-in user's bank alone. */
 export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> => {
   const { vaultDB, userIdOf } = vaultResolversOpts.parse(opts)
 
@@ -195,7 +195,7 @@ const safebyokEpochMillis = new GraphQLScalarType<number, number>({
 
 // == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, readerOf, typenameOf
 
-/** `answer` as it crosses: each field the schema names, and of a refusal its crossed parts alone. */
+/** `answer` as it crosses, each field the schema names. */
 const crossingOf = (answer: DB.Answer<unknown, string, unknown>): CrossingAnswer => ({
   ok:         answer.ok,
   act:        answer.act,
@@ -206,7 +206,7 @@ const crossingOf = (answer: DB.Answer<unknown, string, unknown>): CrossingAnswer
   err:        answer.ok ? null : crossedErrOf(answer.err),
 })
 
-/** A refusal as it crosses: its kind, its message, and of its meta the fields a server lets cross, never its cause. */
+/** A refusal as it crosses, never its cause. */
 const crossedErrOf = ({ refusalkind, message, meta }: DB.VaultError): DB.CrossedErr => {
   // Checked for the wire: a limit of Infinity, which JSON cannot carry, becomes the largest safe integer.
   const capacity = DB.capacity.safeParse(meta?.capacity)
@@ -235,7 +235,7 @@ const endingWith = (refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
   return iterator
 }
 
-/** The reader of what `vaultDB` hears of `scope`; cancelling it stops the watch. */
+/** The reader of what `vaultDB` hears of `scope`, whose cancel stops the watch. */
 const readerOf = (vaultDB: DB.VaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> => {
   // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
   // `next`, which for a quiet bank is forever, so a subscriber gone while it waited would keep the

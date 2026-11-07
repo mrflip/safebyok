@@ -42,7 +42,7 @@ const answerFields = `
   req_params: SafebyokReqParams!
   err:        SafebyokErr`
 
-/** The GraphQL schema a vaultDB's front verbs cross by, as SDL, every name in it `safebyok...` or `Safebyok...`, to sit beside your own. */
+/** The SDL of the GraphQL schema a vaultDB's front verbs cross by, every name in it prefixed `safebyok` to sit beside your own. */
 export const VaultSchemaSdl = `"""A JSON value carried whole: a box's sidecar, a damaged row, or a refusal's meta."""
 scalar SafebyokJson
 
@@ -202,7 +202,7 @@ type SafebyokBoxAnswer {${answerFields}
   dbhas:      SafebyokRow
 }
 
-"""A row that changed, with its vault row where the store sent one; or the err that ends the watch."""
+"""A row that changed and its vault row, or the err that ends the watch."""
 type SafebyokNotice {
   ok:    Boolean!
   act:   String!
@@ -334,7 +334,7 @@ type Mutation {
 }
 
 type Subscription {
-  """Each row that changes in the bank, or in one vault of it; a notice carrying an err is the last."""
+  """Each row that changes in the bank, or in one vault of it."""
   safebyokWatch(applabel: String!, user_id: String!, vaultlabel: String): SafebyokNotice!
 }
 `
