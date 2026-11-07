@@ -298,7 +298,7 @@ export const ConfirmField = ({ ref, gripeId, fieldlabel, gripe, onChange }: {
   />
 )
 
-/** What a host says of a passphrase as the user chooses it, or null for nothing. */
+/** What a host says of a passphrase as the user chooses it, or null for nothing. It hears the passphrase in plain text, so keep it on the device. */
 export type PassphraseAdvice = (passphrase: string) => string | null | Promise<string | null>
 
 /** The refusal for a host's `passphraseAdvice` that threw, leaving out what it threw. */
