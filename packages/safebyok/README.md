@@ -48,12 +48,13 @@ it names are the old design's (`putWayin`, `getWhisper`): for calls, trust the t
 
 ```ts
 import { Bank } from 'safebyok'
-import { idbDeviceDB } from 'safebyok/browser'
+import { browserOpts } from 'safebyok/browser'
 
 const bank = Bank.make({
+  ...browserOpts({ dbName: 'acme' }), // keyDeriver, deviceDB and strengthChecker; a field after it wins
   applabel: 'acme', user_id: session.user_id,
-  vaultDB, keyDeriver, strengthChecker, // see below
-  deviceDB: idbDeviceDB(),
+  device_id: deviceId, // a crypto.randomUUID() you keep for this device
+  vaultDB, // see below
   requestCleartext: async (gating) => {
     if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
     while (gating.isOpen) { // a wrong passphrase leaves it open
@@ -76,6 +77,7 @@ await vault.ensureUnlocked() // no lease now: asks, unlock_vault
 Easy to get wrong:
 
 * With no `strengthChecker`, every new passphrase is refused `weak_passphrase`, so no vault builds.
+  `browserOpts` supplies `zxcvbnStrengthChecker`, whose dictionary loads at `bank.hello()`.
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
@@ -171,8 +173,9 @@ merges deeply, and an array replaces.
 
 **A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
 `Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
-`safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers and
-`idbDeviceDB`, the device store in IndexedDB. Nothing in the core exports a `VaultDB` or a strength checker.
+`safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
+`idbDeviceDB`, the device store in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, the three in one bag. Nothing in
+the core exports a `VaultDB`.
 
 ## Next
 

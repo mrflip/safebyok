@@ -87,13 +87,22 @@ export const ListingExpected = "Expected a Listing"
 export const VaultErrorExpected = "Expected a VaultError"
 // --
 
-// == [Passphrases]: PassphraseNotText, passphraseSaltShape
+// == [Passphrases]: PassphraseNotText, passphraseSaltShape, passphraseTooShort, PassphraseGuessable, PassphraseUnjudged
 
 /** A passphrase handed over as anything but text. */
 export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
 
 /** A passphrase wayin's salt that is not base64url text of `minBytes` to `maxBytes` bytes. */
 export const passphraseSaltShape = (minBytes: number, maxBytes: number): string => `A passphrase salt is base64url text of ${String(minBytes)} to ${String(maxBytes)} bytes`
+
+/** zxcvbnStrengthChecker's reason for a new passphrase of fewer than `minChars` characters. */
+export const passphraseTooShort = (minChars: number): string => `A passphrase needs ${String(minChars)} characters or more: a few words together make a strong one, and easy to remember.`
+
+/** zxcvbnStrengthChecker's reason for a new passphrase a guesser would reach early. */
+export const PassphraseGuessable = "That passphrase would be easy to guess: add a word or two that don't usually go together, and leave out names, dates and this app's own words."
+
+/** zxcvbnStrengthChecker's reason for a new passphrase it could not judge, as its dictionary did not load. */
+export const PassphraseUnjudged = "This passphrase can't be checked just now: the list of common passwords it is checked against didn't load. Check your connection, then try again."
 // --
 
 // == [Passkeys]: PasskeyAnswerUsed, prfSaltNotFresh
@@ -135,7 +144,7 @@ export const KeyDeriverSpecShape = "Expected a keyDeriverSpec: algorithm 'argon2
 export const memoryPerLane = (minKib: number): string => `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)`
 
 /** A `strengthChecker` that is no checker. */
-export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. safebyok ships none: pass your own (CUSTOMIZATION.md, Pluggable Passphrase Strength Checker)"
+export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. Pass zxcvbnStrengthChecker from safebyok/browser, or your own (CUSTOMIZATION.md, Pluggable Passphrase Strength Checker)"
 // --
 
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
