@@ -11,9 +11,9 @@
 * **Sprint PR:** #572 (draft).
 * **Sprint doc:** https://claude.ai/artifact/UN5fpxiLeEaLHjpFgBiHg9 (doc
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
-  matters table mnx96vk4741.393, bookmark rev 2; Cleanup body 6cb5c40d-1cc7; Progress body
+  matters table mnx96vk4741.393, bookmark rev 16; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** thread 1 filed (#573); thread 2 in review (#574); thread 3 split, passkeys now thread 11.
+* **Status:** threads 1 (#573) filed; 2 (#574) reviewed, filing; next 3, 4 and 12 side by side.
 
 ## Read first
 
@@ -122,8 +122,8 @@ Later rulings in the same session, verbatim where they bind the threads:
 
 ## The threads
 
-Waves: **1**, then **2**, then **3 and 4 side by side**. Then **5** (after restacking 3 and 4 into
-one line) beside **11**, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
+Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **5** (after restacking 3, 4 and 12
+into one line) beside **11**, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
 **10** comes last.
 
 ### 1. core_for_react
@@ -185,6 +185,12 @@ Re-exports in `src/index.ts`, with tests in `tests/index.test.ts`; a changeset.
   Thread 4 adds box hooks beside the vault hooks, so keep the hooks' file open to that. Thread 5's
   account menu reads `useVaultSnapshot` and an unborn-vault state, so expose `unborn` plainly
   (from the bank's snapshot, or the hook's answer).
+* *Review:* `medium`, fixed (6 fixes kept): `askByDialog` again ends the showing a new gating replaces;
+  `NoDialog` answers once though `onDone` is inline; the README's deriver example; three style fixes.
+  Left: inline `onPanic` remakes the bank, misused handlers no longer refused, the remake warning lost
+  (all three to thread 12); dead strings in `messages.ts` (to thread 3); about 14 doc-block first lines
+  joining two facts, and about 15 compound test titles (a row for the Coach); test gaps for the
+  held-bank guard mid-render and dialogs under StrictMode; `useProvided` throws a plain `Error`. PR #574.
 
 ### 3. react_dialogs
 
@@ -196,8 +202,10 @@ thread 11.
 * In the demo:
   * `WaysIn` comes back with *Change passphrase* on `vault.replacePassphrasePrompt`;
   * `SessionBar` gets *Delete account* back, on `vault.delVaultPrompt`.
-* Ride-along: thread 2 stopped handing a non-function `onBadNews` (or `requestCleartext`) through
-  to `Bank.make` to be refused. Restore that, so misuse still reaches the error boundary.
+* Prune what thread 2 left of deleted features once these dialogs settle which strings return:
+  `Messages` entries no dialog uses, `Gripe.fromPasskey` if passkeys (thread 11) don't need it,
+  `BoundarySource`'s `'GatingModal'` if nothing passes it, `useAttempts`' unused `isShown`. Leave
+  what thread 11 will need.
 * *Touches:* `gating-modal.tsx`, `modal.tsx`, the passphrase dialog, their tests; demo `WaysIn`,
   `SessionBar`; README sections.
 * *Depends on:* 2. Runs beside 4. *Size:* medium.
@@ -253,7 +261,7 @@ thread 11.
   whichever flow calls it.
 * After this thread, nothing in the demo imports `safebyok-old`.
 * *Touches:* `demos/safebyok-demo-react` (`src/lib/*`, `App.tsx`, new components, tests).
-* *Depends on:* 3 and 4, restacked into one line first. *Size:* medium-large.
+* *Depends on:* 3, 4 and 12, restacked into one line first. *Size:* medium-large.
 * *Look-ahead:* threads 6 and 7 each add one sibling flow component beside `KnockKnockFields`;
   thread 8 adds the dev panels below the app. Give each a slot in `App.tsx`.
 
@@ -361,6 +369,26 @@ shows it beside the other two.
 * *Touches:* `passkey.ts`, `passkey-unlock-button.tsx`, `gating-modal.tsx`, their tests; demo
   `WaysIn`; README.
 * *Depends on:* 3. Runs beside 5. *Size:* medium.
+
+### 12. provider_handlers
+
+> I would like to get react and the demo-react working.
+
+*Gloss.* *Orchestrator:* from thread 2's review (#574). The provider's handler props, made right:
+* A non-function `onBadNews` or `requestCleartext` from a JavaScript host reaches `Bank.make` as
+  given, so it is refused `bad_option` to the error boundary, as before thread 2.
+* `onPanic` is held in a ref as `onBadNews` is, so writing it inline makes no new bank. With no
+  `onPanic` given, the bank must still behave as the core does with none (it vacates the vault). A
+  panic from a bank the provider has let go must never reach the next user's handler. Prefer the
+  core's no-handler behaviour for it, and record the choice as an open matter.
+* The warning, said once through the logger, when a prop that remakes the bank (`logger`,
+  `keyDeriver`, `strengthChecker`, `vaultDB`, `deviceDB`) changes identity between renders, as the
+  old provider gave.
+* *Touches:* `packages/safebyok-react/src/bank-provider.tsx`, its tests, the README's provider
+  section.
+* *Levels:* worker `sonnet`; review `medium` (a lease that survived its erase is what `onPanic`
+  hears).
+* *Depends on:* 2. Runs beside 3 and 4. *Size:* small.
 
 ## For the Coach
 

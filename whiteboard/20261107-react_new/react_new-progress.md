@@ -5,7 +5,7 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 
 ## Where things stand
 
-*Orchestrator:* thread 1 filed (#573); thread 2 in review (#574).
+*Orchestrator:* thread 1 filed (#573); thread 2 reviewed, filing (#574); next 3, 4 and 12.
 
 ## Facts every thread may need
 
@@ -60,3 +60,6 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
   `demos/safebyok-demo-react/src/lib/stores.ts`. `lib/anthropic.ts` and the CSS of the removed
   components are kept. The demo depends on `safebyok` and `safebyok-indexeddb`, and keeps
   `safebyok-old` only for the fake auth's `StringStore` in `lib/`.
+* *Orchestrator:* thread 2's review (#574) found the provider's handler props wanting: inline
+  `onPanic` remakes the bank, non-function `onBadNews` / `requestCleartext` are no longer refused,
+  and the remake warning is gone. All three are thread 12's.
