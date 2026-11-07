@@ -121,14 +121,22 @@ export const BankProvider = (props: BankProviderProps) => {
     const { requestCleartext, onBadNews, onPanic, passphraseUsername: _username, passphraseAdvice: _advice, children: _children, user_id: _user_id, applabel: _applabel, ...passedOpts } = making
     // Once swept, the bank tells and asks no one: the handler now may be the next user's.
     const kept = { held: true }
-    const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? latestProps.current.onBadNews?.(news) : undefined)
+    // A handler dropped since the making falls back to the one the bank was made with, so a bank made
+    // with a handler has one for its whole life: the core vacates a vault only for a bank with none.
+    const tellWhileHeld: BadNewsHandler = (news) => {
+      if (! kept.held) { return }
+      const latest = latestProps.current.onBadNews
+      const hearing = typeof latest === 'function' ? latest : onBadNews
+      hearing?.(news)
+    }
     const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
-    // The core reports a panic handler's throw to the platform, as it does a panic nobody hears:
-    // a let-go bank's panic goes there, and never to the next user's handler.
+    // The core reports a panic handler's throw to the platform and counts the panic heard: a let-go
+    // bank's panic goes there, and never to the next user's handler.
     const panicWhileHeld: PanicHandler = async (refusal) => {
-      const hearing = latestProps.current.onPanic
-      if (typeof hearing !== 'function' || ! kept.held) { throw refusal }
-      await hearing(refusal)
+      if (! kept.held) { throw refusal }
+      const latest = latestProps.current.onPanic
+      const hearing = typeof latest === 'function' ? latest : onPanic
+      await hearing?.(refusal)
     }
     const misusedBadNews = misusedHandler(onBadNews)
     const misusedPanic = misusedHandler(onPanic)

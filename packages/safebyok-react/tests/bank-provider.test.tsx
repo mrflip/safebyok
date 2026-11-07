@@ -224,6 +224,27 @@ describe("BankProvider's handlers", () => {
     expect(shown('vault')).to.eq('present locked')
   })
 
+  it("tells the onPanic the bank was made with of a panic once the props drop it", async () => {
+    vi.stubGlobal('reportError', vi.fn())
+    const madeWith = vi.fn()
+    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: madeWith })
+    rerender({ ...props, onPanic: undefined })
+    refuseErase(deviceDB)
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(madeWith).toHaveBeenCalledWith(Refusal) })
+    expect(shown('vault')).to.eq('present locked')
+  })
+
+  it("tells the onBadNews the bank was made with of bad news once the props drop it", async () => {
+    const madeWith = vi.fn()
+    const { props, rerender } = provided({ onBadNews: madeWith })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, onBadNews: undefined })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    TH.seenBanks[0]?.tellBadNews([Refusal])
+    expect(madeWith).toHaveBeenCalledWith(Refusal)
+  })
+
   it("leaves a vault whose lease survived its erase to be vacated when the host has no onPanic, as the core does", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
