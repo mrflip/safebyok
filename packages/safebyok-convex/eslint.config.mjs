@@ -153,6 +153,7 @@ export default defineConfig([
       'no-inner-declarations':                     ['off'],
       'no-restricted-syntax':                      ['off'],
       'no-underscore-dangle':                      ['off'],
+      'no-useless-escape':                         ['off'],
       'no-useless-rename':                         ['off'],
       'prefer-template':                           ['off'],
 

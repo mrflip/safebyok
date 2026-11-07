@@ -17,11 +17,11 @@ import * as Phrases from '../helpers/phrases'
  */
 export const Patterns = Object.freeze({
   /** Base64url text without padding: the letters, the digits, `-` and `_`. */
-  b64url:  /^[A-Za-z0-9_\-]+$/, // eslint-disable-line no-useless-escape
+  b64url:  /^[A-Za-z0-9_\-]+$/,
   /** A label: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two characters at least. */
   label:   /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/,
   /** A user_id: ASCII letters and digits and `-_.~:@+|%`, never dots alone. */
-  user_id: /^(?!\.+$)[A-Za-z0-9_.~:@+\|%\-]+$/, // eslint-disable-line no-useless-escape
+  user_id: /^(?!\.+$)[A-Za-z0-9_.~:@+\|%\-]+$/,
 })
 
 /** The most characters a label holds. */
