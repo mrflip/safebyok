@@ -49,7 +49,7 @@ describe("AX's answer checks", () => {
     }
   })
 
-  it("parse a refusal that crossed to a VaultError of its kind, its meta holding the act, world and request", async () => {
+  it("parses a refusal that crossed to a VaultError of its kind", async () => {
     const vaultDB = await storeWithBox()
     const answer = await vaultDB.tryPutVault(vaultAt(1), { prior: stale })
     expect(answer.ok).to.be.false
@@ -71,7 +71,7 @@ describe("AX's answer checks", () => {
     expect(() => AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, vaults: [...listed.val.vaults, damaged] } })).to.throw(VaultError)
   })
 
-  it("take a damaged row under the label it is stored under, though that label fails a label's check", async () => {
+  it("takes a damaged row under the label it is stored under", async () => {
     const vaultDB = await storeWithBox()
     const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
     const misnamed = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'Not A Label' }, { vault_tok: 'life1' })
@@ -79,7 +79,7 @@ describe("AX's answer checks", () => {
     expect(parsed.ok && parsed.val.damaged_rows).to.deep.eq([misnamed])
   })
 
-  it("refuse a field this copy does not know, an act its verb never answers, or a missing world", async () => {
+  it("refuses an answer out of step with its verb's checker", async () => {
     const vaultDB = await storeWithBox()
     const got = crossed(await vaultDB.tryGetVault(vaultScope)) as Record<string, unknown>
     for (const bad of [{ ...got, surplus: 1 }, { ...got, act: 'born' }, { ...got, world: null }]) {

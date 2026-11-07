@@ -65,7 +65,7 @@ describe("GraphQLVaultDB's constructor", () => {
 })
 
 describe("GraphQLVaultDB's answers off the wire", () => {
-  it("answers a GraphQL error as 'unexpected_error', with no cause", async () => {
+  it("refuses a GraphQL error with no cause", async () => {
     const combined = new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')] })
     const { vaultDB } = fakeClient({ error: combined })
     const answer = await vaultDB.tryGetVault(TH.vaultScope)
@@ -76,7 +76,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'unexpected_error')
   })
 
-  it("answers a server serving some other schema as unexpected_error", async () => {
+  it("refuses a server serving some other schema", async () => {
     const { vaultDB } = fakeClient({ data: { somethingElse: 1 } })
     await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')
   })
@@ -91,13 +91,20 @@ describe("GraphQLVaultDB's watch", () => {
   beforeEach(() => { vi.useFakeTimers() })
   afterEach(() => { vi.useRealTimers() })
 
-  it("hears each notice once, and subscribes again a second after a stream ends", async () => {
+  it("hears each notice once", () => {
     const { vaultDB, streams } = fakeClient()
     const heard: DB.Notice[] = []
     const stop = vaultDB.watch(TH.bankScope, (notice) => { heard.push(notice) })
     streams[0]?.({ data: gotNotice, hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: false })
     expect(heard).to.deep.eq([{ act: 'got', val: TH.vaultAt(), world: null }])
+    stop()
+  })
+
+  it("subscribes again a second after a stream ends", async () => {
+    const { vaultDB, streams } = fakeClient()
+    const stop = vaultDB.watch(TH.bankScope, () => undefined)
+    streams[0]?.({ data: gotNotice, hasNext: false })
     await vi.advanceTimersByTimeAsync(999)
     expect(streams).to.have.length(1)
     await vi.advanceTimersByTimeAsync(1)
@@ -105,7 +112,7 @@ describe("GraphQLVaultDB's watch", () => {
     stop()
   })
 
-  it("never subscribes again after identity_revoked", async () => {
+  it("never subscribes again once the server has revoked its identity", async () => {
     const { vaultDB, streams } = fakeClient()
     const heard: DB.Notice[] = []
     const stop = vaultDB.watch(TH.bankScope, (notice) => { heard.push(notice) })

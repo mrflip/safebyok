@@ -70,7 +70,7 @@ const watching = async (schema: GraphQLSchema, context: TH.TestContext, scope: o
 }
 
 describe("vaultResolvers", () => {
-  it("refuses every verb of a request signed in as another user, or signed out, as an answer, and stores nothing", async () => {
+  it("refuses every verb of a request signed in as another user, or signed out", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
     const record = TH.vaultAt()
@@ -100,7 +100,7 @@ describe("vaultResolvers", () => {
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
-  it("answers each verb as the store's own try* verb does, for a request signed in as the user it asks for", async () => {
+  it("answers each verb as the store's own try* verb does", async () => {
     await TH.emptyTables()
     const store = await TH.serverOver()
     const schema = TH.schemaOver(store)
@@ -130,17 +130,22 @@ describe("vaultResolvers", () => {
     expect(goneVault).to.deep.include({ ok: true, val: TH.vaultTombstoneOf(vault) })
   })
 
-  it("leaves each option out to take the store's default, and refuses one sent as null", async () => {
+  it("takes the store's default for an option left out", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
     const absent = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, TH.vaultScope)) as DB.BadAnswer
     expect(absent.ok).to.be.false
     expect(DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ...TH.vaultScope, opts: { ifAbsent: 'nil' } }))).to.deep.include({ ok: true, val: null })
+  })
+
+  it("refuses an option sent as null", async () => {
+    await TH.emptyTables()
+    const schema = TH.schemaOver(await TH.serverOver())
     const nulled = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ...TH.vaultScope, opts: { ifAbsent: null } })) as DB.BadAnswer
     expect(nulled.err.refusalkind).to.eq('bad_option')
   })
 
-  it("sends a refusal's kind and message as the answer's err, never what the store's driver said", async () => {
+  it("sends a refusal as the answer's err with nothing of what the store's driver said", async () => {
     const crossed = await sent(TH.schemaOver(unreachable()), VaultOperations.getVault, TH.vaultScope)
     const answer = DB.getVaultAnswer.parse(crossed) as DB.BadAnswer
     expect(answer.err.refusalkind).to.eq('storage_unavailable')
@@ -190,7 +195,7 @@ describe("vaultResolvers", () => {
 })
 
 describe("vaultResolvers' watch", () => {
-  it("hears each row that changes while the session that subscribed stays signed in as its user, and lets go when ended", async () => {
+  it("hears each row that changes while the session that subscribed stays signed in as its user", async () => {
     await TH.emptyTables()
     const { listening, store, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' })
@@ -200,10 +205,18 @@ describe("vaultResolvers' watch", () => {
     expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', TH.boxAt().boxlabel)
     expect(listening.size).to.eq(1)
     await stream.return(undefined)
+  })
+
+  it("lets go of its listen when ended", async () => {
+    await TH.emptyTables()
+    const { listening, schema } = await watchedServer()
+    const { stream } = await watching(schema, { user_id: 'u1' })
+    expect(listening.size).to.eq(1)
+    await stream.return(undefined)
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
   })
 
-  it("ends with identity_revoked once its session is signed out or in as another user", async () => {
+  it("ends once its session is signed out or in as another user", async () => {
     for (const revoked of ['u2', null]) {
       await TH.emptyTables()
       const { listening, store, schema } = await watchedServer()
@@ -219,7 +232,7 @@ describe("vaultResolvers' watch", () => {
     }
   })
 
-  it("ends with unexpected_error once its userIdOf throws, sending nothing of what it said", async () => {
+  it("ends with a refusal carrying nothing of what its throwing userIdOf said", async () => {
     await TH.emptyTables()
     const { listening, store, schema } = await watchedServer()
     const session: TH.TestContext = { user_id: 'u1' }
@@ -233,7 +246,7 @@ describe("vaultResolvers' watch", () => {
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
   })
 
-  it("refuses a watch of another user's bank, or of a malformed scope, with one notice", async () => {
+  it("ends a watch it refuses after one notice", async () => {
     const { listening, schema } = await watchedServer()
     for (const [context, scope, refusalkind] of [[{ user_id: 'u2' }, TH.bankScope, 'identity_revoked'], [{ user_id: 'u1' }, { ...TH.bankScope, applabel: '' }, 'bad_scope']] as const) {
       const { nextNotice } = await watching(schema, context, scope)
@@ -258,12 +271,18 @@ describe("VaultSchemaSdl", () => {
     for (const document of Object.values(VaultOperations)) { expect(validate(schema, parse(document))).to.deep.eq([]) }
   })
 
-  it("carries a time past 32 bits, and refuses one that is not a safe integer", async () => {
+  it("carries a time past 32 bits", async () => {
     await TH.emptyTables()
     const executable = TH.schemaOver(await TH.serverOver())
     const later = TH.vaultAt(0, 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
     const born = DB.putVaultAnswer.parse(await sent(executable, VaultOperations.putVault, { record: later, opts: { prior: DB.VoidRevision } }))
     expect(born.val).to.have.property('written_at', 2 ** 41)
+  })
+
+  it("refuses a time that is not a safe integer", async () => {
+    await TH.emptyTables()
+    const executable = TH.schemaOver(await TH.serverOver())
+    const later = TH.vaultAt(0, 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
     const fractional = await graphql({ schema: executable, source: VaultOperations.putVault, variableValues: { record: { ...later, written_at: 1.5 }, opts: { prior: DB.VoidRevision } }, contextValue: { user_id: 'u1' } })
     expect(fractional.errors).to.have.lengthOf(1)
   })
