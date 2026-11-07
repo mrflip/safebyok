@@ -37,7 +37,7 @@ const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request)
 }
 
 /** The README's browser half: a GraphQLVaultDB over an urql Client that posts to the route, and subscribes over it too. */
-const browserVaultDB = (fetcher: typeof fetch, opts: DB.VaultDBOpts = {}) => new GraphQLVaultDB({ ...opts, client: new Client({
+const browserVaultDB = (fetcher: typeof fetch) => new GraphQLVaultDB({ client: new Client({
   url:                'https://app.example.test/api/graphql',
   exchanges:          [fetchExchange],
   fetchSubscriptions: true,
@@ -45,7 +45,7 @@ const browserVaultDB = (fetcher: typeof fetch, opts: DB.VaultDBOpts = {}) => new
 }) })
 // --
 
-// == [Wiring]: Route, byHeader, overTheNetwork, browserFor, signedInAsAsked
+// == [Wiring]: Route, byHeader, overTheNetwork, browserFor, signedInAsAsked, makeVaultDB, makeTwin
 
 type Route = (request: Request) => Promise<Response>
 
@@ -67,13 +67,13 @@ const overTheNetwork = (request: Request, response: Response): Response => {
 }
 
 /** A browser whose fetch reaches `route` in-process, signed in as `signedInAs` says of each operation's variables. */
-const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown>) => string | null, opts: DB.VaultDBOpts = {}) => (
+const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown>) => string | null) => (
   browserVaultDB(async (url, init) => {
     const request = new Request(url, init)
     const user_id = signedInAs(await variablesOf(request.clone()))
     if (user_id !== null) { request.headers.set('x-test-user', user_id) }
     return overTheNetwork(request, await route(request))
-  }, opts)
+  })
 )
 
 /** The variables an operation was sent with: in the URL, as urql sends a query by GET, or in the body. */
@@ -88,32 +88,47 @@ const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
   TH.signedInAsAsked({ variables } as unknown as Parameters<TH.Signing>[0]).user_id
 )
 
-const routes = new WeakMap<GraphQLVaultDB, Route>()
+const serversOf = new WeakMap<GraphQLVaultDB, { route: Route, store: PostgresVaultDB }>()
 
-/** A fresh browser over emptied tables, through its own route. */
+/** A fresh browser over emptied tables, through its own route, its server's store made with `opts` and at most `maxBoxes` boxes to a vault. */
 const makeVaultDB = async (opts: DB.VaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
   await TH.emptyTables()
-  const route = vaultRoute(await TH.serverOver((maxBoxes === undefined) ? {} : { maxBoxes }), byHeader)
-  const vaultDB = browserFor(route, signedInAsAsked, opts)
-  routes.set(vaultDB, route)
+  const store = await TH.serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
+  const route = vaultRoute(store, byHeader)
+  const vaultDB = browserFor(route, signedInAsAsked)
+  serversOf.set(vaultDB, { route, store })
   return vaultDB
+}
+
+/** The route and store behind a browser makeVaultDB or makeTwin made. */
+const serverOf = (vaultDB: GraphQLVaultDB): { route: Route, store: PostgresVaultDB } => {
+  const server = serversOf.get(vaultDB)
+  if (server === undefined) { throw new Error('This takes a browser makeVaultDB or makeTwin made') }
+  return server
+}
+
+/** A second browser through the same route, as another device holds. */
+const makeTwin = (vaultDB: GraphQLVaultDB): GraphQLVaultDB => {
+  const server = serverOf(vaultDB)
+  const twin = browserFor(server.route, signedInAsAsked)
+  serversOf.set(twin, server)
+  return twin
 }
 // --
 
-// Skipped until thread 4's milestone 3 moves GraphQLVaultDB onto the typed schema: it still sends the old operations.
-describe.skip("the README's Yoga recipe, its browser half", () => {
+describe("the README's Yoga recipe, its browser half", () => {
   TH.describeVaultDBBattery("the README's Yoga recipe", {
     makeVaultDB:          async (opts) => await makeVaultDB(opts),
     makeCappedVaultDB:    async (maxBoxes) => await makeVaultDB({}, maxBoxes),
-    makeTwin:             (vaultDB) => browserFor(routes.get(vaultDB)!, signedInAsAsked),
+    makeTwin,
     _cheat_rowsOf:        () => TH.rowsOf(),
+    _cheat_storeOf:       (vaultDB) => serverOf(vaultDB).store,
     boxNoticesCarryVault: false,
   })
 })
 
 describe("the README's Yoga recipe", () => {
-  // Skipped until thread 4's milestone 3, as the battery above is.
-  it.skip("refuses a browser signed in as one user the bank of another", async () => {
+  it("refuses a browser signed in as one user the bank of another", async () => {
     await TH.emptyTables()
     const route = vaultRoute(await TH.serverOver(), byHeader)
     const intruder = browserFor(route, () => 'u2')
@@ -122,8 +137,7 @@ describe("the README's Yoga recipe", () => {
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
-  // Skipped until thread 4's milestone 3, as the battery above is.
-  it.skip("stops the server's watch once the browser stops watching", async () => {
+  it("stops the server's watch once the browser stops watching", async () => {
     let watching = 0
     const listen: PostgresListen = async (channel, onNotify) => {
       watching += 1
