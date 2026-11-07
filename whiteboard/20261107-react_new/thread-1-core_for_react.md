@@ -1,6 +1,6 @@
 # Thread 1: core_for_react (2026-11-07)
 
-Branch `20261107-core_for_react`, PR (see below), cut from main (495cc5d6e). Justify: see PR.
+Branch `20261107-core_for_react`, PR #573, cut from main (495cc5d6e). Justify: green.
 
 * **Built**: re-exports in `packages/safebyok/src/index.ts` (file's grouping kept), tests in `packages/safebyok/tests/index.test.ts`, changeset `.changeset/20261107-core_for_react.md` (minor, additive).
   * Values: `correctablekindVals`, `PasskeySaltBytes`, `PrfAnswerBytes`, `MinuteMillis`, `HostErrorSanitizer` (the module as a namespace, as its own header says to import it).
@@ -12,3 +12,6 @@ Branch `20261107-core_for_react`, PR (see below), cut from main (495cc5d6e). Jus
   * `HostErrorSanitizer.refusalFor` is exactly what an error boundary needs: `(foreign, kind, message) => VaultError`, reading nothing of `foreign`. Exported whole as `HostErrorSanitizer`, the form its doc block already promises (`import { HostErrorSanitizer } from 'safebyok'`), which the index had not yet honoured.
   * Generous extras: `Wayinkind`, `Damagekind`, `BoxSparse`, `PasskeyAnswer`, the two member headers, since exported signatures (or `DamagedBox`, `PasskeyAnswer`) name them.
 * **Deviations**: none; no core file touched beyond `src/index.ts`.
+* **Discoveries**: `stage` is on `BankSnapshot`, not `Bank`. `isCorrectable` is private in `models/gating.ts` (`correctablekindVals` is the shared list). No `Correctablekind` type exists.
+* **For the Coach**: add `isCorrectable(err)` beside `isVaultError` once devicedb_idb has merged? (Open question in the PR.)
+* **Looked up**: nothing in the plan or progress documents; the handoff sufficed.
