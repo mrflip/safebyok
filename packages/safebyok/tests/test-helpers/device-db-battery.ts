@@ -297,11 +297,17 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
     })
 
     describe("ensureBank(scope)", () => {
-      it("makes the bank row on the first call, its device_id a fresh UUID, and answers it again on the next", async () => {
+      it("makes the bank row on the first call, its device_id a fresh UUID", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureBank(bankScope)
         expect(CX.device_id.safeParse(made.device_id).success).to.be.true
         expect(made).to.deep.equal({ ...bankScope, device_id: made.device_id })
+        expect(await deviceDB.listRawBanks()).to.deep.equal([made])
+      })
+
+      it("answers the same row on a later call", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank(bankScope)
         expect(await deviceDB.ensureBank(bankScope)).to.deep.equal(made)
         expect(await deviceDB.listRawBanks()).to.deep.equal([made])
       })

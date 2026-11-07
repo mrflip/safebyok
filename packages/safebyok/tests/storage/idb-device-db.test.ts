@@ -99,12 +99,17 @@ describe("IdbDeviceDB's database", () => {
     expect(await dbNamesNow()).to.include(`${dbName}:device-v001-001-001`)
   })
 
-  it("keeps its bank rows in a database of their own, named with its version, beside the leases'", async () => {
+  it("keeps its bank rows in a database of their own, named with its version", async () => {
     const dbName = freshDbName()
     const deviceDB = makeDeviceDB(dbName)
     await deviceDB.stow({ ...TH.vaultScope, vault_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
-    const made = await deviceDB.ensureBank(TH.bankScope)
+    await deviceDB.ensureBank(TH.bankScope)
     expect(await dbNamesNow()).to.include.members([`${dbName}:device-v001-001-001`, `${dbName}:bank-v001-001-001`])
+  })
+
+  it("keeps the bank rows of each dbName apart", async () => {
+    const dbName = freshDbName()
+    const made = await makeDeviceDB(dbName).ensureBank(TH.bankScope)
     expect(await makeDeviceDB(dbName).ensureBank(TH.bankScope)).to.deep.equal(made)
     expect(await makeDeviceDB().ensureBank(TH.bankScope)).to.not.deep.equal(made)
   })
