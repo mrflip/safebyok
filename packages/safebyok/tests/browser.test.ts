@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
-import { Argon2idWebV1, IdbDeviceDB, argon2idDeriver, argon2idWebV1Deriver, browserOpts, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
+import { Argon2idWebV1, IdbDeviceDB, PassphraseSaltBytes, argon2idDeriver, argon2idWebV1Deriver, browserOpts, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
 import * as Front from '../src/index'
 import * as Phrases from '../src/helpers/phrases'
 import * as TH from './test-helpers'
@@ -77,6 +77,7 @@ describe("safebyok/browser", () => {
     expect(argon2idWebV1Deriver).to.include({ ...Argon2idWebV1 })
     expect(parseKeyDeriverSpec(CheapSpec)).to.deep.equal(CheapSpec)
     expect(() => parseKeyDeriverSpec({ ...Argon2idWebV1, iterations: 4 })).to.throw(/argon2id_web_v1/u)
+    expect(PassphraseSaltBytes).to.eq(Argon2idWebV1.salt_bytes)
   })
 
   it("is not on the front door", () => {

@@ -12,10 +12,21 @@ describe("safebyok", () => {
     expectTypeOf<Front.BankOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()
     expectTypeOf<Front.BankOpts['logger']>().toEqualTypeOf<Front.VaultLogger | undefined>()
     expectTypeOf<Parameters<Front.RequestCleartext>[0]>().toEqualTypeOf<Front.AnyGating>()
+    expectTypeOf<Front.KeyDeriver['salt_bytes']>().toEqualTypeOf<typeof Front.PassphraseSaltBytes>()
     expectTypeOf<Parameters<Front.GuardedKeyDeriver['deriveKeyBytes']>[0]>().toEqualTypeOf<Front.PassphraseCleartext>()
     expectTypeOf<ReturnType<Front.Gating<'build_vault'>['checkStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
     expectTypeOf<Front.VaultError['refusalkind']>().toEqualTypeOf<Front.Refusalkind>()
     expectTypeOf<Front.VaultError['family']>().toEqualTypeOf<Front.RefusalFamily>()
+    expectTypeOf<Parameters<Front.Vault['getBox']>[1]>().toEqualTypeOf<Front.FetchOpts | undefined>()
+    expectTypeOf<Parameters<Front.Vault['putBox']>[0]>().toEqualTypeOf<Front.BoxPut>()
+    expectTypeOf<Parameters<Front.Box['put']>[0]>().toEqualTypeOf<Front.BoxPatch>()
+    expectTypeOf<Parameters<Front.Box['expose']>[0]>().toEqualTypeOf<Front.TimelyOpts | undefined>()
+    expectTypeOf<ReturnType<Front.Box['lockState']>>().toEqualTypeOf<Front.LockState>()
+    expectTypeOf<Front.BankSnapshot['stage']>().toEqualTypeOf<Front.BankStage>()
+    expectTypeOf<Front.GatingSnapshot['gatingkind']>().toEqualTypeOf<Front.Gatingkind>()
+    expectTypeOf<Front.Box['scope']>().toEqualTypeOf<Front.Boxscope>()
+    expectTypeOf<Front.Bank['scope']>().toEqualTypeOf<Front.BankScope>()
+    expectTypeOf<Front.VaultError['meta']>().toEqualTypeOf<Front.RefusalMeta | undefined>()
   })
 
   it("exports the patterns and limits an input checks a label or a user_id by", () => {
@@ -25,6 +36,10 @@ describe("safebyok", () => {
     expect(Front.Patterns.user_id.test('..')).to.be.false
     expect(Front.MaxLabelChars).to.eq(40)
     expect(Front.MaxUserIdChars).to.eq(100)
+  })
+
+  it("exports the salt length a key deriver's salt_bytes must be", () => {
+    expect(Front.PassphraseSaltBytes).to.eq(16)
   })
 
   it("exports the device store a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {

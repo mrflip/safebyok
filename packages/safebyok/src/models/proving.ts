@@ -1,6 +1,6 @@
 import { Checkers, consistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
-import { PassphraseKeyBytes, brandGuarded } from '../helpers/consts'
+import { PassphraseKeyBytes, type PassphraseSaltBytes, brandGuarded } from '../helpers/consts'
 import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
@@ -196,7 +196,7 @@ const mintPasskeyHeader = ({ device_id }: ProvingWorld, { credential_id, prf_sal
 /** A key deriver as a bank keeps it: the host's, held to its interface by {@link guardKeyDeriver}. */
 export type GuardedKeyDeriver = Readonly<{
   key_deriver_label: string
-  salt_bytes:        number
+  salt_bytes:        typeof PassphraseSaltBytes
   deriveKeyBytes:    (passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array) => Promise<unknown>
   load:              () => Promise<void>
 }>
