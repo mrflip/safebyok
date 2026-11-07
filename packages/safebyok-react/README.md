@@ -60,11 +60,8 @@ core's *Where it runs*.
 import { argon2idWebV1Deriver } from 'safebyok/browser'
 import { BankProvider } from 'safebyok-react'
 
-// Made once, outside any component.
-const keyDeriver = argon2idWebV1Deriver()
-
 <BankProvider applabel="acme" user_id={session?.user_id ?? null} device_id={deviceId}
-  vaultDB={vaultDB} deviceDB={deviceDB} keyDeriver={keyDeriver} strengthChecker={strengthChecker}>
+  vaultDB={vaultDB} deviceDB={deviceDB} keyDeriver={argon2idWebV1Deriver} strengthChecker={strengthChecker}>
   <App />
 </BankProvider>
 ```
