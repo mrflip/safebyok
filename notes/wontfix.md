@@ -111,3 +111,7 @@ not as a settled ruling, and check it against the current design before relying 
   last field unbinds lands after the `unexpose`, so the whisper stays exposed with no field to tie it to, until the host unexposes or the box is swept,
   vacated or deleted. Also: **a `box.saveFields()` crossing an edit:** it reads the fields when called, so what is typed during the put's awaits is not
   in that put, and stays in the element for the next.
+* 2026-11-07 (the Coach, on a proposal to chain each revision to its prior): **storage that rolls a record back.** Nothing detects it beyond one session,
+  and nothing chains a revision to its prior. The Coach: there is no certainty the device is right and the server wrong or vice versa; a device
+  that writes on top saw a working state, storage saw one, and a record that deciphers was sealed under a working key. Today a fetch below
+  the revision held is ignored as `older`; after a reload the older copy is taken as found.
