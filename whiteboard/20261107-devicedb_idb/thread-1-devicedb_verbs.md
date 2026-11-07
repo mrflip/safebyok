@@ -1,6 +1,6 @@
 # Thread 1: devicedb_verbs (2026-11-07)
 
-Branch `20261107-devicedb_verbs`, cut from main (495cc5d6e), PR #TBD. Justify: green. The core has
+Branch `20261107-devicedb_verbs`, cut from main (495cc5d6e), PR [#567](https://github.com/mrflip/safebyok/pull/567). Justify: green. The core has
 70 files and 2305 tests; lint shows 0 errors and 365 warnings, all of them pre-existing kinds.
 
 * **Built**:
