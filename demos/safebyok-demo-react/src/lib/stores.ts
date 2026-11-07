@@ -38,14 +38,14 @@ export const deviceDB = new MemoryDeviceDB()
 /** What makes a key from a passphrase: the browser's Argon2id. */
 export const keyDeriver = argon2idWebV1Deriver
 
-const DeviceIdKey = 'safebyok-demo:device_id'
+const DeviceIdCkey = 'safebyok-demo:device_id'
 
 /** This browser's id, made once and kept in localStorage. */
 const deviceIdOf = (): string => {
-  const kept = storage?.getItem(DeviceIdKey)
+  const kept = storage?.getItem(DeviceIdCkey)
   if (kept !== null && kept !== undefined) { return kept }
   const made = crypto.randomUUID()
-  storage?.setItem(DeviceIdKey, made)
+  storage?.setItem(DeviceIdCkey, made)
   return made
 }
 
