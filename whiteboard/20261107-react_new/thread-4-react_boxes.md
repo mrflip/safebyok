@@ -1,6 +1,6 @@
 # Thread 4: react_boxes (2026-11-07)
 
-Branch `20261107-react_boxes`, PR #TBD, stacked on #574. Justify: green (safebyok-react 124 tests, 12 files; core 2306).
+Branch `20261107-react_boxes`, PR #576, stacked on #574. Justify: green (safebyok-react 124 tests, 12 files; core 2306).
 
 * **Built**:
   * Box hooks in `packages/safebyok-react/src/hooks.ts`, section *Box hooks*: `useBoxes(vaultlabel)`
@@ -50,3 +50,7 @@ Branch `20261107-react_boxes`, PR #TBD, stacked on #574. Justify: green (safebyo
   * jsdom has no `Element.getHTML`, though `unicorn/prefer-dom-node-html-methods` asks for it over
     `innerHTML`. Tests use `childNodes` instead.
 * **For the Coach**: see the PR's *Open questions*.
+
+Open questions, also on the PR: who exposes for `BoxWhisperField` (the host's own button, for now);
+no `ref` on `BoxWhisperField`; a change of `path` unexposes a box's only field; a test pins the
+StrictMode regression. No suppressions.
