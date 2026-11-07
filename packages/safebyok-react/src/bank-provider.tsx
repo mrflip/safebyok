@@ -121,7 +121,7 @@ export const BankProvider = (props: BankProviderProps) => {
   useEffect(() => {
     if (user_id === null) { return }
     const making = latestProps.current
-    const { requestCleartext, onBadNews, onPanic, passphraseUsername: _username, passphraseAdvice: _advice, children: _children, user_id: _user_id, applabel: _applabel, ...passedOpts } = making
+    const { requestCleartext, onBadNews, onPanic, passphraseUsername: _username, passphraseAdvice: _advice, passkeyRpId: _rpId, children: _children, user_id: _user_id, applabel: _applabel, ...passedOpts } = making
     // Once swept, the bank tells and asks no one: the handler now may be the next user's.
     const kept = { held: true }
     // A handler dropped since the making falls back to the one the bank was made with, so a bank made
