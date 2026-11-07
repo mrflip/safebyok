@@ -116,14 +116,23 @@ describe("BankProvider's bank", () => {
 })
 
 describe("BankProvider's props", () => {
-  it("keeps its bank when a prop it was made with changes, and says so once through the bank's logger", async () => {
+  it("keeps its bank when a prop it was made with changes", async () => {
+    const { props, rerender } = provided()
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, keyDeriver: { ...props.keyDeriver } })
+    rerender({ ...props, autolockMinutes: 5 })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(TH.seenBanks).to.have.lengthOf(1)
+    expect(shown('bank')).to.eq('u1 ready')
+  })
+
+  it("says once, through the bank's logger, that a change to a prop it was made with is ignored", async () => {
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ logger: spy.logger })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     rerender({ ...props, keyDeriver: { ...props.keyDeriver } })
     rerender({ ...props, autolockMinutes: 5 })
     await act(async () => { await TH.wakeupAtNextTick() })
-    expect(TH.seenBanks).to.have.lengthOf(1)
     expect(spy.calls.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'BankProvider', props: ['keyDeriver'] }]])
     expect(spy.calls[0]?.message).to.match(/^BankProvider ignored a change to its keyDeriver/)
   })
