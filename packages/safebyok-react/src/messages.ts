@@ -59,8 +59,8 @@ export const Messages = {
   passkeyButton:     'Use a passkey',
   passkeyTrouble:    "Your passkey can't be used here just now. Unlock with your passphrase instead.",
   noPasskeyToAsk:    'This vault has no passkey to ask: unlock it with your passphrase, then add one.',
-  noWebAuthn:        'This browser offers no passkeys (WebAuthn): use your passphrase.',
-  noPrf:             "This passkey's authenticator does not offer the PRF extension a vault's passkey needs: use your passphrase, or try another device or security key.",
+  noWebAuthn:        "This browser can't use passkeys. Your passphrase still works.",
+  noPrf:             "That device or security key can't be used with this vault: it lacks a feature a vault's passkey needs. Try another, or use your passphrase.",
   passkeyAskFailed:  "Your browser couldn't ask for a passkey just now: try again, or use your passphrase.",
 
   // The whisper field

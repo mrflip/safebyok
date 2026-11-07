@@ -13,7 +13,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `bad_option`, `bad_record`, `insecure_context`, `unexpected_error`, `gate_issue`, `disabled`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
- *   `weak_passphrase`, `wrong_passkey`,
+ *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `storage_unavailable`,
  *   `vault_gone`, `vault_mismatch`, `gating_landed`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
@@ -36,6 +36,7 @@ export const refusalkindVals = [
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
+  'passkey_unavailable', // no passkey answer is to be had here: the browser offers no WebAuthn, the authenticator no PRF, or the browser failed to ask
   'absent_box',          // no box under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
@@ -79,6 +80,7 @@ export const RefusalFamilyForKind = {
   wrong_passphrase:    'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',
+  passkey_unavailable: 'condition',
   absent_box:          'condition',
   absent_vault:        'condition',
   absent_wayin:        'condition',
