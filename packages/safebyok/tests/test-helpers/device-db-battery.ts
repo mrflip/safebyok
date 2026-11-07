@@ -276,16 +276,29 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.peek(asked)).to.not.be.null
       })
 
-      it.skipIf(noRows)("deletes a row filed under labels today's checks refuse, and a row that lost its scope, each by its scopepath", async () => {
+      it.skipIf(noRows)("deletes a row filed under labels today's checks refuse, by the scopepath listRawLeases answers", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const badLabel = vaultScopeOf('Bad Label')
         await rowsOf(deviceDB).plantLeaseRow(badLabel, await leaseRowOf(badLabel))
-        await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('stripped'), { proved_at: T0, wrapped: 'opaque' })
         const listed = await deviceDB.listRawLeases()
-        const doomed = listed.filter(({ scopepath }) => scopepath[2] !== vaultScope.vaultlabel).map(({ scopepath }) => scopepath)
-        expect(doomed).to.have.deep.members([scopepathOf(badLabel), scopepathOf(vaultScopeOf('stripped'))])
-        for (const scopepath of doomed) { await deviceDB.delRawLease(scopepath) }
+        const doomed = listed.find(({ scopepath }) => scopepath[2] === badLabel.vaultlabel)
+        expect(doomed?.scopepath).to.deep.equal(scopepathOf(badLabel))
+        await deviceDB.delRawLease(doomed!.scopepath)
+        const left = await deviceDB.listRawLeases()
+        expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(vaultScope)])
+        expect(await deviceDB.listLeases()).to.have.lengthOf(1)
+      })
+
+      it.skipIf(noRows)("deletes a row that lost its scope, by the scopepath listRawLeases answers", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        const stripped = vaultScopeOf('stripped')
+        await rowsOf(deviceDB).plantLeaseRow(stripped, { proved_at: T0, wrapped: 'opaque' })
+        const listed = await deviceDB.listRawLeases()
+        const doomed = listed.find(({ scopepath }) => scopepath[2] === stripped.vaultlabel)
+        expect(doomed?.scopepath).to.deep.equal(scopepathOf(stripped))
+        await deviceDB.delRawLease(doomed!.scopepath)
         const left = await deviceDB.listRawLeases()
         expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(vaultScope)])
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
