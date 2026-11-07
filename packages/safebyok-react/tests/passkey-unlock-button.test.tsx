@@ -64,7 +64,7 @@ describe("PasskeyUnlockButton", () => {
     expect(answers).to.deep.equal([])
   })
 
-  it("stays focusable while the browser asks, so the dialog still hears Escape, and asks once however often it is pressed", async () => {
+  it("stays focusable while the browser asks", async () => {
     const { gating, authenticator } = await passkeyedUnlock()
     buttonFor(gating, { takesFocus: true })
     const button = screen.getByText(Messages.passkeyButton)

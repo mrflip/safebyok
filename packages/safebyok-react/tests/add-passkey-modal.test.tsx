@@ -53,7 +53,7 @@ describe("AddPasskeyModal", () => {
     expect(passkeyHeld(bank)).to.equal(authenticator.credentialIds()[1])
   })
 
-  it("asks for the passphrase before the browser makes a passkey it could not add, and adds one once it is typed", async () => {
+  it("asks for the passphrase before the browser makes a passkey", async () => {
     const { gating, answers, authenticator } = await shownFor()
     fireEvent.click(screen.getByText(Messages.addPasskeyButton))
     await screen.findByText(Messages.passphraseFirst)

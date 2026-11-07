@@ -205,7 +205,8 @@ describe("askPasskey's header and options", () => {
     })
   }
 
-  it("refuses a salt that is not base64url, which no vault the core read holds", async () => {
+  // No vault the core read holds such a salt: it came from the host.
+  it("refuses a salt that is not base64url", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const refused = await refusalOf(askPasskey(headerOf('AAAA', 'not base64url!')))
     expect(refused).to.include({ refusalkind: 'bad_option' })
