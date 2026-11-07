@@ -31,13 +31,9 @@ export const DeviceDBVersion = '001-001-001'
 /** The layout version in the name of the IndexedDB vault database, `${dbName}:vaults-v001-001-001`. */
 export const VaultsDBVersion = '001-001-001'
 
-// The default deriver's 16, the fewest any deriver of the package has made.
-/** The fewest bytes a passphraseSalt holds, and the fewest a key deriver asks for. */
-export const MinSaltBytes = 16
-
-// Twice the default deriver's 16, and as many as a passkey's prfSalt.
-/** The most bytes a passphraseSalt holds, and the most a key deriver's spec asks for. */
-export const MaxSaltBytes = 32
+// RFC 9106's recommendation for Argon2id. One length for every deriver, until a host asks for another.
+/** How many random bytes a passphraseSalt holds: the `salt_bytes` of every key deriver. */
+export const PassphraseSaltBytes = 16
 
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
 export const PassphraseKeyBytes = 32

@@ -201,9 +201,9 @@ export type GuardedKeyDeriver = Readonly<{
   load:              () => Promise<void>
 }>
 
-// Its interface is checked, never its choices (#the-host-is-not-our-threat-model): what its key bytes must be is
+// Its interface and its salt length are checked, never its other choices (#the-host-is-not-our-threat-model): what its key bytes must be is
 // checked where they land, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
-// a VaultError it throws passes as it came.
+// a VaultError `load` throws passes as it came.
 /** `hostDeriver` held to its interface: the one way a proving asks it for key bytes. */
 export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
   const { key_deriver_label, salt_bytes } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
@@ -218,13 +218,11 @@ export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
   return brandGuarded<GuardedKeyDeriver>({ key_deriver_label, salt_bytes, deriveKeyBytes: (passphrase, saltBytes) => deriveKeyBytes(hostDeriver, passphrase, saltBytes), load })
 }
 
-// The key deriver hears the passphrase here (guarantees.md, G1 and G8): what else it throws may quote it, so it is replaced, not kept as a cause.
-// A VaultError it throws passes as it came, as the deriver's own refusal of a salt that does not fit does: the deriver's to word.
+// The key deriver hears the passphrase here (guarantees.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
 const deriveKeyBytes = async (hostDeriver: KeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> => {
   try {
     return await hostDeriver.deriveKeyBytes(passphrase, saltBytes)
-  } catch (err) {
-    if (isVaultError(err)) { throw err }
+  } catch {
     throw keyDeriverThrew()
   }
 }
@@ -248,7 +246,7 @@ const isSafelyAllZero = (bytes: Uint8Array): boolean => {
   return seen === 0
 }
 
-// The record's check settles the salt's characters and length, but not whether they decode: a length no unpadded base64url has, or stray bits in the last character.
+// The record's check settles the salt's characters and length, but not whether they decode: stray bits in the last character.
 const saltBytesOf = (salt_b64: string): Uint8Array => {
   const saltBytes = fromB64OrNull(salt_b64)
   if (saltBytes === null) { throw undecodedSalt() }

@@ -2,12 +2,12 @@ import { describe, expect, it, type Mock, vi } from 'vitest'
 import { PasskeySaltBytes, isGuarded } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
-import { argon2idDeriver } from '../../src/deriver/argon2id-webv1'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
 import { salt_b64, vaultScope } from '../../src/shapes/shapes-core'
 import { type ProvingWorld, FirstGateEpoch, type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
+import { VaultError } from '../../src/refusals/errors'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
 import { _cheat_vaultKeyBytesOf, builtGateOf, DeviceId, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
@@ -263,14 +263,9 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 
-  // The record's check lets these through: a length no unpadded base64url has, and a last character with stray padding bits.
-  const UndecodedSaltCases = [
-    ['25 characters',                     "A".repeat(25)],
-    ['41 characters',                     "A".repeat(41)],
-    ['22 characters, stray padding bits', `${"A".repeat(21)}B`],
-  ] as const
-
-  it.each(UndecodedSaltCases)("refuses a stored salt that will not decode, %s", async (_what, salt) => {
+  // The record's check lets it through: 22 base64url characters, the last with stray padding bits.
+  it("refuses a stored salt that will not decode", async () => {
+    const salt = `${"A".repeat(21)}B`
     const { gate } = await gateWithBoth()
     const { passphrase_wayin } = gate.pickle()
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
@@ -350,8 +345,8 @@ describe("guardKeyDeriver(hostDeriver)", () => {
     expect(isGuarded({ ...guarded })).to.be.false
   })
 
-  it("takes any label and salt length a host chooses that fits the interface", async () => {
-    const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf', salt_bytes: 20 })
+  it("takes any label a host chooses that fits the interface", async () => {
+    const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf' })
     const proving = await novelPassphrase({ ...provingWorldOf(), keyDeriver: guarded })
     const wayin = await proving.buildWayin(NOVEL)
     expect(wayin.toJSON()).to.include({ key_deriver_label: 'my_own_kdf' })
@@ -360,7 +355,8 @@ describe("guardKeyDeriver(hostDeriver)", () => {
   const Misfits = [
     [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 16 },                                         'a deriver with no deriveKeyBytes'],
     [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 0, deriveKeyBytes: () => Promise.resolve() },  'a deriver asking for no salt'],
-    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 15, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt under 16 bytes'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 15, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt of 15 bytes'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 32, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt of 32 bytes'],
     [{ salt_bytes: 16, deriveKeyBytes: () => Promise.resolve() },                                  'a deriver with no label'],
     [() => undefined,                                                                              'a bare function'],
   ] as const
@@ -378,10 +374,14 @@ describe("guardKeyDeriver(hostDeriver)", () => {
     await guardKeyDeriver(TH.testDeriver).load()
   })
 
-  it("passes a refusal the deriver throws through as itself", async () => {
-    const deriver = argon2idDeriver({ algorithm: 'argon2id', key_deriver_label: 'cheap_argon2id_v0', memory_kib: 8, iterations: 1, parallelism: 1, salt_bytes: 16, output_bytes: 32 })
-    const err = await TH.expectRefusal(guardKeyDeriver(deriver).deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), new Uint8Array(15)), 'bad_option')
-    expect(err.message).to.match(/salt of 16 bytes/)
+  it("replaces a refusal the deriver throws with one that quotes nothing of it", async () => {
+    const hostRefusal = new VaultError('bad_option', `cannot derive ${TestPassphrase}`, { cause: new TypeError(TestPassphrase), meta: { fieldnames: [TestPassphrase] } })
+    const deriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(hostRefusal) }
+    const err = await TH.expectRefusal(guardKeyDeriver(deriver).deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), new Uint8Array(16)), 'unexpected_error')
+    expect(err).to.not.eq(hostRefusal)
+    expect(TH.thrownText(err)).to.not.include(TestPassphrase)
+    expect(err.cause).to.be.undefined
+    expect(err.meta).to.be.undefined
   })
 
   it("replaces anything else the deriver throws with a refusal that quotes nothing", async () => {

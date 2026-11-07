@@ -1,6 +1,6 @@
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'
-import { MaxSaltBytes, MinSaltBytes, PassphraseKeyBytes } from '../helpers/consts'
+import { PassphraseKeyBytes, PassphraseSaltBytes } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 
 // == [Bounds]: MaxMemoryKib, MinMemoryKibPerLane, Uint32Bound, ReservedLabelPrefix, TestLabelPrefix
@@ -23,7 +23,7 @@ export const { keyDeriverSpec } = Checkers('bad_option', ({ obj, str, int, lit }
     memory_kib:        int.gte(MinMemoryKibPerLane).lte(MaxMemoryKib),
     iterations:        int.gte(1).lt(Uint32Bound),
     parallelism:       int.gte(1),
-    salt_bytes:        int.gte(MinSaltBytes).lte(MaxSaltBytes),
+    salt_bytes:        lit(PassphraseSaltBytes),
     output_bytes:      lit(PassphraseKeyBytes),
   }, Phrases.KeyDeriverSpecShape).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { error: Phrases.memoryPerLane(MinMemoryKibPerLane), path: ['memory_kib'] }),
 }))
@@ -36,8 +36,8 @@ export const Argon2idWebV1 = Object.freeze({
   memory_kib:        65_536,
   iterations:        3,
   parallelism:       1,
-  salt_bytes:        16,
-  output_bytes:      32,
+  salt_bytes:        PassphraseSaltBytes,
+  output_bytes:      PassphraseKeyBytes,
 } as const) satisfies KeyDeriverSpec
 
 export const SuppliedSpecs: readonly KeyDeriverSpec[] = Object.freeze([Argon2idWebV1])

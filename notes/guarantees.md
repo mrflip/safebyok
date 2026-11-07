@@ -392,8 +392,9 @@ the crypto imports.
   wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver `argon2idDeriver`
   makes under a supplied label must carry exactly its parameters, and it makes none under another label with the
   reserved prefix `argon2id_web_`: `checkSuppliedSpecKept` (`deriver/basederiver.ts`), reached through
-  `parseKeyDeriverSpec` from `argon2idDeriver` alone. A host's own deriver is checked by its interface,
-  `keyDeriverShape` (`shapes/shapes-core.ts`), once, in `guardKeyDeriver` as `Bank`'s constructor wraps it, not by its parameters: a
+  `parseKeyDeriverSpec` from `argon2idDeriver` alone. A host's own deriver is checked by its interface and its `salt_bytes`,
+  which every deriver's spec and every stored salt hold to 16 (`PassphraseSaltBytes`, `helpers/consts.ts`),
+  `keyDeriverShape` (`shapes/shapes-core.ts`), once, in `guardKeyDeriver` as `Bank`'s constructor wraps it, not by its other parameters: a
   host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). `safebyok/browser`
   exports `argon2idDeriver` and `argon2idWebV1Deriver` (the front door, `safebyok`, exports neither), and
   `tests/browser.test.ts` runs both, `checkSuppliedSpecKept` through `parseKeyDeriverSpec`;
