@@ -289,6 +289,10 @@ open a fresh IndexedDB shelf, so the battery's twin is a second connection again
 * maxRecordBytes: "if the backend will accept it, send it along but in no ways enforce it. We set
   it to a very low value, much below Postgres' limit, and a customer may well want to raise that".
   The client accepts it and enforces no record size; no wire field raises a server's limit.
+  *Superseded (the Coach, chat, 2026-11-07):* "it's an option given at startup, right? I was
+  thinking graphql passed options along but it shouldn't, you configure the child adapter and pass
+  it to graphql." GraphQLVaultDB takes no maxRecordBytes (d4fe2c209 reverted, in review); the
+  host sets it on the vaultDB its server hosts.
 * Network-error cause: "pick out what's easy to pick out from the top errors you expect, but at
   least error name". A fresh cause: the error's name plus the easy fields (HTTP status, code).
 
