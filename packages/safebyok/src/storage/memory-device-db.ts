@@ -6,7 +6,9 @@ import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 
+/** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
+/** The ckey the lease row filed under `scopepath` is held at. */
 const leaseCkeyOf = (scopepath: LeaseScopepath): string => ckeyOf(...scopepath)
 
 /** A device store that keeps its rows in memory, for the page's life. */
