@@ -130,7 +130,8 @@ refused. The browser throws it again as that VaultError. The box cap is the `max
 vaultDB behind your resolvers, a best-effort limit: exact at moderate write rates, never a strict
 one. **Nothing else of a refusal crosses**, not its cause: a driver's message stays on your server.
 
-In the browser, a failed fetch is `storage_unavailable`. A GraphQL error, or an answer the core's
+In the browser, a failed fetch is `storage_unavailable`, its cause naming only the error, the HTTP
+status and a code such as `ECONNREFUSED`, never a message or a response's body. A GraphQL error, or an answer the core's
 checks refuse, is `unexpected_error`: a server out of step with this copy of safebyok.
 
 ## Developing this package
