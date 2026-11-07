@@ -11,10 +11,10 @@
 * **Sprint PR:** #572 (draft).
 * **Sprint doc:** https://claude.ai/artifact/UN5fpxiLeEaLHjpFgBiHg9 (doc
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
-  matters table mnx96vk4741.393, bookmark rev 34; Cleanup body 6cb5c40d-1cc7; Progress body
+  matters table mnx96vk4741.393, bookmark rev 53; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** filed 1 (#573), 2 (#574), 3 (#577), 4 (#576), 12 (#575). Thread 11 building from 3. Thread 5
-  waits on the Coach's `/restacker 573 574 576 577 575`.
+* **Status:** filed 1 (#573), 2 (#574), 3 (#577), 4 (#576), 12 (#575); 11 (#578) filing. Threads 5 and
+  13 wait on the Coach's `/restacker 573 574 576 577 575 578`.
 
 ## Read first
 
@@ -123,8 +123,8 @@ Later rulings in the same session, verbatim where they bind the threads:
 
 ## The threads
 
-Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **11** (from 3), and **5** once the
-Coach restacks 4, 3 and 12 into one line, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
+Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **11** (from 3), and **5** beside
+**13** once the Coach restacks 4, 3, 12 and 11 into one line, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
 **10** comes last.
 
 ### 1. core_for_react
@@ -285,7 +285,8 @@ thread 11.
   * `VaultLockControl`'s Unlock calls `vault.tryEnsureUnlocked()` on the vault in hand rather than
     `bank.tryEnsureVault`, so Unlock never creates a vault; only `CreateVaultButton` does.
 * *Touches:* `demos/safebyok-demo-react` (`src/lib/*`, `App.tsx`, new components, tests).
-* *Depends on:* 3, 4 and 12, restacked into one line first. *Size:* medium-large.
+* *Depends on:* the restacked line (#573 → #574 → #576 → #577 → #575 → #578), cut from its top.
+  *Size:* medium-large.
 * *Look-ahead:* threads 6 and 7 each add one sibling flow component beside `KnockKnockFields`;
   thread 8 adds the dev panels below the app. Give each a slot in `App.tsx`.
 
@@ -375,7 +376,7 @@ More detail:
 verbs (`listLeases`, or `listRawLeases` for damaged rows too), each row with `forget`. The demo
 shows it beside the other two.
 * *Levels:* worker `sonnet`; review `low`.
-* *Depends on:* 9, 7, 8 and 11, restacked into one line. *Size:* small-medium.
+* *Depends on:* 9, 7, 8 and 13, restacked into one line. *Size:* small-medium.
 
 ### 11. react_passkeys
 
@@ -398,6 +399,14 @@ shows it beside the other two.
 * *Depends on:* 3. *Orchestrator:* cut from thread 3's tip while the restack of 4, 3 and 12 waits on
   the Coach (`/restacker` refuses agents from the base checkout); its two thread-4 ride-alongs moved
   to thread 5. *Size:* medium.
+* *Review:* `high`, fixed. `askPasskey` zeroes an answer from a credential it didn't offer before
+  refusing; the changeset is `minor` (about 16 new exports); a test marked for its `@example`s; style.
+  PRF bytes were traced by hand: one copy, the browser's zeroed, no state, no quoting, every exit
+  zeroes. Left: the helpers don't check their arguments, focus after a dismissed prompt, and
+  `passkeyRpId` not forwarded (thread 13); Safari's second ask unverified, the missing core
+  `passkey_unavailable`, orphan passkeys and stale `guarantees.md` wording (rows for the Coach); doc
+  blocks, names and titles for a documentarian. One `eslint-disable-next-line jsx-a11y/no-autofocus`
+  in `passkey-unlock-button.tsx`, as the old code had. PR #578.
 
 ### 12. provider_handlers
 
@@ -424,10 +433,26 @@ shows it beside the other two.
   no handler. Left, minor: `misusedHandler`'s doc block; `null` hidden by its cast; small
   redundancies; an `it.each` table in `'`. PR #575.
 
+### 13. react_tidy
+
+> 3. ... and so on: the rest of the facilities needed to make our demo app
+
+*Gloss.* *Orchestrator:* from thread 11's review (#578), what needs no decision:
+* `createPasskey`'s `opts`, `askPasskey`'s header and `attemptOnce`'s answer are checked at the
+  entrypoint and refused `bad_option`, with checkers made the STYLE.md way (*Validation*) and
+  sloppy-input tests. Today a host's malformed `opts` reaches the user as a correctable "try again".
+* Focus after a dismissed passkey prompt: the button is disabled while the prompt is up, and nothing
+  returns focus to the dialog after, so Escape may stop reaching `ModalForm`. Refocus the button once
+  asking ends, or use `aria-disabled`.
+* `BankProvider` forwards `passkeyRpId` to `GatingModal`.
+* VOCABULARY.md line 22 no longer says `createPasskey` and `askPasskey` run on the old design.
+* *Touches:* `passkey.ts`, `passkey-unlock-button.tsx`, `bank-provider.tsx`, their tests, VOCABULARY.md.
+* *Depends on:* 11 and 12, on the restacked line. Cut beside 5 from its top. *Size:* small.
+
 ## For the Coach
 
-* **Run `/restacker 573 574 576 577 575`** (line `main → #573 → #574 → #576 → #577 → #575`). Thread 5
-  waits on it; the skill refuses agents from the base checkout.
+* **Run `/restacker 573 574 576 577 575 578`** (line `main → #573 → #574 → #576 → #577 → #575 →
+  #578`). Threads 5 and 13 wait on it; the skill refuses agents from the base checkout.
 
 * Threads 9 and 10 wait on the `devicedb_idb` line (`main → #567 → #568 → #569 → #570`) merging,
   which waits on your restack. The other threads don't.
