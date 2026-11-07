@@ -629,7 +629,7 @@ the scope.
   record it is sent that it will use. A server's word that a record is damaged it may take: the
   worst a lying server does with that is offer to delete what it could delete anyway. It still
   parses the word itself (a damaged box's label, its kind of damage, its token).
-* **A wire sharpens an interface.** A store's client implements the same `VaultDBVerbs` as the
+* **A wire sharpens an interface.** A store's client implements the same `VaultDB` as the
   store, and each GraphQL operation answers what its verb's `try*` form answers, so a browser's
   adapter checks the server's answer with the core's answer checks and hands it on. Where the two
   would differ, change the VaultDB.

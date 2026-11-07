@@ -7,7 +7,7 @@ import type { Awaitable } from '../../src/helpers/helpers'
 import type { BankScope, VaultScope } from '../../src/shapes/shapes-core'
 import * as CX from '../../src/shapes/shapes-core'
 import type { LeaseRow } from '../../src/shapes/shapes-storage'
-import type { DeviceDB } from '../../src/storage/device-db-new'
+import type { DeviceDB } from '../../src/storage/device-db'
 import { expectBad, expectGood, expectRefusal } from './refusals'
 import { bankScope, vaultScope, vaultScopeOf } from './storage-world'
 

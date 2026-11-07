@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, VaultsDBVersion, hasModelkind, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
+import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, VaultsDBVersion, hasModelkind, isAdapterVaultDB, isDeviceDB, isVaultDB } from '../../src/helpers/consts'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import { VaultDBVerbnames } from '../../src/storage/vault-db'
 import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
 
 describe("DeviceDBVersion and VaultsDBVersion", () => {
@@ -73,5 +74,24 @@ describe("isVaultDB and isDeviceDB", () => {
     expect(isDeviceDB(vaultDB)).to.be.false
     expect(isVaultDB(null)).to.be.false
     expect(isDeviceDB(undefined)).to.be.false
+  })
+})
+
+describe("isAdapterVaultDB", () => {
+  it("tells an adapter's store from a client of one, which wears only the VaultDB's brand", () => {
+    const vaultDB = new MemoryVaultDB()
+    const client = { [Symbol.for('@safebyok/vaultdb')]: true }
+    expect([isVaultDB(vaultDB), isAdapterVaultDB(vaultDB)]).to.eql([true, true])
+    expect([isVaultDB(client), isAdapterVaultDB(client)]).to.eql([true, false])
+    expect(isAdapterVaultDB({ [Symbol.for('@safebyok/adaptervaultdb')]: true })).to.be.true
+  })
+
+  it("refuses a plain object answering every verb, and a copy of a store's own fields", () => {
+    const vaultDB = new MemoryVaultDB()
+    const verbs = Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
+    expect([isVaultDB(verbs), isAdapterVaultDB(verbs)]).to.eql([false, false])
+    expect(isAdapterVaultDB(Object.assign({}, vaultDB))).to.be.false
+    expect(isAdapterVaultDB(new MemoryDeviceDB())).to.be.false
+    expect(isAdapterVaultDB(null)).to.be.false
   })
 })

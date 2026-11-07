@@ -95,6 +95,13 @@ export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
 export const isVaultDB = (val: unknown): val is { [IsVaultDB]: true } => answersTrueTo(val, IsVaultDB)
 
 // `Symbol.for`, for the same reason as IsVaultDB.
+/** The tag an AdapterVaultDB answers true to, and no client of one, as a GraphQLVaultDB is. */
+export const IsAdapterVaultDB: unique symbol = Symbol.for('@safebyok/adaptervaultdb')
+
+/** True for an AdapterVaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsAdapterVaultDB}. */
+export const isAdapterVaultDB = (val: unknown): val is { [IsAdapterVaultDB]: true } => answersTrueTo(val, IsAdapterVaultDB)
+
+// `Symbol.for`, for the same reason as IsVaultDB.
 /** The tag a DeviceDB answers true to, so a model can tell one from a duck. */
 export const IsDeviceDB: unique symbol = Symbol.for('@safebyok/devicedb')
 

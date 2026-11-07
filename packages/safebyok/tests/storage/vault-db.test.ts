@@ -1,11 +1,11 @@
-/** The VaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and the duck a model takes for one. */
+/** The AdapterVaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and the duck a model takes for one. */
 
 import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
 import { brandedVaultDB } from '../../src/shapes/shapes-vaultish'
-import { VaultDBVerbnames } from '../../src/storage/vault-db-new'
+import { VaultDBVerbnames } from '../../src/storage/vault-db'
 import { bankScope, boxscope, vaultAt, vaultScope } from '../test-helpers/storage-world'
 
 /** Each verb of `vaultDB`, bound, as a client of it would answer them. */
@@ -16,7 +16,7 @@ const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
   return null
 }
 
-describe("VaultDB", () => {
+describe("AdapterVaultDB", () => {
   describe("a scope failing its check", () => {
     it("listBoxes refuses a query without its vault_tok, or under a vaultlabel failing its check", async () => {
       const vaultDB = new MemoryVaultDB()

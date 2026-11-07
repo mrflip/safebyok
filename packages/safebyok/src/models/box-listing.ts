@@ -9,7 +9,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import { type BoxCreateOpts, type BoxDna, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, type ListingOpts, boxDna } from '../shapes/shapes-vaultish'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
-import type { Notice } from '../storage/vault-db-new'
+import type { Notice } from '../storage/vault-db'
 import { Box } from './box'
 import { Listing } from './listing'
 
