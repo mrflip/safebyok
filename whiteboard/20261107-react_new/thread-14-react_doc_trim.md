@@ -1,6 +1,6 @@
 # Thread 14: react_doc_trim (2026-11-07)
 
-Branch `20261107-react_doc_trim`, cut from main (a80589274). Justify: green.
+Branch `20261107-react_doc_trim`, PR #581, cut from main (a80589274). Justify: green.
 
 * **Built**: every doc block in `packages/safebyok-react/src` is one line of purpose (the multi-line
   ones folded to their first sentence; `@example` blocks kept; single-line ones with a `;` or `:`
