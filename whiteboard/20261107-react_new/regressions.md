@@ -27,3 +27,13 @@ Every package is marked `sideEffects: false`, so an `import 'pkg/entry'` used on
 tree-shaken. The Dev*Inspector panels are gated by being exported only from `safebyok-react/devmode`,
 which a host must import by name, so nothing relies on a bare import. Any future "import this to
 turn it on" needs a real export, or a `sideEffects` exception for that file.
+
+## No start-over for a forgotten passphrase
+
+The old dialog took `allowStartOver`, meant to let a user who forgot the passphrase begin a new
+vault. The new gating has no start-over, so thread 2 dropped the prop, and threads 3 and 11 did not
+bring it back. *Orchestrator:* the Coach took the Rec (2026-11-07): decide later whether it returns,
+likely as delete-and-rebuild behind a warning.
+
+A host sees: a user who forgot the passphrase, with no passkey, deletes the vault (Delete account)
+and starts again.

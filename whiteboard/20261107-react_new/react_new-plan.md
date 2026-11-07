@@ -13,9 +13,9 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** **paused** 2026-11-07 for the Coach's `/restacker 573 574 576 577 575 578`
-  (`human/20261107-sprint_react_new_paused.md`). Filed: 1 (#573), 2 (#574), 3 (#577), 4 (#576),
-  12 (#575), 11 (#578), 9 (#579). Waiting: 5 and 13 on the restack; then 6, 7, 8; 10 last.
+* **Status:** resumed 2026-11-07: the Coach merged #573 to #578; #579 is filed, open, on top of
+  them. Filed: 1, 2, 3, 4, 9, 11, 12. Running: 5 (on #579), 13 and 14 (on main). Waiting: 6, 7 and 8
+  on 5. Thread 10 folded into 5 and 8.
 
 ## Read first
 
@@ -63,16 +63,19 @@ Every worker has CLAUDE.md. Beyond it, by thread:
   `listRawLeases`. `IdbDeviceDB` / `idbDeviceDB` are in `safebyok/browser`. Threads cut before the
   merge reach it at the Coach's restack. Core files are no longer off limits beyond the sprint's own
   rule: the smallest additive change a thread needs.
-* **The demo's storage until thread 10:**
-  * `idbVaultDB` from `safebyok-indexeddb`, which is on the new core on main;
-  * `MemoryDeviceDB`, so every reload asks for the passphrase;
-  * a demo-local strength checker in `src/lib/`, marked DEMO JANK, of at least 12 characters;
-  * a `device_id` the demo mints once and keeps in `localStorage`.
+* **The demo's storage** (*Orchestrator:* the Coach, 2026-11-07, "speedrun the browser
+  resurrection": thread 10's move to `browserOpts` folds into thread 5):
+  * `...browserOpts({ dbName: Applabel })` from `safebyok/browser` (#579): `idbDeviceDB`, so a lease
+    survives a reload; zxcvbn; the Argon2id deriver;
+  * `idbVaultDB` from `safebyok-indexeddb`;
+  * a `device_id` the demo mints once and keeps in `localStorage` (the Coach is weighing
+    `mash(applabel^user_id)` instead: an Open Matters row; keep it one small function).
 
-  Thread 10 replaces all of these with `browserOpts`. The fake auth's stores stay demo-local.
-* **The safebyok-react README** is 555 lines about the old API. Each thread rewrites the sections
-  for what it changes and deletes sections that describe what is gone. It never keeps a stale
-  section.
+  No DEMO JANK checker, no `MemoryDeviceDB`. The fake auth's stores stay demo-local.
+* **The safebyok-react README** (*Orchestrator:* the Coach, 2026-11-07: "we'll rewrite from
+  scratch later"): thread 14 cuts it to a sentence or so. Other threads add no README sections.
+* **Doc blocks** (*Orchestrator:* the Coach, 2026-11-07): one simple line of purpose each; a
+  documentarian runs later, and does best starting from something small.
 * **Changesets**: every thread that changes a published package writes one (PROCESS.md,
   *Changesets*). safebyok-react's surface changes wholesale; pre-1.0, nothing keeps a shim.
 
@@ -124,9 +127,9 @@ Later rulings in the same session, verbatim where they bind the threads:
 
 ## The threads
 
-Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **11** (from 3), and **5** beside
-**13** once the Coach restacks 4, 3, 12 and 11 into one line, then **6 → 7 beside 8**. **9** waits on the `devicedb_idb` line merging;
-**10** comes last.
+Waves: **1**, then **2**, then **3, 4 and 12 side by side**. Then **11** (from 3), and **9**.
+*Orchestrator:* after the Coach merged #573 to #578: **5** (from #579's tip) beside **13** and
+**14** (from main), then **6 → 7 beside 8**, all on 5. **10** is folded into 5 and 8.
 
 ### 1. core_for_react
 
@@ -260,7 +263,7 @@ thread 11.
 > Implement the knock-knock app, doing them in reverse order: 3, 2, 1
 
 *Gloss.* The demo stands up on the new core, and flow 3 comes first:
-* The ground rules' storage, and a demo-local `localStorage` store for the fake auth in place of
+* The ground rules' storage (`browserOpts`, thread 10's work folded in), and a demo-local `localStorage` store for the fake auth in place of
   `safebyok-old`'s `domStore`.
 * The outage switch becomes a subclass of `IdbVaultDB`.
 * An account menu with `VaultLockControl`, kept in a form that could ship.
@@ -286,8 +289,11 @@ thread 11.
   * `VaultLockControl`'s Unlock calls `vault.tryEnsureUnlocked()` on the vault in hand rather than
     `bank.tryEnsureVault`, so Unlock never creates a vault; only `CreateVaultButton` does.
 * *Touches:* `demos/safebyok-demo-react` (`src/lib/*`, `App.tsx`, new components, tests).
-* *Depends on:* the restacked line (#573 → #574 → #576 → #577 → #575 → #578), cut from its top.
-  *Size:* medium-large.
+* *Depends on:* *Orchestrator:* #579 (thread 9), cut from its tip, which stands on the merged
+  #573 to #578. Stacked on #579. *Size:* medium-large (`browserOpts` makes the storage smaller, not
+  larger: no stand-in checker, no memory device store).
+* *Not yet on its base:* #580 and #571 merged to main after #579 was stacked; the restack at the
+  end brings them in.
 * *Look-ahead:* threads 6 and 7 each add one sibling flow component beside `KnockKnockFields`;
   thread 8 adds the dev panels below the app. Give each a slot in `App.tsx`.
 
@@ -332,11 +338,13 @@ of it (a `useExposedWhisper`-style hook), propose it in open matters rather than
   `useBox`, so exposing "bob" here exposes "bob" everywhere on the page.
 
 The demo shows both below the app, behind its outage switch, and drops its old `inspection/`
-folder. `DevDeviceDBInspector` waits for thread 10, after the DeviceDB verbs are renamed.
-* *Touches:* `packages/safebyok-react` (new `src/devmode/`, `package.json`, `tsdown.config.ts`,
-  README, a size line of its own), demo `App.tsx`.
+folder.
+* **`DevDeviceDBInspector`** (*Orchestrator:* folded in from thread 10): the lease rows through the
+  DeviceDB verbs (`listLeases`, or `listRawLeases` for damaged rows too), each row with `forget`.
+  The demo shows it beside the other two.
+* *Touches:* `packages/safebyok-react` (new `src/devmode/`, `package.json`, `tsdown.config.ts`, a
+  size line of its own; no README sections), demo `App.tsx`.
 * *Depends on:* 5. Runs beside 6 and 7. *Size:* medium.
-* *Look-ahead:* thread 10 adds `DevDeviceDBInspector` to the same entry.
 
 ### 9. browser_batteries
 
@@ -371,6 +379,10 @@ More detail:
   blocks and titles. PR #579.
 
 ### 10. demo_browser
+
+*Orchestrator:* **folded** (the Coach, 2026-11-07, "speedrun the browser resurrection"): the demo's
+move to `browserOpts` is thread 5's, `DevDeviceDBInspector` thread 8's. The original text stays
+for the record.
 
 > yes to a lease browser as a dev mode panel.
 
@@ -453,13 +465,39 @@ shows it beside the other two.
   asking ends, or use `aria-disabled`.
 * `BankProvider` forwards `passkeyRpId` to `GatingModal`.
 * VOCABULARY.md line 22 no longer says `createPasskey` and `askPasskey` run on the old design.
-* *Touches:* `passkey.ts`, `passkey-unlock-button.tsx`, `bank-provider.tsx`, their tests, VOCABULARY.md.
-* *Depends on:* 11 and 12, on the restacked line. Cut beside 5 from its top. *Size:* small.
+* *Orchestrator:* ride-alongs from the Coach's rulings (2026-11-07):
+  * `.changeset/20261107-provider_handlers.md` names `onBadNews: null` as refused `bad_option`
+    (where the old provider let it through), and that `requestCleartext: null` still asks no one.
+  * A TODO.md entry: a void vault in place of the create dialog (an unborn vault starts as a
+    tombstone, as boxes do, so `bank.ensureVault` never opens a dialog by itself), a thread of its
+    own after this sprint.
+* *Touches:* `passkey.ts`, `passkey-unlock-button.tsx`, `bank-provider.tsx`, their tests, VOCABULARY.md,
+  the changeset, TODO.md.
+* *Depends on:* *Orchestrator:* nothing unmerged: 11 and 12 are on main. Cut from `origin/main`.
+  *Size:* small.
+
+### 14. react_doc_trim
+
+> would you have an agent write a simple single line on each now and I'll have a documentarian run
+> later -- i get best results when it starts from something small
+
+> [the safebyok-react README:] we'll rewrite from scratch later. Strip it down to a sentence or so
+> if that won't cause a failing test
+
+*Gloss.* *Orchestrator:* from two Open Matters rulings (2026-11-07).
+* Every doc block in `packages/safebyok-react/src` becomes one simple line of purpose, said for its
+  caller (CLAUDE.md, *Doc blocks at a glance*). Nothing past the first line; `@example` blocks and
+  `@internal`-style tags that a lint or the build needs stay. Behaviour, names and tests unchanged.
+* `packages/safebyok-react/README.md` becomes a sentence or so: what the package is, and that the
+  full guide is coming. If a test or script reads the README (a link check, a size or example
+  check), keep what it needs and say so.
+* A changeset (`safebyok-react`: patch): the README is cut for a rewrite.
+* *Levels:* worker `sonnet`; review `low`.
+* *Touches:* every file in `packages/safebyok-react/src` (doc blocks only), the README.
+* *Depends on:* nothing unmerged. Cut from `origin/main`, beside 5 and 13; its doc-block lines may
+  meet theirs at the end's restack, which is the restacker's to settle. *Size:* small.
 
 ## For the Coach
-
-* **Run `/restacker 573 574 576 577 575 578`** (line `main → #573 → #574 → #576 → #577 → #575 →
-  #578`). Threads 5 and 13 wait on it; the skill refuses agents from the base checkout.
 
 * The base checkout's `whiteboard/20261107-react_new/` holds my pre-sprint drafts (`plan.md`,
   `regressions.md`). This directory's copies (`design.md`, `regressions.md`) are current. I haven't

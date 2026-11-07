@@ -5,7 +5,9 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
 
 ## Where things stand
 
-*Orchestrator:* paused for the Coach's `/restacker 573 574 576 577 575 578`; filed 1, 2, 3, 4, 9, 11, 12.
+*Orchestrator:* the Coach merged #573 to #578 (2026-11-07); #579 (thread 9) is filed and open,
+stacked on them, so threads 1 to 4, 11 and 12 are on main. Running: 5 (from #579), 13 and 14 (from
+main). Thread 10 is folded into 5 (the demo on `browserOpts`) and 8 (`DevDeviceDBInspector`).
 
 ## Facts every thread may need
 
@@ -109,3 +111,18 @@ they disagree. Workers look things up here; the handoffs quote what each thread 
   restack. The DeviceDB verbs there are `stow`, `peek`, `forget`, `listLeases` and `listRawLeases`.
   `idbDeviceDB` is in `safebyok/browser` (#569), and `browserOpts` arrives with #579, which is not in
   the line for 5 and 13 (it joins at thread 10).
+
+## Rulings of 2026-11-07 (Open Matters)
+
+* *Orchestrator:* the demo runs on `browserOpts` now ("speedrun the browser resurrection"): no DEMO
+  JANK checker, no `MemoryDeviceDB`.
+* *Orchestrator:* the safebyok-react README is cut to a sentence or so (thread 14); no thread adds
+  README sections. Every doc block is one simple line; a documentarian runs later.
+* *Orchestrator:* kept as built: a deleted vault reads `unborn`; a refused `vault.hello()` from
+  `useVault` goes to `onBadNews`; the gesture check leans open; a let-go bank's panic goes to the
+  platform; `onBadNews: null` is refused (the changeset is to say so, thread 13); a quiet `declined`;
+  `useBoxes` has no "not listed yet" (unless a flow needs it: say so as an open matter).
+* *Orchestrator:* still open with the Coach: what `device_id` should be (they asked about
+  `mash(applabel^user_id)`; it must be a UUID, and it is only a label in wayin headers), and whether
+  `BankProvider` should read its options once per `user_id` instead of remaking the bank on a
+  change. Neither blocks thread 5; keep the demo's `device_id` minting in one small function.
