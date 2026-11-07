@@ -172,6 +172,19 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(spy.calls).to.have.lengthOf(1) })
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['keyDeriver', 'deviceDB'] })
   })
+
+  it("says nothing of a prop the host makes anew for each user", async () => {
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    rerender({ ...props, user_id: 'u2', deviceDB: new MemoryDeviceDB() })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    rerender({ ...props, user_id: null })
+    await waitFor(() => { expect(shown('bank')).to.eq('none') })
+    rerender({ ...props, user_id: 'u2', deviceDB: new MemoryDeviceDB() })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    expect(spy.calls).to.deep.equal([])
+  })
 })
 
 describe("BankProvider's autolock", () => {
