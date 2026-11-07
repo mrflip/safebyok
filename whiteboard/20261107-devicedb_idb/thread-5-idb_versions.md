@@ -1,6 +1,6 @@
 # Thread 5: idb_versions (2026-11-07)
 
-Branch `20261107-idb_versions`, PR #570, stacked on #569 (thread 2's `20261107-idb_devicedb`). Justify green: core 2,359 tests, indexeddb 110, fastkey 47, postgres 123, convex 227, graphql 210, e2e 200; sizes in budget.
+Branch `20261107-idb_versions`, PR #570, stacked on #569 (thread 2's `20261107-idb_devicedb`). Justify green: core 2,385 tests, indexeddb 110, fastkey 48, postgres 123, convex 227, graphql 210, e2e 200; sizes in budget.
 
 * **Built**
   * `packages/safebyok/src/helpers/consts.ts`: `DeviceDBVersion` and `VaultsDBVersion` (both `'001-001-001'`), and `Patterns.b64url`.
