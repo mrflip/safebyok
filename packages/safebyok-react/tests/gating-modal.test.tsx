@@ -8,11 +8,6 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-const deleting = async (bank: Bank) => {
-  const vault = await bank.ensureVault(TH.VaultScopeGiven)
-  return vault.tryDelVaultPrompt()
-}
-
 /** The gating `raise` opens, shown in a GatingModal whose answers the test reads. */
 const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, built: boolean) => {
   const world = TH.makeBankWorld()
@@ -25,8 +20,10 @@ const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, b
 
 describe("GatingModal", () => {
   const DialogCases = [
-    [TH.building,  false, Messages.chooseTitle, 'shows the passphrase dialog, choosing, for a build_vault gating'],
-    [TH.unlocking, true,  Messages.unlockTitle, 'shows the passphrase dialog, unlocking, for an unlock_vault gating'],
+    [TH.building,  false, Messages.chooseTitle,   'shows the passphrase dialog, choosing, for a build_vault gating'],
+    [TH.unlocking, true,  Messages.unlockTitle,   'shows the passphrase dialog, unlocking, for an unlock_vault gating'],
+    [TH.replacing, true,  Messages.changeTitle,   'shows the dialog that replaces the passphrase for a replace_passphrase gating'],
+    [TH.deleting,  true,  Messages.delVaultTitle, 'shows the dialog that deletes the vault for a del_vault gating'],
   ] as const
 
   for (const [raise, built, title, blurb] of DialogCases) {
@@ -37,7 +34,7 @@ describe("GatingModal", () => {
   }
 
   it("answers declined at once for a gatingkind with no dialog, and the gating is declined", async () => {
-    const { raising, answers } = await shownFor(deleting, true)
+    const { raising, answers } = await shownFor(TH.addingPasskey, true)
     await waitFor(() => { expect(answers).to.deep.equal(['declined']) })
     expect(screen.queryByRole('dialog')).to.be.null
     expect(await raising).to.include({ ok: false })
@@ -46,7 +43,7 @@ describe("GatingModal", () => {
   it("answers once for a gatingkind with no dialog, though its onDone is new at each render", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const held = await TH.heldGatingOf(world, deleting)
+    const held = await TH.heldGatingOf(world, TH.addingPasskey)
     const answers: DialogAnswer[] = []
     const ui = () => <GatingModal gating={held.gating} onDone={(answer) => { answers.push(answer) }} />
     const { rerender } = render(ui())

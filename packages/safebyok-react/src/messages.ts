@@ -33,7 +33,6 @@ export const Messages = {
   // The dialogs for a change to the ways in, and for a deletion
   changeTitle:        'Change your vault passphrase',
   changeBlurb:        'Enter the passphrase you use now, then choose a new one. The new one takes its place on every device. A forgotten passphrase cannot be recovered.',
-  changeDropsPasskey: 'Your passkey goes with the old passphrase: add it again once the new one is set.',
   currentField:       'current passphrase',
   newField:           'new passphrase',
   confirmNewField:    'confirm new passphrase',
@@ -41,9 +40,6 @@ export const Messages = {
   putPasskeyTitle:    'Add a passkey',
   putPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',
   putPasskeyButton:   'Add passkey',
-  replacePasskeyTitle:  'Replace your passkey',
-  replacePasskeyBlurb:  'Enter your vault passphrase. Then your browser asks you to make a new passkey, which takes the place of the one this vault has now.',
-  replacePasskeyButton: 'Replace passkey',
   delPasskeyTitle:    'Remove your passkey',
   delPasskeyBlurb:    'Enter your vault passphrase to remove the passkey. You will unlock with the passphrase alone, on every device.',
   delPasskeyButton:   'Remove passkey',
