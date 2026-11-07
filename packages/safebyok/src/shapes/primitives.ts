@@ -10,17 +10,18 @@ import * as Phrases from '../helpers/phrases'
 
 // == [Patterns and labels]: Patterns, MaxLabelChars, label, MaxUserIdChars, user_id
 
+// A browser compiles an input's `pattern` with the v flag, which refuses a `-` or `|` in a character class unescaped.
 /** The patterns text is matched against: a `source` suits an HTML input's `pattern` attribute, and none has a repeated group, so each refuses text of millions of characters without throwing.
  *
  * @example <input pattern={Patterns.label.source} maxLength={MaxLabelChars} />
  */
 export const Patterns = Object.freeze({
   /** Base64url text without padding: the letters, the digits, `-` and `_`. */
-  b64url:  /^[A-Za-z0-9_-]+$/,
+  b64url:  /^[A-Za-z0-9_\-]+$/, // eslint-disable-line no-useless-escape
   /** A label: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two characters at least. */
   label:   /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/,
   /** A user_id: ASCII letters and digits and `-_.~:@+|%`, never dots alone. */
-  user_id: /^(?!\.+$)[A-Za-z0-9_.~:@+|%-]+$/,
+  user_id: /^(?!\.+$)[A-Za-z0-9_.~:@+\|%\-]+$/, // eslint-disable-line no-useless-escape
 })
 
 /** The most characters a label holds. */

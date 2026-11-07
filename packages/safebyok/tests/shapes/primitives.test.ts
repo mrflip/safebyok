@@ -216,6 +216,18 @@ describe("epochMillis", () => {
   })
 })
 
+describe("Patterns as an input's pattern", () => {
+  // A browser compiles an input's `pattern` with the v flag, which refuses an unescaped `-` or `|` in a character class.
+  it("compiles each source with the v flag, matching as the pattern does", () => {
+    const cases = { b64url: ['Zm9v-_9A', 'Zm+v', ''], label: ['my_vault', 'my__vault', 'Anthropic'], user_id: ['auth0|5f7c8ec7', 'a-b%2F', '..', 'a/b'] }
+    for (const [patternname, pattern] of Object.entries(Patterns)) {
+      const asInput = new RegExp(pattern.source, 'v')
+      const texts = cases[patternname as keyof typeof cases]
+      for (const text of texts) { expect(asInput.test(text), `${patternname}: ${text}`).to.eq(pattern.test(text)) }
+    }
+  })
+})
+
 describe("Patterns.b64url", () => {
   it("matches unpadded base64url text, and nothing with padding, a standard-base64 character or a space", () => {
     expect(Patterns.b64url.test('Zm9v-_9A')).to.be.true
