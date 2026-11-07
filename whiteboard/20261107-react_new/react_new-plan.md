@@ -540,15 +540,23 @@ shows it beside the other two.
 
 > yay simpler: one per applabel + user_id (you only mentioned user_id, it should be both
 
+*Orchestrator:* the Coach's React remarks are offered as a newcomer's opinion (2026-11-07): the calls
+below are mine as the React developer, on their merits.
+
 *Gloss.* *Orchestrator:* from two Open Matters rulings (2026-11-07), both in `bank-provider.tsx`:
 * `BankProvider` makes its bank once per `applabel` + `user_id`. Every other prop is read when the
   bank is made; a later change is ignored and warned of once through the bank's logger. The remake
   bookkeeping goes: the prop-to-ref effects, the remember-the-last-props block, the long dependency
-  list, the has-handler tracking. *My call (a row):* handlers are read once too, no latest-handler
-  refs; a host wanting a fresh bank keys `<BankProvider>`.
+  list, the has-handler tracking. A host wanting a fresh bank keys `<BankProvider>`.
+* `onBadNews`, `onPanic` and `requestCleartext` are called through one ref holding the latest props
+  (my call as the React developer, a row): reading them once would hand hosts the stale-closure bug
+  with inline handlers. The bank's having a handler or not is fixed when it is made.
 * Right before `Bank.make`, the provider calls `deviceDB.ensureBank({ applabel, user_id })` (thread
-  15) and makes the bank with that `device_id`. *My reading (a row):* the provider runs it, and the
-  `device_id` prop goes.
+  15) and makes the bank with that `device_id`; the `device_id` prop goes (my call as the React
+  developer, a row: the call is async, the provider already owns making the bank per scope and its
+  `waiting` stage covers the wait, and a host-side helper would make every host write an effect, a
+  loading state and StrictMode care). `ensureBank` refuses `bad_scope` or `storage_unavailable`:
+  report it as the provider reports a failed make.
 * The demo stops minting a `device_id` in `localStorage`.
 * README: none (thread 14 cut it). Tests: what the provider does now; the remake tests go.
 * *Depends on:* 15, and 5 (the demo it edits): cut once both are on main, or restacked into a line.
