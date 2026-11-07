@@ -1,7 +1,6 @@
 /** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over real in-memory stores,
  * and every step asserts what its components render. */
 
-import { Whispered, brandOf } from '../../src/helpers/consts'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
@@ -9,7 +8,6 @@ import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
 import type { Whisper } from '../../src/shapes/shapes-core'
-import { Storable } from '../../src/models/storable'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { ticks } from '../test-helpers/timing'
@@ -23,7 +21,7 @@ const onBadNews = (news: VaultError): void => { badNews.push(news) }
 const expectNoBadNews = (): void => { expect(badNews.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal([]) }
 afterEach(expectNoBadNews)
 
-// == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, whisperStoreOf, whisperReveal, makeDialog
+// == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, whisperStoreOf, whisperRevealOf, makeDialog
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
@@ -66,7 +64,8 @@ const boxRow = ({ boxlabel, present, sidecar }: BoxSnapshot): string => `${boxla
 /** The store of the component that shows the whisper itself: `box.whisper` is its snapshot, as the box's snapshot never holds it. */
 const whisperStoreOf = (box: Box): Store<Whisper> => ({ subscribe: box.subscribe, getSnapshot: () => box.whisper })
 
-const whisperReveal = (whisper: Whisper): string => (Storable.isFUBag(whisper) ? String(brandOf(whisper, Whispered)) : JSON.stringify(whisper))
+/** The view of `box`'s whisper: the whisper while it shows, else where it stands. */
+const whisperRevealOf = (box: Box) => (whisper: Whisper): string => (box.isShowing ? JSON.stringify(whisper) : box.exposure)
 
 /** The host's dialog: it records what it was shown for, and attempts what the user types; typing nothing closes it. */
 const makeDialog = () => {
@@ -132,8 +131,8 @@ describe("the proof", () => {
     const boxUi = mountComponent(box, boxRow, { hearsVault: true })
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     // The whisper's component watches the box alone, whose subscribers hear of a lock through the vault.
-    const revealUi = mountComponent(whisperStoreOf(box), whisperReveal, { hearsVault: true })
-    revealUi.expectRenders(['encrypted'])
+    const revealUi = mountComponent(whisperStoreOf(box), whisperRevealOf(box), { hearsVault: true })
+    revealUi.expectRenders(['unexposed'])
     const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
     expect(boxRows).to.have.lengthOf(1)
     expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper.apiKey)
@@ -186,7 +185,7 @@ describe("the proof", () => {
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
     boxesUi.expectRenders(['no boxes'])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
-    revealUi.expectRenders(['locked', 'encrypted'])
+    revealUi.expectRenders(['locked', 'unexposed'])
     await TH.expectRefusal(box.extractWhisper())
 
     // Rebuild over the tombstone: a new life, a new instance, a new vault_tok.

@@ -59,7 +59,7 @@ export const brandOf = (val: unknown, Brand: symbol): unknown => (
 )
 
 /** The mark on what a box answers for a whisper it will not show.
- * Never read it: compare `box.whisper` with {@link ENCRYPTED}, {@link LOCKED} or {@link VEILED}, or ask `box.isShowing` or {@link isWhisperedBag}.
+ * Never read it, nor compare `box.whisper` with a bag: ask `box.exposure`, `box.isShowing`, `box.isVeiled` or {@link isWhisperedBag}.
  */
 export const Whispered: unique symbol = Symbol.for('@safebyok/whispered')
 
@@ -67,13 +67,15 @@ export const Whispered: unique symbol = Symbol.for('@safebyok/whispered')
 export type WhisperedBag = Whisper & { readonly [Whispered]: 'encrypted' | 'locked' | 'veiled' }
 
 // Literals, not `brand()`: the mark is an own enumerable key, so a spread or an assign carries it to the put that refuses it.
-/** What `box.whisper` answers for a whisper not exposed. */
+// Each copy of safebyok freezes its own bags, so a host comparing `box.whisper` with one fails across copies, where
+// `box.exposure`, a string, does not.
+/** What `box.whisper` answers for a whisper not exposed. Ask `box.exposure`, never this bag's identity. */
 export const ENCRYPTED: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
 
-/** What `box.whisper` answers for a whisper exposed while the vault is locked. */
+/** What `box.whisper` answers for a whisper exposed while the vault is locked. Ask `box.exposure`, never this bag's identity. */
 export const LOCKED: WhisperedBag = Object.freeze({ [Whispered]: 'locked' })
 
-/** What `box.whisper` answers for a whisper exposed and veiled. */
+/** What `box.whisper` answers for a whisper exposed and veiled. Ask `box.exposure`, never this bag's identity. */
 export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */

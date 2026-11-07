@@ -72,6 +72,11 @@ describe("safebyok", () => {
     expect(Front.ForeverMillis).to.be.above(100 * 365 * 24 * 60 * Front.MinuteMillis)
   })
 
+  it("exports where a box's whisper stands", () => {
+    expect(Front.boxExposureVals).to.deep.equal(['unexposed', 'locked', 'veiled', 'showing'])
+    expectTypeOf<Front.Box['exposure']>().toEqualTypeOf<Front.BoxExposure>()
+  })
+
   it("exports the bags box.whisper answers while it will not show", () => {
     for (const bag of [Front.ENCRYPTED, Front.LOCKED, Front.VEILED]) { expect(Front.isWhisperedBag(bag)).to.be.true }
     expect(Front.isWhisperedBag({ apiKey: 'sk-test-0000' })).to.be.false

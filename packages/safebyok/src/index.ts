@@ -8,7 +8,7 @@ export { type Modelkind, type ModelkindClasses, ForeverMillis, MinuteMillis, Pas
 export { ENCRYPTED, LOCKED, VEILED, isWhisperedBag, brand, brandOf, IsVaultError } from './helpers/consts'
 export { VaultError, isVaultError, type RefusalFamily, type RefusalFamilyForKind, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from './refusals/errors'
 export * as HostErrorSanitizer from './refusals/host-error-sanitizer'
-export { correctablekindVals, type Damagekind, type Gatingkind, type LockState, type Wayinkind } from './shapes/shapes-enums'
+export { correctablekindVals, type Damagekind, type Gatingkind, type LockState, type Wayinkind, boxExposureVals, type BoxExposure } from './shapes/shapes-enums'
 export type { BadOutcome, GoodOutcome, Outcome } from './refusals/outcome'
 export { MaxLabelChars, MaxUserIdChars, Patterns } from './shapes/primitives'
 export type { BankedVaultScope, VaultScope, Whisper } from './shapes/shapes-core'

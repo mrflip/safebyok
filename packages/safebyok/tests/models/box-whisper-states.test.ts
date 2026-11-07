@@ -1,7 +1,8 @@
-/** A Box's whisper states: what `box.whisper` shows from each state, after each operation; the veil, putExposed, and hearing of a lock. */
+/** A Box's whisper states: what `box.whisper` and `box.exposure` show from each state, after each operation; the veil, putExposed, and hearing of a lock. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { ENCRYPTED, LOCKED, VEILED } from '../../src/helpers/consts'
+import type { BoxExposure } from '../../src/shapes/shapes-enums'
 import type { Fetched } from '../../src/shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
@@ -61,6 +62,9 @@ const Operations = {
 
 const Shows = { value: Exposed, encrypted: ENCRYPTED, locked: LOCKED, veiled: VEILED } as const
 
+/** What `box.exposure` answers beside each thing `box.whisper` shows. */
+const BoxExposures: Record<keyof typeof Shows, BoxExposure> = { value: 'showing', encrypted: 'unexposed', locked: 'locked', veiled: 'veiled' }
+
 /** Each cell is what `box.whisper` shows after the operation, or the refusal it throws, leaving the state as it was. */
 const StateTable = [
   //                        shows         veil         unveil        unexpose     expose           lock        unlock
@@ -76,6 +80,7 @@ const OperationOrder = ['veil', 'unveil', 'unexpose', 'expose', 'lock', 'unlock'
 
 const expectShows = (box: TestableBox, shown: keyof typeof Shows): void => {
   if (shown === 'value') { expect(box.whisper).to.deep.equal(Exposed) } else { expect(box.whisper).to.eq(Shows[shown]) }
+  expect(box.exposure).to.eq(BoxExposures[shown])
   expect(box.isShowing).to.eq(shown === 'value')
 }
 
@@ -99,6 +104,44 @@ describe("box.whisper, state by operation (the Coach, 2026-11-05)", () => {
       })
     }
   }
+})
+// --
+
+// == [isVeiled]: whether the veil is on, apart from what the whisper shows
+
+describe("box.isVeiled", () => {
+  it("is false for a box showing its whisper", async () => {
+    const box = await showingOf()
+    expect(box.isVeiled).to.be.false
+  })
+
+  it("is true for a veiled box, locked or not", async () => {
+    const box = await veiledOf()
+    expect(box.isVeiled).to.be.true
+    locking(box)
+    expect(box.whisper).to.eq(LOCKED)
+    expect(box.isVeiled).to.be.true
+  })
+
+  it("is false once unveiled or exposed again", async () => {
+    const unveiled = await veiledOf()
+    expect(unveiled.unveil().isVeiled).to.be.false
+    const exposed = await veiledOf()
+    await exposed.expose()
+    expect(exposed.isVeiled).to.be.false
+  })
+
+  it("is false once unexposed", async () => {
+    const box = await veiledOf()
+    expect(box.unexpose().isVeiled).to.be.false
+    expect(box.getSnapshot().veiled).to.be.false
+  })
+
+  it("is true for an unexposed box veiled", async () => {
+    const box = await unexposedOf()
+    expect(box.veil().isVeiled).to.be.true
+    expect(box.exposure).to.eq('unexposed')
+  })
 })
 // --
 
@@ -169,7 +212,30 @@ describe("the endings of a box exposed", () => {
       expect(box.unexpose()).to.eq(box)
       TH.expectSyncRefusal(() => box.unveil())
     })
+
+    it(`a ${ending} clears the veil`, async () => {
+      const box = await veiledOf()
+      end(box)
+      expect(box.isVeiled).to.be.false
+      expect(box.getSnapshot().veiled).to.be.false
+    })
   }
+
+  it("a tombstone received clears the value and the veil", async () => {
+    const box = await veiledOf()
+    box.receive(held.mw.tombstoneBoxRecord({ box_tok: box.box_tok, revision_seq: box.revision_seq + 1, revision_tok: 'rev-gone' }))
+    expect(box.isPresent).to.be.false
+    expect(box.whisper).to.eq(ENCRYPTED)
+    expect(box.isVeiled).to.be.false
+    expect(box.getSnapshot()).to.deep.include({ exposed: false, veiled: false })
+  })
+
+  it("a delete clears the value and the veil", async () => {
+    const box = await veiledOf()
+    await box.del()
+    expect(box.isVeiled).to.be.false
+    expect(box.getSnapshot().veiled).to.be.false
+  })
 
   it("a delete clears the value", async () => {
     const box = await showingOf()
