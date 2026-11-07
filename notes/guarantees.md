@@ -394,9 +394,10 @@ the crypto imports.
   reserved prefix `argon2id_web_`: `checkSuppliedSpecKept` (`deriver/basederiver.ts`), reached through
   `parseKeyDeriverSpec` from `argon2idDeriver` alone. A host's own deriver is checked by its interface,
   `keyDeriverShape` (`shapes/shapes-core.ts`), once, in `guardKeyDeriver` as `Bank`'s constructor wraps it, not by its parameters: a
-  host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). The published
-  entry points export neither `argon2idDeriver` nor `argon2idWebV1Deriver`, and no test of the core calls
-  `argon2idDeriver` or `checkSuppliedSpecKept`; safebyok-fastkey's hash-wasm deriver runs on the old core.
+  host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). `safebyok/browser`
+  exports `argon2idDeriver` and `argon2idWebV1Deriver` (the front door, `safebyok`, exports neither), and
+  `tests/browser.test.ts` runs both, `checkSuppliedSpecKept` through `parseKeyDeriverSpec`;
+  safebyok-fastkey's hash-wasm deriver runs on the old core.
 * *Randomness* from `crypto.getRandomValues`, `crypto.randomUUID` and `subtle.generateKey` alone (`randomBytes`,
   `randomId`, the key makers).
 * *No secret is compared.* A wrong passphrase or passkey is learned from the AEAD tag failing to

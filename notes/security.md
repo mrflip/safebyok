@@ -810,20 +810,25 @@ added or folded into through the subagent, and no other entry changes.
   checks a device record's scope; amended 2026-10-28 (vault_refresh): `deviceRecordFor` is gone, see the rollback-check entry below).
 
 * 2026-10-22 (thread wire_meta, branch 20261022-wire_meta, commit 43746aff): **over GraphQL, what a refused write learned
-  travels in the mutation's response `data`, and a GraphQL error carries `extensions.kind` alone, never a record.**
+  travels in the mutation's response `data`, and a GraphQL error carries no record.**
   Before, a `stale_write` put the winning vault props (both wayins' salts and wrapped vaultKeys: offline-guessing
   material) and the winning box (`box_stored`), and a full vault its `capacity`, in `extensions.meta`, which GraphQL
   servers, gateways and APM tools commonly log. The Coach ruled: move meta out of the error and into the body,
-  available on success or failure. `safebyokPutVaultProps` and `safebyokPutBox` now resolve answer types
-  (`SafebyokPutVaultPropsAnswer`, `SafebyokPutBoxAnswer`) with `landed`; on a `stale_write` (or a box write's
-  `vault_full`) `landed` is false with `refusalkind`, `message`, and `vault_props_stored`, `box_stored` or
-  `capacity`. A stored record, sound or damaged, travels as the `SafebyokStoredRecord` JSON scalar, which GraphQL
-  does not check; `graphqlVaultDB` reads the body and throws the same VaultError with the same
-  `meta`, so the VaultDB layer's `err.meta` is unchanged. Every other refusal still crosses as an error with kind
-  only; tests pin that no error's `extensions` carries a record
-  (`packages/safebyok-graphql/tests/vault-resolvers.test.ts`, "a write's answer in the body"). Residual: the records
-  are now in the response `data`, which a host's response logging can still write down; the README says so.
-  The Postgres route recipe and Convex already answer with the record in a body, not an error.
+  available on success or failure. Amended 2026-11-07 (docblock_trim): that wire was replaced (`a227cfe56`), and
+  none of the names above survives. Every
+  operation of `safebyok-graphql`'s schema now answers one typed object, the same fields as its verb's `try*` answer
+  (`ok`, `act`, `val`, `world`, `dbhas`, `req_params`, `err`), and a refusal of any kind is that answer's `err` field
+  (`SafebyokErr`: `refusalkind`, `message`, and `meta` of `capacity`, `fieldnames` and `call` alone, never a record or
+  a cause), not a GraphQL error; there are no `landed` flag, `SafebyokPutBoxAnswer`, `SafebyokPutVaultPropsAnswer` or
+  `SafebyokStoredRecord` scalar (the mutations are `safebyokPutVault` and `safebyokPutBox`). On a `stale_write` the
+  winning rows travel as the answer's typed `world` and `dbhas` (`SafebyokVaultRow`, `SafebyokRow`), and a damaged
+  row in a listing as a `SafebyokJson` of `damaged_rows`; `GraphQLVaultDB` checks the answer against the core's own checker
+  (`DB.putBoxAnswer` and its kin) and throws the same VaultError, its `meta` holding `world` and `dbhas`
+  again, so the VaultDB layer's `err.meta` is unchanged. A GraphQL error, whose text can quote a variable sent (the
+  record), is refused in the browser as `unexpected_error` with no cause, and a failed fetch as
+  `storage_unavailable`, its cause naming only the error, the HTTP status and a code. Residual: the winning rows
+  are in the response `data`, which a host's response logging can still write down; the package README does not
+  say so. The Postgres route recipe and Convex already answer with the record in a body, not an error.
 
 * 2026-10-22 (thread get_vault, PR [#244](https://github.com/mrflip/safebyok/pull/244)): **the vault props record has two shapes,
   and `getVault` reads props and box listing in one atomic step.** (1) `VaultProps` (format
@@ -2914,7 +2919,16 @@ added or folded into through the subagent, and no other entry changes.
   is the limit. `postgresVaultDB` enforces its `maxBoxes` (default 1000; a host wanting none
   passes a large safe integer) as a best effort, inside the one statement that inserts a new
   box (see the 2026-10-16 entry below, which replaced a counter column and a row lock). The
-  refusal's message names the limit, never a boxlabel or a record.
+  refusal's message names the limit, never a boxlabel or a record. Amended 2026-11-07 (docblock_trim): none of
+  the declaring or the `Vault.make` check survives. The core's `VaultDBOpts` is `maxRecordBytes` alone (no limit
+  by default); `maxBoxes` is an option of the vaultDB that enforces it, a soft cap on a vault's live boxes
+  (exact at moderate write rates, never strict): `MemoryVaultDB` and `PostgresVaultDB` default to `Infinity`
+  and refuse a put of a new box past it as `vault_full`, `PostgresVaultDB` by counting the vault's live boxes in
+  the put's transaction; `ConvexVaultDB` takes one optionally under the component's 8,000, which holds
+  whatever it is given; `IdbVaultDB` takes none. `GraphQLVaultDB` takes `{ client }` alone and declares no limit
+  of any kind: the browser learns no limit before it meets the server's `vault_full` refusal, and the cap is the
+  `maxBoxes` of the vaultDB the host's server hands to `vaultResolvers`. The refusal's `meta` carries the
+  `capacity`, not a boxlabel or a record.
 * 2026-10-15: a host's own checks replace ours for every name
   (`Vault.make({ validators })`, any Zod 4 schema), with no floor beneath them, since the ckeys
   (JSON tuples) and the cipher ctx (a JSON array) take any text. What holds: **a check only
@@ -3700,7 +3714,12 @@ added or folded into through the subagent, and no other entry changes.
   that passes no limit lets one signed-in user, through a modified browser, grow their own vault
   without bound, and Postgres sets no limit on a vault's bytes either; bounding that is the host's,
   by `maxBoxes` or its own quotas. `graphqlVaultDB` declares `Infinity` to match, so a browser
-  learns a server's limit only when the host declares it there too.
+  learns a server's limit only when the host declares it there too. Amended 2026-11-07 (docblock_trim): the last
+  clause no longer holds. `GraphQLVaultDB` takes `{ client }` alone and declares no limit, so nothing a
+  host sets in the browser moves one; `maxBoxes` and `maxRecordBytes` are options of the vaultDB the host's server
+  hosts and hands to `vaultResolvers`, and a browser learns the cap only from the `vault_full` refusal that
+  vaultDB answers, its `capacity` in the answer's `err.meta`. `PostgresVaultDB`'s `maxBoxes` still defaults to
+  `Infinity` and is still the host's to set.
 * 2026-10-17 (thread 16, strength_principles, [PR #142](https://github.com/mrflip/safebyok/pull/142)):
   **the core has no strength test of its own.** `Vault.make`'s
   `strengthChecker` that is not a function is refused
