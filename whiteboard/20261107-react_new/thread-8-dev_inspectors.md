@@ -1,6 +1,6 @@
 # Thread 8: dev inspectors (2026-11-07)
 
-Branch `20261107-dev_inspectors`, PR (to come), cut from main at c3a38219e (thread 5's demo, #584).
+Branch `20261107-dev_inspectors`, PR [#590](https://github.com/mrflip/safebyok/pull/590), cut from main at c3a38219e (thread 5's demo, #584).
 Justify: green; safebyok-react 213 passed (17 new in `tests/devmode/`, 1 in `hooks.test.tsx`), the
 demo 62 passed, every other package unchanged.
 
@@ -77,3 +77,5 @@ demo 62 passed, every other package unchanged.
   * Should the panels stay in the demo's production build? They are imported unconditionally in
     `App.tsx`. A host would gate them by `import.meta.env.DEV`. The demo is a playground, so I
     left them always on.
+  * **Open (also in the PR):** `KnockKnockFields`' own `useIsShowing` can switch to `useBoxIsShowing` once
+    #587 merges.
