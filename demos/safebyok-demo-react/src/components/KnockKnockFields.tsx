@@ -19,7 +19,7 @@ const useIsShowing = (box: Box | null): boolean => (
 /** The knock-knock machine with its API key in a field safebyok fills and reads, so the key never passes through React. */
 export const KnockKnockFields = () => {
   const bank = useBank()
-  const { stage } = useVault(Vaultlabel)
+  const { stage, vault } = useVault(Vaultlabel)
   const box = useBox(Vaultlabel, Boxlabel)
   const isShowing = useIsShowing(box)
   const fieldId = useId()
@@ -28,7 +28,7 @@ export const KnockKnockFields = () => {
   const isReady = (bank !== null) && (stage !== 'waiting')
 
   /** Runs a button's work, saying what refused unless the user cancelled. */
-  const perform = async (work: () => Promise<unknown>) => {
+  const perform = async (work: () => unknown) => {
     setGripe(null)
     setIsSaved(false)
     try {
@@ -54,17 +54,18 @@ export const KnockKnockFields = () => {
     setIsSaved(true)
   })
 
-  // What the knock reads is the whisper as saved, not an edit still in the field.
-  const apiKeyOf = async (): Promise<string | null> => {
-    if (bank === null) { return null }
-    const vault = await bank.ensureVault({ vaultlabel: Vaultlabel })
+  // What the knock reads is the whisper as saved, never an edit still in the field, and it leaves the field as it was.
+  // The vault in hand, never bank.ensureVault: a knock with no vault builds none.
+  const extractApiKey = async (): Promise<string | null> => {
+    if (vault === null) { return null }
     await vault.ensureUnlocked()
     const stored = await vault.getBox(Boxlabel, { ifAbsent: 'nil' })
     if (stored === null) { return null }
-    if (! stored.snapshot.exposed) { await stored.expose() }
-    const { apiKey } = stored.whisper
+    const { apiKey } = await stored.extractWhisper()
     return ((typeof apiKey === 'string') && (apiKey !== '')) ? apiKey : null
   }
+
+  const done = () => perform(() => box?.unexpose())
 
   return (
     <section className="flow knock-knock" aria-labelledby={`${fieldId}-title`}>
@@ -81,14 +82,14 @@ export const KnockKnockFields = () => {
           ? (
             <>
               <button type="button" onClick={() => { void save() }}>Save</button>
-              <button type="button" onClick={() => { box.unexpose() }}>Done</button>
+              <button type="button" onClick={() => { void done() }}>Done</button>
             </>
           )
           : <button type="button" disabled={! isReady} onClick={() => { void edit() }}>{box === null ? 'Add key' : 'Edit key'}</button>}
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm apiKeyOf={apiKeyOf} isReady={isReady} />
+      <KnockForm extractApiKey={extractApiKey} isReady={isReady} />
     </section>
   )
 }

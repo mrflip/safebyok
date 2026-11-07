@@ -1,6 +1,6 @@
 /** The vaultDB in memory. */
 
-import { type BoxesFetched, type BoxFetched, type BoxLanding, type Heard, type Landing, type RowOfVault, type Tidied, VaultDB } from './vault-db-new'
+import { type BoxesFetched, type BoxFetched, type BoxLanding, type Heard, type Landing, type RowOfVault, type Tidied, AdapterVaultDB } from './vault-db'
 import { ckeyOf } from '../helpers/helpers'
 import * as Refuse from '../refusals/throwers'
 import * as SX from '../shapes/shapes-storage'
@@ -17,7 +17,7 @@ const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGive
   SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
 )
 
-export class MemoryVaultDB extends VaultDB {
+export class MemoryVaultDB extends AdapterVaultDB {
   // == [Props]: #vaultrowsOfBank, #boxLives, #heeders, #maxBoxes
 
   readonly #vaultrowsOfBank = new Map<string, Map<string, unknown>>()
@@ -29,8 +29,8 @@ export class MemoryVaultDB extends VaultDB {
   // == [Construction]: constructor
 
   constructor(opts: MemoryVaultDBOpts = {}) {
-    const { maxBoxes = Infinity, ...vaultDBOpts } = SX.memoryVaultDBOpts.parse(opts)
-    super(vaultDBOpts)
+    const { maxBoxes = Infinity, ...adapterVaultDBOpts } = SX.memoryVaultDBOpts.parse(opts)
+    super(adapterVaultDBOpts)
     this.#maxBoxes = maxBoxes
   }
   // --
@@ -98,7 +98,7 @@ export class MemoryVaultDB extends VaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of VaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected doListVaults(scope: BankScope): RowOfVault[] {
     return Array.from(this._cheat_vaultRowsOf(scope), ([vaultlabel, vault]) => ({ vaultlabel, vault: structuredClone(vault) }))

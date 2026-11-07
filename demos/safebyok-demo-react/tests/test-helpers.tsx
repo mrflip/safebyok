@@ -14,9 +14,6 @@ import type { StringStore } from '../src/lib/local-store'
 
 export * from 'safebyok/testing'
 
-/** The device_id of the provider's bank in these tests. */
-export const DeviceId = '00000000-0000-4000-8000-0000000000d1'
-
 /** `ui` inside a BankProvider signed in as `user_id`, over a fresh vaultDB in memory, deriving through the cheap test deriver; and that `vaultDB`.
  *
  * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
@@ -25,7 +22,7 @@ export const renderInBank = (ui: ReactNode, user_id: string | null = 'u1') => {
   const vaultDB = new MemoryVaultDB()
   render(
     <BankProvider
-      applabel="acme" user_id={user_id} device_id={DeviceId} vaultDB={vaultDB} deviceDB={new MemoryDeviceDB()}
+      applabel="acme" user_id={user_id} vaultDB={vaultDB} deviceDB={new MemoryDeviceDB()}
       keyDeriver={testDeriver} strengthChecker={anyStrengthChecker} logger={quietLogger}
     >
       {ui}

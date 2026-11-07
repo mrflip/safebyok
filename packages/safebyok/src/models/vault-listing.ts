@@ -12,7 +12,7 @@ import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-ga
 import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import type { Answer, Notice } from '../storage/vault-db-new'
+import type { Answer, Notice } from '../storage/vault-db'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import type { Gate } from './gate'

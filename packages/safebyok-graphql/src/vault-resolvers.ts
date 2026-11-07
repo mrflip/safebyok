@@ -6,7 +6,7 @@ import * as DB from 'safebyok/storage'
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
   /** The vaultDB every request is served from, such as a `PostgresVaultDB`. */
-  vaultDB:  DB.VaultDB
+  vaultDB:  DB.AdapterVaultDB
   /** The user_id your own auth signed this request in as, or null when signed out. */
   userIdOf: (context: ContextT) => DB.Awaitable<string | null>
 }
@@ -88,7 +88,7 @@ export type VaultResolvers<ContextT> = {
 // == [Resolvers]: vaultResolvers
 
 const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
-  vaultDB:  custom<DB.VaultDB>((candidate) => candidate instanceof DB.VaultDB, 'Expected a VaultDB from safebyok/storage'),
+  vaultDB:  custom<DB.AdapterVaultDB>(DB.isAdapterVaultDB, 'Expected an AdapterVaultDB from safebyok/storage'),
   userIdOf: fn<VaultResolversOpts<unknown>['userIdOf']>(),
 }), 'bad_option')
 
@@ -239,7 +239,7 @@ const endingWith = (refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
 }
 
 /** Opens a watch of `scope` on `vaultDB`, as a reader whose cancel stops it. */
-const openWatch = (vaultDB: DB.VaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> => {
+const openWatch = (vaultDB: DB.AdapterVaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> => {
   // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
   // `next`, which for a quiet bank is forever, so a subscriber gone while it waited would keep the
   // watch open. A reader's `cancel` ends the pending read at once.

@@ -150,7 +150,7 @@ export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, vaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, VaultDBOpts, MemoryVaultDBOpts
+// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
 export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
@@ -163,14 +163,14 @@ export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Check
   return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
 }, [CX])
 
-/** The check of a vaultDB's options, refusing 'bad_option'. */
-export const vaultDBOpts = objCheck(({ num }) => ({
+/** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
+export const adapterVaultDBOpts = objCheck(({ num }) => ({
   /** The most bytes one stored record may weigh; no limit by default. */
   maxRecordBytes: num.positive().optional(),
 }), 'bad_option')
 /** The check of a memory vaultDB's options, refusing 'bad_option'. */
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({
-  ...vaultDBOpts.shape,
+  ...adapterVaultDBOpts.shape,
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
   /** A soft cap on the live boxes one vault holds; no limit by default. */
   maxBoxes: uint.optional(),
@@ -184,8 +184,8 @@ export type PutOptsGiven = Readonly<Z.output<typeof putOpts>>
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
-/** What a vaultDB's constructor takes. */
-export type VaultDBOpts = Readonly<Z.input<typeof vaultDBOpts>>
+/** What an AdapterVaultDB's constructor takes. */
+export type AdapterVaultDBOpts = Readonly<Z.input<typeof adapterVaultDBOpts>>
 /** What a memory vaultDB's constructor takes. */
 export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 // --
@@ -304,7 +304,7 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow
+// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, bankRow, BankRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
 export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis }) => {
@@ -316,4 +316,9 @@ export type LeaseQuery   = Z.infer<typeof leaseQuery>
 /** A stowed lease as the deviceDB dates it: its query and its `proved_at`. */
 export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
+
+/** The bank row: the `device_id` this device goes by in one bank scope. */
+export const bankRow = objCheck(({ applabel, user_id, device_id }) => ({ applabel, user_id, device_id }), 'bad_record', [CX])
+
+export type BankRow      = Z.infer<typeof bankRow>
 // --

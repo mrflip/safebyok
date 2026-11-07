@@ -1,6 +1,7 @@
 /** vaultResolvers and VaultSchemaSdl: who reaches which bank, and what each answer carries over the wire. */
 
 import { describe, expect, it, vi } from 'vitest'
+import { Client } from '@urql/core'
 import { buildSchema, graphql, isObjectType, parse, subscribe, validate } from 'graphql'
 import type { GraphQLSchema } from 'graphql'
 import { makeExecutableSchema } from '@graphql-tools/schema'
@@ -8,6 +9,7 @@ import * as DB from 'safebyok/storage'
 import { PostgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
+import { GraphQLVaultDB } from '../src/index'
 import { VaultOperations } from '../src/vault-operations'
 import * as TH from './test-helpers'
 
@@ -190,9 +192,10 @@ describe("vaultResolvers", () => {
     expect(full.err.meta?.capacity).to.deep.eq({ boxes: { used: 1, max: 1 }, bytes: { used: 0, max: Number.MAX_SAFE_INTEGER } })
   })
 
-  it("refuses a vaultDB or userIdOf it cannot use", async () => {
+  it("refuses a vaultDB or userIdOf it cannot use, a client of a vaultDB among them", async () => {
     const vaultDB = await TH.serverOver()
-    const unusable = [{}, { vaultDB }, { vaultDB: {}, userIdOf: () => 'u1' }, { vaultDB, userIdOf: 'u1' }]
+    const client = new GraphQLVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
+    const unusable = [{}, { vaultDB }, { vaultDB: {}, userIdOf: () => 'u1' }, { vaultDB, userIdOf: 'u1' }, { vaultDB: client, userIdOf: () => 'u1' }]
     for (const opts of unusable) { TH.expectSyncRefusal(() => vaultResolvers(opts as never), 'bad_option') }
   })
 })
