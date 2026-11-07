@@ -1,10 +1,15 @@
-/** The VaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and its relay. */
+/** The VaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and the duck a model takes for one. */
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as SX from '../../src/shapes/shapes-storage'
-import { bankScope, boxAt, boxQuery, boxscope, vaultAt, vaultScope } from '../test-helpers/storage-world'
+import { brandedVaultDB } from '../../src/shapes/shapes-vaultish'
+import { VaultDBVerbnames } from '../../src/storage/vault-db-new'
+import { bankScope, boxscope, vaultAt, vaultScope } from '../test-helpers/storage-world'
+
+/** Each verb of `vaultDB`, bound, as a client of it would answer them. */
+const verbsOf = (vaultDB: MemoryVaultDB): Record<string, unknown> => Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
 
 const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
   try { await thunk() } catch (err) { return err }
@@ -68,43 +73,21 @@ describe("VaultDB", () => {
     })
   })
 
-  describe("its relay", () => {
-    it("answers each call as the store's generic call does", async () => {
+  describe("the duck a model takes for one", () => {
+    const brand = { [Symbol.for('@safebyok/vaultdb')]: true }
+
+    it("takes a store, or a client of one that wears the brand and answers every verb", () => {
       const vaultDB = new MemoryVaultDB()
-      const vault = vaultAt()
-      const box = boxAt()
-      expect(await vaultDB.relay.putVault(vault, { prior: SX.VoidRevision })).to.deep.equal({ landed: true, ante: null })
-      expect(await vaultDB.relay.putBox(box, { prior: SX.VoidRevision })).to.deep.equal({ landed: true, ante: null, vault })
-      expect(await vaultDB.relay.getBox(boxQuery)).to.deep.equal({ vault, box })
-      expect(await vaultDB.relay.putVault(vaultAt(0, 'life2'), { prior: SX.VoidRevision, ifPresent: 'fail' })).to.deep.equal({ landed: false, ante: vault })
+      expect(brandedVaultDB.parse(vaultDB)).to.eq(vaultDB)
+      const client = { ...brand, ...verbsOf(vaultDB) }
+      expect(brandedVaultDB.parse(client)).to.eq(client)
     })
 
-    it("refuses what the verb would refuse before the store is asked", async () => {
-      const vaultDB = new MemoryVaultDB({ maxRecordBytes: 2000 })
-      await vaultDB.putVault(vaultAt(), { prior: SX.VoidRevision })
-      const heavy = boxAt(0, 'life1', { sidecar: { note: 'x'.repeat(3000) } })
-      await expect(vaultDB.relay.putBox(heavy, { prior: SX.VoidRevision })).rejects.toSatisfy((err) => isVaultError(err, 'box_too_large'))
-      await expect(vaultDB.relay.putBox(boxAt(1), { prior: SX.VoidRevision })).rejects.toSatisfy((err) => isVaultError(err, 'bad_option'))
-      await expect(vaultDB.relay.getVault({ ...vaultScope, vaultlabel: 'no way' })).rejects.toSatisfy((err) => isVaultError(err, 'bad_scope'))
-      expect(() => vaultDB.relay.watch({ ...bankScope, user_id: '' }, () => undefined)).to.throw(VaultError)
-      expect(await vaultDB.relay.listBoxes({ ...vaultScope, vault_tok: 'life1' })).to.deep.equal({ vault: vaultAt(), boxes: [] })
-    })
-
-    it("refuses for a store's own failure, whatever it threw", async () => {
-      class FailingVaultDB extends MemoryVaultDB {
-        protected override doListVaults(): never { throw new Error('socket closed') }
-      }
-      await expect(new FailingVaultDB().relay.listVaults(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
-    })
-
-    it("hears what the store's watch hears, the rows unchecked", async () => {
-      const vaultDB = new MemoryVaultDB()
-      const heard: unknown[] = []
-      const unwatch = vaultDB.relay.watch(vaultScope, (each) => { heard.push(each) })
-      const vault = vaultAt()
-      await vaultDB.relay.putVault(vault, { prior: SX.VoidRevision })
-      await vi.waitFor(() => { expect(heard).to.deep.equal([{ vault }]) })
-      unwatch()
+    it("refuses a brand without the verbs, the verbs without a brand, or a verb that is no function", () => {
+      const verbs = verbsOf(new MemoryVaultDB())
+      expect(() => brandedVaultDB.parse(brand)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => brandedVaultDB.parse(verbs)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => brandedVaultDB.parse({ ...brand, ...verbs, watch: 'soon' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
     })
   })
 })

@@ -75,7 +75,7 @@
   },
   "peerDependencies": {
     "@urql/core": "^6.0.0",
-    "graphql": "^16.3.0 || ^17.0.0",
+    "graphql": "^17.0.0",
     "safebyok": "workspace:^"
   },
   "peerDependenciesMeta": {

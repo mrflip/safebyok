@@ -3,13 +3,13 @@
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
 import { bankScope, vaultScope, boxscope, Now, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
-import type { VaultDB } from '../../src/storage/vault-db-new'
+import type { VaultDBVerbs } from '../../src/storage/vault-db-new'
 import type { BatteryWorld } from './vault-db-battery'
 
 /** Registers the dels' and tidyGone's cases over `world`. */
 export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
   /** The box row `openai` under the life `vault_tok` of the vault, as stored. */
-  const storedBoxOf = async (vaultDB: VaultDB, vault_tok = 'life1'): Promise<unknown> => {
+  const storedBoxOf = async (vaultDB: VaultDBVerbs, vault_tok = 'life1'): Promise<unknown> => {
     const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, vault_tok)
     return boxrows.get('openai')
   }

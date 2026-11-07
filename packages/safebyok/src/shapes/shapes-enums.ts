@@ -63,3 +63,22 @@ export type Gatingkind = typeof gatingkindVals[number]
 /** The refusals an attempt leaves its gating open under, for the user to try again. */
 export const correctablekindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
 // --
+
+// == [Acts]: listActVals, ListAct, gotActVals, GotAct, putActVals, PutAct, delActVals, DelAct
+
+/** What a listing verb's answer says happened: `got` rows, or `gotvoid` for none. */
+export const listActVals = ['got', 'gotvoid'] as const
+export type ListAct = typeof listActVals[number]
+
+/** What a get's answer says happened: `got` the row, `gotvoid` for none stored, `gotgone` for a tombstone. */
+export const gotActVals = ['got', 'gotvoid', 'gotgone'] as const
+export type GotAct = typeof gotActVals[number]
+
+/** What a put's answer says happened: `born` over nothing, `reborn` over a tombstone, `replaced` a live row, or `declined` for the live row taken up. */
+export const putActVals = ['born', 'reborn', 'replaced', 'declined'] as const
+export type PutAct = typeof putActVals[number]
+
+/** What a del's answer says happened: `deleted` the row, `gone` for a tombstone found, or `void` for nothing stored. */
+export const delActVals = ['deleted', 'gone', 'void'] as const
+export type DelAct = typeof delActVals[number]
+// --
