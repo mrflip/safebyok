@@ -36,20 +36,34 @@ describe("GraphQLVaultDB over the typed schema", () => {
 /** What one call of a fake client hands back, as urql's own `OperationResult` holds it. */
 type FakeResult = { data?: unknown, error?: CombinedError, hasNext?: boolean }
 
-/** A GraphQLVaultDB over a fake urql Client whose queries and mutations answer `asked`, and each of whose subscriptions hands the test its callback. */
-const fakeClient = (asked: FakeResult = {}) => {
+/**
+ * A GraphQLVaultDB over a fake urql Client whose queries and mutations answer `asked`, and each of whose subscriptions
+ * hands the test its callback, first handing that callback `atOnce` where given; `unsubscribed` counts the stops.
+ */
+const fakeClient = (asked: FakeResult = {}, atOnce?: FakeResult) => {
   const streams: ((result: FakeResult) => void)[] = []
+  const counts = { unsubscribed: 0 }
   const client = {
     query:        () => ({ toPromise: () => Promise.resolve(asked) }),
     mutation:     () => ({ toPromise: () => Promise.resolve(asked) }),
     subscription: () => ({
       subscribe: (onResult: (result: FakeResult) => void) => {
         streams.push(onResult)
-        return { unsubscribe: () => undefined }
+        if (atOnce !== undefined) { onResult(atOnce) }
+        return { unsubscribe: () => { counts.unsubscribed += 1 } }
       },
     }),
   }
-  return { vaultDB: new GraphQLVaultDB({ client: client as never }), streams }
+  return { vaultDB: new GraphQLVaultDB({ client: client as never }), streams, counts }
+}
+
+/** A watch over a fake client, and the notices and bad news it tells. */
+const watched = (atOnce?: FakeResult) => {
+  const { vaultDB, streams, counts } = fakeClient({}, atOnce)
+  const heard: DB.Notice[] = []
+  const badnews: DB.VaultError[] = []
+  const stop = vaultDB.watch(TH.bankScope, (notice) => { heard.push(notice) }, (news) => { badnews.push(news) })
+  return { streams, counts, heard, badnews, stop }
 }
 
 const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'got', val: { __typename: 'SafebyokVaultRecord', ...TH.vaultAt() }, world: null, err: null } }
@@ -119,43 +133,68 @@ describe("GraphQLVaultDB's watch", () => {
   afterEach(() => { vi.useRealTimers() })
 
   it("hears each notice once", () => {
-    const { vaultDB, streams } = fakeClient()
-    const heard: DB.Notice[] = []
-    const stop = vaultDB.watch(TH.bankScope, (notice) => { heard.push(notice) })
+    const { streams, heard, stop } = watched()
     streams[0]?.({ data: gotNotice, hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: false })
     expect(heard).to.deep.eq([{ act: 'got', val: TH.vaultAt(), world: null }])
     stop()
   })
 
-  it("subscribes again a second after a stream ends", async () => {
-    const { vaultDB, streams } = fakeClient()
-    const stop = vaultDB.watch(TH.bankScope, () => undefined)
+  it("tells a stream the server ends once, and never subscribes again", async () => {
+    const { streams, counts, badnews, stop } = watched()
     streams[0]?.({ data: gotNotice, hasNext: false })
-    await vi.advanceTimersByTimeAsync(999)
-    expect(streams).to.have.length(1)
-    await vi.advanceTimersByTimeAsync(1)
-    expect(streams).to.have.length(2)
+    streams[0]?.({ data: null, hasNext: false })
+    await vi.advanceTimersByTimeAsync(60_000)
     stop()
+    expect(streams).to.have.length(1)
+    expect(badnews).to.have.length(1)
+    expect(badnews[0]).to.include({ refusalkind: 'storage_unavailable', message: DB.WatchEnded })
+    expect(badnews[0]?.meta).to.deep.eq({ call: 'watch' })
+    expect(counts.unsubscribed).to.be.greaterThanOrEqual(1)
   })
 
-  it("never subscribes again once the server has revoked its identity", async () => {
-    const { vaultDB, streams } = fakeClient()
-    const heard: DB.Notice[] = []
-    const stop = vaultDB.watch(TH.bankScope, (notice) => { heard.push(notice) })
+  it("tells a failed request once, its cause naming the error alone", () => {
+    const { streams, badnews } = watched()
+    streams[0]?.({ error: new CombinedError({ networkError: new TypeError('Failed to fetch') }), hasNext: false })
+    expect(badnews).to.have.length(1)
+    expect(badnews[0]?.refusalkind).to.eq('storage_unavailable')
+    expect(badnews[0]?.cause).to.include({ thrownName: 'TypeError' })
+  })
+
+  it("tells a GraphQL error once, stops its stream, and hears nothing after", () => {
+    const { streams, counts, heard, badnews } = watched()
+    streams[0]?.({ error: new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field')] }), hasNext: true })
+    streams[0]?.({ data: gotNotice, hasNext: true })
+    expect(badnews).to.have.length(1)
+    expect(badnews[0]).to.include({ refusalkind: 'unexpected_error', message: DB.SchemaNotServed })
+    expect(badnews[0]?.cause).to.be.undefined
+    expect(heard).to.deep.eq([])
+    expect(counts.unsubscribed).to.eq(1)
+  })
+
+  it("tells nothing of the stream the server ends revoking its identity, and never subscribes again", async () => {
+    const { streams, heard, badnews, stop } = watched()
     streams[0]?.({ data: revokedNotice, hasNext: false })
-    await vi.advanceTimersByTimeAsync(5000)
+    await vi.advanceTimersByTimeAsync(60_000)
+    stop()
     expect(streams).to.have.length(1)
     expect(heard).to.deep.eq([])
-    stop()
+    expect(badnews).to.deep.eq([])
   })
 
-  it("never subscribes again once stopped, a pause pending", async () => {
-    const { vaultDB, streams } = fakeClient()
-    const stop = vaultDB.watch(TH.bankScope, () => undefined)
-    streams[0]?.({ data: null, hasNext: false })
+  it("tells nothing of a stream that ends once stopped", () => {
+    const { streams, counts, badnews, stop } = watched()
     stop()
-    await vi.advanceTimersByTimeAsync(5000)
-    expect(streams).to.have.length(1)
+    streams[0]?.({ data: null, hasNext: false })
+    expect(badnews).to.deep.eq([])
+    expect(counts.unsubscribed).to.eq(1)
+  })
+
+  it("stops a stream that ends as it begins, telling it once", () => {
+    const { counts, badnews, stop } = watched({ data: null, hasNext: false })
+    expect(badnews).to.have.length(1)
+    expect(counts.unsubscribed).to.eq(1)
+    stop()
+    expect(badnews).to.have.length(1)
   })
 })

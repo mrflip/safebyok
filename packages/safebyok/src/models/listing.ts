@@ -104,7 +104,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Start the watch. */
   async hello(): Promise<void> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     this.demandEnabled()
-    this.#unwatch ??= this.watchRows(this.#onNotice)
+    this.#unwatch ??= this.watchRows(this.#onNotice, (news) => { this.world.tellBadNews([news]) })
   }
 
   /** End the watch. The instances stay as they are. */
@@ -326,8 +326,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected abstract tryGetRow(scope: ScopeT): Promise<ListingAnswer<RecordT, SparseT>>
   protected abstract tryPutRow(record: RecordT, opts: PutOpts): Promise<ListingAnswer<RecordT, SparseT>>
   protected abstract tryDelRow(tombstone: DelTombstone<SparseT>, opts: DelOpts): Promise<ListingAnswer<RecordT, SparseT>>
-  /** Start the vaultDB's watch over this listing's scope; returns how to stop. */
-  protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void): () => void
+  /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of its end unbidden; returns how to stop. */
+  protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
   /** True for a row this listing holds: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
   protected abstract isOwnRow(row: VaultRow | BoxRow): row is (VaultRow | BoxRow) & Fetched<RecordT, SparseT>
   // --

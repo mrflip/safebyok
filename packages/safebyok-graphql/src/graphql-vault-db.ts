@@ -192,29 +192,32 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 
   // == [Watch]: watch
 
-  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. */
-  watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
+  /** Tells `onNotice` of rows that change under a bank or a vault, and `onBadNews` of a stream that ends unbidden; returns how to stop. */
+  watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: DB.VaultError) => void): () => void {
     const { applabel, user_id, vaultlabel = null } = DB.watchScope.parse(scope)
     const variables = { applabel, user_id, vaultlabel }
-    let isWatching = true
-    let subscription = { unsubscribe: noop }
-    let cancelPause = noop
-    const subscribe = (): void => {
-      let isRevoked = false
-      let heardData: unknown
-      subscription = this.#client.subscription(VaultOperations.watch, variables).subscribe((result) => {
-        // The closing result of a stream over fetch repeats the data of the notice before it.
-        if (result.data !== heardData) { isRevoked ||= heedNotice(result, onNotice) }
-        heardData = result.data
-        if (isWatching && ! isRevoked && ! result.hasNext) { cancelPause = afterAPause(subscribe) }
-      })
+    const watching: { isOn: boolean, subscription?: { unsubscribe: () => void } } = { isOn: true }
+    let heardData: unknown
+    // A stream that ends is told once and never subscribed again: what to do about it is the host's to decide.
+    const end = (news: DB.VaultError | null): void => {
+      watching.isOn = false
+      watching.subscription?.unsubscribe()
+      if (news !== null) { onBadNews?.(news) }
     }
-    subscribe()
-    return () => {
-      isWatching = false
-      cancelPause()
-      subscription.unsubscribe()
-    }
+    watching.subscription = this.#client.subscription(VaultOperations.watch, variables).subscribe((result) => {
+      if (! watching.isOn) { return }
+      if (result.error !== undefined) {
+        end(troubleOf(result.error))
+        return
+      }
+      // The closing result of a stream over fetch repeats the data of the notice before it.
+      const isRevoked = (result.data !== heardData) && heedNotice(result, onNotice)
+      heardData = result.data
+      if (isRevoked) { end(null) } else if (! result.hasNext) { end(new DB.VaultError('storage_unavailable', DB.WatchEnded, { meta: { call: 'watch' } })) }
+    })
+    // A stream that ended as it began ended before `end` had its subscription to stop.
+    if (! watching.isOn) { watching.subscription.unsubscribe() }
+    return () => { end(null) }
   }
   // --
 
@@ -233,7 +236,7 @@ export class GraphQLVaultDB implements VaultDBVerbs {
 }
 // --
 
-// == [Answers]: answerOf, goodAnswerOf, fieldOf, networkTroubleOf, statusOf, codeOf, heedNotice
+// == [Answers]: answerOf, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, heedNotice
 
 /** What `ask` answers, or a bad answer holding the refusal it threw. */
 const answerOf = async <ValT, ActT extends string, WorldT>(call: string, req_params: ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
@@ -251,15 +254,19 @@ const goodAnswerOf = <ValT, ActT extends string, WorldT>(answer: Answer<ValT, Ac
 
 /** The `fieldname` of an operation's answer, or the refusal a failed operation stands for. */
 const fieldOf = ({ error: err, data }: OperationResult<unknown>, fieldname: string): unknown => {
-  if (err?.networkError !== undefined) { throw networkTroubleOf(err) }
-  // A GraphQL error is a client and server out of step, which no retry mends: never a condition of storage. It is
-  // refused with no cause, so that no GraphQL error's server text crosses: a variable-coercion error can quote the
-  // variable sent, which is the record.
-  if ((err !== undefined) || (typeof data !== 'object') || (data === null) || ! Object.hasOwn(data, fieldname)) {
-    throw new DB.VaultError('unexpected_error', DB.SchemaNotServed)
-  }
+  if (err !== undefined) { throw troubleOf(err) }
+  if ((typeof data !== 'object') || (data === null) || ! Object.hasOwn(data, fieldname)) { throw schemaNotServed() }
   return (data as Record<string, unknown>)[fieldname]
 }
+
+/** The refusal a failed operation stands for: `storage_unavailable` where the request failed, else `unexpected_error`. */
+const troubleOf = (err: CombinedError): DB.VaultError => (err.networkError === undefined) ? schemaNotServed() : networkTroubleOf(err)
+
+// A GraphQL error is a client and server out of step, which no retry mends: never a condition of storage. It is refused
+// with no cause, so that no GraphQL error's server text crosses: a variable-coercion error can quote the variable sent,
+// which is the record.
+/** A server whose answer lacks what was asked, as `unexpected_error`. */
+const schemaNotServed = (): DB.VaultError => new DB.VaultError('unexpected_error', DB.SchemaNotServed)
 
 // A network error's message can be the response's body, which may quote the record sent, so the cause is made fresh
 // from the fields that cannot: the error's name, the HTTP status, and a code such as ECONNREFUSED.
@@ -285,9 +292,9 @@ const codeOf = (thrown: unknown): string | null => {
 }
 
 /** Hands `onNotice` the notice `result` carries, answering true for the notice that ends the watch for good. */
-const heedNotice = ({ error: err, data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): boolean => {
-  // A notice is a hint to fetch again, so a failed one, or one of the wrong shape, is passed over.
-  if ((err !== undefined) || (typeof data !== 'object') || (data === null)) { return false }
+const heedNotice = ({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): boolean => {
+  // A notice is a hint to fetch again, so one of the wrong shape is passed over.
+  if ((typeof data !== 'object') || (data === null)) { return false }
   const crossed = DB.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
   if (! crossed.success) { return false }
   if (crossed.data.ok) {
@@ -296,20 +303,6 @@ const heedNotice = ({ error: err, data }: OperationResult<unknown>, onNotice: (n
   }
   return DB.isVaultError(crossed.data.err, 'identity_revoked')
 }
-// --
-
-// == [Resubscribing]: ResubscribeMillis, afterAPause, noop
-
-// A pause, so a server that ends each stream at once is not asked again in a tight loop.
-const ResubscribeMillis = 1000
-
-/** Calls `resubscribe` after a pause, and returns how to cancel it. */
-const afterAPause = (resubscribe: () => void): () => void => {
-  const timer = setTimeout(resubscribe, ResubscribeMillis)
-  return () => { clearTimeout(timer) }
-}
-
-const noop = (): void => undefined
 // --
 
 // == [Typenames]: Drop, dropTypename, wayinOf, gateOf, rowOf, rowsOf, listedOf, answerDrop, rowAnswerOf, listedAnswerOf, tidiedAnswerOf

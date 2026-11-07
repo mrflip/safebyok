@@ -534,7 +534,7 @@ export const storeFailed = (call: string, named: string): string => `This device
 export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
 // --
 
-// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed
+// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed, WatchEnded
 
 /** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
 export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
@@ -565,4 +565,7 @@ export const fetchFailed = (thrownName: string, status: number | null, code: str
   const said = [thrownName, ...((status === null) ? [] : [`HTTP ${String(status)}`]), ...((code === null) ? [] : [code])]
   return `A request to the GraphQL server failed: ${said.join(', ')}.`
 }
+
+/** A watch's stream that the GraphQL server ended. */
+export const WatchEnded = "The GraphQL server ended a watch's stream, so changes to its rows go unheard until the watch is started again."
 // --
