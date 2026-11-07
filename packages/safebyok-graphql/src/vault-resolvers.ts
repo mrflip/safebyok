@@ -108,12 +108,12 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     return crossingOf({ ok: false, err: refusal, act: refusal.refusalkind, world: null, req_params: DB.reqParamsOf(asked) })
   }
 
-  /** The notices a watch of `scope` hears, as they cross, while the request stays signed in as its user. */
-  const noticesOf = async (context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> => {
+  /** Watches `scope` for the notices that cross, while the request stays signed in as its user. */
+  const watchNotices = async (context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> => {
     const refusal = await gateRefusalOf(context, scope.user_id)
     if (refusal !== null) { return endingWith(refusal) }
     // A watch's own refusal, bad_scope, is thrown from the stream's start, and the stream's constructor throws it on.
-    const watched = await DB.outcomeOf(() => readerOf(vaultDB, scope))
+    const watched = await DB.outcomeOf(() => openWatch(vaultDB, scope))
     if (! watched.ok) { return endingWith(watched.err) }
     const reader = watched.val
     const iterator: AsyncIterableIterator<CrossingNotice> = {
@@ -160,7 +160,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     Subscription: {
       safebyokWatch: {
         // A vaultlabel sent as null asks for the whole bank, as one left out does.
-        subscribe: async (_parent, { vaultlabel, ...bank }, context) => await noticesOf(context, (typeof vaultlabel === 'string') ? { ...bank, vaultlabel } : bank),
+        subscribe: async (_parent, { vaultlabel, ...bank }, context) => await watchNotices(context, (typeof vaultlabel === 'string') ? { ...bank, vaultlabel } : bank),
         resolve:   (notice) => notice,
       },
     },
@@ -193,7 +193,7 @@ const safebyokEpochMillis = new GraphQLScalarType<number, number>({
 })
 // --
 
-// == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, readerOf, typenameOf
+// == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, openWatch, typenameOf
 
 /** `answer` as it crosses, each field the schema names. */
 const crossingOf = (answer: DB.Answer<unknown, string, unknown>): CrossingAnswer => ({
@@ -235,8 +235,8 @@ const endingWith = (refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
   return iterator
 }
 
-/** The reader of what `vaultDB` hears of `scope`, whose cancel stops the watch. */
-const readerOf = (vaultDB: DB.VaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> => {
+/** Opens a watch of `scope` on `vaultDB`, as a reader whose cancel stops it. */
+const openWatch = (vaultDB: DB.VaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> => {
   // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
   // `next`, which for a quiet bank is forever, so a subscriber gone while it waited would keep the
   // watch open. A reader's `cancel` ends the pending read at once.
