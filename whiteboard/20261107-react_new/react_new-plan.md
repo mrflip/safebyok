@@ -13,8 +13,9 @@
   dd983d99-c90e-49a6-908a-a9d4a431cc86; State enum 17bf4ab3-9727; Open Matters body 644feba5-d4ff,
   matters table mnx96vk4741.393, bookmark rev 55; Cleanup body 6cb5c40d-1cc7; Progress body
   4e2c8165-c64b, table mnx96vk4741.105; Resolved body 7b60aab3-b0e6).
-* **Status:** running. Merged: 1, 2, 3, 4, 9, 11, 12, 14. Filed: 13 (#583). Reviewing: 5 (#584).
-  Building: 15, 17 (on #583). Waiting: 6, 7, 8 on 5; 16 on 15 and 5; 18 for a free slot. Thread 10 folded into 5 and 8.
+* **Status:** running. Merged: 1, 2, 3, 4, 5 (#584), 9, 11, 12, 14. Filed, open: 13 (#583), 17
+  (#585, on 13), 15 (#586), 5's follow-up (#587). Building: 6 (on #587), 8 (on main), 16 (on #586).
+  Waiting: 7 on 6; 18 on a slot (cut from #586). Thread 10 folded into 5 and 8.
 
 ## Read first
 
@@ -295,6 +296,11 @@ thread 11.
   end brings them in.
 * *Look-ahead:* threads 6 and 7 each add one sibling flow component beside `KnockKnockFields`;
   thread 8 adds the dev panels below the app. Give each a slot in `App.tsx`.
+* *Review:* medium, **flagged** (#584): a knock read the exposed working copy, so an unsaved edit
+  could be sent after a lock or a failed Save. The Coach merged #584 meanwhile; the rework is #587:
+  the knock reads the saved key with `box.extractWhisper()` and no longer exposes the field;
+  `apiKeyOf` → `extractApiKey`, `deviceIdOf` → `ensureDeviceId`; Done clears "Saved.". Second review
+  (medium, fixed): a test that a knock never exposes a hidden field; the veil test waits for the veil.
 
 ### 6. demo_exposed
 
@@ -535,6 +541,10 @@ shows it beside the other two.
 * *Depends on:* nothing unmerged. Cut from `origin/main`. *Size:* medium.
 * *Look-ahead:* thread 16 calls `ensureBank` from `BankProvider`; thread 8's `DevDeviceDBInspector` may
   list bank rows beside leases (a raw list verb, if the worker finds one natural).
+* *Review:* high, fixed (#586): two chained test titles split; one transaction confirmed; guarantees
+  hold. Deviations kept: bank rows in their own IndexedDB database (rows ask the Coach); a damaged
+  row made afresh. Left: no scope check on a stored row; `idb-shelf.ts`'s stale `dbstem` doc (thread
+  18 rides it along); doc blocks for the documentarian.
 
 ### 16. provider_once
 
@@ -578,6 +588,10 @@ below are mine as the React developer, on their merits.
 * Ride-along from the Cleanup list (#573 review): hostile-input tests for
   `HostErrorSanitizer.refusalFor` (`undefined`, a string, an object whose getters throw).
 * *Depends on:* 13 (#583, which reworks `passkey.ts`). Cut from its tip once filed. *Size:* small.
+* *Review:* medium, fixed (#585): the `refusalFor` getter test now records reads (a swallowed read
+  passed before); the not-offered-credential refusal uses the ask-failed words (my call); the
+  changeset names the exhaustive-switch break (my call). Left: a TypeError in `askAuthenticator`'s
+  fallthrough becomes `passkey_unavailable` (was `wrong_passkey`).
 
 ### 18. vaultdb_names
 
@@ -617,7 +631,8 @@ below are mine as the React developer, on their merits.
   consistent order is ThingVaultDB). Where the
   shapes check a store by its verbs today (`isVaultDBVerbs`, `brandedVaultDB`), the worker sees
   whether the brand check is what is wanted there, and says so in the PR.
-* `storage/device-db-new.ts` → `device-db.ts` too (the Coach, 2026-11-07), with every import. Thread
+* `storage/device-db-new.ts` → `device-db.ts` too (the Coach, 2026-11-07), with every import. Ride-along:
+  `idb-shelf.ts`'s `dbstem` doc says "`device` or `vaults`"; add `bank` (#586 review). Thread
   15 (#586) is in that file: cut 18 after 15 files, from its tip or from main once #586 merges.
 
 ## For the Coach
