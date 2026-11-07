@@ -41,10 +41,14 @@ describe("HostErrorSanitizer.refusalFor", () => {
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
+  // Each getter notes its read before it throws, so a read swallowed by a catch is still caught.
+  const getterReads: string[] = []
+  const notedTrap = (field: string): never => { getterReads.push(field); return quotingTrap() }
+
   const HostileCases = [
     [undefined,                     'stands in for undefined thrown'],
     ["sk-ant-fake-thrown-string",   'stands in for a bare string thrown, quoting none of it'],
-    [{ get message(): string { return quotingTrap() }, get name(): string { return quotingTrap() } }, 'stands in for an object whose getters throw, reading none of them'],
+    [{ get message(): string { return notedTrap('message') }, get name(): string { return notedTrap('name') }, get stack(): string { return notedTrap('stack') }, get cause(): string { return notedTrap('cause') } }, 'stands in for an object whose getters throw, reading none of them'],
   ] as const
 
   for (const [foreign, blurb] of HostileCases) {
@@ -53,6 +57,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
       expect(refusal).to.include({ refusalkind: 'unexpected_error', message: 'The checker threw.' })
       expect(refusal.cause).to.be.undefined
       expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
+      expect(getterReads).to.be.empty
     })
   }
 
