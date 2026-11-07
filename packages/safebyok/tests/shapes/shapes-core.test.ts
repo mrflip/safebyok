@@ -246,13 +246,13 @@ describe("vaultScope", () => {
 
 // 16 bytes are 22 unpadded base64url characters, and 32 are 43.
 const SaltCases = [
-  ['A'.repeat(22),  true,  'the 22 characters of 16 bytes'],
-  ['-_Az09'.repeat(7) + 'A',  true,  'base64url characters, 43 of them, as 32 bytes take'],
-  ['A'.repeat(21),  false, 'one character short of 16 bytes'],
-  ['A'.repeat(44),  false, 'one character past 32 bytes'],
-  ['A'.repeat(21) + '+', false, 'a standard-base64 character'],
-  ['A'.repeat(21) + '=', false, 'padding'],
-  ['',              false, 'no text'],
+  ["A".repeat(22),              true,   'the 22 characters of 16 bytes'],
+  ["-_Az09".repeat(7) + "A",    true,   'base64url characters, 43 of them, as 32 bytes take'],
+  ["A".repeat(21),              false,  'one character short of 16 bytes'],
+  ["A".repeat(44),              false,  'one character past 32 bytes'],
+  ["A".repeat(21) + "+",        false,  'a standard-base64 character'],
+  ["A".repeat(21) + "=",        false,  'padding'],
+  ["",                          false,  'no text'],
 ] as const
 
 describe("CX.salt_b64", () => {
