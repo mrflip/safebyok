@@ -4,20 +4,25 @@ import { describe, expect, it } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
 import { objCheck } from '../../src/helpers/validator'
 import type { Awaitable } from '../../src/helpers/helpers'
-import type { VaultScope } from '../../src/shapes/shapes-core'
+import type { BankScope, VaultScope } from '../../src/shapes/shapes-core'
+import * as CX from '../../src/shapes/shapes-core'
 import type { LeaseRow } from '../../src/shapes/shapes-storage'
-import type { DeviceDB } from '../../src/storage/device-db-new'
+import type { DeviceDB } from '../../src/storage/device-db'
 import { expectBad, expectGood, expectRefusal } from './refusals'
-import { vaultScope, vaultScopeOf } from './storage-world'
+import { bankScope, vaultScope, vaultScopeOf } from './storage-world'
 
 // == [The hooks a store hands the battery]: DeviceDBRowCheats, DeviceDBBatteryOpts
 
-/** A store's raw lease rows, past its verbs: the test backdoor the battery plants a row by, damaged or not, and reads the rows back by. */
+/** A store's raw lease and bank rows, past its verbs: the test backdoor the battery plants a row by, damaged or not, and reads the rows back by. */
 export type DeviceDBRowCheats = {
   /** Stores `row` as the lease row at `scope`, unchecked. */
   plantLeaseRow: (scope: VaultScope, row: unknown) => Awaitable<void>
   /** Every lease row as stored, in any order. */
   leaseRowsOf:   () => Awaitable<unknown[]>
+  /** Stores `row` as the bank row at `scope`, unchecked. */
+  plantBankRow:  (scope: BankScope, row: unknown) => Awaitable<void>
+  /** Every bank row as stored, in any order. */
+  bankRowsOf:    () => Awaitable<unknown[]>
 }
 
 /** What a store hands {@link describeDeviceDBBattery}: how to make one, and the backdoors to its rows and its storage. */
@@ -291,11 +296,113 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
       })
     })
 
+    describe("ensureBank(scope)", () => {
+      it("makes the bank row on the first call, its device_id a fresh UUID", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank(bankScope)
+        expect(CX.device_id.safeParse(made.device_id).success).to.be.true
+        expect(made).to.deep.equal({ ...bankScope, device_id: made.device_id })
+        expect(await deviceDB.listRawBanks()).to.deep.equal([made])
+      })
+
+      it("answers the same row on a later call", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank(bankScope)
+        expect(await deviceDB.ensureBank(bankScope)).to.deep.equal(made)
+        expect(await deviceDB.listRawBanks()).to.deep.equal([made])
+      })
+
+      it("gives each bank scope a device_id of its own", async () => {
+        const deviceDB = await fresh()
+        const ids = new Set<string>()
+        for (const scope of [bankScope, { ...bankScope, user_id: 'u2' }, { ...bankScope, applabel: 'other' }]) {
+          const made = await deviceDB.ensureBank(scope)
+          ids.add(made.device_id)
+        }
+        expect(ids.size).to.eq(3)
+        expect(await deviceDB.listRawBanks()).to.have.lengthOf(3)
+      })
+
+      it("answers one device_id to two calls made at once for a scope", async () => {
+        const deviceDB = await fresh()
+        const [one, other] = await Promise.all([deviceDB.ensureBank(bankScope), deviceDB.ensureBank(bankScope)])
+        expect(other).to.deep.equal(one)
+        expect(await deviceDB.listRawBanks()).to.have.lengthOf(1)
+      })
+
+      it("takes a vault scope or any bag holding a bank scope, keeping only the bank scope", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank({ ...vaultScope, vault_tok: 'tok_one' } as never)
+        expect(made).to.have.keys(['applabel', 'user_id', 'device_id'])
+        expect(await deviceDB.ensureBank(bankScope)).to.deep.equal(made)
+      })
+
+      it("hands back a copy of the row stored", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank(bankScope)
+        const kept = made.device_id
+        made.device_id = 'changed'
+        const again = await deviceDB.ensureBank(bankScope)
+        expect(again.device_id).to.eq(kept)
+      })
+
+      it("keeps its rows apart from the leases", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        await deviceDB.ensureBank(bankScope)
+        expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
+        expect(await deviceDB.listLeases()).to.have.lengthOf(1)
+        expect(await deviceDB.listRawBanks()).to.have.lengthOf(1)
+        await deviceDB.delRawLease(vaultScope)
+        expect(await deviceDB.listRawBanks()).to.have.lengthOf(1)
+      })
+
+      it.skipIf(noRows)("makes a fresh row over a stored one that fails its check", async () => {
+        const deviceDB = await fresh()
+        await rowsOf(deviceDB).plantBankRow(bankScope, { ...bankScope, device_id: 'not-a-uuid' })
+        const made = await deviceDB.ensureBank(bankScope)
+        expect(CX.device_id.safeParse(made.device_id).success).to.be.true
+        expect(await deviceDB.ensureBank(bankScope)).to.deep.equal(made)
+        expect(await rowsOf(deviceDB).bankRowsOf()).to.deep.equal([made])
+      })
+
+      it("refuses a malformed scope", async () => {
+        const deviceDB = await fresh()
+        await expectRefusal(deviceDB.ensureBank({ ...bankScope, applabel: 'No Good!' }), 'bad_scope')
+        await expectRefusal(deviceDB.ensureBank({ applabel: 'acme' } as never), 'bad_scope')
+        await expectBad(deviceDB.tryEnsureBank({ ...bankScope, user_id: '' }), 'bad_scope')
+        expect(await deviceDB.listRawBanks()).to.deep.equal([])
+      })
+
+      it("answers an Outcome through its try form", async () => {
+        const deviceDB = await fresh()
+        const made = await expectGood(deviceDB.tryEnsureBank(bankScope))
+        expect(await deviceDB.ensureBank(bankScope)).to.deep.equal(made)
+      })
+    })
+
+    describe("listRawBanks()", () => {
+      it.skipIf(noRows)("answers a stored row that fails its check beside the sound ones", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank(bankScope)
+        await rowsOf(deviceDB).plantBankRow({ ...bankScope, user_id: 'u2' }, { device_id: 5 })
+        expect(await expectGood(deviceDB.tryListRawBanks())).to.have.deep.members([made, { device_id: 5 }])
+      })
+
+      it("answers an empty list for an empty store", async () => {
+        const deviceDB = await fresh()
+        expect(await deviceDB.listRawBanks()).to.deep.equal([])
+      })
+    })
+
     describe("a store whose storage fails", () => {
       it.skipIf(_cheat_failNextCall === undefined)("refuses each verb", async () => {
         const deviceDB = await fresh()
         const row = await leaseRowOf()
-        const verbs = [() => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryDelRawLease(asked)]
+        const verbs = [
+          () => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryDelRawLease(asked),
+          () => deviceDB.tryEnsureBank(bankScope), () => deviceDB.tryListRawBanks(),
+        ]
         for (const verb of verbs) {
           await failNextCall(deviceDB)
           await expectBad(verb(), 'storage_unavailable')

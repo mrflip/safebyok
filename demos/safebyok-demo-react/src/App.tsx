@@ -1,4 +1,5 @@
 import { BankProvider } from 'safebyok-react'
+import { KnockKnockExposed } from './components/KnockKnockExposed'
 import { KnockKnockFields } from './components/KnockKnockFields'
 import { OutageSwitch } from './components/OutageSwitch'
 import { SessionBar } from './components/SessionBar'
@@ -27,6 +28,7 @@ const Page = ({ session }: { session: Session | null }) => (
       : (
         <div className="flows">
           <KnockKnockFields />
+          <KnockKnockExposed />
         </div>
       )}
     <aside className="dev-tools" aria-label="Developer tools">

@@ -61,7 +61,7 @@ export const gatingkindVals = ['build_vault', 'unlock_vault', 'replace_passphras
 export type Gatingkind = typeof gatingkindVals[number]
 
 /** The refusals an attempt leaves its gating open under, for the user to try again. */
-export const correctablekindVals = ['wrong_passphrase', 'wrong_passkey', 'weak_passphrase', 'same_passphrase'] as const
+export const correctablekindVals = ['wrong_passphrase', 'wrong_passkey', 'passkey_unavailable', 'weak_passphrase', 'same_passphrase'] as const
 // --
 
 // == [Acts]: listActVals, ListAct, gotActVals, GotAct, putActVals, PutAct, delActVals, DelAct

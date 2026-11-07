@@ -7,7 +7,7 @@ import { Client, cacheExchange, makeErrorResult, mapExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import type { Operation } from '@urql/core'
 import type { GraphQLSchema } from 'graphql'
-import type { Boxscope, VaultDB, VaultDBOpts, VaultScope } from 'safebyok/storage'
+import type { AdapterVaultDB, AdapterVaultDBOpts, Boxscope, VaultScope } from 'safebyok/storage'
 import * as TH from 'safebyok/testing'
 import { PostgresVaultDB, VaultTablesSql, vaultChannelOf } from 'safebyok-postgres'
 import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
@@ -82,7 +82,7 @@ export const serverOver = async (opts: Omit<PostgresVaultDBOpts, 'client'> = {})
 )
 
 /** The GraphQL schema over `vaultDB`, each request signed in as its context says. */
-export const schemaOver = (vaultDB: VaultDB): GraphQLSchema => makeExecutableSchema({
+export const schemaOver = (vaultDB: AdapterVaultDB): GraphQLSchema => makeExecutableSchema({
   typeDefs:  VaultSchemaSdl,
   resolvers: vaultResolvers({ vaultDB, userIdOf: ({ user_id }: TestContext) => user_id }),
 })
@@ -128,7 +128,7 @@ export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAs
 const serversOf = new WeakMap<GraphQLVaultDB, { schema: GraphQLSchema, store: PostgresVaultDB }>()
 
 /** A fresh browser's store over emptied tables, its server's store made with `opts` and at most `maxBoxes` boxes to a vault. */
-export const makeVaultDB = async (opts: VaultDBOpts = {}, maxBoxes?: number): Promise<FlakyVaultDB> => {
+export const makeVaultDB = async (opts: AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<FlakyVaultDB> => {
   await emptyTables()
   const store = await serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
   const schema = schemaOver(store)
@@ -153,7 +153,7 @@ export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
 }
 
 /** The PostgresVaultDB behind a browser's store, for the battery's races. */
-export const storeOf = (vaultDB: GraphQLVaultDB): VaultDB => serverOf(vaultDB).store
+export const storeOf = (vaultDB: GraphQLVaultDB): AdapterVaultDB => serverOf(vaultDB).store
 // --
 
 // == [Rows]: sql, rowsOf

@@ -40,6 +40,8 @@ export const Messages = {
   addPasskeyTitle:    'Add a passkey',
   addPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',
   addPasskeyButton:   'Add passkey',
+  /** Said at an add-passkey submit with the passphrase field empty: the browser is not asked. */
+  passphraseFirst:    'Enter your vault passphrase first: the passkey is added only once it is proven.',
   revokePasskeyTitle:  'Remove your passkey',
   revokePasskeyBlurb:  'Enter your vault passphrase to remove the passkey. You will unlock with the passphrase alone, on every device.',
   revokePasskeyButton: 'Remove passkey',
@@ -57,8 +59,8 @@ export const Messages = {
   passkeyButton:     'Use a passkey',
   passkeyTrouble:    "Your passkey can't be used here just now. Unlock with your passphrase instead.",
   noPasskeyToAsk:    'This vault has no passkey to ask: unlock it with your passphrase, then add one.',
-  noWebAuthn:        'This browser offers no passkeys (WebAuthn): use your passphrase.',
-  noPrf:             "This passkey's authenticator does not offer the PRF extension a vault's passkey needs: use your passphrase, or try another device or security key.",
+  noWebAuthn:        "This browser can't use passkeys. Your passphrase still works.",
+  noPrf:             "That device or security key can't be used with this vault: it lacks a feature a vault's passkey needs. Try another, or use your passphrase.",
   passkeyAskFailed:  "Your browser couldn't ask for a passkey just now: try again, or use your passphrase.",
 
   // The whisper field

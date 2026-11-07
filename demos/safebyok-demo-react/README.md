@@ -14,8 +14,9 @@ Whispers are encrypted on this device before anything reaches storage. The page 
 browser's batteries, `browserOpts` from `safebyok/browser`: Argon2id to derive, zxcvbn to judge
 a new passphrase, and the device's leases in this browser's IndexedDB. The vault's rows live in
 IndexedDB too, in a database of their own (through `safebyok-indexeddb`), standing in for the
-ciphertext a backend would hold. Only the fake auth's scaffolding rows, and this browser's
-`device_id`, sit in localStorage.
+ciphertext a backend would hold. Only the fake auth's scaffolding rows sit in localStorage; the
+`device_id` each user's bank is made with is kept beside the leases, as the provider asks the
+deviceDB for it.
 
 ## The page
 
@@ -30,13 +31,16 @@ confirmation), then the account. Under it,
 with *Change passphrase*, and a fingerprint button to add or remove a passkey. A dialog the user
 cancels changes nothing, and the page says nothing of it.
 
-Below the header sit the flows, side by side, each keeping the same key its own way and knocking
-through [src/lib/anthropic.ts](src/lib/anthropic.ts):
+Below the header sit the flows, side by side, each keeping a key of its own in its own box, so the
+ways compare side by side, and each knocking with its own key through [src/lib/anthropic.ts](src/lib/anthropic.ts):
 
 * **With managed fields** ([src/components/KnockKnockFields.tsx](src/components/KnockKnockFields.tsx)):
   the key sits in a field that `safebyok/dom` fills and saves, so it never passes through React.
   *Add key* builds and unlocks the vault as needed and shows the field; *Save* stores it; *Done*
   hides it again.
+* **With an exposed whisper** ([src/components/KnockKnockExposed.tsx](src/components/KnockKnockExposed.tsx)):
+  an ordinary controlled field over `useWhisper(box)`; typing is `box.patchWhisper`, *Save* is
+  `box.putExposed`, and leaving the page is `box.unexpose`.
 
 The aside, *Behind the scenes*, is for developers: its *Backend online* switch
 ([src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts)) takes the vaultDB offline, so every
@@ -48,7 +52,7 @@ verb refuses as an unreachable backend does. Take the aside away and what is lef
 |---|---|
 | the library | the `safebyok` workspace package (`packages/safebyok/src/`) |
 | React plumbing | the `safebyok-react` workspace package (provider, hooks, controls, the dialogs) |
-| app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in over localStorage; a real app brings its own auth and passes `user_id` to the provider), [src/lib/stores.ts](src/lib/stores.ts) (the bank's options: this browser's IndexedDB standing in for a backend, and its `device_id`) |
+| app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in over localStorage; a real app brings its own auth and passes `user_id` to the provider), [src/lib/stores.ts](src/lib/stores.ts) (the bank's options: this browser's IndexedDB standing in for a backend) |
 | developer tools | [src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts), [src/components/OutageSwitch.tsx](src/components/OutageSwitch.tsx) |
 | the app itself | [src/components/](src/components/), [src/lib/anthropic.ts](src/lib/anthropic.ts) |
 

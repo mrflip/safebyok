@@ -116,7 +116,7 @@ async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this>
 The first line rests on the `/**` and is one whole sentence, so it reads with the code folded. It runs long only while it is
 still one fact a caller must know before calling; a second fact goes on a line below, under a short headline. The test:
 read the line aloud; a breath taken at "so", "as" or a semicolon marks where the second line begins. Three pairs, from
-`models/box-listing.ts`, `storage/vault-db-new.ts` and `models/box.ts` on `main` at `fa7ff8e5`; the Gallant column is
+`models/box-listing.ts`, `storage/vault-db.ts` and `models/box.ts` on `main` at `fa7ff8e5`; the Gallant column is
 proposed.
 
 **Goes long: a refusal the caller meets in normal use is headline news.** `create` refusing a live box is the one thing a
@@ -463,7 +463,7 @@ States the 'vault_full' a caller meets in normal use, and gives no recipe for it
 
 ## Option values get a list `#option-values-get-a-list`
 
-One value a line, the default marked. Values gapped into a sentence, or told as policy prose, hide the one the caller is looking for. The `PutVaultOpts` Gallant is checked against `storage/vault-db-new.ts` and `memory-vault-db.ts` on `main`: a write lands only where the row stands at `prior`, a rebirth over a tombstone included, and `putVault` takes no `'repl'`.
+One value a line, the default marked. Values gapped into a sentence, or told as policy prose, hide the one the caller is looking for. The `PutVaultOpts` Gallant is checked against `storage/vault-db.ts` and `memory-vault-db.ts` on `main`: a write lands only where the row stands at `prior`, a rebirth over a tombstone included, and `putVault` takes no `'repl'`.
 
 **Goofus:**
 

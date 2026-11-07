@@ -4,6 +4,8 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
 import type { MemoryVaultDB } from 'safebyok/storage'
+import { useBox } from 'safebyok-react'
+import { ApiKeyVaultlabel, FieldsApiKeyBoxlabel } from '../../src/lib/saved-api-key'
 import { KnockKnockFields } from '../../src/components/KnockKnockFields'
 import * as TH from '../test-helpers'
 
@@ -12,6 +14,12 @@ const Punchline = 'Banana who? Banana split, gotta run!'
 
 /** The flow beside the vault probe, in a bank for `u1`. */
 const renderFlow = () => TH.renderInBank(<><KnockKnockFields /><TH.VaultProbe /></>)
+
+/** A Veil button for the box under the flow, which nothing on the page offers. */
+const BoxVeiler = () => {
+  const box = useBox(ApiKeyVaultlabel, FieldsApiKeyBoxlabel)
+  return <button type="button" onClick={() => { box?.veil() }}>Veil</button>
+}
 
 /** The API key field, once a box backs it. */
 const apiKeyField = async () => await screen.findByLabelText<HTMLInputElement>('Anthropic API key')
@@ -56,7 +64,7 @@ describe("KnockKnockFields", () => {
     expect(screen.getByRole('button', { name: 'Save' })).to.not.be.null
   })
 
-  it("keeps the field showing after Add key under StrictMode, whose second mount of the field must not hide it", async () => {
+  it("keeps the field showing after Add key under StrictMode", async () => {
     TH.renderInBank(<StrictMode><KnockKnockFields /><TH.VaultProbe /></StrictMode>)
     const field = await addKey()
     fireEvent.change(field, { target: { value: FakeApiKey } })
@@ -69,7 +77,7 @@ describe("KnockKnockFields", () => {
     await saveKey()
     expect(document.body.outerHTML).to.not.contain(FakeApiKey)
     const boxrows = storedBoxRows(vaultDB)
-    expect([...boxrows.keys()]).to.deep.equal(['anthropic_api_key'])
+    expect([...boxrows.keys()]).to.deep.equal([FieldsApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
@@ -84,6 +92,15 @@ describe("KnockKnockFields", () => {
     await waitFor(() => { expect(field.value).to.eq(FakeApiKey) })
   })
 
+  it("clears Saved. on Done", async () => {
+    renderFlow()
+    const field = await saveKey()
+    fireEvent.change(field, { target: { value: 'sk-ant-unsaved-edit' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await screen.findByRole('button', { name: 'Edit key' })
+    expect(screen.queryByText('Saved.')).to.be.null
+  })
+
   it("knocks with the saved key, and shows Claude's punchline", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
@@ -94,14 +111,53 @@ describe("KnockKnockFields", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
+  it("knocks with the saved key after an unsaved edit and a lock", async () => {
+    const anthropic = TH.fakeAnthropic(200, Punchline)
+    vi.stubGlobal('fetch', anthropic.fetchFn)
+    renderFlow()
+    const field = await saveKey()
+    fireEvent.change(field, { target: { value: 'sk-ant-unsaved-edit' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
+    await TH.expectProbe('present locked')
+    await knockAs('Banana')
+    await TH.answerPassphraseDialog()
+    await screen.findByText(Punchline)
+    expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
+  })
+
+  it("knocks with the saved key while the box is veiled", async () => {
+    const anthropic = TH.fakeAnthropic(200, Punchline)
+    vi.stubGlobal('fetch', anthropic.fetchFn)
+    TH.renderInBank(<><KnockKnockFields /><BoxVeiler /><TH.VaultProbe /></>)
+    await saveKey()
+    fireEvent.click(screen.getByRole('button', { name: 'Veil' }))
+    await screen.findByRole('button', { name: 'Edit key' })
+    await knockAs('Banana')
+    await screen.findByText(Punchline)
+    expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
+  })
+
+  it("leaves a hidden field hidden at a knock", async () => {
+    const anthropic = TH.fakeAnthropic(200, Punchline)
+    vi.stubGlobal('fetch', anthropic.fetchFn)
+    renderFlow()
+    const field = await saveKey()
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await screen.findByRole('button', { name: 'Edit key' })
+    await knockAs('Banana')
+    await screen.findByText(Punchline)
+    expect(field.value).to.eq('')
+    expect(screen.queryByRole('button', { name: 'Save' })).to.be.null
+  })
+
   it("asks for the key at a knock before one is saved, sending nothing", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     renderFlow()
     await knockAs('Banana')
-    await TH.answerPassphraseDialog()
     await screen.findByText('Save your Anthropic API key first.')
-    expect(anthropic.seen).to.have.length(0)
+    expect(anthropic.seen).to.have.lengthOf(0)
+    await TH.expectProbe('unborn none')
   })
 
   it("asks who's there before it knocks", async () => {
@@ -112,11 +168,11 @@ describe("KnockKnockFields", () => {
 
   it("says nothing when the user cancels the dialog, and builds no vault", async () => {
     renderFlow()
-    const prompting = vi.spyOn(Bank.prototype, 'ensureVault')
+    const ensureVaultSpy = vi.spyOn(Bank.prototype, 'ensureVault')
     fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await waitFor(() => { expect(prompting).toHaveBeenCalled() })
-    await act(async () => { await Promise.allSettled(prompting.mock.results.map((result): unknown => result.value)) })
+    await waitFor(() => { expect(ensureVaultSpy).toHaveBeenCalled() })
+    await act(async () => { await Promise.allSettled(ensureVaultSpy.mock.results.map((result): unknown => result.value)) })
     expect(document.querySelector('.knock-knock .gripe')).to.be.null
     expect(screen.getByRole('button', { name: 'Add key' })).to.not.be.null
     await TH.expectProbe('unborn none')
