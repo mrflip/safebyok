@@ -262,6 +262,19 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
   })
 
+  it("tells an onPanic given only after the bank was made nothing, and leaves the vault to be vacated", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const later = vi.fn()
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    rerender({ ...props, onPanic: later })
+    refuseErase(deviceDB)
+    fireEvent.click(screen.getByText('Lock'))
+    await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
+    await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
+    expect(later).not.toHaveBeenCalled()
+  })
+
   it("tells the next user's onPanic nothing of a panic from the bank it let go", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
