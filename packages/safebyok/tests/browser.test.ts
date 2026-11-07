@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
-import { Argon2idWebV1, IdbDeviceDB, argon2idDeriver, argon2idWebV1Deriver, browserOpts, checkSaltFits, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
+import { Argon2idWebV1, IdbDeviceDB, argon2idDeriver, argon2idWebV1Deriver, browserOpts, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
 import * as Front from '../src/index'
 import * as Phrases from '../src/helpers/phrases'
 import * as TH from './test-helpers'
@@ -38,7 +38,7 @@ describe("Argon2id's reference test vector", () => {
     expect(Buffer.from(derived).toString('hex')).to.eq('09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7')
   })
 
-  it("is out of reach of a keyDeriverSpec, which asks for a salt of 16 bytes or more", () => {
+  it("is out of reach of a keyDeriverSpec, which asks for a salt of 16 bytes", () => {
     expect(() => parseKeyDeriverSpec({ ...CheapSpec, salt_bytes: 8 })).to.throw(/salt_bytes/u)
   })
 })
@@ -73,12 +73,10 @@ describe("safebyok/browser", () => {
     expect(await deriver.deriveKeyBytes('another passphrase', salt)).to.not.deep.eq(first)
   })
 
-  it("hands another deriver what it needs to wear the same specs: the supplied spec, its parse and its salt check", () => {
+  it("hands another deriver what it needs to wear the same specs: the supplied spec and its parse", () => {
     expect(argon2idWebV1Deriver).to.include({ ...Argon2idWebV1 })
     expect(parseKeyDeriverSpec(CheapSpec)).to.deep.equal(CheapSpec)
     expect(() => parseKeyDeriverSpec({ ...Argon2idWebV1, iterations: 4 })).to.throw(/argon2id_web_v1/u)
-    expect(() => { checkSaltFits(CheapSpec, salt) }).to.not.throw()
-    expect(() => { checkSaltFits(CheapSpec, new Uint8Array(15)) }).to.throw(/16/u)
   })
 
   it("is not on the front door", () => {

@@ -1,4 +1,5 @@
-import { reservedLabel, saltDoesNotFit, suppliedSpecChanged } from '../refusals/throwers'
+import type { PassphraseSaltBytes } from '../helpers/consts'
+import { reservedLabel, suppliedSpecChanged } from '../refusals/throwers'
 import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefix, keyDeriverSpec } from './shapes'
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
@@ -7,8 +8,8 @@ import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefi
 export interface KeyDeriver {
   /** The name each wayin stores for how its key was derived, so a later device derives it alike. */
   readonly key_deriver_label: string
-  /** How many bytes of salt each derivation takes. */
-  readonly salt_bytes:        number
+  /** How many bytes of salt each derivation takes: {@link PassphraseSaltBytes}, for every deriver. */
+  readonly salt_bytes:        typeof PassphraseSaltBytes
   /** The name of the derivation algorithm, as the supplied derivers carry it (`argon2id`). */
   readonly algorithm?:        string | undefined
   /** Derive the key's bytes from the passphrase and the wayin's salt, the same bytes for the same two. */
@@ -20,7 +21,7 @@ export interface KeyDeriver {
 export type Argon2idKeyDeriver = KeyDeriverSpec & KeyDeriver
 // --
 
-// == [Checks]: parseKeyDeriverSpec, checkSuppliedSpecKept, checkSaltFits, isTestDeriver
+// == [Checks]: parseKeyDeriverSpec, checkSuppliedSpecKept, isTestDeriver
 
 export const parseKeyDeriverSpec = (candidate: unknown): KeyDeriverSpec => {
   const spec = keyDeriverSpec.parse(candidate)
@@ -37,10 +38,6 @@ export const checkSuppliedSpecKept = (candidate: KeyDeriverSpec): void => {
   const carried: Readonly<Record<string, unknown>> = candidate
   const kept = Object.entries(supplied).every(([fieldname, val]) => carried[fieldname] === val)
   if (! kept) { throw suppliedSpecChanged(supplied.key_deriver_label) }
-}
-
-export const checkSaltFits = (spec: Pick<KeyDeriverSpec, 'salt_bytes'>, saltBytes: Uint8Array): void => {
-  if (saltBytes.length !== spec.salt_bytes) { throw saltDoesNotFit(spec.salt_bytes, saltBytes.length) }
 }
 
 export const isTestDeriver = (keyDeriver: Pick<KeyDeriver, 'key_deriver_label'>): boolean => keyDeriver.key_deriver_label.startsWith(TestLabelPrefix)

@@ -203,13 +203,11 @@ export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_
 export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerLoadFailed, { cause })
 // --
 
-// == [Deriver Throwers]: reservedLabel, suppliedSpecChanged, saltDoesNotFit
+// == [Deriver Throwers]: reservedLabel, suppliedSpecChanged
 
 export const reservedLabel = (reservedPrefix: string): VaultError => new VaultError('bad_option', Phrases.reservedDeriverLabel(reservedPrefix))
 
 export const suppliedSpecChanged = (label: string): VaultError => new VaultError('bad_option', Phrases.suppliedSpecChanged(label))
-
-export const saltDoesNotFit = (expectedCount: number, handedCount: number): VaultError => new VaultError('bad_option', Phrases.saltDoesNotFit(expectedCount, handedCount))
 // --
 
 // == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext

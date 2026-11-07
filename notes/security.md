@@ -463,6 +463,11 @@ added or folded into through the subagent, and no other entry changes.
   (`^[A-Za-z0-9_-]{22,43}$`, 16 to 32 bytes unpadded) by its text alone, with no decode, and a record whose salt fails is `bad_record`; a passkey's `prf_salt_b64`
   stays non-empty text, judged per wayin as above. A key deriver's spec must ask for 16 to 32 `salt_bytes` (`MinSaltBytes` = 16, `src/helpers/consts.ts`), and fewer is refused at
   setup; the default Argon2id deriver makes 16. The Argon2id spec in `src/deriver/shapes.ts` still allows a minimum of 8 (`MinArgon2SaltBytes`), so a deriver of 8 is refused by the Bank.
+  Amended 2026-11-07 (docblock_trim): a passphrase salt is exactly 16 bytes for every key deriver (`PassphraseSaltBytes`, `src/helpers/consts.ts`; RFC 9106's recommendation for Argon2id),
+  and the range, `MinSaltBytes` and `MinArgon2SaltBytes` above no longer hold. A deriver's `salt_bytes` (in `keyDeriverSpec`, `src/deriver/shapes.ts`, and in the host deriver `guardKeyDeriver`
+  checks through `keyDeriverShape`, `src/shapes/shapes-core.ts`) must be 16; a stored `salt_b64` must be exactly 22 base64url characters, by length and pattern without decoding; a salt that
+  still fails to decode (stray trailing bits) is refused `bad_record` by `saltBytesOf` (`src/models/proving.ts`) before the deriver is asked. The derivers' own per-call salt-length
+  check (`checkSaltFits`) is gone. The pin may be relaxed if a host asks for another length.
   (5) `vault_tok` and `revision_tok` stay plain strings, since a host's storage adapter handles them. Their check refuses an empty one
   with its own sentence ("A token is minted by safebyok, so it can't be empty"), quoting nothing.
 * 2026-10-26 (zod_classic, branch `20261026-zod_classic`, stacked on PR [#273](https://github.com/mrflip/safebyok/pull/273)): **stored records parse
@@ -2406,7 +2411,9 @@ added or folded into through the subagent, and no other entry changes.
   `{ call: 'deriveKeyBytes', refusalkind }`, the `refusalkind` being the thrown `VaultError`'s only when it is one of
   `refusalKindVals` (amended 2026-10-28 (validator_names): `RefusalKindVals` when this was written; `listedKindOf`, `src/errors.ts`; a kind off the list is the thrower's own text), else null; conditions are
   not logged. This is the rule `requestCleartext` (thread 9b, same helper) and the strength checker's guard already follow; the
-  strength checker's `load()`, which hears no passphrase, keeps its `cause`. A deriver's own text is lost to the caller:
+  strength checker's `load()`, which hears no passphrase, keeps its `cause`. Amended 2026-11-07 (docblock_trim): `guardKeyDeriver`'s `deriveKeyBytes`
+  (`src/models/proving.ts`) replaces every throw from the host's deriver, a `VaultError` included, with `keyDeriverThrew()`, no cause (`guarantees.md` G8), so the `refusalkind` kept
+  above, the one logged, and a condition passing through on the sealing paths no longer hold; a brief pass-through of a deriver's own `VaultError` was reverted before release. A deriver's own text is lost to the caller:
   safebyok-fastkey's `bad_option` asking for `'wasm-unsafe-eval'` in the CSP reaches the host as `unexpected_error`, with the
   kind `bad_option` in the log. Still open (a Coach's TODO, "Add sensitive and host flags to refusals"): a strength checker's
   verdict `reason` becomes the `weak_passphrase` message as given, so a checker that quoted the passphrase in its `reason` would
@@ -3491,7 +3498,7 @@ added or folded into through the subagent, and no other entry changes.
   (`parseKeyDeriverSpec`; amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): it refuses in one fixed sentence listing every field's bounds, reading nothing of the failure, `SpecLimitForField` gone) on any deriver declaring `algorithm: 'argon2id'`, so a spec Argon2id
   cannot run fails at open with a kind, not at the first unlock as a library's plain Error. The
   supplied derivers (the core's and `safebyok-fastkey`'s) refuse a salt of another length than the
-  spec's before deriving (`bad_option`, never quoting the salt): the stored-vault half of that
+  spec's before deriving (`bad_option`, never quoting the salt; amended 2026-11-07 (docblock_trim): that per-call check is gone, the salt's length being pinned at 16 elsewhere, see the 2026-10-26 `brands` entry): the stored-vault half of that
   was already so, a wayin with a salt of the wrong length being passed over as damaged.
 * 2026-10-16: **a `test_` label is warned of, never refused.** `Vault.make` says through the
   logger, once per open, that a key deriver whose label begins `test_` (the published
