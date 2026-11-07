@@ -54,7 +54,7 @@ export const Hider = ({ hiding }: { hiding: Promise<unknown> | null }) => {
 
 // == [Provider world]: DeviceId, providerPropsOf, withoutGesture
 
-/** The device_id of the provider's bank in these tests. */
+/** A device_id for a test that writes one into a record by hand. */
 export const DeviceId = '00000000-0000-4000-8000-0000000000c1'
 
 /** A BankProvider's props over `world`'s vaultDB, signed in as the world's user, with a deviceDB of its own, so a vault the world's bank built is locked to the provider's.
@@ -64,7 +64,7 @@ export const DeviceId = '00000000-0000-4000-8000-0000000000c1'
  *   render(<BankProvider {...TH.providerPropsOf(world)}><Shows /></BankProvider>)
  */
 export const providerPropsOf = (world: BankWorld, overrides: Partial<Omit<BankProviderProps, 'children'>> = {}): Omit<BankProviderProps, 'children'> => ({
-  applabel: 'acme', user_id: 'u1', device_id: DeviceId, vaultDB: world.vaultDB, deviceDB: new MemoryDeviceDB(),
+  applabel: 'acme', user_id: 'u1', vaultDB: world.vaultDB, deviceDB: new MemoryDeviceDB(),
   keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, ...overrides,
 })
 
