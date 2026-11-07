@@ -19,7 +19,7 @@ Branch `20261107-docblock_trim`, PR pending, stacked on #571. Justify: green (li
   - Single-line blocks were rewritten to a purpose phrase only where they ran over 120 characters or read the body aloud (machinery, atomicity, deletes); the many short ones were left.
 
 * **Discoveries**
-  - `notes/gallant-docblocks.md` carries unresolved merge conflict markers (`<<<<<<< HEAD` ... `>>>>>>> 32d3abf71`) near its contents list, in the base checkout's history (commit d338712e9 "docs: Gallant/Goofus code examples"). Not touched here.
+  - `notes/gallant-docblocks.md` carries unresolved merge conflict markers (`<<<<<<< HEAD` ... `>>>>>>> 32d3abf71`) at lines 17-23 and 188-753, committed on main in 80d2f6f26 ("the gallant bestiaries as the Coach left them"). Not touched here.
   - The subagent left two spots in `notes/security.md` alone as out of its brief: entries near lines 1644, 2316 and 2841 cross-reference wire_meta and still name `box_stored` / `capacity` as `safebyokPutBox` answer fields, and the 2026-10-15 entry near line 2489 says the box count is "capped on the client".
   - The wire_meta entry cites the graphql README as stating the response-logging residual; the README has no such text. The subagent's edit says so.
 
