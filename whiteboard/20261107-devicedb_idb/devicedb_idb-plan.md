@@ -295,6 +295,15 @@ worker do this." `doListLeases` returns each row with its scopepath; `listRawLea
 `{ scopepath, row }`; `delRawLease` takes that scopepath, checked by its interface only;
 `listLeases` stays a full read. G8 follows once ruled.
 
+*G8 ruled (the Coach, 2026-11-07, Open Matters, proceed):* "reverse my decision: this is too much
+drama for a thing few people will want to do, changing the salt size. Make the key deriver force the
+exact length we use (43 chars?) -- don't decode it just to count length, or catch and re-throw the
+errors. We can relax it whenever someone asks." *Orchestrator's reading:* the length we use is the
+deriver spec's 16 bytes (22 characters; the Coach's 43 is a passkey PRF salt). One `SaltBytes = 16`;
+`salt_b64` is exactly 22 characters of b64url; a deriver's `salt_bytes` is 16; the deriver's own
+salt-length check and its refusal go; `deriveKeyBytes` replaces every host throw again (the
+pass-through reverted), so G8 stands unamended. Next rework, after the second review lands.
+
 ### 4b. #571's second rework (the Coach, 2026-11-07, Open Matters)
 
 * tidyGone: "by \"front-end\" I should better have said \"public interface\" -- tidyGone is one of
