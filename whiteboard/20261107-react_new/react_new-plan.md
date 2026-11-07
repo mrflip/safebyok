@@ -498,6 +498,11 @@ shows it beside the other two.
 * *Touches:* every file in `packages/safebyok-react/src` (doc blocks only), the README.
 * *Depends on:* nothing unmerged. Cut from `origin/main`, beside 5 and 13; its doc-block lines may
   meet theirs at the end's restack, which is the restacker's to settle. *Size:* small.
+* *Review:* low, fixed (#581): two first lines put on the `/**` (style pass); `VaultLockControl`'s
+  line again says it renders Create while unborn; `PassphraseAdvice`'s line again warns that it hears
+  the passphrase in plain text (my call: a caveat about a secret, still one line). Left for the
+  documentarian: `useWhenShown`'s `isShown` guidance, `useWhisper`'s "read it at each render",
+  `ModalForm`'s class names.
 
 ## For the Coach
 

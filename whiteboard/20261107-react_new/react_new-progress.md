@@ -126,3 +126,8 @@ main). Thread 10 is folded into 5 (the demo on `browserOpts`) and 8 (`DevDeviceD
   `mash(applabel^user_id)`; it must be a UUID, and it is only a label in wayin headers), and whether
   `BankProvider` should read its options once per `user_id` instead of remaking the bank on a
   change. Neither blocks thread 5; keep the demo's `device_id` minting in one small function.
+
+## From thread 14 (react_doc_trim, #581)
+
+* *Orchestrator:* every doc block in `packages/safebyok-react/src` is one line, and the README is two
+  lines. New doc blocks follow suit. Expect doc-block conflicts with 5 and 13 at the restack.
