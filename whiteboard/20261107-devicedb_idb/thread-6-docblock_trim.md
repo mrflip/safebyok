@@ -27,6 +27,9 @@ Branch `20261107-docblock_trim`, PR #580, stacked on #571 (base main). Justify: 
   - Confirm the two leftover security.md spots (above) are worth another pass.
   - The size limits Convex README names are as the code has them (8,000 box rows, 7 MiB less 1 KiB per life); the Coach said they will be adjusted once the sprint ends, so the README will need that edit then.
 
+Second rework, one salt length (the Coach's ruling reversing the deriver pass-through below): `thread-6-docblock_trim-salt.md`,
+for whoever files or reworks this thread.
+
 ## Rework after review (2026-11-07)
 
 Directives from the review on #580 and the Coach's chat on lease keys. Justify green at each commit (safebyok 2414 tests).
