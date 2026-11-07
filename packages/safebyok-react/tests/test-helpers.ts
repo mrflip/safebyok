@@ -85,7 +85,7 @@ export const withoutGesture = () => {
  * @example await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))  // one the fake authenticator holds
  */
 export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?: PasskeyAnswer | null) => {
-  const {typing} = world.dialog
+  const { typing } = world.dialog
   world.dialog.typing = { passphraseClear: Passphrase, passkeyClear: passkeyClear ?? await passkeyOf('laptop') }
   try {
     await vault.addPasskeyPrompt()
@@ -296,7 +296,7 @@ class FakePublicKeyCredential {
 /** HMAC-SHA256 of `saltBytes` under `secretBytes`: the fake's PRF, as hmac-secret's is in spirit. */
 const prfOf = async (secretBytes: Uint8Array<ArrayBuffer>, saltBytes: BufferSource): Promise<ArrayBuffer> => {
   const hmacKey = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  return await crypto.subtle.sign('HMAC', hmacKey, saltBytes)
+  return crypto.subtle.sign('HMAC', hmacKey, saltBytes)
 }
 
 /** `source`'s bytes as base64url, whichever kind of buffer it is. */
