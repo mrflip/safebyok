@@ -71,7 +71,7 @@ export class IdbDeviceDB extends DeviceDB {
     const [scopepaths, rows] = await inOneStep(this.#shelf, 'readonly', (store) => Promise.all([
       promisifyRequest<IDBValidKey[]>(store.getAllKeys()), promisifyRequest<unknown[]>(store.getAll()),
     ]))
-    return scopepaths.map((scopepath, idx) => ({ scopepath: scopepath as LeaseScopepath, row: rows[idx] }))
+    return scopepaths.map((scopepath, ii) => ({ scopepath: scopepath as LeaseScopepath, row: rows[ii] }))
   }
 
   protected async doDelRawLease(scopepath: LeaseScopepath): Promise<void> {
