@@ -239,9 +239,11 @@ const goodAnswerOf = <ValT, ActT extends string, WorldT>(answer: Answer<ValT, Ac
 /** The `fieldname` of an operation's answer, or the refusal a failed operation stands for. */
 const fieldOf = ({ error: err, data }: OperationResult<unknown>, fieldname: string): unknown => {
   if (err?.networkError !== undefined) { throw DB.storageUnavailable(err) }
-  // A GraphQL error is a client and server out of step, which no retry mends: never a condition of storage.
+  // A GraphQL error is a client and server out of step, which no retry mends: never a condition of storage. It is
+  // refused with no cause, as every GraphQL error crosses with no server text: a variable-coercion error can quote the
+  // variable sent, which is the record.
   if ((err !== undefined) || (typeof data !== 'object') || (data === null) || ! Object.hasOwn(data, fieldname)) {
-    throw new DB.VaultError('unexpected_error', DB.SchemaNotServed, { cause: err })
+    throw new DB.VaultError('unexpected_error', DB.SchemaNotServed)
   }
   return (data as Record<string, unknown>)[fieldname]
 }
