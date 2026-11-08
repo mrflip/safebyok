@@ -20,7 +20,7 @@ export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
 export type PasskeyUnlockButtonProps = {
   /** The gating the passkey answers, as the bank handed it to `requestCleartext`. */
   gating:      Gating<'unlock_vault'>
-  /** Called once the gating is answered: 'unlocked', or 'declined' for a refusal that closes the dialog. */
+  /** Called with 'unlocked' when the passkey unlocks the vault, and with 'declined' on a refusal that closes the dialog. */
   onDone:      (answer: 'unlocked' | 'declined') => void
   /** What the button has to say, or null once what it said last no longer stands. */
   onGripe:     (gripe: string | null) => void
@@ -46,7 +46,7 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlo
   if (failure !== null) { throw forBoundary(failure.err, 'PasskeyUnlockButton') }
   if (! offersPasskey(gating)) { return null }
 
-  /** What the attempt, or the authenticator asked before it, refused with. */
+  /** Meet a refusal from the attempt, or from the authenticator asked before it. */
   const heard = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
     // Pressed while a passphrase attempt runs: that attempt answers for the dialog.

@@ -5,11 +5,11 @@ import type { PassphraseAdvice } from '../modal'
 
 // == [Props]: BankProviderProps, providerProps, HeldBankOpts, Handlers
 
-/** What BankProvider is handed: the Bank.make options but the device's, the signed-in `user_id`, and the dialogs' props. */
+/** What BankProvider is handed: the Bank.make options but `device_id`, the signed-in `user_id`, and the dialogs' props. */
 export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then the provider holds no bank. */
   user_id:             string | null
-  /** What asks the user for a passphrase or passkey: the provider's own dialogs when left out. */
+  /** What asks the user for a passphrase or passkey. Defaults to the provider's own dialogs. */
   requestCleartext?:   RequestCleartext | undefined
   /** What a password manager files a vault's passphrase under. */
   passphraseUsername?: string | undefined
@@ -20,7 +20,7 @@ export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'reques
   children:            ReactNode
 }
 
-/** BankProvider's props: Bank.make's options but the device's, beside the signed-in user and the dialogs' props. */
+/** BankProvider's props: Bank.make's options but `device_id`, beside the signed-in user and the dialogs' props. */
 export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_id: true }).extend({
   user_id:            bankOpts.shape.user_id.nullable(),
   requestCleartext:   fn<RequestCleartext>().optional(),
@@ -30,7 +30,7 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
   children:           custom<ReactNode>(),
 }), 'bad_option')
 
-/** The options a held bank is made from: Bank.make's, but the device's and the handlers. */
+/** The options a held bank is made from: Bank.make's, but `device_id` and the handlers. */
 export type HeldBankOpts = Omit<BankOpts, 'device_id' | 'onPanic' | 'onBadNews' | 'requestCleartext'>
 
 /** The functions a held bank calls back, each as it was last rendered. */

@@ -6,7 +6,7 @@ import type { Gatingkind } from 'safebyok'
 /** The locale the dialog formats its relative times in, and the language of every message here. */
 export const Locale = 'en'
 
-/** The words themselves. */
+/** The words safebyok-react shows a user, each under its name. */
 export const Messages = {
   // The passphrase dialog
   chooseTitle:       'Choose a vault passphrase',
@@ -24,9 +24,9 @@ export const Messages = {
   createButton:      'Create vault',
   unlockButton:      'Unlock',
   cancelButton:      'Cancel',
-  /** The window, while the dialog creates the vault: `relative` is a phrase such as 'in 7 days'. */
+  /** How long the unlock lasts, said while the dialog creates the vault: `relative` is a phrase such as 'in 7 days'. */
   locksIn:           (relative: string) => `Locks on this device ${relative}.`,
-  /** The window, on an ordinary unlock: `relative` is a phrase such as 'in 7 days'. */
+  /** How long the unlock lasts, said on an ordinary unlock: `relative` is a phrase such as 'in 7 days'. */
   locksAgainIn:      (relative: string) => `Locks again on this device ${relative}.`,
   staysUnlocked:     'Stays unlocked on this device until you lock it.',
 

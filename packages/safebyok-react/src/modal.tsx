@@ -21,7 +21,7 @@ const answerOf = (gating: AnyGating, outcome: Outcome<Vault>): DialogAnswer => {
   return gating.gatingkind === 'del_vault' ? 'deleted' : 'unlocked'
 }
 
-/** The dialog's one answer to `gating`, calling `onDone` the first time only. */
+/** The dialog's one answer to `gating`: a `done` that calls `onDone` the first time only. */
 const useAnswerOnce = (gating: AnyGating, onDone: (answer: DialogAnswer) => void) => {
   const onDoneRef = useRef(onDone)
   useLayoutEffect(() => { onDoneRef.current = onDone })
@@ -137,7 +137,7 @@ type ModalFormProps = {
   submitWord: string
   /** What to say in the live region, or null for nothing. */
   gripe:      Gripe | null
-  /** The live region's id, for a field it describes: a confirmation's, from {@link useConfirmation}. */
+  /** The live region's id, from {@link useConfirmation}. */
   gripeId?:   string | undefined
   /** A quiet line under the live region: how long an unlock lasts. */
   footnote?:  string | undefined
@@ -172,7 +172,7 @@ export const ModalForm = ({ title, blurb, submitWord, gripe, gripeId, footnote, 
   )
 }
 
-/** Whether the focus is inside `container`, read in the document or shadow root it lives in. */
+/** True while the focus is inside `container`, shadow roots included. */
 export const holdsFocus = (container: HTMLElement | null): boolean => {
   if (container === null) { return false }
   const root = container.getRootNode()
@@ -187,7 +187,7 @@ const MinutesPerDay = 24 * MinutesPerHour
 
 type Unit = 'day' | 'hour' | 'minute'
 
-/** The lease as a count of whole days, else of whole hours, else of minutes (at least one). */
+/** `leaseMillis` as a count of whole days, else of whole hours, else of minutes (at least one). */
 const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
   const minutes = Math.max(1, Math.round(leaseMillis / MinuteMillis))
   if (minutes % MinutesPerDay === 0) { return { count: minutes / MinutesPerDay, unit: 'day' } }

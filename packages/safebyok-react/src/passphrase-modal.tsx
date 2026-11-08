@@ -19,7 +19,7 @@ export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
 export type PassphraseModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              PassphraseGating
-  /** Called once, with the dialog's answer: 'unlocked' once an attempt is ok, 'declined' otherwise. */
+  /** Called once with 'unlocked' when an attempt succeeds, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
@@ -55,7 +55,7 @@ const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername,
     if (creating) { void advice.hear(typed) }
   }
 
-  /** What the passkey button says, which stays as the user types, till the next submit or press. */
+  /** Show the passkey button's gripe until the next submit or press. */
   const passkeyGripe = (text: string | null) => {
     setGripe(text === null ? null : { text, fromPasskey: true })
     // A passkey button that took itself away took the focus with it: back to the passphrase.

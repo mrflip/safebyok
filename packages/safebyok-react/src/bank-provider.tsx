@@ -5,7 +5,7 @@ import { providerProps, type BankProviderProps, type Handlers, type HeldBankOpts
 
 // == [Provided]: Provided, BankContext, NoneHeld, useProvided
 
-/** What the provider hands down: the signed-in user's bank, and the vaults a hook has said hello to. */
+/** What the provider hands down: the signed-in user's bank, and the Vault objects a hook has called `tryHello` on. */
 export type Provided = { bank: Bank | null, helloedVaults: WeakSet<Vault> }
 
 const BankContext = createContext<Provided | null>(null)
@@ -23,15 +23,15 @@ export const useProvided = (hookname: string): Provided => {
 
 // == [Hooks]: hasUserGesture, changedKeys, useGatingDialog, useHeldBank
 
-/** Whether the user's gesture is still in hand, true where the browser does not say. */
+/** True while the user's gesture is still active, or in a browser that does not say. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** The fields of `now` and `was` whose values differ. */
+/** The fields whose values differ between `was` and `now`. */
 const changedKeys = (was: Record<string, unknown>, now: Record<string, unknown>): string[] => Object.keys({ ...was, ...now }).filter((ckey) => ! Object.is(was[ckey], now[ckey]))
 
-/** The provider's own dialog: the one gating it shows, how to ask the user by it, and how to end it. */
+/** The provider's own gating dialog: what it shows now, and how to open and close it. */
 const useGatingDialog = () => {
-  /** One showing of the dialog: which one, the gating it answers, and how it closes. */
+  /** One showing of the dialog: its round, the gating it answers, and how it closes. */
   type Showing = { round: number, gating: AnyGating, close: () => void }
 
   // The dialog showing now, if any. The ref is what the callbacks read, so that a dialog's answer
@@ -41,7 +41,7 @@ const useGatingDialog = () => {
   // Counts the dialog's showings, so that each is a fresh dialog with nothing kept from the last.
   const showingRounds = useRef(0)
 
-  /** Close `ending` if it is still the dialog showing, and resolve its ask. */
+  /** Close `ending` if it is still the dialog showing, and resolve the `ask` call that showed it. */
   const endShowing = useCallback((ending: Showing) => {
     if (showingRef.current === ending) {
       showingRef.current = null
@@ -55,7 +55,7 @@ const useGatingDialog = () => {
 
   // A bank opens one gating at a time, but the last one's dialog may not have answered yet: it is
   // ended here, so its ask resolves rather than waiting on a dialog that will never mount again.
-  /** Show the dialog for `gating`'s kind while the user's gesture is in hand; resolves as it closes. */
+  /** Show the dialog for `gating`, if the user's gesture is still active, and resolve once it closes. */
   const ask = useCallback((gating: AnyGating) => new Promise<void>((close) => {
     if (! hasUserGesture()) { close(); return }
     endAny()
@@ -68,7 +68,7 @@ const useGatingDialog = () => {
   return { showing, ask, endShowing, endAny }
 }
 
-/** The bank made from the first render's `opts`, held from mount to unmount, calling each handler as last rendered. */
+/** The bank made from the first render's `opts` and held until unmount. */
 const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void): Provided => {
   const [madeFrom] = useState(opts)
   const [held, setHeld] = useState<Provided>(NoneHeld)
@@ -130,14 +130,14 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
 
 // == [BankProvider]: BankProvider, UserBankProvider
 
-/** Hand the hooks the signed-in user's bank, made once per `applabel` and `user_id`, and no bank while nobody is signed in. */
+/** Hand the hooks a bank for each `applabel` and signed-in `user_id`, or none while nobody is signed in. */
 export const BankProvider = (props: BankProviderProps) => {
   const { applabel, user_id, children } = providerProps.parse(props, { where: 'BankProvider' })
   if (user_id === null) { return <BankContext.Provider value={NoneHeld}>{children}</BankContext.Provider> }
   return <UserBankProvider key={JSON.stringify([applabel, user_id])} {...props} user_id={user_id} />
 }
 
-/** Hold one signed-in user's bank from mount to unmount, with the dialog its gatings ask by. */
+/** Hold one signed-in user's bank from mount to unmount, and show the dialog for its gatings. */
 const UserBankProvider = (props: BankProviderProps & { user_id: string }) => {
   const dialog = useGatingDialog()
   const { passphraseUsername, passphraseAdvice, passkeyRpId, children, onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props

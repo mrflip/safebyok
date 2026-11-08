@@ -15,7 +15,7 @@ export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (
 export type ReplacePassphraseModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'replace_passphrase'>
-  /** Called once, with the dialog's answer: 'unlocked' once the passphrase is replaced, 'declined' otherwise. */
+  /** Called once with 'unlocked' when the passphrase is replaced, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined

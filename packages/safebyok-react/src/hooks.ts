@@ -83,7 +83,7 @@ export const useBoxSnapshot = (box: Box | null): BoxSnapshot | null => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, box?.getSnapshot ?? getNothing, getNothing)
 )
 
-/** Whether `box` shows its whisper, read live; false for no box. */
+/** True while `box` shows its whisper, and false where there is no box. */
 export const useBoxIsShowing = (box: Box | null): boolean => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.isShowing ?? false, () => false)
 )

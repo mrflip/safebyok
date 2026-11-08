@@ -28,7 +28,7 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   const { val: rows, trouble, relist } = useListing<readonly Record<string, unknown>[]>(list)
   const { lastCall, call } = useLastCall()
 
-  /** Runs a button's verb, then lists the rows again. */
+  /** Run a button's verb, then list the rows again. */
   const callThenRelist = async (verbname: string, work: () => Promise<string>) => {
     await call(verbname, work)
     relist()

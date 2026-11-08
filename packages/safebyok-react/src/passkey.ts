@@ -167,7 +167,7 @@ const credentialBytesOf = (credential_id: string): Uint8Array<ArrayBuffer> => {
   }
 }
 
-/** A PasskeyAnswer of the credential `credential_id`, answering `answer` over `saltBytes`. */
+/** The PasskeyAnswer of credential `credential_id`: the PRF `answer` it gave over `saltBytes`. */
 const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
   credential_id,
   prf_salt_b64: toB64(saltBytes),

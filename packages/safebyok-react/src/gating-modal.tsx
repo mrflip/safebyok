@@ -11,7 +11,7 @@ import { RevokePasskeyModal } from './revoke-passkey-modal'
 export type GatingModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              AnyGating
-  /** Called once, with the dialog's answer: 'unlocked' or 'deleted' once an attempt is ok, 'declined' otherwise. */
+  /** Called once with 'unlocked' or 'deleted' when an attempt succeeds, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
